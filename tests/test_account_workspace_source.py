@@ -106,3 +106,75 @@ def test_source_rejects_a_different_world_database_without_exposing_urls(monkeyp
     with pytest.raises(AccountWorkspaceUnavailable, match="same database/schema") as failure:
         source.verify()
     assert "secret" not in str(failure.value)
+
+
+def test_a_paced_source_names_the_workspaces_there_each_pass_and_every_one_now_and_then():
+    """Every pass reads who is there; every SLOW_SCAN_SECONDS, everyone; a guest who is not there
+    costs a pass nothing between scans."""
+    from exulanica.db.account_workspaces import SLOW_SCAN_SECONDS, PacedWorkspaces
+
+    there, everyone = (
+        frozenset({uuid.UUID(int=1)}),
+        frozenset({uuid.UUID(int=n) for n in (1, 2, 3)}),
+    )
+    asked: list[str] = []
+
+    class Source:
+        def recent(self, guest_seconds):
+            asked.append(f"recent {guest_seconds}")
+            return there
+
+        def __call__(self):
+            asked.append("every")
+            return everyone
+
+    now = [1_000.0]
+    paced = PacedWorkspaces(Source(), guest_seconds=900, clock=lambda: now[0])  # type: ignore[arg-type]
+    assert paced() == everyone
+    assert paced() == there
+    now[0] += SLOW_SCAN_SECONDS - 1
+    assert paced() == there
+    now[0] += 1
+    assert paced() == everyone
+    assert asked == ["recent 900", "every", "recent 900", "recent 900", "recent 900", "every"]
+
+
+def test_a_paced_source_takes_the_play_window_from_the_environment(monkeypatch):
+    from exulanica.db import account_workspaces
+
+    class Source:
+        def __init__(self, account_url, application_url):
+            pass
+
+        def verify(self):
+            return self
+
+    monkeypatch.setattr(account_workspaces, "AccountWorkspaceSource", Source)
+    assert account_workspaces.paced_account_source(None, "app", {}) is None
+    paced = account_workspaces.paced_account_source("account", "app", {})
+    assert paced is not None and paced.guest_seconds == 900
+    window = {account_workspaces.GUEST_PLAY_SECONDS_ENV: "600"}
+    assert account_workspaces.paced_account_source("account", "app", window).guest_seconds == 600
+    with pytest.raises(ValueError):
+        account_workspaces.paced_account_source(
+            "account", "app", {account_workspaces.GUEST_PLAY_SECONDS_ENV: "30"}
+        )
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "exulanica/ingest/generated_tiles_command.py",
+        "exulanica/ingest/worker_command.py",
+        "exulanica/world/asset_preparation_command.py",
+        "exulanica/world/material_bake_command.py",
+    ],
+)
+def test_every_worker_command_reads_its_account_workspaces_paced(command):
+    """A worker that drained every account workspace each pass would cost every admitted guest a
+    session per pass for good; each builds its source with paced_account_source."""
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parents[1] / command).read_text(encoding="utf-8")
+    assert "paced_account_source(" in text
+    assert "AccountWorkspaceSource(" not in text

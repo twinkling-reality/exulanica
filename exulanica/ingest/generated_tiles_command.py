@@ -38,7 +38,7 @@ from typing import Any, Final
 import psycopg
 from psycopg.rows import dict_row
 
-from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV, AccountWorkspaceSource
+from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV, paced_account_source
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
 from exulanica.db.session import Database
@@ -145,7 +145,11 @@ def main(
         if narrow is not None:
             _emit(output, "publisher_not_narrow", message=narrow)
         account_url = environment.get(ACCOUNT_DATABASE_URL_ENV)
-        source = AccountWorkspaceSource(account_url, database.url).verify() if account_url else None
+        # The workspaces whose people are there every pass, every account's once in a while: a
+        # pass costs nothing for a guest who is not there.
+        source = (
+            paced_account_source(account_url, database.url, environment) if account_url else None
+        )
         workspaces = _workspaces(args.workspace, environment)
         if not workspaces and source is None:
             raise ValueError(

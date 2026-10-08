@@ -16,7 +16,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Final
 
@@ -315,9 +315,12 @@ def admission_refusal(
 @dataclass(frozen=True, slots=True)
 class SpendingRefusals:
     """What admission would answer a workspace's next attempt, by provider: its refusal
-    (:func:`admission_refusal`), or None while that provider's allowance remains."""
+    (:func:`admission_refusal`), or None while that provider's allowance remains; and, where read,
+    each provider's remaining USD (``available_usd``), against which a caller can tell that no
+    attempt's reservation fits before asking."""
 
     by_provider: Mapping[str, SpendingRefused | None]
+    available_usd: Mapping[str, Decimal] = field(default_factory=dict)
 
     def first(self, providers: Iterable[str]) -> SpendingRefused | None:
         """The refusal of the first of ``providers`` whose allowance is spent, or None."""
@@ -340,9 +343,11 @@ def read_spending_refusals(
     """:func:`admission_refusal` for every provider the manifest names, read on ``connection``,
     scoped to the workspace, from its grants alone: admission compares what is committed with
     each ceiling, so what its reservations hold is not read."""
+    entries = _entries(connection, workspace_id, None, None, held=False)
     return SpendingRefusals(
         {
             entry["provider"]: admission_refusal(entry, witness_configured=witness_configured)
-            for entry in _entries(connection, workspace_id, None, None, held=False)
-        }
+            for entry in entries
+        },
+        {entry["provider"]: Decimal(entry["available_usd"]) for entry in entries},
     )

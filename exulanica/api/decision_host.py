@@ -863,10 +863,14 @@ class DecisionHost:
             if not asking_roles and not outside_roles:
                 return False
             planned = []
-            spent = self._spent_providers(connection, claim.workspace_id) if asking_roles else ()
+            spent, available = (
+                self._spent_providers(connection, claim.workspace_id)
+                if asking_roles
+                else (frozenset(), {})
+            )
             for role, contract, chosen in asking_roles:
                 assert client is not None
-                due = self._due(role, contract, chosen, row["state"], client, spent)
+                due = self._due(role, contract, chosen, row["state"], client, spent, available)
                 if due:
                     planned.append((role, contract, lease_ends, due))
             outside_planned = []
@@ -1152,9 +1156,13 @@ class DecisionHost:
         state: Mapping[str, Any],
         client: ModelClient,
         spent: Collection[str] = (),
+        available: Mapping[str, Decimal] | None = None,
     ) -> list[tuple[str, Mapping[str, Any], ModelSpec, AnsweringMechanism]]:
         """Each chosen subject of ``role`` at a choice point whose model this host may ask, and
-        whose provider's allowance (``spent``, the providers admission would refuse) remains."""
+        whose provider's allowance (``spent``, the providers admission would refuse) remains and
+        holds at least the smallest reservation one attempt of that model takes: its answer bound
+        at its prices with no prompt (``available``, each provider's remaining USD). An ask whose
+        prompt makes its reservation larger than the remainder is still made, and refused."""
         present = set(role.adapter.subjects(state))
         due = []
         for subject, choice in sorted(chosen.items()):
@@ -1168,28 +1176,39 @@ class DecisionHost:
                 or model_refusal(role, client, self.manifest, contract, choice["model"]) is not None
             ):
                 continue
+            spec = askable[0]
+            remainder = (available or {}).get(spec.provider)
+            if remainder is not None and remainder < client.budget.estimate_usd(
+                spec, max_tokens=answer_tokens(spec) or 0
+            ):
+                continue
             due.append((subject, choice, *askable))
         return due
 
     def _spent_providers(
         self, connection: psycopg.Connection, workspace: uuid.UUID
-    ) -> frozenset[str]:
-        """The providers the durable authority would refuse the workspace's next attempt of, read
-        once for the claim; none where nothing reads it or the read fails (admission still
-        refuses each attempt, as before)."""
+    ) -> tuple[frozenset[str], Mapping[str, Decimal]]:
+        """The providers the durable authority would refuse the workspace's next attempt of, and
+        each provider's remaining USD, read once for the claim; none where nothing reads it or the
+        read fails (admission still refuses each attempt, as before)."""
         if self.spending_refusals is None:
-            return frozenset()
+            return frozenset(), {}
         try:
             with connection.transaction():
                 refusals = self.spending_refusals(connection, workspace)
         except Exception as exc:
             # Never the exception's text, which may carry a connection string.
             _LOG.warning("the spending state could not be read: %s", type(exc).__qualname__)
-            return frozenset()
+            return frozenset(), {}
         if refusals is None:
-            return frozenset()
-        return frozenset(
-            provider for provider, refused in refusals.by_provider.items() if refused is not None
+            return frozenset(), {}
+        return (
+            frozenset(
+                provider
+                for provider, refused in refusals.by_provider.items()
+                if refused is not None
+            ),
+            refusals.available_usd,
         )
 
     @staticmethod

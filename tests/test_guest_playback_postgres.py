@@ -2,10 +2,13 @@
 
 Account discovery tells the host which workspaces it plays and asks models for
 (:func:`~exulanica.db.account_workspaces.watched_workspaces`): every active owner's, and a guest's
-while one of its sessions was used within the play window, the most recently seen first, at most
-the playing maximum; the others there wait. Each test names a way that could be wrong: a visitor
-who left still played (and still spending), a visitor who logged out still played, an owner's
-world dropped, or the maximum filled by the visitors who left first rather than the ones there now.
+while one of its sessions was used within the play window, at most the playing maximum: a playing
+town keeps its place, and with no history a freed place goes to the visitor who entered first;
+the others there wait (the history and the play window's tenure are
+:func:`~exulanica.db.account_workspaces.allot_places`'s, tested without a database). Each test
+names a way that could be wrong: a visitor who left still played (and still spending), a visitor
+who logged out or was disabled still played, an owner's world dropped, a playing town losing its
+place to a newcomer, or a visitor told it waits on a host that plays no guest's town.
 
 The expected answers come from the timeline each test makes (who entered when, who logged out),
 never from the query under test.
@@ -106,7 +109,7 @@ def _logout(account_role, *tokens: str) -> None:
             AccountRepository(connection).logout(token)
 
 
-def test_a_playing_town_keeps_its_place_and_a_freed_place_goes_to_the_longest_waiting(
+def test_a_playing_town_keeps_its_place_and_a_freed_place_goes_to_the_first_to_enter(
     account_role,
 ):
     """Its own three visitors are seen a day ahead and read through a one-second window, so
@@ -128,7 +131,7 @@ def test_a_playing_town_keeps_its_place_and_a_freed_place_goes_to_the_longest_wa
         # The second was playing: it keeps its place.
         read = watched(1, frozenset({second}))
         assert second in read and {first, third} <= read.waiting
-        # It leaves: its place goes to the one waiting longest, the first.
+        # It leaves: with no history kept here, its place goes to the one who entered first.
         _logout(account_role, second_token)
         read = watched(1, frozenset({second}))
         assert first in read and third in read.waiting and second not in read.waiting
@@ -166,3 +169,50 @@ def test_a_visitor_whose_account_was_disabled_is_neither_played_nor_waiting(acco
         AccountRepository(connection).disable_account(row["owner_user_id"])
     watched = _watched(account_role, seconds=3_600, at_most=1_000)
     assert disabled not in watched and disabled not in watched.waiting
+
+
+@pytest.mark.parametrize(
+    "ended",
+    [
+        # Each guard of the guest query on its own, set directly with the immutability triggers
+        # off for the one statement, as no product path sets one without the others.
+        "update account_browser_session set expires_at = created_at + interval '1 millisecond' "
+        "where workspace_id = %(w)s",
+        "update account_user set disabled_at = now() where user_id = "
+        "(select owner_user_id from account_workspace where workspace_id = %(w)s)",
+        "update account_workspace set disabled_at = now() where workspace_id = %(w)s",
+        "update account_membership set revoked_at = now() where workspace_id = %(w)s",
+    ],
+    ids=["session-expired", "user-disabled", "workspace-disabled", "membership-revoked"],
+)
+def test_each_ended_authority_stops_a_guest_being_played(account_role, spine_schema, ended):
+    from tests_support_api import scratch_database
+
+    workspace, token = _guest(account_role)
+    _seen_ahead(account_role, workspace)
+    assert workspace in _watched(account_role, seconds=3_600, at_most=1_000)
+    _psycopg, scratch = spine_schema
+    with scratch_database(scratch).unscoped() as admin, admin.transaction():
+        admin.execute("set local session_replication_role = replica")
+        admin.execute(ended, {"w": workspace})
+    watched = _watched(account_role, seconds=3_600, at_most=1_000)
+    assert workspace not in watched and workspace not in watched.waiting
+    _logout(account_role, token)
+
+
+def test_a_workers_recent_read_names_the_owners_and_every_guest_there_and_no_other(account_role):
+    """What a background worker drains each pass: every active owner's workspace and every guest
+    seen within the window, with no playing maximum, and not a guest who left."""
+    from exulanica.db.account_workspaces import AccountWorkspaceSource
+
+    owner = _owner(account_role)
+    left, left_token = _guest(account_role)
+    time.sleep(2)
+    entered = [_guest(account_role) for _ in range(3)]
+    for workspace, _ in entered:
+        _seen_ahead(account_role, workspace)
+    recent = AccountWorkspaceSource(account_role, "not used by this read").recent(1)
+    assert owner in recent
+    assert {workspace for workspace, _ in entered} <= recent
+    assert left not in recent
+    _logout(account_role, left_token, *(token for _, token in entered))

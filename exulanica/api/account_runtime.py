@@ -25,7 +25,7 @@ import secrets
 import threading
 import time
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
@@ -174,8 +174,9 @@ class GuestEntryConfig:
     #: (``EXULANICA_GUEST_PLAY_SECONDS``): a session's ``seen_at`` moves at most once a minute.
     play_seconds: int = GUEST_PLAY_SECONDS_DEFAULT
     #: How many guests' towns play at once (``EXULANICA_GUEST_PLAYING_MAXIMUM``): a playing town
-    #: keeps its place while its visitor is there, and a freed place goes to the visitor waiting
-    #: longest; 0 plays none of them.
+    #: keeps its place while its visitor is there, for ``play_seconds`` at most while another
+    #: waits, and a freed place goes to the visitor waiting longest (the one who entered first,
+    #: before any history); 0 plays none of them.
     playing_maximum: int = GUEST_PLAYING_MAXIMUM_DEFAULT
 
     def __post_init__(self) -> None:
@@ -391,13 +392,16 @@ class GoogleOIDCProvider:
 
 
 class _GuestPlaces:
-    """The guests' workspaces this process played at its last read, so a playing town keeps its
-    place from one read to the next (:func:`~exulanica.db.account_workspaces.watched_workspaces`).
+    """The guests' workspaces this process played at its last read, and when each got its place
+    or began waiting, so a playing town keeps its place from one read to the next, for the play
+    window at most while another waits (:func:`~exulanica.db.account_workspaces.allot_places`).
     Every reader in the process (the playback rounds, the routes' refusals) shares it."""
 
-    def __init__(self) -> None:
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
         self.lock = threading.Lock()
+        self.clock = clock
         self.playing: frozenset[uuid.UUID] = frozenset()
+        self.since: dict[uuid.UUID, float] = {}
 
 
 @dataclass(frozen=True)
@@ -489,9 +493,13 @@ class AccountRuntime:
                 guest_seconds=guest.play_seconds if guest else GUEST_PLAY_SECONDS_DEFAULT,
                 guests_at_most=guest.playing_maximum if guest else 0,
                 playing=places.playing,
+                since=places.since,
+                now=places.clock(),
+                tenure_seconds=guest.play_seconds if guest else None,
             )
             # Owners are in the set too; keeping them is harmless, since only guests are ranked.
             places.playing = frozenset(watched)
+            places.since = dict(getattr(watched, "since", {}))
             return watched
 
     def start(self, return_uri: str | None = None) -> tuple[str, str]:

@@ -486,16 +486,15 @@ def test_the_account_runtime_hands_each_read_the_guests_it_played_last():
 
     runtime = AccountRuntime(None, "postgresql://unused.invalid/db", None, _guest())
     asked: list[frozenset[uuid.UUID]] = []
-    answers = iter(
-        [
-            WatchedWorkspaces(frozenset({WATCHED}), frozenset({WAITING})),
-            WatchedWorkspaces(frozenset({WAITING}), frozenset()),
-        ]
-    )
+    histories: list[dict] = []
+    first = WatchedWorkspaces(frozenset({WATCHED}), frozenset({WAITING}))
+    first.since = {WATCHED: 5.0, WAITING: 6.0}
+    answers = iter([first, WatchedWorkspaces(frozenset({WAITING}), frozenset())])
 
     class _Repository:
-        def watched_workspaces(self, *, guest_seconds, guests_at_most, playing):
+        def watched_workspaces(self, *, guest_seconds, guests_at_most, playing, **history):
             asked.append(playing)
+            histories.append(history)
             return next(answers)
 
     @contextlib.contextmanager
@@ -506,6 +505,9 @@ def test_the_account_runtime_hands_each_read_the_guests_it_played_last():
     runtime.watched_workspaces()
     runtime.watched_workspaces()
     assert asked == [frozenset(), frozenset({WATCHED})]
+    # The history and the play window's tenure go with each read.
+    assert [history["since"] for history in histories] == [{}, {WATCHED: 5.0, WAITING: 6.0}]
+    assert {history["tenure_seconds"] for history in histories} == {_guest().play_seconds}
 
 
 def test_a_playback_process_says_which_town_waits_and_which_is_not_played():
@@ -527,3 +529,95 @@ def test_a_playback_process_says_which_town_waits_and_which_is_not_played():
     assert process.refusal(ELSEWHERE) == "workspace_not_played"
     process._read = (clock.now, False, frozenset({LISTED, WATCHED}), frozenset({WAITING}))
     assert process.refusal(WATCHED) == "playback_worker_stopped"
+
+
+def test_a_read_that_took_its_whole_timeout_is_not_tried_again_at_once():
+    """The time of the last try is taken when the read ends, so the caller after a slow failure
+    does not start another slow read straight away."""
+    clock, tries = _Clock(), []
+    read = WatchedRead(clock=clock)
+
+    def slow_failure() -> frozenset[uuid.UUID]:
+        tries.append(clock.now)
+        clock.now += WATCHED_READ_SECONDS  # the account database's own timeout
+        raise AccountUnavailable("the account database did not answer in time")
+
+    assert read.get(slow_failure) == frozenset()
+    clock.now += 1.0
+    assert read.get(slow_failure) == frozenset()
+    assert len(tries) == 1
+
+
+# -- places --------------------------------------------------------------------------------------
+
+A, B, C = (uuid.UUID(int=n) for n in (11, 12, 13))
+
+
+def _allot(there, *, at_most, playing=(), since=None, now=1_000.0, tenure=900.0):
+    from exulanica.db.account_workspaces import allot_places
+
+    return allot_places(
+        list(there),
+        at_most=at_most,
+        playing=frozenset(playing),
+        since=dict(since or {}),
+        now=now,
+        tenure_seconds=tenure,
+    )
+
+
+def test_a_kept_place_is_given_up_after_the_play_window_while_another_waits():
+    # A has played since 100; at 1,000 it has held its place 900 s and B waits: B plays, and A
+    # joins the back of the queue from now.
+    places = _allot([A, B], at_most=1, playing={A}, since={A: 100.0, B: 500.0})
+    assert (places.playing, places.waiting) == ((B,), (A,))
+    assert places.since[A] == 1_000.0 and places.since[B] == 1_000.0
+    # Nobody waits: A keeps its place however long it has held it.
+    places = _allot([A], at_most=1, playing={A}, since={A: 100.0})
+    assert (places.playing, places.waiting) == ((A,), ())
+    # Within the window it keeps it although B waits.
+    places = _allot([A, B], at_most=1, playing={A}, since={A: 500.0, B: 600.0})
+    assert (places.playing, places.waiting) == ((A,), (B,))
+
+
+def test_a_freed_place_goes_to_the_one_waiting_longest_and_a_newcomer_waits_behind():
+    # A entered first but began waiting after C; C has waited longest. B is new this read.
+    places = _allot([A, B, C], at_most=1, since={A: 300.0, C: 200.0})
+    assert places.playing == (C,) and places.waiting == (A, B)
+    # With no history at all, entry order decides.
+    assert _allot([A, B, C], at_most=1).playing == (A,)
+    # No place: nothing plays and none waits.
+    places = _allot([A, B], at_most=0, playing={A})
+    assert (places.playing, places.waiting) == ((), ())
+
+
+def test_with_no_guest_entry_no_guest_town_plays_and_none_waits():
+    """An installation with Google sign-in and no guest entry plays no guest's town, whatever
+    guest memberships remain: no place and no tenure is asked for."""
+    import contextlib
+
+    from exulanica.api.account_runtime import AccountRuntime
+
+    runtime = AccountRuntime(None, "postgresql://unused.invalid/db", None, _guest())
+    object.__setattr__(runtime, "guest", None)
+    asked: list[dict] = []
+
+    class _Repository:
+        def watched_workspaces(self, **figures):
+            asked.append(figures)
+            return WatchedWorkspaces(frozenset({WATCHED}), frozenset())
+
+    @contextlib.contextmanager
+    def repository():
+        yield _Repository()
+
+    object.__setattr__(runtime, "repository", repository)
+    runtime.watched_workspaces()
+    ((figures,),) = [asked]
+    assert figures["guests_at_most"] == 0 and figures["tenure_seconds"] is None
+
+
+def test_services_hand_the_playback_worker_its_number_of_workers():
+    assert _services(society_runtime=object()).build_society_control_worker().workers == 1
+    built = _services(society_runtime=object(), society_playback_workers=3)
+    assert built.build_society_control_worker().workers == 3

@@ -26,7 +26,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Final
 
-from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV, AccountWorkspaceSource
+from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV, paced_account_source
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
 from exulanica.db.session import Database
@@ -68,7 +68,8 @@ def _build(args: argparse.Namespace, environ: Mapping[str, str]) -> MaterialBake
     with database.unscoped() as connection:
         assert_runtime_role(connection)
     account_url = environ.get(ACCOUNT_DATABASE_URL_ENV)
-    source = AccountWorkspaceSource(account_url, database.url).verify() if account_url else None
+    # The workspaces whose people are there every pass, every account's once in a while.
+    source = paced_account_source(account_url, database.url, environ) if account_url else None
     workspaces = _workspaces(args.workspace, environ)
     if not workspaces and source is None:
         raise ValueError(

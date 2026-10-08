@@ -51,6 +51,7 @@ from exulanica.api.comparison_spending import bound_room_refusal
 from exulanica.api.composer_rights import photograph_text_right
 from exulanica.api.decision_host import (
     DecisionHost,
+    answer_tokens,
     host_refusal,
     model_refusal,
     question_refusal,
@@ -138,6 +139,7 @@ if TYPE_CHECKING:
 __all__ = [
     "DATA_DIR_ENV",
     "DERIVATIVE_WORKER_ENV",
+    "PLAYBACK_WORKERS_ENV",
     "PLAYBACK_WORKER_ENV",
     "READONLY_DATABASE_URL_ENV",
     "SOCIETY_AUTHORED_WORLDS_ENV",
@@ -177,6 +179,11 @@ SOCIETY_CONTROL_WORKSPACES_ENV: Final = env_name("SOCIETY_CONTROL_WORKSPACES")
 #: minute at a time when somebody advances it.
 PLAYBACK_WORKER_ENV: Final = env_name("PLAYBACK_WORKER")
 
+#: How many workspaces' claims one playback round runs at once, 1 to 8. Absent means 1: each claim
+#: in turn, the behaviour before the setting existed. More lets one workspace's model answers be
+#: awaited while another's are; asks stay bounded by the process's model slots either way.
+PLAYBACK_WORKERS_ENV: Final = env_name("PLAYBACK_WORKERS")
+
 #: Who plays the comparisons started from the application, for the workspaces this host asks models
 #: for. Absent (or an explicit on), this process, in a thread. ``process``, a process of its own
 #: (``python -m exulanica.orchestration.comparison_worker``), and this one only serves starts.
@@ -206,6 +213,7 @@ SOCIETY_SETTING_REFUSALS: Final = {
     "society_tick_interval_not_integer": "must be a whole number of milliseconds",
     "comparison_worker_not_recognised": "must be absent, on, process or off",
     "playback_worker_not_recognised": "must be absent, on, process or off",
+    "playback_workers_out_of_bounds": "must be absent or a whole number from 1 to 8",
     "society_tick_interval_out_of_bounds": (
         f"must be {BASE_TICK_INTERVAL_MIN_MS} to {BASE_TICK_INTERVAL_MAX_MS} milliseconds and "
         f"divisible by {BASE_TICK_INTERVAL_DIVISOR}, so every speed divides it exactly"
@@ -267,13 +275,15 @@ class WatchedRead:
         with self._lock:
             now = self._clock()
             if self._asked is None or now - self._asked >= WATCHED_READ_SECONDS:
-                self._asked = now
                 try:
                     self._good = (now, read())
                 except Exception as exc:
                     _LOG.warning(
                         "the watched workspaces could not be read: %s", type(exc).__qualname__
                     )
+                # Stamped once the read has ended, so a read that took its whole timeout is not
+                # tried again at once by the caller after it.
+                self._asked = now = self._clock()
             if self._good is None or now - self._good[0] >= WATCHED_STALE_SECONDS:
                 return frozenset()
             return self._good[1]
@@ -338,6 +348,8 @@ class Services:
     runs_society_control_worker: bool = False
     #: ``build_services`` reads it from ``EXULANICA_SOCIETY_TICK_INTERVAL_MS``.
     society_base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS
+    #: How many workspaces' claims a playback round runs at once (:data:`PLAYBACK_WORKERS_ENV`).
+    society_playback_workers: int = 1
     #: Who plays the societies this host plays (:data:`PLAYBACK_WORKER_ENV`): ``here``, this
     #: process; ``process``, the playback worker's process; ``none``, nobody. ``here`` for a
     #: hand-built Services, as before the setting existed; ``build_services`` reads the setting.
@@ -752,6 +764,21 @@ class Services:
             return PROVIDER_CREDENTIAL_ABSENT
         return self.model_client.refusals.get(provider)
 
+    def smallest_ask_usd(self) -> dict[str, Decimal]:
+        """By provider, the smallest reservation one attempt of any model a person may be given
+        takes: its answer bound at its prices with no prompt. A remainder below it admits no ask
+        of that provider's models; empty with no model client."""
+        client = self.model_client
+        if client is None:
+            return {}
+        floors: dict[str, Decimal] = {}
+        for spec in load_manifest().models.values():
+            if not (spec.is_chat and spec.answering):
+                continue
+            usd = client.budget.estimate_usd(spec, max_tokens=answer_tokens(spec) or 0)
+            floors[spec.provider] = min(usd, floors.get(spec.provider, usd))
+        return floors
+
     def spending_refusals(
         self, connection: psycopg.Connection, workspace_id: uuid.UUID
     ) -> SpendingRefusals | None:
@@ -850,6 +877,7 @@ class Services:
             ),
             base_tick_interval_ms=self.society_base_tick_interval_ms,
             before_minute=(None if (host := self.decision_host()) is None else host.before_minute),
+            workers=self.society_playback_workers,
         )
 
     def playback_configuration_sha256(self) -> str:
@@ -1158,6 +1186,7 @@ def build_services(
         society_base_tick_interval_ms=_society_tick_interval_ms(
             env_get("SOCIETY_TICK_INTERVAL_MS", environ)
         ),
+        society_playback_workers=_playback_workers(env_get("PLAYBACK_WORKERS", environ)),
         playback_player=playback_player,
         societies_of_things=_explicitly_enabled(
             env_get("SOCIETY_OF_THINGS", environ),
@@ -1380,6 +1409,17 @@ def _society_control_workspaces(value: str | None) -> tuple[uuid.UUID, ...]:
             "society_control_workspaces_duplicate", SOCIETY_CONTROL_WORKSPACES_ENV
         )
     return tuple(workspaces)
+
+
+def _playback_workers(value: str | None) -> int:
+    """How many workspaces' claims a playback round runs at once (:data:`PLAYBACK_WORKERS_ENV`),
+    1 when absent, or a named refusal of anything but a whole number from 1 to 8."""
+    if value is None or not value.strip():
+        return 1
+    text = value.strip()
+    if not text.isascii() or not text.isdigit() or not 1 <= int(text) <= 8:
+        raise SocietySettingRefused("playback_workers_out_of_bounds", PLAYBACK_WORKERS_ENV)
+    return int(text)
 
 
 def _society_tick_interval_ms(value: str | None) -> int:

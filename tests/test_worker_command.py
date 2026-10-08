@@ -173,7 +173,9 @@ def test_account_role_discovery_can_be_the_dedicated_workers_only_scope(monkeypa
     monkeypatch.setattr(worker_command, "Database", Database)
     monkeypatch.setattr(worker_command, "verify_schema", lambda _database: None)
     monkeypatch.setattr(worker_command, "assert_runtime_role", lambda _connection: None)
-    monkeypatch.setattr(worker_command, "AccountWorkspaceSource", Source)
+    from exulanica.db import account_workspaces
+
+    monkeypatch.setattr(account_workspaces, "AccountWorkspaceSource", Source)
 
     class Worker:
         def __init__(self, *args, **kwargs):
@@ -199,7 +201,10 @@ def test_account_role_discovery_can_be_the_dedicated_workers_only_scope(monkeypa
         (None, None, "verified"),
     ]
     assert built["args"][2] == frozenset()
-    assert isinstance(built["kwargs"]["workspace_source"], Source)
+    # Paced: the workspaces whose people are there each pass, every account's once in a while.
+    paced = built["kwargs"]["workspace_source"]
+    assert isinstance(paced, account_workspaces.PacedWorkspaces)
+    assert isinstance(paced.source, Source)
     assert built["refreshed"] is True
 
 

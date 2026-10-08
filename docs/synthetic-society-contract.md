@@ -1080,7 +1080,9 @@ The authenticated base route is `/world/versions/{version_id}/society/control`:
   `control` inside a step answer carry it too. `model_minds_code` is `spending_cap_reached` when
   the workspace's allowance for open models is used up (its own grant, or the authority every guest
   shares): the durable spending authority would refuse the next attempt of every provider the
-  workspace holds an allowance for, or the society's latest decision receipt was refused
+  workspace holds an allowance for, or its remaining USD is below the smallest reservation any of
+  that provider's offered models takes (so no ask of them is made), or the society's latest
+  decision receipt was refused
   `spending_limit_reached` (admission refuses once the remainder fits no attempt's reservation,
   which the spending state cannot foresee); null otherwise, and null when the spending state cannot
   be read, which leaves the rest of the read as it is; `model_minds_reason` is its sentence

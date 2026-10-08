@@ -190,6 +190,8 @@ services:
       # The command refuses startup when both sources are absent.
       EXULANICA_WORKSPACE_IDS: ${EXULANICA_WORKSPACE_IDS:-}
       EXULANICA_ACCOUNT_DATABASE_URL: ${EXULANICA_ACCOUNT_DATABASE_URL:-}
+      # Who counts as there, drained each pass: the API's play window (empty: 900 s).
+      EXULANICA_GUEST_PLAY_SECONDS: ${EXULANICA_GUEST_PLAY_SECONDS:-}
       EXULANICA_DATA_DIR: /var/lib/exulanica
       # The checkpoint is the one models.manifest.json pins as local_roles.depth.
       EXULANICA_DEPTH_MODEL: moge
@@ -257,6 +259,8 @@ services:
       # the command refuses startup when both are absent.
       EXULANICA_WORKSPACE_IDS: ${EXULANICA_WORKSPACE_IDS:-}
       EXULANICA_ACCOUNT_DATABASE_URL: ${EXULANICA_ACCOUNT_DATABASE_URL:-}
+      # Who counts as there, drained each pass: the API's play window (empty: 900 s).
+      EXULANICA_GUEST_PLAY_SECONDS: ${EXULANICA_GUEST_PLAY_SECONDS:-}
       EXULANICA_DATA_DIR: /var/lib/exulanica
       EXULANICA_INSTALLATION_PROFILE: /app/deploy/profiles/${EXULANICA_PROFILE:-single-host-server-only}.json
     volumes:
@@ -291,6 +295,8 @@ services:
       # As the derivative worker: static workspaces, the verified account-role source, or both.
       EXULANICA_WORKSPACE_IDS: ${EXULANICA_WORKSPACE_IDS:-}
       EXULANICA_ACCOUNT_DATABASE_URL: ${EXULANICA_ACCOUNT_DATABASE_URL:-}
+      # Who counts as there, drained each pass: the API's play window (empty: 900 s).
+      EXULANICA_GUEST_PLAY_SECONDS: ${EXULANICA_GUEST_PLAY_SECONDS:-}
       EXULANICA_DATA_DIR: /var/lib/exulanica
       EXULANICA_INSTALLATION_PROFILE: /app/deploy/profiles/${EXULANICA_PROFILE:-single-host-server-only}.json
     volumes:

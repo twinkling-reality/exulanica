@@ -20,7 +20,7 @@ from typing import Any, Final
 from exulanica.consent.place_name_rights import released_place_names
 from exulanica.db.account_workspaces import (
     ACCOUNT_DATABASE_URL_ENV,
-    AccountWorkspaceSource,
+    paced_account_source,
 )
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
@@ -130,8 +130,9 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
     with database.unscoped() as connection:
         assert_runtime_role(connection)
     account_url = environ.get(ACCOUNT_DATABASE_URL_ENV)
+    # The workspaces whose people are there every pass, every account's once in a while.
     workspace_source = (
-        AccountWorkspaceSource(account_url, database.url).verify() if account_url else None
+        paced_account_source(account_url, database.url, environ) if account_url else None
     )
 
     client = worker_model_client(environ, database)

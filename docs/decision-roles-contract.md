@@ -555,10 +555,11 @@ refusal there is recorded on the receipt by its own reason (`spending_not_grante
 `spending_revoked`, `spending_expired`, `spending_limit_reached`, `spending_suspended`,
 `spending_unavailable` or `spending_scope_missing`), and ends a comparison run by that reason.
 The host reads once a claim what the authority would answer the workspace's next attempt, by
-provider; a subject whose model's provider would be refused is not reserved for and decides by its
-routine, so a spent allowance writes no receipt and takes no admission lock. A refusal the spending
-state cannot foresee (a remainder that fits no attempt's reservation) is still asked, refused at
-admission and recorded as above.
+provider, with each provider's remaining USD; a subject whose model's provider would be refused, or
+whose remaining USD is below the smallest reservation one ask of the chosen model takes (its answer
+bound at its prices with no prompt), is not reserved for and decides by its routine, so a spent
+allowance writes no receipt and takes no admission lock. A remainder above that floor but below
+what the ask's prompt adds is still asked, refused at admission and recorded as above.
 
 The host decides on what the process has spent, whoever spent it, never on what calls under way
 hold. Once what is left, beside the part kept for other work, fits no ask, it asks nobody, and the

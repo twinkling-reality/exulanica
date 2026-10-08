@@ -135,8 +135,9 @@ def model_minds_code(
     Said when either holds:
 
     *   the durable authority would refuse the next attempt of every provider the workspace
-        holds an allowance for (each refusal ``spending_limit_reached``; a provider never
-        granted is not the workspace's allowance); or
+        holds an allowance for (each refusal ``spending_limit_reached``, or a remainder below the
+        smallest reservation any of that provider's models takes, so that the host asks none of
+        them; a provider never granted is not the workspace's allowance); or
     *   the society's latest receipt was refused ``spending_limit_reached``: admission refuses
         once the remainder is below one attempt's reservation, which the spending state cannot
         foresee, so a USD allowance usually ends this way, before its calls do.
@@ -165,13 +166,23 @@ def model_minds_code(
         # Never the exception's text, which may carry a connection string.
         _LOG.warning("the spending state could not be read: %s", type(exc).__qualname__)
         return None
-    granted = [
-        refused
-        for refused in refusals.by_provider.values()
+    smallest = getattr(services, "smallest_ask_usd", None)
+    floors = smallest() if smallest is not None else {}
+
+    def spent(provider: str, refused: Any) -> bool:
+        if refused is not None:
+            return refused.reason == "spending_limit_reached"
+        remainder = refusals.available_usd.get(provider)
+        floor = floors.get(provider)
+        return remainder is not None and floor is not None and remainder < floor
+
+    granted_providers = [
+        (provider, refused)
+        for provider, refused in refusals.by_provider.items()
         if refused is None or refused.reason != "spending_not_granted"
     ]
-    every_spent = bool(granted) and all(
-        refused is not None and refused.reason == "spending_limit_reached" for refused in granted
+    every_spent = bool(granted_providers) and all(
+        spent(provider, refused) for provider, refused in granted_providers
     )
     refused_last = latest is not None and _row_value(latest, "reason") == "spending_limit_reached"
     return "spending_cap_reached" if every_spent or refused_last else None

@@ -24,6 +24,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable, Iterable
+from concurrent.futures import ThreadPoolExecutor
 from typing import Final
 
 import psycopg
@@ -231,8 +232,16 @@ class SocietyControlWorker:
         workspace_source: Callable[[], Iterable[uuid.UUID]] | None = None,
         base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS,
         before_minute: Callable[[ControlClaim, float], bool] | None = None,
+        workers: int = 1,
     ) -> None:
         validate_settings("paused", 1, base_tick_interval_ms)
+        if not 1 <= workers <= 8:
+            raise ValueError("a playback round runs 1 to 8 workspaces' claims at once")
+        #: How many workspaces' claims a round runs at once. 1 plays them in turn on the calling
+        #: thread, as before the setting existed; more, on a pool of that many threads, each claim
+        #: still its own lease and session, so a slow model answer in one workspace does not hold
+        #: another's minute.
+        self.workers = workers
         self.database, self.runtime = database, runtime
         #: Asks the chosen models before a claimed minute, given the claim and the monotonic time
         #: its lease runs out; says whether the world runs people by models.
@@ -352,6 +361,34 @@ class SocietyControlWorker:
         except LeaseLost:
             return {"status": "lease_lost"}
 
+    def _pooled_round(
+        self, workspaces: Iterable[uuid.UUID], stop: threading.Event
+    ) -> tuple[bool, bool]:
+        """One round's claims, :attr:`workers` at once; whether one failed, and whether every one
+        was run (a stop skips those not yet started, as it ends the turn-by-turn round). Each pool
+        thread holds the round's snapshot as its own authority."""
+        snapshot = frozenset(workspaces)
+
+        def one(workspace: uuid.UUID) -> str:
+            if stop.is_set():
+                return "skipped"
+            self._round_authority.workspaces = snapshot
+            try:
+                self.run_once(workspace)
+            except Exception:
+                # As the turn-by-turn round: the lease expires; no bytes or provider text logged.
+                _LOG.error("Society playback round failed; its lease remains recoverable")
+                return "failed"
+            finally:
+                del self._round_authority.workspaces
+            return "ran"
+
+        with ThreadPoolExecutor(
+            max_workers=self.workers, thread_name_prefix="society-playback"
+        ) as pool:
+            outcomes = list(pool.map(one, sorted(snapshot, key=str)))
+        return "failed" in outcomes, "skipped" not in outcomes
+
     def run(self, stop: threading.Event, *, poll_seconds: float = 0.25) -> None:
         if not 0.05 <= poll_seconds <= 5:
             raise ValueError("playback polling must be between 0.05 and 5 seconds")
@@ -369,21 +406,26 @@ class SocietyControlWorker:
             # cannot drain its entire backlog before another workspace is considered. The
             # thread-local snapshot lets run_once preserve its public test/direct-call seam
             # without turning a cached readiness value into authority for another thread.
-            self._round_authority.workspaces = frozenset(workspaces)
-            try:
-                for workspace in workspaces:
-                    if stop.is_set():
-                        complete = False
-                        break
-                    try:
-                        self.run_once(workspace)
-                    except Exception:
-                        failed = True
-                        # Leave the committed lease to expire, rather than claiming false success.
-                        # Do not log request/source bytes or provider exception text.
-                        _LOG.error("Society playback round failed; its lease remains recoverable")
-            finally:
-                del self._round_authority.workspaces
+            if self.workers > 1:
+                failed, complete = self._pooled_round(workspaces, stop)
+            else:
+                self._round_authority.workspaces = frozenset(workspaces)
+                try:
+                    for workspace in workspaces:
+                        if stop.is_set():
+                            complete = False
+                            break
+                        try:
+                            self.run_once(workspace)
+                        except Exception:
+                            failed = True
+                            # Leave the committed lease to expire, rather than claiming false
+                            # success. Do not log request/source bytes or provider exception text.
+                            _LOG.error(
+                                "Society playback round failed; its lease remains recoverable"
+                            )
+                finally:
+                    del self._round_authority.workspaces
             if complete:
                 if failed:
                     self._record_failed_round()

@@ -190,14 +190,18 @@ def _requests(admin, workspace: uuid.UUID) -> int:
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_an_allowance_too_small_for_one_ask_is_refused_and_the_control_read_says_so(
-    app, spine_schema, tmp_path
+@pytest.mark.parametrize("above_floor", [False, True], ids=["below-floor", "below-reservation"])
+def test_an_allowance_too_small_for_one_ask_is_not_spent_and_the_control_read_says_so(
+    app, spine_schema, tmp_path, above_floor
 ):
-    """A USD remainder above zero that fits no attempt's reservation: the spending state cannot
-    foresee the refusal, so the ask is made, admission refuses it, the receipt says
-    spending_limit_reached, nothing is sent, and the control read reports the cap from it."""
+    """A USD remainder above zero that fits no attempt's reservation. Below the smallest one
+    (the chosen model's answer bound with no prompt) the host reserves nobody and the control read
+    says the cap at once. Above it but below what the ask's prompt adds, the ask is made, admission
+    refuses it, the receipt says spending_limit_reached and the control read says the cap from
+    it. Nothing is sent either way."""
     from types import SimpleNamespace
 
+    from exulanica.api.decision_host import answer_tokens
     from exulanica.api.routes.society_control import model_minds_code
 
     world, client = app
@@ -220,10 +224,19 @@ def test_an_allowance_too_small_for_one_ask_is_refused_and_the_control_read_says
         operator="test-operator",
         reason="the installation's allowance for guests",
     )
+    budget = BudgetGuard(ceiling_usd=Decimal("100"), max_calls=1000)
+    spec = manifest.spec(model_id)
+    floor = budget.estimate_usd(spec, max_tokens=answer_tokens(spec) or 0)
+    ceiling = (
+        (floor + Decimal("0.00000001")).quantize(Decimal("0.00000001"), rounding="ROUND_CEILING")
+        if above_floor
+        else Decimal("0.00000001")
+    )
+    assert (ceiling >= floor) is above_floor
     operator.grant(
         authority,
         workspace,
-        ceiling_usd=Decimal("0.00000001"),
+        ceiling_usd=ceiling,
         max_calls=200,
         valid_until=now + dt.timedelta(days=7),
         operator="test-operator",
@@ -242,7 +255,7 @@ def test_an_allowance_too_small_for_one_ask_is_refused_and_the_control_read_says
             api_key="test-key-not-real",
             manifest=manifest,
             transport=transport,
-            budget=BudgetGuard(ceiling_usd=Decimal("100"), max_calls=1000),
+            budget=budget,
             spending=durable,
         ),
         workspaces=frozenset(),
@@ -263,7 +276,11 @@ def test_an_allowance_too_small_for_one_ask_is_refused_and_the_control_read_says
     )
     request = SimpleNamespace(
         app=SimpleNamespace(
-            state=SimpleNamespace(services=SimpleNamespace(spending_refusals=refusals))
+            state=SimpleNamespace(
+                services=SimpleNamespace(
+                    spending_refusals=refusals, smallest_ask_usd=lambda: {provider: floor}
+                )
+            )
         )
     )
 
@@ -271,6 +288,18 @@ def test_an_allowance_too_small_for_one_ask_is_refused_and_the_control_read_says
         with services.database.session(workspace) as connection:
             return model_minds_code(request, connection, workspace, snapshot["society_id"])
 
+    if not above_floor:
+        # Nothing could be admitted: said before any ask, and nobody is reserved for.
+        assert code() == "spending_cap_reached"
+        for _ in range(10):
+            host.before_minute(
+                person_decisions._claim(world, snapshot), time.monotonic() + LEASE_SECONDS
+            )
+            snapshot = stays._step(world, client, snapshot)
+        assert _requests(admin, workspace) == 0
+        assert person_decisions._decisions(services, world, snapshot) == []
+        assert transport.requests == []
+        return
     assert code() is None
     for _ in range(30):
         host.before_minute(

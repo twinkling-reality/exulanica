@@ -23,7 +23,8 @@ uv run --extra reconstruction exulanica-derivative-worker
 ```
 
 Repeat `--workspace <uuid>` instead of the environment variable when that is easier to manage, or
-set `EXULANICA_ACCOUNT_DATABASE_URL` to drain every active account-owned workspace as well.
+set `EXULANICA_ACCOUNT_DATABASE_URL` to drain the active account-owned workspaces as well:
+those whose people are there on every pass, and every one once every five minutes.
 `--name` provides a stable operator-chosen worker identifier; otherwise the command combines host,
 PID, and a random suffix. `--once` drains the work that is eligible at that moment, with the same
 durable start and stop events, and exits. An empty or malformed workspace set with no account

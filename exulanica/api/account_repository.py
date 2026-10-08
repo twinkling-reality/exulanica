@@ -110,6 +110,9 @@ class AccountRepository:
         guest_seconds: int,
         guests_at_most: int,
         playing: frozenset[uuid.UUID] = frozenset(),
+        since: dict[uuid.UUID, float] | None = None,
+        now: float = 0.0,
+        tenure_seconds: float | None = None,
     ) -> WatchedWorkspaces:
         """Every active owner's workspace and the guests' seen lately, through the account role
         (:func:`~exulanica.db.account_workspaces.watched_workspaces`)."""
@@ -118,6 +121,9 @@ class AccountRepository:
             guest_seconds=guest_seconds,
             guests_at_most=guests_at_most,
             playing=playing,
+            since=since,
+            now=now,
+            tenure_seconds=tenure_seconds,
         )
 
     def begin_login(
