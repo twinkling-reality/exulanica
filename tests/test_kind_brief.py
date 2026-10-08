@@ -344,6 +344,29 @@ def test_what_a_model_gets_wrong_is_made_what_the_checks_need() -> None:
     assert "empty" not in zones
 
 
+def test_a_seat_someone_works_at_is_the_workplace_and_a_seat_sold_from_stays_a_seat() -> None:
+    """A dentist's chair drafted as a seat with a workplace use and a dentist's work is where the
+    dentist works; deck chairs drafted as a shop with work stated stay seats."""
+    brief = held_to_form(brief_of(fixture_kind("farm")))
+    farmyard = next(zone for zone in brief["zones"] if zone["label"] == "farmyard")
+    barn = next(s for s in farmyard["structures"] if s["label"] == "barn")
+    bench = next(f for f in farmyard["fixtures"] if f["label"] == "bench")
+    chair = {
+        **copy.deepcopy(bench),
+        "label": "dental chair",
+        "roles": ["seat"],
+        "use_role": "workplace",
+        "work": copy.deepcopy(barn["work"]),
+    }
+    idle = {**copy.deepcopy(chair), "label": "spare chair", "work": []}
+    farmyard["fixtures"].extend([chair, idle])
+    document = compile_brief(brief, size=False, provenance=PROVENANCE).document
+    read_kind(document)
+    worked = _farm_part(document, "dental chair")
+    assert worked["roles"] == ["workplace"] and worked["use_class"]
+    assert _farm_part(document, "spare chair")["roles"] == ["seat"]
+
+
 def test_one_use_stated_twice_in_the_same_words_is_one_class() -> None:
     brief = held_to_form(brief_of(fixture_kind("farm")))
     farmyard = next(zone for zone in brief["zones"] if zone["label"] == "farmyard")

@@ -513,9 +513,15 @@ class _Compiler:
         part = self._common(raw, "fixture")
         use_role = raw["use_role"]
         roles = set(raw["roles"])
-        if use_role and roles & {"seat", "gathering"}:
-            # A fixture stated as a seat or a gathering spot stays one: what people rest or meet
-            # at is not also a workplace or a shop, whatever work the brief states for it.
+        if (
+            use_role
+            and roles & {"seat", "gathering"}
+            and not (use_role == "workplace" and raw["work"])
+        ):
+            # A fixture stated as a seat or a gathering spot stays one when it is drafted as a shop
+            # or as a workplace nobody works at: deck chairs and benches are what people rest or
+            # meet at, whatever work the brief states for them. A seat someone works at for the
+            # people who sit in it (a dentist's chair, a barber's chair) is that workplace.
             use_role = ""
         if use_role:
             roles -= {"seat", "gathering"}
