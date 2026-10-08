@@ -64,6 +64,7 @@ import {
 import {
   buildWorldInhabitants,
   inhabitantWords,
+  modelMinds,
   placeRows,
   type InhabitedObject,
   type PeopleOperation,
@@ -1589,6 +1590,8 @@ export function mountEnvironmentSelection(
 
   function reflectPlayback(): void {
     const control = societyControl;
+    // Who decides says the same calm line as People when open models are not asked now.
+    societyModels?.setModelMinds(modelMinds(control));
     if (control === null) {
       playbackStatus.textContent = 'Playback controls are not connected.';
       playbackMode.disabled = true; playbackSpeed.disabled = true; advanceSociety.disabled = true;

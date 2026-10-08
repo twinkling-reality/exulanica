@@ -185,6 +185,52 @@ export interface PlaybackView {
  * saved mode is playing, so a world saved as playing on a host that does not play it can still be
  * paused and advanced by hand.
  */
+/**
+ * Why this host does not play a world on its own, by `host_playback_code` (`HOST_PLAYBACK_REFUSALS`
+ * in `exulanica/api/society_control_worker.py`), in the page's own words; the server's sentence is
+ * said only for a code the page has no words for. Held to the server's codes by
+ * society-control-words-parity.test.ts.
+ */
+export const HOST_PLAYBACK_WORDS: Readonly<Record<string, string>> = {
+  no_playback_worker: 'This server does not play worlds on their own.',
+  playback_worker_stopped: 'This server\'s playback has stopped, so this world does not move on its own until the server restarts.',
+  workspace_not_played: 'This server plays other worlds on their own, not this one.',
+  guest_towns_full: 'Many visitors\' worlds are playing on this server right now, so yours waits until one of them stops.',
+};
+
+/**
+ * Why the people here who would ask an open model follow their own routines for now, by
+ * `model_minds_code` (`MODEL_MINDS_REASONS` in `exulanica/api/routes/society_control.py`). Never an
+ * error: the world keeps playing.
+ */
+export const MODEL_MINDS_WORDS: Readonly<Record<string, string>> = {
+  spending_cap_reached: 'The allowance for open models on this visit is used up, so people here now follow their own routines. The world keeps playing.',
+};
+
+/** The same, as the clause Who decides gives for a chosen model it does not ask now. */
+export const MODEL_MINDS_WHY: Readonly<Record<string, string>> = {
+  spending_cap_reached: 'the allowance for open models on this visit is used up',
+};
+
+/** The calm line for open models not asked now, or null while they may be. */
+export function modelMindsWords(control: SocietyPlaybackControl | null): string | null {
+  return modelMinds(control)?.words ?? null;
+}
+
+/**
+ * Open models not asked now, as Who decides says it: the calm line, and the clause that says why a
+ * chosen model is not asked (the server's sentence and a plain clause for a code the page has no
+ * words for); null while they may be.
+ */
+export function modelMinds(control: SocietyPlaybackControl | null): { readonly words: string; readonly why: string } | null {
+  const minds = control?.modelMinds ?? null;
+  if (minds === null) return null;
+  return {
+    words: MODEL_MINDS_WORDS[minds.code] ?? minds.reason,
+    why: MODEL_MINDS_WHY[minds.code] ?? 'this server is not asking open models for the people here now',
+  };
+}
+
 export function playbackWords(control: SocietyPlaybackControl | null): {
   readonly offerPlay: boolean;
   readonly offerPause: boolean;
@@ -206,7 +252,7 @@ export function playbackWords(control: SocietyPlaybackControl | null): {
     return {
       offerPlay: false, offerPause: playing,
       status: playing ? 'Saved as playing, but nothing moves until this host plays it.' : '',
-      why: `${host.reason} Use Next minute to move on one minute at a time instead.`,
+      why: `${(host.code === null ? undefined : HOST_PLAYBACK_WORDS[host.code]) ?? host.reason} Use Next minute to move on one minute at a time instead.`,
     };
   }
   if (!control.playEligible && !playing) {
@@ -372,6 +418,8 @@ export function buildWorldInhabitants(handlers: {
   const paceLabel = el('label', { class: 'world-inhabitants-pace', hidden: true }, [document.createTextNode('Pace '), pace]);
   const playbackStatus = el('p', { class: 'world-inhabitants-playback', role: 'status', hidden: true });
   const playbackWhy = el('p', { class: 'world-help', hidden: true });
+  // Open models not asked now: said calmly under the play controls, never as a stop or an error.
+  const mindsLine = el('p', { class: 'world-help world-inhabitants-minds', role: 'status', hidden: true });
   const movedLine = el('p', { class: 'world-help world-inhabitants-moved', hidden: true });
   const noticeLine = el('p', { class: 'world-inhabitants-notice', role: 'status', hidden: true });
   const flightLine = el('p', { class: 'world-help world-inhabitants-flight', role: 'status', hidden: true });
@@ -395,7 +443,7 @@ export function buildWorldInhabitants(handlers: {
   pace.addEventListener('change', () => handlers.onPace?.(Number(pace.value) as SocietyPlaybackSpeed));
   const root = el('section', { class: 'world-inhabitants', 'aria-label': 'People' }, [
     heading, summary, about, need, refusal, refusalDetails, bringIn, bringBack, play, paceLabel,
-    playbackStatus, playbackWhy, advance, advanceWhy, movedLine, noticeLine, flightLine, unplacedLine,
+    playbackStatus, playbackWhy, mindsLine, advance, advanceWhy, movedLine, noticeLine, flightLine, unplacedLine,
     sendAway, presenceHelp, area, placesHeading, placesList, select,
   ]);
   root.dataset['state'] = 'idle';
@@ -427,6 +475,9 @@ export function buildWorldInhabitants(handlers: {
     setText(playbackStatus, words?.status ?? '');
     playbackWhy.hidden = !words?.why;
     setText(playbackWhy, words?.why ?? '');
+    const minds = offered ? modelMindsWords(playback.control) : null;
+    mindsLine.hidden = minds === null;
+    setText(mindsLine, minds ?? '');
     return playing;
   };
 
@@ -530,7 +581,7 @@ export function buildWorldInhabitants(handlers: {
     unavailable(reason) {
       root.dataset['state'] = 'unavailable';
       setText(summary, reason);
-      for (const node of [need, refusal, refusalDetails, bringIn, bringBack, play, paceLabel, playbackStatus, playbackWhy,
+      for (const node of [need, refusal, refusalDetails, bringIn, bringBack, play, paceLabel, playbackStatus, playbackWhy, mindsLine,
         advance, advanceWhy, movedLine, noticeLine, flightLine, unplacedLine, sendAway, presenceHelp, area, placesHeading, placesList, select]) {
         node.hidden = true;
       }

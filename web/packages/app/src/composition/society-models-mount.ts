@@ -51,8 +51,8 @@ export interface PersonMind {
  * The model asked for a person now: the one chosen for them, unless this host asks no model or
  * not theirs (a refusal on the read or on their choice), when their own routine decides.
  */
-function runningModel(view: SocietyModels, subjectId: string): NamedModelRef | null {
-  if (view.hostRefusal !== null) return null;
+function runningModel(view: SocietyModels, subjectId: string, paused: boolean): NamedModelRef | null {
+  if (view.hostRefusal !== null || paused) return null;
   const choice = view.choices.find((held) => held.subjectId === subjectId);
   return choice === undefined || choice.refusal !== null ? null : choice.model;
 }
@@ -83,6 +83,12 @@ export interface MountedSocietyModels {
   mindOf(subjectId: string): PersonMind | null;
   /** Every person a model is asked for now, by the same rule as `mindOf`. */
   runningModels(): ReadonlyMap<string, NamedModelRef>;
+  /**
+   * Say why open models are not asked for the people here now (the playback control's
+   * `model_minds_code`, as `modelMinds` words it), or null while they may be. While it is said,
+   * nobody's chosen model is running, so no surface marks them as run by one.
+   */
+  setModelMinds(minds: { readonly words: string; readonly why: string } | null): void;
   dispose(): void;
 }
 
@@ -119,6 +125,7 @@ export function mountSocietyModels(options: {
   let message = '';
   let failure = '';
   let signalMessage = '';
+  let minds: { readonly words: string; readonly why: string } | null = null;
   let readTick: number | null | undefined;
   let wanted: number | null = null;
   let reading: Promise<void> | null = null;
@@ -136,7 +143,7 @@ export function mountSocietyModels(options: {
   const render = () => {
     signals.render(signalView, busy, [signalMessage, failure].filter(Boolean).join(' '));
     section.setSignals(signals.root.hidden || signalView === null ? null : signalSummary(signalView));
-    section.render({ view, people, busy, message: [message, failure].filter(Boolean).join(' ') });
+    section.render({ view, people, busy, message: [message, failure].filter(Boolean).join(' '), minds });
   };
 
   async function read(tick: number | null): Promise<void> {
@@ -212,7 +219,7 @@ export function mountSocietyModels(options: {
     if (recorded && !disposed) {
       section.clearPeople();
       // Said from the read that followed the choice, so it never names a model nobody asks.
-      message = recordedWords(view, chosen, model);
+      message = recordedWords(view, chosen, model, minds?.why ?? null);
       render();
     }
     return { recorded, words: message };
@@ -261,21 +268,28 @@ export function mountSocietyModels(options: {
     },
     mindOf(subjectId) {
       if (view === null || !view.takesModelChoices) return null;
-      return { running: runningModel(view, subjectId), words: choiceWords(view, subjectId) };
+      return { running: runningModel(view, subjectId, minds !== null), words: choiceWords(view, subjectId, minds?.why ?? null) };
     },
     runningModels() {
       const running = new Map<string, NamedModelRef>();
       if (view === null || !view.takesModelChoices) return running;
       for (const choice of view.choices) {
-        const model = runningModel(view, choice.subjectId);
+        const model = runningModel(view, choice.subjectId, minds !== null);
         if (model !== null) running.set(choice.subjectId, model);
       }
       return running;
     },
+    setModelMinds(next) {
+      if (disposed || (next?.words === minds?.words && next?.why === minds?.why)) return;
+      minds = next;
+      render();
+      // The card and the marks read who runs each person again.
+      options.onRead?.();
+    },
     personDetails(subjectId) {
       if (view === null || !view.takesModelChoices) return [];
       return [
-        ['Decided by', choiceWords(view, subjectId)],
+        ['Decided by', choiceWords(view, subjectId, minds?.why ?? null)],
         ['Latest decision', decisionWordsFor(view, subjectId) ?? 'None yet.'],
       ];
     },

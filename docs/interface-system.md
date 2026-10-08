@@ -192,6 +192,19 @@ choice came to. Another surface opens the panel with its subjects chosen through
 the world's environment selection, as a person would choose them. What each model decided, and how
 the panel's models decide, follow below it.
 
+When the playback control says open models are not asked for the people here now (its
+`model_minds_code`, `spending_cap_reached` when the allowance for this visit is used up), People says
+so in one calm status line under the play controls and Who decides says the same in place of its
+host line: "The allowance for open models on this visit is used up, so people here now follow their
+own routines. The world keeps playing." It is never an error and never stops play. While it is said
+no chosen model is running: the People card reads "Their own routine for now", each chosen person's
+line says their routine decides for now and why, and neither the card nor the marks over people show
+them as run by an AI, as when a host asks no model at all. Why a host does
+not play a world (`host_playback_code`, such as `guest_towns_full` while many visitors' worlds play
+at once) is said in the page's own words too, beside Use Next minute. The page holds its words by
+code (`HOST_PLAYBACK_WORDS` and `MODEL_MINDS_WORDS` in `ui/world-inhabitants.ts`), held to the
+server's codes by a parity test, and says the server's sentence only for a code it has no words for.
+
 ### The thing card
 
 The thing card (`web/packages/app/src/ui/thing-card.ts`, `ui/thing-card.css`, mounted by

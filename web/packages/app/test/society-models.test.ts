@@ -439,6 +439,49 @@ describe('the cards of who decides', () => {
   });
 });
 
+describe('open models not asked for the people here now', () => {
+  const MINDS = {
+    words: 'The allowance for open models on this visit is used up, so people here now follow their own routines. The world keeps playing.',
+    why: 'the allowance for open models on this visit is used up',
+  };
+
+  it('says so in the host line, and every chosen person\'s line and the card say their routine decides for now', () => {
+    const section = buildSocietyModels({ onChoose: () => undefined });
+    const people = [{ id: 'ada', name: 'Ada' }];
+    section.render({ view: parseSocietyModels(read()), people, busy: false, message: '', minds: MINDS });
+    expect(section.root.querySelector('.society-models-host')!.textContent).toBe(MINDS.words);
+    expect(section.root.querySelector('[data-subject-id="ada"]')!.textContent).toContain(
+      'Their own routine for now, because the allowance for open models on this visit is used up. You chose Nemotron 3 Nano 30B.');
+    expect(section.root.querySelector('.society-models-role-words')!.textContent).toBe('Their own routine for now');
+    section.render({ view: parseSocietyModels(read()), people, busy: false, message: '', minds: null });
+    expect(section.root.querySelector('.society-models-host')!.textContent).toBe(hostWords(null));
+    expect(section.root.querySelector('.society-models-role-words')!.textContent).toBe('1 by Nemotron 3 Nano 30B');
+  });
+
+  it('runs nobody\'s model while it is said, so the card and the marks say so too, and again once it is not', async () => {
+    const answer = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+    const fetcher = vi.fn(async () => answer(read()));
+    const onRead = vi.fn();
+    const client = new SocietyModelsClient({ baseUrl: 'https://example.test', token: 't', worldId: 'w', fetch: fetcher as typeof fetch });
+    const mounted = mountSocietyModels({ credentials: { baseUrl: 'https://example.test', token: 't' }, world: { worldId: 'w', versionId: 'version' }, client, onRead });
+    await mounted.refresh(1, [{ id: 'ada', name: 'Ada' }]);
+    expect(mounted.runningModels().size).toBe(1);
+    const reads = onRead.mock.calls.length;
+    mounted.setModelMinds(MINDS);
+    expect(onRead.mock.calls.length).toBe(reads + 1);
+    expect(mounted.root.querySelector('.society-models-host')!.textContent).toBe(MINDS.words);
+    expect(mounted.mindOf('ada')).toEqual({ running: null, words: expect.stringMatching(/^Their own routine for now, because the allowance/u) });
+    expect(mounted.runningModels().size).toBe(0);
+    // Said again unchanged: nothing to tell anyone.
+    mounted.setModelMinds({ ...MINDS });
+    expect(onRead.mock.calls.length).toBe(reads + 1);
+    mounted.setModelMinds(null);
+    expect(mounted.root.querySelector('.society-models-host')!.textContent).toBe(hostWords(null));
+    expect(mounted.mindOf('ada')?.running).toMatchObject({ name: 'Nemotron 3 Nano 30B' });
+    mounted.dispose();
+  });
+});
+
 describe('Who decides opened for chosen subjects', () => {
   const people = [{ id: 'ada', name: 'Ada' }, { id: 'grace', name: 'Grace' }, { id: 'lin', name: 'Lin' }];
   const ticked = (root: HTMLElement) => [...root.querySelectorAll<HTMLInputElement>('.society-models-people-list input[type=checkbox]')]

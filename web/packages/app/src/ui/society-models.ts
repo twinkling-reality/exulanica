@@ -82,11 +82,11 @@ export function hostWords(refusal: string | null): string {
  * Who decides for a person now, in words: the model chosen for them while this host asks it, and
  * otherwise their own routine, for now and why, whenever their model is not asked here.
  */
-export function choiceWords(view: SocietyModels, subjectId: string): string {
+export function choiceWords(view: SocietyModels, subjectId: string, paused: string | null = null): string {
   const choice = view.choices.find((held) => held.subjectId === subjectId);
   if (choice === undefined || choice.model === null) return 'Their own routine.';
   const { name } = choice.model;
-  const why = hostReason(view.hostRefusal) ?? (choice.refusal === null
+  const why = hostReason(view.hostRefusal) ?? paused ?? (choice.refusal === null
     ? null
     : MODEL_REFUSAL_WORDS[choice.refusal] ?? `the model you chose is not asked here (${choice.refusal})`);
   return why === null ? `${name}, which you chose.` : `Their own routine for now, because ${why}. You chose ${name}.`;
@@ -97,12 +97,14 @@ export function choiceWords(view: SocietyModels, subjectId: string): string {
  * decides for them from their next choice, or that their routine does for now, and why, whenever
  * this host would not ask it.
  */
-export function recordedWords(view: SocietyModels | null, people: readonly string[], model: ModelRef | null): string {
+export function recordedWords(
+  view: SocietyModels | null, people: readonly string[], model: ModelRef | null, paused: string | null = null,
+): string {
   const one = people.length === 1;
   const who = one ? 'One person' : `${people.length} people`;
   if (model === null) return `${who} ${one ? 'now follows' : 'now follow'} their own routine, from the next time they choose what to do.`;
   const refused = view?.choices.find((held) => people.includes(held.subjectId) && held.refusal !== null)?.refusal ?? null;
-  const why = hostReason(view?.hostRefusal ?? null) ?? (refused === null
+  const why = hostReason(view?.hostRefusal ?? null) ?? paused ?? (refused === null
     ? null
     : MODEL_REFUSAL_WORDS[refused] ?? `the model you chose is not asked here (${refused})`);
   if (why === null) return `${who} ${one ? 'is' : 'are'} now decided by the model you chose, from the next time they choose what to do.`;
@@ -179,6 +181,12 @@ export interface SocietyModelsSection {
     readonly busy: boolean;
     /** What the last choice or read came to, or empty. */
     readonly message: string;
+    /**
+     * Why open models are not asked for the people here now (`modelMinds` in ui/world-inhabitants.ts):
+     * its calm line, said in place of the host's line, and the clause each chosen person's line gives;
+     * null while they may be asked.
+     */
+    readonly minds?: { readonly words: string; readonly why: string } | null;
   }): void;
   /** The traffic-light role's card, or null where this world offers that role nothing. */
   setSignals(summary: RoleSummary | null): void;
@@ -246,7 +254,7 @@ export function chooseWords(model: NamedModelRef | null, chosen: number, busy: b
 }
 
 /** What the People card says of who decides for the people here now. */
-export function peopleRoleWords(view: SocietyModels, people: readonly ChoosablePerson[]): string {
+export function peopleRoleWords(view: SocietyModels, people: readonly ChoosablePerson[], paused: string | null = null): string {
   const present = new Set(people.map((person) => person.id));
   const byModel = new Map<string, { name: string; n: number }>();
   for (const choice of view.choices) {
@@ -256,6 +264,8 @@ export function peopleRoleWords(view: SocietyModels, people: readonly ChoosableP
     byModel.set(key, { ...held, n: held.n + 1 });
   }
   if (byModel.size === 0) return 'Their own routine';
+  // Chosen but not asked now, by this host or for open models here: their routines decide.
+  if (view.hostRefusal !== null || paused !== null) return 'Their own routine for now';
   const counted = [...byModel.values()];
   const decided = counted.reduce((sum, held) => sum + held.n, 0);
   return counted.length === 1 ? `${decided} by ${counted[0]!.name}` : `${decided} by ${counted.length} models`;
@@ -400,8 +410,9 @@ export function buildSocietyModels(handlers: {
     showTab();
     if (view === null || !takes) return;
     setText(peopleRole.count, `People · ${people.length}`);
-    setText(peopleRole.words, peopleRoleWords(view, people));
-    setText(host, hostWords(view.hostRefusal));
+    const paused = state.minds?.why ?? null;
+    setText(peopleRole.words, peopleRoleWords(view, people, paused));
+    setText(host, state.minds?.words ?? hostWords(view.hostRefusal));
     // The cards are rebuilt only when the models change, so a choice in progress is kept.
     if (shown === null || shown.models !== view.models) {
       if (picked !== ROUTINE && !view.models.some((entry) => optionValue(entry) === picked)) picked = ROUTINE;
@@ -433,7 +444,7 @@ export function buildSocietyModels(handlers: {
       const label = el('label', {}, [
         box,
         el('span', { class: 'society-models-person-name', text: person.name }),
-        el('span', { class: 'society-models-person-decider', text: choiceWords(view, person.id) }),
+        el('span', { class: 'society-models-person-decider', text: choiceWords(view, person.id, paused) }),
       ]);
       label.dataset['subjectId'] = person.id;
       return label;

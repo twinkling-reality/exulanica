@@ -4,6 +4,8 @@ import type { LiveSocietyView } from '../src/composition/live-society.js';
 import { parseSociety } from '../src/society-api.js';
 import { parseSocietyControl, type SocietyPlaybackControl } from '../src/society-control-api.js';
 import {
+  HOST_PLAYBACK_WORDS,
+  MODEL_MINDS_WORDS,
   buildWorldInhabitants,
   everyWords,
   inhabitantWords,
@@ -107,6 +109,36 @@ describe('Play, Pause and pace beside the people', () => {
     built.render({ society: view(), objects, walked: 0, advanceBlocked: null, playback: { control: control('playing', notHere), busy: false } });
     expect(built.play.textContent).toBe('Pause');
     expect(built.root.textContent).toContain('Saved as playing, but nothing moves until this host plays it.');
+  });
+
+  it('says why the host does not play in the page\'s own words by code, and the server\'s for a code it has none for', () => {
+    const { built } = panel();
+    const waiting = { running: false, interval_ms: 4000, reason: 'Many visitors\' worlds are playing on this server right now. Advance one minute at a time.' };
+    built.render({ society: view(), objects, walked: 0, advanceBlocked: null,
+      playback: { control: control('paused', waiting, { host_playback_code: 'guest_towns_full' }), busy: false } });
+    expect(built.root.textContent).toContain(`${HOST_PLAYBACK_WORDS['guest_towns_full']} Use Next minute to move on one minute at a time instead.`);
+    // The server's own advice is not said twice beside the page's.
+    expect(built.root.textContent).not.toContain('Advance one minute at a time.');
+    built.render({ society: view(), objects, walked: 0, advanceBlocked: null,
+      playback: { control: control('paused', notHere, { host_playback_code: 'a_code_from_later' }), busy: false } });
+    expect(built.root.textContent).toContain('This host does not play this workspace. Use Next minute');
+  });
+
+  it('says calmly, under the controls, that open models are not asked now, while the world keeps playing', () => {
+    const { built, shown, text } = panel();
+    const spent = { model_minds_code: 'spending_cap_reached', model_minds_reason: 'The server\'s sentence.' };
+    built.render({ society: view(), objects, walked: 0, advanceBlocked: null, playback: { control: control('playing', running, spent), busy: false } });
+    expect(text('.world-inhabitants-minds')).toBe(MODEL_MINDS_WORDS['spending_cap_reached']);
+    expect(built.root.querySelector('.world-inhabitants-minds')!.getAttribute('role')).toBe('status');
+    // Never a stop: Pause stays, and nothing is said as an error.
+    expect(built.play.textContent).toBe('Pause');
+    expect(shown(built.play)).toBe(true);
+    expect(built.root.querySelector('[role="alert"]:not([hidden])')).toBeNull();
+    built.render({ society: view(), objects, walked: 0, advanceBlocked: null,
+      playback: { control: control('playing', running, { ...spent, model_minds_code: 'a_code_from_later' }), busy: false } });
+    expect(text('.world-inhabitants-minds')).toBe('The server\'s sentence.');
+    built.render({ society: view(), objects, walked: 0, advanceBlocked: null, playback: { control: control('playing', running), busy: false } });
+    expect(text('.world-inhabitants-minds')).toBeNull();
   });
 
   it('offers no Play where the server says nothing about playing, or the engine cannot', () => {

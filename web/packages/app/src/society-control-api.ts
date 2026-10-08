@@ -26,6 +26,21 @@ export interface HostPlayback {
   readonly running: boolean;
   readonly intervalMs: number;
   readonly reason: string | null;
+  /**
+   * Why it does not play, by code (`host_playback_code`, the keys of `HOST_PLAYBACK_REFUSALS`), or
+   * null while it plays or from a server that names none; the page says it in its own words.
+   */
+  readonly code: string | null;
+}
+
+/**
+ * Why the people here who would ask an open model follow their own routines instead
+ * (`model_minds_code`, the keys of `MODEL_MINDS_REASONS`), with the server's sentence. The world
+ * keeps playing either way: it is not a playback refusal.
+ */
+export interface ModelMinds {
+  readonly code: string;
+  readonly reason: string;
 }
 
 export interface SocietyPlaybackControl {
@@ -44,6 +59,8 @@ export interface SocietyPlaybackControl {
   readonly playIneligibleReason: string | null;
   /** Whether this host plays the world; null for a server that does not say. */
   readonly hostPlayback: HostPlayback | null;
+  /** Why open models are not asked for the people here now, or null while they may be (or the server does not say). */
+  readonly modelMinds?: ModelMinds | null;
 }
 
 const object = (value: unknown): Record<string, unknown> => {
@@ -58,8 +75,9 @@ const integer = (value: unknown): value is number => Number.isSafeInteger(value)
 const HOST_PLAYBACK_KEYS = ['interval_ms', 'reason', 'running'];
 
 /** The host's statement, exactly: a reason when and only when it does not play. */
-function parseHostPlayback(value: unknown): HostPlayback | null {
+function parseHostPlayback(value: unknown, code: unknown): HostPlayback | null {
   if (value === undefined) return null;
+  if (!(code === undefined || code === null || text(code))) throw new Error('Invalid society playback response');
   const held = object(value);
   if (Object.keys(held).sort().join() !== HOST_PLAYBACK_KEYS.join()
     || typeof held['running'] !== 'boolean' || !integer(held['interval_ms']) || held['interval_ms'] === 0
@@ -68,7 +86,15 @@ function parseHostPlayback(value: unknown): HostPlayback | null {
   }
   return Object.freeze({
     running: held['running'], intervalMs: held['interval_ms'] as number, reason: held['reason'] as string | null,
+    code: held['running'] ? null : (code as string | null | undefined) ?? null,
   });
+}
+
+/** Why open models are not asked now: a code with its sentence, both or neither; absent from an older server. */
+function parseModelMinds(code: unknown, reason: unknown): ModelMinds | null {
+  if ((code === undefined || code === null) && (reason === undefined || reason === null)) return null;
+  if (!text(code) || !text(reason)) throw new Error('Invalid society playback response');
+  return Object.freeze({ code, reason });
 }
 
 export function parseSocietyControl(value: unknown, versionId: string): SocietyPlaybackControl {
@@ -94,7 +120,8 @@ export function parseSocietyControl(value: unknown, versionId: string): SocietyP
     stateSha256: row['state_sha256'] as string, nextDueAt: row['next_due_at'] as string | null,
     reason: row['reason'] as string | null, playEligible: row['play_eligible'] as boolean,
     playIneligibleReason: row['play_ineligible_reason'] as string | null,
-    hostPlayback: parseHostPlayback(row['host_playback']),
+    hostPlayback: parseHostPlayback(row['host_playback'], row['host_playback_code']),
+    modelMinds: parseModelMinds(row['model_minds_code'], row['model_minds_reason']),
   });
 }
 
