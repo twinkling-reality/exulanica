@@ -179,6 +179,9 @@ def phase_environment(*, private_servers: bool, copy_url: str) -> dict[str, str]
     environment = dict(os.environ)
     environment["EXULANICA_REQUIRE_POSTGRES"] = "1"
     environment["EXULANICA_REFERENCE_DATABASE_URL"] = copy_url
+    # Servers somebody else started, one per worker, as continuous integration names them. Each
+    # phase here chooses its own servers, and the suite refuses that list beside either choice.
+    environment.pop("EXULANICA_TEST_DATABASE_URLS", None)
     if private_servers:
         environment.pop("EXULANICA_TEST_DATABASE_URL", None)
         environment["EXULANICA_TEST_POSTGRES"] = "private"

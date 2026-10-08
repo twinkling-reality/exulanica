@@ -6,7 +6,12 @@ exists only on the machine that holds the retained data. A hosted runner can pas
 cannot pass phase 2, so ``.github/workflows/check.yml`` runs phase 1's selection, and this file
 holds that selection to the runner's own in both directions: a workflow that runs a
 ``reference_copy`` test fails every push for a reason unrelated to the change, and one that leaves
-anything else out reports a pass for tests that never ran.
+anything else out reports a pass for tests that never ran. How many workers run the selection is
+not part of it, as it is not in the runner's own plan: ``-n`` decides which process runs a test,
+never whether it runs. Nor is how many jobs share it, when the run takes ``--part`` from the job's
+matrix and the matrix lists every part once: ``tests/conftest.py`` gives each test to exactly one
+part, so between them the jobs run the selection once. A part written any other way, or a matrix
+that misses or repeats one, is refused.
 
 The run's skips are held to ``tests/expected_skips.toml`` by the runner's own check. The pytest run
 writes a junit file and a later step hands it to ``run_backend_suite.py --check-skips``, which fails
@@ -59,6 +64,14 @@ _NAME = re.compile(r"^(- +)?name:")
 _OPERATORS = frozenset({"&&", "||", ";", "|", "&", ";;"})
 #: The backend runner, whose --check-skips holds a run's junit file to the expected-skips manifest.
 RUNNER_SCRIPT = "run_backend_suite.py"
+#: pytest-xdist's worker count, written as an option with its value as the next argument.
+_WORKERS = frozenset({"-n", "--numprocesses"})
+#: tests/conftest.py's option for one part of the selection, written K/N.
+_PART = "--part"
+#: The one value a run may give it: the job's own part from the matrix, of a count written there.
+_MATRIX_PART = re.compile(r"\$\{\{ *matrix\.part *\}\}/(?P<parts>[0-9]+)")
+#: The matrix line that lists the parts, as a flow sequence: ``part: [1, 2, 3]``.
+_MATRIX_PARTS = re.compile(r"^ *part: *\[(?P<listed>[^\]]*)\] *(#.*)?$")
 
 
 @dataclass(frozen=True)
@@ -185,6 +198,49 @@ def pytest_arguments(command: str) -> list[list[str]]:
     return found
 
 
+def without_workers(arguments: Sequence[str]) -> list[str]:
+    """Pytest arguments without the worker count, which decides where a test runs and not whether.
+
+    Every spelling pytest-xdist reads is taken out, ``-n 4``, ``-n4``, ``--numprocesses 4`` and
+    ``--numprocesses=4``, so a count written differently cannot pass for a selection.
+    """
+    rest: list[str] = []
+    expecting = False
+    for argument in arguments:
+        if expecting:
+            expecting = False
+        elif argument in _WORKERS:
+            expecting = True
+        elif not argument.startswith("--numprocesses=") and not re.fullmatch(r"-n\S+", argument):
+            rest.append(argument)
+    return rest
+
+
+def without_part(arguments: Sequence[str]) -> tuple[str | None, list[str]]:
+    """The ``--part`` value among pytest arguments, the last as pytest reads it, and the rest."""
+    rest: list[str] = []
+    part: str | None = None
+    expecting = False
+    for argument in arguments:
+        if expecting:
+            part, expecting = argument, False
+        elif argument == _PART:
+            expecting = True
+        elif argument.startswith(f"{_PART}="):
+            part = argument.split("=", 1)[1]
+        else:
+            rest.append(argument)
+    return part, rest
+
+
+def selection(arguments: Sequence[str]) -> list[str]:
+    """What one pytest run selects, its jobs taken together: its arguments without the junit file,
+    the worker count and the part, which part_problems holds to the matrix."""
+    _, rest = runner._without_junit(arguments)
+    _, rest = without_part(rest)
+    return without_workers(rest)
+
+
 def runner_arguments(command: str) -> list[list[str]]:
     """The arguments of every run of the backend runner in one shell command."""
     found = []
@@ -276,9 +332,9 @@ def selection_problems(text: str) -> list[str]:
     required = phase_one_requirement()
     for command, arguments in invocations:
         # The junit file is where the skips are checked from, as it is in the runner, and selects
-        # nothing; skip_check_problems holds it to the step that reads it.
-        _, selection = runner._without_junit(arguments)
-        if selection != expected:
+        # nothing; skip_check_problems holds it to the step that reads it. The worker count selects
+        # nothing either.
+        if selection(arguments) != expected:
             problems.append(
                 f"line {command.line} runs pytest with {shlex.join(arguments)!r}; the runner's "
                 f"phase 1 selects with {shlex.join(expected)!r} and nothing else, so every test "
@@ -358,8 +414,54 @@ def skip_check_problems(text: str) -> list[str]:
     return problems
 
 
+def part_problems(text: str) -> list[str]:
+    """Every way the jobs a matrix makes could leave a part of the selection unrun, as sentences.
+
+    A run that takes ``--part`` runs one part, and the parts add up to the selection only when the
+    job's matrix lists each of them once: 1 to N for ``${{ matrix.part }}/N``. A part written as a
+    number runs that part in every job and the others in none.
+    """
+    runs = []
+    for command in run_commands(text):
+        try:
+            runs.extend((command, arguments) for arguments in pytest_arguments(command.text))
+        except ValueError:
+            continue  # selection_problems reports a command the shell could not split
+    if len(runs) != 1:
+        return []  # selection_problems reports the count
+    run, arguments = runs[0]
+    _, rest = runner._without_junit(arguments)
+    part, _ = without_part(rest)
+    listed = [match for line in text.splitlines() if (match := _MATRIX_PARTS.match(line))]
+    if part is None:
+        if listed:
+            return [
+                f"the matrix lists parts and the run on line {run.line} takes none, so every job "
+                "runs the whole selection"
+            ]
+        return []
+    written = _MATRIX_PART.fullmatch(part)
+    if written is None:
+        return [
+            f"line {run.line} runs part {part!r}; a run takes its job's own part, "
+            "${{ matrix.part }}/N, so that between them the jobs run every part"
+        ]
+    parts = int(written["parts"])
+    if len(listed) != 1:
+        return [f"{len(listed)} matrix lines list parts; one lists the parts 1 to {parts}"]
+    numbers = [number.strip() for number in listed[0]["listed"].split(",")]
+    if numbers != [str(number) for number in range(1, parts + 1)]:
+        return [
+            f"the matrix lists parts [{listed[0]['listed']}], and the run on line {run.line} "
+            f"splits the selection into {parts}, so each of 1 to {parts} must be listed once, in "
+            "order"
+        ]
+    return []
+
+
 def test_the_workflow_runs_the_backend_runners_phase_one_and_nothing_narrower():
     assert selection_problems(WORKFLOW_TEXT) == []
+    assert part_problems(WORKFLOW_TEXT) == []
 
 
 def test_the_reader_finds_the_one_pytest_run_the_workflow_makes():
@@ -370,7 +472,7 @@ def test_the_reader_finds_the_one_pytest_run_the_workflow_makes():
         for command in run_commands(WORKFLOW_TEXT)
         for arguments in pytest_arguments(command.text)
     ]
-    assert [runner._without_junit(arguments)[1] for arguments in runs] == [list(phase_one())]
+    assert [selection(arguments) for arguments in runs] == [list(phase_one())]
 
 
 def test_the_workflow_checks_the_skips_of_its_run_with_the_runner():
@@ -396,7 +498,10 @@ def test_the_expected_selection_is_read_from_the_runner():
 
 
 _JUNIT = '"$RUNNER_TEMP/backend-suite.xml"'
-_THE_RUN = f'run: uv run pytest -m "not reference_copy" --junitxml={_JUNIT}'
+_THE_RUN = (
+    f'run: uv run pytest -n "$WORKERS" --part "${{{{ matrix.part }}}}/6" -m "not reference_copy" '
+    f"--junitxml={_JUNIT}"
+)
 _THE_CHECK = f"run: uv run python scripts/run_backend_suite.py --check-skips {_JUNIT}"
 _CHECK_STEP = f"      - name: skips\n        {_THE_CHECK}\n"
 
@@ -426,6 +531,16 @@ _CHECK_STEP = f"      - name: skips\n        {_THE_CHECK}\n"
             id="narrows-to-a-path",
         ),
         pytest.param(
+            'run: uv run pytest -n "$WORKERS" -m "not reference_copy" -k api',
+            "phase 1 selects",
+            id="narrows-beside-a-worker-count",
+        ),
+        pytest.param(
+            'run: uv run pytest -n4 -m "not reference_copy" tests/test_api.py',
+            "phase 1 selects",
+            id="narrows-beside-a-joined-worker-count",
+        ),
+        pytest.param(
             "run: uv run python -m pytest -m reference_copy",
             "phase 1 selects",
             id="starts-pytest-as-a-module",
@@ -447,6 +562,96 @@ def test_a_workflow_that_selects_anything_else_is_refused(replacement, refusal):
     changed = WORKFLOW_TEXT.replace(_THE_RUN, replacement)
     assert changed != WORKFLOW_TEXT
     problems = selection_problems(changed)
+    assert any(refusal in problem for problem in problems), problems
+
+
+@pytest.mark.parametrize(
+    "workers", ["", "-n 4", "-n4", "--numprocesses 4", "--numprocesses=4", "-n auto"]
+)
+def test_a_worker_count_however_written_selects_nothing(workers):
+    """The other half of the controls above: the count alone leaves the run phase 1's."""
+    changed = WORKFLOW_TEXT.replace(
+        _THE_RUN, f'run: uv run pytest {workers} -m "not reference_copy" --junitxml={_JUNIT}'
+    )
+    assert _THE_RUN in WORKFLOW_TEXT, "the control edits a line the workflow no longer has"
+    assert selection_problems(changed) == []
+    assert skip_check_problems(changed) == []
+
+
+def _the_parts() -> tuple[str, int]:
+    """The matrix line that lists the parts, and how many the run splits the selection into."""
+    (line,) = [line for line in WORKFLOW_TEXT.splitlines() if _MATRIX_PARTS.match(line)]
+    (arguments,) = [
+        found for c in run_commands(WORKFLOW_TEXT) for found in pytest_arguments(c.text)
+    ]
+    part, _ = without_part(runner._without_junit(arguments)[1])
+    assert part is not None, "the workflow's run takes no part"
+    written = _MATRIX_PART.fullmatch(part)
+    assert written is not None, part
+    return line, int(written["parts"])
+
+
+def test_the_reader_finds_the_parts_the_matrix_lists_and_the_run_takes():
+    """The guard on the guard for parts: no problems means something only if both were read."""
+    line, parts = _the_parts()
+    assert parts > 1
+    listed = _MATRIX_PARTS.match(line)["listed"]
+    assert [int(number) for number in listed.split(",")] == list(range(1, parts + 1))
+
+
+@pytest.mark.parametrize(
+    ("edit", "refusal"),
+    [
+        pytest.param(
+            lambda line, parts: line.replace(f", {parts}]", "]"),
+            "must be listed once",
+            id="misses-the-last-part",
+        ),
+        pytest.param(
+            lambda line, parts: line.replace("[1,", "[1, 1,"),
+            "must be listed once",
+            id="repeats-a-part",
+        ),
+        pytest.param(
+            lambda line, parts: line.replace("[1,", "[0, 1,"),
+            "must be listed once",
+            id="lists-a-part-that-is-not-one",
+        ),
+    ],
+)
+def test_a_matrix_that_misses_or_repeats_a_part_is_refused(edit, refusal):
+    line, parts = _the_parts()
+    changed = WORKFLOW_TEXT.replace(line, edit(line, parts))
+    assert changed != WORKFLOW_TEXT
+    problems = part_problems(changed)
+    assert any(refusal in problem for problem in problems), problems
+
+
+@pytest.mark.parametrize(
+    ("edit", "refusal"),
+    [
+        pytest.param(
+            lambda written, parts: f"1/{parts}", "a run takes its job's own part", id="a-fixed-part"
+        ),
+        pytest.param(
+            lambda written, parts: written.replace(f"/{parts}", f"/{parts + 1}"),
+            "must be listed once",
+            id="more-parts-than-the-matrix-lists",
+        ),
+        pytest.param(lambda written, parts: None, "takes none", id="no-part-beside-a-matrix"),
+    ],
+)
+def test_a_run_whose_part_the_matrix_does_not_cover_is_refused(edit, refusal):
+    _, parts = _the_parts()
+    written = f'"${{{{ matrix.part }}}}/{parts}"'
+    option = f" {_PART} {written}"
+    assert option in _THE_RUN and _THE_RUN in WORKFLOW_TEXT
+    replaced = edit(written, parts)
+    changed = WORKFLOW_TEXT.replace(
+        _THE_RUN, _THE_RUN.replace(option, "" if replaced is None else f" {_PART} {replaced}")
+    )
+    assert changed != WORKFLOW_TEXT
+    problems = part_problems(changed)
     assert any(refusal in problem for problem in problems), problems
 
 

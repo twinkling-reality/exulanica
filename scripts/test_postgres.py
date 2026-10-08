@@ -293,7 +293,7 @@ def _watch_owner(server: Server, owner: int) -> None:
     )
 
 
-def create_runtime_roles(server: Server) -> None:
+def create_runtime_roles(server: Server | str) -> None:
     """Create the four runtime roles, holding no privileges, before any migration runs.
 
     Migrations 0017, 0021, 0023, 0042 and 0065 grant to a runtime role only if it already exists,
@@ -304,6 +304,10 @@ def create_runtime_roles(server: Server) -> None:
     them, and so does 5433. The attributes are the ones ``provision_runtime_role``,
     ``provision_purge_role`` and ``provision_account_role`` create; the privileges are still
     granted only by migrations and by the tests that provision.
+
+    ``server`` is a private server, or the URL of one somebody else started for a test worker
+    (``EXULANICA_TEST_DATABASE_URLS`` in ``tests/conftest.py``). Roles belong to the whole server,
+    so any of its databases will do, and a role such a server already has is left as it is.
     """
     import psycopg
     from psycopg import sql
@@ -311,6 +315,7 @@ def create_runtime_roles(server: Server) -> None:
     from exulanica.db.account_roles import ACCOUNT_ROLE
     from exulanica.db.roles import EXECUTOR_ROLE, PURGE_ROLE, RUNTIME_ROLE
 
+    url = server if isinstance(server, str) else server.url("postgres")
     statements = [
         (role, "create role {} login nobypassrls")
         for role in (RUNTIME_ROLE, EXECUTOR_ROLE, PURGE_ROLE)
@@ -322,8 +327,10 @@ def create_runtime_roles(server: Server) -> None:
             "noreplication nobypassrls",
         )
     )
-    with psycopg.connect(server.url("postgres"), autocommit=True) as connection:
+    with psycopg.connect(url, autocommit=True) as connection:
         for role, statement in statements:
+            if connection.execute("select 1 from pg_roles where rolname = %s", (role,)).fetchone():
+                continue
             connection.execute(sql.SQL(statement).format(sql.Identifier(role)))
 
 

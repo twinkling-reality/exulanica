@@ -55,8 +55,13 @@ def test_the_marker_selects_exactly_the_tests_that_need_the_pinned_endpoint():
     assert selected == REFERENCE_COPY_TESTS
 
 
-def test_each_phase_runs_where_its_tests_can_pass():
-    """Phase 1 on a private server per worker, phase 2 on the copy the gate pins."""
+def test_each_phase_runs_where_its_tests_can_pass(monkeypatch):
+    """Phase 1 on a private server per worker, phase 2 on the copy the gate pins.
+
+    A list of servers exported for another kind of run is withdrawn from both, because the suite
+    refuses it beside the server either phase chooses.
+    """
+    monkeypatch.setenv("EXULANICA_TEST_DATABASE_URLS", "postgresql://localhost:5432/x_test")
     parallel = runner.phase_environment(private_servers=True, copy_url=runner.DEFAULT_COPY_URL)
     assert parallel["EXULANICA_TEST_POSTGRES"] == "private"
     assert "EXULANICA_TEST_DATABASE_URL" not in parallel
@@ -66,6 +71,7 @@ def test_each_phase_runs_where_its_tests_can_pass():
     for environment in (parallel, serial):
         assert environment["EXULANICA_REFERENCE_DATABASE_URL"] == runner.DEFAULT_COPY_URL
         assert environment["EXULANICA_REQUIRE_POSTGRES"] == "1"
+        assert "EXULANICA_TEST_DATABASE_URLS" not in environment
 
 
 def test_the_plan_names_both_phases_and_gives_phase_two_its_own_record(capsys):

@@ -19,23 +19,21 @@ concurrency:
 jobs:
   python:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        # The documented target, matched exactly. tests/pg_harness.py refuses a server that
-        # cannot run the schema rather than substituting for it, which is how R11 was found.
-        image: pgvector/pgvector:0.8.6-pg18
-        env:
-          POSTGRES_PASSWORD: postgres
-          # The suite logs in as the non-superuser roles it provisions, by name and with no
-          # password of their own, exactly as it does on the private servers
-          # scripts/test_postgres.py starts with initdb --auth=trust. Under the image's default
-          # password authentication every such login is refused. This server holds nothing but
-          # the suite's throwaway schemas and is reachable only from this job.
-          POSTGRES_HOST_AUTH_METHOD: trust
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s --health-timeout 3s --health-retries 20
+    strategy:
+      # Every part runs to its end, so a failure in one does not hide what another would report.
+      fail-fast: false
+      matrix:
+        # Phase 1 in six parts, each on a runner of its own. tests/conftest.py's --part gives
+        # every test to exactly one part, and tests/test_ci_workflow.py fails when this list stops
+        # naming each part the run line splits the selection into once.
+        part: [1, 2, 3, 4, 5, 6]
+    env:
+      # pytest-xdist workers on each runner, each with a PostgreSQL server of its own below. Two,
+      # not one for each of the runner's four processors (two cores of two threads): with four,
+      # every test ran at about half its serial speed, and a traffic test whose worker has the
+      # product's 30 s wait (WAIT_SECONDS in exulanica/world/episode_worker.py) exceeded it on
+      # the slower runners.
+      WORKERS: 2
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,25 +53,64 @@ jobs:
           sudo apt-get install --yes postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install --yes postgresql-client-18
-      # A superuser connection, because the harness creates and drops throwaway schemas and
-      # installs extensions. tests/test_row_level_security.py provisions its own non-superuser
-      # roles and asserts they are not superusers before it asserts anything else.
-      - name: create the test database
-        run: psql "$ADMIN_URL" -c 'create database exulanica_spine_test'
-        env:
-          ADMIN_URL: postgresql://postgres:postgres@localhost:5432/postgres
-          PGPASSWORD: postgres
+      # A server for each worker, never one shared: migration 0041's asset-read barrier is an
+      # advisory lock, which belongs to a whole database, and the runtime roles belong to a whole
+      # server, so two workers on one server fail each other's tests (the measurements are in
+      # scripts/test_postgres.py). A local run initialises a private server for each worker; this
+      # runner has the client programs and no server binaries, so these are containers of the
+      # documented target instead, matched exactly: tests/pg_harness.py refuses a server that
+      # cannot run the schema rather than substituting for it, which is how R11 was found.
+      # tests/conftest.py gives worker gwN the URL at position N of EXULANICA_TEST_DATABASE_URLS
+      # and creates the four runtime roles on its server before any migration runs, as a private
+      # server has them.
+      #
+      # fsync and full_page_writes are off, as on every private server: they protect a cluster
+      # against a machine crash, no query sees them, and these servers are deleted with the job,
+      # while several servers flushing to one disk slow every worker.
+      #
+      # Trust authentication, because the suite logs in as the non-superuser roles it provisions,
+      # by name and with no password of their own, exactly as it does on the private servers
+      # scripts/test_postgres.py starts with initdb --auth=trust. Under the image's default
+      # password authentication every such login is refused. Each server holds nothing but the
+      # suite's throwaway schemas and is reachable only from this job. The database is created
+      # as the superuser, because the harness creates and drops throwaway schemas and installs
+      # extensions; tests/test_row_level_security.py provisions its own non-superuser roles and
+      # asserts they are not superusers before it asserts anything else.
+      - name: start a PostgreSQL server for each worker
+        run: |
+          set -euo pipefail
+          urls=()
+          for worker in $(seq 0 $((WORKERS - 1))); do
+            port=$((5432 + worker))
+            docker run --detach --name "postgres-$worker" --publish "127.0.0.1:$port:5432" \
+              --env POSTGRES_PASSWORD=postgres --env POSTGRES_HOST_AUTH_METHOD=trust \
+              pgvector/pgvector:0.8.6-pg18 -c fsync=off -c full_page_writes=off
+            urls+=("postgresql://postgres@localhost:$port/exulanica_spine_test")
+          done
+          for worker in $(seq 0 $((WORKERS - 1))); do
+            port=$((5432 + worker))
+            for attempt in $(seq 1 60); do
+              if pg_isready --quiet --host localhost --port "$port" --username postgres; then
+                break
+              fi
+              echo "waiting for postgres-$worker ($attempt/60)"
+              sleep 1
+            done
+            psql "postgresql://postgres@localhost:$port/postgres" \
+              --command 'create database exulanica_spine_test'
+          done
+          echo "EXULANICA_TEST_DATABASE_URLS=${urls[*]}" >> "$GITHUB_ENV"
       - run: uv run ruff check .
       - run: uv run lint-imports
       # Phase 1 of scripts/run_backend_suite.py: every test except those marked reference_copy.
       # Those check the frontier preflight's pinned endpoint, the retained reference copy on
       # port 5433, which exists only on the machine that holds the retained data; the runner's
       # phase 2 runs them there. tests/test_ci_workflow.py fails when this selection stops being
-      # the runner's phase 1, in either direction.
+      # the runner's phase 1, in either direction; the worker count decides only which worker
+      # runs a test.
       - name: pytest
-        run: uv run pytest -m "not reference_copy" --junitxml="$RUNNER_TEMP/backend-suite.xml"
+        run: uv run pytest -n "$WORKERS" --part "${{ matrix.part }}/6" -m "not reference_copy" --junitxml="$RUNNER_TEMP/backend-suite.xml"
         env:
-          EXULANICA_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/exulanica_spine_test
           # The whole reason this job exists. Without it a broken server silently skips the 19
           # tests that are the only executable proof of invariant 4.
           EXULANICA_REQUIRE_POSTGRES: "1"

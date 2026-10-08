@@ -112,6 +112,27 @@ shared database took 1074 s, and `-n 6` with private servers took 301 s, failing
 exactly the same tests. More workers were no faster at comparable load and take every core from
 other work, so six, one per performance core, is the setting to use.
 
+#### Servers you started: one per worker
+
+A machine without PostgreSQL's server binaries cannot initialise private servers. Continuous
+integration is one: it has the client programs only, so it starts a `pgvector/pgvector:0.8.6-pg18`
+container for each worker and names them, separated by whitespace, in
+`EXULANICA_TEST_DATABASE_URLS`:
+
+```bash
+EXULANICA_TEST_DATABASE_URLS="postgresql://postgres@localhost:5432/exulanica_spine_test
+  postgresql://postgres@localhost:5433/exulanica_spine_test" \
+EXULANICA_REQUIRE_POSTGRES=1 \
+uv run pytest -n 2 -m "not reference_copy"
+```
+
+Worker `gw0` takes the first URL, `gw1` the second and so on, and a serial run takes the first.
+Each URL must name a different server, for the reason a private server is a whole server, so the
+suite refuses a list that names one server twice, a list shorter than `-n`, and the list beside
+`EXULANICA_TEST_DATABASE_URL` or `EXULANICA_TEST_POSTGRES`. Before any test runs, each worker
+creates the four runtime roles on its server if they are missing, as a private server has them.
+It creates nothing else: each database must already exist, and the server's settings are its own.
+
 #### Expected failures
 
 With `EXULANICA_REFERENCE_DATABASE_URL` set as above, these fail on any database except the

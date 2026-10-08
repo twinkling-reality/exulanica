@@ -802,8 +802,8 @@ its own role. The [local database](local-database.md) guide owns its steps.
   `EXULANICA_REFERENCE_PICTURES` configure reference notes, owned by the [reference notes contract](reference-notes-contract.md#7-configuration).
   Web notes need `https://api.tavily.com` in `EXULANICA_EGRESS_ALLOWLIST`.
 - The test suite's settings, such as `EXULANICA_TEST_DATABASE_URL`, `EXULANICA_TEST_POSTGRES`,
-  `EXULANICA_REQUIRE_POSTGRES` and `EXULANICA_REFERENCE_DATABASE_URL`, are in
-  [development setup](development-setup.md).
+  `EXULANICA_TEST_DATABASE_URLS`, `EXULANICA_REQUIRE_POSTGRES` and
+  `EXULANICA_REFERENCE_DATABASE_URL`, are in [development setup](development-setup.md).
 - `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` and `EXULANICA_PORT` are read by
   `compose.yaml` itself, and `EXULANICA_SEED_ARCHIVE` and `EXULANICA_JUDGE_PORT` by
   `deploy/judge/compose.yaml`, which also requires `EXULANICA_BUDGET_USD` and

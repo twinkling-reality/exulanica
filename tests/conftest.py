@@ -12,7 +12,9 @@ transport rather than a mock of the client.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import io
+import re
 import struct
 import urllib.parse
 import uuid
@@ -512,16 +514,52 @@ def client(manifest, transport) -> ModelClient:
 DATABASE_FIXTURES = frozenset({"spine_schema", "ingest_spine", "repository", "cli_database"})
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--part",
+        metavar="K/N",
+        help=(
+            "run part K of N of the selected tests: every test belongs to exactly one part, so N "
+            "runs with K from 1 to N run the selection once between them"
+        ),
+    )
+
+
+def part_of(nodeid: str, parts: int) -> int:
+    """The part, from 1 to ``parts``, that the test with this node id belongs to.
+
+    A digest of the node id alone, so the answer does not depend on which other tests were
+    collected, in what order, or on which machine or worker collected them.
+    """
+    digest = hashlib.sha256(nodeid.encode()).digest()
+    return int.from_bytes(digest[:8], "big") % parts + 1
+
+
+def chosen_part(text: str) -> tuple[int, int]:
+    """``--part K/N`` read as (K, N), refused unless 1 <= K <= N."""
+    written = re.fullmatch(r"([0-9]+)/([0-9]+)", text)
+    if written is None or not 1 <= int(written[1]) <= int(written[2]):
+        raise pytest.UsageError(f"--part takes K/N with 1 <= K <= N, not {text!r}")
+    return int(written[1]), int(written[2])
+
+
 def pytest_collection_modifyitems(config, items):
     """Mark every test that reaches a real database, by what it asks for rather than by where
-    it lives."""
+    it lives, and keep only the tests of the part ``--part`` names."""
     for item in items:
         if DATABASE_FIXTURES & set(getattr(item, "fixturenames", ())):
             item.add_marker(pytest.mark.postgres)
+    if (written := config.getoption("part")) is None:
+        return
+    part, parts = chosen_part(written)
+    elsewhere = [item for item in items if part_of(item.nodeid, parts) != part]
+    if elsewhere:
+        config.hook.pytest_deselected(items=elsewhere)
+        items[:] = [item for item in items if part_of(item.nodeid, parts) == part]
 
 
 # ---------------------------------------------------------------------------------------
-# A private server per test process.
+# A server per test process.
 #
 # EXULANICA_TEST_POSTGRES=private gives every process that runs tests, each pytest-xdist
 # worker or a plain serial run, a PostgreSQL server of its own, started before collection and
@@ -529,13 +567,105 @@ def pytest_collection_modifyitems(config, items):
 # asset-read barrier is a database-wide advisory lock, and runtime roles are cluster-wide. The
 # measurements are in scripts/test_postgres.py.
 #
-# The URL is exported as EXULANICA_TEST_DATABASE_URL, so the harness, the fixtures and any
-# subprocess a test starts all read the one variable they always read. A child pytest that
-# loads this file sees _PRIVATE_OWNER and uses its parent's server instead of starting one.
+# EXULANICA_TEST_DATABASE_URLS gives every such process a server somebody else started instead:
+# one database URL per server, separated by whitespace, and worker gwN takes the one at position
+# N. Continuous integration runs this way, one PostgreSQL container per worker, because a hosted
+# runner has the client programs and no server binaries to initialise a private server with. Each
+# server is prepared as a private one is, with the four runtime roles created before any migration
+# runs.
+#
+# Either way the URL is exported as EXULANICA_TEST_DATABASE_URL, so the harness, the fixtures and
+# any subprocess a test starts all read the one variable they always read. A child pytest that
+# loads this file sees _PRIVATE_OWNER and uses its parent's server instead of starting one; a
+# process that took a server from the list withdraws the list from its environment, so a child
+# sees the one URL, as a serial run on a named database does.
 # ---------------------------------------------------------------------------------------
 
 _PRIVATE_OWNER = "EXULANICA_TEST_POSTGRES_OWNER"
 _private_server = None
+
+
+def given_servers(listed: str) -> list[str]:
+    """The URLs EXULANICA_TEST_DATABASE_URLS names, refused when two of them share a server.
+
+    A server, not a database, because two databases of one server share its roles, and two workers
+    provisioning the runtime roles at once fail each other's fixtures. The server is told by host
+    and port as the URL writes them, so one server written as two different host names is not
+    caught here.
+    """
+    from exulanica.env import env_name
+    from psycopg import ProgrammingError
+    from psycopg.conninfo import conninfo_to_dict
+
+    urls = listed.split()
+    if not urls:
+        raise pytest.UsageError(f"{env_name('TEST_DATABASE_URLS')} is set and names no server")
+    first: dict[tuple[str, str], str] = {}
+    for url in urls:
+        try:
+            parts = conninfo_to_dict(url)
+        except ProgrammingError as error:
+            raise pytest.UsageError(
+                f"{env_name('TEST_DATABASE_URLS')} names {url!r}, which is not a URL: "
+                f"{str(error).strip()}"
+            ) from error
+        server = (str(parts.get("host") or "localhost"), str(parts.get("port") or 5432))
+        if server in first:
+            raise pytest.UsageError(
+                f"{env_name('TEST_DATABASE_URLS')} names the server at {server[0]}:{server[1]} "
+                f"twice, as {first[server]} and {url}; each worker needs a server of its own"
+            )
+        first[server] = url
+    return urls
+
+
+def given_server_for(worker: str | None, urls: list[str]) -> str:
+    """The URL among ``urls`` that the worker named ``worker`` takes; a serial run takes the first.
+
+    pytest-xdist numbers its workers gw0, gw1 and on, so each worker's position is its own. A
+    worker started in place of a crashed one is numbered past the others and cannot know which
+    server the crashed one left, so it is refused rather than given a server another worker holds.
+    """
+    from exulanica.env import env_name
+
+    position = 0 if worker is None else int(worker.removeprefix("gw"))
+    if position >= len(urls):
+        raise pytest.UsageError(
+            f"worker {worker} has no server of its own: {env_name('TEST_DATABASE_URLS')} names "
+            f"{len(urls)}, one for each of gw0 to gw{len(urls) - 1}"
+        )
+    return urls[position]
+
+
+def _take_a_given_server(config, worker, listed: str, *, mode, explicit) -> None:
+    """Point this process at its own server among EXULANICA_TEST_DATABASE_URLS, prepared."""
+    import os
+
+    from exulanica.env import env_name
+
+    if mode is not None or explicit is not None:
+        raise pytest.UsageError(
+            f"set one of {env_name('TEST_DATABASE_URLS')}, {env_name('TEST_DATABASE_URL')} and "
+            f"{env_name('TEST_POSTGRES')}=private, not more"
+        )
+    urls = given_servers(listed)
+    if worker is None and _distributing(config):
+        # The controller runs no test. Its workers inherit the list, so it is checked here once.
+        workers = int(config.option.numprocesses)
+        if workers > len(urls):
+            raise pytest.UsageError(
+                f"-n {workers} needs a server for each worker, and "
+                f"{env_name('TEST_DATABASE_URLS')} names {len(urls)}"
+            )
+        return
+    url = given_server_for(None if worker is None else worker["workerid"], urls)
+    try:
+        _test_postgres_helper().create_runtime_roles(url)
+    except Exception as error:
+        message = f"could not prepare the PostgreSQL server at {url}: {error}"
+        raise pytest.UsageError(message) from error
+    os.environ[env_name("TEST_DATABASE_URL")] = url
+    os.environ.pop(env_name("TEST_DATABASE_URLS"), None)
 
 
 def _distributing(config) -> bool:
@@ -573,12 +703,17 @@ def pytest_configure(config):
     mode = env_get("TEST_POSTGRES")
     worker = getattr(config, "workerinput", None)
     explicit = env_get("TEST_DATABASE_URL")
+    listed = env_get("TEST_DATABASE_URLS")
+    if listed is not None:
+        _take_a_given_server(config, worker, listed, mode=mode, explicit=explicit)
+        return
     if mode is None:
         if explicit and (worker is not None or _distributing(config)):
             raise pytest.UsageError(
                 f"{env_name('TEST_DATABASE_URL')} names one database, and parallel workers "
                 "sharing one database collide on its advisory locks and on cluster-wide roles. "
-                f"Unset it and set {env_name('TEST_POSTGRES')}=private for a parallel run."
+                f"Unset it and set {env_name('TEST_POSTGRES')}=private for a parallel run, or "
+                f"name a server for each worker in {env_name('TEST_DATABASE_URLS')}."
             )
         return
     if mode != "private":
@@ -652,7 +787,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     from exulanica.env import env_get
 
     # Under pytest-xdist this runs in the controller, which never holds the workers' URL.
-    if env_get("TEST_DATABASE_URL") or env_get("TEST_POSTGRES"):
+    if env_get("TEST_DATABASE_URL") or env_get("TEST_POSTGRES") or env_get("TEST_DATABASE_URLS"):
         return
     skipped = [
         report
