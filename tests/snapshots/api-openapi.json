@@ -28377,6 +28377,103 @@
     ],
     "title": "LinkSubject"
    },
+   "LookOfferView": {
+    "properties": {
+     "state": {
+      "type": "string",
+      "enum": [
+       "offered",
+       "none",
+       "unavailable"
+      ],
+      "title": "State"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "answer_refused",
+         "timed_out",
+         "failed",
+         "request_refused",
+         "no_allowance"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "pack_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Pack Id"
+     },
+     "version": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version"
+     },
+     "manifest_sha256": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Manifest Sha256"
+     },
+     "look_words": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Look Words"
+     },
+     "prompt_version": {
+      "type": "string",
+      "title": "Prompt Version"
+     },
+     "prompt_sha256": {
+      "type": "string",
+      "title": "Prompt Sha256"
+     },
+     "execution": {
+      "$ref": "#/components/schemas/ExecutionView"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "state",
+     "reason",
+     "pack_id",
+     "version",
+     "manifest_sha256",
+     "look_words",
+     "prompt_version",
+     "prompt_sha256",
+     "execution"
+    ],
+    "title": "LookOfferView",
+    "description": "The look the words ask for, offered for the person to keep or change, or why there is none.\n\n``offered`` names a library pack at its current version (``pack_id``, ``version`` and\n``manifest_sha256``, so the page binds exactly what was offered) and the person's own words\nthat chose it, as typed. ``none``: the step found no listed look in the words, or its answer\nwas refused twice (``reason`` ``answer_refused``). ``unavailable``: the step could not be\nasked or did not answer (``reason`` ``timed_out``, ``failed``, ``request_refused`` or\n``no_allowance``). Either way the world is made in the library's default unless the person\npicks a look, and the draft is unchanged."
+   },
    "MemberPersonRegionRow": {
     "properties": {
      "region_id": {
@@ -39361,6 +39458,16 @@
      },
      "execution": {
       "$ref": "#/components/schemas/ExecutionView"
+     },
+     "look_offer": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/LookOfferView"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "additionalProperties": false,

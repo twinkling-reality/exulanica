@@ -78,6 +78,7 @@ from exulanica.selection.environment_proposal import (
     propose_environment_operation,
 )
 from exulanica.selection.kind_drafting import KindVerdict, draft_kind
+from exulanica.selection.look_choosing import LookOption, choose_look
 from exulanica.selection.plan import (
     Intent,
     SelectionPlan,
@@ -89,7 +90,11 @@ from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import answer_question
 from exulanica.selection.request_names import RequestNames
 from exulanica.selection.society_question import answer_about_society, build_scene
-from exulanica.selection.world_drafting import propose_world_specification, specification_view
+from exulanica.selection.world_drafting import (
+    propose_world_specification,
+    sendable,
+    specification_view,
+)
 from exulanica.world.society_decision_contract import decision_contract, person_role
 
 from conftest import ingest_observed, write_photo
@@ -136,6 +141,7 @@ HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
         "exulanica.selection.world_drafting",
         "draft_world_specification",
     ),
+    "look chooser": ("exulanica.selection.look_choosing", "choose_look"),
     "query embedding": ("exulanica.selection.embeddings", "embed_query"),
     "caption embedding": ("exulanica.epistemics.caption_embeddings", "embed_capture"),
     "vision": ("exulanica.ingest.vision", "NebiusVisionModel.observe"),
@@ -553,6 +559,26 @@ def run_specification(world: World) -> Witness:
     return transport
 
 
+def run_look_choosing(world: World) -> Witness:
+    """The look chooser, handed the description as the drafts route hands it: as it was sent to
+    the drafter, every saved name replaced, with the library's looks."""
+    answer = {"look": "exulanica.cozy-town", "look_words": ["cozy harbour town"]}
+    client, transport = world.hosted([_json_reply(answer, Role.LOOK_CHOOSER)])
+    sent = sendable(
+        world.connection,
+        world.repository.workspace_id,
+        f"a cozy harbour town where {PERSON} lives beside {PLACE}",
+    )
+    choice = choose_look(
+        client,
+        sent.text,
+        (LookOption("exulanica.cozy-town", "Cozy town", "Warm light, soft colours."),),
+        placeholders=sent.placeholders,
+    )
+    assert choice.look == "exulanica.cozy-town", choice.refused
+    return transport
+
+
 def run_creature_drafting(world: World) -> Witness:
     """The creature drafter, handed a person's words as the creature route will hand them."""
     form = form_of("horse", label="striped hill beast")
@@ -771,6 +797,7 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "appearance drafter": (run_appearance, "THE REVIEWED CATALOGUE"),
     "environment drafter": (run_environment, "put the selected tree"),
     "specification drafter": (run_specification, "a harbour town"),
+    "look chooser": (run_look_choosing, "a cozy harbour town"),
     "caption embedding": (run_caption, "RUNNING CLUB"),
     "vision": (run_vision, "Describe this photograph"),
     "role decision": (run_person, "wait here a minute"),
@@ -792,6 +819,7 @@ CALL_SITE_REPLACES: Mapping[str, tuple[str, ...]] = {
     "appearance drafter": ("exulanica.selection.request_names",),
     "environment drafter": ("exulanica.selection.request_names",),
     "specification drafter": ("exulanica.selection.world_drafting",),
+    "look chooser": ("exulanica.selection.world_drafting",),
     "action classifier": ("exulanica.selection.request_names",),
     "world-edit drafter": ("exulanica.selection.request_names",),
     "simulation drafter": ("exulanica.selection.request_names",),

@@ -1,0 +1,42 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "client_timeout_seconds": 30,
+  "kind": "exulanica.look-chooser-timings/v1",
+  "max_tokens": 1024,
+  "measured": {
+   "roles": {
+    "look_chooser": {
+     "primary": "nvidia/nemotron-3-super-120b-a12b",
+     "primary_measured": {
+      "longest_ms": 4830,
+      "p50_ms": 1041,
+      "p99_ms": 4830,
+      "rows": 59
+     }
+    }
+   }
+  },
+  "module_sha256": "b6cba6d2c8a7b0047e7fb269365b7f2312c8c4d35c3a3ad1b05c100540d00c69",
+  "note": "The look chooser's primary's own calls in its pre-registered timing measurement: twenty fixed descriptions of towns, three times each, each answered with one listed look or none from the library's three packs; rows are its completed calls (a repair would be a call of its own; the primary needed none). The run stopped at its pre-registered bound of 120 calls with one of the primary's sixty asks not reached. The pre-registration's own rule (the longest call rounded up to the next 5 s) gives 5 s; the manifest's timeout_rule, which binds every role, gives 10 s (the longest call times two, rounded up to 5 s), and the manifest's rule governs. The three longest calls were all one description. A call past the timeout leaves the library default with no error. The fallback serves under the same timeout when the primary is withdrawn; its slowest calls in this run were longer than the primary's and are cut by it. Nothing else of any other model is published here.",
+  "preregistration_sha256": "24daeca1ab0e0d6117a494b6b77b8c50e52cd40cf2884c0c15c0bf4333305f7f",
+  "prompt_sha256": "72515ccf64e0835a1168f4bf76bbb79778d9a3479175a8a52086f2c9163f7fab",
+  "provider": "Nebius Token Factory",
+  "run_sha256": "b741c8464584d1e7fe7ad8ab1a05a1d5e0a956151ae815b33d8d9972a8924006",
+  "script_sha256": "3303f477805b923918a9671b61e226a31c392bf2dc598fad9a7b2cba3da90f11",
+  "tree": {
+   "diff_head_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "head": "647b4caa987e57f3a0005914d6d4b6f6c6328a61",
+   "untracked_sha256": {
+    "exulanica/selection/look-choosing.v1.json": "72515ccf64e0835a1168f4bf76bbb79778d9a3479175a8a52086f2c9163f7fab",
+    "exulanica/selection/look_choosing.py": "b6cba6d2c8a7b0047e7fb269365b7f2312c8c4d35c3a3ad1b05c100540d00c69",
+    "tests/test_look_choosing.py": "e99b2d474cce7b62f3c7b510e56441e763efa1d5fc2be9864f1bbeb62537f172"
+   }
+  },
+  "window": {
+   "ended": "2026-10-07T22:04:19-0400",
+   "started": "2026-10-07T22:01:50-0400"
+  }
+ },
+ "record_sha256": "23eb1d1bcd562da6ff60b4be2f80c6bdc9249739dbea5643be09c4d5ed22ceae"
+}

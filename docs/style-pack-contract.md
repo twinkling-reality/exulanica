@@ -285,3 +285,39 @@ transaction, so it follows the making's: when it is refused as busy, the world s
 no pack, and is drawn in the default. Binding the default at creation means a later change of the
 library's default never restyles a world already made; a rollback to the first version returns a
 world to naming no pack.
+
+### 10.1 A look offered from a description
+
+A person who describes a world in words (`POST /worlds/specification/drafts`) is offered the look
+the words ask for, if any. After a draft that is not refused, the route makes one short call of its
+own (`exulanica/selection/look_choosing.py`, the manifest role `look_chooser`), shown only the
+description as it was sent to the drafter, every saved name replaced, and each library pack's id,
+title and description. The answer is one listed pack id or none, with up to three phrases copied
+from the description that chose it. Code decides what is kept: a pack the library does not list, a
+phrase not found word for word in the description, a look with no words or words with no look is
+refused, told why once, and on a second refusal the step answers none. The answer is the draft
+response's optional `look_offer`:
+
+| `state` | Meaning |
+| --- | --- |
+| `offered` | `pack_id`, `version` and `manifest_sha256` name the library's current version of the pack, so the page binds exactly what was offered; `look_words` are the person's own words that chose it, as typed, a saved name written back and never sent |
+| `none` | The words ask for no listed look, or the answer was refused twice (`reason` `answer_refused`) |
+| `unavailable` | The step did not answer: `reason` `timed_out`, `failed`, `request_refused` (the workspace's rules refused the request) or `no_allowance` (the draft's allowance is spent) |
+
+`look_offer` is absent for a refused draft and while the library holds no pack. Whatever it says, the
+person picks the look, and a world made naming none is made in the library's default (section 10).
+The step never changes the draft: the drafter's request is the same, byte for byte, with the step
+and without it, and the draft's `execution` lists only the drafter's calls; the step's own calls are
+in `look_offer.execution`. It spends the same allowance as the draft, through the same client.
+
+The step runs after the draft in the same request, so the answer comes that much later: a median
+of about 1 s in its measurement, and at most two calls at the role's timeout. The role's timeout,
+10 s, follows the manifest's timeout rule (the primary's longest measured call times two, rounded up
+to 5 s) from its pre-registered measurement, whose record holds the primary's own calls
+([record](evaluation/2026-10-07-look-chooser-timings.json)): 59 calls, longest 4,830 ms. The
+measurement's own pre-registered rule, the longest call rounded up to the next 5 s, gives 5 s; the
+manifest's rule governs every role. The three longest calls were all one description. A call past
+the timeout leaves the library default with no error. The fallback serves under the same timeout
+when the primary is withdrawn; its slowest calls in the measurement were longer than the primary's
+and are cut by it. Twenty descriptions over three packs do not establish how well the step reads
+other words or a larger library. The page does not show the offer yet.

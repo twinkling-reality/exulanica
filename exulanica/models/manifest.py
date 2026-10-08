@@ -121,6 +121,7 @@ class Role(StrEnum):
     SPECIFICATION_DRAFTER = "specification_drafter"
     CREATURE_DRAFTER = "creature_drafter"
     KIND_DRAFTER = "kind_drafter"
+    LOOK_CHOOSER = "look_chooser"
     REFERENCE_DRAFTING = "reference_drafting"
     REFERENCE_VISION = "reference_vision"
     EMBEDDING = "embedding"

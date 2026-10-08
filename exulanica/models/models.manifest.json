@@ -390,6 +390,23 @@
       "required_use_cases": ["text"],
       "rationale": "Drafts a kind of world from a person's description (exulanica/selection/kind_drafting.py): a brief with no keys, zones holding their structures, rooms, areas and fixtures and each part's use where it stands, compiled by code into a kind document and held to both stages of the kind checks, with two repairs naming the check's code, place and sentence and no fallback to another model on a refused brief. Chosen by the rule pre-registered for the measurement over four licence-resolved text models with a JSON schema in this manifest: eligible at 5 of 6 valid and 4 of 6 matching the words by rule; an eligible NVIDIA model with the shortest slowest draft within 120 s first, otherwise the eligible model with the shortest slowest draft. One model was eligible, so the role has no fallback."
     },
+    "look_chooser": {
+      "primary": "nvidia/nemotron-3-super-120b-a12b",
+      "fallback": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "timeout_seconds": 10,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-10-07-look-chooser-timings.json",
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "rows": 59,
+        "p50_ms": 1041,
+        "p99_ms": 4830,
+        "longest_ms": 4830,
+        "note": "The primary's own calls in the pre-registered timing measurement of the look chooser: twenty fixed descriptions of towns three times each against the library's three packs, every answer admitted on its first call; the three longest were one description. A call past the timeout leaves the library default with no error. No retained public record measures the Qwen3 235B fallback, which serves under this timeout when the primary is withdrawn."
+      },
+      "max_tokens": {"value": 1024, "basis": "The ceiling the measurement asked with, above the client's floor for a model that reasons before it answers; the primary answered every description within it using at most 769 completion tokens. A ceiling is not a spend; a low one costs a look offer."},
+      "required_use_cases": ["text"],
+      "rationale": "Chooses which listed look a person's description asks for, if any, after the specification drafter has drafted it (exulanica/selection/look_choosing.py): it is shown only the description as the drafter was sent it and each library pack's id, title and description, and answers one listed pack id or none with the description's own words that chose it, validated by code and repaired once. Kept apart from the drafter so offering looks can never move a draft. The drafter's model pair, so no new model or licence entry; a pre-registered measurement set its timeout. Model-unavailability errors select the fallback; a refused answer is repaired once and then answers none, never escalated to a larger model."
+    },
     "reference_drafting": {
       "primary": "Qwen/Qwen3-235B-A22B-Instruct-2507",
       "fallback": "deepseek-ai/DeepSeek-V4-Flash-0731",

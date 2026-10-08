@@ -75,7 +75,10 @@ agent calling the API receives the same proposal. The drafting model was chosen 
 comparison on version 1 of the specification and of the drafter's words
 ([record](../evaluation/2026-09-29-world-drafting-models-v2.json)); version 2 of the words says what a
 share is and names no value, so a description's street mix and kinds of building and shop become the
-specification's values. Every town made through `POST /worlds/generated` wears a look from the
+specification's values. The draft also offers the library look the words ask for, if any, chosen
+by a short call of its own after the draft that never changes it, with the person's own words that
+chose it; the person keeps or changes it, and the page does not show it yet
+([the look offer](../style-pack-contract.md#101-a-look-offered-from-a-description)). Every town made through `POST /worlds/generated` wears a look from the
 moment it is made: the pack the request names, or the host's default. It keeps that look when the
 pack gains a version, since the host serves every version it has published, and moving to the newer
 one is a choice of its own ([style packs](../style-pack-contract.md#10-a-worlds-pack)).

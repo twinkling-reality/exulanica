@@ -5,6 +5,7 @@ stand-ins the drafter's tests use."""
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import uuid
 from collections.abc import Mapping
@@ -18,12 +19,15 @@ from exulanica.api.routes import world_drafts
 from exulanica.api.services import Services
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
+from exulanica.models.errors import BudgetExceededError, TransportError
 from exulanica.models.manifest import load_manifest
 from exulanica.models.transport import HttpResponse
+from exulanica.selection.look_choosing import CHOOSER_ROLE, LookOption, render_request
 from exulanica.selection.world_drafting import DRAFTER_ROLE
 from exulanica.world import specification_source
 from exulanica.world.specification_samples import Counted, TownSample
 from exulanica.world.specification_source import ValueRefusal
+from exulanica.world.style_pack_library import style_pack_library
 from fastapi.testclient import TestClient
 
 from conftest import TEST_CEILING_USD, TEST_MAX_CALLS
@@ -37,6 +41,7 @@ pytestmark = pytest.mark.postgres
 TOKEN = "world-drafts-owner-token-at-least-32-chars"
 NO_MODEL_TOKEN = "world-drafts-no-model-token-at-least-32-chars"
 DRAFTER = load_manifest()[DRAFTER_ROLE].primary.model_id
+CHOOSER = load_manifest()[CHOOSER_ROLE].primary.model_id
 
 
 def _form(**changes: Any) -> dict[str, Any]:
@@ -244,6 +249,8 @@ def test_nothing_a_town_can_be_is_refused_by_name_with_nothing_sampled(drafts):
     assert body["refusal"]["code"] == "description_not_supported"
     assert body["not_supported"] == ["a floating city in the clouds"]
     assert samples.asked == []
+    # A refused draft is offered no look, and the look step asks nothing.
+    assert body["look_offer"] is None and transport.call_count == 1
 
 
 def test_without_a_model_the_route_says_so_and_asks_for_nothing(drafts, monkeypatch):
@@ -288,3 +295,128 @@ def test_a_description_past_its_ceiling_is_refused_before_any_model_is_asked(dra
 
     assert response.status_code == 422
     assert transport.call_count == 0
+
+
+# -- the look offered after the draft ------------------------------------------------------------
+
+
+def _choice(look: str | None, words: list[str]) -> HttpResponse:
+    content = json.dumps({"look": look, "look_words": words})
+    return HttpResponse(status_code=200, text=json.dumps(chat_body(content, model=CHOOSER)))
+
+
+def _payload_bytes(request: Mapping[str, Any]) -> bytes:
+    return json.dumps(
+        {"url": request["url"], "payload": request["payload"]}, sort_keys=True
+    ).encode()
+
+
+def test_a_look_the_words_ask_for_is_offered_in_the_persons_own_words(drafts):
+    app, transport, _, _ = drafts
+    transport.responses += [
+        _reply(_form(fit="part", not_supported=["a harbour like it"])),
+        _choice("exulanica.cozy-town", ["cozy", "warm evening light like [place A]"]),
+    ]
+    description = "A cozy town in warm evening light like lantern house, a harbour like it"
+
+    with app() as client:
+        body = _draft(client, description).json()
+
+    offer = body["look_offer"]
+    cozy = style_pack_library().pack("exulanica.cozy-town")
+    assert cozy is not None
+    assert (offer["state"], offer["reason"]) == ("offered", None)
+    assert (offer["pack_id"], offer["version"], offer["manifest_sha256"]) == (
+        cozy.pack_id,
+        cozy.version,
+        cozy.manifest_sha256,
+    )
+    # The person's own words, as typed: the saved name written back, never sent.
+    assert offer["look_words"] == ["cozy", "warm evening light like lantern house"]
+    assert offer["prompt_version"] == "look-choosing-1"
+    assert [call["role"] for call in offer["execution"]["calls"]] == [str(CHOOSER_ROLE)]
+    # The draft's own execution lists the drafter's calls alone.
+    assert [call["role"] for call in body["execution"]["calls"]] == [str(DRAFTER_ROLE)]
+    # The step was shown the description as the drafter was sent it, and the looks; no name.
+    first, second = transport.requests
+    sent = first["payload"]["messages"][1]["content"]
+    assert "[place A]" in sent
+    messages = second["payload"]["messages"]
+    looks = tuple(
+        LookOption(pack.pack_id, pack.title, pack.description)
+        for pack in style_pack_library().packs
+    )
+    words = "A cozy town in warm evening light like [place A], a harbour like it"
+    assert messages[1]["content"] == render_request(words, looks)
+    assert "lantern" not in json.dumps(second["payload"]).lower()
+
+
+def test_the_drafters_request_is_the_same_byte_for_byte_with_the_look_step_on_and_off(
+    drafts, monkeypatch
+):
+    """The fit rule as a test: offering looks never changes what the drafter is asked."""
+    app, transport, _, _ = drafts
+    description = "A cozy little market town in warm evening light"
+    transport.responses += [_reply(_form()), _choice(None, [])]
+    with app() as client:
+        on = _draft(client, description).json()
+    assert on["look_offer"]["state"] == "none" and transport.call_count == 2
+    drafted_with_step = _payload_bytes(transport.requests[0])
+
+    # Off: a library holding no look, so the step asks nothing.
+    library = style_pack_library()
+    monkeypatch.setattr(
+        world_drafts,
+        "style_pack_library",
+        lambda: dataclasses.replace(library, packs=()),
+    )
+    transport.requests.clear()
+    transport.responses.append(_reply(_form()))
+    with app() as client:
+        off = _draft(client, description).json()
+    assert off["look_offer"] is None and transport.call_count == 1
+
+    assert _payload_bytes(transport.requests[0]) == drafted_with_step
+    assert {k: v for k, v in on.items() if k != "look_offer"} == {
+        k: v for k, v in off.items() if k != "look_offer"
+    } | {"execution": on["execution"]}
+
+
+def test_a_refused_answer_offers_no_look_and_says_why(drafts):
+    app, transport, _, _ = drafts
+    unlisted = _choice("exulanica.cozy-town", ["snug"])
+    transport.responses += [_reply(_form()), unlisted, unlisted]
+
+    with app() as client:
+        offer = _draft(client, "a cozy little town").json()["look_offer"]
+
+    assert (offer["state"], offer["reason"], offer["pack_id"]) == ("none", "answer_refused", None)
+    assert offer["look_words"] == [] and len(offer["execution"]["calls"]) == 2
+
+
+@pytest.mark.parametrize(
+    ("failure", "reason"),
+    [
+        (TransportError("no whole answer", timed_out=True), "timed_out"),
+        (TransportError("the provider failed", retryable=False), "failed"),
+        (BudgetExceededError("no allowance", spent_usd=1, ceiling_usd=1), "no_allowance"),
+    ],
+)
+def test_a_look_step_that_cannot_answer_leaves_the_draft_and_says_why(
+    drafts, monkeypatch, failure, reason
+):
+    app, transport, _, _ = drafts
+    transport.responses.append(_reply(_form()))
+
+    def unanswered(*args: Any, **kwargs: Any) -> Any:
+        raise failure
+
+    monkeypatch.setattr(world_drafts, "choose_look", unanswered)
+    with app() as client:
+        response = _draft(client, "a cozy little town")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["proposal"]["preset"] == "small_town"
+    assert (body["look_offer"]["state"], body["look_offer"]["reason"]) == ("unavailable", reason)
+    assert body["look_offer"]["pack_id"] is None

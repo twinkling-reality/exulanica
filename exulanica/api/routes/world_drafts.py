@@ -11,7 +11,12 @@ proposal document, the same for the page and for an agent calling the API:
     (:mod:`exulanica.world.specification_samples`): its people, vehicles, streets and premises;
 *   the parts of the words no value can say, each the person's own words;
 *   or a refusal by name when nothing the words ask for is a world this server makes;
-*   the specification, prompt and model it was drafted with, and what the drafting cost.
+*   the specification, prompt and model it was drafted with, and what the drafting cost;
+*   for a draft that is not refused, ``look_offer``: which of the library's looks the words ask
+    for, if any, chosen by a short step of its own after the draft
+    (:mod:`exulanica.selection.look_choosing`), with the person's own words that chose it. The
+    drafter's request is the same whether or not the step runs; whatever the step answers, the
+    person picks the look, and the library's default stands when it offers none.
 
 Nothing is written. Making the world is the person's ``POST /worlds/generated`` with the preset and
 values they confirm, the one gate every world passes. The route needs ``world.read`` and
@@ -29,14 +34,21 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
 from exulanica.api.routes.selection import ExecutionView, _execution, _require_model
 from exulanica.epistemics.hosted_requests import borrowing, no_place_released
+from exulanica.errors import PrivacyAdmissionError
+from exulanica.models.client import ModelClient
+from exulanica.models.errors import BudgetExceededError, ModelError
 from exulanica.models.manifest import load_manifest
+from exulanica.selection.calls import CallLog
+from exulanica.selection.look_choosing import LookOption, choose_look, chooser_prompt
 from exulanica.selection.world_drafting import (
+    SentDescription,
     drafting_prompt,
     propose_world_specification,
     specification_view,
 )
 from exulanica.world import specification_source
 from exulanica.world.specification_samples import TownSample, sample_worker
+from exulanica.world.style_pack_library import style_pack_library
 
 __all__ = ["router"]
 
@@ -127,6 +139,37 @@ class DraftRefusalView(BaseModel):
     detail: str
 
 
+#: Why a look offer is none or unavailable.
+LookReason = Literal["answer_refused", "timed_out", "failed", "request_refused", "no_allowance"]
+
+
+class LookOfferView(BaseModel):
+    """The look the words ask for, offered for the person to keep or change, or why there is none.
+
+    ``offered`` names a library pack at its current version (``pack_id``, ``version`` and
+    ``manifest_sha256``, so the page binds exactly what was offered) and the person's own words
+    that chose it, as typed. ``none``: the step found no listed look in the words, or its answer
+    was refused twice (``reason`` ``answer_refused``). ``unavailable``: the step could not be
+    asked or did not answer (``reason`` ``timed_out``, ``failed``, ``request_refused`` or
+    ``no_allowance``). Either way the world is made in the library's default unless the person
+    picks a look, and the draft is unchanged.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    state: Literal["offered", "none", "unavailable"]
+    reason: LookReason | None
+    pack_id: str | None
+    version: int | None
+    manifest_sha256: str | None
+    #: The person's own words that chose the look, as typed: never a saved name.
+    look_words: list[str]
+    prompt_version: str
+    prompt_sha256: str
+    #: What the step cost to produce, its own attempts only; the draft's are in ``execution``.
+    execution: ExecutionView
+
+
 class WorldDraftView(BaseModel):
     """What a description drafted: a proposal to confirm, or a refusal, and how it was made."""
 
@@ -147,6 +190,60 @@ class WorldDraftView(BaseModel):
     #: The name a person reads for ``model_id`` (``Manifest.model_name``): no page derives one.
     model_name: str | None
     execution: ExecutionView
+    #: Present for a draft that is not refused, while the library holds a look; absent otherwise.
+    look_offer: LookOfferView | None = None
+
+
+def _unavailable(failed: Exception) -> LookReason:
+    if isinstance(failed, BudgetExceededError):
+        return "no_allowance"
+    if isinstance(failed, PrivacyAdmissionError):
+        return "request_refused"
+    return "timed_out" if getattr(failed, "timed_out", False) else "failed"
+
+
+def _look_offer(client: ModelClient, sent: SentDescription) -> LookOfferView | None:
+    """Ask which listed look the words sent to the drafter ask for, after the draft. The step
+    spends the same allowance the draft does, and its failure never fails the draft."""
+    packs = {pack.pack_id: pack for pack in style_pack_library().packs}
+    if not packs:
+        return None
+    prompt = chooser_prompt()
+    options = tuple(
+        LookOption(pack.pack_id, pack.title, pack.description) for pack in packs.values()
+    )
+    log = CallLog()
+    state: Literal["offered", "none", "unavailable"]
+    reason: LookReason | None
+    pack = None
+    words: list[str] = []
+    try:
+        choice = choose_look(
+            client.with_attempts(log.attempt),
+            sent.text,
+            options,
+            prompt=prompt,
+            placeholders=sent.placeholders,
+            log=log,
+        )
+    except (ModelError, PrivacyAdmissionError) as failed:
+        state, reason = "unavailable", _unavailable(failed)
+    else:
+        reason = None if choice.refused is None else "answer_refused"
+        pack = None if choice.look is None else packs[choice.look]
+        state = "none" if pack is None else "offered"
+        words = [sent.typed_words(start, end) for start, end in choice.look_words_at]
+    return LookOfferView(
+        state=state,
+        reason=reason,
+        pack_id=None if pack is None else pack.pack_id,
+        version=None if pack is None else pack.version,
+        manifest_sha256=None if pack is None else pack.manifest_sha256,
+        look_words=words,
+        prompt_version=prompt.prompt_version,
+        prompt_sha256=prompt.sha256,
+        execution=_execution(log.calls, (), prompt_version=prompt.prompt_version),
+    )
 
 
 def _sample(sample: TownSample) -> SampleView:
@@ -230,4 +327,5 @@ def draft_world(
         if outcome.model_id is None
         else load_manifest().model_name(outcome.model_id),
         execution=_execution(outcome.calls, (), prompt_version=prompt.prompt_version),
+        look_offer=None if draft is None else _look_offer(client, sent),
     )
