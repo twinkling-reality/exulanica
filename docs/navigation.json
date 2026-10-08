@@ -33,6 +33,7 @@
       "documents": [
         {"path": "synthetic-society-contract.md", "role": "contract", "owns": "Society engines, inputs, identity, persistence, playback, directed actions and replay"},
         {"path": "decision-roles-contract.md", "role": "contract", "owns": "Decision roles, the owner's model choice, the person's decision contract, host asking and spend bounds, dispositions and replay"},
+        {"path": "minds-contract.md", "role": "contract", "owns": "What a being of a society of things notices and remembers: the surroundings and memory blocks a decider is shown, and the rules and bounds that build them"},
         {"path": "door-contract.md", "role": "contract", "owns": "The door for outside programs: admitted bridges, owners' grants and their secrets, the channel a bridge reads and answers on, the external asker and mapping files"},
         {"path": "society-experiments.md", "role": "contract", "owns": "Comparisons of the models that decide for a world's people, and intervention experiments over a living society"},
         {"path": "movement-modules-contract.md", "role": "contract", "owns": "Movement modules and their dispatch: walking, flight through a world's air, flying kinds and roads"},

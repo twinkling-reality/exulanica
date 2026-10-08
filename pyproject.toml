@@ -1015,3 +1015,25 @@ forbidden_modules = [
   "exulanica.models",
   "exulanica.selection",
 ]
+
+[[tool.importlinter.contracts]]
+# What a being notices and remembers is built by rule from a society's stored state, its input and
+# its minute's events, so a replay rebuilds it to the byte. These modules cannot open the database,
+# reach the HTTP surface, the door or the spending authority, or ask a model: what a decider is
+# shown is never fetched, and nothing in it is written by a model. The store is not listed: they
+# read the planner's routine and walking graph, whose ground composition reaches the asset store's
+# readers.
+name = "What a being notices and remembers is built by rule, with no database, door or model call"
+type = "forbidden"
+source_modules = [
+  "exulanica.world.society_recollection",
+  "exulanica.world.society_surroundings",
+]
+forbidden_modules = [
+  "psycopg",
+  "exulanica.api",
+  "exulanica.db",
+  "exulanica.door",
+  "exulanica.models.client",
+  "exulanica.spending",
+]

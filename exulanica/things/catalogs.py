@@ -79,6 +79,7 @@ __all__ = [
     "ThingCatalogError",
     "ThingCatalogs",
     "load_thing_catalogs",
+    "offers_of_version",
     "read_body_plan",
     "thing_catalogs",
 ]
@@ -861,3 +862,16 @@ def load_thing_catalogs(directory: Path = CATALOG_DIRECTORY) -> ThingCatalogs:
 def thing_catalogs() -> ThingCatalogs:
     """The catalogs this process reads, once."""
     return load_thing_catalogs(CATALOG_DIRECTORY)
+
+
+@cache
+def offers_of_version(version: int, directory: Path = CATALOG_DIRECTORY) -> Mapping[str, Offer]:
+    """Every offer as version ``version`` of the offers catalog states it, read against its schema:
+    a reader that shows an offer's words to a decider names the version it read, so a later
+    version never changes what an earlier request was shown."""
+    read = load_catalog(
+        directory / f"offers.v{version}.json", _schema("offers", version, _FIELDS["offers"])
+    )
+    return MappingProxyType(
+        {entry.key: _offer(f"offers[{index}]", entry) for index, entry in enumerate(read.entries)}
+    )
