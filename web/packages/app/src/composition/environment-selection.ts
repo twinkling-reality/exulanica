@@ -197,7 +197,15 @@ export interface SelectedBeing {
    * For a visitor: the bridge it crossed through and the door's entry for it, null where the door
    * does not list that bridge here (or has not been read yet).
    */
-  readonly crossing: { readonly bridge: string; readonly entry: DoorBridge | null; readonly arrivalId: string } | null;
+  readonly crossing: {
+    readonly bridge: string;
+    readonly entry: DoorBridge | null;
+    readonly arrivalId: string;
+    /** Who decides for it here, as its arrival said: the world, or (absent) the program that sent it. */
+    readonly decidedBy: 'program' | 'world';
+  } | null;
+  /** Who runs it and how it came, as the world's marks read it (`markInputFor`), so card and world agree. */
+  readonly mark: MarkInput;
   /** The things it holds now, by the state's own ids and kinds. */
   readonly holding: readonly { readonly id: string; readonly kind: KindReference }[];
   /** The saved world and version it lives in, for the looks chosen for its things. */
@@ -2129,16 +2137,18 @@ export function mountEnvironmentSelection(
       kindLabel: (kind: KindReference) => kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label ?? null,
       speaker: (other: string) => {
         const speaker = people.find((held) => held.id === other);
-        if (speaker === undefined) return null;
-        const crossed = speaker.came_by === 'crossed' ? speaker.crossing ?? null : null;
-        return { running: running.get(other) ?? null, crossing: crossed, bridge: crossed === null ? null : bridges?.get(crossed.bridge) ?? null, declared: null };
+        return speaker === undefined ? null : markInputFor(speaker, running);
       },
     };
     return {
       kind: person.kind,
       cameBy: person.came_by,
       placedId: person.placed_id ?? null,
-      crossing: crossing === null ? null : { bridge: crossing.bridge, entry: bridges?.get(crossing.bridge) ?? null, arrivalId: crossing.arrival_id },
+      crossing: crossing === null ? null : {
+        bridge: crossing.bridge, entry: bridges?.get(crossing.bridge) ?? null, arrivalId: crossing.arrival_id,
+        decidedBy: crossing.decided_by === 'world' ? 'world' : 'program',
+      },
+      mark: markInputFor(person, running),
       holding: (state?.things ?? []).filter((thing) => thing.held_by === id).map((thing) => ({ id: thing.id, kind: thing.kind })),
       world: savedWorld === null ? null : { worldId: savedWorld.worldId, versionId: savedWorld.versionId },
       said: saidBy(id, events, names),

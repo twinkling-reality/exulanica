@@ -13,7 +13,7 @@
 
 import type { ThingLibrary } from '@exulanica/atlas-react/things';
 import { buildThingCard, type CardLine, type CardLooks, type CardMark, type CardMind, type CardMindChoice, type ThingCardModel } from '../ui/thing-card.js';
-import { costWords, modelLine } from '../ui/society-models.js';
+import { cameWords, costWords, modelLine, outsideShort } from '../ui/society-models.js';
 import type { ModelRef, SocietyModel } from '../society-models-api.js';
 import type { Credentials } from '../config.js';
 import { openThingLibrary } from '../things-library.js';
@@ -49,15 +49,19 @@ export interface BeingFacts {
   readonly crossing?: CrossingRows | null;
 }
 
-/** A visitor's mind: the program it came with decides for it, in words from the door's entry alone. */
-function outsideMind(mark: ThingMark, entry: SelectedBeing['crossing']): CardMind {
+/**
+ * A visitor's mind before Who decides' read names who runs it: the program it came with decides,
+ * said only as far as the door's entry goes. A program-decided grant says nothing about a person,
+ * so no person is claimed; an AI is named only where the door's entry says an AI runs the bridge.
+ */
+function outsideMind(mark: ThingMark | null, entry: SelectedBeing['crossing']): CardMind {
   const bridge = entry?.entry ?? null;
   const line = bridge === null
     ? 'Decided from outside this world.'
     : bridge.ai
-      ? `Decided from outside, through ${bridge.label}. It is not one of this world's own minds.`
-      : `Decided from outside, through ${bridge.label}. It is not an AI.`;
-  return { name: mark.full, line, mark: cardMark(mark), choices: [], ask: '', when: '' };
+      ? `Decided from outside by an AI agent, through ${bridge.label}. It is not one of this world's own minds.`
+      : `Decided from outside, through ${bridge.label}.`;
+  return { name: bridge?.label ?? 'From outside', line, mark: mark === null ? null : cardMark(mark), choices: [], ask: '', when: '' };
 }
 
 /**
@@ -98,25 +102,34 @@ export function personCard(
 ): ThingCardModel {
   const being = about.being ?? null;
   const crossing = being?.crossing ?? null;
-  if (being !== null && crossing !== null) {
-    const outside = markOf({ running: null, crossing, bridge: crossing.entry, declared: null })!;
+  // Who runs it from outside, as Who decides' read names it (a visitor its program decides for, or
+  // one of the world's own people a grant lets a program run); before that read names it, a visitor
+  // whose arrival did not say the world decides is taken as its program's.
+  const outsideEntry = about.mind?.outside ?? null;
+  if (being !== null && (outsideEntry !== null || (crossing !== null && crossing.decidedBy === 'program'))) {
+    const outside = markOf(being.mark) ?? (crossing === null ? null : markOf({ running: null, crossing, bridge: crossing.entry }));
+    const mind: CardMind = outsideEntry !== null && about.mind !== null
+      // Who decides' own words for it, never a copy: an outside program decides, so no Change.
+      ? { name: outsideShort(outsideEntry), line: about.mind.words, mark: outside === null ? null : cardMark(outside), choices: [], ask: '', when: '' }
+      : outsideMind(outside, crossing);
     return {
       subject: subjectId,
       title: about.note.title,
-      mark: cardMark(outside),
+      mark: outside === null ? null : cardMark(outside),
       summary: facts?.kind.summary ?? about.note.description,
       now: about.note.activity.trim() === '' ? null : about.note.activity,
-      mind: outsideMind(outside, crossing),
+      mind,
       looks: looksOf(facts?.look ?? null),
       holding: facts?.holding ?? null,
       crossing: facts?.crossing ?? null,
       said: cardLines(being.said, subjectId, models, true),
       heard: cardLines(being.heard, subjectId, models, false),
-      cameFrom: beingCameWords(being, facts?.kind ?? null),
+      cameFrom: outsideEntry !== null ? cameWords(outsideEntry) : beingCameWords(being, facts?.kind ?? null),
     };
   }
   const running = about.mind?.running ?? null;
-  const mark = markOf({ running });
+  // A visitor the world decides for is marked by its mind and where it came from, as in the world.
+  const mark = being === null ? markOf({ running }) : markOf({ ...being.mark, running });
   const offered = running === null ? undefined : models?.find((model) => modelKey(model) === modelKey(running));
   const choices: CardMindChoice[] = about.mind === null || models === null ? [] : [
     { key: ROUTINE_KEY, name: ROUTINE_NAME, line: ROUTINE_LINE, badge: null, now: running === null, refused: null },

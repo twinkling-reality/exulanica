@@ -241,12 +241,17 @@ describe('visitors crossing into a saved world', () => {
     notices[0]!.seeWho!();
     const card = shown.at(-1)!;
     expect(card.id).toBe('visitor-1');
-    expect(card.about.being).toEqual({
+    expect(card.about.being).toMatchObject({
       kind: KNIGHT, cameBy: 'crossed', placedId: null,
-      crossing: { bridge: 'blockgame', entry: { bridge: 'blockgame', label: 'Block Game', game: 'Block Game', runBy: 'server', ai: false }, arrivalId: 'arrival-visitor-1' },
+      crossing: { bridge: 'blockgame', entry: { bridge: 'blockgame', label: 'Block Game', game: 'Block Game', runBy: 'server', ai: false }, arrivalId: 'arrival-visitor-1', decidedBy: 'program' },
       holding: [{ id: 'sword-1', kind: SWORD }],
       world: { worldId: WORLD, versionId: 'version' },
       said: [], heard: [],
+    });
+    // The card is handed the very input the world's marks read (markInputFor), so the two agree.
+    expect(card.about.being!.mark).toEqual({
+      running: null, crossing: { arrival_id: 'arrival-visitor-1', bridge: 'blockgame', grant_id: 'grant-1' },
+      bridge: { bridge: 'blockgame', label: 'Block Game', game: 'Block Game', runBy: 'server', ai: false }, declared: null,
     });
 
     // Read again with nothing new, nothing is told again.
@@ -410,3 +415,30 @@ describe('why one of the world\'s own people a grant hands to an outside program
     }
    });
  });
+
+describe('who decides for a visitor, handed to its card', () => {
+  it('carries its arrival\'s word that the world decides for it, and the world\'s mark input with it', async () => {
+    server.tick = 5;
+    server.people = [
+      person('visitor-1', { kind: KNIGHT, came_by: 'crossed', placed_id: null, crossing: { arrival_id: 'a1', bridge: 'blockgame', grant_id: 'g1' } }),
+      person('visitor-2', { kind: KNIGHT, came_by: 'crossed', placed_id: null, crossing: { arrival_id: 'a2', bridge: 'blockgame', grant_id: 'g2', decided_by: 'world' } }),
+    ];
+    server.things = [];
+    server.events = [];
+    const { mounted, shown, crowd } = mount();
+    crowd.visibleInhabitantIds = ['visitor-1', 'visitor-2'];
+    await mounted.begin();
+    await settle();
+    const pick = [...document.querySelectorAll('select')].find((one) => one.getAttribute('aria-label') === 'Inspect nearby inhabitant')!;
+    const beingOf = (id: string) => {
+      pick.value = id;
+      pick.dispatchEvent(new Event('change'));
+      return shown.at(-1)!.about.being!;
+    };
+    expect(beingOf('visitor-1').crossing?.decidedBy).toBe('program');
+    const world = beingOf('visitor-2');
+    expect(world.crossing?.decidedBy).toBe('world');
+    expect(world.mark.crossing).toMatchObject({ bridge: 'blockgame', decided_by: 'world' });
+    mounted.dispose();
+  });
+});

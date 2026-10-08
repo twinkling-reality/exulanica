@@ -266,11 +266,16 @@ its kind's summary; the look it is drawn in (the one chosen for it, else its kin
 who made it and its licence, and no look row where it is drawn as one of the world's people; what
 it holds ("Holding: a sword"); and how it came: "You placed it here." with its kind's origin, "One
 of the people who live in this world.", or, for a visitor, "Came in from" the bridge's label as
-the door lists it. A visitor is decided for by the program it came with, so its card offers no
-Change: its Mind names who runs it by its mark ("A person playing Block Game", "An outside AI
-agent") and says "Decided from outside, through" the bridge, adding "It is not an AI." only where
-the door's entry says no AI runs that bridge; a bridge the door does not list reads "Decided from
-outside this world." with no claim either way.
+the door lists it. Who decides for a visitor comes from the data, never from how it came: one an
+outside program decides for (Who decides' read lists it among those run from outside, or, before
+that read names it, its arrival did not say the world decides) has no Change, and its Mind is Who
+decides' own words (`outsideWords`, through the bridge, naming an AI agent only where the door's
+entry says an AI runs it), with Came from in the same words (`cameWords`). Before that read names it,
+the card says only "Decided from outside, through" the bridge: a grant whose program decides says
+nothing about a person, so none is claimed. One of the world's own people a grant lets a program run reads the
+same way. A visitor the world decides for has its world mind like any being, the model named or
+its routine, with Change for the owner, and wears the world's mark for it (the AI pill naming the
+model, with where it came from).
 
 A visitor's card also says what came across with it and what stayed behind, from its crossing's
 translation manifest (`GET /door/crossings/{arrival_id}/manifest`, the stored document): "Came

@@ -15,7 +15,9 @@ import type { DoorBridge } from '../src/door-bridges-api.js';
 import type { LookReference } from '../src/thing-card-api.js';
 import { readKindFacts, readLookFacts } from '../src/thing-card-api.js';
 import { readCrossingManifest } from '../src/crossing-manifest-api.js';
-import { AN_AI_MODEL, markLabel } from '../src/composition/thing-marks.js';
+import { cameWords, outsideShort, outsideWords } from '../src/ui/society-models.js';
+import type { OutsideDecider } from '../src/society-models-api.js';
+import { AN_AI_MODEL, markLabel, markOf } from '../src/composition/thing-marks.js';
 
 const repository = `${process.cwd()}/..`;
 const read = (path: string): Record<string, unknown> =>
@@ -52,33 +54,44 @@ const about = (being: SelectedBeing | undefined, running: SelectedPerson['mind']
   mind: running,
   ...(being === undefined ? {} : { being }),
 });
-const being = (fields: Partial<SelectedBeing>): SelectedBeing => ({
-  kind: ref('knight'), cameBy: 'placed', placedId: 'knight-1', crossing: null, holding: [],
-  world: { worldId: 'world:authored:saved', versionId: 'version' }, said: [], heard: [], ...fields,
-});
+const being = (fields: Partial<SelectedBeing>): SelectedBeing => {
+  const base = {
+    kind: ref('knight'), cameBy: 'placed' as const, placedId: 'knight-1' as string | null, crossing: null as SelectedBeing['crossing'], holding: [],
+    world: { worldId: 'world:authored:saved', versionId: 'version' }, said: [], heard: [], ...fields,
+  };
+  // The world's marks read a being this way (markInputFor): its crossing, and the door's entry for its bridge.
+  const crossing = base.crossing;
+  const mark = crossing === null ? { running: null }
+    : { running: null, crossing: { bridge: crossing.bridge, ...(crossing.decidedBy === 'world' ? { decided_by: 'world' as const } : {}) }, bridge: crossing.entry, declared: null };
+  return { mark, ...base } as SelectedBeing;
+};
 const facts = (look: string | null, holding: string | null = null) => ({
   kind: readKindFacts(KINDS['knight']), look: look === null ? null : readLookFacts(LOOKS[look]), holding,
 });
 
 describe('a person of a society of things, on the card', () => {
-  it('a visitor a person plays: marked by its game, decided from outside, with no Change', () => {
-    const card = personCard('visitor-1', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'arrival-blockgame' } })), null, facts(null, 'a sword'));
-    expect(card.mark).toEqual({ kind: 'from', text: 'from Block Game', label: 'From Block Game, decided from outside' });
-    expect(card.mind).toMatchObject({ name: 'From Block Game, decided from outside', line: 'Decided from outside, through Block Game. It is not an AI.', choices: [] });
+  it('a visitor from a game its program decides for: marked by its game, decided from outside, no person claimed, no Change', () => {
+    const card = personCard('visitor-1', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'arrival-blockgame', decidedBy: 'program' } })), null, facts(null, 'a sword'));
+    // The pill is the world's (markOf); its spoken words are the drawing's to say.
+    const mark = markOf({ running: null, crossing: { bridge: 'blockgame' }, bridge: GAME, declared: null })!;
+    expect(card.mark).toEqual({ kind: 'from', text: 'from Block Game', label: markLabel(mark) });
+    // A program-decided grant says nothing about a person (root's ruling, 2026-10-08): none is claimed.
+    expect(card.mind).toMatchObject({ name: 'Block Game', line: 'Decided from outside, through Block Game.', choices: [] });
+    expect(card.mind?.line).not.toMatch(/person|not an AI/u);
     expect(card.summary).toBe(KINDS['knight']!['summary']);
     expect(card.holding).toBe('a sword');
     expect(card.cameFrom).toBe('Came in from Block Game.');
   });
 
   it('a visitor an outside agent runs wears the AI mark and is not called a person', () => {
-    const card = personCard('visitor-2', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'agents', entry: AGENTS, arrivalId: 'arrival-agents' } })), null);
-    expect(card.mark).toEqual({ kind: 'ai', text: 'AI', label: 'An outside AI agent' });
-    expect(card.mind?.line).toBe('Decided from outside, through an outside agent. It is not one of this world\'s own minds.');
+    const card = personCard('visitor-2', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'agents', entry: AGENTS, arrivalId: 'arrival-agents', decidedBy: 'program' } })), null);
+    expect(card.mark).toEqual({ kind: 'ai', text: 'AI', label: markLabel(markOf({ running: null, crossing: { bridge: 'agents' }, bridge: AGENTS, declared: null })!) });
+    expect(card.mind?.line).toBe('Decided from outside by an AI agent, through an outside agent. It is not one of this world\'s own minds.');
     expect(card.mind?.line).not.toContain('not an AI');
   });
 
   it('a visitor through a bridge the door does not list claims nothing about who runs it', () => {
-    const card = personCard('visitor-3', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'elsewhere', entry: null, arrivalId: 'arrival-elsewhere' } })), null);
+    const card = personCard('visitor-3', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'elsewhere', entry: null, arrivalId: 'arrival-elsewhere', decidedBy: 'program' } })), null);
     expect(card.mind?.line).toBe('Decided from outside this world.');
     expect(card.cameFrom).toBe('Came in from outside this world.');
   });
@@ -90,6 +103,46 @@ describe('a person of a society of things, on the card', () => {
     expect(placed.holding).toBeNull();
     const villager = personCard('person-0', about(being({ kind: ref('villager'), cameBy: 'populated', placedId: null })), null);
     expect(villager.cameFrom).toBe('One of the people who live in this world.');
+  });
+});
+
+describe('who decides for a visitor, from Who decides\' read and its arrival', () => {
+  // The words are Who decides' own (ui/society-models.ts), which the card must show, never copy;
+  // the marks are the world's (markOf over markInputFor's input).
+  const QWEN = { provider: 'nebius_token_factory', modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507', name: 'Qwen3 235B Instruct', description: 'An open model.', refusal: null, price: null } as never;
+  const entry = (fields: Partial<OutsideDecider>): OutsideDecider => ({
+    subjectId: 'visitor-1', came: 'crossed', grantId: 'g', bridge: 'blockgame', bridgeLabel: 'Block Game', runBy: 'server',
+    ai: false, connected: true, declared: null, ...fields,
+  });
+  const outsideAbout = (decider: OutsideDecider, crossed: SelectedBeing | undefined): SelectedPerson => ({
+    ...about(crossed), mind: { running: null, words: outsideWords(decider), outside: decider },
+  });
+
+  it('an outside-decided visitor: Who decides\' words for its mind and where it came from, and no Change', () => {
+    const decider = entry({});
+    const card = personCard('visitor-1', outsideAbout(decider, being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'a', decidedBy: 'program' } })), [QWEN]);
+    expect(card.mind).toMatchObject({ name: outsideShort(decider), line: outsideWords(decider), choices: [] });
+    expect(card.cameFrom).toBe(cameWords(decider));
+    expect(card.mark?.text).toBe('from Block Game');
+  });
+
+  it('one of the world\'s own people a grant lets a program run: decided from outside, no Change', () => {
+    const decider = entry({ subjectId: 'knight-0', came: 'run', ai: true, declared: { name: 'Scout', maker: 'Acme', mind: null } });
+    const card = personCard('knight-0', outsideAbout(decider, being({})), [QWEN]);
+    expect(card.mind).toMatchObject({ name: 'Scout', line: outsideWords(decider), choices: [] });
+    expect(card.cameFrom).toBe(cameWords(decider));
+  });
+
+  it('a visitor the world decides for: its world mind with Change, marked by its mind and where it came from', () => {
+    const world = being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'a', decidedBy: 'world' } });
+    const runByModel = personCard('visitor-1', about(world, { running: QWEN, words: 'Qwen3 235B Instruct, the mind you named for travellers through their gate.' }), [QWEN]);
+    expect(runByModel.mind?.name).toBe('Qwen3 235B Instruct');
+    expect(runByModel.mind?.choices.length).toBeGreaterThan(0);
+    expect(runByModel.mark).toEqual({ kind: 'ai', text: 'AI', label: 'run by an AI model, Qwen3 235B Instruct, from Block Game' });
+    expect(runByModel.cameFrom).toBe('Came in from Block Game.');
+    const byRoutine = personCard('visitor-1', about(world, { running: null, words: 'Their own routine.' }), [QWEN]);
+    expect(byRoutine.mind?.choices.length).toBeGreaterThan(0);
+    expect(byRoutine.mark).toEqual({ kind: 'from', text: 'from Block Game', label: 'From Block Game, run by this world' });
   });
 });
 
@@ -107,7 +160,7 @@ describe('what came across with a visitor, on its card', () => {
     shell.append(card.view.root);
     return { card, root: card.view.root, asked };
   }
-  const visitor = being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'arrival-1' } });
+  const visitor = being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'arrival-1', decidedBy: 'program' } });
   const answer = {
     manifest_sha256: 'e'.repeat(64), from: { bridge: 'blockgame', label: 'Block Game', ai: false },
     manifest: { profile: 'exulanica.translation-manifest/v2', translator: {}, source: {}, target: {}, fields: [
@@ -254,7 +307,7 @@ describe('the mounted card for a being', () => {
   it('reads its kind, the look chosen for it by its own id, and what it holds, then shows them', async () => {
     const blocky = looksOf('knight')[1]!;
     const { card, root, lookReads } = mount(new Map([['visitor-1', { key: blocky.look, version: blocky.version, sha256: blocky.sha256 }]]));
-    const visitor = being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'arrival-blockgame' }, holding: [{ id: 'sword-1', kind: ref('sword') }] });
+    const visitor = being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'arrival-blockgame', decidedBy: 'program' }, holding: [{ id: 'sword-1', kind: ref('sword') }] });
     card.view.show('visitor-1', about(visitor));
     await settle();
     expect(root.querySelector('.thing-card-summary')?.textContent).toBe(KINDS['knight']!['summary']);
