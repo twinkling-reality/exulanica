@@ -495,29 +495,32 @@ class MaterialBakeWorker:
         on its own, so an error in one is recorded and the others are still served.
         """
         outcome = BakeOutcome()
-        with contextlib.ExitStack() as sessions:
-            active: dict[uuid.UUID, psycopg.Connection] = {}
-            for workspace_id in sorted(self.workspaces()):
-                try:
-                    connection = sessions.enter_context(self._database.session(workspace_id))
+        # A workspace's session is open only while one of its claims is served (and, on its first
+        # visit, while its exhausted work is expired), so a pass holds one connection at a time
+        # however many workspaces it visits.
+        active: list[uuid.UUID] = []
+        for workspace_id in sorted(self.workspaces()):
+            try:
+                with self._database.session(workspace_id) as connection:
                     outcome.exhausted += self._expire_exhausted(connection, workspace_id)
-                except Exception as error:
-                    outcome.errors.append(f"{workspace_id}: {type(error).__name__}: {error}")
-                    continue
-                active[workspace_id] = connection
-            while active and outcome.handled < self._limit and not self._stop.is_set():
-                for workspace_id, connection in list(active.items()):
-                    if outcome.handled >= self._limit or self._stop.is_set():
-                        break
-                    try:
+            except Exception as error:
+                outcome.errors.append(f"{workspace_id}: {type(error).__name__}: {error}")
+                continue
+            active.append(workspace_id)
+        while active and outcome.handled < self._limit and not self._stop.is_set():
+            for workspace_id in list(active):
+                if outcome.handled >= self._limit or self._stop.is_set():
+                    break
+                try:
+                    with self._database.session(workspace_id) as connection:
                         claim = self._claim(connection, workspace_id)
                         if claim is None:
-                            del active[workspace_id]
+                            active.remove(workspace_id)
                             continue
                         self._bake_one(connection, workspace_id, claim, outcome)
-                    except Exception as error:
-                        outcome.errors.append(f"{workspace_id}: {type(error).__name__}: {error}")
-                        del active[workspace_id]
+                except Exception as error:
+                    outcome.errors.append(f"{workspace_id}: {type(error).__name__}: {error}")
+                    active.remove(workspace_id)
         return outcome
 
     def start(self) -> None:

@@ -124,3 +124,60 @@ def test_the_setting_is_one_when_absent_and_refused_outside_one_to_eight():
         assert named.value.code == "playback_workers_out_of_bounds"
     with pytest.raises(ValueError):
         _worker(0)
+
+
+def test_a_pool_that_fails_records_a_failed_round_and_playback_goes_on(monkeypatch):
+    """The pool itself failing (no thread to start) is a failed round, as a claim's failure is,
+    not the end of playback until a restart."""
+
+    class Broken:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("can't start new thread")
+
+    monkeypatch.setattr(worker_module, "ThreadPoolExecutor", Broken)
+    worker = _worker(2)
+    stop = threading.Event()
+    runner = threading.Thread(target=worker.run, args=(stop,), kwargs={"poll_seconds": 0.05})
+    runner.start()
+    try:
+        for _ in range(200):
+            if worker.health["failed_rounds"] >= 2:
+                break
+            threading.Event().wait(0.05)
+        assert worker.health["failed_rounds"] >= 2, "playback stopped after the pool failed"
+        assert runner.is_alive()
+        assert worker.health["last_round_failed"] is True
+    finally:
+        stop.set()
+        runner.join(timeout=10)
+
+
+def test_one_pool_serves_every_round_and_ends_with_playback(monkeypatch):
+    built: list[object] = []
+    real = worker_module.ThreadPoolExecutor
+
+    def counted(*args, **kwargs):
+        pool = real(*args, **kwargs)
+        built.append(pool)
+        return pool
+
+    monkeypatch.setattr(worker_module, "ThreadPoolExecutor", counted)
+    worker = _worker(2)
+    claims: list[uuid.UUID] = []
+    worker._run_authorized_once = claims.append  # type: ignore[method-assign]
+    stop = threading.Event()
+    runner = threading.Thread(target=worker.run, args=(stop,), kwargs={"poll_seconds": 0.05})
+    runner.start()
+    try:
+        for _ in range(200):
+            if len(claims) >= 3 * len(WORKSPACES):
+                break
+            threading.Event().wait(0.05)
+        assert len(claims) >= 3 * len(WORKSPACES), "three rounds did not run"
+    finally:
+        stop.set()
+        runner.join(timeout=10)
+    assert len(built) == 1, "a pool per round"
+    assert worker._pool is None
+    with pytest.raises(RuntimeError):
+        built[0].submit(lambda: None)  # shut down with playback

@@ -178,3 +178,33 @@ def test_every_worker_command_reads_its_account_workspaces_paced(command):
     text = (Path(__file__).resolve().parents[1] / command).read_text(encoding="utf-8")
     assert "paced_account_source(" in text
     assert "AccountWorkspaceSource(" not in text
+
+
+def test_the_apis_own_derivative_worker_reads_its_account_workspaces_paced():
+    """The API can run the derivative worker in its own process (EXULANICA_DERIVATIVE_WORKER);
+    its account workspaces are paced like the worker commands'."""
+    from pathlib import Path
+
+    from exulanica.api.services import _RuntimeAccounts
+
+    text = (Path(__file__).resolve().parents[1] / "exulanica/api/services.py").read_text(
+        encoding="utf-8"
+    )
+    builder = text.split("return DerivativeWorker(", 1)[1].split("lease_seconds=", 1)[0]
+    assert "PacedWorkspaces(" in builder and "_RuntimeAccounts(self.accounts)" in builder
+
+    asked: list[object] = []
+
+    class Accounts:
+        def active_owned_workspaces(self):
+            asked.append("every")
+            return frozenset({uuid.UUID(int=1), uuid.UUID(int=2)})
+
+        def recent_workspaces(self, guest_seconds):
+            asked.append(guest_seconds)
+            return frozenset({uuid.UUID(int=1)})
+
+    source = _RuntimeAccounts(Accounts())  # type: ignore[arg-type]
+    assert source() == frozenset({uuid.UUID(int=1), uuid.UUID(int=2)})
+    assert source.recent(900) == frozenset({uuid.UUID(int=1)})
+    assert asked == ["every", 900]

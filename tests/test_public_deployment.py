@@ -500,6 +500,8 @@ def test_guests_towns_play_in_the_api_with_their_settings_from_init():
     base_api = BASE_SERVICES["api"]
     for name in ("EXULANICA_GUEST_PLAY_SECONDS", "EXULANICA_GUEST_PLAYING_MAXIMUM"):
         assert f"{name}: ${{{name}:-}}" in base_api
+    # The playback pool's size, which init writes.
+    assert "EXULANICA_PLAYBACK_WORKERS: ${EXULANICA_PLAYBACK_WORKERS:-}" in base_api
 
 
 @needs_shell
@@ -516,6 +518,13 @@ def test_init_writes_the_guests_play_window_and_maximum(tmp_path):
         "600",
         "12",
     )
+    # Four playback workers unless the operator says otherwise (JDAY's measurement, 10-08).
+    assert lines["EXULANICA_PLAYBACK_WORKERS"] == "4"
+    again = tmp_path / "again"
+    again.mkdir()
+    result = _script(again, "init", **{**_init_env(again), "EXULANICA_PLAYBACK_WORKERS": "2"})
+    assert result.returncode == 0, result.stderr
+    assert _env_lines(again / "deploy" / "public.env")["EXULANICA_PLAYBACK_WORKERS"] == "2"
 
 
 #: A host a public certificate authority can certify, as the judges' server's sslip.io name.
@@ -618,3 +627,15 @@ def test_every_docker_run_runs_a_loaded_image_and_the_build_pulls_by_the_platfor
     assert "docker buildx imagetools inspect --raw" in build_step
     pulls = [line for line in build_step.splitlines() if "docker pull" in line]
     assert pulls and all('@$manifest"' in line for line in pulls), pulls
+
+
+def test_watch_recreates_the_api_on_its_own_liveness_never_on_the_edges():
+    """A failed issuance or a rate-limited certificate makes the edge fail while the API is well;
+    restarting the API would fix nothing. The counter follows the API's own liveness, read from
+    inside the client container; the edge's answer is logged and never acted on."""
+    script = _directives(SCRIPT.read_text(encoding="utf-8")).replace("\\\n", " ")
+    watch = script.split("\n  watch)\n", 1)[1].split("\n    ;;\n", 1)[0]
+    assert re.search(r'inside="\$\(compose exec -T client .*http://api:8000/healthz', watch)
+    assert 'if [ "$inside" = 200 ]; then failures=0;' in watch
+    assert 'if [ "$live" = 200 ]' not in watch
+    assert "edge_healthz=$live" in watch

@@ -402,6 +402,7 @@ class _GuestPlaces:
         self.clock = clock
         self.playing: frozenset[uuid.UUID] = frozenset()
         self.since: dict[uuid.UUID, float] = {}
+        self.last_waited: dict[uuid.UUID, float] = {}
 
 
 @dataclass(frozen=True)
@@ -477,6 +478,14 @@ class AccountRuntime:
         with self.repository() as repository:
             return repository.active_owned_workspaces()
 
+    def recent_workspaces(self, guest_seconds: int) -> frozenset[uuid.UUID]:
+        """Every active owner's workspace and every guest's seen within ``guest_seconds``, with no
+        playing maximum and no memory of places: the workspaces whose people are there."""
+        with self.repository() as repository:
+            return frozenset(
+                repository.watched_workspaces(guest_seconds=guest_seconds, guests_at_most=1_000_000)
+            )
+
     def owned_workspace_active(self, workspace_id: uuid.UUID) -> bool:
         """Whether one workspace is open, read for it alone through the account role."""
         with self.repository() as repository:
@@ -496,10 +505,12 @@ class AccountRuntime:
                 since=places.since,
                 now=places.clock(),
                 tenure_seconds=guest.play_seconds if guest else None,
+                last_waited=places.last_waited,
             )
             # Owners are in the set too; keeping them is harmless, since only guests are ranked.
             places.playing = frozenset(watched)
             places.since = dict(getattr(watched, "since", {}))
+            places.last_waited = dict(getattr(watched, "last_waited", {}))
             return watched
 
     def start(self, return_uri: str | None = None) -> tuple[str, str]:

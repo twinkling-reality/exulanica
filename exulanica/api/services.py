@@ -44,7 +44,11 @@ from typing import TYPE_CHECKING, Final, Literal
 
 import psycopg
 
-from exulanica.api.account_runtime import AccountRuntime, load_account_runtime
+from exulanica.api.account_runtime import (
+    GUEST_PLAY_SECONDS_DEFAULT,
+    AccountRuntime,
+    load_account_runtime,
+)
 from exulanica.api.admission import AdmissionSettings
 from exulanica.api.authorisation import API_TOKENS_ENV, TokenDirectory, load_token_directory
 from exulanica.api.comparison_spending import bound_room_refusal
@@ -77,6 +81,7 @@ from exulanica.api.society_control_worker import (
 )
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
 from exulanica.consent.place_name_rights import released_place_names
+from exulanica.db.account_workspaces import PacedWorkspaces
 from exulanica.db.session import DATABASE_URL_ENV, Database
 from exulanica.door.runtime import DoorRuntime, door_runtime
 from exulanica.env import env_get, env_name, resolve_data_dir
@@ -288,6 +293,19 @@ class WatchedRead:
             if self._good is None or now - self._good[0] >= WATCHED_STALE_SECONDS:
                 return frozenset()
             return self._good[1]
+
+
+class _RuntimeAccounts:
+    """The API's account runtime as a paced source reads it (PacedWorkspaces)."""
+
+    def __init__(self, accounts: AccountRuntime) -> None:
+        self._accounts = accounts
+
+    def __call__(self) -> frozenset[uuid.UUID]:
+        return self._accounts.active_owned_workspaces()
+
+    def recent(self, guest_seconds: int) -> frozenset[uuid.UUID]:
+        return self._accounts.recent_workspaces(guest_seconds)
 
 
 @dataclass(frozen=True, slots=True)
@@ -774,7 +792,7 @@ class Services:
             return PROVIDER_CREDENTIAL_ABSENT
         return self.model_client.refusals.get(provider)
 
-    def smallest_ask_usd(self) -> dict[str, Decimal]:
+    def smallest_reservation_usd(self) -> dict[str, Decimal]:
         """By provider, the smallest reservation one attempt of any model a person may be given
         takes: its answer bound at its prices with no prompt. A remainder below it admits no ask
         of that provider's models; empty with no model client."""
@@ -1094,8 +1112,19 @@ class Services:
             self.database,
             self.store,
             self.tokens.workspaces,
+            # Paced as the worker commands are: the workspaces whose people are there every pass,
+            # every account workspace once in a while.
             workspace_source=(
-                self.accounts.active_owned_workspaces if self.accounts is not None else None
+                PacedWorkspaces(
+                    _RuntimeAccounts(self.accounts),
+                    guest_seconds=(
+                        self.accounts.guest.play_seconds
+                        if self.accounts.guest is not None
+                        else GUEST_PLAY_SECONDS_DEFAULT
+                    ),
+                )
+                if self.accounts is not None
+                else None
             ),
             vision=NebiusVisionModel(self.model_client) if self.model_client else None,
             embedding_pass=(

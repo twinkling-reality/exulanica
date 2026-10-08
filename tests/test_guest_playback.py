@@ -489,6 +489,7 @@ def test_the_account_runtime_hands_each_read_the_guests_it_played_last():
     histories: list[dict] = []
     first = WatchedWorkspaces(frozenset({WATCHED}), frozenset({WAITING}))
     first.since = {WATCHED: 5.0, WAITING: 6.0}
+    first.last_waited = {WAITING: 6.0}
     answers = iter([first, WatchedWorkspaces(frozenset({WAITING}), frozenset())])
 
     class _Repository:
@@ -507,6 +508,7 @@ def test_the_account_runtime_hands_each_read_the_guests_it_played_last():
     assert asked == [frozenset(), frozenset({WATCHED})]
     # The history and the play window's tenure go with each read.
     assert [history["since"] for history in histories] == [{}, {WATCHED: 5.0, WAITING: 6.0}]
+    assert [history["last_waited"] for history in histories] == [{}, {WAITING: 6.0}]
     assert {history["tenure_seconds"] for history in histories} == {_guest().play_seconds}
 
 
@@ -621,3 +623,46 @@ def test_services_hand_the_playback_worker_its_number_of_workers():
     assert _services(society_runtime=object()).build_society_control_worker().workers == 1
     built = _services(society_runtime=object(), society_playback_workers=3)
     assert built.build_society_control_worker().workers == 3
+
+
+def test_with_one_place_short_every_guest_takes_a_turn_waiting():
+    """Twenty-five guests, twenty-four places, the play window 900 s: each window one guest gives
+    its place to the one waiting, the one who waited longest ago (never, at first) going next, so
+    the guests who came first do not keep their places for good."""
+    from exulanica.db.account_workspaces import allot_places
+
+    guests = [uuid.UUID(int=100 + n) for n in range(25)]
+    playing: frozenset[uuid.UUID] = frozenset()
+    since: dict[uuid.UUID, float] = {}
+    waited: dict[uuid.UUID, float] = {}
+    turns = []
+    for step in range(7):
+        places = allot_places(
+            guests,
+            at_most=24,
+            playing=playing,
+            since=since,
+            now=step * 900.0,
+            tenure_seconds=900.0,
+            last_waited=waited,
+        )
+        assert len(places.playing) == 24 and len(places.waiting) == 1
+        turns.append(places.waiting[0])
+        playing, since, waited = frozenset(places.playing), places.since, places.last_waited
+    assert turns == [guests[24], guests[0], guests[1], guests[2], guests[3], guests[4], guests[5]]
+
+
+def test_the_guest_who_waited_longest_ago_gives_its_place_first():
+    from exulanica.db.account_workspaces import allot_places
+
+    places = allot_places(
+        [A, B, C],
+        at_most=2,
+        playing=frozenset({A, B}),
+        since={A: 0.0, B: 0.0},
+        now=1_000.0,
+        tenure_seconds=900.0,
+        # A entered first but waited recently; B never waited: B gives its place to C.
+        last_waited={A: 500.0},
+    )
+    assert set(places.playing) == {A, C} and places.waiting == (B,)

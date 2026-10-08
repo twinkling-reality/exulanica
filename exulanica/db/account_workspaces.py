@@ -6,7 +6,7 @@ import time
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Final
+from typing import Any, Final
 
 import psycopg
 from psycopg.rows import dict_row
@@ -65,6 +65,8 @@ class WatchedWorkspaces(frozenset):
     waiting: frozenset[uuid.UUID]
     #: When each guest there got its place or began waiting, for the next read.
     since: dict[uuid.UUID, float]
+    #: When each guest there last waited, for the next read.
+    last_waited: dict[uuid.UUID, float]
 
     def __new__(
         cls, played: frozenset[uuid.UUID], waiting: frozenset[uuid.UUID] = frozenset()
@@ -72,6 +74,7 @@ class WatchedWorkspaces(frozenset):
         watched = super().__new__(cls, played)
         watched.waiting = frozenset(waiting)
         watched.since = {}
+        watched.last_waited = {}
         return watched
 
 
@@ -83,6 +86,8 @@ class GuestPlaces:
     playing: tuple[uuid.UUID, ...]
     waiting: tuple[uuid.UUID, ...]
     since: dict[uuid.UUID, float]
+    #: When each guest there last waited, so places turn over to those who waited longest ago.
+    last_waited: dict[uuid.UUID, float] = field(default_factory=dict)
 
 
 def allot_places(
@@ -93,34 +98,48 @@ def allot_places(
     since: dict[uuid.UUID, float],
     now: float,
     tenure_seconds: float | None,
+    last_waited: dict[uuid.UUID, float] | None = None,
 ) -> GuestPlaces:
     """At most ``at_most`` of the guests ``there`` (in the order they entered) play.
 
-    A guest in ``playing`` keeps its place while it is there, except that one which has held it
-    ``tenure_seconds`` or longer gives it up while another waits, and joins the back of the queue.
-    A freed place goes to the guest waiting longest (``since``), a newcomer waiting from ``now``.
-    With no place at all none waits. Pure: the caller keeps ``since`` between reads."""
+    A guest in ``playing`` keeps its place while it is there. While others wait, as many places
+    as there are waiting guests are given up by those who have held theirs ``tenure_seconds`` or
+    longer, choosing first the guests who last waited longest ago (one who never waited first),
+    so every guest takes a turn; a guest giving its place up joins the back of the queue. A freed
+    place goes to the guest waiting longest (``since``), a newcomer waiting from ``now``. With no
+    place at all none waits. Pure: the caller keeps ``since`` and ``last_waited`` between reads.
+    """
     if at_most <= 0:
-        return GuestPlaces((), (), {})
+        return GuestPlaces((), (), {}, {})
+    waited = {} if last_waited is None else dict(last_waited)
     known = {guest: since.get(guest, now) for guest in there}
+    order = {guest: position for position, guest in enumerate(there)}
     kept = [guest for guest in there if guest in playing]
     kept.sort(key=lambda guest: known[guest])
     kept = kept[:at_most]
+    waiting = [guest for guest in there if guest not in kept]
     rotated: list[uuid.UUID] = []
-    if tenure_seconds is not None and len(there) > at_most:
-        rotated = [guest for guest in kept if now - known[guest] >= tenure_seconds]
+    if tenure_seconds is not None and waiting:
+        due = [guest for guest in kept if now - known[guest] >= tenure_seconds]
+        due.sort(key=lambda guest: (waited.get(guest, float("-inf")), order[guest]))
+        rotated = due[: len(waiting)]
         kept = [guest for guest in kept if guest not in rotated]
     for guest in rotated:
         known[guest] = now
-    order = {guest: position for position, guest in enumerate(there)}
-    queue = sorted(
-        (guest for guest in there if guest not in kept),
-        key=lambda guest: (guest in rotated, known[guest], order[guest]),
-    )
+    queue = sorted(waiting, key=lambda guest: (known[guest], order[guest])) + rotated
     taken = queue[: at_most - len(kept)]
     for guest in taken:
         known[guest] = now
-    return GuestPlaces(tuple(kept) + tuple(taken), tuple(queue[len(taken) :]), known)
+    still = queue[len(taken) :]
+    for guest in still:
+        waited[guest] = now
+    present = set(there)
+    return GuestPlaces(
+        tuple(kept) + tuple(taken),
+        tuple(still),
+        known,
+        {guest: when for guest, when in waited.items() if guest in present},
+    )
 
 
 def watched_workspaces(
@@ -132,6 +151,7 @@ def watched_workspaces(
     since: dict[uuid.UUID, float] | None = None,
     now: float = 0.0,
     tenure_seconds: float | None = None,
+    last_waited: dict[uuid.UUID, float] | None = None,
 ) -> WatchedWorkspaces:
     """The workspaces a host plays and asks models for: every active owner's, and the guests'
     whose visitor was there lately.
@@ -175,12 +195,14 @@ def watched_workspaces(
         since={} if since is None else since,
         now=now,
         tenure_seconds=tenure_seconds,
+        last_waited=last_waited,
     )
     watched = WatchedWorkspaces(
         frozenset(row["workspace_id"] for row in owners) | frozenset(places.playing),
         frozenset(places.waiting),
     )
     watched.since = places.since
+    watched.last_waited = places.last_waited
     return watched
 
 
@@ -292,7 +314,9 @@ class PacedWorkspaces:
     the guest is there, so it is drained at once; work left when a guest leaves, or whose claim
     lapsed, is drained by the slow scan; guests who are not there cost a pass nothing."""
 
-    source: AccountWorkspaceSource
+    #: Called for every active account workspace; its ``recent(guest_seconds)`` names those whose
+    #: people are there (an AccountWorkspaceSource, or the API's own account runtime's).
+    source: Any
     guest_seconds: int = _GUEST_PLAY_SECONDS_DEFAULT
     slow_seconds: float = SLOW_SCAN_SECONDS
     clock: Callable[[], float] = time.monotonic

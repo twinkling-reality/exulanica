@@ -166,7 +166,9 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
         lease_seconds=lease_seconds,
     )
     if workspace_source is not None:
-        worker.refresh_workspaces()
+        # Verified at startup against the full account source itself, so the paced source's first
+        # call, which names every account workspace, is left for the first drain (and --once).
+        workspace_source.source()
     return worker
 
 

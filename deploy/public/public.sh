@@ -356,6 +356,10 @@ EXULANICA_GUEST_SESSION_SECONDS=${EXULANICA_GUEST_SESSION_SECONDS:-}
 # empty takes the defaults (fifteen minutes, 24).
 EXULANICA_GUEST_PLAY_SECONDS=${EXULANICA_GUEST_PLAY_SECONDS:-}
 EXULANICA_GUEST_PLAYING_MAXIMUM=${EXULANICA_GUEST_PLAYING_MAXIMUM:-}
+# How many towns' claims one playback round runs at once. 4 by default here: measured with 12 and
+# 24 model-run towns, four workers played about 4 minutes a minute per town against one worker's
+# 1 to 2, every answer accepted (docs/deployment.md 5.1.5).
+EXULANICA_PLAYBACK_WORKERS=${EXULANICA_PLAYBACK_WORKERS:-4}
 ENV
     # The operator's own token: a workspace of its own and operations.read alone, for the
     # installation facts, capacity and spending reads. It makes no world and asks no model.
@@ -539,10 +543,12 @@ PY
     ;;
 
   watch)
-    # One check through the public edge, for a timer to run every minute. Docker never restarts a
-    # container whose health check fails (deployment.md section 9), so three liveness failures in a
-    # row recreate the API container. Readiness is logged, never acted on: a dependency that is
-    # down is not fixed by restarting the API.
+    # One check, for a timer to run every minute. Docker never restarts a container whose health
+    # check fails (deployment.md section 9), so three failures in a row of the API's own liveness,
+    # read from inside the client container over the compose network, recreate the API container.
+    # The same check through the public edge is logged beside it and never acted on: an edge or a
+    # certificate that fails (a failed issuance, a rate limit) is not fixed by restarting the API.
+    # Readiness is logged too, never acted on: a dependency that is down is not fixed that way.
     need_env_file
     host="$(env_value EXULANICA_PUBLIC_HOST)"
     port="$(env_value EXULANICA_EDGE_HTTPS_PORT)"
@@ -558,13 +564,16 @@ PY
       --resolve "$host:${port:-443}:$address" "$origin/api/healthz" || true)"
     ready="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 $insecure \
       --resolve "$host:${port:-443}:$address" "$origin/api/readyz" || true)"
+    inside="$(compose exec -T client sh -c \
+      'wget -q -T 10 -O /dev/null http://api:8000/healthz && echo 200 || echo 000' 2>/dev/null \
+      || echo 000)"
     failures=0
     [ -f "$watch_state" ] && failures="$(cat "$watch_state")"
-    if [ "$live" = 200 ]; then failures=0; else failures=$((failures + 1)); fi
+    if [ "$inside" = 200 ]; then failures=0; else failures=$((failures + 1)); fi
     echo "$failures" >"$watch_state"
-    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) healthz=$live readyz=$ready failures=$failures"
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) api_healthz=$inside edge_healthz=$live readyz=$ready failures=$failures"
     if [ "$failures" -ge 3 ]; then
-      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) recreating api after $failures liveness failures"
+      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) recreating api after $failures failures of its own liveness"
       compose up -d --no-build --pull never --no-deps --force-recreate api
       echo 0 >"$watch_state"
     fi

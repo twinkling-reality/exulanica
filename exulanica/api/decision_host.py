@@ -892,9 +892,12 @@ class DecisionHost:
                 if asking_roles
                 else (frozenset(), {})
             )
+            # What each provider's allowance has left for this claim's asks, spent down as they are
+            # reserved (_reserved).
+            remaining = dict(available)
             for role, contract, chosen in asking_roles:
                 assert client is not None
-                due = self._due(role, contract, chosen, row["state"], client, spent, available)
+                due = self._due(role, contract, chosen, row["state"], client, spent)
                 if due:
                     planned.append((role, contract, lease_ends, due))
             outside_planned = []
@@ -971,7 +974,16 @@ class DecisionHost:
                 ) -> tuple[list[RoleAsk], list[tuple[uuid.UUID, dict[str, Any]]]]:
                     assert client is not None
                     return self._reserved(
-                        connection, claim, decisions, row, role, contract, due, sendable, client
+                        connection,
+                        claim,
+                        decisions,
+                        row,
+                        role,
+                        contract,
+                        due,
+                        sendable,
+                        client,
+                        remaining,
                     )
 
                 try:
@@ -1186,13 +1198,10 @@ class DecisionHost:
         state: Mapping[str, Any],
         client: ModelClient,
         spent: Collection[str] = (),
-        available: Mapping[str, Decimal] | None = None,
     ) -> list[tuple[str, Mapping[str, Any], ModelSpec, AnsweringMechanism]]:
         """Each chosen subject of ``role`` at a choice point whose model this host may ask, and
-        whose provider's allowance (``spent``, the providers admission would refuse) remains and
-        holds at least the smallest reservation one attempt of that model takes: its answer bound
-        at its prices with no prompt (``available``, each provider's remaining USD). An ask whose
-        prompt makes its reservation larger than the remainder is still made, and refused."""
+        whose provider's allowance remains (``spent``, the providers admission would refuse). One
+        whose remaining USD cannot hold an attempt is answered at reservation (_reserved)."""
         present = set(role.adapter.subjects(state))
         due = []
         for subject, choice in sorted(chosen.items()):
@@ -1204,12 +1213,6 @@ class DecisionHost:
             if (
                 askable is None
                 or model_refusal(role, client, self.manifest, contract, choice["model"]) is not None
-            ):
-                continue
-            spec = askable[0]
-            remainder = (available or {}).get(spec.provider)
-            if remainder is not None and remainder < client.budget.estimate_usd(
-                spec, max_tokens=answer_tokens(spec) or 0
             ):
                 continue
             due.append((subject, choice, *askable))
@@ -1282,9 +1285,14 @@ class DecisionHost:
         due: Sequence[tuple[str, Mapping[str, Any], ModelSpec, AnsweringMechanism]],
         sendable: Mapping[tuple[str, str], frozenset[str] | None],
         client: ModelClient,
+        remaining: dict[str, Decimal] | None = None,
     ) -> tuple[list[RoleAsk], list[tuple[uuid.UUID, dict[str, Any]]]]:
         """``role``'s requests reserved for this minute, in one transaction: the asks the world's
-        hour admits, and each request past it with the bound it met."""
+        hour admits, and each request past it with the bound it met. ``remaining``, each
+        provider's USD left in the workspace's allowance, is spent down by each ask's one-attempt
+        reservation; a request whose attempt no longer fits is answered spending_limit_reached
+        here, without asking admission, so it takes no admission lock and leaves a receipt the
+        control read sees, and a new, larger grant is asked at once."""
         asks: list[RoleAsk] = []
         refused: list[tuple[uuid.UUID, dict[str, Any]]] = []
         attempts = contract.value("answer_attempts_maximum")
@@ -1349,6 +1357,12 @@ class DecisionHost:
                 if refusal is not None:
                     refused.append((request_id, _refused(refusal)))
                     continue
+                left = None if remaining is None else remaining.get(spec.provider)
+                if left is not None and bound / attempts > left:
+                    refused.append((request_id, _refused("spending_limit_reached")))
+                    continue
+                if left is not None:
+                    remaining[spec.provider] = left - bound / attempts
                 asked += 1
                 spent += bound
                 asks.append(

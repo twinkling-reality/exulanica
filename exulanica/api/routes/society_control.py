@@ -166,7 +166,7 @@ def model_minds_code(
         # Never the exception's text, which may carry a connection string.
         _LOG.warning("the spending state could not be read: %s", type(exc).__qualname__)
         return None
-    smallest = getattr(services, "smallest_ask_usd", None)
+    smallest = getattr(services, "smallest_reservation_usd", None)
     floors = smallest() if smallest is not None else {}
 
     def spent(provider: str, refused: Any) -> bool:

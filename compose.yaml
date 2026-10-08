@@ -130,6 +130,8 @@ services:
       # Who plays: "on" (the default), this process in threads; "process", the playback-worker
       # service below, started with `--profile playback`, and this process plays nothing.
       EXULANICA_PLAYBACK_WORKER: ${EXULANICA_PLAYBACK_WORKER:-on}
+      # How many workspaces' claims one round plays at once here: empty is 1, 2 to 8 a pool.
+      EXULANICA_PLAYBACK_WORKERS: ${EXULANICA_PLAYBACK_WORKERS:-}
       EXULANICA_DATA_DIR: /var/lib/exulanica
       # Production delivery belongs to the separate worker service below. The in-process worker
       # remains available for a one-process development run, but this composition does not use it.

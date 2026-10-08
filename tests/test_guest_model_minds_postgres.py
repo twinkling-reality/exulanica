@@ -190,15 +190,17 @@ def _requests(admin, workspace: uuid.UUID) -> int:
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-@pytest.mark.parametrize("above_floor", [False, True], ids=["below-floor", "below-reservation"])
+@pytest.mark.parametrize("case", ["below-floor", "below-reservation", "fits-one"])
 def test_an_allowance_too_small_for_one_ask_is_not_spent_and_the_control_read_says_so(
-    app, spine_schema, tmp_path, above_floor
+    app, spine_schema, tmp_path, case, monkeypatch
 ):
-    """A USD remainder above zero that fits no attempt's reservation. Below the smallest one
-    (the chosen model's answer bound with no prompt) the host reserves nobody and the control read
-    says the cap at once. Above it but below what the ask's prompt adds, the ask is made, admission
-    refuses it, the receipt says spending_limit_reached and the control read says the cap from
-    it. Nothing is sent either way."""
+    """A USD remainder above zero that fits no attempt's reservation, below the smallest one (the
+    chosen model's answer bound with no prompt) or above it but below what the ask's prompt adds:
+    the host answers each due person spending_limit_reached at reservation, without asking
+    admission, so no lock is taken and the receipt is there for the control read, which says the
+    cap (below the floor, before any ask). Nothing is sent either way. With room for one attempt
+    and not two (fits-one, each attempt priced at USD 0.01), one ask of the claim is admitted and
+    the remainder it leaves answers the others at reservation."""
     from types import SimpleNamespace
 
     from exulanica.api.decision_host import answer_tokens
@@ -225,10 +227,17 @@ def test_an_allowance_too_small_for_one_ask_is_not_spent_and_the_control_read_sa
         reason="the installation's allowance for guests",
     )
     budget = BudgetGuard(ceiling_usd=Decimal("100"), max_calls=1000)
+    if case == "fits-one":
+        monkeypatch.setattr(budget, "estimate_usd", lambda spec, **_: Decimal("0.01"))
+    above_floor = case != "below-floor"
     spec = manifest.spec(model_id)
     floor = budget.estimate_usd(spec, max_tokens=answer_tokens(spec) or 0)
     ceiling = (
-        (floor + Decimal("0.00000001")).quantize(Decimal("0.00000001"), rounding="ROUND_CEILING")
+        Decimal("0.015")
+        if case == "fits-one"
+        else (floor + Decimal("0.00000001")).quantize(
+            Decimal("0.00000001"), rounding="ROUND_CEILING"
+        )
         if above_floor
         else Decimal("0.00000001")
     )
@@ -278,7 +287,7 @@ def test_an_allowance_too_small_for_one_ask_is_not_spent_and_the_control_read_sa
         app=SimpleNamespace(
             state=SimpleNamespace(
                 services=SimpleNamespace(
-                    spending_refusals=refusals, smallest_ask_usd=lambda: {provider: floor}
+                    spending_refusals=refusals, smallest_reservation_usd=lambda: {provider: floor}
                 )
             )
         )
@@ -288,19 +297,19 @@ def test_an_allowance_too_small_for_one_ask_is_not_spent_and_the_control_read_sa
         with services.database.session(workspace) as connection:
             return model_minds_code(request, connection, workspace, snapshot["society_id"])
 
-    if not above_floor:
-        # Nothing could be admitted: said before any ask, and nobody is reserved for.
-        assert code() == "spending_cap_reached"
-        for _ in range(10):
-            host.before_minute(
-                person_decisions._claim(world, snapshot), time.monotonic() + LEASE_SECONDS
-            )
-            snapshot = stays._step(world, client, snapshot)
-        assert _requests(admin, workspace) == 0
-        assert person_decisions._decisions(services, world, snapshot) == []
-        assert transport.requests == []
-        return
-    assert code() is None
+    # Every admission the workspace's spending is asked for, counted: none is expected.
+    from exulanica.spending import ledger
+
+    admissions: list[object] = []
+    admit = ledger.WorkspaceSpending.admit
+
+    def counted(self, request):
+        admissions.append(request)
+        return admit(self, request)
+
+    monkeypatch.setattr(ledger.WorkspaceSpending, "admit", counted)
+    # Below the smallest reservation the cap is said before any ask; above it, not yet.
+    assert code() == (None if above_floor else "spending_cap_reached")
     for _ in range(30):
         host.before_minute(
             person_decisions._claim(world, snapshot), time.monotonic() + LEASE_SECONDS
@@ -309,6 +318,24 @@ def test_an_allowance_too_small_for_one_ask_is_not_spent_and_the_control_read_sa
         if person_decisions._decisions(services, world, snapshot):
             break
     receipts = person_decisions._decisions(services, world, snapshot)
+    if case == "fits-one":
+        # One attempt fitted: it alone was admitted; the claim's remainder, spent down by it,
+        # answered every other due person at reservation.
+        assert len(admissions) == 1 and _admissions(admin, workspace) == 1
+        assert len(receipts) >= 2, receipts
+        refused = [r for r in receipts if r["reason"] == "spending_limit_reached"]
+        assert len(refused) == len(receipts) - 1, receipts
+        return
+    # Each due person is answered at reservation: the receipt says the allowance is spent,
+    # admission is never asked (no reservation row, so no lock taken), and nothing is sent.
     assert receipts and {r["reason"] for r in receipts} == {"spending_limit_reached"}
+    assert admissions == [] and _admissions(admin, workspace) == 0
     assert transport.requests == []
     assert code() == "spending_cap_reached"
+
+
+def _admissions(admin, workspace: uuid.UUID) -> int:
+    (row,) = admin_rows(
+        admin, "select count(*) as n from spending_reservation where workspace_id = %s", workspace
+    )
+    return row["n"]

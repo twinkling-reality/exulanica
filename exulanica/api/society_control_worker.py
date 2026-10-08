@@ -242,6 +242,7 @@ class SocietyControlWorker:
         #: still its own lease and session, so a slow model answer in one workspace does not hold
         #: another's minute.
         self.workers = workers
+        self._pool: ThreadPoolExecutor | None = None
         self.database, self.runtime = database, runtime
         #: Asks the chosen models before a claimed minute, given the claim and the monotonic time
         #: its lease runs out; says whether the world runs people by models.
@@ -383,15 +384,30 @@ class SocietyControlWorker:
                 del self._round_authority.workspaces
             return "ran"
 
-        with ThreadPoolExecutor(
-            max_workers=self.workers, thread_name_prefix="society-playback"
-        ) as pool:
-            outcomes = list(pool.map(one, sorted(snapshot, key=str)))
+        # One pool for the run (run() shuts it down), so idle rounds start no threads.
+        if self._pool is None:
+            self._pool = ThreadPoolExecutor(
+                max_workers=self.workers, thread_name_prefix="society-playback"
+            )
+        outcomes = list(self._pool.map(one, sorted(snapshot, key=str)))
         return "failed" in outcomes, "skipped" not in outcomes
+
+    def _close_pool(self) -> None:
+        """Shut the round pool down once its claims under way end, as the round's own pool was:
+        run() calls it as it ends, and a failed round to start the next with a new pool."""
+        pool, self._pool = self._pool, None
+        if pool is not None:
+            pool.shutdown(wait=True, cancel_futures=True)
 
     def run(self, stop: threading.Event, *, poll_seconds: float = 0.25) -> None:
         if not 0.05 <= poll_seconds <= 5:
             raise ValueError("playback polling must be between 0.05 and 5 seconds")
+        try:
+            self._rounds(stop, poll_seconds)
+        finally:
+            self._close_pool()
+
+    def _rounds(self, stop: threading.Event, poll_seconds: float) -> None:
         while not stop.is_set():
             failed = False
             complete = True
@@ -407,7 +423,14 @@ class SocietyControlWorker:
             # thread-local snapshot lets run_once preserve its public test/direct-call seam
             # without turning a cached readiness value into authority for another thread.
             if self.workers > 1:
-                failed, complete = self._pooled_round(workspaces, stop)
+                try:
+                    failed, complete = self._pooled_round(workspaces, stop)
+                except Exception as exc:
+                    # The pool itself failed (no thread to start, for one): a failed round, as a
+                    # claim's failure is, and the next round goes on with a new pool.
+                    _LOG.error("Society playback round failed: %s", type(exc).__qualname__)
+                    self._close_pool()
+                    failed, complete = True, True
             else:
                 self._round_authority.workspaces = frozenset(workspaces)
                 try:

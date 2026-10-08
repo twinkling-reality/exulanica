@@ -127,10 +127,12 @@ def test_worker_discovery_is_role_separated_and_society_requires_explicit_opt_in
     monkeypatch, tmp_path
 ):
     token_workspace, account_workspace, watched = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
-    # Queues are drained for every account workspace; playback plays the watched ones (S4: every
-    # owner's, and a guest's while the guest is there).
+    # Queues are drained for every account workspace, paced: those whose people are there each
+    # pass, and every one at the first pass and every five minutes; playback plays the watched
+    # ones (S4: every owner's, and a guest's while the guest is there).
     runtime = SimpleNamespace(
         active_owned_workspaces=lambda: frozenset({account_workspace}),
+        recent_workspaces=lambda guest_seconds: frozenset(),
         watched_workspaces=lambda: frozenset({watched}),
         guest=None,
     )
@@ -162,6 +164,8 @@ def test_worker_discovery_is_role_separated_and_society_requires_explicit_opt_in
     configured.build_derivative_worker()
     assert captured["derivative_static"] == frozenset({token_workspace})
     assert captured["derivative_source"]() == frozenset({account_workspace})
+    # The next pass, inside the five minutes, reads only the workspaces whose people are there.
+    assert captured["derivative_source"]() == frozenset()
     assert configured.build_society_control_worker() is None
 
     dynamic = dataclasses.replace(configured, runs_society_control_worker=True)

@@ -170,6 +170,10 @@ def test_account_role_discovery_can_be_the_dedicated_workers_only_scope(monkeypa
             source_calls.append((None, None, "verified"))
             return self
 
+        def __call__(self):
+            source_calls.append((None, None, "read in full"))
+            return frozenset()
+
     monkeypatch.setattr(worker_command, "Database", Database)
     monkeypatch.setattr(worker_command, "verify_schema", lambda _database: None)
     monkeypatch.setattr(worker_command, "assert_runtime_role", lambda _connection: None)
@@ -196,16 +200,20 @@ def test_account_role_discovery_can_be_the_dedicated_workers_only_scope(monkeypa
         },
     )
 
+    # Verified, then read in full once at startup straight from the account source, so the
+    # paced source's own first scan of every account workspace is left for the first drain.
     assert source_calls == [
         (account_url, Database.url, "created"),
         (None, None, "verified"),
+        (None, None, "read in full"),
     ]
     assert built["args"][2] == frozenset()
     # Paced: the workspaces whose people are there each pass, every account's once in a while.
     paced = built["kwargs"]["workspace_source"]
     assert isinstance(paced, account_workspaces.PacedWorkspaces)
     assert isinstance(paced.source, Source)
-    assert built["refreshed"] is True
+    assert "refreshed" not in built
+    assert paced._scanned_at is None
 
 
 def test_neither_worker_imports_the_native_runtime_the_other_one_loads():

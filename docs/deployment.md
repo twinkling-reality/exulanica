@@ -331,7 +331,7 @@ Where a table says "no default", the process refuses to start without the settin
 | `EXULANICA_EGRESS_ALLOWLIST` | The origins this process may reach, a JSON array ([security floor](security-floor.md#3-egress-allowlist)) | No default. Required when a model client is built or Google sign-in is configured. It must include `https://api.tokenfactory.nebius.com` for the model endpoint, and the three Google origins with sign-in (5.1.4) |
 | `EXULANICA_BUDGET_USD` | The process's safety fuse on model spend, in USD. It does not refill while the process runs, and it is not the durable allowance | `5.00`. Person decisions may use all of it but the reserve their contract keeps for other work ([model selection](model-and-service-selection.md#what-a-persons-decisions-may-spend)) |
 | `EXULANICA_BUDGET_MAX_CALLS` | The process's ceiling on model calls | `2000` |
-| `EXULANICA_DERIVATIVE_WORKER` | Whether this process drains the derivative queue that `POST /intake` fills | On. `0`, `false`, `off` or `no` turns it off, and `/readyz` says which. `compose.yaml` turns it off and runs the dedicated worker. The in-process worker runs vision and caption vectors but no depth model |
+| `EXULANICA_DERIVATIVE_WORKER` | Whether this process drains the derivative queue that `POST /intake` fills | On. `0`, `false`, `off` or `no` turns it off, and `/readyz` says which. `compose.yaml` turns it off and runs the dedicated worker. The in-process worker runs vision and caption vectors but no depth model, and drains the account workspaces paced as the dedicated worker does |
 | `EXULANICA_TEXTURE_DIRECTORY` | The published material catalog: `manifest.json`, `catalog.json` and `objects/` | A checkout finds its own; the image sets `/app/assets/textures`. Without a catalog the `/materials` routes answer 503 and `/readyz` warns; a catalog that is present but not the reviewed one stops startup |
 | `EXULANICA_SOCIETY_AUTHORED_WORLDS` | A JSON file (`exulanica.society-authored-worlds/v1`) of host registrations that bind a saved world's society to a named place | Optional; without it a society binds a place derived from the world itself. A malformed file stops startup |
 | `EXULANICA_SOCIETY_OF_THINGS` | `on` (or `true`, `yes`, `1`) lets a world's owner make a society of things (`exulanica-society/v7`) through `POST /world/versions/{version_id}/society` | Optional; absent or `off` (`false`, `no`, `0`) leaves it off, and that route refuses it as `society_engine_not_offered`: its people do not yet pick things up, hand them over or follow anybody, and a society made now is one every later version of its engine must keep replaying. Any other value stops startup as `society_of_things_not_boolean` |
@@ -530,8 +530,10 @@ Listed and discovered workspaces are played together. A guest's workspace is dis
 of its browser sessions, unrevoked and unexpired, was used within `EXULANICA_GUEST_PLAY_SECONDS`.
 At most `EXULANICA_GUEST_PLAYING_MAXIMUM` guests' towns play: a playing town keeps its place while
 its guest is there (the process remembers which it played and since when), but gives it up after
-`EXULANICA_GUEST_PLAY_SECONDS` while another guest waits, and joins the back of the queue; a freed
-place goes to the guest waiting longest (before any history, the one who entered first). A page
+`EXULANICA_GUEST_PLAY_SECONDS` while another guest waits, and joins the back of the queue. As many
+places turn over as guests wait, given up first by the guests who last waited longest ago (one who
+never waited first), so every guest takes a turn; a freed place goes to the guest waiting longest
+(before any history, the one who entered first). A page
 left open keeps its guest there, and a paused town holds its place like a playing one, so the
 tenure is what turns places over. A waiting world's `host_playback_code` is `guest_towns_full`,
 whose sentence says it waits until another stops. With a maximum of 0, or no guest entry configured, no
@@ -539,9 +541,9 @@ guest's town plays and none is told it waits: its code is `workspace_not_played`
 stops being played within the window, so a town whose people a model runs spends nothing after
 them. When a guest's allowance, or the authority all guests share, is spent, the town keeps playing
 and its people decide by their routines: the host reserves nothing for a person whose model's
-provider admission would refuse, or whose remaining USD cannot hold the smallest reservation one
-ask of that model takes (its answer bound with no prompt); an ask whose prompt makes the
-reservation larger than what remains is still made and refused. The control read says so with
+provider admission would refuse, and answers `spending_limit_reached` on the receipt, without
+asking admission, for a person whose one attempt (its prompt included) no longer fits the USD
+left once the minute's earlier asks are reserved. The control read says so with
 `model_minds_code` `spending_cap_reached` and a sentence (synthetic society contract).
 Guests' towns are played in the API's own process (`EXULANICA_PLAYBACK_WORKER`
 on, as the public overlay sets it, 8.2): the separate playback process is not given the guest
@@ -1365,7 +1367,9 @@ workspaces names many worlds, each its workspace's own.
 - Built: a visitor's town plays, and asks the models its people were given, while the visitor is
   there, paid from their own grant (5.1.5): the overlay turns account discovery on and plays in the
   API's process. At most `EXULANICA_GUEST_PLAYING_MAXIMUM` guests' towns play at once; another
-  waits, and its page says so.
+  waits, and its page says so. `init` writes `EXULANICA_PLAYBACK_WORKERS=4` unless told otherwise:
+  measured with 12 and 24 model-run towns, four workers played a median of 4.2 and 3.7 simulated
+  minutes a minute per town against one worker's 2.3 and 1.2, with every answer accepted.
 
 `deploy/public/public.sh` runs every step. Every step but `build`, `images` and `save` reads the
 secrets directory `EXULANICA_DEPLOY_DIR`:
@@ -1381,7 +1385,7 @@ secrets directory `EXULANICA_DEPLOY_DIR`:
 | `issue-authority`, `guest-policy`, `guest-policy-withdraw`, `grant <label>`, `spending` | Issue the server's spending authority from `EXULANICA_AUTHORITY_USD`, `EXULANICA_AUTHORITY_CALLS` and `EXULANICA_AUTHORITY_VALID_UNTIL`; grant a minted workspace `EXULANICA_GRANT_USD` and `EXULANICA_GRANT_CALLS` under it; set what each guest is granted under it (`EXULANICA_GUEST_USD`, `EXULANICA_GUEST_CALLS`, `EXULANICA_GUEST_DAYS`) and how many guests it grants in a UTC day (`EXULANICA_GUEST_GRANTS_PER_DAY`, the day's entries unless stated); end that policy so no guest is granted anything until another is set; print the authorities' state and each live guest policy, with whether it must be set again. Each runs `python -m exulanica.spending` as the owner in a one-shot container on the server's network, with the witness volume |
 | `backup-now` | One maintenance pass now (9.3) |
 | `status` | The containers, readiness from inside the client container, Docker's disk use and the backup and custody file systems |
-| `watch` | One liveness and readiness read through the edge, resolved to this machine. Three liveness failures in a row recreate the API container, because Docker restarts a container that exits and never one that only fails its health check (section 9) |
+| `watch` | One liveness read of the API from inside the client container, and one liveness and readiness read through the edge, resolved to this machine. Three failures in a row of the API's own liveness recreate the API container, because Docker restarts a container that exits and never one that only fails its health check (section 9); the edge's answers are logged beside it and never acted on, since a failing certificate or edge is not fixed by restarting the API |
 | `preflight` | The catalog preflight (section 7) from the backend image. Its allowlist is the catalog origins the image's manifest declares; the API's allowlist stays the model endpoint |
 | `logs`, `down`, `destroy --yes-delete-volumes` | Follow the logs; stop and keep the volumes; stop and delete them, the database, store and spending witness included |
 

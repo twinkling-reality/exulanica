@@ -113,6 +113,7 @@ class AccountRepository:
         since: dict[uuid.UUID, float] | None = None,
         now: float = 0.0,
         tenure_seconds: float | None = None,
+        last_waited: dict[uuid.UUID, float] | None = None,
     ) -> WatchedWorkspaces:
         """Every active owner's workspace and the guests' seen lately, through the account role
         (:func:`~exulanica.db.account_workspaces.watched_workspaces`)."""
@@ -124,6 +125,7 @@ class AccountRepository:
             since=since,
             now=now,
             tenure_seconds=tenure_seconds,
+            last_waited=last_waited,
         )
 
     def begin_login(
