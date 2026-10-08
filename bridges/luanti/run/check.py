@@ -1,8 +1,11 @@
 """The scripted check of the Exulanica gate on a headless Luanti server: nobody at the keyboard.
 
     <checkout>/.venv/bin/python bridges/luanti/run/check.py [--port-base 19520]
-        [--luanti-port 19529] [--minutes-speed 1] [--keep-stack] [--scene FILE]
-        [--against stack|fake] [--play NAME [--carry ITEMS]]
+        [--luanti-port 19529] [--minutes-speed 1] [--lives-s 20] [--keep-stack] [--scene FILE]
+        [--against stack|fake] [--play NAME [--carry ITEMS]] [--invite] [--traveller-mind]
+    <checkout>/.venv/bin/python bridges/luanti/run/check.py --api URL --token-file FILE
+        --record FILE [--scene FILE] [--luanti-port 19529] [--minutes-speed 1] [--lives-s 20]
+        [--play NAME [--carry ITEMS]] [--traveller-mind]
 
 What it does, in order, refusing by name at the first thing that is not as expected:
 
@@ -21,8 +24,8 @@ What it does, in order, refusing by name at the first thing that is not as expec
     with ``exulanica_gate`` and the check mod ``exulanica_gate_check``, bound to 127.0.0.1 on the
     slot's UDP port, and waits for the check mod to stop the server. Meanwhile it acts as the
     world's owner, from the mod's recording: it sends the character home once it has lived in the
-    world for a while, and closes the gate once its player has left the game with the character
-    away again.
+    world for ``--lives-s`` seconds (unless the world's minds lead it home first), and closes the
+    gate once its player has left the game with the character away again.
 4.  Reads the check's result and the mod's recording of every exchange, then the world's own
     records: the gate answered no ask (the world decides for a character that crossed), each ask
     about the character was decided by the world, and the society replays with no game running.
@@ -31,6 +34,16 @@ What it does, in order, refusing by name at the first thing that is not as expec
 
 ``--against fake`` runs the same crossing against ``tools/fake_door.py`` instead, with no stack;
 ``--play NAME`` serves the world for a person to play in.
+
+``--api URL --token-file FILE --record FILE`` joins a stack this check did not start, where a scene
+was built for a take: it starts and stops no stack and builds nothing. That stack was started with
+the ``luanti`` bridge declared (``tools/cross_once.py declare``). The world is the one the scene
+builder's record names (``scripts/demo/build_scene.py --record``), its scene read from the scene
+catalog at the record's digest, or from ``--scene`` when the catalog does not ship it; the society
+the builder started (``--minds``) is read back, or, where the record names none, one is started over
+the version. A paused society is played at ``--minutes-speed``; one already playing keeps its speed.
+The world owner's token is read once from ``--token-file`` and stays in this process. The grant
+this check issued is closed when it ends (revoking twice changes nothing); the stack keeps running.
 """
 
 from __future__ import annotations
@@ -149,9 +162,9 @@ def launch(*arguments: str) -> str:
     return done.stdout
 
 
-def make_crossing_world(api: Api, folder: Path, token: str, scene: Path) -> dict[str, Any]:
+def build_scene(api: Api, folder: Path, token: str, scene: Path) -> dict[str, Any]:
     """``scene`` on a starter world, built through the public routes by the scene builder (without
-    ``--minds``, so its beings keep their routines), and a society of things over it."""
+    ``--minds``, so its beings keep their routines): the builder's record of what it placed."""
     record = folder / "scene-build.json"
     built = subprocess.run(
         [
@@ -170,7 +183,37 @@ def make_crossing_world(api: Api, folder: Path, token: str, scene: Path) -> dict
     )
     if built.returncode != 0:
         raise Refused("scene", (built.stdout + built.stderr)[-2000:])
-    placed = json.loads(record.read_text())
+    return json.loads(record.read_text())
+
+
+def scene_of_record(placed: dict[str, Any], scene: Path | None) -> Path:
+    """The file of the scene a builder's record names: ``scene`` when given, else the scene
+    catalog's, which the lock must name at the record's digest (read by the product's own scene
+    reader). Either way the document's canonical digest is the record's."""
+    sys.path.insert(0, str(CHECKOUT))
+    from exulanica.canonical import sha256_of_canonical
+    from exulanica.world.scenes import SCENES_DIRECTORY, SceneRefused, shipped_scene
+
+    named = placed["scene"]
+    if scene is None:
+        try:
+            shipped_scene(named["scene"], named["version"], named["sha256"])
+        except SceneRefused:
+            raise Refused(
+                "scene",
+                f"the scene catalog ships no {named['scene']} v{named['version']} at the "
+                "record's digest; name its file with --scene",
+            ) from None
+        scene = SCENES_DIRECTORY / f"{named['scene']}.v{named['version']}.json"
+    if sha256_of_canonical(json.loads(scene.read_text())).hex() != named["sha256"]:
+        raise Refused("scene", f"{scene.name} is not the scene the record built")
+    return scene
+
+
+def crossing_world(api: Api, placed: dict[str, Any], scene: Path) -> dict[str, Any]:
+    """The world a scene builder's record names, the gate travellers come through, and its society
+    of things: the one the builder started (``--minds``), read back, or else one started over the
+    version (asked again, the version's society is read back)."""
     gates = [thing["thing_id"] for thing in placed["things"] if thing["kind"]["kind"] == "gate"]
     if not gates:
         raise Refused("scene", "the scene placed no gate for travellers to come through")
@@ -191,14 +234,22 @@ def make_crossing_world(api: Api, folder: Path, token: str, scene: Path) -> dict
         "travellers": travellers,
         "words": json.loads(scene.read_text())["title"],
     }
-    started = api(
-        "POST",
-        world["society"],
-        params=world["scope"],
-        body={"region_id": world["region"], "profile": SOCIETY_OF_THINGS},
-    )
-    if started.get("profile") != SOCIETY_OF_THINGS:
-        raise Refused("society", f"the version's society runs {started.get('profile')}")
+    named = placed.get("society")
+    if named:
+        society = api("GET", world["society"], params=world["scope"])
+        if society.get("society_id") != named["society_id"]:
+            raise Refused(
+                "society", f"the version's society is not {named['society_id']}, the record's"
+            )
+    else:
+        society = api(
+            "POST",
+            world["society"],
+            params=world["scope"],
+            body={"region_id": world["region"], "profile": SOCIETY_OF_THINGS},
+        )
+    if society.get("profile") != SOCIETY_OF_THINGS:
+        raise Refused("society", f"the version's society runs {society.get('profile')}")
     return world
 
 
@@ -225,14 +276,29 @@ def opened_to_travellers(
     return opened
 
 
-def play(api: Api, world: dict[str, Any], speed: int) -> None:
+def play(api: Api, world: dict[str, Any], speed: int) -> dict[str, Any]:
+    """Play the world's society at ``speed`` unless it is playing already: a society someone else
+    plays keeps its speed. Says which."""
     control = api("GET", world["society"] + "/control", params=world["scope"])
+    if control["mode"] == "playing":
+        return {"speed": control["speed"], "played_by_this_check": False}
     api(
         "PUT",
         world["society"] + "/control",
         params=world["scope"],
         body={"base_revision": control["revision"], "mode": "playing", "speed": speed},
     )
+    return {"speed": speed, "played_by_this_check": True}
+
+
+def close_grant(api: Api, grant_id: str) -> bool:
+    """End the grant this check issued, in a world it did not build: revoking twice changes
+    nothing. False when the stack did not answer."""
+    try:
+        api("POST", f"/door/grants/{grant_id}/revoke", expected=(200,))
+    except (Refused, OSError):
+        return False
+    return True
 
 
 def luanti_world(
@@ -243,10 +309,12 @@ def luanti_world(
     *,
     player: str | None = None,
     carry: str | None = None,
+    lives_s: float = 20.0,
 ) -> Path:
-    """A fresh flat world and its server settings: a check world with the check mod, or, given a
-    ``player``, a world for a person to play in, with the gate at the spawn and only that name let
-    in, starting with ``carry`` (the game's own item words) in the hand when given."""
+    """A fresh flat world and its server settings: a check world with the check mod (told how long
+    the world's owner lets a character live in the world, ``lives_s``), or, given a ``player``, a
+    world for a person to play in, with the gate at the spawn and only that name let in, starting
+    with ``carry`` (the game's own item words) in the hand when given."""
     world = folder / "world"
     world.mkdir(parents=True)
     mods = "load_mod_exulanica_gate = true\n"
@@ -275,6 +343,7 @@ def luanti_world(
             "exulanica_gate.world_words = The check's square",
             "exulanica_gate.check_mode = true",
             f"exulanica_gate_check.scenario = {scenario}",
+            f"exulanica_gate_check.lives_s = {round(lives_s)}",
         ]
     else:
         settings += [
@@ -360,20 +429,27 @@ def read_marks(recorded: Path, start: int) -> tuple[list[dict[str, Any]], int]:
     return [mark for mark in marks if "mark" in mark], len(lines)
 
 
-#: How long a character lives in the world before its owner sends it home, at 1x: two world minutes
-#: and a little more, so the world has asked about it and decided at least once.
+#: How long a character lives in the world before its owner sends it home, at 1x, unless
+#: ``--lives-s`` says otherwise: two world minutes and a little more, so the world has asked about
+#: it and decided at least once.
 LIVES_S = 20.0
 
 
 def act_as_owner(
-    api: Api, grant_id: str, recorded: Path, server: subprocess.Popen, limit_s: int
+    api: Api,
+    grant_id: str,
+    recorded: Path,
+    server: subprocess.Popen,
+    limit_s: int,
+    lives_s: float = LIVES_S,
 ) -> dict[str, Any]:
     """Wait for the check's server to stop, acting meanwhile as the world's owner, each act once,
     from the mod's recording: send the character home once it has lived in the world for
-    ``LIVES_S``, and close the gate a few seconds after it has crossed again (by then its player
-    has left the game)."""
+    ``lives_s``, unless it has left by itself (where minds decide for it), and close the gate a
+    few seconds after it has crossed again (by then its player has left the game)."""
     acts: dict[str, Any] = {}
     arrivals: list[tuple[float, str | None]] = []
+    departed: set[str | None] = set()
     start = 0
     ends = time.monotonic() + limit_s
     while server.poll() is None:
@@ -385,18 +461,22 @@ def act_as_owner(
         arrivals += [
             (time.monotonic(), mark.get("subject")) for mark in marks if mark["mark"] == "arrived"
         ]
+        departed |= {mark.get("subject") for mark in marks if mark["mark"] == "departed"}
         now = time.monotonic()
-        if arrivals and "sent_home" not in acts and now - arrivals[0][0] >= LIVES_S:
-            api(
-                "POST",
-                f"/door/grants/{grant_id}/send-away",
-                body={"thing_id": arrivals[0][1]},
-                expected=(202,),
-            )
-            acts["sent_home"] = {
-                "thing_id": arrivals[0][1],
-                "after_arrival_s": round(now - arrivals[0][0], 1),
-            }
+        if arrivals and not {"sent_home", "left_by_itself"} & acts.keys():
+            arrived_at, character = arrivals[0]
+            lived = {"thing_id": character, "after_arrival_s": round(now - arrived_at, 1)}
+            if character in departed:
+                acts["left_by_itself"] = lived
+            elif now - arrived_at >= lives_s:
+                # 404: it left between the recording's last read and this call.
+                sent = api(
+                    "POST",
+                    f"/door/grants/{grant_id}/send-away",
+                    body={"thing_id": character},
+                    expected=(202, 404),
+                )
+                acts["sent_home" if "sent_away" in sent else "left_by_itself"] = lived
         if len(arrivals) > 1 and "revoked" not in acts and now - arrivals[1][0] >= 5:
             api("POST", f"/door/grants/{grant_id}/revoke", expected=(200,))
             acts["revoked"] = {"after_arrival_s": round(now - arrivals[1][0], 1)}
@@ -521,7 +601,13 @@ def main(argv: list[str] | None = None) -> int:
         metavar="ITEMS",
         help="with --play: what the person starts holding, as the game names its items",
     )
-    parser.add_argument("--scene", type=Path, default=None, help="the scene to build")
+    parser.add_argument(
+        "--scene",
+        type=Path,
+        default=None,
+        help="the scene to build; with --api, the file of the scene the record names, where the "
+        "scene catalog does not ship it",
+    )
     parser.add_argument(
         "--invite",
         action="store_true",
@@ -533,8 +619,37 @@ def main(argv: list[str] | None = None) -> int:
         help="give travellers the mind the scene names (its model calls are paid for: only under "
         "an allocation)",
     )
+    parser.add_argument(
+        "--lives-s",
+        type=float,
+        default=LIVES_S,
+        help="how long the world's owner lets the character live in the world before sending it "
+        "home, unless the world's minds lead it home first",
+    )
+    parser.add_argument(
+        "--api",
+        metavar="URL",
+        help="join a stack this check did not start, at its API's address, with --token-file and "
+        "--record; it is left running",
+    )
+    parser.add_argument(
+        "--token-file", type=Path, help="with --api: the world owner's token, read once"
+    )
+    parser.add_argument(
+        "--record",
+        type=Path,
+        help="with --api: the scene builder's record of the world to cross into",
+    )
     arguments = parser.parse_args(argv)
-    arguments.scene = arguments.scene or newest_demo_scene()
+    joined = arguments.api is not None
+    if [arguments.token_file is not None, arguments.record is not None] != [joined, joined]:
+        parser.error("--api, --token-file and --record go together")
+    if joined and (arguments.against == "fake" or arguments.keep_stack or arguments.invite):
+        # An invite is redeemed with the bridge's own credential, which whoever declared the bridge
+        # on that stack holds.
+        parser.error("--api joins a running stack: no --against fake, --keep-stack or --invite")
+    if not joined:
+        arguments.scene = arguments.scene or newest_demo_scene()
     if arguments.against == "fake":
         folder = CHECKOUT / ".exulanica" / "luanti-checks" / time.strftime("%Y%m%d-%H%M%S-fake")
         folder.mkdir(parents=True)
@@ -552,57 +667,86 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if checks and not failed else 1
 
     adapter = json.loads((MOD / "adapter.json").read_text())
-    # The bridge's own credential redeems invites; only its digest is declared, and the credential
-    # reaches the Luanti server's environment alone, and only in an invite check.
-    bridge_credential = secrets.token_urlsafe(32)
-    folder = CHECKOUT / ".exulanica" / "luanti-checks" / time.strftime("%Y%m%d-%H%M%S")
+    folder = (
+        CHECKOUT
+        / ".exulanica"
+        / "luanti-checks"
+        / time.strftime("%Y%m%d-%H%M%S-joined" if joined else "%Y%m%d-%H%M%S")
+    )
     folder.mkdir(parents=True)
-    bridges = [
-        {
-            "bridge": "luanti",
-            "label": "Luanti",
-            "game": "Luanti (Minetest Game)",
-            "run_by": "server",
-            "ai": False,
-            "credential_sha256": hashlib.sha256(bridge_credential.encode()).hexdigest(),
-            "mapping_sha256": [mapping_digest()],
-            "adapter_versions": [adapter["adapter_version"]],
-            "listed": False,
-            "workspaces": "synthetic",
-        }
-    ]
-    declared = folder / "door-bridges.json"
-    declared.write_text(json.dumps(bridges))
     summary: dict[str, Any] = {
         "profile": "exulanica-gate.check-run/v1",
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "adapter_version": adapter["adapter_version"],
-        "mapping_sha256": bridges[0]["mapping_sha256"][0],
+        "mapping_sha256": mapping_digest(),
     }
-    started = launch(
-        "up",
-        "--port-base",
-        str(arguments.port_base),
-        "--society-playback",
-        "--no-derivative-worker",
-        "--door-bridges",
-        str(declared),
-        "--society-of-things",
-    )
-    state = json.loads(started[: started.rindex("}") + 1])
+    bridge_credential = None
+    if joined:
+        api = Api(arguments.api.rstrip("/"), arguments.token_file.read_text().strip())
+        summary["stack"] = {
+            "api": api.base,
+            "started_by_this_check": False,
+            "record": str(arguments.record),
+        }
+    else:
+        # The bridge's own credential redeems invites; only its digest is declared, and the
+        # credential reaches the Luanti server's environment alone, and only in an invite check.
+        bridge_credential = secrets.token_urlsafe(32)
+        bridges = [
+            {
+                "bridge": "luanti",
+                "label": "Luanti",
+                "game": "Luanti (Minetest Game)",
+                "run_by": "server",
+                "ai": False,
+                "credential_sha256": hashlib.sha256(bridge_credential.encode()).hexdigest(),
+                "mapping_sha256": [summary["mapping_sha256"]],
+                "adapter_versions": [adapter["adapter_version"]],
+                "listed": False,
+                "workspaces": "synthetic",
+            }
+        ]
+        declared = folder / "door-bridges.json"
+        declared.write_text(json.dumps(bridges))
+        started = launch(
+            "up",
+            "--port-base",
+            str(arguments.port_base),
+            "--society-playback",
+            "--no-derivative-worker",
+            "--door-bridges",
+            str(declared),
+            "--society-of-things",
+        )
+        state = json.loads(started[: started.rindex("}") + 1])
     try:
-        token = (Path(state["run_dir"]) / "token").read_text().strip()
-        api = Api(f"http://127.0.0.1:{state['ports']['api']}", token)
-        world = make_crossing_world(api, folder, token, arguments.scene)
+        if joined:
+            placed = json.loads(arguments.record.read_text())
+            scene = scene_of_record(placed, arguments.scene)
+        else:
+            token = (Path(state["run_dir"]) / "token").read_text().strip()
+            api = Api(f"http://127.0.0.1:{state['ports']['api']}", token)
+            summary["stack"] = {"api": api.base, "started_by_this_check": True}
+            placed = build_scene(api, folder, token, arguments.scene)
+            del token
+            scene = arguments.scene
+        offered = [bridge["bridge"] for bridge in api("GET", "/door/bridges")["bridges"]]
+        if "luanti" not in offered:
+            raise Refused(
+                "bridge",
+                "the stack offers this workspace no luanti bridge: start it with --door-bridges "
+                "and the file tools/cross_once.py declare writes",
+            )
+        world = crossing_world(api, placed, scene)
         from exulanica.canonical import sha256_of_canonical
 
         summary["scene"] = {
-            "file": arguments.scene.name,
+            "file": scene.name,
             # The digest a scene lock names: the document's canonical form, not its file's bytes.
-            "sha256": sha256_of_canonical(json.loads(arguments.scene.read_text())).hex(),
+            "sha256": sha256_of_canonical(json.loads(scene.read_text())).hex(),
             "travellers": world["travellers"],
         }
-        play(api, world, arguments.minutes_speed)
+        summary["playback"] = play(api, world, arguments.minutes_speed)
         grant = {
             "visitors_maximum": 1,
             "kinds": ["player"],
@@ -614,7 +758,6 @@ def main(argv: list[str] | None = None) -> int:
                 world["travellers"], world_may_decide(api), arguments.traveller_mind
             ),
         }
-        del token
         issued = api(
             "POST",
             "/door/grants",
@@ -648,6 +791,7 @@ def main(argv: list[str] | None = None) -> int:
             arguments.luanti_port,
             api.base,
             "crossing_invite" if arguments.invite else "crossing_door",
+            lives_s=arguments.lives_s,
         )
         recorded = luanti / "exulanica_gate" / "exchanges.jsonl"
         server = start_luanti(
@@ -660,7 +804,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         del credential, invite, bridge_credential
         summary["owner_acts"] = act_as_owner(
-            api, summary["grant_id"], recorded, server, arguments.limit_s
+            api, summary["grant_id"], recorded, server, arguments.limit_s, arguments.lives_s
         )
         exit_code = server.returncode
         summary["luanti_exit"] = exit_code
@@ -702,7 +846,11 @@ def main(argv: list[str] | None = None) -> int:
         ended = api("GET", f"/door/grants/{summary['grant_id']}")["grant"]
         summary["grant_at_the_end"] = {key: ended.get(key) for key in ("state", "ended_reason")}
     finally:
-        if not arguments.keep_stack:
+        if joined:
+            # Nothing of the run stays open in a world it did not build; the stack keeps running.
+            if "grant_id" in summary:
+                summary["grant_closed"] = close_grant(api, summary["grant_id"])
+        elif not arguments.keep_stack:
             launch("down")
         (folder / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     checks = summary.get("check", {}).get("checks", [])
@@ -721,6 +869,7 @@ def main(argv: list[str] | None = None) -> int:
                 "failed": [entry["check"] for entry in failed],
                 "asks_left_to_the_world": len(summary.get("receipts", [])),
                 "the_world_decided": world_decided,
+                "came_home": summary.get("check", {}).get("came_home"),
                 "replay_verified": summary.get("replay_verified"),
             },
             indent=2,

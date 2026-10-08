@@ -172,6 +172,13 @@ local GAME_FORM = "the game's own inventory form"
 -- no channel credential of its own), then one crossing, sent home by the world's owner.
 local scenario = core.settings:get("exulanica_gate_check.scenario") or "crossing_door"
 result.scenario = scenario
+-- How long the world's owner (check.py) lets the character live in the world before sending it
+-- home, in seconds; where minds decide for it, the character may come home sooner by itself.
+local lives_s = tonumber(core.settings:get("exulanica_gate_check.lives_s")) or 20
+-- The look a character crosses in when the world cannot show the player's own, as the adapter says.
+local adapter_file = assert(io.open(core.get_modpath("exulanica_gate") .. "/adapter.json"))
+local FREE_LOOK = core.parse_json(adapter_file:read("*a")).looks.otherwise
+adapter_file:close()
 -- Read once, in a check world only; typed into the form as a player pastes it, never logged.
 local invite_code = scenario == "crossing_invite" and os.getenv("EXULANICA_GATE_CHECK_INVITE") or nil
 -- Forms shown before the player walks in (an invite's form): none may be added while away.
@@ -334,8 +341,11 @@ step("the character arrives carrying a lantern, and the player is told once", 60
 		told ~= nil and arrived.details.kind == "carried"
 			and shown == "Your character is in " .. result.world_words,
 		told)
-	verdict("a world that cannot show the own look yet gets the free look, and the player is told",
-		player:heard_since(0, "This world cannot show your own look yet") ~= nil)
+	-- The player's own look where the world can show it; else the free look, and the player told.
+	result.look_key = journey.look_key
+	local told_why = player:heard_since(0, "This world cannot show your own look yet") ~= nil
+	verdict("the character arrives in the player's own look, or the free look and the player told",
+		(journey.look_key == FREE_LOOK) == told_why, journey.look_key)
 	return true
 end)
 
@@ -382,17 +392,39 @@ if scenario == "crossing" then
 		return true
 	end)
 else
-	step("sent home by the world's owner, the character brings back the torch", 180, function()
+	-- The world's owner sends the character home after lives_s (the departure's why, sent_home),
+	-- unless the world's own minds lead it home first; either way the torch comes back, with
+	-- whatever the world gave it.
+	local coming_home = {
+		sent_home = "Your character was sent back from ",
+		chose_to_leave = "Your character came back from ",
+		decider_lost = "Your character came back from ",
+	}
+	local home_check = "the character comes home with the torch and what the world gave it"
+	step(home_check, lives_s + 180, function()
 		if check.journey("checker") ~= nil then
 			return false
 		end
 		home_from = #marks
-		local words = player:heard_since(0, "Your character was sent back from "
-			.. result.world_words .. ", carrying a torch.")
-		verdict("sent home by the world's owner, the character brings back the torch",
-			count(player.inventory, "default:torch") == 5 and words ~= nil
-				and line_shown(player) == nil,
-			tostring(words))
+		local departed = mark_since(0, "departed")
+		local details = departed and departed.details or {}
+		local opening = coming_home[details.why or ""]
+		local words = opening and player:heard_since(0, opening .. result.world_words
+			.. ", carrying ")
+		local delivered = details.delivered or {}
+		local holds = count(player.inventory, "default:torch") == 5
+		local given = {}
+		for _, item in ipairs(delivered) do
+			if item ~= "default:torch" then
+				given[item] = (given[item] or 0) + 1
+			end
+		end
+		for item, number in pairs(given) do
+			holds = holds and count(player.inventory, item) >= number
+		end
+		result.came_home = {why = details.why, delivered = delivered}
+		verdict(home_check, holds and words ~= nil and words:find("a torch", 1, true) ~= nil
+			and line_shown(player) == nil, tostring(words))
 		result.timings.walk_in_to_home_ms = now_ms() - walked_at
 		return true
 	end)

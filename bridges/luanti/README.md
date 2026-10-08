@@ -35,7 +35,7 @@ the next, so a deployment that pinned one keeps working: version 1 (profile
 | `mod/exulanica_gate/adapter.json` | The adapter's version and the game fields it reads (with every item its mapping lists) |
 | `mod/exulanica_gate/mapping/` | The mapping files for each Luanti game, every published version kept |
 | `check/exulanica_gate_check/` | A test mod that plays a player on a headless server |
-| `run/` | `install.sh` unpacks the engine and the game; `check.py` runs the scripted check, or with `--play NAME` serves a world for a person; `serve.sh` and `play.sh` run the demo server and a window joined to it |
+| `run/` | `install.sh` unpacks the engine and the game; `check.py` runs the scripted check on its own stack or one already running (`--api`), or with `--play NAME` serves a world for a person; `serve.sh` and `play.sh` run the demo server and a window joined to it |
 | `tools/` | `build_look.py` builds a player's own look; `cross_once.py` makes one character cross into a running stack exactly as the mod would, with no game (for checking how a world shows it); `fake_door.py` is a stand-in door for checks; `fixtures.py` turns a recorded run into a fixture |
 | `fixtures/` | Exchanges recorded from real runs, which the repository's tests read |
 | `LICENCE-NOTES.md` | What the adapter uses of Luanti and Minetest Game, and their licences |
@@ -67,12 +67,28 @@ and the stand-in player types it into `/cross` (the bridge's own credential and 
 server's environment alone, and nothing records either). A headless Luanti server's check mod then walks a
 stand-in player into the gate with torches through the same handlers a person's actions reach,
 while the check acts as the world's owner from the mod's recording: it sends the character home
-after it has lived in the world for a while, and closes the gate once its player has left the game
-with the character away again. It then reads the world's own records: the gate posted no answer,
-each ask about the character was settled by the world, and the society replays with no game
-running. Each run's folder (ignored) holds the server's log, the mod's recording of every exchange
-and a summary with no credential in it. With `--against fake` the same crossing runs against the
-stand-in door instead, with no stack, where the character is given a sword and leaves on its own.
+after it has lived in the world for `--lives-s` seconds (20 by default) unless the world's minds
+lead it home first, and closes the gate once its player has left the game with the character away
+again. Whatever the world gave the character must come home into the player's inventory with the
+torch, and the character arrives in the player's own look where the world can show it, else in the
+free look with the player told why. It then reads the world's own records: the gate posted no
+answer, each ask about the character was settled by the world, and the society replays with no
+game running. Each run's folder (ignored) holds the server's log, the mod's recording of every
+exchange and a summary with no credential in it. With `--against fake` the same crossing runs
+against the stand-in door instead, with no stack, where the character is given a sword and leaves
+on its own.
+
+`--api URL --token-file FILE --record FILE` joins a stack the check did not start, where a scene
+was built for a take: it starts and stops no stack and builds nothing. That stack is started with
+the bridge declared (`launch.py up ... --society-of-things --door-bridges OUT`, where `OUT` is
+written by `tools/cross_once.py declare OUT`), and the scene is built there by
+`scripts/demo/build_scene.py --record FILE` (with `--minds` where its beings get their models). The
+check crosses into the world that record names: the scene is read from the catalog at the record's
+digest (or from `--scene` for a scene the catalog does not ship), the society the builder started is
+read back (or one is started where the record names none), a paused society is played at
+`--minutes-speed` and a playing one keeps its speed. The world owner's token is read once from the
+file and stays in the check's process; the grant the check issued is closed when it ends. With
+`--play NAME` a person plays the crossing instead of the check mod.
 
 ## Security notes
 

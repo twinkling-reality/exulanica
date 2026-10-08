@@ -351,8 +351,12 @@ local function on_departed(chan, frame)
 	deps.store.put("delivered:" .. tostring(frame.departure_id), {delivered = delivered,
 		not_delivered = refused, at = os.time()})
 	report(chan, frame.departure_id, delivered, refused)
+	local brought = {}
+	for _, item in ipairs(delivered) do
+		brought[#brought + 1] = item.game_item
+	end
 	deps.record.mark("departed", {request = frame.departure_id, subject = frame.thing_id,
-		why = frame.why})
+		why = frame.why, delivered = brought})
 	if name then
 		local record = deps.journey.record_of(name)
 		local sentence = (WHY_WORDS[frame.why] or "Your character came back") .. " from "
