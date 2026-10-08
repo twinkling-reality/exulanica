@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as pc from 'playcanvas';
 import { CHARACTER_RENDERABLE_TAG } from '../src/playcanvas/character/renderable.js';
 import type { LookDrawing } from '../src/playcanvas/things/documents.js';
@@ -70,9 +70,11 @@ describe('a society\'s things drawn by their looks', () => {
     expect(renderable.root.tags.has(CHARACTER_RENDERABLE_TAG)).toBe(true);
     renderable.pose({ position: [3, 0, 4], deltaSeconds: 1 / 60, yaw: Math.PI / 2 } as never);
     expect(renderable.figure).toBeNull();
-    for (let i = 0; i < 6; i += 1) await settle();
+    // The figure is made once the library has read the kind, the look and the body plans, each held
+    // to its digest by a SHA-256 the runtime computes off the main thread: how many turns of the
+    // event loop that takes depends on the machine's load, so the test waits for the figure itself.
+    await vi.waitFor(() => expect(renderable.figure).toBeInstanceOf(RigidOnBonesFigure), { timeout: 2000, interval: 5 });
     // Made after the pose: the last pose is handed over, so it stands where the crowd put it.
-    expect(renderable.figure).toBeInstanceOf(RigidOnBonesFigure);
     expect(renderable.figure!.root.getPosition().toArray()).toEqual([3, 0, 4]);
     expect(figures.figureOf('knight-1')).toBe(renderable.figure);
     renderable.destroy();
