@@ -43,7 +43,7 @@ import datetime as dt
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Final
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -51,7 +51,13 @@ from psycopg.types.json import Jsonb
 from exulanica.canonical import CanonicalisationError, canonical_json, sha256_of_canonical
 from exulanica.door.bridges import Bridge, BridgeDirectory
 from exulanica.door.grants import Grant, GrantRepository
-from exulanica.door.mapping import MappingRefused, check_mapping, check_plain, check_reads
+from exulanica.door.mapping import (
+    MappingRefused,
+    check_mapping,
+    check_plain,
+    check_reads,
+    mapped_fields,
+)
 from exulanica.door.protocol import (
     ASKED_BYTES_MAXIMUM,
     DECLARED_CHARACTERS_MAXIMUM,
@@ -62,8 +68,11 @@ from exulanica.door.protocol import (
     QUIET_SECONDS,
     Cursor,
     answer_sha256,
+    arrival_refused_frame,
+    arrived_frame,
     asked_frame,
     declared_fault,
+    departed_frame,
     grant_ended_frame,
     grant_frame,
     outcome_frame,
@@ -97,13 +106,17 @@ def declared_sha256(declared: Mapping[str, str]) -> str:
 
 
 class ChannelRefused(ExulanicaError):
-    """A channel request the door will not act on: ``code`` and ``status`` say how it answers."""
+    """A channel request the door will not act on: ``code`` and ``status`` say how it answers, and
+    ``retry_after_s`` when asking again later would be answered."""
 
-    def __init__(self, code: str, status: int, detail: str) -> None:
+    def __init__(
+        self, code: str, status: int, detail: str, *, retry_after_s: int | None = None
+    ) -> None:
         super().__init__(f"{code}: {detail}")
         self.code = code
         self.status = status
         self.detail = detail
+        self.retry_after_s = retry_after_s
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +161,25 @@ def presence_of(
     return None if row is None else Presence(**row)
 
 
+#: This grant's arrivals the society took. A society's minute takes crossings in the order the door
+#: wrote them, so their ``crossing_seq`` is the order they were taken in, and a cursor holds the
+#: last one it was told of.
+_ARRIVALS_TAKEN: Final = (
+    "from door_crossing c join door_crossing_binding b "
+    "  on b.workspace_id = c.workspace_id and b.society_id = c.society_id "
+    " and b.crossing_id = c.crossing_id "
+    "where c.workspace_id = %(w)s and c.grant_id = %(g)s and c.kind = 'arrival' "
+)
+#: The departures the society recorded of this grant's visitors, in the order it recorded them:
+#: those the door wrote and those the society decided by its own rules.
+_DEPARTURES: Final = (
+    "from world_society_event e join door_crossing c "
+    "  on c.workspace_id = e.workspace_id and c.society_id = e.society_id "
+    " and c.thing_id = e.subject_id and c.kind = 'arrival' "
+    "where e.workspace_id = %(w)s and c.grant_id = %(g)s and e.event_kind = 'thing_departed' "
+)
+
+
 @dataclass(frozen=True, slots=True)
 class Head:
     """What a cheap read of the channel finds: whether anything after a cursor is waiting."""
@@ -156,14 +188,26 @@ class Head:
     outcomes: int
     grant_seq: int
     ended: str | None
+    crossed: int = 0
+    departed: int = 0
+    arrived: int = 0
+    pending: int = 0
 
     def news(self, cursor: Cursor) -> bool:
         return (
             self.asks > cursor.ask
             or self.outcomes > 0
             or self.grant_seq > cursor.grant
-            or (self.ended is not None and not cursor.ended)
+            or self.crossed > cursor.crossed
+            or self.departed > cursor.departed
+            or (self.ended is not None and not cursor.ended and self.settled(cursor.departed))
         )
+
+    def settled(self, departed: int) -> bool:
+        """Whether every visitor of the grant has left and the bridge was told each departure, so
+        the grant's end may be told: nothing still waits for a minute, and every arrival that
+        arrived has departed."""
+        return self.pending == 0 and departed >= self.arrived
 
 
 class ChannelRepository:
@@ -284,12 +328,16 @@ class ChannelRepository:
                 {**self._ids, "v": adapter_version, "m": digest, "h": declared_digest},
             )
             head = self.head(Cursor())
+            departed = self._delivered_before()
         return {
             "profile": FRAME_PROFILE,
             "grant": grant.view(),
             "hold_seconds": bridge.hold_seconds,
-            # From here on: asks made before this hello are not sent again; the grant is.
-            "cursor": Cursor(ask=head.asks, outcome=head.asks).encode(),
+            # From here on: asks made before this hello are not sent again; the grant is, what
+            # became of each of its arrivals, and every departure from the first whose delivery
+            # the bridge has not reported, so a bridge that restarted delivers what its visitors
+            # carried home.
+            "cursor": Cursor(ask=head.asks, outcome=head.asks, departed=departed).encode(),
         }
 
     def open_poll(self, cursor: Cursor) -> tuple[list[dict[str, Any]], Cursor] | None:
@@ -345,6 +393,14 @@ class ChannelRepository:
             " order by r.grant_seq desc limit 1) as revision, "
             "exists (select 1 from door_grant_revocation v "
             " where v.workspace_id = %(w)s and v.grant_id = %(g)s) as revoked, "
+            "(select coalesce(max(c.crossing_seq), 0) " + _ARRIVALS_TAKEN + ") as crossed, "
+            "(select count(*) " + _ARRIVALS_TAKEN + " and b.disposition = 'arrived') as arrived, "
+            "(select count(*) " + _DEPARTURES + ") as departed, "
+            "(select count(*) from door_crossing c left join door_crossing_binding b "
+            "   on b.workspace_id = c.workspace_id and b.society_id = c.society_id "
+            "  and b.crossing_id = c.crossing_id "
+            " where c.workspace_id = %(w)s and c.grant_id = %(g)s and b.crossing_id is null) "
+            "  as pending, "
             "statement_timestamp() as now",
             {**self._ids, "outcome": cursor.outcome, "ask": cursor.ask},
         ).fetchone()
@@ -360,13 +416,18 @@ class ChannelRepository:
             outcomes=row["outcomes"],
             grant_seq=revision["grant_seq"],
             ended=ended,
+            crossed=row["crossed"],
+            departed=row["departed"],
+            arrived=row["arrived"],
+            pending=row["pending"],
         )
 
     def frames(self, cursor: Cursor) -> tuple[list[dict[str, Any]], Cursor]:
         """Everything after ``cursor``, at most :data:`FRAMES_PER_POLL` frames, and the cursor
-        after them: the grant if it changed, outcomes in ask order, open asks, then its end, once
-        every ask was read and every outcome reported, so the end is the last thing a bridge
-        reads."""
+        after them: the grant if it changed, outcomes in ask order, open asks, what became of its
+        visitors' arrivals, their departures, then its end, once every ask was read, every outcome
+        reported, every visitor departed and each departure read, so the end is the last thing a
+        bridge reads."""
         grant = self.grant()
         now = self._grants.now()
         frames: list[dict[str, Any]] = []
@@ -374,6 +435,8 @@ class ChannelRepository:
             "ask": cursor.ask,
             "outcome": cursor.outcome,
             "grant": cursor.grant,
+            "crossed": cursor.crossed,
+            "departed": cursor.departed,
             "ended": cursor.ended,
         }
         if grant.grant_seq > cursor.grant:
@@ -449,6 +512,7 @@ class ChannelRepository:
                         role, request["context"], AnsweringMechanism.TOOL_CALL
                     ),
                     act=role.choice(request["context"]).tool(),
+                    idle_label=role.idle_label(request["context"]),
                 )
                 size = len(canonical_json(frame))
                 if asked_bytes and asked_bytes + size > ASKED_BYTES_MAXIMUM:
@@ -459,6 +523,35 @@ class ChannelRepository:
                 position["ask"] = row["ask_seq"]
             if len(asks) == room:
                 every_ask = False  # there may be more: the next poll reads on
+        room = FRAMES_PER_POLL - len(frames)
+        if room > 0:
+            for row in self._connection.execute(
+                "select c.crossing_seq, c.document, c.game_items, b.disposition, b.reason "
+                + _ARRIVALS_TAKEN
+                + "and c.crossing_seq > %(after)s order by c.crossing_seq limit %(room)s",
+                {**self._ids, "after": cursor.crossed, "room": room},
+            ).fetchall():
+                position["crossed"] = row["crossing_seq"]
+                document = row["document"]
+                if row["disposition"] == "arrived":
+                    frames.append(
+                        arrived_frame(
+                            arrival_id=document["arrival_id"],
+                            thing_id=document["thing_id"],
+                            carried=row["game_items"],
+                        )
+                    )
+                else:
+                    frames.append(
+                        arrival_refused_frame(
+                            arrival_id=document["arrival_id"], reason=row["reason"]
+                        )
+                    )
+        room = FRAMES_PER_POLL - len(frames)
+        if room > 0:
+            departed = self.departures(after=cursor.departed, limit=room)
+            frames.extend(departed)
+            position["departed"] += len(departed)
         ended = grant.ended(now)
         if (
             ended is not None
@@ -466,6 +559,7 @@ class ChannelRepository:
             and len(frames) < FRAMES_PER_POLL
             and every_ask
             and position["outcome"] >= position["ask"]
+            and self.head(Cursor()).settled(position["departed"])
         ):
             frames.append(
                 grant_ended_frame(
@@ -474,6 +568,180 @@ class ChannelRepository:
             )
             position["ended"] = True
         return frames, Cursor(**position)
+
+    def departures(self, *, after: int, limit: int) -> list[dict[str, Any]]:
+        """The departed frames of this grant's visitors after the first ``after``, at most
+        ``limit``. A thing a visitor brought in goes home as the game item it came in as; a thing
+        of the world it holds becomes the one item the mapping lets travel out for its kind only
+        under a grant that lets things be carried out, and otherwise none."""
+        rows = self._connection.execute(
+            "select e.event_id, e.subject_id, e.document, c.game_items "
+            + _DEPARTURES
+            + "order by e.tick, (e.document->>'order')::int offset %(after)s limit %(limit)s",
+            {**self._ids, "after": after, "limit": limit},
+        ).fetchall()
+        if not rows:
+            return []
+        outbound = self._outbound() if self.grant().scope.may_carry_out else {}
+        frames = []
+        for row in rows:
+            details = row["document"]["thing"]
+            came_as = {held["thing_id"]: held["game_item"] for held in row["game_items"] or []}
+            frames.append(
+                departed_frame(
+                    departure_id=details.get("crossing_id") or str(row["event_id"]),
+                    thing_id=str(row["subject_id"]),
+                    why=row["document"]["reason"],
+                    carried=[
+                        {
+                            "thing_id": held["id"],
+                            "kind": held["kind"],
+                            "game_item": came_as.get(held["id"])
+                            or outbound.get(held["kind"]["kind"]),
+                        }
+                        for held in details.get("carried", [])
+                    ],
+                )
+            )
+        return frames
+
+    def _delivered_before(self) -> int:
+        """How many of this grant's departures come before the first one that carried something
+        home and whose delivery the bridge has not reported: a hello's cursor starts there, so no
+        such departure is ever skipped."""
+        row = self._connection.execute(
+            "with d as (select row_number() over "
+            "  (order by e.tick, (e.document->>'order')::int) as n, e.event_id, e.document "
+            + _DEPARTURES
+            + ") select coalesce((select min(d.n) - 1 from d "
+            "  where jsonb_array_length(coalesce(d.document->'thing'->'carried', '[]')) > 0 "
+            "    and not exists (select 1 from door_delivery x where x.workspace_id = %(w)s "
+            "      and x.departure_id "
+            "        = coalesce((d.document->'thing'->>'crossing_id')::uuid, d.event_id))), "
+            " (select count(*) from d)) as before",
+            self._ids,
+        ).fetchone()
+        assert row is not None
+        return int(row["before"])
+
+    def _outbound(self) -> dict[str, str]:
+        """The game item each thing kind travels out as, by the mapping of the bridge's hello."""
+        presence = presence_of(self._connection, self._session.workspace_id, self._session.grant_id)
+        if presence is None:
+            return {}
+        row = self._connection.execute(
+            "select document from door_mapping where workspace_id = %(w)s "
+            "and mapping_sha256 = %(m)s",
+            {**self._ids, "m": presence.mapping_sha256},
+        ).fetchone()
+        if row is None:
+            return {}
+        return {
+            item["kind"]["key"]: item["game_item"]
+            for item in row["document"]["items"]
+            if item["ways"] in ("out", "both")
+        }
+
+    def arrive(self, body: Mapping[str, Any]) -> tuple[dict[str, Any], bool]:
+        """Write one arrival of a visitor of this standing grant, or answer with the one its
+        arrival id wrote; True when it is new. The mapping is the one the bridge's own hello named;
+        the arrival's manifest accounts for every game field it maps (each field the adapter said it
+        reads is one of them)."""
+        from exulanica.door.crossings import Visits
+
+        with self._connection.transaction():
+            self._live()
+            grant = self._standing()
+            presence = self._presence(self.bridge(), "sending a visitor")
+            mapping = self._mapping(presence.mapping_sha256)
+            visits = Visits(
+                self._connection, self._session.workspace_id, grant, self._session.actor
+            )
+            return visits.arrive(
+                arrival_id=body["arrival_id"],
+                game_type=body["game_type"],
+                look_key=body["look_key"],
+                carried=body["carried"],
+                presence=presence,
+                mapping=mapping,
+                reads=sorted(mapped_fields(mapping)),
+            )
+
+    def delivered(self, departure_id: uuid.UUID, body: Mapping[str, Any]) -> bool:
+        """Record the bridge's report that its game delivered, or could not deliver, what one of
+        this grant's departed visitors carried home; True when it is new. A report may follow the
+        grant's end, and a second report of one departure changes nothing."""
+        with self._connection.transaction():
+            row = self._connection.execute(
+                "select e.subject_id, e.document from world_society_event e join door_crossing c "
+                "  on c.workspace_id = e.workspace_id and c.society_id = e.society_id "
+                " and c.thing_id = e.subject_id and c.kind = 'arrival' "
+                "where e.workspace_id = %(w)s and c.grant_id = %(g)s "
+                "  and e.event_kind = 'thing_departed' "
+                "  and coalesce((e.document->'thing'->>'crossing_id')::uuid, e.event_id) = %(d)s",
+                {**self._ids, "d": departure_id},
+            ).fetchone()
+            if row is None:
+                raise ChannelRefused(
+                    "unknown_reference", 404, "nothing at this address is open to this channel"
+                )
+            carried = {held["id"] for held in row["document"]["thing"].get("carried", [])}
+            named = [entry["thing_id"] for entry in (*body["delivered"], *body["not_delivered"])]
+            if len(set(named)) != len(named) or set(named) != carried:
+                raise ChannelRefused(
+                    "delivery_not_this_departure",
+                    422,
+                    "a report names each thing the visitor carried home once",
+                )
+            document = {
+                "departure_id": str(departure_id),
+                "delivered": [dict(entry) for entry in body["delivered"]],
+                "not_delivered": [dict(entry) for entry in body["not_delivered"]],
+            }
+            written = self._connection.execute(
+                "insert into door_delivery (workspace_id, grant_id, departure_id, thing_id, "
+                "document, document_sha256) values (%(w)s, %(g)s, %(d)s, %(t)s, %(doc)s, %(h)s) "
+                "on conflict (workspace_id, departure_id) do nothing returning departure_id",
+                {
+                    **self._ids,
+                    "d": departure_id,
+                    "t": row["subject_id"],
+                    "doc": Jsonb(document),
+                    "h": sha256_of_canonical(document).hex(),
+                },
+            ).fetchone()
+        return written is not None
+
+    def gone(self, thing_id: uuid.UUID) -> bool:
+        """Record that the person behind one of this grant's visitors left the game: the visitor
+        is not asked again. True when it is new."""
+        from exulanica.door.crossings import Visits
+
+        with self._connection.transaction():
+            self._live()
+            grant = self.grant()
+            visits = Visits(
+                self._connection, self._session.workspace_id, grant, self._session.actor
+            )
+            if thing_id not in visits.present():
+                raise ChannelRefused(
+                    "unknown_reference", 404, "nothing at this address is open to this channel"
+                )
+            written = self._connection.execute(
+                "insert into door_visitor_gone (workspace_id, grant_id, thing_id) "
+                "values (%(w)s, %(g)s, %(t)s) on conflict do nothing returning thing_id",
+                {**self._ids, "t": thing_id},
+            ).fetchone()
+        return written is not None
+
+    def _mapping(self, mapping_sha256: str) -> dict[str, Any]:
+        row = self._connection.execute(
+            "select document from door_mapping where workspace_id = %(w)s "
+            "and mapping_sha256 = %(m)s",
+            {**self._ids, "m": mapping_sha256},
+        ).fetchone()
+        assert row is not None  # a presence names a mapping its hello stored
+        return row["document"]
 
     def answer(self, body: Mapping[str, Any]) -> str:
         """Store a bridge's answer to one open ask of this standing grant, with who answered as its

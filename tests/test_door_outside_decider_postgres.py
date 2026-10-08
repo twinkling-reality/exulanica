@@ -270,12 +270,36 @@ def test_a_quiet_bridge_is_not_asked_and_revoking_hands_the_person_back(door, mo
     grant_id = _grant(world, client, person, key="outside-person-quiet")
     _channel(client, grant_id)  # said hello once, then went quiet
     monkeypatch.setattr("exulanica.door.asker.presence_window", lambda _bridge: dt.timedelta(0))
+    monkeypatch.setattr("exulanica.door.outside.presence_window", lambda _bridge: dt.timedelta(0))
     host = services.decision_host()
     snapshot = _until_decided(world, client, services, host, snapshot)
     [receipt] = _decisions(services, world, snapshot)
     assert (receipt["status"], receipt["reason"]) == ("unavailable", "decider_disconnected")
     assert receipt["provider"] is None
+    # The world's models read names who decides for the person from outside, with what the grant
+    # view says of the program; while it does, the owner's own choice for them is refused.
+    scope, _, society = routes(world)
+    read = client.get(society + "/models", headers=OWNER, params=scope)
+    assert read.json()["outside"] == [
+        {
+            "subject_id": person,
+            "came": "run",
+            "grant_id": grant_id,
+            "bridge": "test-bridge",
+            "bridge_label": "A test bridge",
+            "run_by": "server",
+            "ai": False,
+            "connected": False,
+            "declared": None,
+        }
+    ]
+    chosen = {"idempotency_key": str(uuid.uuid4()), "people": [person], "model": None}
+    refused = client.post(society + "/models", headers=OWNER, params=scope, json=chosen)
+    assert (refused.status_code, refused.json()["code"]) == (409, "decided_from_outside")
     revoked = client.post(f"/door/grants/{grant_id}/revoke", headers=OWNER)
     assert revoked.status_code == 200, revoked.text
     assert revoked.json()["grant"]["ended"] == "revoked"
     assert _choice_of(world, client, person)["decider"] == {"kind": "routine"}
+    assert client.get(society + "/models", headers=OWNER, params=scope).json()["outside"] == []
+    again = client.post(society + "/models", headers=OWNER, params=scope, json=chosen)
+    assert again.status_code in (200, 201), again.text

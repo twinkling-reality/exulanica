@@ -849,6 +849,9 @@ def door_grant(owner) -> str:
                 "bridge": "test-bridge",
                 "visitors_maximum": 1,
                 "kinds": ["player"],
+                # The version visitors would arrive in; a grant records it and asks for no society
+                # until one crosses.
+                "version_id": "6f2b9b7e-0d5c-5b8e-9a51-3c4d2e1f0a77",
             },
         ),
         200,

@@ -23,6 +23,9 @@ ADAPTER_VERSION: Final = "0.1.0"
 #: A second admitted version, for a bridge that says hello again with a newer adapter.
 NEWER_ADAPTER_VERSION: Final = "0.2.0"
 
+#: The thing library's shipped CC0 look a visitor of the test game arrives in.
+BLOCKY_TRAVELLER_SHA256: Final = "45d65686f899ae246d0c01e1a679213e67bb7935a157f26ec304c7dada339e3d"
+
 MAPPING: Final[dict[str, Any]] = {
     "profile": "exulanica.bridge-mapping/v1",
     "key": "test-game-content",
@@ -39,7 +42,7 @@ MAPPING: Final[dict[str, Any]] = {
             "looks": [
                 {
                     "look_key": "otherwise",
-                    "look": "sha256:" + "0" * 64,
+                    "look": "sha256:" + BLOCKY_TRAVELLER_SHA256,
                     "licence": {"spdx": "CC0-1.0"},
                 }
             ],
@@ -91,6 +94,21 @@ MAPPING: Final[dict[str, Any]] = {
 }
 #: The game fields the test adapter declares it reads, each accounted for by the mapping.
 READS: Final = ["player", "test:sword", "test:torch", "chat", "player name", "health"]
+
+
+def mapping_v2(version: int = 1) -> dict[str, Any]:
+    """The test mapping as ``exulanica.bridge-mapping/v2``: each look by the thing library's key,
+    version and digest instead of its digest alone."""
+    document = mapping(version)
+    document["profile"] = "exulanica.bridge-mapping/v2"
+    for visitor in document["visitors"]:
+        for look in visitor["looks"]:
+            look["look"] = {
+                "look": "blocky-traveller",
+                "version": 1,
+                "sha256": look["look"].removeprefix("sha256:"),
+            }
+    return document
 
 
 def mapping(version: int = 1) -> dict[str, Any]:

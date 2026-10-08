@@ -62,6 +62,14 @@ describe('reading who decides', () => {
     expect(() => parseSocietyModels(read({ latest: [{ ...read().latest[0], name: undefined }] }))).toThrow();
   });
 
+  it('reads a view that also names who outside programs decide for, as a reader that predates it does', () => {
+    const outside = [{
+      subject_id: 'grace', came: 'run', grant_id: 'grant', bridge: 'agents', bridge_label: 'Outside agents',
+      run_by: 'owner', ai: true, connected: true, declared: { name: 'Scout', maker: 'Acme', mind: null },
+    }];
+    expect(parseSocietyModels(read({ outside }))).toEqual(parseSocietyModels(read()));
+  });
+
   it('reads the route exactly, and refuses a read that is not one', () => {
     const view = parseSocietyModels(read());
     expect(view.models[0]).toMatchObject({ modelId: MODEL, mechanism: 'tool_call', refusal: null });

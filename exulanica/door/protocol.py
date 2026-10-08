@@ -40,7 +40,7 @@ import hashlib
 import json
 import re
 import unicodedata
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -49,10 +49,12 @@ from exulanica.things.lines import LineRefused, check_line
 
 __all__ = [
     "ANSWER_BODY_BYTES",
+    "ARRIVAL_BODY_BYTES",
     "ASKED_BYTES_MAXIMUM",
     "DEADLINE_MS_DEFAULT",
     "DECLARED_CHARACTERS_MAXIMUM",
     "DECLARED_MIND_MAXIMUM",
+    "DELIVERY_BODY_BYTES",
     "FRAMES_PER_POLL",
     "FRAME_PROFILE",
     "HELLO_BODY_BYTES",
@@ -60,6 +62,8 @@ __all__ = [
     "HOLD_SECONDS_MAXIMUM",
     "LINE_CHARACTERS_MAXIMUM",
     "MAPPING_PROFILE",
+    "MAPPING_PROFILES",
+    "MAPPING_PROFILE_V2",
     "OWNER_BODY_BYTES",
     "QUIET_SECONDS",
     "READS_MAXIMUM",
@@ -68,8 +72,11 @@ __all__ = [
     "Cursor",
     "InvalidCursor",
     "answer_sha256",
+    "arrival_refused_frame",
+    "arrived_frame",
     "asked_frame",
     "declared_fault",
+    "departed_frame",
     "grant_ended_frame",
     "grant_frame",
     "outcome_frame",
@@ -78,6 +85,10 @@ __all__ = [
 
 FRAME_PROFILE: Final = "exulanica.door-frame/v1"
 MAPPING_PROFILE: Final = "exulanica.bridge-mapping/v1"
+#: The second profile, read beside the first: a visitor's look names the thing library's look by its
+#: key, version and digest, where the first names it by digest alone.
+MAPPING_PROFILE_V2: Final = "exulanica.bridge-mapping/v2"
+MAPPING_PROFILES: Final = (MAPPING_PROFILE, MAPPING_PROFILE_V2)
 
 #: The longest a poll is held open with nothing to send, in seconds, unless a bridge declares its
 #: own. Under the 20 s the first game engine's HTTP client waits by default, so the hold ends before
@@ -109,6 +120,10 @@ ASKED_BYTES_MAXIMUM: Final = 262144
 ANSWER_BODY_BYTES: Final = 4096
 HELLO_BODY_BYTES: Final = 65536
 REDEEM_BODY_BYTES: Final = 1024
+#: An arrival names a visitor's type, its look and at most sixteen carried game items; a delivery
+#: report names each thing a departed visitor carried home. Each fits in a few kilobytes.
+ARRIVAL_BODY_BYTES: Final = 8192
+DELIVERY_BODY_BYTES: Final = 8192
 #: An owner's grant routes: a scope of ids, kinds and words.
 OWNER_BODY_BYTES: Final = 4096
 #: The most code points in a line a bridge sends, the role policy's own bound.
@@ -131,8 +146,12 @@ _DECLARED_MARKS: Final = frozenset(" .,'&()_+-")
 #: they look like and no mark written before the dot hides the letter it follows.
 _HOST: Final = re.compile(r"[^\W_]\.[^\W\d_]{2,}|\d{1,3}(?:\.\d{1,3}){3}")
 
-_CURSOR_VERSION: Final = 1
-_CURSOR_FIELDS: Final = frozenset({"v", "ask", "outcome", "grant", "ended"})
+_CURSOR_VERSION: Final = 2
+_CURSOR_FIELDS: Final = frozenset({"v", "ask", "outcome", "grant", "crossed", "departed", "ended"})
+#: The first cursor, written by a door without crossings, is read beside the second as one told no
+#: arrival's outcome and no departure, which is all such a door could tell; a bridge holding one
+#: across an upgrade reads on from where it was.
+_CURSOR_FIRST_FIELDS: Final = frozenset({"v", "ask", "outcome", "grant", "ended"})
 _CURSOR_TEXT_MAXIMUM: Final = 200
 _SEQUENCE_MAXIMUM: Final = 2**62
 
@@ -146,7 +165,9 @@ class InvalidCursor(ValueError):
 @dataclass(frozen=True, slots=True)
 class Cursor:
     """How far a bridge has read: the last ask, the last outcome, the grant revision it was sent,
-    and whether it was told the grant ended.
+    the last of its arrivals' outcomes it was told (by the crossing's sequence in its society, so a
+    poll reads on from there rather than counting past what it was told), how many of its visitors'
+    departures it was told, and whether it was told the grant ended.
 
     ``outcome`` counts asks whose receipts were reported, in ask order, so it never passes ``ask``.
     Encoded as URL-safe base64 of its canonical JSON; a bridge treats it as opaque.
@@ -155,10 +176,12 @@ class Cursor:
     ask: int = 0
     outcome: int = 0
     grant: int = 0
+    crossed: int = 0
+    departed: int = 0
     ended: bool = False
 
     def __post_init__(self) -> None:
-        for value in (self.ask, self.outcome, self.grant):
+        for value in (self.ask, self.outcome, self.grant, self.crossed, self.departed):
             if type(value) is not int or not 0 <= value <= _SEQUENCE_MAXIMUM:
                 raise InvalidCursor("a cursor counts whole numbers from zero")
         if type(self.ended) is not bool:
@@ -172,6 +195,8 @@ class Cursor:
             "ask": self.ask,
             "outcome": self.outcome,
             "grant": self.grant,
+            "crossed": self.crossed,
+            "departed": self.departed,
             "ended": self.ended,
         }
         return base64.urlsafe_b64encode(canonical_json(document)).decode("ascii").rstrip("=")
@@ -188,19 +213,30 @@ class Cursor:
             document = json.loads(raw)
         except (binascii.Error, ValueError) as exc:
             raise InvalidCursor("not a cursor") from exc
-        if (
-            not isinstance(document, dict)
-            or set(document) != _CURSOR_FIELDS
-            or document["v"] != _CURSOR_VERSION
-        ):
+        if not isinstance(document, dict) or type(document.get("v")) is not int:
             raise InvalidCursor("not a cursor")
-        cursor = cls(
-            ask=document["ask"],
-            outcome=document["outcome"],
-            grant=document["grant"],
-            ended=document["ended"],
-        )
-        if cursor.encode() != text:
+        if set(document) == _CURSOR_FIELDS and document["v"] == _CURSOR_VERSION:
+            cursor = cls(
+                ask=document["ask"],
+                outcome=document["outcome"],
+                grant=document["grant"],
+                crossed=document["crossed"],
+                departed=document["departed"],
+                ended=document["ended"],
+            )
+            written = cursor.encode()
+        elif set(document) == _CURSOR_FIRST_FIELDS and document["v"] == 1:
+            cursor = cls(
+                ask=document["ask"],
+                outcome=document["outcome"],
+                grant=document["grant"],
+                ended=document["ended"],
+            )
+            first = {key: document[key] for key in ("v", "ask", "outcome", "grant", "ended")}
+            written = base64.urlsafe_b64encode(canonical_json(first)).decode("ascii").rstrip("=")
+        else:
+            raise InvalidCursor("not a cursor")
+        if written != text:
             raise InvalidCursor("not a cursor")
         return cursor
 
@@ -253,9 +289,11 @@ def asked_frame(
     deadline_ms: int,
     messages: list[dict[str, str]],
     act: Mapping[str, Any],
+    idle_label: str | None = None,
 ) -> dict[str, Any]:
     """The frame asking a bridge to choose for one thing: the request as a model is asked it, its
-    context and the role's words, and the same request rendered as a model is sent it."""
+    context and the role's words, the same request rendered as a model is sent it, and the label
+    of the offered option that changes nothing (the role's own, None where it offers none)."""
     return {
         "kind": "asked",
         "ask_seq": ask_seq,
@@ -269,6 +307,7 @@ def asked_frame(
         "context": request["context"],
         "messages": messages,
         "act": dict(act),
+        "idle_label": idle_label,
     }
 
 
@@ -280,6 +319,38 @@ def outcome_frame(*, ask_seq: int, request_id: str, status: str, reason: str) ->
         "request_id": request_id,
         "status": status,
         "reason": reason,
+    }
+
+
+def arrived_frame(
+    *, arrival_id: str, thing_id: str, carried: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    """A visitor the bridge sent arrived: its id here, and the id each carried thing has here
+    beside the game item it was, so the game keeps each original under its id."""
+    return {
+        "kind": "arrived",
+        "arrival_id": arrival_id,
+        "thing_id": thing_id,
+        "carried": [dict(held) for held in carried],
+    }
+
+
+def arrival_refused_frame(*, arrival_id: str, reason: str) -> dict[str, Any]:
+    """The society refused an arrival, and why, in one of the society's own words."""
+    return {"kind": "arrival_refused", "arrival_id": arrival_id, "reason": reason}
+
+
+def departed_frame(
+    *, departure_id: str, thing_id: str, why: str, carried: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    """A visitor left the world, why, and what it carried home: each thing's id, its kind and the
+    game item it becomes (null where the mapping lets no item of that kind travel out)."""
+    return {
+        "kind": "departed",
+        "departure_id": departure_id,
+        "thing_id": thing_id,
+        "why": why,
+        "carried": [dict(held) for held in carried],
     }
 
 

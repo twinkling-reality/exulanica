@@ -1,1 +1,1 @@
-lane BRIDGE (2026-10-03 wave), package 2: crossings and their binding to society events
+a hole kept for lane BRIDGE (2026-10-03 wave): reserved for the door's crossings (package 2) and never used, because from 0157 every migration lands numbered above main's highest (the crossings took 0163)

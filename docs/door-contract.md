@@ -200,16 +200,17 @@ so a frame never disagrees with the history it reports:
 | Frame | Carries |
 | --- | --- |
 | `grant` | The grant's scope, its world words and its end, first and again whenever its owner changes it |
-| `asked` | One reserved request: its id and digest, the minute it was asked at, the deadline, the role's instruction and choice description, the request's context byte for byte as a model reads it, and the same request rendered as a model is sent it: the role's own `messages` and `act`, the one function a model is forced to call, whose `action` is one of the offered labels |
+| `asked` | One reserved request: its id and digest, the minute it was asked at, the deadline, the role's instruction and choice description, the request's context byte for byte as a model reads it, and the same request rendered as a model is sent it: the role's own `messages` and `act`, the one function a model is forced to call, whose `action` is one of the offered labels; and `idle_label`, the label of the offered option that changes nothing (the role's own, null where it offers none), which a bridge answers when nobody in its game acts for the thing |
 | `outcome` | The status and reason the host recorded for an ask, in ask order |
-| `grant_ended` | That the grant was revoked or ended, once |
+| `arrived`, `arrival_refused`, `departed` | What became of the grant's visitors, in the order the society recorded it (see Crossings) |
+| `grant_ended` | That the grant was revoked or ended, once, after everything else the bridge is told |
 
 An ask whose turn was decided before the bridge read it is not sent; its outcome is. One poll's
 answer stops adding asked frames once they pass 262,144 bytes (the first always goes), and the next
 poll reads on, so an agent never renders a role's words itself and no answer grows past a bound.
 Every poll checks its grant: under a standing grant it records the poll; once the grant has ended it
-sends the end without waiting, and once the bridge has read that end its polls and hellos are
-refused (410 `grant_ended`). A poll is held for at most its bridge's hold with nothing to send.
+sends the end as soon as nothing else is left to tell (see Crossings for a grant's visitors), and
+once the bridge has read that end its polls and hellos are refused (410 `grant_ended`). A poll is held for at most its bridge's hold with nothing to send.
 While held it keeps no database connection or transaction: its first read records the poll and reads
 the head on one short connection, later reads each open a short connection from a limiter of four
 poller threads per process, and frames are built only when the head says something is new. Within
@@ -276,9 +277,14 @@ replays with no bridge running and no channel reachable.
 
 ## Mapping files
 
-A mapping file, `exulanica.bridge-mapping/v1`, states how one game's things become things here and
-what never crosses (`exulanica/door/mapping.py`). It is data, kept with its adapter outside the
-product and pinned by digest in the deployment's bridge directory:
+A mapping file states how one game's things become things here and what never crosses
+(`exulanica/door/mapping.py`). It is data, kept with its adapter outside the product and pinned by
+digest in the deployment's bridge directory. Two profiles are read side by side, the same but for
+how a visitor's look is named: `exulanica.bridge-mapping/v1` names it by its digest
+(`sha256:<digest>`), which the door resolves against the thing library's shipped looks when a
+visitor arrives, and `exulanica.bridge-mapping/v2` by the library's own reference, `{look, version,
+sha256}`. A mapping pinned in either profile stays valid; a look the library holds only in a
+workspace's store can be named only in the second.
 
 | Part | States |
 | --- | --- |
@@ -306,8 +312,8 @@ kind library by the crossings that use it.
   door credential reaches only the channel routes its declaration names.
 - An id the caller does not hold is answered as a nonexistent one, on owner and channel routes alike.
 - Bodies are bounded before they are read or parsed (`exulanica/api/routes/door.py`, `BODY_LIMITS`):
-  a hello 65,536 bytes, an answer 4,096, a redemption 1,024 and an owner's grant routes 4,096 (413
-  `body_too_large`). A hello's mapping is at most 49,152 canonical bytes and 64 fields read; at most
+  a hello 65,536 bytes, an answer 4,096, an arrival and a delivery report 8,192 each, a redemption
+  and a player's leaving 1,024 each and an owner's grant routes 4,096 (413 `body_too_large`). A hello's mapping is at most 49,152 canonical bytes and 64 fields read; at most
   32 frames a poll.
 - Nothing from a program is executed: a mapping is closed data, every answer is one of the labels its
   request offered, checked again by the engine in its minute, and a line meets the line rule before
@@ -315,18 +321,93 @@ kind library by the crossings that use it.
 - What leaves through the door is the request as the host reserved it, which is what a model is
   shown: its context, the role's instruction and the description of the one choice, the same
   request rendered as a model is sent it (`messages` and the forced `act`) and the minute it was
-  asked at; and the grant as its owner issued it, its named things and the version they live in
-  included.
+  asked at; the grant as its owner issued it, its named things and the version they live in
+  included; and what became of the grant's own visitors: the ids the door gave them and the things
+  they carried, the reason a minute refused one, and each departure with the game item each thing
+  carried home becomes. A hello's cursor tells every arrival's outcome again from the grant's first.
 - `door_secret` and `door_redemption_refusal` belong to the deployment and never travel in a seed
   (`exulanica/orchestration/judge_seed.py`). Grants, asks, answers, mappings and declarations are
   kept with the world; the transport tables are kept as appended.
 
 ## Crossings
 
-Planned, not delivered: a game character arriving as a thing of the `visitor` kind through a gate,
-saying lines, carrying things both ways and leaving, each crossing with a translation manifest; the
-adapters that do it live in the repository's `bridges/` folder, outside the product, each with its
-own licence notes. Until they land, a grant's visitor scope is recorded and offers nothing.
+A grant that lets visitors in names the world version they arrive in (`version_id`), which must
+hold a society whose engine holds things (`exulanica-society/v7`, as the engine table in
+`exulanica/world/society_engines.py` says; else 409 `world_not_open_to_visitors`), and may name the
+gate they come through (`gate`, the id a gate was placed with, only with visitors). Both are rules
+of issuing: a stored revision is read as it was written, so a visitors grant whose revision names
+no version is listed, opened and revoked like any other and takes no arrival (409
+`world_not_open_to_visitors`). Its bridge sends visitors and reads what became of them on its
+channel; the owner may send one home:
+
+| Route | Credential | Does |
+| --- | --- | --- |
+| `POST /door/channel/arrivals` | channel | `{arrival_id, game_type, look_key, carried: [{game_item, count}]}`: one visitor of a type the grant admits, in a look its mapping offers, carrying game items its mapping lets travel in, under an `arrival_id` of the bridge's own that is a random version 4 UUID; 201 `{arrival_id, thing_id}`, or 200 with the same answer for the same arrival sent again |
+| `POST /door/channel/departures/{departure_id}/delivered` | channel | `{delivered: [{thing_id, game_item}], not_delivered: [{thing_id, reason}]}`, naming each thing a departed visitor carried home once: 202 `{recorded}`, true the first time; a report may follow the grant's end |
+| `POST /door/channel/gone` | channel | `{thing_id}`: the person behind a visitor left the game, so it is not asked again; 202 `{recorded}` |
+| `POST /door/grants/{grant_id}/send-away` | `world.write`, `door.grant` | `{thing_id}`: a visitor of the grant goes home at the next minute; 202 |
+
+An arrival is refused before anything is written: an arrival id that is not a random version 4
+UUID (422), a grant that brings no visitors (403 `no_visitors_allowed`), a type it does not admit
+(422 `kind_not_admitted`), a kind the mapping names that the thing library does not ship (422
+`kind_not_shipped`), a look the mapping does not offer (422 `look_not_offered`) or the thing library
+does not ship for the visitor's kind (422 `look_not_shipped`, `look_unfit` or
+`thing_kind_not_shipped`, `exulanica/world/thing_looks.py`), carrying without `may_carry_in` (403
+`carrying_not_allowed`), more than 16 things (422 `too_much_carried`), an item that does not travel
+in (422 `item_not_mapped`), more than 60 arrivals of the grant in the last hour, refused ones
+included (429 `too_many_arrivals`, with `retry_after_s`), as many visitors as the grant lets in
+already present (409 `visitors_full`; both counted under the society's crossing lock), an arrival
+id already naming another arrival (409 `crossing_id_reused`), or no hello under the live credential
+(409 `hello_first`). An arrival is named by the bridge's random id and a departure by one the door
+derives (version 5), so no arrival can take the id a departure will be written under; the
+crossings' migration refuses an arrival named any other way. The visitor's id and each carried thing's are derived
+from the grant and the arrival id, so an arrival sent again is the same arrival; one sent again
+after a hello with another adapter version or mapping is another arrival's document, so 409
+`crossing_id_reused`. The door writes an `exulanica.thing-arrival/v1` document ([things
+contract](things-contract.md)): the visitor's kind by the library's digest, its origin (class
+`crossed`: the bridge, its adapter version and mapping, the grant, with the licence and
+distribution of the shipped look it wears, never a mapping's words about that look), and the digest
+of its translation manifest (`exulanica.translation-manifest/v2`), which says for each game field
+the mapping accounts for whether it came across exact, approximated or not at all, in the mapping's
+own words, and is kept in the workspace by that digest (`door_manifest`).
+
+The society's next minute takes at most 32 crossings no minute has taken, in the order the door
+wrote them, and binds each once to the event it recorded (`door_crossing_binding`): an arrival
+arrived or was refused (`no_arrival_place`, `visitor_limit`, `unknown_kind`, `already_here`,
+`malformed_crossing`), a departure departed, found nobody of that id here (`not_here`) or was
+refused. An arrival that arrived records its visitor's look in the same transaction
+(`world_thing_look`, chosen by the crossing), never anything the society reads. A society with
+visitors therefore replays from what it stored and bound, with no bridge running.
+
+The bridge reads what became of its visitors as frames, in the order the society recorded it:
+`arrived` `{arrival_id, thing_id, carried: [{thing_id, game_item}]}`, `arrival_refused`
+`{arrival_id, reason}`, and `departed` `{departure_id, thing_id, why, carried: [{thing_id, kind,
+game_item}]}` for every departure of one of its visitors, those the door wrote and those the society
+decided by its own rules. `why` is the society's word for the departure: `sent_home` for the owner's
+send-away, `grant_ended`, or the society's own reasons (`chose_to_leave`, `decider_lost`). A thing a
+visitor brought in goes home as the game item it came in as; a thing of the world it holds becomes
+the one item the mapping lets travel out for its kind only under a grant that lets things be carried
+out (`may_carry_out`), else none. A visitor leaves when its owner sends it home (`sent_away`), when
+its grant ends (revoking writes a `grant_ended` departure for each visitor in the revocation's
+transaction, before the grant's named things are handed back, and a grant that ran out sends each
+visitor home the next time the host would ask it), or when the society sends it home. Until the
+minute that takes its departure a visitor is still in the world, and its program is still asked for
+it while its grant stands. The `grant_ended` frame comes only once no crossing of the grant waits
+for a minute, every visitor of it has departed and the bridge has read each departure, so a bridge
+that stops at the end has read every one. A hello's cursor tells every arrival's outcome again from
+the grant's first, and every departure from the first one carrying something whose delivery the
+bridge has not reported.
+
+Migration 0163 holds the crossings (`door_crossing`), their bindings, manifests, delivery reports
+(`door_delivery`) and the word that a visitor's player left (`door_visitor_gone`), each appended and
+never changed, kept to its workspace, and inserted by the runtime only, and indexes a society's
+departures by the thing that left, which is how the door finds a visitor's. Not built yet: the
+lines and events a visitor hears, as frames. Whether a grant's visitors may speak (`may_speak`) is
+recorded and shown; no line crosses the door yet, so nothing reads it. No visitor can take hold of a
+thing of the world yet, so `may_carry_out` names no game item yet either; and a thing of the world a
+visitor held would leave the world with it, game item or none, until the society keeps such a thing
+behind. The adapters that send visitors live in the repository's
+`bridges/` folder, outside the product, each with its own licence notes.
 
 ## Implementation and evidence
 
@@ -340,5 +421,7 @@ own licence notes. Until they land, a grant's visitor scope is recorded and offe
 | The product names no game and imports no adapter | `pyproject.toml` import contracts | `tests/test_door_names_no_game.py` |
 | The reference client: HTTPS or loopback only, no redirects | `bridges/door_client/door_client.py` | `tests/test_door_reference_client.py` |
 | Running a slot's API with bridges | `scripts/acceptance/launch.py` (`--door-bridges`) | `tests/test_acceptance_launcher.py` |
+| Crossings: arrivals, looks, manifests, departures, deliveries, the end's order, replay | `exulanica/door/crossings.py`, `manifest.py`, `channel.py`, `exulanica/api/routes/door.py`, migration 0163 | `tests/test_door_crossings_postgres.py` |
+| The crossing rules: arrival ids apart from departure ids, revisions read as written, arrivals an hour, the look's licence, refusals by name, two grants in one society, the end's wait | `exulanica/door/crossings.py`, `grants.py`, `asker.py`, `exulanica/api/routes/door.py`, the crossings' migration | `tests/test_door_crossing_rules_postgres.py` |
 
 Decision record: [ADR-0031](adr/0031-an-outside-program-decides-only-through-the-door.md).

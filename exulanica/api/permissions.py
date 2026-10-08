@@ -765,8 +765,8 @@ _WORLD_READS_READING_ADMISSION: Final = _every(
     "GET /worlds/personal-source",
 )
 
-#: Issuing, opening and revoking a door grant: a change to who may decide in a world, so
-#: ``world.write``, and isolated by name as ``door.grant``.
+#: Issuing, opening and revoking a door grant, and sending its visitors home: a change to who may
+#: decide or stand in a world, so ``world.write``, and isolated by name as ``door.grant``.
 _DOOR_GRANTS: Final = _every(
     _requires(_P.WORLD_WRITE, _P.DOOR_GRANT),
     "POST /door/grants",
@@ -774,6 +774,7 @@ _DOOR_GRANTS: Final = _every(
     "POST /door/grants/{grant_id}/credentials/revoke",
     "POST /door/grants/{grant_id}/invites",
     "POST /door/grants/{grant_id}/revoke",
+    "POST /door/grants/{grant_id}/send-away",
 )
 
 #: The one route a bridge's own deployment credential reaches.
@@ -791,8 +792,17 @@ _GRANT_CHANNEL: Final[Mapping[str, Channel]] = MappingProxyType(
         "POST /door/channel/answers": Channel(
             "grant", "answers an ask of the grant its credential opens"
         ),
+        "POST /door/channel/arrivals": Channel(
+            "grant", "sends a visitor into the world version of the grant its credential opens"
+        ),
+        "POST /door/channel/departures/{departure_id}/delivered": Channel(
+            "grant", "reports what a departed visitor of the grant its credential opens took home"
+        ),
         "GET /door/channel/frames": Channel(
             "grant", "reads what was sent to the grant its credential opens"
+        ),
+        "POST /door/channel/gone": Channel(
+            "grant", "says a visitor of the grant its credential opens has no player behind it"
         ),
         "POST /door/channel/hello": Channel(
             "grant", "presents an adapter and its mapping for the grant its credential opens"

@@ -18,7 +18,9 @@ from dataclasses import dataclass, field
 from exulanica.db.session import Database
 from exulanica.door.asker import DoorAsker
 from exulanica.door.bridges import BridgeDirectory, load_bridge_directory
+from exulanica.door.crossings import DoorCrossings
 from exulanica.door.notices import HeldPolls, Hellos, Notices
+from exulanica.world.crossings import register_crossing_stream
 
 __all__ = ["DoorRuntime", "door_runtime"]
 
@@ -50,5 +52,9 @@ def door_runtime(
     open_to: Callable[[uuid.UUID], bool] | None = None,
 ) -> DoorRuntime:
     """The door for this process, with the bridges its environment declares (none when unset), and
-    whether a workspace is open where the deployment has accounts."""
+    whether a workspace is open where the deployment has accounts. Its crossings are handed to
+    every society of things this process plays (:class:`exulanica.door.crossings.DoorCrossings`,
+    registered for the process), so the process that plays a society takes its visitors whether
+    or not it serves the channel."""
+    register_crossing_stream(DoorCrossings())
     return DoorRuntime(database=database, bridges=load_bridge_directory(environ), open_to=open_to)

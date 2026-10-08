@@ -162,6 +162,7 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /companion/memory/escapes": {
         "json": {"escape": "skip", "intent": "confirm_continuity", "turn_id": "turn-1"}
     },
+    "POST /door/grants/{grant_id}/send-away": {"json": {"thing_id": str(uuid.uuid4())}},
     "POST /environment-resources/sources/{admission_id}/feature-indexes": {
         "json": {
             "render_asset_id": str(uuid.uuid4()),

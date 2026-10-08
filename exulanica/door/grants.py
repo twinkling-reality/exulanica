@@ -31,6 +31,10 @@ take the grant's lock (:meth:`GrantRepository.lock`), so a credential being ende
 again by a request running beside it, a cap is never passed by two requests at once, and an answer
 is never stored under a hello its credential did not say.
 
+Revoking also writes a departure for every visitor the grant brought in that is still in its
+society (:mod:`exulanica.door.crossings`), so a grant's end sends its visitors home at the next
+minute.
+
 A grant may carry ``world_words``, the words its owner chose for its bridge to show players about
 the world (a title for a panel). The door never reads the world's own title, which is the owner's
 content and may hold a name.
@@ -52,6 +56,7 @@ is refused.
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import re
 import uuid
 from collections.abc import Sequence
@@ -97,6 +102,8 @@ __all__ = [
     "grant_actor",
 ]
 
+_LOG = logging.getLogger(__name__)
+
 GRANT_PROFILE: Final = "exulanica.door-grant/v1"
 VISITORS_MAXIMUM: Final = 4
 THINGS_MAXIMUM: Final = 8
@@ -120,6 +127,8 @@ _GRANT_NAMESPACE: Final = uuid.UUID("6b0c9d2e-3f4a-5b6c-8d7e-9f0a1b2c3d4e")
 _ACTOR_NAMESPACE: Final = uuid.UUID("2a7e5c19-8b3d-5f40-9c61-d4e8f0a2b6c3")
 _KEY: Final = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
 _GAME_TYPE: Final = re.compile(r"^[A-Za-z0-9_:.-]{1,80}$")
+#: A placed thing's id, as a version's things are placed with (``exulanica.world.placed_things``).
+_PLACED_ID: Final = re.compile(r"[a-z0-9]([a-z0-9:._-]{0,198}[a-z0-9])?")
 
 
 class GrantRefused(ExulanicaError):
@@ -169,14 +178,18 @@ class Scope:
             raise GrantRefused(
                 "invalid_scope", f"a grant decides for at most {THINGS_MAXIMUM} named things"
             )
-        named = (self.gate, self.version_id)
-        for value in (*self.things, *(value for value in named if value is not None)):
+        named = () if self.version_id is None else (self.version_id,)
+        for value in (*self.things, *named):
             try:
                 if str(uuid.UUID(value)) != value:
                     raise ValueError(value)
             except (TypeError, ValueError, AttributeError) as exc:
                 raise GrantRefused("invalid_scope", "a thing is named by its id") from exc
-        if bool(self.things) != (self.version_id is not None):
+        if self.gate is not None and (
+            not isinstance(self.gate, str) or _PLACED_ID.fullmatch(self.gate) is None
+        ):
+            raise GrantRefused("invalid_scope", "a gate is named by the id it was placed with")
+        if bool(self.things) and self.version_id is None:
             raise GrantRefused(
                 "invalid_scope", "a grant names the world version its things are bound in"
             )
@@ -190,6 +203,20 @@ class Scope:
             fault = words_fault(self.world_words, maximum=WORLD_WORDS_MAXIMUM)
             if fault is not None:
                 raise GrantRefused("invalid_scope", f"a grant's world words: {fault}")
+
+    def check_issue(self) -> None:
+        """The rules a grant is issued under beyond those every stored revision keeps, so a
+        revision written before one of them existed is still read as it was written: a grant for
+        visitors names the version they arrive in, and a gate is named only for visitors to come
+        through. A visitors grant stored without a version takes no arrival
+        (``world_not_open_to_visitors``)."""
+        if (bool(self.things) or self.visitors_maximum > 0) != (self.version_id is not None):
+            raise GrantRefused(
+                "invalid_scope",
+                "a grant names the version its things are bound in and its visitors arrive in",
+            )
+        if self.gate is not None and self.visitors_maximum == 0:
+            raise GrantRefused("invalid_scope", "a gate is named only for visitors to come through")
 
     def document(self) -> dict[str, Any]:
         return {
@@ -406,6 +433,7 @@ class GrantRepository:
             raise GrantRefused("invalid_idempotency_key", "8 to 128 letters, digits or ._:-")
         if type(minutes) is not int or not 1 <= minutes <= MINUTES_MAXIMUM:
             raise GrantRefused("invalid_scope", f"a grant lasts 1 to {MINUTES_MAXIMUM} minutes")
+        scope.check_issue()
         if not bridge.offered_to(self._workspace_id):
             raise GrantRefused("bridge_not_offered", "this deployment offers no such bridge here")
         grant_id = uuid.uuid5(_GRANT_NAMESPACE, f"{self._workspace_id}:{idempotency_key}")
@@ -475,11 +503,30 @@ class GrantRepository:
                 "values (%s, %s, %s)",
                 (self._workspace_id, grant_id, self._actor),
             )
+            # Every visitor it brought in goes home, in the revocation's own transaction, before
+            # its things are handed back: the departures take the society's crossing lock first
+            # and its row after, as every crossing written does.
+            self._send_home(grant, self._actor)
             if grant.scope.things:
                 self._release(grant)
             revoked = self.current(grant_id)
         assert revoked is not None
         return revoked
+
+    def _send_home(self, grant: Grant, actor: uuid.UUID) -> int:
+        """A departure for every visitor of ``grant`` still present, because it ended; how many
+        were written. A departure the door cannot write is said by name in the log and stops no
+        revocation: the grant ends all the same, nobody is asked under it, and its visitor's
+        quiet minutes send it home."""
+        # Imported here: the crossings read grants, and a grant ends its own visits.
+        from exulanica.door.channel import ChannelRefused
+        from exulanica.door.crossings import Visits
+
+        try:
+            return Visits(self._connection, self._workspace_id, grant, actor).end()
+        except ChannelRefused as exc:
+            _LOG.warning("A grant's visitors were not sent home: %s", exc.code)
+            return 0
 
     def lapse(self, grant_id: uuid.UUID) -> bool:
         """Hand a grant's named things back to their routine once the grant has run out, as

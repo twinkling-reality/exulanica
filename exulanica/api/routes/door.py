@@ -46,7 +46,7 @@ import psycopg
 from anyio.lowlevel import RunVar
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import UUID4, BaseModel, ConfigDict, Field
 
 from exulanica.api.dependencies import (
     CurrentBridge,
@@ -64,6 +64,7 @@ from exulanica.door.channel import (
     presence_of,
     presence_window,
 )
+from exulanica.door.crossings import CARRIED_UNITS_MAXIMUM, Visits
 from exulanica.door.grants import (
     MINUTES_DEFAULT,
     MINUTES_MAXIMUM,
@@ -77,7 +78,9 @@ from exulanica.door.grants import (
 )
 from exulanica.door.protocol import (
     ANSWER_BODY_BYTES,
+    ARRIVAL_BODY_BYTES,
     DECLARED_MIND_MAXIMUM,
+    DELIVERY_BODY_BYTES,
     FRAME_PROFILE,
     HELLO_BODY_BYTES,
     HOLD_SECONDS_DEFAULT,
@@ -114,6 +117,10 @@ BODY_LIMITS: Final = (
     ("POST", "/door/invites/redeem", REDEEM_BODY_BYTES),
     ("POST", "/door/channel/hello", HELLO_BODY_BYTES),
     ("POST", "/door/channel/answers", ANSWER_BODY_BYTES),
+    ("POST", "/door/channel/arrivals", ARRIVAL_BODY_BYTES),
+    ("POST", "/door/channel/departures/{departure_id}/delivered", DELIVERY_BODY_BYTES),
+    ("POST", "/door/channel/gone", REDEEM_BODY_BYTES),
+    ("POST", "/door/grants/{grant_id}/send-away", OWNER_BODY_BYTES),
 )
 #: How a grant refusal answers, by its code. A refusal of the choice record that binds a grant's
 #: named things answers as the choices route answers it: CHOICE_CONFLICTS 409, any other 422.
@@ -182,7 +189,8 @@ class IssueBody(BaseModel):
     things: list[uuid.UUID] = Field(default_factory=list, max_length=THINGS_MAXIMUM)
     #: The world version the named things are bound in; a version's society is its own.
     version_id: uuid.UUID | None = None
-    gate: uuid.UUID | None = None
+    #: The gate visitors come through, by the id it was placed with; none for the version's own.
+    gate: str | None = Field(default=None, min_length=1, max_length=200)
     may_carry_in: bool = False
     may_carry_out: bool = False
     may_speak: bool = True
@@ -272,7 +280,7 @@ def issue_grant(
             kinds=tuple(body.kinds),
             things=tuple(str(thing) for thing in body.things),
             version_id=None if body.version_id is None else str(body.version_id),
-            gate=None if body.gate is None else str(body.gate),
+            gate=body.gate,
             may_carry_in=body.may_carry_in,
             may_carry_out=body.may_carry_out,
             may_speak=body.may_speak,
@@ -406,6 +414,40 @@ def channel_credential(
     return JSONResponse(status_code=201, content=_shown_once(issued))
 
 
+class SendAwayBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    #: The visitor, by the thing id its arrival gave it in the world.
+    thing_id: uuid.UUID
+
+
+@router.post("/grants/{grant_id}/send-away")
+def send_away(
+    request: Request,
+    grant_id: uuid.UUID,
+    body: SendAwayBody,
+    session: CurrentSession,
+    connection: ScopedConnection,
+) -> Any:
+    """Send one of a grant's visitors home at the world's next minute, as its owner."""
+    thing_id = body.thing_id
+    door = _door(request)
+    if door is None:
+        return _unavailable()
+    grant = GrantRepository(connection, session.workspace_id, session.actor).current(grant_id)
+    if grant is None:
+        return _problem(404, "unknown_reference", "nothing at this address is available")
+    visits = Visits(connection, session.workspace_id, grant, session.actor)
+    try:
+        if thing_id not in visits.present():
+            # The owner's own grant: saying it has no such visitor tells them nothing new.
+            return _problem(404, "unknown_reference", "this grant has no visitor of that id here")
+        visits.depart(thing_id, "sent_away")
+    except ChannelRefused as exc:
+        return _channel_problem(exc)
+    return JSONResponse(status_code=202, content={"sent_away": str(thing_id)})
+
+
 # -- what a bridge sends ---------------------------------------------------------------------
 
 
@@ -446,8 +488,56 @@ class ChannelAnswerBody(BaseModel):
     line: str | None = Field(default=None, max_length=4 * LINE_CHARACTERS_MAXIMUM)
 
 
+class CarriedBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    game_item: str = Field(min_length=1, max_length=80)
+    count: int = Field(ge=1, le=CARRIED_UNITS_MAXIMUM)
+
+
+class ArrivalBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    #: The bridge's own id for this arrival, a random version 4 UUID: a resend with the same id is
+    #: the same arrival.
+    arrival_id: UUID4
+    game_type: str = Field(min_length=1, max_length=80)
+    look_key: str = Field(min_length=1, max_length=64)
+    carried: list[CarriedBody] = Field(default_factory=list, max_length=CARRIED_UNITS_MAXIMUM)
+
+
+class DeliveredBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    thing_id: uuid.UUID
+    game_item: str = Field(min_length=1, max_length=80)
+
+
+class NotDeliveredBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    thing_id: uuid.UUID
+    reason: str = Field(pattern=r"^[a-z][a-z0-9_]{0,47}$")
+
+
+class DeliveryBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    delivered: list[DeliveredBody] = Field(default_factory=list, max_length=CARRIED_UNITS_MAXIMUM)
+    not_delivered: list[NotDeliveredBody] = Field(
+        default_factory=list, max_length=CARRIED_UNITS_MAXIMUM
+    )
+
+
+class GoneBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    thing_id: uuid.UUID
+
+
 def _channel_problem(exc: ChannelRefused) -> JSONResponse:
-    return _problem(exc.status, exc.code, exc.detail)
+    extra = {} if exc.retry_after_s is None else {"retry_after_s": exc.retry_after_s}
+    return _problem(exc.status, exc.code, exc.detail, **extra)
 
 
 def _on_channel(
@@ -530,6 +620,59 @@ def answer(request: Request, body: ChannelAnswerBody, channel: CurrentChannel) -
     if door is not None:
         door.notices.answered(body.request_id)
     return JSONResponse(status_code=202, content={"received": True, "answer_sha256": digest})
+
+
+@router.post("/channel/arrivals")
+def arrive(request: Request, body: ArrivalBody, channel: CurrentChannel) -> Any:
+    """Send a visitor into the grant's world version: it arrives at the world's next minute."""
+    payload = {
+        "arrival_id": body.arrival_id,
+        "game_type": body.game_type,
+        "look_key": body.look_key,
+        "carried": [entry.model_dump() for entry in body.carried],
+    }
+    try:
+        document, created = _on_channel(
+            request, channel, lambda repository: repository.arrive(payload)
+        )
+    except ChannelRefused as exc:
+        return _channel_problem(exc)
+    return JSONResponse(
+        status_code=201 if created else 200,
+        content={"arrival_id": document["arrival_id"], "thing_id": document["thing_id"]},
+    )
+
+
+@router.post("/channel/departures/{departure_id}/delivered")
+def delivered(
+    request: Request, departure_id: uuid.UUID, body: DeliveryBody, channel: CurrentChannel
+) -> Any:
+    """Report what the game delivered of what a departed visitor carried home."""
+    payload = {
+        "delivered": [
+            {**entry.model_dump(), "thing_id": str(entry.thing_id)} for entry in body.delivered
+        ],
+        "not_delivered": [
+            {**entry.model_dump(), "thing_id": str(entry.thing_id)} for entry in body.not_delivered
+        ],
+    }
+    try:
+        created = _on_channel(
+            request, channel, lambda repository: repository.delivered(departure_id, payload)
+        )
+    except ChannelRefused as exc:
+        return _channel_problem(exc)
+    return JSONResponse(status_code=202, content={"recorded": created})
+
+
+@router.post("/channel/gone")
+def gone(request: Request, body: GoneBody, channel: CurrentChannel) -> Any:
+    """Say the person behind one of the grant's visitors left the game."""
+    try:
+        created = _on_channel(request, channel, lambda repository: repository.gone(body.thing_id))
+    except ChannelRefused as exc:
+        return _channel_problem(exc)
+    return JSONResponse(status_code=202, content={"recorded": created})
 
 
 async def _in_thread(work: Callable[[], _T]) -> _T:

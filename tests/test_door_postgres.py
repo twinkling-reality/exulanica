@@ -125,6 +125,8 @@ def door(saved_world, spine_schema, monkeypatch):
                 store=world["store"], authored_bindings=[], reviewed_affordances=world["registry"]
             ),
             door=runtime,
+            # Visitors cross into a society of things, which a host makes only when it offers them.
+            societies_of_things=True,
         )
         return TestClient(
             create_app(services, verify=False), raise_server_exceptions=False
@@ -146,7 +148,13 @@ def _world_id(door) -> str:
 
 
 def _issue(door, key: str = "grant-key-0001", **scope: Any) -> Any:
-    body = {"idempotency_key": key, "bridge": "test-bridge", "visitors_maximum": 1}
+    # Visitors arrive in a version of the world, which a grant that lets them in names.
+    body = {
+        "idempotency_key": key,
+        "bridge": "test-bridge",
+        "visitors_maximum": 1,
+        "version_id": str(door["world"]["binding"].version_id),
+    }
     body["kinds"] = ["player"]
     body.update(scope)
     return door["client"].post(
@@ -229,13 +237,17 @@ def test_a_grant_names_a_bridge_offered_here_a_registered_world_and_no_unbound_t
             "bridge": "test-bridge",
             "kinds": ["player"],
             "visitors_maximum": 1,
+            "version_id": str(door["world"]["binding"].version_id),
         },
     )
     assert (elsewhere.status_code, elsewhere.json()["code"]) == (404, "unknown_world")
     # A named thing is bound in the version the grant names, so a grant naming one names it, and
     # binds only one of that version's people (the choice record's own refusal).
-    unbound = _issue(door, things=[str(uuid.uuid4())])
+    unbound = _issue(door, things=[str(uuid.uuid4())], version_id=None)
     assert (unbound.status_code, unbound.json()["code"]) == (422, "invalid_scope")
+    # Visitors arrive in a version too, so a grant letting them in names one.
+    homeless = _issue(door, key="grant-key-0004", version_id=None)
+    assert (homeless.status_code, homeless.json()["code"]) == (422, "invalid_scope")
     stranger = _issue(
         door,
         key="grant-key-0003",
@@ -513,6 +525,8 @@ def test_the_asker_asks_the_bridge_and_returns_its_answer_as_the_receipt_records
         role.choice_description,
     )
     assert asked["deadline_ms"] == DEADLINE_MS_DEFAULT
+    assert asked["idle_label"] == role.idle_label(external["context"])
+    assert asked["idle_label"] in {option["label"] for option in asked["context"]["options"]}
     label = asked["context"]["options"][0]["label"]
 
     not_offered = door["client"].post(

@@ -120,6 +120,8 @@ def _key(world: dict[str, Any], client: TestClient) -> tuple[str, str]:
             "bridge": "agents",
             "visitors_maximum": 1,
             "kinds": ["agent"],
+            # The version its visitor would arrive in; nothing asks for a society until one does.
+            "version_id": str(world["binding"].version_id),
             "channel_credential": True,
         },
     )

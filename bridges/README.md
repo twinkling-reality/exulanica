@@ -9,8 +9,8 @@ source names no game (`tests/test_door_names_no_game.py`).
   written in Python use it; adapters in other languages follow it. It speaks HTTPS, or plain HTTP to
   this machine for development, and follows no redirect, so a credential is sent nowhere else.
 - One folder per program, added with its adapter: the adapter's code, its mapping file
-  (`exulanica.bridge-mapping/v1`, every entry with its plain `words`, and `reason_words` where it is
-  not exact) and its licence notes.
+  (`exulanica.bridge-mapping/v1` or `/v2`, every entry with its plain `words`, and `reason_words`
+  where it is not exact) and its licence notes.
 
 How an adapter is admitted is the deployment's: each bridge states who runs it (`run_by` `server`
 for a game server other people join, `owner` for a program a world's owner runs), whether its

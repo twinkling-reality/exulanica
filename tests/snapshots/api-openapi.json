@@ -19285,6 +19285,76 @@
     }
    }
   },
+  "/door/grants/{grant_id}/send-away": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Send Away",
+    "description": "Send one of a grant's visitors home at the world's next minute, as its owner.",
+    "operationId": "send_away_door_grants__grant_id__send_away_post",
+    "parameters": [
+     {
+      "name": "grant_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Grant Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SendAwayBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Send Away Door Grants  Grant Id  Send Away Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/door/invites/redeem": {
    "post": {
     "tags": [
@@ -19394,6 +19464,144 @@
        "application/json": {
         "schema": {
          "title": "Response Answer Door Channel Answers Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/channel/arrivals": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Arrive",
+    "description": "Send a visitor into the grant's world version: it arrives at the world's next minute.",
+    "operationId": "arrive_door_channel_arrivals_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ArrivalBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Arrive Door Channel Arrivals Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/channel/departures/{departure_id}/delivered": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Delivered",
+    "description": "Report what the game delivered of what a departed visitor carried home.",
+    "operationId": "delivered_door_channel_departures__departure_id__delivered_post",
+    "parameters": [
+     {
+      "name": "departure_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Departure Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DeliveryBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Delivered Door Channel Departures  Departure Id  Delivered Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/channel/gone": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Gone",
+    "description": "Say the person behind one of the grant's visitors left the game.",
+    "operationId": "gone_door_channel_gone_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GoneBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Gone Door Channel Gone Post"
         }
        }
       }
@@ -21410,6 +21618,43 @@
     ],
     "title": "ArrangementView"
    },
+   "ArrivalBody": {
+    "properties": {
+     "arrival_id": {
+      "type": "string",
+      "format": "uuid4",
+      "title": "Arrival Id"
+     },
+     "game_type": {
+      "type": "string",
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Game Type"
+     },
+     "look_key": {
+      "type": "string",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Look Key"
+     },
+     "carried": {
+      "items": {
+       "$ref": "#/components/schemas/CarriedBody"
+      },
+      "type": "array",
+      "maxItems": 16,
+      "title": "Carried"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "arrival_id",
+     "game_type",
+     "look_key"
+    ],
+    "title": "ArrivalBody"
+   },
    "ArrivalDescriptor": {
     "properties": {
      "profile": {
@@ -22631,6 +22876,29 @@
     ],
     "title": "CaptureWindow",
     "description": "One half-open interval on capture wall-clock time.\n\nHalf-open at the end, matching every other interval in this system, so two adjacent windows\ntile without overlapping and a capture on the boundary belongs to exactly one of them.\n\nCapture time comes from EXIF. ADR-0005 records why this dimension is the most reliable one\nin the product: it costs no model call and it is correct for effectively every photograph,\nincluding the ones that can never be reconstructed."
+   },
+   "CarriedBody": {
+    "properties": {
+     "game_item": {
+      "type": "string",
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Game Item"
+     },
+     "count": {
+      "type": "integer",
+      "maximum": 16.0,
+      "minimum": 1.0,
+      "title": "Count"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "game_item",
+     "count"
+    ],
+    "title": "CarriedBody"
    },
    "ChannelAnswerBody": {
     "properties": {
@@ -24479,6 +24747,51 @@
     "title": "DeclaredPlaceFrame",
     "description": "A place whose frame a provider documented rather than a reconstruction measured.\n\n``docs/place-identity.md`` gives a place one frame authority: its anchor scene's own\nrecovered frame. An admitted map, footprint set or tile set has no photographs behind it and\ntherefore no anchor scene, so this is the other authority, and ``frame_authority`` is the\ncolumn that keeps the two distinguishable.\n\nEverything here is **declared**. The coordinate reference system, axis order, units,\norientation, altitude reference and bounds are copied from the provider's own documentation;\nnothing in this repository measures a coordinate against the world. A declaration says where\na provider says its data lives. It does not say that the place is there, that this frame\nrelates to any recovered scene frame, or that the bounds are complete or current, and it\ngrants no right to anything: rights are resolved per admission and a place carries none."
    },
+   "DeliveredBody": {
+    "properties": {
+     "thing_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Thing Id"
+     },
+     "game_item": {
+      "type": "string",
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Game Item"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "thing_id",
+     "game_item"
+    ],
+    "title": "DeliveredBody"
+   },
+   "DeliveryBody": {
+    "properties": {
+     "delivered": {
+      "items": {
+       "$ref": "#/components/schemas/DeliveredBody"
+      },
+      "type": "array",
+      "maxItems": 16,
+      "title": "Delivered"
+     },
+     "not_delivered": {
+      "items": {
+       "$ref": "#/components/schemas/NotDeliveredBody"
+      },
+      "type": "array",
+      "maxItems": 16,
+      "title": "Not Delivered"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "DeliveryBody"
+   },
    "DerivedEnvironmentAsset": {
     "properties": {
      "asset_id": {
@@ -26269,6 +26582,21 @@
     ],
     "title": "GoToIntent"
    },
+   "GoneBody": {
+    "properties": {
+     "thing_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Thing Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "thing_id"
+    ],
+    "title": "GoneBody"
+   },
    "GrammarView": {
     "properties": {
      "grammar_id": {
@@ -27497,7 +27825,8 @@
       "anyOf": [
        {
         "type": "string",
-        "format": "uuid"
+        "maxLength": 200,
+        "minLength": 1
        },
        {
         "type": "null"
@@ -28550,6 +28879,27 @@
      "kind"
     ],
     "title": "NoopIntervention"
+   },
+   "NotDeliveredBody": {
+    "properties": {
+     "thing_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Thing Id"
+     },
+     "reason": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,47}$",
+      "title": "Reason"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "thing_id",
+     "reason"
+    ],
+    "title": "NotDeliveredBody"
    },
    "ObjectActivityView": {
     "properties": {
@@ -36291,6 +36641,21 @@
     ],
     "title": "SelectionView",
     "description": "What a Selection resolved to.\n\n``total_matched`` and ``truncated`` are separate fields on purpose. A bounded result that\ndoes not say it was bounded reads as \"that is all there is\", and the interface needs to be\nable to say \"at least\"."
+   },
+   "SendAwayBody": {
+    "properties": {
+     "thing_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Thing Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "thing_id"
+    ],
+    "title": "SendAwayBody"
    },
    "SetObjectBehaviourBody": {
     "properties": {

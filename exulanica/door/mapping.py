@@ -1,13 +1,18 @@
 """A bridge's mapping file: how one game's things become things here, and what never crosses.
 
-A mapping file is data, ``exulanica.bridge-mapping/v1``, one per game and content set, kept with its
-adapter outside the product and pinned by digest in the deployment's bridge directory. It states:
+A mapping file is data, one per game and content set, kept with its adapter outside the product and
+pinned by digest in the deployment's bridge directory. Two profiles are read side by side, the same
+but for how a visitor's look is named: ``exulanica.bridge-mapping/v1`` names it by its digest
+(``sha256:<digest>``), which the door resolves against the thing library when a visitor arrives, and
+``exulanica.bridge-mapping/v2`` by the library's own reference, its key, version and digest. A
+pinned mapping of either profile stays valid. It states:
 
 ``visitors``
     Each kind of game character that may cross, the thing kind it arrives as here, the words it is
-    known by, and the looks it may arrive in, each with its licence. A look is chosen by a key the
-    adapter reports; no picture crosses at run time. None for a program that brings no visitor and
-    only decides for a world's own things, such as an agent.
+    known by, and the looks it may arrive in, each a look the thing library ships, with its
+    licence. A look is chosen by a key the adapter reports; no picture crosses at run time. None
+    for a program that brings no visitor and only decides for a world's own things, such as an
+    agent.
 ``items``
     Each game item that may be carried across, the thing kind it becomes, which ways it travels,
     and whether the correspondence is exact or approximated. At most one item of each kind travels
@@ -40,7 +45,8 @@ from typing import Any, Final
 
 from exulanica.canonical import canonical_json
 from exulanica.door.protocol import (
-    MAPPING_PROFILE,
+    MAPPING_PROFILE_V2,
+    MAPPING_PROFILES,
     READS_MAXIMUM,
     WORDS_CHARACTERS_MAXIMUM,
     words_fault,
@@ -65,6 +71,9 @@ _ABILITY: Final = re.compile(r"^[a-z][a-z0-9 _.-]{0,63}$")
 #: colons, so one grammar serves every game.
 _READ: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _:.-]{0,79}$")
 _DIGEST_REFERENCE: Final = re.compile(r"^sha256:[0-9a-f]{64}$")
+#: A shipped look's key, as the thing library names it.
+_LOOK_KEY: Final = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
+_SHA256: Final = re.compile(r"^[0-9a-f]{64}$")
 _SPDX: Final = re.compile(r"^[A-Za-z0-9.+-]{1,64}$")
 _OUTCOMES: Final = frozenset({"exact", "approximated"})
 _WAYS: Final = frozenset({"in", "out", "both"})
@@ -127,6 +136,14 @@ def _kind(value: Any, where: str) -> None:
     _require(type(value["version"]) is int and 1 <= value["version"] <= 10_000, where)
 
 
+def _look(value: Any, where: str) -> None:
+    """A look the thing library ships, named as it names one: its key, version and digest."""
+    _object(value, ("look", "version", "sha256"), where)
+    _require(isinstance(value["look"], str) and bool(_LOOK_KEY.match(value["look"])), where)
+    _require(type(value["version"]) is int and 1 <= value["version"] <= 10_000, where)
+    _require(isinstance(value["sha256"], str) and bool(_SHA256.match(value["sha256"])), where)
+
+
 def _licence(value: Any, where: str) -> None:
     _object(value, ("spdx",), where, optional=("attribution", "share_alike", "licence_url"))
     _require(isinstance(value["spdx"], str) and bool(_SPDX.match(value["spdx"])), where)
@@ -179,7 +196,11 @@ def check_mapping(document: Any) -> dict[str, Any]:
         ("profile", "key", "version", "game", "visitors", "items", "actions", "never_crosses"),
         "the mapping",
     )
-    _require(document["profile"] == MAPPING_PROFILE, f"the mapping's profile is {MAPPING_PROFILE}")
+    _require(
+        document["profile"] in MAPPING_PROFILES,
+        f"the mapping's profile is one of {', '.join(MAPPING_PROFILES)}",
+    )
+    by_reference = document["profile"] == MAPPING_PROFILE_V2
     _require(isinstance(document["key"], str) and bool(_KEY.match(document["key"])), "its key")
     _require(type(document["version"]) is int and 1 <= document["version"] <= 10_000, "version")
     game = _object(document["game"], ("label",), "its game", optional=("content",))
@@ -218,10 +239,13 @@ def check_mapping(document: Any) -> dict[str, Any]:
                 isinstance(look["look_key"], str) and bool(_KEY.match(look["look_key"])),
                 f"{spot} look_key",
             )
-            _require(
-                isinstance(look["look"], str) and bool(_DIGEST_REFERENCE.match(look["look"])),
-                f"{spot} names its look by sha256:<digest>",
-            )
+            if by_reference:
+                _look(look["look"], f"{spot} names a shipped look by its key, version and sha256")
+            else:
+                _require(
+                    isinstance(look["look"], str) and bool(_DIGEST_REFERENCE.match(look["look"])),
+                    f"{spot} names its look by sha256:<digest>",
+                )
             _licence(look["licence"], f"{spot} licence")
             if "source_sha256" in look:
                 _require(

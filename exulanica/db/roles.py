@@ -296,6 +296,15 @@ INSERT_ONLY_TABLES: Final = (
     "thing_kind_version",
     "look_version",
     "look_withdrawal",
+    # Migration 0163 appends each crossing the door hands a society of things, what the minute that
+    # took it did with it, each translation manifest a crossing names, a bridge's report of what a
+    # departed visitor carried home and its word that a visitor's player left, and refuses every
+    # update and delete of each.
+    "door_crossing",
+    "door_crossing_binding",
+    "door_manifest",
+    "door_delivery",
+    "door_visitor_gone",
 )
 
 #: Tables the runtime may change only in the named columns: provisioning takes the table's UPDATE

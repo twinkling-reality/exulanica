@@ -802,8 +802,6 @@ These are material limits of the boundary above, not partial behaviour:
   model that wrote it; it says `an AI model`. An outside agent's pill says `agent` rather than the
   name it gives itself, which no read serves the page yet, and a person in flight wears no pill:
   the flock draws them, not the crowd.
-- No crossing writes a translation manifest yet; the look importer writes one for each look it
-  makes.
 - No route drafts a creature or keeps its documents. The drafter is measured and bound to its own
   manifest role, `creature_drafter` (see [model and service selection](model-and-service-selection.md)),
   and is reached by tests and the measurement only.

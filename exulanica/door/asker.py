@@ -6,12 +6,14 @@ application gives it (``exulanica/api/external_asking.py``), and this is the one
 
 *   :meth:`DoorAsker.configuration`, before anything is reserved, states the external request's
     ``provider_config`` as the grant stands now (its bridge, revision, the mapping its bridge last
-    said hello with, and the bridge's declared deadline) and whether to ask at all: a revoked or
-    expired grant, a bridge the deployment no longer declares or offers here, a workspace that is
-    closed (where the deployment has accounts), or a program that is not connected, is a refusal the
-    host records at once. A program is connected when the holder of the grant's live credential
-    said hello since it was issued, with a version and mapping the deployment still admits, and
-    polled within the presence window (:func:`exulanica.door.channel.presence_of`).
+    said hello with, and the bridge's declared deadline) and whether to ask at all, for a thing the
+    grant names or one of its visitors still here: a revoked or expired grant, a bridge the
+    deployment no longer declares or offers here, a workspace that is closed (where the deployment
+    has accounts), a program that is not connected, or a visitor whose player left its game, is a
+    refusal the host records at once. A program is connected when the holder of the grant's live
+    credential said hello since it was issued, with a version and mapping the deployment still
+    admits, and polled within the presence window (:func:`exulanica.door.channel.presence_of`). A
+    visitor of a grant that ended is sent home: the door writes its departure for the next minute.
 *   :meth:`DoorAsker.answer` writes the ask to the grant's outbox, where the bridge's held poll
     reads it, and waits until ``ends_at`` for the bridge's answer in the inbox. The answer it finds
     becomes the result the host records as the receipt: the offered option the bridge named, and
@@ -37,6 +39,7 @@ import psycopg
 from exulanica.db.session import Database
 from exulanica.door.bridges import BridgeDirectory
 from exulanica.door.channel import presence_of, presence_window
+from exulanica.door.crossings import Visits
 from exulanica.door.grants import GrantRepository, grant_actor
 from exulanica.door.notices import Notices
 from exulanica.door.protocol import DEADLINE_MS_DEFAULT
@@ -48,6 +51,13 @@ __all__ = ["DoorAsker"]
 #: process is seen within this.
 _READ_EVERY_SECONDS: Final = 0.25
 _ENDED: Final = {"revoked": "grant_revoked", "expired": "grant_expired"}
+
+
+def _uuid_or_none(text: str) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(text)
+    except ValueError:
+        return None
 
 
 def _unavailable(reason: str) -> dict[str, Any]:
@@ -81,6 +91,19 @@ class DoorAsker:
                 raise LookupError("a decider names a grant this world does not hold")
             presence = presence_of(connection, workspace_id, grant_id)
             now = grants.now()
+            ended = grant.ended(now)
+            named = subject_id in grant.scope.things
+            visits = Visits(connection, workspace_id, grant, grant_actor(grant_id))
+            visitor = None if named else _uuid_or_none(subject_id)
+            visiting = visitor is not None and visitor in visits.present()
+            if ended is not None and visiting:
+                # A grant that ended unrevoked sends its visitor home at the next minute; a
+                # revocation already did, and writing the same departure again writes nothing.
+                visits.depart(visitor, "grant_ended")
+            # A visitor whose departure is written is still in the world until the minute that
+            # takes it, and its program decides for it until then.
+            visiting = visitor is not None and visits.in_world(visitor)
+            gone = visiting and visits.gone(visitor)
         bridge = self.bridges.get(grant.bridge)
         config = {
             "kind": "external",
@@ -92,8 +115,7 @@ class DoorAsker:
             ),
             "deadline_ms": DEADLINE_MS_DEFAULT if bridge is None else bridge.deadline_ms,
         }
-        ended = grant.ended(now)
-        if ended == "expired" and subject_id in grant.scope.things:
+        if ended == "expired" and named:
             # A grant that ran out hands its things back to their routine the first time the host
             # meets one of them, as a revocation does: this turn is recorded grant_expired, and the
             # host asks the routine for every later one, with no request.
@@ -101,8 +123,9 @@ class DoorAsker:
                 GrantRepository(connection, workspace_id, grant_actor(grant_id)).lapse(grant_id)
         if ended is not None:
             return config, _ENDED[ended]
-        if subject_id not in grant.scope.things:
-            # The owner narrowed the grant after binding this thing; the routine decides for it.
+        if not named and not visiting:
+            # Neither a thing the grant names nor one of its visitors still here: the owner
+            # narrowed the grant after binding this thing; the routine decides for it.
             return config, "grant_revoked"
         if bridge is None or not bridge.offered_to(workspace_id):
             # The deployment removed the bridge, or stopped offering it here: nobody may answer.
@@ -111,10 +134,12 @@ class DoorAsker:
             # The workspace was disabled, or its owner's account or membership ended.
             return config, "decider_disconnected"
         if (
-            presence is None
+            gone
+            or presence is None
             or not presence.admitted_by(bridge)
             or not presence.connected(now, presence_window(bridge))
         ):
+            # The bridge is quiet, or said the person behind this visitor left its game.
             return config, "decider_disconnected"
         return config, None
 

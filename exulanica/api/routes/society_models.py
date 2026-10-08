@@ -32,6 +32,7 @@ from exulanica.api.decision_host import HOST_REFUSALS
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.services import Services
 from exulanica.api.world_scope import WorldId
+from exulanica.door.outside import outside_deciders
 from exulanica.models.manifest import load_manifest
 from exulanica.models.usage import usd_string
 from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
@@ -338,6 +339,17 @@ def society_models_view(
             for summary in _by_model(asked_models)
         ],
         "decisions_read": {"counted": len(decisions), "maximum": DECISIONS_READ},
+        # Every subject an outside program decides for now under a grant that stands, the world's
+        # own people a grant names (came "run") and the visitors that crossed in ("crossed"), with
+        # what the grant view says of its program. Added to this profile as an optional field: a
+        # reader that predates it reads everything else unchanged, and absent means nobody.
+        "outside": outside_deciders(
+            connection,
+            session.workspace_id,
+            state=snapshot["state"],
+            choices=choices,
+            bridges=None if services.door is None else services.door.bridges,
+        ),
     }
 
 

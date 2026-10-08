@@ -92,8 +92,9 @@ CHOICE_REFUSALS: Final = {
         "one subject cannot be run by chosen models under two decision roles"
     ),
     "decided_from_outside": (
-        "somebody this choice names came into the world from outside, and the program they came "
-        "with decides for them; end its grant or send them away instead"
+        "a program from outside decides for somebody this choice names: the one they came into "
+        "the world with, or one the world's owner granted them to; end its grant, or send them "
+        "away, instead"
     ),
     "engine_takes_no_traveller_choice": (
         "only a society of things takes visitors, so only its engine takes the mind a gate's "
@@ -401,6 +402,7 @@ class SocietyModelChoiceRepository:
             described=described,
             chosen_by=chosen_by,
             contract=contract,
+            granted_away=True,
         )
         assert recorded is not None
         return recorded
@@ -640,11 +642,14 @@ class SocietyModelChoiceRepository:
         described: Any,
         chosen_by: uuid.UUID,
         contract: DecisionContract,
+        granted_away: bool = False,
     ) -> dict[str, Any] | None:
         """Record one choice of ``role`` naming ``asked``, checked as ``described()`` checks it,
         or return the one this idempotency key already recorded. ``subjects`` may be read from
         the society's choices under its lock instead: then a key already recorded is answered
-        whoever it named, and None is returned, recording nothing, when they name nobody."""
+        whoever it named, and None is returned, recording nothing, when they name nobody. With
+        ``granted_away``, the owner's own choice, a subject a grant decides for now is refused
+        (``decided_from_outside``): only ending the grant hands it back."""
         with self.connection.transaction():
             society = self._society(version_id, lock=True)
             rows = self._rows(society["society_id"])
@@ -687,6 +692,13 @@ class SocietyModelChoiceRepository:
                 # A visitor is never handed to another outside program: its own program, or the
                 # world, decides for it.
                 raise ModelChoiceRefused("decided_from_outside")
+            if granted_away:
+                held = self._current(role, rows)
+                if any(
+                    held.get(subject, {}).get("decider", {}).get("kind") == "external"
+                    for subject in chosen
+                ):
+                    raise ModelChoiceRefused("decided_from_outside")
             state = society["state"]
             if not all(kind_allows(state, subject, record["kind"]) for subject in chosen):
                 raise ModelChoiceRefused("decider_not_allowed")

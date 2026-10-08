@@ -371,6 +371,9 @@ FRAME_FIELDS = {
     "grant": set(grant_frame(grant_seq=1, scope={})),
     "grant_ended": set(grant_ended_frame(grant_id="g", grant_seq=1, reason="r")),
 }
+#: Fields the door added to a frame kind after these fixtures were recorded. A frame grows only by
+#: optional fields, so a recorded frame may lack one, and the mod reads none of them as required.
+ADDED_SINCE_RECORDED: dict[str, set[str]] = {"asked": {"idle_label"}}
 
 
 def test_every_frame_the_mod_read_has_the_fields_the_door_writes():
@@ -379,7 +382,11 @@ def test_every_frame_the_mod_read_has_the_fields_the_door_writes():
         if not entry["path"].startswith("/door/channel/frames") or entry["status"] != 200:
             continue
         for frame in json.loads(entry["response_text"])["frames"]:
-            assert set(frame) == FRAME_FIELDS[frame["kind"]], frame["kind"]
+            written = FRAME_FIELDS[frame["kind"]]
+            assert set(frame) <= written, frame["kind"]
+            assert written - set(frame) <= ADDED_SINCE_RECORDED.get(frame["kind"], set()), frame[
+                "kind"
+            ]
             kinds.add(frame["kind"])
     assert {"grant", "asked", "outcome"} <= kinds
 

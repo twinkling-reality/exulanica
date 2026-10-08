@@ -175,6 +175,28 @@ def test_a_cursor_round_trips_and_a_first_poll_starts_from_nothing():
 
 
 @pytest.mark.parametrize(
+    ("written", "read"),
+    [
+        # Cursors as a door without crossings wrote them (the first version), held by a bridge
+        # across the upgrade: {"ask":7,"ended":false,"grant":2,"outcome":6,"v":1} and its end.
+        (
+            "eyJhc2siOjcsImVuZGVkIjpmYWxzZSwiZ3JhbnQiOjIsIm91dGNvbWUiOjYsInYiOjF9",
+            Cursor(ask=7, outcome=6, grant=2, crossed=0, departed=0, ended=False),
+        ),
+        (
+            "eyJhc2siOjcsImVuZGVkIjp0cnVlLCJncmFudCI6Mywib3V0Y29tZSI6NywidiI6MX0",
+            Cursor(ask=7, outcome=7, grant=3, crossed=0, departed=0, ended=True),
+        ),
+    ],
+)
+def test_a_cursor_written_before_crossings_reads_on_as_told_no_crossing(written, read):
+    assert Cursor.decode(written) == read
+    # What the door writes next is the second cursor, which reads back as itself.
+    assert read.encode() != written
+    assert Cursor.decode(read.encode()) == read
+
+
+@pytest.mark.parametrize(
     "text",
     [
         "not base64 at all!",
@@ -188,6 +210,17 @@ def test_a_cursor_round_trips_and_a_first_poll_starts_from_nothing():
         base64.urlsafe_b64encode(b'{"ask": 1, "ended": false, "grant": 0, "outcome": 0, "v": 1}')
         .decode()
         .rstrip("="),  # not this door's own writing of it
+        base64.urlsafe_b64encode(b'{"ask":1,"ended":false,"grant":0,"outcome":0,"v":true}')
+        .decode()
+        .rstrip("="),  # a first cursor's version written as a truth value
+        base64.urlsafe_b64encode(
+            b'{"ask":1,"crossed":0,"departed":0,"ended":false,"grant":0,"outcome":0,"v":1}'
+        )
+        .decode()
+        .rstrip("="),  # the second cursor's fields under the first's version
+        base64.urlsafe_b64encode(b'{"ask":1,"ended":false,"grant":0,"outcome":0,"v":2}')
+        .decode()
+        .rstrip("="),  # the first cursor's fields under the second's version
         "A" * 201,
     ],
 )
@@ -244,6 +277,12 @@ def _nested(depth):
         (lambda document: document.update(profile="other/v1"), "profile"),
         (lambda document: document.update(extra=1), "states exactly"),
         (lambda document: document["visitors"][0]["looks"][0].update(look="a.png"), "sha256"),
+        (
+            lambda document: document["visitors"][0]["looks"][0].update(
+                look={"look": "blocky-traveller", "version": 1, "sha256": "0" * 64}
+            ),
+            "sha256:<digest>",
+        ),
         (lambda document: document["items"].append(dict(document["items"][0])), "once"),
         (lambda document: document["items"][0].update(ways="sideways"), "in, out or both"),
         (lambda document: document["visitors"][0]["kind"].update(version=0), "kind"),
@@ -265,6 +304,23 @@ def test_a_mapping_that_breaks_its_profile_is_refused_by_name(change, says):
     change(document)
     with pytest.raises(MappingRefused, match=says):
         check_mapping(document)
+
+
+def test_the_second_mapping_profile_names_a_look_by_the_library_s_reference():
+    document = door_support.mapping_v2()
+    assert check_mapping(document) is document
+    # Each profile names a look its own way, and only its own way.
+    document["visitors"][0]["looks"][0]["look"] = "sha256:" + "0" * 64
+    with pytest.raises(MappingRefused, match="shipped look by its key"):
+        check_mapping(document)
+    later = door_support.mapping_v2()
+    later["visitors"][0]["looks"][0]["look"]["version"] = 0
+    with pytest.raises(MappingRefused, match="shipped look by its key"):
+        check_mapping(later)
+    other = door_support.mapping()
+    other["profile"] = "exulanica.bridge-mapping/v3"
+    with pytest.raises(MappingRefused, match="profile is one of"):
+        check_mapping(other)
 
 
 def test_a_program_that_brings_no_visitor_needs_none_in_its_mapping():
