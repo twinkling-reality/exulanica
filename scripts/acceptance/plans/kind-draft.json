@@ -1,0 +1,41 @@
+{
+ "profile": "q10-scripted-model-plan/v1",
+ "note": "KD1 (candidate-34): the kind drafter answers by description: the hand-written farm brief from tests/kind_briefs.py (a test fixture, not a kind a model made), a brief with no zones three times (refused by name after both repairs), and a failure from the provider.",
+ "bounds": {
+  "ceiling_usd": "0.50",
+  "max_calls": 200
+ },
+ "descriptions": {
+  "ready": "a small farm with a farmhouse, a barn and a duck pond",
+  "refused": "a place with nothing in it at all",
+  "failed": "a quiet harbour where the boats come in"
+ },
+ "rules": [
+  {
+   "match": {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "contains": "a small farm with a farmhouse, a barn and a duck pond"
+   },
+   "content": "{\"boundary\":{\"gate_width_mm\":3000,\"height_mm\":1200,\"label\":\"fence\",\"look\":\"boundary.fence_wood\",\"thickness_mm\":100},\"employment_permille\":1000,\"enclosure\":\"open\",\"ground\":\"ground.grass\",\"kind\":\"fixture_farm\",\"label\":\"A test farm\",\"offsite_home\":\"homes nearby\",\"offsite_residents\":0,\"place_words\":{\"around\":\"around here\",\"here\":\"here\"},\"site_depth_mm\":128000,\"site_fenced\":true,\"site_width_mm\":96000,\"spine\":{\"label\":\"farm track\",\"look\":\"path.track\",\"road\":true,\"width_mm\":4000},\"summary\":\"A hand-written test fixture: a farmhouse, barns, fields and a pond on a track.\",\"zones\":[{\"access\":\"open\",\"areas\":[],\"fenced\":false,\"fixtures\":[{\"blocks\":true,\"count\":{\"from\":2,\"to\":2},\"depth_mm\":500,\"description\":\"a weathered wooden bench\",\"height_mm\":900,\"label\":\"bench\",\"look\":\"fixture.bench\",\"pattern\":\"row\",\"roles\":[\"seat\"],\"seats\":2,\"sleepers\":0,\"stands\":0,\"use_role\":\"\",\"visit\":[],\"width_mm\":1800,\"work\":[]},{\"blocks\":true,\"count\":{\"from\":3,\"to\":6},\"depth_mm\":1200,\"description\":\"a round hay bale\",\"height_mm\":1000,\"label\":\"hay bale\",\"look\":\"prop.hay_bale\",\"pattern\":\"scatter\",\"roles\":[\"obstruction\"],\"seats\":0,\"sleepers\":0,\"stands\":0,\"use_role\":\"\",\"visit\":[],\"width_mm\":1200,\"work\":[]}],\"ground\":\"ground.gravel\",\"label\":\"farmyard\",\"placement\":\"front\",\"share\":400,\"structures\":[{\"count\":{\"from\":1,\"to\":1},\"depth_mm\":{\"from\":8000,\"to\":10000},\"description\":\"an old stone farmhouse\",\"door_width_mm\":1000,\"label\":\"farmhouse\",\"look\":\"structure.farmhouse\",\"residents\":0,\"roof_form\":\"gable\",\"roof_look\":\"roof.tile\",\"rooms\":[{\"count\":{\"from\":1,\"to\":1},\"description\":\"\",\"fixtures\":[{\"blocks\":true,\"count\":{\"from\":1,\"to\":1},\"depth_mm\":900,\"description\":\"a farmhouse table\",\"height_mm\":750,\"label\":\"table\",\"look\":\"fixture.table\",\"pattern\":\"centre\",\"roles\":[\"decoration\"],\"seats\":0,\"sleepers\":0,\"stands\":0,\"use_role\":\"\",\"visit\":[],\"width_mm\":1600,\"work\":[]}],\"label\":\"kitchen\",\"look\":\"ground.floor_tile\",\"share\":3},{\"count\":{\"from\":2,\"to\":2},\"description\":\"\",\"fixtures\":[{\"blocks\":true,\"count\":{\"from\":1,\"to\":2},\"depth_mm\":2000,\"description\":\"a single bed\",\"height_mm\":600,\"label\":\"bed\",\"look\":\"fixture.bed\",\"pattern\":\"back_wall\",\"roles\":[\"bed\"],\"seats\":0,\"sleepers\":1,\"stands\":0,\"use_role\":\"\",\"visit\":[],\"width_mm\":1000,\"work\":[]}],\"label\":\"bedroom\",\"look\":\"ground.floor_wood\",\"share\":2}],\"storey_height_mm\":2800,\"storeys\":{\"from\":2,\"to\":2},\"use_role\":\"home\",\"visit\":[],\"wall_look\":\"wall.stone\",\"width_mm\":{\"from\":10000,\"to\":14000},\"work\":[]},{\"count\":{\"from\":1,\"to\":1},\"depth_mm\":{\"from\":8000,\"to\":12000},\"description\":\"a red timber barn\",\"door_width_mm\":3000,\"label\":\"barn\",\"look\":\"structure.barn\",\"residents\":0,\"roof_form\":\"gable\",\"roof_look\":\"roof.metal\",\"rooms\":[],\"storey_height_mm\":4500,\"storeys\":{\"from\":1,\"to\":1},\"use_role\":\"workplace\",\"visit\":[],\"wall_look\":\"wall.timber\",\"width_mm\":{\"from\":12000,\"to\":16000},\"work\":[{\"closing_minute\":1140,\"opening_minute\":300,\"role_label\":\"dairy hand\",\"shifts\":[\"early\"],\"staff_per_unit\":2}]}]},{\"access\":\"open\",\"areas\":[{\"count\":{\"from\":2,\"to\":3},\"description\":\"rows of wheat\",\"label\":\"field\",\"look\":\"ground.crop_rows\",\"roles\":[\"field\"],\"use_role\":\"workplace\",\"work\":[{\"closing_minute\":1080,\"opening_minute\":360,\"role_label\":\"farmer\",\"shifts\":[\"day\"],\"staff_per_unit\":1}]}],\"fenced\":true,\"fixtures\":[],\"ground\":\"ground.grass\",\"label\":\"fields\",\"placement\":\"back\",\"share\":500,\"structures\":[]},{\"access\":\"open\",\"areas\":[{\"count\":{\"from\":1,\"to\":1},\"description\":\"a small duck pond\",\"label\":\"duck pond\",\"look\":\"water.pond\",\"roles\":[\"water\"],\"use_role\":\"\",\"work\":[]}],\"fenced\":false,\"fixtures\":[{\"blocks\":true,\"count\":{\"from\":1,\"to\":1},\"depth_mm\":200,\"description\":\"a rail to lean on by the water\",\"height_mm\":1000,\"label\":\"pond rail\",\"look\":\"fixture.rail\",\"pattern\":\"row\",\"roles\":[\"gathering\"],\"seats\":0,\"sleepers\":0,\"stands\":3,\"use_role\":\"\",\"visit\":[],\"width_mm\":2400,\"work\":[]}],\"ground\":\"ground.grass\",\"label\":\"pond corner\",\"placement\":\"right\",\"share\":200,\"structures\":[]}]}"
+  },
+  {
+   "match": {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "contains": "a place with nothing in it at all"
+   },
+   "content": "{\"zones\": []}"
+  },
+  {
+   "match": {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "contains": "a quiet harbour where the boats come in"
+   },
+   "status": 500,
+   "body": {
+    "error": {
+     "message": "scripted failure for the kind drafter"
+    }
+   }
+  }
+ ]
+}

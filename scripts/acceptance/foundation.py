@@ -4118,29 +4118,63 @@ OUTSIDE_ROWS = (
         "pill over the agent's own visitor is recorded, not judged. Scripted agent; functional "
         "only.",
     ),
+    (
+        "N1.x",
+        "people.visitor_words",
+        "outside-visitor-words",
+        "In the same session, with the agent answering each turn of the two people it is granted "
+        "with its first offered action that says nothing (candidate-34): the society's models "
+        "read lists both among those decided from outside, each with its latest decision (seq, "
+        "base tick, consumed tick, status, reason) and naming no model; the knight's card offers "
+        "no Change and its Mind line is Who decides' own words for it; its Now line says "
+        "'its own program chose it' (phrase.chosen_by_their_program) and never 'the model you "
+        "chose for them picked it'. Scripted agent; functional only.",
+    ),
 )
 OUTSIDE_NAME, OUTSIDE_MAKER = "Q10 Scout", "acceptance"
 OUTSIDE_PEOPLE = ("knight", "lantern-spirit")
 #: The game type AGENTS' mapping brings an agent's own body in as (outside-agents.v1.json).
 OUTSIDE_VISITOR_TYPE = "agent"
 #: The agent the outside session keeps connected while the page reads: it says hello under its
-#: declared name and polls, answering nothing (the world's routine decides missed turns).
+#: declared name and polls. With "enter" it brings its own body in and answers nothing (the world's
+#: routine decides missed turns); with "answer" it answers each turn of the people it is granted
+#: with its first offered action that says nothing (N1.x).
 WAITING_AGENT = r"""
 import sys, time
 from exulanica_agent import Body
-body = Body.connect(name=sys.argv[1], maker=sys.argv[2], mind="answers nothing")
+answering = sys.argv[4:] == ["answer"]
+body = Body.connect(name=sys.argv[1], maker=sys.argv[2],
+                    mind="first quiet action" if answering else "answers nothing")
 try:
     if sys.argv[4:] == ["enter"]:
         answer = body.enter()
         print("entered" if answer.received else f"not entered: {answer.refusal}", file=sys.stderr, flush=True)
-    time.sleep(float(sys.argv[3]))
+    deadline = time.monotonic() + float(sys.argv[3])
+    while time.monotonic() < deadline:
+        if not answering:
+            time.sleep(min(5.0, max(0.0, deadline - time.monotonic())))
+            continue
+        turn = body.next_turn(min(15.0, max(0.1, deadline - time.monotonic())))
+        if turn is not None:
+            option = ([o for o in turn.options if not o.says_line] or list(turn.options))[0]
+            answer = turn.act(option.action, "Hello." if option.says_line else None)
+            print(f"minute {turn.minute}: {option.action}: {answer.received}", file=sys.stderr, flush=True)
 finally:
     body.close(wait_seconds=5)
 """
-OUTSIDE_AGENT_SECONDS = 1200
+#: How long past the page session's own bound the outside agents stay connected, so they are there
+#: whenever the queued page runs (A-129); the session ends them as soon as its page is done.
+OUTSIDE_AGENT_MARGIN_SECONDS = 300
 
 
-def prepare_outside(stack: Stack, out: Path) -> tuple[dict[str, Any], list[subprocess.Popen[str]]]:
+def page_session_seconds(rehearse: Any) -> int:
+    """The longest a browser session may take: its budget, the GPU slot's wait and two minutes."""
+    return JOURNEY_BUDGET_SECONDS + rehearse.GPU_SLOT_WAIT_SECONDS + 120
+
+
+def prepare_outside(
+    stack: Stack, out: Path, agent_seconds: int
+) -> tuple[dict[str, Any], list[subprocess.Popen[str]]]:
     """The outside session's world (A-116): the demo scene built in workspace 1, its society of
     things started, AGENTS' AI bridge granted two of its beings, and the agent connected (the
     process is returned so the session can end it)."""
@@ -4245,7 +4279,7 @@ def prepare_outside(stack: Stack, out: Path) -> tuple[dict[str, Any], list[subpr
                 WAITING_AGENT,
                 OUTSIDE_NAME,
                 OUTSIDE_MAKER,
-                str(OUTSIDE_AGENT_SECONDS),
+                str(agent_seconds),
                 *extra,
             ],
             cwd=stack.worktree,
@@ -4260,7 +4294,7 @@ def prepare_outside(stack: Stack, out: Path) -> tuple[dict[str, Any], list[subpr
             text=True,
         )
 
-    agent = connected((issued or {}).get("credential") or "", "outside-agent.txt")
+    agent = connected((issued or {}).get("credential") or "", "outside-agent.txt", "answer")
     visitor = connected(
         (visiting_key or {}).get("credential") or "", "outside-visitor.txt", "enter"
     )
@@ -4454,7 +4488,9 @@ def browser(arguments: argparse.Namespace) -> int:
     started = dt.datetime.now(dt.UTC).isoformat()
     agent = None
     if outside:
-        facts, agent = prepare_outside(stack, out)
+        facts, agent = prepare_outside(
+            stack, out, page_session_seconds(rehearse) + OUTSIDE_AGENT_MARGIN_SECONDS
+        )
         facts["said"] = facts.get("ready")
     else:
         facts = prepare_things(stack, out) if things else {}
@@ -4509,7 +4545,7 @@ def browser(arguments: argparse.Namespace) -> int:
             capture_output=True,
             text=True,
             check=False,
-            timeout=JOURNEY_BUDGET_SECONDS + rehearse.GPU_SLOT_WAIT_SECONDS + 120,
+            timeout=page_session_seconds(rehearse),
         )
     (out / "runner.txt").write_text(completed.stdout + completed.stderr)
     for one in agent or []:

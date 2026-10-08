@@ -14,6 +14,7 @@ import importlib.util
 import json
 import struct
 import sys
+from decimal import Decimal
 from pathlib import Path
 from types import ModuleType
 
@@ -517,3 +518,50 @@ def test_lk1s_drafted_form_fills_every_value_the_served_specification_lets_a_dra
     adjustable = {e["key"] for e in served_document()["values"] if e.get("adjustable") is True}
     assert set(form) == {"preset", "fit", "not_supported", *adjustable}
     assert form["preset"] in {p["key"] for p in served_document()["presets"]}
+
+
+def test_pr1s_estimate_from_the_compute_catalog_gives_the_contracts_own_figures():
+    # docs/generated-pieces-contract.md: "Four variants of one kind are USD 0.016 typically and USD
+    # 0.06 at worst", and the first variant of each kind comes 8 seconds an item apart.
+    expected = DRIVE.expected_estimate(DRIVE.piece_compute(ROOT), [4])
+    contract = " ".join((ROOT / "docs" / "generated-pieces-contract.md").read_text().split())
+
+    assert "Four variants of one kind are USD 0.016 typically and USD 0.06 at worst" in contract
+    assert (expected["usd_typical"], expected["usd_worst_case"]) == (
+        Decimal("0.016"),
+        Decimal("0.06"),
+    )
+    assert (expected["items"], expected["first_seconds_warm"], expected["all_seconds_warm"]) == (
+        4,
+        8,
+        32,
+    )
+    # A mutant: the bounding item's seconds in place of the typical's is not the contract's.
+    assert not DRIVE.same_estimate(
+        {**{k: str(v) for k, v in expected.items()}, "usd_typical": "0.06"}, expected
+    )
+
+
+def test_pr1_names_more_shipped_kind_versions_than_an_ask_may_hold():
+    kinds = list((ROOT / "assets" / "catalogs" / "things" / "kinds").glob("*.v*.json"))
+
+    assert len(kinds) > DRIVE.PIECE_KINDS_MAXIMUM
+
+
+def test_the_kind_draft_plan_answers_the_manifests_drafter_with_the_fixture_farm():
+    from exulanica.models.manifest import load_manifest
+    from exulanica.selection.kind_drafting import DRAFTER_ROLE
+
+    sys.path.insert(0, str(ROOT / "tests"))
+    from kind_briefs import brief_of, fixture_kind, held_to_form
+
+    plan = json.loads(DRIVE.KIND_DRAFT_PLAN.read_text())
+    drafter = load_manifest()[DRAFTER_ROLE].primary.model_id
+    by_words = {rule["match"]["contains"]: rule for rule in plan["rules"]}
+
+    assert {rule["match"]["model"] for rule in plan["rules"]} == {drafter}
+    assert set(by_words) == set(plan["descriptions"].values())
+    ready = by_words[plan["descriptions"]["ready"]]
+    assert json.loads(ready["content"]) == held_to_form(brief_of(fixture_kind("farm")))
+    assert json.loads(by_words[plan["descriptions"]["refused"]]["content"]) == {"zones": []}
+    assert by_words[plan["descriptions"]["failed"]]["status"] == 500

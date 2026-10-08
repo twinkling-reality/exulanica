@@ -57,7 +57,7 @@ const PEOPLE_STEPS = ['people-card', 'people-marks'];
 const THINGS_STEPS = ['things-lines'];
 // The outside session (A-116): people an outside AI agent decides for, in Who decides and over their
 // heads, while the agent is connected (the driver's facts name the world, the people and the name).
-const OUTSIDE_STEPS = ['outside-deciders'];
+const OUTSIDE_STEPS = ['outside-deciders', 'outside-visitor-words'];
 // The world the people session opens: the workspace's starter with a stall placed, so its people
 // have somewhere to go and stand near where a person arrives (as N1.h prepares it; A-101).
 const PEOPLE_STARTER = { title: 'Q10 people' };
@@ -106,6 +106,15 @@ function whyWords() {
     'society-inhabitant-words.v1.json'), 'utf8'));
   const entry = catalog.entries.find((e) => e.code === 'ask_why');
   if (entry === undefined) throw new Error('the society words catalog has no ask_why entry');
+  return entry.words;
+}
+
+/** A phrase or reason's words in the society words catalog, by its key. */
+function catalogWords(key) {
+  const catalog = JSON.parse(readFileSync(join(REPOSITORY, 'assets', 'catalogs', 'society-words',
+    'society-inhabitant-words.v1.json'), 'utf8'));
+  const entry = catalog.entries.find((e) => e.key === key);
+  if (entry === undefined) throw new Error(`the society words catalog has no ${key} entry`);
   return entry.words;
 }
 
@@ -714,6 +723,55 @@ const STEP_HANDLERS = {
     // stands and when the page draws its pill are not yet pinned down.
     ctx.note(`outside pills: ${JSON.stringify(pills)} (wanted ${name})`);
     await ctx.screenshot('pills', "the agent's visitor with its outside pill");
+  },
+  async 'outside-visitor-words'(ctx) {
+    // N1.x (candidate-34): who decides for a person a program runs is read from its record. The
+    // models read lists each with its latest decision from outside and names no model; the card
+    // offers no Change and its Mind line is Who decides' own words; once its program has answered,
+    // the card's Now line says its own program chose it, never that a model did.
+    const { outside_world: world, outside_people: people } = ctx.facts;
+    const entry = (await ctx.api('GET', `/world-entries/${world}`)).body;
+    const query = `?world_id=${encodeURIComponent(entry?.world_id ?? '')}`;
+    const modelsPath = `/world/versions/${entry?.authored_version_id}/society/models${query}`;
+    const deadline = Date.now() + SETTLE_MS * 8;
+    let outside = [];
+    while (Date.now() < deadline) {
+      outside = (await ctx.api('GET', modelsPath)).body?.outside ?? [];
+      if (people.every((id) => outside.some((e) => e.subject_id === id && e.latest))) break;
+      await sleep(5_000);
+    }
+    const entries = people.map((id) => outside.find((e) => e.subject_id === id) ?? null);
+    const latestShaped = (l) => l !== null && typeof l === 'object' && Number.isInteger(l.decision_seq)
+      && Number.isInteger(l.base_tick) && typeof l.status === 'string' && 'reason' in l && 'consumed_tick' in l;
+    const namesModel = (value) => value !== null && typeof value === 'object'
+      && Object.entries(value).some(([k, v]) => k === 'model' || k === 'model_id' || namesModel(v));
+    ctx.observe('outside-entries-carry-latest', entries.every((e) => e !== null && latestShaped(e.latest)), { entries });
+    ctx.observe('outside-entries-name-no-model', entries.every((e) => e !== null && !namesModel(e)), { entries });
+    const subject = people[0];
+    const program = catalogWords('phrase.chosen_by_their_program');
+    const modelWords = catalogWords('reason.chosen_by_their_model');
+    await ctx.page.waitFor(`[...(${INSPECT})?.options ?? []].some(o => o.value === ${JSON.stringify(subject)}) ? true : null`,
+      SETTLE_MS, `${subject} nearby`);
+    await ctx.page.setValue(INSPECT, subject);
+    const CARD = `document.querySelector('section.thing-card[data-subject="${subject}"]')`;
+    const card = `(() => { const c = ${CARD}; if (!c || !c.checkVisibility()) return null;
+      const mind = [...c.querySelectorAll('div.thing-card-row')].find(r => r.querySelector('h4')?.textContent?.trim() === 'Mind');
+      return { change: !!c.querySelector('[data-action="card.mind.change"]'),
+        name: mind?.querySelector('.thing-card-mind-name')?.textContent ?? null,
+        line: mind?.querySelector('.thing-card-muted')?.textContent ?? null,
+        now: c.querySelector('.thing-card-now span')?.textContent ?? null }; })()`;
+    const read = await ctx.page.waitFor(`(() => { const r = ${card}; return r && (r.now ?? '').includes(${JSON.stringify(program)}) ? r : null; })()`,
+      SETTLE_MS * 4, 'the card to say its program chose').catch(async () => ctx.page.evaluate(card));
+    await ctx.screenshot('visitor-card', "the card of a person a program runs");
+    if (!await ctx.page.evaluate(`document.querySelector('#world-panel-decides')?.checkVisibility() ?? false`)) {
+      await ctx.page.click(ACTION('people.decides'), 'Who decides');
+    }
+    const decider = await ctx.page.waitFor(`document.querySelector('section.society-models label[data-subject-id="${subject}"] .society-models-person-decider')?.textContent || null`,
+      SETTLE_MS, "Who decides' words for the person").catch(() => null);
+    ctx.observe('card-offers-no-change', read !== null && read.change === false, { read });
+    ctx.observe('card-mind-is-who-decides-words', read !== null && decider !== null && read.line === decider, { line: read?.line ?? null, decider });
+    ctx.observe('now-says-its-program-chose', read !== null && (read.now ?? '').includes(program) && !(read.now ?? '').includes(modelWords),
+      { now: read?.now ?? null, program, model_words: modelWords });
   },
   async 'journey-open'(ctx) {
     await open(ctx);

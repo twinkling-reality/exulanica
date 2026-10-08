@@ -54,6 +54,18 @@ leaves the stack running:
 - ``kinds``: W1 (a creator's world kind kept in its workspace), W2 (a world of a kind, its site
   drawing, title and body limits) and W3 (people living in it). The stack is started with
   ``--workspaces 2 --read-only-token --no-derivative-worker``.
+- ``kind-drafts``: KD1 (a kind of place drafted from words, kept with its provenance and never the
+  words). The stack is started with ``--workspaces 2 --peer-token --scripted-model
+  scripts/acceptance/plans/kind-draft.json --spending process --no-derivative-worker``.
+- ``pieces``: PR1 (asking for a look's generated pieces, with no generation session). The stack is
+  started with ``--workspaces 2 --scripted-model scripts/acceptance/plans/spending.json --spending
+  durable --no-derivative-worker``; the driver issues a GPU authority and grants as an operator does.
+- ``hands``: HN1 (a being picks a thing up in a society of things). A fresh database, and the stack
+  started with ``--workspaces 2 --society-of-things --society-playback --scripted-model
+  scripts/acceptance/plans/hands.json --spending process --no-derivative-worker``.
+- ``guest-turns``: V7 (every waiting guest takes a turn) and PR2 (a guest asking for pieces). The
+  stack is started as ``guest-places``'s; ``guest-allowance`` also checks KD2 (drafting refused
+  before anything is spent when a guest's allowance cannot cover one attempt).
 
 Every row ends ``passed``, ``failed`` or ``blocked``, by the rules of ``foundation.py``, whose
 records, clients and stack this file uses. Like it, this is an independent client: it imports
@@ -4674,9 +4686,10 @@ def row_r2(stack: Stack, transcripts: Any) -> Row:
         "references.pictures_not_offered",
         "Where a person's pictures are not read for reference notes (the default): the list states "
         "pictures not offered, with a code and at most 4; a request naming a picture is refused "
-        "409 reference_pictures_not_offered and nothing is queued; a picture named twice is 422 "
-        "pictures_repeated; a request asking for neither web notes nor pictures is 422 "
-        "nothing_to_look_up (A-103).",
+        "409 with the code the list's pictures.code states and nothing is queued (A-120); a "
+        "picture named twice is 422 pictures_repeated; a request asking for neither web notes nor "
+        "pictures is 422 nothing_to_look_up (A-103). A-103's constant, "
+        "reference_pictures_not_offered, is recorded beside it and not judged.",
     )
     w1 = F.client(stack, transcripts, "w1", "token")
     status_list, listed = w1.call("R2", "GET", "/worlds/references")
@@ -4694,8 +4707,9 @@ def row_r2(stack: Stack, transcripts: Any) -> Row:
         "R2", "POST", "/worlds/references", body={**base, "pictures": [picture]}
     )
     row.expect(
-        status_one == 409 and F.problem_code(one) == "reference_pictures_not_offered",
-        f"a request naming a picture answered {status_one} {F.problem_code(one)}",
+        status_one == 409 and F.problem_code(one) == pictures.get("code"),
+        f"a request naming a picture answered {status_one} {F.problem_code(one)}, the list "
+        f"states {pictures.get('code')}",
     )
     row.expect(
         (w1.call("R2", "GET", "/worlds/references")[1] or {}).get("references") == [],
@@ -4717,6 +4731,8 @@ def row_r2(stack: Stack, transcripts: Any) -> Row:
     row.observed = {
         "pictures": pictures,
         "one_picture": [status_one, F.problem_code(one)],
+        # A-120: A-103's constant, kept as its own line and not judged.
+        "a103_constant_line": F.problem_code(one) == "reference_pictures_not_offered",
         "twice": [status_twice, F.problem_code(twice)],
         "nothing": [status_bare, F.problem_code(nothing)],
     }
@@ -6259,8 +6275,9 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
         "decided from outside; an unknown bridge is 422 bridge_not_offered; the read-only grant is "
         "refused 403; the other workspace reads no grant of workspace 1's (404); things without the version, or the version without things, are 422 "
         "invalid_scope; a person not in the world is 422 person_not_in_this_world. One channel "
-        "credential is live: a hello on it is 200, a second credential ends it (its next request 401 "
-        "unauthenticated), the second polls only after its own hello (409 hello_first, then 200); "
+        "credential is live: a hello on it is 200, a second credential ends it (its next hello, "
+        "and its poll before the second's hello, 401 unauthenticated, A-121), the second polls "
+        "only after its own hello (409 hello_first, then 200); "
         "revoking reads ended, hands the people back to their routine, and the hello after is "
         "refused.",
     )
@@ -6412,6 +6429,15 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
         status_ended == 401 and F.problem_code(ended_answer) == "unauthenticated",
         f"the ended credential answered {status_ended} {F.problem_code(ended_answer)}",
     )
+    # A-121 (1621cb37): the ended credential's poll, before the newer one has said hello, is
+    # refused as unauthenticated, never asked for a hello first.
+    status_ended_poll, ended_poll = door_call(
+        stack, first_credential, "GET", "/door/channel/frames"
+    )
+    row.expect(
+        status_ended_poll == 401 and F.problem_code(ended_poll) == "unauthenticated",
+        f"the ended credential's poll answered {status_ended_poll} {F.problem_code(ended_poll)}",
+    )
     status_early, early = door_call(stack, second_credential, "GET", "/door/channel/frames")
     row.expect(
         status_early == 409 and F.problem_code(early) == "hello_first",
@@ -6456,6 +6482,7 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
             "second": status_second,
             "first_after_second": [status_ended, F.problem_code(ended_answer)],
             "poll_before_hello": [status_early, F.problem_code(early)],
+            "ended_credential_poll": [status_ended_poll, F.problem_code(ended_poll)],
             "second_hello_and_poll": [status_hello_2, status_poll],
         },
         "revoke": [status_revoke, ended],
@@ -7089,7 +7116,847 @@ def guest_allowance(arguments: argparse.Namespace) -> int:
     out = Path(arguments.out).resolve()
     (out / "evidence").mkdir(parents=True, exist_ok=True)
     started = dt.datetime.now(dt.UTC).isoformat()
-    rows = [row_v5(stack, Transcripts(out / "transcripts"))]
+    transcripts = Transcripts(out / "transcripts")
+    rows = [row_v5(stack, transcripts), row_kd2(stack, transcripts)]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
+# -- KD1, KD2: a kind of place drafted from words ---------------------------------------------------
+
+#: The plan KD1's stack is served by: the kind drafter answers by description, the hand-written farm
+#: brief (tests/kind_briefs.py, a test fixture), a brief with no zones, or a provider failure.
+KIND_DRAFT_PLAN = HERE / "plans" / "kind-draft.json"
+#: How long a draft may take to end here: the client's call bound and the checks' bound, three times.
+KIND_DRAFT_SECONDS = 600
+
+
+def kind_draft_ended(c: Any, step: str, draft_id: str) -> dict[str, Any]:
+    """The draft once it is no longer drafting, or its last reading at the bound."""
+    deadline = time.monotonic() + KIND_DRAFT_SECONDS
+    read: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        _, body = c.call(step, "GET", f"/worlds/kinds/drafts/{draft_id}")
+        read = body if isinstance(body, dict) else {}
+        if read.get("state") != "drafting":
+            return read
+        time.sleep(3)
+    return read
+
+
+def kept_kind_row(stack: Stack, kind: str) -> dict[str, Any] | None:
+    """An evidence read as the owner: workspace 1's kept kind of this key, newest version."""
+    found = psql_owner(
+        stack,
+        "select json_build_object('origin', origin, 'document', document)::text from "
+        f"world_kind_version where workspace_id = '{stack.state['workspace_id']}' and "
+        f"kind = '{kind}' order by version desc limit 1",
+    )
+    return json.loads(found) if found else None
+
+
+def row_kd1(stack: Stack, transcripts: Any) -> Row:
+    plan = json.loads(KIND_DRAFT_PLAN.read_text())
+    words = plan["descriptions"]
+    drafter = next(r["match"]["model"] for r in plan["rules"])
+    row = Row(
+        "KD1",
+        "kinds.drafted_from_words",
+        "A kind of place drafted from words (candidate-34): before anything is typed the library "
+        "says drafting is offered with the closed list of refusals; a draft answers 202 at once; "
+        "the farm's words end ready with a kind kept in the workspace, origin drafted, whose "
+        "provenance names the role, the model, the prompt version and digest and the SHA-256 of "
+        "the words and never the words, and the ended draft forgets them; a second start while "
+        "one runs is 409 kind_draft_busy naming the draft only to its starter; another person in "
+        "the workspace and another workspace read it 404 kind_draft_unknown; a brief making no "
+        "kind ends refused by name after both repairs, with its cost; a provider failure ends "
+        "refused with a code from the closed list, with its cost; a world is made of the kept "
+        "kind.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    peer = F.client(stack, transcripts, "peer", "token-peer")
+    _, library = w1.call("KD1", "GET", "/worlds/kinds")
+    drafting = (library or {}).get("drafting") or {}
+    closed = {r.get("code") for r in drafting.get("refusals") or []}
+    row.expect(
+        drafting.get("offered") is True and drafting.get("code") is None and bool(closed),
+        f"the library says drafting {drafting.get('offered')} {drafting.get('code')}",
+    )
+    calls_before = len(scripted_log(stack))
+    status, started = w1.call(
+        "KD1", "POST", "/worlds/kinds/drafts", body={"description": words["ready"]}
+    )
+    started = started if isinstance(started, dict) else {}
+    draft_id = str(started.get("draft_id") or "")
+    row.expect(
+        status == 202 and started.get("state") == "drafting" and bool(draft_id),
+        f"the start answered {status} {F.problem_code(started)} {started.get('state')}",
+    )
+    # A second start while the first runs; the first may already have ended, which is then noted.
+    status_busy, busy = w1.call(
+        "KD1 busy", "POST", "/worlds/kinds/drafts", body={"description": words["ready"]}
+    )
+    status_peer_busy, peer_busy = peer.call(
+        "KD1 peer busy", "POST", "/worlds/kinds/drafts", body={"description": words["ready"]}
+    )
+    status_peer_read, peer_read = peer.call("KD1 peer", "GET", f"/worlds/kinds/drafts/{draft_id}")
+    status_w2_read, w2_read = w2.call("KD1 w2", "GET", f"/worlds/kinds/drafts/{draft_id}")
+    busy_seen = status_busy == 409
+    if busy_seen:
+        row.expect(
+            F.problem_code(busy) == "kind_draft_busy" and str(busy.get("draft_id")) == draft_id,
+            f"the starter's second start answered {F.problem_code(busy)} naming {busy.get('draft_id')}",
+        )
+        row.expect(
+            status_peer_busy == 409
+            and F.problem_code(peer_busy) == "kind_draft_busy"
+            and "draft_id" not in (peer_busy or {}),
+            f"the other person's start answered {status_peer_busy} {F.problem_code(peer_busy)} "
+            f"naming {(peer_busy or {}).get('draft_id')}",
+        )
+    row.expect(
+        status_peer_read == 404 and F.problem_code(peer_read) == "kind_draft_unknown",
+        f"the other person read the draft {status_peer_read} {F.problem_code(peer_read)}",
+    )
+    row.expect(
+        status_w2_read == 404 and F.problem_code(w2_read) == "kind_draft_unknown",
+        f"another workspace read the draft {status_w2_read} {F.problem_code(w2_read)}",
+    )
+    ready = kind_draft_ended(w1, "KD1 ready", draft_id)
+    kind = (ready.get("kind") or {}) if isinstance(ready.get("kind"), dict) else {}
+    row.expect(
+        ready.get("state") == "ready"
+        and kind.get("origin") == "drafted"
+        and kind.get("source") == "workspace",
+        f"the farm ended {ready.get('state')} {(ready.get('refusal') or {}).get('code')} "
+        f"keeping {kind.get('kind')} {kind.get('origin')}",
+    )
+    row.expect(ready.get("description") == "", "the ended draft still holds the words")
+    row.expect(ready.get("execution") is not None, "the ready draft shows no cost")
+    kept = kept_kind_row(stack, str(kind.get("kind"))) if kind.get("kind") else None
+    provenance = ((kept or {}).get("document") or {}).get("provenance") or {}
+    expected_words = hashlib.sha256(words["ready"].encode("utf-8")).hexdigest()
+    row.expect(
+        (kept or {}).get("origin") == "drafted"
+        and provenance.get("role") == "kind_drafter"
+        and provenance.get("model") == drafter
+        and bool(provenance.get("prompt_version"))
+        and re.fullmatch(r"[0-9a-f]{64}", str(provenance.get("prompt_sha256"))) is not None
+        and provenance.get("words_sha256") == expected_words,
+        f"the kept kind's provenance is {provenance}",
+    )
+    row.expect(
+        words["ready"] not in json.dumps((kept or {}).get("document") or {}),
+        "the kept kind holds the words",
+    )
+    preset = ((kind.get("presets") or [{}])[0]).get("key")
+    status_world, world = (None, {})
+    if kind.get("kind"):
+        status_world, world = w1.call(
+            "KD1 world",
+            "POST",
+            f"/worlds/kinds/{kind['kind']}/worlds",
+            body={"preset": preset, "title": "Q10 KD1 farm"},
+        )
+    row.expect(
+        status_world in (200, 201) and bool((world or {}).get("entry_id")),
+        f"a world of the kept kind answered {status_world} {F.problem_code(world)}",
+    )
+    ended: dict[str, dict[str, Any]] = {}
+    for key in ("refused", "failed"):
+        before = len(scripted_log(stack))
+        status_key, answer = w1.call(
+            f"KD1 {key}", "POST", "/worlds/kinds/drafts", body={"description": words[key]}
+        )
+        read = kind_draft_ended(w1, f"KD1 {key}", str((answer or {}).get("draft_id")))
+        ended[key] = {
+            "start": status_key,
+            "state": read.get("state"),
+            "refusal": read.get("refusal"),
+            "execution_calls": len(((read.get("execution") or {}).get("calls")) or []),
+            "scripted_calls": len(scripted_log(stack)) - before,
+        }
+    refused = ended["refused"]
+    row.expect(
+        refused["state"] == "refused"
+        and (refused["refusal"] or {}).get("code") == "kind_not_drafted"
+        and bool((refused["refusal"] or {}).get("detail"))
+        and refused["scripted_calls"] == 3
+        and refused["execution_calls"] == 3,
+        f"the brief making no kind ended {refused}",
+    )
+    failed = ended["failed"]
+    row.expect(
+        failed["state"] == "refused"
+        and (failed["refusal"] or {}).get("code") in closed
+        and failed["execution_calls"] >= 1,
+        f"the provider failure ended {failed}",
+    )
+    row.observed = {
+        "plan_sha256": hashlib.sha256(KIND_DRAFT_PLAN.read_bytes()).hexdigest(),
+        "drafting": {"offered": drafting.get("offered"), "code": drafting.get("code")},
+        "start": [status, started.get("state")],
+        "busy": {
+            "seen": busy_seen,
+            "starter": [status_busy, F.problem_code(busy)],
+            "other_person": [status_peer_busy, F.problem_code(peer_busy)],
+            "note": None
+            if busy_seen
+            else "the first draft ended before the second start: not judged",
+        },
+        "reads": {"other_person": status_peer_read, "other_workspace": status_w2_read},
+        "ready": {
+            "state": ready.get("state"),
+            "kind": kind.get("kind"),
+            "model_id": ready.get("model_id"),
+            "provenance": provenance,
+            "words_sha256_expected": expected_words,
+        },
+        "world": [status_world, F.problem_code(world)],
+        "ended": ended,
+        "scripted_calls": len(scripted_log(stack)) - calls_before,
+    }
+    return row.close()
+
+
+def row_kd2(stack: Stack, transcripts: Any) -> Row:
+    ceiling = stack.state["accounts"]["guest_policy"]["ceiling_usd"]
+    row = Row(
+        "KD2",
+        "kinds.drafting_allowance",
+        f"A guest whose allowance (USD {ceiling} per provider) is below one drafting attempt "
+        "(candidate-34): the kinds library says drafting.code budget_exceeded before anything is "
+        "typed, a start is 429 budget_exceeded with its spending member, it is no draft, and no "
+        "model is asked.",
+    )
+    guest, entered = enter_guest(stack, transcripts, "guest-drafts")
+    row.expect(entered.get("status") == 201, f"the guest entered {entered.get('status')}")
+    calls_before = len(scripted_log(stack))
+    _, library = guest.call("KD2", "GET", "/worlds/kinds")
+    drafting = (library or {}).get("drafting") or {}
+    status, refused = guest.call(
+        "KD2", "POST", "/worlds/kinds/drafts", body={"description": "a small farm by a river"}
+    )
+    _, listed = guest.call("KD2", "GET", "/worlds/kinds/drafts")
+    calls_after = len(scripted_log(stack))
+    row.expect(
+        drafting.get("offered") is False and drafting.get("code") == "budget_exceeded",
+        f"the library says drafting {drafting.get('offered')} {drafting.get('code')}",
+    )
+    row.expect(
+        status == 429
+        and F.problem_code(refused) == "budget_exceeded"
+        and isinstance((refused or {}).get("spending"), dict),
+        f"the start answered {status} {F.problem_code(refused)}",
+    )
+    row.expect((listed or {}).get("drafts") == [], f"the guest's drafts are {listed}")
+    row.expect(calls_after == calls_before, f"{calls_after - calls_before} models were asked")
+    row.observed = {
+        "ceiling_usd": ceiling,
+        "drafting": {"offered": drafting.get("offered"), "code": drafting.get("code")},
+        "start": [status, F.problem_code(refused), (refused or {}).get("spending")],
+        "drafts": (listed or {}).get("drafts"),
+        "calls": calls_after - calls_before,
+    }
+    return row.close()
+
+
+def kind_drafts(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    served = (stack.state.get("scripted_model") or {}).get("plan_sha256")
+    if (
+        served != hashlib.sha256(KIND_DRAFT_PLAN.read_bytes()).hexdigest()
+        or not stack.token_file("token-peer").exists()
+        or not stack.token_file("token-2").exists()
+    ):
+        raise SystemExit(
+            "kind-drafts needs a stack started with --workspaces 2 --peer-token --scripted-model "
+            "scripts/acceptance/plans/kind-draft.json --spending process --no-derivative-worker"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_kd1(stack, Transcripts(out / "transcripts"))]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
+# -- PR1, PR2: asking for a look's generated pieces -------------------------------------------------
+
+GENERATION_CATALOGS = Path("assets") / "catalogs" / "generation"
+#: The provider a piece request's allowance is held to (docs/generated-pieces-contract.md).
+GPU_PROVIDER = "nebius_ai_cloud_gpu"
+#: The two shipped kinds PR1 asks pieces of, a person's kind and a kind that is not shipped.
+PIECE_KINDS = ({"key": "bench", "version": 1}, {"key": "lamp_post", "version": 1})
+PERSON_KIND = {"key": "knight", "version": 2}
+UNSHIPPED_KIND = {"key": "nowhere_thing", "version": 1}
+#: Workspace 1's GPU allowance, and workspace 2's, below one request's worst case.
+PIECE_GRANT_USD, PIECE_SMALL_GRANT_USD = "0.50", "0.01"
+#: What an ask may name, from the contract's section 2.
+PIECE_KINDS_MAXIMUM = 16
+
+
+def piece_compute(worktree: Path) -> dict[str, Any]:
+    """The compute catalog's entry for the GPU provider, read from the committed file."""
+    catalog = json.loads((worktree / GENERATION_CATALOGS / "piece-compute.v1.json").read_text())
+    return next(e for e in catalog["entries"] if e["provider"] == GPU_PROVIDER)
+
+
+def expected_estimate(compute: Mapping[str, Any], variants: Sequence[int]) -> dict[str, Any]:
+    """An ask's estimate from the catalog's figures: items, warm seconds and dollars."""
+    items = sum(variants)
+    rate = Decimal(compute["rate_cents_per_hour"]) / 100 / 3600
+    return {
+        "items": items,
+        "first_seconds_warm": len(variants) * compute["item_seconds_typical"],
+        "all_seconds_warm": items * compute["item_seconds_typical"],
+        "cold_start_seconds": compute["cold_start_seconds"],
+        "usd_typical": items * compute["item_seconds_typical"] * rate,
+        "usd_worst_case": items * compute["item_seconds_bound"] * rate,
+        "provider": GPU_PROVIDER,
+    }
+
+
+def same_estimate(answered: Mapping[str, Any], expected: Mapping[str, Any]) -> bool:
+    try:
+        return all(
+            Decimal(str(answered.get(key))) == Decimal(str(value))
+            if key.startswith("usd_")
+            else answered.get(key) == value
+            for key, value in expected.items()
+        )
+    except ArithmeticError:
+        return False
+
+
+def spending_operator(stack: Stack, worktree: Path, *arguments: str) -> dict[str, Any]:
+    """The installation's own spending command as its operator (the owner, with the witness)."""
+    done = subprocess.run(
+        [str(worktree / ".venv" / "bin" / "python"), "-m", "exulanica.spending", *arguments],
+        cwd=worktree,
+        env={
+            **LAUNCH.clean_environment(),
+            "EXULANICA_DATABASE_URL": stack.state["database"]["owner_url_for_evidence_reads"],
+            "EXULANICA_SPENDING_WITNESS_DIR": str(stack.run_dir / LAUNCH.SPENDING_WITNESS_NAME),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if done.returncode != 0:
+        raise SystemExit(f"exulanica.spending {arguments[0]} refused: {done.stderr.strip()[-300:]}")
+    return json.loads(done.stdout)
+
+
+def grant_gpu(stack: Stack, worktree: Path) -> dict[str, Any]:
+    """An authority for the GPU provider and a grant to each workspace, as an operator issues them."""
+    common = ("--operator", "acceptance", "--reason", "acceptance piece requests")
+    authority = spending_operator(
+        stack,
+        worktree,
+        "issue",
+        "--provider",
+        GPU_PROVIDER,
+        "--ceiling-usd",
+        "1.00",
+        "--max-calls",
+        "100",
+        "--valid-until",
+        "2027-01-01T00:00:00Z",
+        *common,
+    )
+    grants = {}
+    for workspace, usd in (
+        (stack.state["workspace_id"], PIECE_GRANT_USD),
+        (stack.state["other_workspaces"][0]["workspace_id"], PIECE_SMALL_GRANT_USD),
+    ):
+        grants[workspace] = spending_operator(
+            stack,
+            worktree,
+            "grant",
+            "--authority",
+            authority["authority_id"],
+            "--workspace",
+            workspace,
+            "--ceiling-usd",
+            usd,
+            "--max-calls",
+            "50",
+            "--valid-until",
+            "2027-01-01T00:00:00Z",
+            *common,
+        )
+    return {"authority": authority.get("authority_id"), "grants": sorted(grants)}
+
+
+def made_town(c: Any, step: str, title: str) -> dict[str, Any]:
+    """A town made through the kinds route, as a person makes one, with its saved entry."""
+    town = next(
+        (
+            k
+            for k in (c.call(step, "GET", "/worlds/kinds")[1] or {}).get("kinds", [])
+            if k.get("kind") == "town"
+        ),
+        {},
+    )
+    _, made = c.call(
+        step,
+        "POST",
+        "/worlds/kinds/town/worlds",
+        body={"preset": ((town.get("presets") or [{}])[0]).get("key"), "title": title},
+    )
+    return made if isinstance(made, dict) else {}
+
+
+def row_pr1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
+    row = Row(
+        "PR1",
+        "pieces.requests",
+        "Asking for a look's generated pieces with no generation session (candidate-34): with an "
+        f"operator's {GPU_PROVIDER} grant, an ask for two shipped kinds' pieces in a served look "
+        "is 202 with two requested requests, the session off and an estimate equal to the compute "
+        "catalog's figures for the requests' variants; its idempotency key answers 200 with the "
+        "same requests, and with another body 409 idempotency_key_reused; the same ask with no "
+        "key is 200, already waiting; the world's list is newest first; a cancel ends one "
+        "cancelled and a second cancel is 409 piece_request_not_cancellable stating cancelled; a "
+        "person's kind is 422 kind_without_piece, a repeated kind 422 kind_repeated, 17 kinds 422 "
+        "too_many_kinds, an unshipped kind 422 kind_unknown, a manifest digest not served 422 "
+        "look_not_served, an unknown world 404 unknown_world, and another workspace reads a "
+        "request 404 unknown_piece_request; a workspace whose grant is below one request's worst "
+        "case is 429 budget_exceeded with its spending member.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    issued = grant_gpu(stack, worktree)
+    compute = piece_compute(worktree)
+    styled = {
+        e["pack_id"]
+        for e in json.loads((worktree / GENERATION_CATALOGS / "piece-styles.v1.json").read_text())[
+            "entries"
+        ]
+    }
+    packs = (w1.call("PR1", "GET", "/world/style-packs")[1] or {}).get("packs") or []
+    pack = next((p for p in packs if p.get("pack_id") in styled), None)
+    town = made_town(w1, "PR1", "Q10 PR1 town")
+    if pack is None or not town.get("world_id"):
+        row.blocked_by.append(f"no served pack with style words ({sorted(styled)}) or no town")
+        row.observed = {"issued": issued, "town": town.get("world_id")}
+        return row.close()
+    look = {k: pack[k] for k in ("pack_id", "version", "manifest_sha256")}
+    world_id = town["world_id"]
+    key = str(uuid.uuid4())
+    body = {"world_id": world_id, "look": look, "kinds": list(PIECE_KINDS)}
+    status, asked = w1.call(
+        "PR1 ask", "POST", "/world/piece-requests", body={**body, "idempotency_key": key}
+    )
+    asked = asked if isinstance(asked, dict) else {}
+    requests = asked.get("piece_requests") or []
+    ids = [r.get("piece_request_id") for r in requests]
+    expected = expected_estimate(compute, [int(r.get("variants") or 0) for r in requests])
+    row.expect(
+        status == 202
+        and len(requests) == 2
+        and all(r.get("state") == "requested" for r in requests)
+        and {(r.get("kind") or {}).get("key") for r in requests} == {k["key"] for k in PIECE_KINDS}
+        and (asked.get("session") or {}).get("state") == "off",
+        f"the ask answered {status} {F.problem_code(asked)} with {len(requests)} requests",
+    )
+    row.expect(
+        same_estimate(asked.get("estimate") or {}, expected),
+        f"the estimate {asked.get('estimate')} is not the catalog's {expected}",
+    )
+    status_again, again = w1.call(
+        "PR1 key", "POST", "/world/piece-requests", body={**body, "idempotency_key": key}
+    )
+    row.expect(
+        status_again == 200
+        and [r.get("piece_request_id") for r in (again or {}).get("piece_requests") or []] == ids,
+        f"the same key answered {status_again} {F.problem_code(again)}",
+    )
+    status_other, other = w1.call(
+        "PR1 key other body",
+        "POST",
+        "/world/piece-requests",
+        body={**body, "kinds": [PIECE_KINDS[0]], "idempotency_key": key},
+    )
+    row.expect(
+        status_other == 409 and F.problem_code(other) == "idempotency_key_reused",
+        f"the key with another body answered {status_other} {F.problem_code(other)}",
+    )
+    status_waiting, waiting = w1.call("PR1 waiting", "POST", "/world/piece-requests", body=body)
+    row.expect(
+        status_waiting == 200
+        and sorted(r.get("piece_request_id") for r in (waiting or {}).get("piece_requests") or [])
+        == sorted(ids),
+        f"the same ask with no key answered {status_waiting} {F.problem_code(waiting)}",
+    )
+    _, listed = w1.call("PR1 list", "GET", "/world/piece-requests", query={"world_id": world_id})
+    listed_rows = (listed or {}).get("piece_requests") or []
+    instants = [r.get("requested_at") for r in listed_rows]
+    row.expect(
+        sorted(r.get("piece_request_id") for r in listed_rows) == sorted(ids)
+        and instants == sorted(instants, reverse=True),
+        f"the world's list holds {[r.get('piece_request_id') for r in listed_rows]}",
+    )
+    status_cancel, cancelled = w1.call("PR1 cancel", "DELETE", f"/world/piece-requests/{ids[0]}")
+    status_twice, twice = w1.call("PR1 cancel again", "DELETE", f"/world/piece-requests/{ids[0]}")
+    row.expect(
+        status_cancel == 200 and (cancelled or {}).get("state") == "cancelled",
+        f"the cancel answered {status_cancel} {(cancelled or {}).get('state')}",
+    )
+    row.expect(
+        status_twice == 409
+        and F.problem_code(twice) == "piece_request_not_cancellable"
+        and (twice or {}).get("state") == "cancelled",
+        f"the second cancel answered {status_twice} {F.problem_code(twice)} {(twice or {}).get('state')}",
+    )
+    shipped = sorted(
+        (
+            {"key": p.name.split(".v")[0], "version": int(p.name.split(".v")[1].split(".")[0])}
+            for p in (worktree / "assets" / "catalogs" / "things" / "kinds").glob("*.v*.json")
+        ),
+        key=lambda k: (k["key"], k["version"]),
+    )
+    many = shipped[: PIECE_KINDS_MAXIMUM + 1]
+    refusals = {}
+    for label, changes, status_wanted, code in (
+        ("person", {"kinds": [PERSON_KIND]}, 422, "kind_without_piece"),
+        ("repeated", {"kinds": [PIECE_KINDS[0], PIECE_KINDS[0]]}, 422, "kind_repeated"),
+        ("too many", {"kinds": many}, 422, "too_many_kinds"),
+        ("unshipped", {"kinds": [UNSHIPPED_KIND]}, 422, "kind_unknown"),
+        ("look", {"look": {**look, "manifest_sha256": "0" * 64}}, 422, "look_not_served"),
+        ("world", {"world_id": str(uuid.uuid4())}, 404, "unknown_world"),
+    ):
+        got_status, got = w1.call(
+            f"PR1 {label}", "POST", "/world/piece-requests", body={**body, **changes}
+        )
+        refusals[label] = [got_status, F.problem_code(got)]
+        row.expect(
+            (got_status, F.problem_code(got)) == (status_wanted, code),
+            f"{label}: answered {got_status} {F.problem_code(got)}, not {status_wanted} {code}",
+        )
+    row.expect(
+        len(many) == PIECE_KINDS_MAXIMUM + 1, f"only {len(many)} shipped kind versions to name"
+    )
+    status_foreign, foreign = w2.call("PR1 w2 read", "GET", f"/world/piece-requests/{ids[1]}")
+    row.expect(
+        status_foreign == 404 and F.problem_code(foreign) == "unknown_piece_request",
+        f"another workspace read a request {status_foreign} {F.problem_code(foreign)}",
+    )
+    town_2 = made_town(w2, "PR1 w2", "Q10 PR1 small grant")
+    status_small, small = w2.call(
+        "PR1 small grant",
+        "POST",
+        "/world/piece-requests",
+        body={"world_id": town_2.get("world_id"), "look": look, "kinds": [PIECE_KINDS[0]]},
+    )
+    row.expect(
+        status_small == 429
+        and F.problem_code(small) == "budget_exceeded"
+        and isinstance((small or {}).get("spending"), dict),
+        f"the small grant answered {status_small} {F.problem_code(small)}",
+    )
+    row.observed = {
+        "issued": issued,
+        "look": look,
+        "ask": [status, len(requests), [r.get("variants") for r in requests]],
+        "estimate": asked.get("estimate"),
+        "estimate_expected": {k: str(v) for k, v in expected.items()},
+        "same_key": status_again,
+        "key_other_body": [status_other, F.problem_code(other)],
+        "waiting": status_waiting,
+        "cancel": [status_cancel, status_twice, F.problem_code(twice)],
+        "refusals": refusals,
+        "other_workspace": [status_foreign, F.problem_code(foreign)],
+        "small_grant": [status_small, F.problem_code(small), (small or {}).get("spending")],
+    }
+    return row.close()
+
+
+def pieces(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if (stack.state.get("scripted_model") or {}).get(
+        "spending"
+    ) != "durable" or not stack.state.get("other_workspaces"):
+        raise SystemExit(
+            "pieces needs a stack started with --workspaces 2 --scripted-model "
+            "scripts/acceptance/plans/spending.json --spending durable --no-derivative-worker"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_pr1(stack, Transcripts(out / "transcripts"), worktree)]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
+# -- HN1: a being's hands ---------------------------------------------------------------------------
+
+#: The plan HN1's stack is served by: every being a model runs picks the sword up when offered,
+#: else gives it, else waits (A-122).
+HANDS_PLAN = HERE / "plans" / "hands.json"
+HANDS_MODULE = "exulanica-ability/hands/v1"
+ABILITY_MODULES = Path("exulanica") / "abilities" / "ability-modules.v1.json"
+BODY_PLANS = Path("assets") / "catalogs" / "things" / "body-plans.v1.json"
+#: Real seconds HN1 waits for the knight to pick the sword up, then watches it held.
+HANDS_SECONDS, HANDS_HOLD_SECONDS = 300, 90
+
+
+def society_events(c: Any, step: str, entry: Mapping[str, Any]) -> list[dict[str, Any]]:
+    _, read = c.call(
+        step, "GET", F.version_path(entry, "/society/events"), query=F.world_query(entry)
+    )
+    return list((read or {}).get("events") or []) if isinstance(read, dict) else []
+
+
+def row_hn1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
+    modules = {
+        m["module"]: m for m in json.loads((worktree / ABILITY_MODULES).read_text())["modules"]
+    }
+    plans = {p["key"]: p for p in json.loads((worktree / BODY_PLANS).read_text())["entries"]}
+    hands_events = set(modules[HANDS_MODULE]["events"])
+    humanoid_sockets = {s["key"] for s in plans["humanoid"]["sockets"]}
+    row = Row(
+        "HN1",
+        "things.hands",
+        "A being's hands (candidate-34): in the newest locked scene's society of things, with "
+        "each being's scene model chosen and every model answering to pick the sword up when "
+        "offered, else give it, else wait (A-122): the society's first state names the hands "
+        "module; within its bound the knight picks the sword up, an event of the module's kinds "
+        "naming the knight and the sword, and holds it in one of the humanoid plan's sockets; the "
+        "lantern spirit, whose float socket holds at most 300 mm, never picks up or is given the "
+        "1,000 mm sword; replay answers the live state.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    record_path = out / "evidence" / "hn1-scene-build.json"
+    built = build_scene(stack, worktree, record_path, token_file="token")
+    (out / "evidence" / "hn1-scene-build.txt").write_text(built.stdout + built.stderr)
+    row.expect(
+        built.returncode == 0 and record_path.exists(), f"the build exited {built.returncode}"
+    )
+    if not record_path.exists():
+        return row.close()
+    record = json.loads(record_path.read_text())
+    entry = F.read_entry(w1, "HN1", record["entry_id"])
+    status, society = w1.call(
+        "HN1",
+        "POST",
+        F.version_path(entry, "/society"),
+        query=F.world_query(entry),
+        body={"region_id": record["arrival"]["region_id"], "profile": THINGS_ENGINE},
+    )
+    society = society if isinstance(society, dict) else {}
+    state = society.get("state") or {}
+    row.expect(
+        status in (200, 201) and HANDS_MODULE in (state.get("modules") or []),
+        f"the society answered {status} {F.problem_code(society)} running {state.get('modules')}",
+    )
+    minds_record = out / "evidence" / "hn1-scene-minds.json"
+    minds = build_scene(stack, worktree, minds_record, token_file="token", minds=True)
+    (out / "evidence" / "hn1-scene-minds.txt").write_text(minds.stdout + minds.stderr)
+    row.expect(minds.returncode == 0, f"the scene's minds step exited {minds.returncode}")
+    placed = {p.get("placed_id"): p.get("id") for p in state.get("inhabitants") or []}
+    knight, spirit = placed.get("knight"), placed.get("lantern-spirit")
+    sword = next(
+        (t.get("id") for t in state.get("things") or [] if t.get("placed_id") == "sword"), None
+    )
+    status_play, _ = control(w1, "HN1", entry, "playing")
+    row.expect(status_play == 200, f"setting it playing answered {status_play}")
+    picked: list[dict[str, Any]] = []
+    deadline = time.monotonic() + HANDS_SECONDS
+    while time.monotonic() < deadline and not picked:
+        time.sleep(5)
+        picked = [
+            e
+            for e in society_events(w1, "HN1", entry)
+            if e.get("event_kind") == "picked_up" and e.get("subject_id") == knight
+        ]
+    time.sleep(HANDS_HOLD_SECONDS if picked else 0)
+    events = society_events(w1, "HN1 after", entry)
+    hands = [e for e in events if e.get("event_kind") in hands_events]
+    _, live = F.society(w1, "HN1 after", entry)
+    things = {t.get("id"): t for t in ((live or {}).get("state") or {}).get("things") or []}
+    held = things.get(sword) or {}
+    row.expect(
+        bool(picked)
+        and ((picked[0].get("document") or {}).get("thing") or {}).get("thing") == sword,
+        f"the knight never picked the sword up in {HANDS_SECONDS} s: {[e.get('event_kind') for e in hands]}",
+    )
+    row.expect(
+        held.get("held_by") == knight and held.get("socket") in humanoid_sockets,
+        f"the sword is held by {held.get('held_by')} in {held.get('socket')}",
+    )
+    spirit_touched = [
+        e
+        for e in hands
+        if e.get("subject_id") == spirit
+        or ((e.get("document") or {}).get("thing") or {}).get("with") == spirit
+    ]
+    row.expect(not spirit_touched, f"the lantern spirit took part in {spirit_touched}")
+    status_replay, replayed = w1.call(
+        "HN1", "GET", F.version_path(entry, "/society/replay"), query=F.world_query(entry)
+    )
+    row.expect(
+        status_replay == 200, f"the replay answered {status_replay} {F.problem_code(replayed)}"
+    )
+    log = scripted_log(stack)
+    row.observed = {
+        "plan_sha256": hashlib.sha256(HANDS_PLAN.read_bytes()).hexdigest(),
+        "scene": record.get("scene"),
+        "modules": state.get("modules"),
+        "beings": {"knight": knight, "lantern-spirit": spirit, "sword": sword},
+        "hands_events": [
+            {k: e.get(k) for k in ("event_kind", "subject_id", "tick")}
+            | {"thing": (e.get("document") or {}).get("thing")}
+            for e in hands
+        ][:12],
+        "sword": {k: held.get(k) for k in ("held_by", "socket", "position_mm")},
+        "scripted_calls": len(log),
+        "chose": sorted({str(c.get("chose")).split(",")[0] for c in log if c.get("chose")})[:12],
+        "replay": status_replay,
+    }
+    return row.close()
+
+
+def hands(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    served = (stack.state.get("scripted_model") or {}).get("plan_sha256")
+    if served != hashlib.sha256(HANDS_PLAN.read_bytes()).hexdigest() or not stack.state.get(
+        "society_playback"
+    ):
+        raise SystemExit(
+            "hands needs a fresh database and a stack started with --workspaces 2 "
+            "--society-of-things --society-playback --scripted-model "
+            "scripts/acceptance/plans/hands.json --spending process --no-derivative-worker"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_hn1(stack, Transcripts(out / "transcripts"), worktree, out)]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
+# -- V7, PR2: every guest takes a turn; a guest asks for pieces --------------------------------------
+
+#: The guests V7 enters, in order.
+TURN_GUESTS = ("guest-a", "guest-b", "guest-c")
+
+
+def row_v7(stack: Stack, transcripts: Any) -> tuple[Row, Any]:
+    accounts = stack.state["accounts"]
+    window = int(accounts["play_seconds"])
+    bound = len(TURN_GUESTS) * window + GUEST_ROTATION_GRACE_SECONDS
+    row = Row(
+        "V7",
+        "accounts.guest_turns",
+        f"With one guest's town playing at a time and a play window of {window} s (candidate-34): "
+        f"guests A, B and C enter in turn and keep reading their control every {GUEST_READ_SECONDS} "
+        f"s; within {bound} s of C's entry each of the three has read its town playing at least "
+        "once.",
+    )
+    entered = {}
+    for name in TURN_GUESTS:
+        guest, came = enter_guest(stack, transcripts, name)
+        town = playing_town(guest, f"V7 {name}", came)
+        row.expect(came.get("status") == 201 and town is not None, f"{name} has no playing town")
+        if town is None:
+            return row.close(), None
+        entered[name] = (guest, town)
+    started = time.monotonic()
+    played_at: dict[str, int | None] = dict.fromkeys(TURN_GUESTS)
+    timeline = []
+    while time.monotonic() < started + bound and None in played_at.values():
+        readings = {
+            name: control_read(guest, f"V7 {name}", town) for name, (guest, town) in entered.items()
+        }
+        t = round(time.monotonic() - started)
+        timeline.append(
+            {"t": t, **{n: [r.get("running"), r.get("code")] for n, r in readings.items()}}
+        )
+        for name, reading in readings.items():
+            if played_at[name] is None and plays(reading):
+                played_at[name] = t
+        time.sleep(GUEST_READ_SECONDS)
+    row.expect(
+        all(t is not None for t in played_at.values()),
+        f"not every guest played within {bound} s: {played_at}",
+    )
+    row.observed = {
+        "window_seconds": window,
+        "maximum": accounts.get("playing_maximum"),
+        "first_played_after_seconds": played_at,
+        "timeline": timeline[-24:],
+    }
+    return row.close(), entered[TURN_GUESTS[0]]
+
+
+def row_pr2(stack: Stack, entered: Any, worktree: Path) -> Row:
+    row = Row(
+        "PR2",
+        "pieces.guest",
+        "A guest asking for pieces of its town's look while no generation session runs "
+        "(candidate-34) is 409 generation_session_off, and nothing is requested.",
+    )
+    if entered is None:
+        row.blocked_by.append("V7 entered no guest with a town")
+        return row.close()
+    guest, town = entered
+    styled = {
+        e["pack_id"]
+        for e in json.loads((worktree / GENERATION_CATALOGS / "piece-styles.v1.json").read_text())[
+            "entries"
+        ]
+    }
+    packs = (guest.call("PR2", "GET", "/world/style-packs")[1] or {}).get("packs") or []
+    pack = next((p for p in packs if p.get("pack_id") in styled), None)
+    if pack is None:
+        row.blocked_by.append("no served pack with style words")
+        return row.close()
+    look = {k: pack[k] for k in ("pack_id", "version", "manifest_sha256")}
+    status, refused = guest.call(
+        "PR2",
+        "POST",
+        "/world/piece-requests",
+        body={"world_id": town["world_id"], "look": look, "kinds": [PIECE_KINDS[0]]},
+    )
+    _, listed = guest.call(
+        "PR2", "GET", "/world/piece-requests", query={"world_id": town["world_id"]}
+    )
+    row.expect(
+        status == 409 and F.problem_code(refused) == "generation_session_off",
+        f"the guest's ask answered {status} {F.problem_code(refused)}",
+    )
+    row.expect(
+        (listed or {}).get("piece_requests") == [],
+        f"the town lists {(listed or {}).get('piece_requests')}",
+    )
+    row.observed = {
+        "ask": [status, F.problem_code(refused)],
+        "listed": (listed or {}).get("piece_requests"),
+    }
+    return row.close()
+
+
+def guest_turns(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    accounts = stack.state.get("accounts") or {}
+    if accounts.get("playing_maximum") != 1 or not accounts.get("play_seconds"):
+        raise SystemExit(
+            "guest-turns needs --accounts-guest-code --guest-playing-maximum 1 "
+            "--guest-play-seconds S on its stack"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    started = dt.datetime.now(dt.UTC).isoformat()
+    transcripts = Transcripts(out / "transcripts")
+    v7, entered = row_v7(stack, transcripts)
+    rows = [v7, row_pr2(stack, entered, worktree)]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
 
@@ -7287,7 +8154,15 @@ def build_parser() -> argparse.ArgumentParser:
     lived = commands.add_parser("society-of-things")
     lived.add_argument("--worktree", required=True)
     lived.add_argument("--out", required=True)
-    for name in ("guest-places", "guest-allowance", "drafts"):
+    for name in (
+        "guest-places",
+        "guest-allowance",
+        "drafts",
+        "kind-drafts",
+        "pieces",
+        "hands",
+        "guest-turns",
+    ):
         guested = commands.add_parser(name)
         guested.add_argument("--worktree", required=True)
         guested.add_argument("--out", required=True)
@@ -7322,6 +8197,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "guest-places": guest_places,
         "guest-allowance": guest_allowance,
         "drafts": drafts,
+        "kind-drafts": kind_drafts,
+        "pieces": pieces,
+        "hands": hands,
+        "guest-turns": guest_turns,
         "declare-luanti": declare_luanti,
     }
     return commands[arguments.command](arguments)
