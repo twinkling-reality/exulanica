@@ -52,6 +52,9 @@ const MAIN_STEPS = ['worlds-first', 'journey-open', 'journey-stall', 'journey-pe
 // The people session (a stack with a scripted model): a person's card and its mind changed in two
 // clicks (N1.s), then the mark over that person (N1.t).
 const PEOPLE_STEPS = ['people-card', 'people-marks'];
+// The things session (A-108): the lines a being said and heard, on its card, in a scene the driver
+// prepared (its facts name the world, the speaker, the line and a hearer).
+const THINGS_STEPS = ['things-lines'];
 // The world the people session opens: the workspace's starter with a stall placed, so its people
 // have somewhere to go and stand near where a person arrives (as N1.h prepares it; A-101).
 const PEOPLE_STARTER = { title: 'Q10 people' };
@@ -112,7 +115,7 @@ const report = {
   started_at: new Date().toISOString(),
   finished_at: null,
   chrome_argv: null,
-  facts: {},
+  facts: { ...(plan.session.facts ?? {}) },
   outcomes: {},
   unreached: {},
 };
@@ -635,6 +638,30 @@ const STEP_HANDLERS = {
     ctx.observe('ai-mark-over-the-person', marked !== null, { subject, marked,
       marks: await ctx.page.evaluate(`document.querySelector('[data-thing-marks]')?.dataset.thingMarks ?? null`) });
     await ctx.screenshot('marks', 'the marks over people');
+  },
+  async 'things-lines'(ctx) {
+    // N1.v (A-108): the speaker's card says the line under Said lately; a hearer's under Heard lately.
+    const { things_world: world, speaker, hearer, line } = ctx.facts;
+    await enter(ctx, () => ctx.page.navigate(ctx.runtime.app_url), world);
+    await openPeopleNearby(ctx.page);
+    const rowLines = (subject, heading) => `(() => { const card = document.querySelector('section.thing-card[data-subject="${subject}"]');
+      if (!card || !card.checkVisibility()) return null;
+      const row = [...card.querySelectorAll('div.thing-card-row')].find(r => r.querySelector('h4')?.textContent?.trim() === ${JSON.stringify(heading)});
+      return row ? [...row.querySelectorAll('li.thing-card-line .thing-card-line-text')].map(p => p.textContent) : []; })()`;
+    const shows = async (subject, heading) => {
+      await ctx.page.waitFor(`[...(${INSPECT})?.options ?? []].some(o => o.value === ${JSON.stringify(subject)}) ? true : null`,
+        SETTLE_MS, `${subject} nearby`);
+      await ctx.page.setValue(INSPECT, subject);
+      return ctx.page.waitFor(`(() => { const l = ${rowLines(subject, heading)}; return l && l.includes(${JSON.stringify(line)}) ? l : null; })()`,
+        SETTLE_MS, `${heading} on the card`).catch(async () => ctx.page.evaluate(rowLines(subject, heading)));
+    };
+    const said = await shows(speaker, 'Said lately');
+    ctx.observe('said-on-the-speakers-card', Array.isArray(said) && said.includes(line), { speaker, said, line });
+    await ctx.screenshot('said', "the speaker's card with the line it said");
+    const heard = hearer ? await shows(hearer, 'Heard lately') : null;
+    ctx.observe('heard-on-a-hearers-card', Array.isArray(heard) && heard.includes(line), { hearer, heard, line });
+    await ctx.screenshot('heard', "a hearer's card with the line it heard");
+    ctx.note(`data-thing-lines-said ${await ctx.page.evaluate(`document.querySelector('[data-thing-lines-said]')?.dataset.thingLinesSaid ?? null`)}`);
   },
   async 'journey-open'(ctx) {
     await open(ctx);

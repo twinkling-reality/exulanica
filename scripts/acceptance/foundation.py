@@ -4034,6 +4034,197 @@ PEOPLE_ROWS = (
 #: The session the people rows drive, and the stack it needs.
 PEOPLE_PLAN = Path("scripts") / "acceptance" / "plans" / "comparisons.json"
 
+#: The things session's row (A-108): on a --society-of-things stack with AGENTS' bridge declared.
+THINGS_ROWS = (
+    (
+        "N1.v",
+        "things.lines_on_cards",
+        "things-lines",
+        "In the demo scene's society of things, an outside agent deciding for the knight says one "
+        "line, taken by the host; opened in the browser, the knight's card shows it under Said "
+        "lately and the card of a being that heard it shows it under Heard lately (A-108). If no "
+        "turn offers the knight a line within the bound, the row is blocked, not failed. "
+        "Scripted agent; functional only.",
+    ),
+)
+#: The scene, the being the agent decides for, the line it says, and the agent's bounds.
+THINGS_SCENE = Path("assets") / "catalogs" / "scenes" / "three-strangers.v3.json"
+THINGS_BUILDER = Path("scripts") / "demo" / "build_scene.py"
+THINGS_SPEAKER, THINGS_LINE = "knight", "Good evening, traveller."
+THINGS_ENGINE = "exulanica-society/v7"
+SPEAKING_AGENT = r"""
+import json, sys, time
+from exulanica_agent import Body
+line, turn_seconds, outcome_seconds = sys.argv[1], float(sys.argv[2]), float(sys.argv[3])
+seen = {"turns": 0, "said": None, "outcome": None, "offered": [], "answers": [], "happened": []}
+body = Body.connect(name="Q10 speaking agent", maker="acceptance", mind="the first line offered")
+try:
+    deadline = time.monotonic() + turn_seconds
+    while time.monotonic() < deadline and seen["outcome"] is None:
+        turn = body.next_turn(min(30.0, max(1.0, deadline - time.monotonic())))
+        if turn is None:
+            continue
+        seen["turns"] += 1
+        speaking = [o for o in turn.options if o.says_line]
+        seen["offered"].append([o.action for o in turn.options][:6])
+        if not speaking:
+            turn.act(turn.options[0].action)
+            continue
+        answer = turn.act(speaking[0].action, line)
+        seen["answers"].append({"minute": turn.minute, "action": speaking[0].action,
+                                "received": answer.received, "refusal": answer.refusal,
+                                "words": answer.words[:200]})
+        if not answer.received:
+            continue
+        seen["said"] = {"minute": turn.minute, "action": speaking[0].action}
+        ends = time.monotonic() + outcome_seconds
+        while time.monotonic() < ends and seen["outcome"] is None:
+            for happening in body.happened():
+                seen["happened"].append(happening.as_dict())
+                if happening.what in ("answer_taken", "answer_not_taken") and happening.minute == turn.minute:
+                    seen["outcome"] = happening.as_dict()
+            time.sleep(1)
+        if (seen["outcome"] or {}).get("what") != "answer_taken":
+            seen["said"], seen["outcome"] = None, None
+finally:
+    body.close(wait_seconds=20)
+seen["answers"], seen["happened"] = seen["answers"][-12:], seen["happened"][-20:]
+print(json.dumps(seen))
+"""
+SPEAKING_TURN_SECONDS, SPEAKING_OUTCOME_SECONDS = 420, 180
+
+
+def prepare_things(stack: Stack, out: Path) -> dict[str, Any]:
+    """The things session's world (A-108): the demo scene built in workspace 1, its society of
+    things playing, AGENTS' bridge granted the knight, and a scripted agent that says one line for
+    it. Answers the facts the browser session reads, with ``said`` false when no line was taken."""
+    transcripts = Transcripts(out / "transcripts")
+    c = client(stack, transcripts, "w1", "token")
+    record_path = out / "evidence" / "things-scene.json"
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    built = subprocess.run(
+        [
+            str(stack.worktree / ".venv" / "bin" / "python"),
+            str(stack.worktree / THINGS_BUILDER),
+            str(stack.worktree / THINGS_SCENE),
+            "--base-url",
+            stack.base_url,
+            "--record",
+            str(record_path),
+        ],
+        cwd=stack.worktree,
+        env={
+            **LAUNCH.clean_environment(),
+            "EXULANICA_TOKEN": stack.token_file("token").read_text().strip(),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=600,
+    )
+    (out / "evidence" / "things-scene.txt").write_text(built.stdout + built.stderr)
+    if not record_path.exists():
+        return {"said": False, "why": f"the scene build exited {built.returncode}"}
+    record = json.loads(record_path.read_text())
+    entry = read_entry(c, "things", record["entry_id"])
+    query = world_query(entry)
+    status, started = c.call(
+        "things",
+        "POST",
+        version_path(entry, "/society"),
+        query=query,
+        body={"region_id": record["arrival"]["region_id"], "profile": THINGS_ENGINE},
+    )
+    people = {
+        p.get("placed_id"): p.get("id")
+        for p in ((started or {}).get("state") or {}).get("inhabitants") or []
+        if p.get("came_by") == "placed"
+    }
+    speaker = people.get(THINGS_SPEAKER)
+    if status != 200 or speaker is None:
+        return {"said": False, "why": f"the society answered {status}; the knight is {speaker}"}
+    declared = json.loads(stack.state["door_bridges"])
+    bridge = next(b["bridge"] for b in declared if b.get("ai"))
+    _, granted = c.call(
+        "things",
+        "POST",
+        "/door/grants",
+        query=query,
+        body={
+            "idempotency_key": str(uuid.uuid4()),
+            "bridge": bridge,
+            "things": [speaker],
+            "version_id": entry["authored_version_id"],
+            "minutes": 30,
+        },
+    )
+    grant_id = ((granted or {}).get("grant") or {}).get("grant_id")
+    _, issued = c.call(
+        "things", "POST", f"/door/grants/{grant_id}/channel-credentials", query=query, body={}
+    )
+    path = version_path(entry, "/society/control")
+    _, control = c.call("things", "GET", path, query=query)
+    c.call(
+        "things",
+        "PUT",
+        path,
+        query=query,
+        body={"base_revision": (control or {}).get("revision", 0), "mode": "playing", "speed": 1},
+    )
+    agent = subprocess.run(
+        [
+            str(stack.worktree / ".venv" / "bin" / "python"),
+            "-c",
+            SPEAKING_AGENT,
+            THINGS_LINE,
+            str(SPEAKING_TURN_SECONDS),
+            str(SPEAKING_OUTCOME_SECONDS),
+        ],
+        cwd=stack.worktree,
+        env={
+            **LAUNCH.clean_environment(),
+            "PYTHONPATH": str(stack.worktree / "bridges" / "agents"),
+            "EXULANICA_URL": stack.base_url,
+            "EXULANICA_AGENT_KEY": (issued or {}).get("credential") or "",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=SPEAKING_TURN_SECONDS + SPEAKING_OUTCOME_SECONDS + 120,
+    )
+    (out / "evidence" / "things-agent.txt").write_text(agent.stderr)
+    _, control = c.call("things", "GET", path, query=query)
+    c.call(
+        "things",
+        "PUT",
+        path,
+        query=query,
+        body={"base_revision": (control or {}).get("revision", 0), "mode": "paused", "speed": 1},
+    )
+    try:
+        seen = json.loads(agent.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        seen = {}
+    _, now = society(c, "things", entry)
+    hearer = next(
+        (
+            p.get("id")
+            for p in ((now or {}).get("state") or {}).get("inhabitants") or []
+            if p.get("id") != speaker
+            and any((h or {}).get("line") == THINGS_LINE for h in p.get("heard") or [])
+        ),
+        None,
+    )
+    return {
+        "said": bool(seen.get("said")),
+        "why": None if seen.get("said") else f"no line was taken in {seen.get('turns')} turns",
+        "things_world": entry["entry_id"],
+        "speaker": speaker,
+        "line": THINGS_LINE,
+        "hearer": hearer,
+        "agent": seen,
+    }
+
 
 def _rehearsal() -> Any:
     """The rehearsal driver's own helpers (slots, Chrome flags, the page's deadlines)."""
@@ -4057,24 +4248,32 @@ def browser(arguments: argparse.Namespace) -> int:
             "browser needs a stack started with --production --society-playback --tiles"
         )
     people = arguments.session == "people"
+    things = arguments.session == "things"
     served = (stack.state.get("scripted_model") or {}).get("plan_sha256")
-    if people != (served == hashlib.sha256((REPOSITORY / PEOPLE_PLAN).read_bytes()).hexdigest()):
+    scripted = served == hashlib.sha256((REPOSITORY / PEOPLE_PLAN).read_bytes()).hexdigest()
+    if (people or things) != scripted:
         raise SystemExit(
-            "the people session needs --scripted-model scripts/acceptance/plans/comparisons.json "
-            "--spending process on its stack, and the main session needs no scripted model"
+            "the people and things sessions need --scripted-model "
+            "scripts/acceptance/plans/comparisons.json --spending process on their stack, and the "
+            "main session needs no scripted model"
         )
+    if things and not (stack.state.get("society_of_things") and stack.state.get("door_bridges")):
+        raise SystemExit("the things session needs --society-of-things and --door-bridges FILE")
     rehearse = _rehearsal()
     steps = json.loads((REPOSITORY / "scripts" / "rehearsal" / "steps.json").read_text())
     out = Path(arguments.out).resolve()
     session_dir = out / "session"
     session_dir.mkdir(parents=True, exist_ok=True)
     started = dt.datetime.now(dt.UTC).isoformat()
+    facts = prepare_things(stack, out) if things else {}
+    listed = PEOPLE_ROWS if people else THINGS_ROWS if things else WORLDS_ROWS
     ports = stack.state["ports"]
     plan = {
         "session": {
-            "id": "n1s" if people else "n1j",
+            "id": "n1s" if people else "n1v" if things else "n1j",
             "budget_seconds": JOURNEY_BUDGET_SECONDS,
-            **({"steps": [step for _, _, step, _ in PEOPLE_ROWS]} if people else {}),
+            **({"steps": [step for _, _, step, _ in listed]} if people or things else {}),
+            **({"facts": facts} if things else {}),
         },
         "out": str(session_dir),
         "runtime": {
@@ -4097,15 +4296,19 @@ def browser(arguments: argparse.Namespace) -> int:
         quiet if quiet.exists() else None,
         ["node", str(JOURNEY_RUNNER), str(plan_file)],
     )
-    completed = subprocess.run(
-        command,
-        cwd=worktree,
-        env=LAUNCH.clean_environment(),
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=JOURNEY_BUDGET_SECONDS + rehearse.GPU_SLOT_WAIT_SECONDS + 120,
-    )
+    if things and not facts.get("said"):
+        # Nothing was said, so there is nothing for a card to show: no page session (A-108).
+        completed = subprocess.CompletedProcess(command, None, "", f"not run: {facts.get('why')}")
+    else:
+        completed = subprocess.run(
+            command,
+            cwd=worktree,
+            env=LAUNCH.clean_environment(),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=JOURNEY_BUDGET_SECONDS + rehearse.GPU_SLOT_WAIT_SECONDS + 120,
+        )
     (out / "runner.txt").write_text(completed.stdout + completed.stderr)
     session = (
         json.loads((session_dir / "session.json").read_text())
@@ -4143,7 +4346,7 @@ def browser(arguments: argparse.Namespace) -> int:
     }
     row.close()
     worlds_rows = []
-    for row_id, check, step, statement in PEOPLE_ROWS if people else WORLDS_ROWS:
+    for row_id, check, step, statement in listed:
         worlds_row = Row(row_id, check, statement)
         outcome = outcomes.get(step) or {}
         worlds_row.expect(
@@ -4156,8 +4359,15 @@ def browser(arguments: argparse.Namespace) -> int:
             "build": app.get("build", {}).get("index_html_sha256"),
         }
         worlds_rows.append(worlds_row.close())
-    # The people session drives only its own steps, so it states no journey row.
-    rows = worlds_rows if people else [row, *worlds_rows]
+    # The people and things sessions drive only their own steps, so they state no journey row; a
+    # things session whose agent said no line is blocked, not failed (A-108).
+    if things and not facts.get("said"):
+        for blocked in worlds_rows:
+            blocked.blocked_by.append(str(facts.get("why")))
+            blocked.close()
+    for one in worlds_rows if things else []:
+        one.observed["facts"] = facts
+    rows = worlds_rows if people or things else [row, *worlds_rows]
     results = {
         "profile": "q10-foundation-acceptance-results/v1",
         "candidate": stack.state["tree"],
@@ -4220,10 +4430,11 @@ def build_parser() -> argparse.ArgumentParser:
     page.add_argument("--out", required=True)
     page.add_argument(
         "--session",
-        choices=("main", "people"),
+        choices=("main", "people", "things"),
         default="main",
         help="main: the journey and Your worlds rows; people: a person's card and marks, on a "
-        "stack with the scripted comparisons plan (default: main)",
+        "stack with the scripted comparisons plan; things: said and heard lines on cards, on such "
+        "a stack with --society-of-things and --door-bridges (default: main)",
     )
     talk = commands.add_parser("companion")
     talk.add_argument("--worktree", required=True)

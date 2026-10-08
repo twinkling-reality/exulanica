@@ -476,3 +476,34 @@ def test_d1_reads_each_persons_newest_choice_and_the_routine_where_none_names_th
         "b": "routine",
         "c": None,
     }
+
+
+def test_df1_holds_only_when_every_definer_is_the_login_less_owners_and_public_runs_none():
+    held = {
+        "definers": 22,
+        "owned_by_another": 0,
+        "flags_all_false": True,
+        "memberships": 0,
+        "public_may_execute": 0,
+    }
+    assert DRIVE.definer_holds(held)
+    for broken in (
+        {"definers": 0},
+        {"owned_by_another": 1},
+        {"flags_all_false": False},
+        {"memberships": 1},
+        {"public_may_execute": 1},
+    ):
+        assert not DRIVE.definer_holds({**held, **broken}), broken
+
+
+def test_v2_says_hello_as_the_gate_mod_does():
+    sent = json.loads(DRIVE.luanti_hello(ROOT))
+    adapter = json.loads((ROOT / DRIVE.LUANTI_MOD / "adapter.json").read_text())
+    mapping = json.loads((ROOT / DRIVE.LUANTI_MAPPING).read_text())
+    assert sent["adapter_version"] == adapter["adapter_version"]
+    # The mapping travels as the file's own document, and the reads are the adapter's then every
+    # mapped item's, as the mod sends them.
+    assert sent["mapping"] == mapping
+    assert sent["reads"] == [*adapter["reads"], *(item["game_item"] for item in mapping["items"])]
+    assert DRIVE.CROSSING_ITEM in sent["reads"]

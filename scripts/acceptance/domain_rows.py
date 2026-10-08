@@ -89,7 +89,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -4668,6 +4668,61 @@ def row_r1(stack: Stack, transcripts: Any) -> Row:
     return row.close()
 
 
+def row_r2(stack: Stack, transcripts: Any) -> Row:
+    row = Row(
+        "R2",
+        "references.pictures_not_offered",
+        "Where a person's pictures are not read for reference notes (the default): the list states "
+        "pictures not offered, with a code and at most 4; a request naming a picture is refused "
+        "409 reference_pictures_not_offered and nothing is queued; a picture named twice is 422 "
+        "pictures_repeated; a request asking for neither web notes nor pictures is 422 "
+        "nothing_to_look_up (A-103).",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    status_list, listed = w1.call("R2", "GET", "/worlds/references")
+    pictures = (listed or {}).get("pictures") or {}
+    row.expect(
+        status_list == 200
+        and pictures.get("offered") is False
+        and bool(pictures.get("code"))
+        and pictures.get("maximum") == 4,
+        f"the list states pictures {pictures}",
+    )
+    picture = str(uuid.uuid4())
+    base = {"purpose": "world_draft", "description": "a quiet harbour town", "web": True}
+    status_one, one = w1.call(
+        "R2", "POST", "/worlds/references", body={**base, "pictures": [picture]}
+    )
+    row.expect(
+        status_one == 409 and F.problem_code(one) == "reference_pictures_not_offered",
+        f"a request naming a picture answered {status_one} {F.problem_code(one)}",
+    )
+    row.expect(
+        (w1.call("R2", "GET", "/worlds/references")[1] or {}).get("references") == [],
+        "a request was queued",
+    )
+    status_twice, twice = w1.call(
+        "R2", "POST", "/worlds/references", body={**base, "pictures": [picture, picture]}
+    )
+    row.expect(
+        status_twice == 422 and F.problem_code(twice) == "pictures_repeated",
+        f"a picture named twice answered {status_twice} {F.problem_code(twice)}",
+    )
+    bare = {"purpose": "world_draft", "description": "a quiet harbour town", "web": False}
+    status_bare, nothing = w1.call("R2", "POST", "/worlds/references", body=bare)
+    row.expect(
+        status_bare == 422 and F.problem_code(nothing) == "nothing_to_look_up",
+        f"a request with nothing to look up answered {status_bare} {F.problem_code(nothing)}",
+    )
+    row.observed = {
+        "pictures": pictures,
+        "one_picture": [status_one, F.problem_code(one)],
+        "twice": [status_twice, F.problem_code(twice)],
+        "nothing": [status_bare, F.problem_code(nothing)],
+    }
+    return row.close()
+
+
 def references(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -4677,7 +4732,7 @@ def references(arguments: argparse.Namespace) -> int:
     (out / "evidence").mkdir(parents=True, exist_ok=True)
     transcripts = Transcripts(out / "transcripts")
     started = dt.datetime.now(dt.UTC).isoformat()
-    rows = [row_r1(stack, transcripts)]
+    rows = [row_r1(stack, transcripts), row_r2(stack, transcripts)]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
 
@@ -4690,7 +4745,8 @@ THING_CATALOGS = Path("assets") / "catalogs" / "things"
 IMPORTED_THINGS = Path("assets") / "things"
 #: The shipped kind T2 places, and the demo scene SC1 builds (A-78, A-79).
 T2_KIND = {"kind": "sword", "version": 3}
-DEMO_SCENE = Path("scripts") / "demo" / "scenes" / "three-strangers.v1.json"
+#: The demo scene as the catalog ships it (A-102): profile exulanica.scene/v1, engine v7, a gate.
+DEMO_SCENE = Path("assets") / "catalogs" / "scenes" / "three-strangers.v3.json"
 DEMO_BUILDER = Path("scripts") / "demo" / "build_scene.py"
 
 
@@ -5105,6 +5161,33 @@ def row_sc1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
 LOOK_CHOICES = "exulanica.thing-look-choices/v1"
 
 
+def row_s4(stack: Stack, transcripts: Any) -> Row:
+    row = Row(
+        "S4",
+        "things.workspace_store",
+        "A workspace's own looks and kinds are read only by digest within that workspace: a look, "
+        "its container and a kind for a digest no workspace holds are each 404 unknown_reference "
+        "(A-106). An admitted look read by its own workspace and refused to another is not "
+        "exercised: no committed look document and container are named by a declared mapping.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    digest = hashlib.sha256(f"q10-s4-{uuid.uuid4()}".encode()).hexdigest()
+    answers = {}
+    for path in (
+        f"/things/looks/{digest}",
+        f"/things/looks/{digest}/container",
+        f"/things/kinds/{digest}",
+    ):
+        status, body = w1.call("S4", "GET", path)
+        answers[path.replace(digest, "{digest}")] = [status, F.problem_code(body)]
+        row.expect(
+            status == 404 and F.problem_code(body) == "unknown_reference",
+            f"{path.replace(digest, '{digest}')} answered {status} {F.problem_code(body)}",
+        )
+    row.observed = {"answers": answers}
+    return row.close()
+
+
 def scene_entry(c: Any, step: str, built: Mapping[str, Any]) -> dict[str, Any] | None:
     """The saved world a scene build recorded, read back, or None when the build left none."""
     return F.read_entry(c, step, built["entry_id"]) if built.get("entry_id") else None
@@ -5200,8 +5283,7 @@ def row_t4(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
         f"workspace 1 and a {THINGS_ENGINE} society started on its version in the arrival's "
         "region; the society runs that engine and counts every scene being that has a mind among "
         "its people, placed; a step advances it; its replay answers the live state; the scene's "
-        "own --minds step is run and what it answers is recorded, not judged (scene v1 names a "
-        "model not offered to beings; A-89, A-94).",
+        "own --minds step chooses each being's model and reads them back (A-89, A-94, A-102).",
     )
     w1 = F.client(stack, transcripts, "w1", "token")
     scene = json.loads((worktree / DEMO_SCENE).read_text())
@@ -5255,6 +5337,14 @@ def row_t4(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
     minds_record = out / "evidence" / "t4-scene-minds.json"
     minds = build_scene(stack, worktree, minds_record, token_file="token", minds=True)
     (out / "evidence" / "t4-scene-minds.txt").write_text(minds.stdout + minds.stderr)
+    # The catalog scene's minds are all models a being is offered (A-102): each is chosen and read
+    # back by the builder, at no cost (choosing asks no model).
+    lived = json.loads(minds_record.read_text()).get("society") if minds_record.exists() else None
+    chosen = {m.get("thing_id") for m in (lived or {}).get("minds") or []}
+    row.expect(
+        minds.returncode == 0 and chosen == beings,
+        f"the scene's minds step exited {minds.returncode} choosing for {sorted(chosen)}",
+    )
     row.observed = {
         "scene": record.get("scene"),
         "society": [status, society.get("profile"), society.get("society_id")],
@@ -5268,6 +5358,568 @@ def row_t4(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
         },
     }
     return row.close()
+
+
+# -- V2, V3: a visitor crosses in through the door and leaves; DF1: privileged functions ------------
+
+#: The Luanti bridge as shipped: its gate mod's adapter and mapping, and the stand-in that drives one
+#: crossing exactly as the mod does (bridges/luanti/tools/cross_once.py).
+LUANTI = Path("bridges") / "luanti"
+LUANTI_MOD = LUANTI / "mod" / "exulanica_gate"
+LUANTI_MAPPING = LUANTI_MOD / "mapping" / "luanti-minetest-game.v2.json"
+LUANTI_STANDIN = LUANTI / "tools" / "cross_once.py"
+#: What the mapping admits and carries both ways, and a look it names that is not shipped.
+CROSSING_TYPE, CROSSING_LOOK, CROSSING_ITEM = "player", "cc0-traveller", "default:torch"
+UNSHIPPED_LOOK = "default-skin"
+CROSSING_FRAME_SECONDS = 60
+
+
+def luanti_hello(worktree: Path) -> bytes:
+    """The hello the gate mod sends: its adapter's version, the mapping file's own text, and the
+    adapter's reads with every mapped item's."""
+    adapter = json.loads((worktree / LUANTI_MOD / "adapter.json").read_text())
+    text = (worktree / LUANTI_MAPPING).read_text()
+    mapping = json.loads(text)
+    reads = list(adapter["reads"]) + [item["game_item"] for item in mapping["items"]]
+    return (
+        '{"adapter_version":'
+        + json.dumps(adapter["adapter_version"])
+        + ',"mapping":'
+        + text
+        + ',"reads":'
+        + json.dumps(reads)
+        + "}"
+    ).encode()
+
+
+def channel(
+    stack: Stack,
+    credential: str,
+    method: str,
+    path: str,
+    body: Any = None,
+    *,
+    raw: bytes | None = None,
+) -> tuple[int, Any]:
+    """A request on a grant's channel, its body as JSON or as the bytes given."""
+    if raw is None:
+        return door_call(stack, credential, method, path, body)
+    request = urllib.request.Request(
+        f"{stack.base_url}{path}",
+        data=raw,
+        method=method,
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {credential}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return response.status, json.loads(response.read() or b"null")
+    except urllib.error.HTTPError as refused:
+        try:
+            return refused.code, json.loads(refused.read() or b"null")
+        except ValueError:
+            return refused.code, None
+
+
+def frames_until(
+    stack: Stack, credential: str, cursor: str, wanted: Callable[[Mapping[str, Any]], bool]
+) -> tuple[str, list[dict[str, Any]], int]:
+    """Read the channel's frames after ``cursor`` until one is ``wanted`` or the bound passes; the
+    cursor after them, every frame read, and the last status."""
+    seen: list[dict[str, Any]] = []
+    status = 0
+    deadline = time.monotonic() + CROSSING_FRAME_SECONDS
+    while time.monotonic() < deadline:
+        status, read = door_call(
+            stack,
+            credential,
+            "GET",
+            f"/door/channel/frames?{urllib.parse.urlencode({'after': cursor})}",
+        )
+        if status != 200:
+            break
+        cursor = (read or {}).get("cursor", cursor)
+        seen += (read or {}).get("frames") or []
+        if any(wanted(frame) for frame in seen):
+            break
+    return cursor, seen, status
+
+
+def step(c: Any, label: str, entry: Mapping[str, Any]) -> int:
+    """One minute of the society, stepped by its owner."""
+    _, now = F.society(c, label, entry)
+    return F.advance(c, label, entry, now or {})[0]
+
+
+def row_v2(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
+    row = Row(
+        "V2",
+        "door.crossing",
+        "A visitor crosses in through the scene's gate and leaves (A-104): the grant 201 and its "
+        "hello 200 (an arrival before the hello 409 hello_first); a non-random arrival id 422 "
+        "(refused by the request's schema); a look not shipped 422 look_not_shipped; the arrival 201 and again "
+        "200 alike; another over the maximum 409 visitors_full; after a step the frames say "
+        "arrived, the society holds the visitor (came_by crossed) with the torch it carried, the "
+        "models view names it outside and the thing-looks read its look chosen by its crossing; "
+        "gone 202; send-away 202 and after a step departed sent_home carrying the torch; a delivery "
+        "naming another thing 422 delivery_not_this_departure, the right one 202 recorded and again "
+        "not recorded; the revoke then a step gives grant_ended and the next poll 410; the replay "
+        "answers the live state; another workspace 404; read-only 403.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    read_only = F.client(stack, transcripts, "read-only", "token-read")
+    record_path = out / "evidence" / "v2-scene-build.json"
+    built = build_scene(stack, worktree, record_path, token_file="token")
+    (out / "evidence" / "v2-scene-build.txt").write_text(built.stdout + built.stderr)
+    row.expect(
+        built.returncode == 0 and record_path.exists(), f"the scene build exited {built.returncode}"
+    )
+    if not record_path.exists():
+        return row.close()
+    record = json.loads(record_path.read_text())
+    entry = F.read_entry(w1, "V2", record["entry_id"])
+    query = F.world_query(entry)
+    status_society, _ = w1.call(
+        "V2",
+        "POST",
+        F.version_path(entry, "/society"),
+        query=query,
+        body={"region_id": record["arrival"]["region_id"], "profile": THINGS_ENGINE},
+    )
+    gate = next(t["thing_id"] for t in record["things"] if t["kind"]["kind"] == "gate")
+    grant_body = {
+        "idempotency_key": str(uuid.uuid4()),
+        "bridge": "luanti",
+        "version_id": entry["authored_version_id"],
+        "minutes": 60,
+        "channel_credential": True,
+        "visitors_maximum": 1,
+        "kinds": [CROSSING_TYPE],
+        "gate": gate,
+        "may_carry_in": True,
+        "may_carry_out": True,
+    }
+    status_ro, _ = read_only.call("V2", "POST", "/door/grants", query=query, body=grant_body)
+    status_grant, granted = w1.call("V2", "POST", "/door/grants", query=query, body=grant_body)
+    grant_id = ((granted or {}).get("grant") or {}).get("grant_id")
+    credential = ((granted or {}).get("channel_credential") or {}).get("credential")
+    row.expect(
+        status_society == 200 and status_grant == 201 and credential,
+        f"the society answered {status_society}, the grant {status_grant}",
+    )
+    row.expect(status_ro == 403, f"read-only issuing answered {status_ro}")
+    if not credential:
+        return row.close()
+    arrival = lambda arrival_id, look=CROSSING_LOOK, carried=True: {  # noqa: E731
+        "arrival_id": arrival_id,
+        "game_type": CROSSING_TYPE,
+        "look_key": look,
+        "carried": [{"game_item": CROSSING_ITEM, "count": 1}] if carried else [],
+    }
+    status_early, early = channel(
+        stack, credential, "POST", "/door/channel/arrivals", arrival(str(uuid.uuid4()))
+    )
+    status_hello, said = channel(
+        stack, credential, "POST", "/door/channel/hello", raw=luanti_hello(worktree)
+    )
+    cursor = (said or {}).get("cursor") or ""
+    status_fixed, fixed = channel(
+        stack,
+        credential,
+        "POST",
+        "/door/channel/arrivals",
+        arrival(str(uuid.uuid5(uuid.NAMESPACE_URL, "q10"))),
+    )
+    status_unshipped, unshipped = channel(
+        stack,
+        credential,
+        "POST",
+        "/door/channel/arrivals",
+        arrival(str(uuid.uuid4()), UNSHIPPED_LOOK),
+    )
+    arrival_id = str(uuid.uuid4())
+    status_in, came = channel(
+        stack, credential, "POST", "/door/channel/arrivals", arrival(arrival_id)
+    )
+    status_again, again = channel(
+        stack, credential, "POST", "/door/channel/arrivals", arrival(arrival_id)
+    )
+    status_full, full = channel(
+        stack,
+        credential,
+        "POST",
+        "/door/channel/arrivals",
+        arrival(str(uuid.uuid4()), carried=False),
+    )
+    thing_id = (came or {}).get("thing_id")
+    refusals = {
+        "before_hello": [status_early, F.problem_code(early)],
+        "not_random": [status_fixed, F.problem_code(fixed)],
+        "look_not_shipped": [status_unshipped, F.problem_code(unshipped)],
+        "over_the_maximum": [status_full, F.problem_code(full)],
+    }
+    for name, (got, code), (status, wanted) in (
+        ("before_hello", refusals["before_hello"], (409, "hello_first")),
+        ("not_random", refusals["not_random"], (422, None)),
+        ("look_not_shipped", refusals["look_not_shipped"], (422, "look_not_shipped")),
+        ("over_the_maximum", refusals["over_the_maximum"], (409, "visitors_full")),
+    ):
+        row.expect(
+            got == status and (wanted is None or code == wanted), f"{name} answered {got} {code}"
+        )
+    row.expect(status_hello == 200, f"the hello answered {status_hello} {F.problem_code(said)}")
+    row.expect(
+        status_in == 201 and thing_id and status_again == 200 and again == came,
+        f"the arrival answered {status_in}, again {status_again}",
+    )
+    status_step, _ = step(w1, "V2", entry), None
+    cursor, seen, _ = frames_until(
+        stack,
+        credential,
+        cursor,
+        lambda f: f.get("kind") == "arrived" and f.get("arrival_id") == arrival_id,
+    )
+    arrived = next(
+        (f for f in seen if f.get("kind") == "arrived" and f.get("arrival_id") == arrival_id), {}
+    )
+    row.expect(
+        arrived.get("thing_id") == thing_id
+        and [c.get("game_item") for c in arrived.get("carried") or []] == [CROSSING_ITEM],
+        f"after a step ({status_step}) the frames read {[f.get('kind') for f in seen]}",
+    )
+    _, society = F.society(w1, "V2", entry)
+    state = (society or {}).get("state") or {}
+    visitor = next((p for p in state.get("inhabitants") or [] if p.get("id") == thing_id), {})
+    held = [t for t in state.get("things") or [] if t.get("held_by") == thing_id]
+    row.expect(
+        visitor.get("came_by") == "crossed" and len(held) == 1,
+        f"the society holds the visitor as {visitor.get('came_by')} holding {len(held)}",
+    )
+    _, minds = w1.call("V2", "GET", F.version_path(entry, "/society/models"), query=query)
+    outside = [o for o in (minds or {}).get("outside") or [] if o.get("subject_id") == thing_id]
+    row.expect(
+        bool(outside)
+        and outside[0].get("grant_id") == grant_id
+        and outside[0].get("bridge") == "luanti",
+        f"the models view's outside reads {outside}",
+    )
+    _, looks = w1.call("V2", "GET", F.version_path(entry, "/thing-looks"), query=query)
+    worn = [look for look in (looks or {}).get("looks") or [] if look.get("thing_id") == thing_id]
+    row.expect(
+        bool(worn) and worn[0].get("chosen_by") == "crossing",
+        f"the thing-looks read {worn}",
+    )
+    status_gone, gone = channel(
+        stack, credential, "POST", "/door/channel/gone", {"thing_id": thing_id}
+    )
+    row.expect(status_gone == 202, f"gone answered {status_gone} {gone}")
+    status_away, _ = w1.call(
+        "V2", "POST", f"/door/grants/{grant_id}/send-away", query=query, body={"thing_id": thing_id}
+    )
+    step(w1, "V2", entry)
+    cursor, seen, _ = frames_until(
+        stack,
+        credential,
+        cursor,
+        lambda f: f.get("kind") == "departed" and f.get("thing_id") == thing_id,
+    )
+    departed = next(
+        (f for f in seen if f.get("kind") == "departed" and f.get("thing_id") == thing_id), {}
+    )
+    carried = departed.get("carried") or []
+    row.expect(
+        status_away == 202
+        and departed.get("why") == "sent_home"
+        and [c.get("game_item") for c in carried] == [CROSSING_ITEM],
+        f"send-away answered {status_away}; departed {departed}",
+    )
+    departure = departed.get("departure_id")
+    report = {
+        "delivered": [
+            {"thing_id": c.get("thing_id"), "game_item": c.get("game_item")} for c in carried
+        ],
+        "not_delivered": [],
+    }
+    wrong = {
+        "delivered": [{"thing_id": str(uuid.uuid4()), "game_item": CROSSING_ITEM}],
+        "not_delivered": [],
+    }
+    path = f"/door/channel/departures/{departure}/delivered"
+    status_wrong, wrong_answer = channel(stack, credential, "POST", path, wrong)
+    status_report, reported = channel(stack, credential, "POST", path, report)
+    status_report_2, reported_2 = channel(stack, credential, "POST", path, report)
+    row.expect(
+        status_wrong == 422 and F.problem_code(wrong_answer) == "delivery_not_this_departure",
+        f"a delivery naming another thing answered {status_wrong} {F.problem_code(wrong_answer)}",
+    )
+    row.expect(
+        status_report == 202
+        and (reported or {}).get("recorded") is True
+        and status_report_2 == 202
+        and (reported_2 or {}).get("recorded") is False,
+        f"the delivery answered {status_report} {reported}, again {status_report_2} {reported_2}",
+    )
+    status_revoke, _ = w1.call(
+        "V2", "POST", f"/door/grants/{grant_id}/revoke", query=query, body={}
+    )
+    step(w1, "V2", entry)
+    cursor, seen, _ = frames_until(
+        stack, credential, cursor, lambda f: f.get("kind") == "grant_ended"
+    )
+    status_after, _ = door_call(
+        stack,
+        credential,
+        "GET",
+        f"/door/channel/frames?{urllib.parse.urlencode({'after': cursor})}",
+    )
+    row.expect(
+        status_revoke == 200
+        and any(f.get("kind") == "grant_ended" for f in seen)
+        and status_after == 410,
+        f"after the revoke the frames read {[f.get('kind') for f in seen]} and a poll {status_after}",
+    )
+    _, live = F.society(w1, "V2", entry)
+    status_replay, replayed = w1.call(
+        "V2", "GET", F.version_path(entry, "/society/replay"), query=query
+    )
+    row.expect(
+        status_replay == 200
+        and (replayed or {}).get("state_sha256") == (live or {}).get("state_sha256"),
+        f"the replay answered {status_replay} with another state",
+    )
+    status_stranger, _ = w2.call("V2", "GET", f"/door/grants/{grant_id}", query=query)
+    row.expect(status_stranger == 404, f"another workspace was answered {status_stranger}")
+    row.observed = {
+        "grant": [status_grant, grant_id],
+        "read_only": status_ro,
+        "hello": status_hello,
+        "refusals": refusals,
+        "arrival": [status_in, status_again, thing_id],
+        "arrived": arrived,
+        "visitor": {"came_by": visitor.get("came_by"), "held": len(held)},
+        "outside": outside,
+        "look": worn,
+        "gone": [status_gone, gone],
+        "departed": departed,
+        "delivery": [
+            status_wrong,
+            F.problem_code(wrong_answer),
+            status_report,
+            reported,
+            status_report_2,
+            reported_2,
+        ],
+        "revoke": [status_revoke, [f.get("kind") for f in seen], status_after],
+        "replay": status_replay,
+        "stranger": status_stranger,
+    }
+    return row.close()
+
+
+def row_v3(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
+    row = Row(
+        "V3",
+        "door.luanti_standin",
+        "The shipped Luanti stand-in (cross_once.py cross), as workspace 1 (the one the host "
+        "plays) on the catalog scene V2 built, builds it, opens "
+        "the gate and brings one character in exactly as the mod would: it exits 0 and prints the "
+        "world, version and character; the society holds that character as crossed, wearing "
+        "cc0-traveller, and it is still there after two steps (it answers no ask and has no leave "
+        "ability) (A-104).",
+    )
+    w2 = F.client(stack, transcripts, "w1", "token")
+    crossed = subprocess.run(
+        [
+            str(worktree / ".venv" / "bin" / "python"),
+            str(worktree / LUANTI_STANDIN),
+            "cross",
+            "--api",
+            stack.base_url,
+            "--token-file",
+            str(stack.token_file("token")),
+            "--scene",
+            str(worktree / DEMO_SCENE),
+            "--stay-s",
+            "5",
+        ],
+        cwd=worktree,
+        env=LAUNCH.clean_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=900,
+    )
+    (out / "evidence" / "v3-standin.txt").write_text(crossed.stdout + crossed.stderr)
+    found = re.search(r"\{.*?\}", crossed.stdout, re.S)
+    printed = json.loads(found.group(0)) if found else {}
+    row.expect(
+        crossed.returncode == 0 and printed.get("character"),
+        f"the stand-in exited {crossed.returncode}",
+    )
+    if not printed.get("character"):
+        return row.close()
+    entry = {"authored_version_id": printed["version_id"], "world_id": printed["world_id"]}
+    for _ in range(2):
+        step(w2, "V3", entry)
+    _, society = F.society(w2, "V3", entry)
+    character = next(
+        (
+            p
+            for p in ((society or {}).get("state") or {}).get("inhabitants") or []
+            if p.get("id") == printed["character"]
+        ),
+        {},
+    )
+    _, looks = w2.call(
+        "V3", "GET", F.version_path(entry, "/thing-looks"), query=F.world_query(entry)
+    )
+    worn = [
+        look
+        for look in (looks or {}).get("looks") or []
+        if look.get("thing_id") == printed["character"]
+    ]
+    look_key = ((worn[0] if worn else {}).get("look") or {}).get("look")
+    row.expect(
+        character.get("came_by") == "crossed", f"the character reads {character.get('came_by')}"
+    )
+    row.expect(
+        printed.get("look_key") == CROSSING_LOOK and bool(worn),
+        f"the character wears {look_key} (printed {printed.get('look_key')})",
+    )
+    row.observed = {"printed": printed, "came_by": character.get("came_by"), "look": worn}
+    return row.close()
+
+
+#: What docs/deployment.md states of the role migration 0161 makes (DF1): its name, and that it
+#: cannot log in, is no superuser, does not bypass row-level security and belongs to no role.
+DEFINER_ROLE = "exulanica_definer"
+DEFINER_FUNCTIONS = (
+    "select count(*) filter (where p.proowner <> r.oid), count(*) from pg_proc p "
+    "join pg_namespace n on n.oid = p.pronamespace, pg_roles r "
+    "where p.prosecdef and r.rolname = '" + DEFINER_ROLE + "' "
+    "and n.nspname not in ('pg_catalog', 'information_schema') and n.nspname not like 'pg_toast%'"
+)
+DEFINER_FLAGS = (
+    "select rolcanlogin, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole, rolreplication "
+    "from pg_roles where rolname = '" + DEFINER_ROLE + "'"
+)
+DEFINER_MEMBERS = (
+    "select count(*) from pg_auth_members m join pg_roles r on r.oid in (m.member, m.roleid) "
+    "where r.rolname = '" + DEFINER_ROLE + "'"
+)
+DEFINER_PUBLIC = (
+    "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+    "where p.prosecdef and n.nspname not in ('pg_catalog', 'information_schema') "
+    "and has_function_privilege('public', p.oid, 'execute')"
+)
+
+
+def psql_owner(stack: Stack, sql: str, database_url: str | None = None) -> str:
+    """An evidence read as the lane database's owner, through the server's own psql."""
+    database = stack.state["database"]
+    url = database_url or database["owner_url_for_evidence_reads"]
+    done = subprocess.run(
+        [str(Path(database["postgres_bin"]) / "psql"), url, "-At", "-F", ",", "-c", sql],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if done.returncode != 0:
+        raise SystemExit(f"psql refused: {done.stderr.strip()[:300]}")
+    return done.stdout.strip()
+
+
+def definer_reading(stack: Stack, database_url: str | None = None) -> dict[str, Any]:
+    others, total = psql_owner(stack, DEFINER_FUNCTIONS, database_url).split(",")
+    flags = psql_owner(stack, DEFINER_FLAGS, database_url).split(",")
+    return {
+        "definers": int(total),
+        "owned_by_another": int(others),
+        "flags_all_false": flags == ["f"] * 6,
+        "memberships": int(psql_owner(stack, DEFINER_MEMBERS, database_url)),
+        "public_may_execute": int(psql_owner(stack, DEFINER_PUBLIC, database_url)),
+    }
+
+
+def definer_holds(reading: Mapping[str, Any]) -> bool:
+    return (
+        reading["definers"] > 0
+        and reading["owned_by_another"] == 0
+        and reading["flags_all_false"]
+        and reading["memberships"] == 0
+        and reading["public_may_execute"] == 0
+    )
+
+
+def row_df1(stack: Stack, transcripts: Any) -> Row:
+    row = Row(
+        "DF1",
+        "install.definer_owner",
+        "On the run's freshly migrated database, read as its owner (A-105): every SECURITY DEFINER "
+        "function is owned by exulanica_definer, which cannot log in, is no superuser, does not "
+        "bypass row-level security and belongs to no role and has no member; PUBLIC may execute "
+        "none of them. A scratch copy of the schema with one definer given to another owner fails "
+        "the same check.",
+    )
+    reading = definer_reading(stack)
+    row.expect(definer_holds(reading), f"the definer reading is {reading}")
+    # The mutant: a schema-only copy in a scratch database, one definer handed to the owner.
+    database = stack.state["database"]
+    owner_url = database["owner_url_for_evidence_reads"]
+    binaries = Path(database["postgres_bin"])
+    scratch = f"q10_df1_{uuid.uuid4().hex[:8]}"
+    scratch_url = owner_url.rsplit("/", 1)[0] + "/" + scratch
+    mutant: dict[str, Any] = {}
+    try:
+        psql_owner(stack, f"create database {scratch}")
+        dump = subprocess.run(
+            [str(binaries / "pg_dump"), "--schema-only", owner_url],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        subprocess.run(
+            [str(binaries / "psql"), scratch_url, "-q", "-v", "ON_ERROR_STOP=0"],
+            input=dump.stdout,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        one = psql_owner(
+            stack,
+            "select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+            "where p.prosecdef and n.nspname not in ('pg_catalog', 'information_schema') limit 1",
+            scratch_url,
+        )
+        psql_owner(stack, f"alter function {one} owner to current_user", scratch_url)
+        mutant = {"function": one, **definer_reading(stack, scratch_url)}
+    finally:
+        psql_owner(stack, f"drop database if exists {scratch}")
+    row.expect(bool(mutant) and not definer_holds(mutant), f"the mutant reads {mutant}")
+    row.observed = {"reading": reading, "mutant": mutant}
+    return row.close()
+
+
+def crossings(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if not stack.state.get("society_of_things") or "door_bridges" not in stack.state:
+        raise SystemExit(
+            "crossings needs a fresh database and a stack started with --workspaces 2 "
+            "--read-only-token --no-derivative-worker --society-of-things --society-playback "
+            "--door-bridges FILE (cross_once.py declare FILE)"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [
+        row_df1(stack, transcripts),
+        row_v2(stack, transcripts, worktree, out),
+        row_v3(stack, transcripts, worktree, out),
+    ]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
 
 
 def society_of_things(arguments: argparse.Namespace) -> int:
@@ -5302,6 +5954,7 @@ def things(arguments: argparse.Namespace) -> int:
         sc1,
         row_t3(stack, transcripts, sc1.observed),
         row_t4a(stack, transcripts, sc1.observed, worktree),
+        row_s4(stack, transcripts),
     ]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
@@ -5359,12 +6012,13 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
     row = Row(
         "D1",
         "door.grants",
-        "With AGENTS' example bridge declared: GET /door/bridges lists it; a visitor grant is 201 "
-        "and the same request again 200 with the same grant; an unknown bridge is 422 "
-        "bridge_not_offered; the read-only grant is refused 403; the other workspace reads no grant "
-        "of workspace 1's (404) (A-80). Named things (A-88): on a generated town with its society, "
-        "a grant naming two of its people and the version is 201 and the people role reads them "
-        "decided from outside; things without the version, or the version without things, are 422 "
+        "With AGENTS' example bridge declared: GET /door/bridges lists it; on the starter a visitor "
+        "grant naming no version is 422 invalid_scope and one naming the starter's version, whose "
+        "society holds no things, is 409 world_not_open_to_visitors (A-109). Named things (A-88): "
+        "on a generated town with its society, a grant naming two of its people and the version is "
+        "201, the same request again 200 with the same grant, and the people role reads them "
+        "decided from outside; an unknown bridge is 422 bridge_not_offered; the read-only grant is "
+        "refused 403; the other workspace reads no grant of workspace 1's (404); things without the version, or the version without things, are 422 "
         "invalid_scope; a person not in the world is 422 person_not_in_this_world. One channel "
         "credential is live: a hello on it is 200, a second credential ends it (its next request 401 "
         "unauthenticated), the second polls only after its own hello (409 hello_first, then 200); "
@@ -5393,37 +6047,29 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
         "minutes": 5,
         "channel_credential": True,
     }
-    status_issue, issued = w1.call("D1", "POST", "/door/grants", query=query, body=body)
-    status_again, again = w1.call("D1", "POST", "/door/grants", query=query, body=body)
-    grant = (issued or {}).get("grant") or {}
-    grant_id = grant.get("grant_id")
-    row.expect(
-        status_issue == 201 and grant_id,
-        f"the grant answered {status_issue} {F.problem_code(issued)}",
-    )
-    row.expect(
-        status_again == 200 and ((again or {}).get("grant") or {}).get("grant_id") == grant_id,
-        f"the same request again answered {status_again}",
-    )
-    refusals = {}
-    for name, change, client, status, code in (
-        ("unknown bridge", {"bridge": "q10-nobody"}, w1, 422, "bridge_not_offered"),
-        ("read-only", {}, read_only, 403, None),
+    # A visitor grant names a version whose society holds things (A-109): the starter has none.
+    visitors = {}
+    for name, change, status, code in (
+        ("visitors without a version", {}, 422, "invalid_scope"),
+        (
+            "visitors into a world without things",
+            {"version_id": entry["authored_version_id"]},
+            409,
+            "world_not_open_to_visitors",
+        ),
     ):
-        got, answer = client.call(
+        got, answer = w1.call(
             "D1",
             "POST",
             "/door/grants",
             query=query,
             body={**body, **change, "idempotency_key": str(uuid.uuid4())},
         )
-        refusals[name] = [got, F.problem_code(answer)]
+        visitors[name] = [got, F.problem_code(answer)]
         row.expect(
-            got == status and (code is None or F.problem_code(answer) == code),
+            got == status and F.problem_code(answer) == code,
             f"{name} answered {got} {F.problem_code(answer)}",
         )
-    status_stranger, _ = w2.call("D1", "GET", f"/door/grants/{grant_id}", query=query)
-    row.expect(status_stranger == 404, f"the other workspace was answered {status_stranger}")
 
     # Named things: two people of a generated town's society, bound in its version (A-88).
     town = generated_town(w1, "D1 town", "Q10 D1 town")
@@ -5462,18 +6108,41 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
             got == status and F.problem_code(answer) == code,
             f"{name} answered {got} {F.problem_code(answer)}",
         )
+    named_body = {**named, "idempotency_key": str(uuid.uuid4())}
     status_named, bound = w1.call(
-        "D1 named",
-        "POST",
-        "/door/grants",
-        query=town_query,
-        body={**named, "idempotency_key": str(uuid.uuid4())},
+        "D1 named", "POST", "/door/grants", query=town_query, body=named_body
     )
     named_id = ((bound or {}).get("grant") or {}).get("grant_id")
     row.expect(
         status_named == 201 and named_id and len(people) == 2,
         f"the named grant answered {status_named} {F.problem_code(bound)} for {len(people)} people",
     )
+    status_again, again = w1.call(
+        "D1 named", "POST", "/door/grants", query=town_query, body=named_body
+    )
+    row.expect(
+        status_again == 200 and ((again or {}).get("grant") or {}).get("grant_id") == named_id,
+        f"the same request again answered {status_again}",
+    )
+    refusals = {}
+    for name, change, client, status, code in (
+        ("unknown bridge", {"bridge": "q10-nobody"}, w1, 422, "bridge_not_offered"),
+        ("read-only", {}, read_only, 403, None),
+    ):
+        got, answer = client.call(
+            "D1 named",
+            "POST",
+            "/door/grants",
+            query=town_query,
+            body={**named, **change, "idempotency_key": str(uuid.uuid4())},
+        )
+        refusals[name] = [got, F.problem_code(answer)]
+        row.expect(
+            got == status and (code is None or F.problem_code(answer) == code),
+            f"{name} answered {got} {F.problem_code(answer)}",
+        )
+    status_stranger, _ = w2.call("D1 named", "GET", f"/door/grants/{named_id}", query=town_query)
+    row.expect(status_stranger == 404, f"the other workspace was answered {status_stranger}")
     decided = deciders(w1, "D1 named", town, people)
     row.expect(
         all(kind == "external" for kind in decided.values()),
@@ -5533,7 +6202,7 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
     row.expect(400 <= status_after < 500, f"the hello after the revoke answered {status_after}")
     row.observed = {
         "bridge": declared["bridge"],
-        "grant": [status_issue, grant_id, grant.get("scope")],
+        "visitors": visitors,
         "again": status_again,
         "refusals": refusals,
         "stranger": status_stranger,
@@ -5600,8 +6269,8 @@ def row_ag1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
         "policy and no model, holds a grant naming one person of a generated town the host plays: "
         "it says hello, its person's turn reaches it within 300 s of the society playing, its act "
         "is received by the door, and within 180 s the host tells it the answer was taken "
-        "(answer_taken; A-100); then it closes. What the library's leaving calls are answered is recorded, not "
-        "judged (A-99).",
+        "(answer_taken; A-100); then it closes. It brings no body in, so the library makes no "
+        "leaving call; V2 checks the leaving routes (A-107).",
     )
     w1 = F.client(stack, transcripts, "w1", "token")
     declared = json.loads((worktree / DOOR_BRIDGE_ENTRY).read_text())
@@ -5676,10 +6345,7 @@ def row_ag1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
         "play": [status_play, status_pause],
         "agent": {"exit": agent.returncode, **seen},
         "outcome": outcome,
-        "leaving_routes_not_served": [
-            "/door/channel/gone",
-            "/door/channel/departures/{id}/delivered",
-        ],
+        "leaving": "no leaving call: the agent decides for a named person and brings no body in",
     }
     return row.close()
 
@@ -6062,6 +6728,9 @@ def build_parser() -> argparse.ArgumentParser:
     shipped = commands.add_parser("things")
     shipped.add_argument("--worktree", required=True)
     shipped.add_argument("--out", required=True)
+    crossed = commands.add_parser("crossings")
+    crossed.add_argument("--worktree", required=True)
+    crossed.add_argument("--out", required=True)
     lived = commands.add_parser("society-of-things")
     lived.add_argument("--worktree", required=True)
     lived.add_argument("--out", required=True)
@@ -6092,6 +6761,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "door": door,
         "guests": guests,
         "society-of-things": society_of_things,
+        "crossings": crossings,
     }
     return commands[arguments.command](arguments)
 

@@ -80,10 +80,11 @@ def test_every_step_a_row_reads_is_a_step_the_runner_runs():
         assert found is not None, name
         return re.findall(r"'([a-z-]+)'", found.group(1))
 
-    main, people = listed("MAIN_STEPS"), listed("PEOPLE_STEPS")
+    main, people, things = listed("MAIN_STEPS"), listed("PEOPLE_STEPS"), listed("THINGS_STEPS")
     read = [*driver.JOURNEY_STEPS, *(step for _, _, step, _ in driver.WORLDS_ROWS)]
 
     assert sorted(read) == sorted(main)
     assert [step for _, _, step, _ in driver.PEOPLE_ROWS] == people
-    for step in [*main, *people]:
+    assert [step for _, _, step, _ in driver.THINGS_ROWS] == things
+    for step in [*main, *people, *things]:
         assert f"async '{step}'(ctx)" in runner, step
