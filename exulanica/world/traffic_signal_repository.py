@@ -98,6 +98,15 @@ class TrafficSignalRepository:
             (self.workspace_id, self.world_id, self.version_id),
         ).fetchone()
 
+    def wall_second(self) -> int:
+        """The database's wall clock, to the whole second: where a choice for traffic that keeps
+        shared real time takes effect from."""
+        return int(
+            self.connection.execute(
+                "select floor(extract(epoch from clock_timestamp()))::bigint as second"
+            ).fetchone()["second"]
+        )
+
     def present(self, wall_second: int) -> tuple[int, str]:
         """The second the version's traffic stands at, and the timeline it is on, which every
         choice's and activation's seconds share: ``wall_second`` while the traffic keeps shared
@@ -274,9 +283,7 @@ class TrafficSignalRepository:
                 # minute of preparation after the traffic already sealed, never by the wall clock.
                 target = _sealed_end(clock) + policy.preparation_lead_seconds
             else:
-                now = self.connection.execute(
-                    "select floor(extract(epoch from clock_timestamp()))::bigint as second"
-                ).fetchone()["second"]
+                now = self.wall_second()
                 target = (
                     (now + policy.preparation_lead_seconds + segment - 1) // segment
                 ) * segment

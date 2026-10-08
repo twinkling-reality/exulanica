@@ -130,6 +130,11 @@ def test_a_choice_interleaved_before_seal_recomputes_that_minute(request, monkey
     workspace = api.repository.workspace_id
     world_id = entry["world_id"]
     path = f"/world/versions/{version_id}/models?world_id={world_id}"
+    # Both choices read one wall second, so a minute boundary passing between them (as on a slow
+    # serial run) cannot move the second choice a minute later than the segment it interleaves.
+    with api.client.app.state.services.database.session(workspace) as connection:
+        now = TrafficSignalRepository(connection, workspace, world_id, version_id).wall_second()
+    monkeypatch.setattr(TrafficSignalRepository, "wall_second", lambda _self: now)
     signal = next(role for role in api.get(path).json()["roles"] if role["subject"] == "signal")
     subject = signal["subjects"][0]["signal_id"]
     model = signal["models"][0]
