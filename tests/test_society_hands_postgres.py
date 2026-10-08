@@ -10,29 +10,46 @@ it, through a scripted model, before each minute. What is shown:
     offers to receive it; each act is an event naming the thing, the socket and the moment within
     the minute the later walk ended;
 *   nobody is offered to give the sword to a villager, whose kind does not receive;
-*   replay regenerates the history from what was stored and asks no model.
+*   replay regenerates the history from what was stored and asks no model;
+*   the failing control: where the other knight, which the routine moves, has walked beyond the
+    module's approach distance by the time the first is asked again, giving is never offered and
+    no hand-over happens in twenty minutes.
+
+The society's seed is the one input of these minutes that differs between runs: a world's own seed
+derives from its id, which the fixture makes new each run. Under forty worlds' own seeds the sword
+was not handed over within twenty minutes in four, so each test here chooses its seed.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import json
+import math
 import time
 
 import pytest
 from exulanica.abilities.registry import HANDS
 from exulanica.models.transport import HttpResponse
 from exulanica.world.society_controls import LEASE_SECONDS
+from exulanica.world.society_hands import approach_mm
 
 import test_society_person_decisions_postgres as decisions
 import test_society_stay_requests_api as stays
 import test_society_things_postgres as things_api
 from model_fakes import FakeTransport, chat_body
+from society_seed_support import choose_society_seed
 from test_society_saved_world_api import OWNER, routes
 
 saved_world = stays.saved_world
 app = stays.app
 pytestmark = pytest.mark.postgres
+
+#: A society seed under which the other knight stands within the approach distance when the first,
+#: holding the sword, is next asked, so the sword is handed over in the third minute.
+NEAR = "625fa188f3f60b26f3a5378131b84cac0d97602b2e655b02dd114896b5504c50"
+#: A society seed under which the other knight walks toward the well while the first stands after
+#: picking the sword up, and stays farther than the approach distance for twenty minutes.
+FAR = "bcf06396544e337e456a5763a5b8afd95e8d1fc6a6984717ec8c821933cb107b"
 
 
 class _Hands(FakeTransport):
@@ -64,22 +81,24 @@ class _Hands(FakeTransport):
         return HttpResponse(200, json.dumps(body))
 
 
-def _offered(transport) -> list[str]:
+def _offered(transport, since: int = 0) -> list[str]:
     return [
         label
-        for request in transport.requests
+        for request in transport.requests[since:]
         for label in request["payload"]["tools"][0]["function"]["parameters"]["properties"][
             "action"
         ]["enum"]
     ]
 
 
-@pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_a_knight_picks_up_a_sword_and_gives_it_to_another_knight(app):
+def _knights(app, seed: str):
+    """The saved world's society of things made from ``seed``: a well, a sword and two knights,
+    the first decided by the scripted model through the host, the other by the routine."""
     world, client = app
     client.app.state.services = dataclasses.replace(
         client.app.state.services, societies_of_things=True
     )
+    choose_society_seed(client.app, seed)
     services = decisions._services(client)
     things_api._place(client, world, "well", "well", 2, -4_000, 2_000)
     things_api._place(client, world, "knight", "knight", 1, 3_000, 3_000)
@@ -96,11 +115,23 @@ def test_a_knight_picks_up_a_sword_and_gives_it_to_another_knight(app):
     decisions._choose(services, world, [giver["id"]], model, manifest=manifest)
     transport = _Hands()
     host = decisions._host(world, decisions._client(manifest, transport), services, manifest)
+    return snapshot, giver, taker, transport, host
+
+
+def _events(client, world, kind):
+    scope, _, society = routes(world)
+    found = client.get(society + "/events", headers=OWNER, params=scope).json()["events"]
+    return [e for e in found if e["event_kind"] == kind]
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_knight_picks_up_a_sword_and_gives_it_to_another_knight(app):
+    world, client = app
+    snapshot, giver, taker, transport, host = _knights(app, NEAR)
     scope, _, society = routes(world)
 
     def events(kind):
-        found = client.get(society + "/events", headers=OWNER, params=scope).json()["events"]
-        return [e for e in found if e["event_kind"] == kind]
+        return _events(client, world, kind)
 
     for _ in range(20):
         assert host.before_minute(
@@ -134,6 +165,40 @@ def test_a_knight_picks_up_a_sword_and_gives_it_to_another_knight(app):
     assert replayed.status_code == 200, replayed.text
     assert replayed.json()["replay_verified"] is True
     assert transport.call_count == asked
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_no_hand_over_is_offered_to_a_knight_beyond_the_approach_distance(app):
+    """The test above in a world whose other knight walks off: each time the first knight is asked
+    holding the sword, the other stands farther than the approach distance, so giving is not
+    offered, the scripted model waits, and twenty minutes pass with no hand-over."""
+    world, client = app
+    snapshot, giver, taker, transport, host = _knights(app, FAR)
+    asked_holding = 0
+    for minute in range(20):
+        people = {p["id"]: p for p in snapshot["state"]["inhabitants"]}
+        (gx, gz), (tx, tz) = people[giver["id"]]["position_mm"], people[taker["id"]]["position_mm"]
+        holding = any(t["held_by"] == giver["id"] for t in snapshot["state"]["things"])
+        before = len(transport.requests)
+        assert host.before_minute(
+            decisions._claim(world, snapshot), time.monotonic() + LEASE_SECONDS
+        )
+        offered = _offered(transport, before)
+        if offered and holding:
+            asked_holding += 1
+            assert math.isqrt((gx - tx) ** 2 + (gz - tz) ** 2) > approach_mm()
+            assert "put down the sword" in offered
+            assert not [label for label in offered if label.startswith("give")], offered
+        snapshot = stays._step(world, client, snapshot)
+        # Read after each minute, while the minute's events are on the events read's first page.
+        assert _events(client, world, "gave") == []
+        if minute == 0:
+            [picked] = _events(client, world, "picked_up")
+            assert picked["subject_id"] == giver["id"]
+    # Asked holding the sword in most of the twenty minutes, and still holding it.
+    assert asked_holding >= 10
+    sword = next(t for t in snapshot["state"]["things"] if t["placed_id"] == "sword")
+    assert sword["held_by"] == giver["id"]
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
