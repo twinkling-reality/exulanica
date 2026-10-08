@@ -160,6 +160,12 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
             }
         ),
     ),
+    # The search query retention migration: reference_lookup_clear_queries reads a workspace's
+    # search records and clears their query text, the one column it writes.
+    "0168": DefinerGrants(
+        tables={"reference_lookup": frozenset({"SELECT"})},
+        columns={"reference_lookup": {"query": frozenset({"UPDATE"})}},
+    ),
 }
 
 

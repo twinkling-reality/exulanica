@@ -119,12 +119,20 @@ cleared, so a key repeated after its request has ended answers with that request
 | Kept | Where | Never kept |
 | --- | --- | --- |
 | The request, its steps and its bundle | `reference_request`, with the workspace | Any search result's text, title or web address |
-| Our record of each search: source, aspect, query text, outcome, credits, provider request id, result count | `reference_lookup`, appended and never changed, with the workspace | Any picture, picture address or picture description a source returned |
+| Our record of each search: source, aspect, query text, outcome, credits, provider request id, result count | `reference_lookup`, appended and never changed but for its query text cleared after 30 days, with the workspace | Any picture, picture address or picture description a source returned |
 | The bundle's model calls: provider, role, model, tokens and USD | In the bundle | The person's description, after the job ends |
 | Nothing of a withdrawn request's bundle | The request keeps its status `withdrawn` and steps | Notes made from a picture whose right stopped or which was deleted, or the web notes kept beside them |
 
 Both tables are under forced row-level security keyed on the workspace. Query text is served to
-nobody through the routes. A retention rule for it is not decided.
+nobody through the routes, and it is kept for 30 days after its search was sent
+(`reference_lookup_query_retention()`, the one place the figure is written), then cleared; the rest
+of the search record stays, with the time its query was cleared. The runtime role cannot change a
+search record: the database's `reference_lookup_clear_queries`, run as the login-less definer owner,
+clears a workspace's old queries, and the table's trigger allows exactly that change and no other. A
+query is cleared at the first sweep after its 30 days: at each process start, for every workspace
+the process knows; hourly in a process that plays reference jobs, for the workspaces it serves; and
+whenever the workspace next uses the reference routes. A clear that fails is logged and tried again
+at the next sweep; it never fails the list, a request, the worker's claim or startup.
 
 ## 6. Spending
 
@@ -313,8 +321,12 @@ from them keeps only the digest it recorded. An expired right is not a stop and 
   own included (the route is not given the account's display name or email), reaches the planner as
   typed, as it reaches the world drafter, and the planner is told never to write one into a query.
   A query that carried one would be kept by the source for good.
-- **Our query text is kept with the workspace.** No erasure path removes reference rows yet, and no
-  retention is decided.
+- **A query can outlive its 30 days.** It is cleared at the first sweep after them (section 5), so a
+  workspace no running process knows, serves or hears from keeps its old query text until one does;
+  and physical copies (below) keep it as long as those copies are kept. A restore of a backup taken
+  before a clear brings the text back into the live table until the restored installation's next
+  sweep. A judge seed carries the text, and a judge stack does not clear it: its role cannot run the
+  clear. No erasure path removes a workspace's reference rows themselves yet.
 - **Physical copies outlive the rows.** A blanked payload and a cleared digest are gone from the
   live rows, but PostgreSQL keeps dead row versions until vacuum, the write-ahead log keeps them until
   it is recycled, and a backup or a judge seed taken while a job was queued or running keeps its
@@ -344,16 +356,15 @@ from them keeps only the digest it recorded. An expired right is not a stop and 
 
 `tests/test_reference_sources.py`, `tests/test_reference_boundary.py`,
 `tests/test_reference_notes.py`, `tests/test_reference_pictures.py` and
-`tests/test_reference_settings.py` run without a database;
-`tests/test_reference_store.py`, `tests/test_reference_worker.py`,
-`tests/test_reference_routes.py`, `tests/test_reference_for_drafting.py`,
-`tests/test_reference_worker_pictures.py`, `tests/test_reference_picture_admission.py` and
-`tests/test_reference_withdrawal.py` run on PostgreSQL; a restore that withdraws again is in
-`tests/test_restore_replay_withdrawals.py`.
-`tests/reference_fixtures.py` makes a finished request with a scripted bundle for a drafter's own
-tests. With every outside party scripted they show that
-a saved person, a saved place, account words given to the job and a planted search result reach no
+`tests/test_reference_settings.py` run without a database; `tests/test_reference_store.py`,
+`tests/test_reference_worker.py`, `tests/test_reference_routes.py`,
+`tests/test_reference_for_drafting.py`, `tests/test_reference_worker_pictures.py`,
+`tests/test_reference_picture_admission.py`, `tests/test_reference_withdrawal.py` and
+`tests/test_reference_query_retention.py` run on PostgreSQL; a restore that withdraws again is in
+`tests/test_restore_replay_withdrawals.py`. `tests/reference_fixtures.py` makes a finished request
+with a scripted bundle for a drafter's own tests. With every outside party scripted they show that a
+saved person, a saved place, account words given to the job and a planted search result reach no
 outgoing query, no stored row and no response, and that each guard can fail; the route tests run as
-the runtime and read-only roles. Row-level security on
-both tables is shown as the runtime role in `tests/test_row_level_security.py`. The three model
-calls (planner, reader and picture reader) are registered paths of `tests/test_hosted_boundary.py`.
+the runtime and read-only roles. Row-level security on both tables is shown as the runtime role in
+`tests/test_row_level_security.py`. The three model calls (planner, reader and picture reader) are
+registered paths of `tests/test_hosted_boundary.py`.

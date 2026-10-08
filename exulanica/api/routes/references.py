@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import unicodedata
 import uuid
 from typing import Annotated, Any, Final, Literal
@@ -68,6 +69,7 @@ from exulanica.spending.status import workspace_status
 __all__ = ["REFERENCE_UNAVAILABLE", "router"]
 
 router = APIRouter(prefix="/worlds", tags=["world"])
+_LOG = logging.getLogger(__name__)
 
 #: Why a reference request is not offered, by code, as the capability and a refusal name it.
 REFERENCE_UNAVAILABLE: Final = (
@@ -157,12 +159,15 @@ def _running(request: Request) -> bool:
 
 
 def _sweep(services: Services, workspace_id: uuid.UUID) -> None:
-    """This workspace's reference jobs no worker here will take, ended now, words blanked."""
+    """This workspace's reference jobs no worker here will take, ended now, words blanked; its
+    searches' query text past its retention, cleared."""
     with services.database.session(workspace_id) as connection:
         if services.serves_references_to(workspace_id):
             store.expire_unclaimed(connection, workspace_id)
         else:
             store.end_unserved(connection, workspace_id)
+        if store.try_clear_old_queries(connection, workspace_id) is None:
+            _LOG.warning("clearing old reference queries failed; the next sweep tries again")
 
 
 def _invalid_description(description: str) -> str | None:

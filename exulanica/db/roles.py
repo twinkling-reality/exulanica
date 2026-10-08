@@ -84,6 +84,7 @@ __all__ = [
     "PURGE_ROLE",
     "READ_ONLY_TABLES",
     "READ_ONLY_WITHHELD_TABLES",
+    "REFERENCE_RUNTIME_FUNCTIONS",
     "RUNTIME_ROLE",
     "SPENDING_ADMIN_TABLES",
     "SPENDING_READ_FUNCTIONS",
@@ -271,7 +272,8 @@ INSERT_ONLY_TABLES: Final = (
     "workspace_preparation_request",
     "workspace_asset_blob",
     # Migration 0148 appends our own record of each search a reference request sent and refuses
-    # every update of one.
+    # every update of one; the retention migration allows one, a query cleared once it is 30
+    # days old, made only by its own function (REFERENCE_RUNTIME_FUNCTIONS).
     "reference_lookup",
     # Migration 0149 appends a door grant, each revision of it and its revocation, each mapping a
     # bridge presented and each declaration a program made, each ask the host writes to a channel
@@ -325,6 +327,12 @@ READ_ONLY_WITHHELD_TABLES: Final = ("door_secret", "door_redemption_refusal")
 #: DELETE: migration 0149's ``door_prune`` removes the door's global rows past their retention, a
 #: bounded batch at a time, and its tables' triggers refuse every other delete.
 DOOR_RUNTIME_FUNCTIONS: Final = (("door_prune", "integer"),)
+
+#: Functions with their owner's rights the runtime executes for references. The runtime holds no
+#: UPDATE on ``reference_lookup``: the retention migration's ``reference_lookup_clear_queries``
+#: clears a workspace's search query text once it is past its retention, and the table's trigger
+#: refuses every other change.
+REFERENCE_RUNTIME_FUNCTIONS: Final = (("reference_lookup_clear_queries", "uuid"),)
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a
 #: predicate row even though it cannot update one.
@@ -599,6 +607,7 @@ def provision_runtime_role(
         if not read_only:
             _grant_functions(connection, schema, role_name, SPENDING_RUNTIME_FUNCTIONS)
             _grant_functions(connection, schema, role_name, DOOR_RUNTIME_FUNCTIONS)
+            _grant_functions(connection, schema, role_name, REFERENCE_RUNTIME_FUNCTIONS)
             connection.execute(
                 sql.SQL("grant usage, select on all sequences in schema {} to {}").format(
                     schema, role_name

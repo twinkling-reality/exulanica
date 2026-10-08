@@ -41,6 +41,7 @@ __all__ = [
     "MAXIMUM_CLAIMS",
     "MAX_DESCRIPTION_CHARACTERS",
     "MAX_WITHHELD_WORDS",
+    "QUERY_RETENTION_DAYS",
     "QUEUED_EXPIRY_SECONDS",
     "ClaimedRequest",
     "ReferenceRequest",
@@ -50,6 +51,7 @@ __all__ = [
     "abandon_stranded",
     "cancel_requested",
     "claim",
+    "clear_old_queries",
     "create_request",
     "end_unserved",
     "expire_unclaimed",
@@ -58,6 +60,7 @@ __all__ = [
     "record_lookup",
     "record_steps",
     "request_cancel",
+    "try_clear_old_queries",
 ]
 
 JOB_KIND: Final = "reference_bundle"
@@ -74,6 +77,9 @@ MAX_DESCRIPTION_CHARACTERS: Final = 1000
 MAX_WITHHELD_WORDS: Final = 16
 #: The most of a person's own pictures one request reads, as many as a bundle lists.
 MAX_PICTURES: Final = 4
+#: How long our record of a search keeps its query text, in days: the database's
+#: reference_lookup_query_retention(), stated here for readers (a test holds the two equal).
+QUERY_RETENTION_DAYS: Final = 30
 #: One requester's unfinished requests, and requests in the last hour: a request spends up to three
 #: of the operator's source credits and two model calls, so one requester cannot queue without end.
 MAX_OPEN_PER_ACTOR: Final = 2
@@ -615,6 +621,32 @@ def expire_unclaimed(connection: psycopg.Connection, workspace_id: uuid.UUID) ->
             "expired",
             "queued and never taken",
         )
+
+
+def clear_old_queries(connection: psycopg.Connection, workspace_id: uuid.UUID) -> int:
+    """Clear the query text of this workspace's searches sent at least
+    :data:`QUERY_RETENTION_DAYS` ago, keeping the rest of each record; how many were cleared.
+
+    The runtime role holds no UPDATE on the table: the database's own function does it as the
+    definer owner, and the table's trigger allows that one change alone (the retention migration).
+    """
+    row = connection.execute(
+        "select reference_lookup_clear_queries(%s) as cleared", (workspace_id,)
+    ).fetchone()
+    return int(_first(row)) if row is not None else 0
+
+
+def try_clear_old_queries(connection: psycopg.Connection, workspace_id: uuid.UUID) -> int | None:
+    """:func:`clear_old_queries`, or None when the database refused or failed it.
+
+    A clear that fails (the function not yet granted, a database below its migration, a lost
+    connection) never fails what called it: the list, a request, the worker's claim or startup go
+    on, and the next sweep tries again. The caller logs the failure's class.
+    """
+    try:
+        return clear_old_queries(connection, workspace_id)
+    except psycopg.Error:
+        return None
 
 
 def end_unserved(connection: psycopg.Connection, workspace_id: uuid.UUID) -> int:

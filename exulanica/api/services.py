@@ -713,8 +713,9 @@ class Services:
     def sweep_references(self) -> int:
         """End the reference jobs no worker here will take, for every workspace this process knows
         (its tokens', its accounts' and its listed ones), blanking their words; expire the stale
-        queued ones of those it serves. Run at startup, so a workspace dropped from the list, a
-        worker set off or a move to a public profile leaves nothing waiting. Returns how many."""
+        queued ones of those it serves; clear their searches' query text past its retention. Run at
+        startup, so a workspace dropped from the list, a worker set off or a move to a public
+        profile leaves nothing waiting. Returns how many jobs it ended."""
         known = set(self.reference_workspaces)
         if self.tokens is not None:
             known |= set(self.tokens.workspaces)
@@ -727,6 +728,8 @@ class Services:
                     ended += reference_store.expire_unclaimed(connection, workspace_id)
                 else:
                     ended += reference_store.end_unserved(connection, workspace_id)
+                if reference_store.try_clear_old_queries(connection, workspace_id) is None:
+                    _LOG.warning("clearing old reference queries failed at startup; it is retried")
         return ended
 
     def build_reference_worker(self) -> ReferenceWorker | None:

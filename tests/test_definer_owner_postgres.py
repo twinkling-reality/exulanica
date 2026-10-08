@@ -7,7 +7,8 @@ the migrating superuser, a privilege the bodies never use, a definer handed back
 migration or a restore and not noticed at deployment, or a role widened by hand and trusted.
 
 The definers themselves run under that owner in every PostgreSQL test that calls one (the spending,
-guest, tile, purge, saved-world and project suites); these tests hold the ownership and the grants.
+guest, tile, purge, saved-world, project and reference query retention suites); these tests hold
+the ownership and the grants.
 Every change they make to an owner or a role is made in a transaction they roll back, because the
 schema is shared with the session's other tests and a role belongs to the whole server.
 """
@@ -78,10 +79,13 @@ TABLE_PRIVILEGES = {
     "world_project_item_revision": {"SELECT", "UPDATE"},
     "world_project_item_source": {"SELECT"},
     "world_project_share": {"SELECT", "UPDATE"},
+    # reference_lookup_clear_queries reads a workspace's search records.
+    "reference_lookup": {"SELECT"},
 }
 
-#: Single columns the owner may reach beyond its table privileges: none today.
-COLUMN_PRIVILEGES: dict[str, dict[str, set[str]]] = {}
+#: Single columns the owner may reach beyond its table privileges: the search query that
+#: reference_lookup_clear_queries clears.
+COLUMN_PRIVILEGES: dict[str, dict[str, set[str]]] = {"reference_lookup": {"query": {"UPDATE"}}}
 
 #: Every SECURITY DEFINER function, and its search path with the schema written as {schema}:
 #: door_prune and record_baked_tile_bake qualify every name and keep pg_catalog, pg_temp; 0161
@@ -98,6 +102,7 @@ DEFINERS = {
             "caption_vector_purge_is_authorized(uuid,uuid,uuid)",
             "caption_vector_purge_is_complete(uuid,uuid)",
             "material_bake_purge_is_authorized(uuid,uuid,bytea)",
+            "reference_lookup_clear_queries(uuid)",
             "spending_admit(uuid,uuid,text,uuid,text,text,text,numeric,text,jsonb)",
             "spending_authority_facts()",
             "spending_close_bound(uuid,uuid,text,text)",
@@ -171,8 +176,9 @@ def _definers(admin) -> dict[str, str]:
 def test_every_definer_belongs_to_the_login_less_owner_and_the_check_passes(admin):
     definers = _definers(admin)
     # 0044, 0066, 0090, 0107, 0124, 0126, 0127, 0139, 0144, 0149 (door_prune, whose body 0157
-    # replaced) and 0155 define these 22. A create or replace that drops SECURITY DEFINER leaves
-    # this set, so it fails here.
+    # replaced), 0155 and the search query retention migration (reference_lookup_clear_queries)
+    # define these 23. A create or replace that drops SECURITY DEFINER leaves this set, so it fails
+    # here.
     assert set(definers) == set(DEFINERS), definers
     assert {owner for owner in definers.values()} == {DEFINER_ROLE}, definers
     schema = admin.execute("select current_schema() s").fetchone()["s"]
@@ -250,10 +256,13 @@ def test_the_held_view_counts_a_column_grant_as_the_column_alone(admin, monkeypa
     assert_definer_role(admin)
     tables, columns = _held(admin)
     assert tables == TABLE_PRIVILEGES
-    assert columns == {"embedding": {"embedding_id": {"UPDATE"}}}
+    assert columns == {**COLUMN_PRIVILEGES, "embedding": {"embedding_id": {"UPDATE"}}}
     assert "SELECT" in TABLE_PRIVILEGES["embedding"]
     admin.execute(sql.SQL("grant select (embedding_id) on embedding to {}").format(role))
-    assert _held(admin) == (TABLE_PRIVILEGES, {"embedding": {"embedding_id": {"UPDATE"}}})
+    assert _held(admin) == (
+        TABLE_PRIVILEGES,
+        {**COLUMN_PRIVILEGES, "embedding": {"embedding_id": {"UPDATE"}}},
+    )
 
 
 def test_a_column_grant_beside_its_tables_grant_of_the_same_privilege_passes(admin, monkeypatch):
