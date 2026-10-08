@@ -72,6 +72,8 @@ token_dir="$deploy_dir/tokens"
 tokens_file="$deploy_dir/tokens.json"
 authority_file="$deploy_dir/authority.json"
 watch_state="$deploy_dir/watch-failures"
+proxy_state="$deploy_dir/watch-proxy-failures"
+edge_state="$deploy_dir/watch-edge-failures"
 
 refuse() {
   echo "public.sh: $*" >&2
@@ -543,11 +545,17 @@ PY
     ;;
 
   watch)
-    # One check, for a timer to run every minute. Docker never restarts a container whose health
-    # check fails (deployment.md section 9), so three failures in a row of the API's own liveness,
-    # read from inside the client container over the compose network, recreate the API container.
-    # The same check through the public edge is logged beside it and never acted on: an edge or a
-    # certificate that fails (a failed issuance, a rate limit) is not fixed by restarting the API.
+    # One check, for a timer to run every minute, of three paths, each with its own count of
+    # failures in a row:
+    # - the API's own liveness, read from inside the client container over the compose network.
+    #   Docker never restarts a container whose health check fails (deployment.md section 9), so
+    #   three failures recreate the API container;
+    # - the path the edge takes, read from inside the edge container: the client proxy, then the
+    #   API. While the API is well, three failures here mean the proxy cannot reach it (nginx finds
+    #   `api` by name once, at its start), so they restart the client proxy, never the API;
+    # - the public edge itself, over TLS. It is reported, never repaired: an edge or a certificate
+    #   that fails (a failed issuance, a rate limit) is fixed by neither restart. From the third
+    #   failure in a row every check that repaired nothing logs `edge failing`, for the journal.
     # Readiness is logged too, never acted on: a dependency that is down is not fixed that way.
     need_env_file
     host="$(env_value EXULANICA_PUBLIC_HOST)"
@@ -567,15 +575,39 @@ PY
     inside="$(compose exec -T client sh -c \
       'wget -q -T 10 -O /dev/null http://api:8000/healthz && echo 200 || echo 000' 2>/dev/null \
       || echo 000)"
-    failures=0
-    [ -f "$watch_state" ] && failures="$(cat "$watch_state")"
-    if [ "$inside" = 200 ]; then failures=0; else failures=$((failures + 1)); fi
-    echo "$failures" >"$watch_state"
-    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) api_healthz=$inside edge_healthz=$live readyz=$ready failures=$failures"
+    proxied="$(compose exec -T edge sh -c \
+      'wget -q -T 10 -O /dev/null http://client:8080/api/healthz && echo 200 || echo 000' \
+      2>/dev/null || echo 000)"
+    count() { # <state file> <passed: yes or no>: the failures in a row, written back
+      local n=0
+      [ -f "$1" ] && n="$(cat "$1")"
+      if [ "$2" = yes ]; then n=0; else n=$((n + 1)); fi
+      echo "$n" >"$1"
+      echo "$n"
+    }
+    failures="$(count "$watch_state" "$([ "$inside" = 200 ] && echo yes || echo no)")"
+    # The proxy's path counts only while the API is well; otherwise the API's own count acts.
+    proxy_failures="$(count "$proxy_state" \
+      "$([ "$inside" != 200 ] || [ "$proxied" = 200 ] && echo yes || echo no)")"
+    edge_failures="$(count "$edge_state" "$([ "$live" = 200 ] && echo yes || echo no)")"
+    now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "$now api_healthz=$inside edge_healthz=$live readyz=$ready failures=$failures proxy_healthz=$proxied proxy_failures=$proxy_failures edge_failures=$edge_failures"
+    repaired=""
     if [ "$failures" -ge 3 ]; then
-      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) recreating api after $failures failures of its own liveness"
+      echo "$now recreating api after $failures failures of its own liveness"
       compose up -d --no-build --pull never --no-deps --force-recreate api
       echo 0 >"$watch_state"
+      repaired=api
+    elif [ "$proxy_failures" -ge 3 ]; then
+      echo "$now restarting the client proxy after $proxy_failures failures to reach a live api"
+      compose restart client
+      echo 0 >"$proxy_state"
+      repaired=client
+    fi
+    # Reported only by a check that repaired nothing: after a repair the next check says whether
+    # the edge answers again.
+    if [ "$edge_failures" -ge 3 ] && [ -z "$repaired" ]; then
+      echo "$now edge failing: $edge_failures checks in a row answered $live through $origin; not repaired here"
     fi
     ;;
 

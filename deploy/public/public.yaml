@@ -115,6 +115,12 @@ services:
       # reach the player.
       EXULANICA_SOCIETY_CONTROL_WORKER: "on"
       EXULANICA_PLAYBACK_WORKER: "on"
+    # A fixed address too. The client proxy finds `api` by name once, when it starts; an `up` that
+    # recreates the API beside other containers, or a host restart, can otherwise give it a new
+    # address, and the proxy then answers 502 for every API path while the API is well.
+    networks:
+      default:
+        ipv4_address: 10.231.89.30
     logging: *bounded-logs
 
   preparation:
@@ -173,8 +179,10 @@ volumes:
   edge_config:
 
 # One network with a fixed range, so the edge and the client proxy keep the addresses the trust
-# settings name. A host that already uses this range for something else changes all four places
-# together (here, the edge, the client and client-trusted-proxies.conf).
+# settings name, and the API keeps the one the client proxy found at its start. A host that already
+# uses this range for something else changes every place that names it together: the subnet here,
+# the edge's, the client's and the API's addresses, the API's FORWARDED_ALLOW_IPS and
+# client-trusted-proxies.conf.
 networks:
   default:
     ipam:

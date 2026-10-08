@@ -629,13 +629,121 @@ def test_every_docker_run_runs_a_loaded_image_and_the_build_pulls_by_the_platfor
     assert pulls and all('@$manifest"' in line for line in pulls), pulls
 
 
-def test_watch_recreates_the_api_on_its_own_liveness_never_on_the_edges():
-    """A failed issuance or a rate-limited certificate makes the edge fail while the API is well;
-    restarting the API would fix nothing. The counter follows the API's own liveness, read from
-    inside the client container; the edge's answer is logged and never acted on."""
+def test_the_api_keeps_the_address_the_client_proxy_found_at_its_start():
+    """nginx in the client proxy finds `api` by name once, when it starts. In a rehearsal an `up`
+    that recreated the API beside the preparation and tile workers gave it a new address, and the
+    proxy answered 502 for every API path while the API was well. The API holds a fixed address in
+    the network's range, apart from the edge's, the client's and the gateway."""
+    import ipaddress
+
+    subnet = re.search(r"^        - subnet: (\S+)$", OVERLAY, re.M)
+    assert subnet is not None
+    network = ipaddress.ip_network(subnet.group(1))
+    pinned = {}
+    for service in ("edge", "client", "api"):
+        found = re.search(r"^\s+ipv4_address: (\S+)$", OVERLAY_SERVICES[service], re.M)
+        assert found is not None, service
+        pinned[service] = ipaddress.ip_address(found.group(1))
+    assert all(a in network and a != next(network.hosts()) for a in pinned.values()), pinned
+    assert len(set(pinned.values())) == 3, pinned
+
+
+def _watch_section() -> str:
     script = _directives(SCRIPT.read_text(encoding="utf-8")).replace("\\\n", " ")
-    watch = script.split("\n  watch)\n", 1)[1].split("\n    ;;\n", 1)[0]
-    assert re.search(r'inside="\$\(compose exec -T client .*http://api:8000/healthz', watch)
-    assert 'if [ "$inside" = 200 ]; then failures=0;' in watch
-    assert 'if [ "$live" = 200 ]' not in watch
-    assert "edge_healthz=$live" in watch
+    return script.split("\n  watch)\n", 1)[1].split("\n    ;;\n", 1)[0]
+
+
+def test_watch_reads_the_path_the_edge_takes_to_the_api():
+    """The edge proxies to the client proxy at the port watch reads it on, from inside the edge."""
+    upstream = re.search(r"^\s*reverse_proxy (\S+) \{$", _directives(CADDYFILE), re.M)
+    assert upstream is not None
+    assert f"http://{upstream.group(1)}/api/healthz" in _watch_section()
+    assert re.search(r'proxied="\$\(compose exec -T edge ', _watch_section())
+
+
+#: Stand-ins for docker and curl: each answers what the scenario says and logs every action.
+_WATCH_STUBS = {
+    "docker": """#!/bin/sh
+case " $* " in
+  *" exec -T client "*) echo "$WATCH_INSIDE" ;;
+  *" exec -T edge "*) echo "$WATCH_PROXIED" ;;
+  *" up "*) echo "up $*" >>"$WATCH_ACTIONS" ;;
+  *" restart "*) echo "restart $*" >>"$WATCH_ACTIONS" ;;
+  *) echo "unexpected docker $*" >>"$WATCH_ACTIONS"; exit 1 ;;
+esac
+""",
+    "curl": """#!/bin/sh
+printf '%s' "$WATCH_LIVE"
+""",
+}
+
+
+def _watch(tmp_path: pathlib.Path, inside: str, proxied: str, live: str) -> tuple[str, list[str]]:
+    stubs = tmp_path / "stubs"
+    if not stubs.exists():
+        stubs.mkdir()
+        for name, body in _WATCH_STUBS.items():
+            (stubs / name).write_text(body, encoding="utf-8")
+            (stubs / name).chmod(0o755)
+        assert _script(tmp_path, "init", **_init_env(tmp_path)).returncode == 0
+    actions = tmp_path / "actions.log"
+    actions.write_text("", encoding="utf-8")
+    result = _script(
+        tmp_path,
+        "watch",
+        PATH=f"{stubs}{os.pathsep}{os.environ['PATH']}",
+        WATCH_INSIDE=inside,
+        WATCH_PROXIED=proxied,
+        WATCH_LIVE=live,
+        WATCH_ACTIONS=str(actions),
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout, actions.read_text(encoding="utf-8").splitlines()
+
+
+@needs_shell
+def test_watch_restarts_the_client_proxy_when_it_cannot_reach_a_live_api(tmp_path):
+    """The rehearsal's failure: the API well inside, the proxy's path to it failing, the edge 502.
+    The third check in a row restarts the client proxy, which finds the API again; the API is
+    never recreated for it."""
+    for _ in range(2):
+        _, actions = _watch(tmp_path, inside="200", proxied="000", live="502")
+        assert actions == []
+    output, actions = _watch(tmp_path, inside="200", proxied="000", live="502")
+    assert (
+        len(actions) == 1
+        and actions[0].startswith("restart ")
+        and actions[0].endswith(" restart client")
+    ), actions
+    assert "restarting the client proxy after 3 failures" in output
+    assert "edge failing" not in output, "the next check says whether the repair worked"
+    assert "proxy_failures=3" in output and "failures=0" in output
+    output, actions = _watch(tmp_path, inside="200", proxied="000", live="502")
+    assert actions == [], "the count starts again after the restart"
+    assert "edge failing: 4 checks" in output, "a repair that did not help is reported"
+
+
+@needs_shell
+def test_watch_recreates_an_api_that_fails_its_own_liveness_and_not_the_proxy(tmp_path):
+    """A failing API fails the proxy's path too; that is the API's to repair, so the proxy's
+    count stays at zero and the third check recreates the API alone."""
+    for _ in range(2):
+        _, actions = _watch(tmp_path, inside="000", proxied="000", live="502")
+        assert actions == []
+    output, actions = _watch(tmp_path, inside="000", proxied="000", live="502")
+    assert len(actions) == 1 and "--force-recreate api" in actions[0], actions
+    assert "proxy_failures=0" in output
+
+
+@needs_shell
+def test_watch_reports_a_failing_edge_and_restarts_nothing_for_it(tmp_path):
+    """A failed issuance or a rate-limited certificate makes the edge fail while the proxy and the
+    API are well; neither restart fixes it. From the third check in a row it is reported in the
+    journal, and nothing is restarted; a passing check starts the count again."""
+    for checks in range(1, 5):
+        output, actions = _watch(tmp_path, inside="200", proxied="200", live="000")
+        assert actions == []
+        assert f"edge_failures={checks}" in output
+        assert ("edge failing" in output) == (checks >= 3)
+    output, _ = _watch(tmp_path, inside="200", proxied="200", live="200")
+    assert "edge_failures=0" in output and "edge failing" not in output
