@@ -32,7 +32,7 @@ export {
   readLookDrawing,
   readThingLibrary,
 } from './documents.js';
-export type { LibraryBytes, LibraryRefusal, Named } from './library.js';
+export type { HeldThings, LibraryBytes, LibraryRefusal, Named } from './library.js';
 export { LibraryRefused, ThingLibrary } from './library.js';
 export type { FigureRefusal, FigureRequest, InstancedContainer } from './dispatch.js';
 export { CatalogPersonFigure, FigureRefused, makeFigure } from './dispatch.js';
