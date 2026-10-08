@@ -7,6 +7,7 @@ import io
 import uuid
 from pathlib import Path
 
+import psycopg
 from exulanica.corpus.__main__ import main as corpus_main
 from exulanica.db.session import Database
 from exulanica.evaluation.cli import main as evaluation_main
@@ -64,13 +65,33 @@ def test_execution_snapshot_carries_actual_runs_cost_timing_attempts_and_reuse(
     assert len(model_events) == 2
     assert all(event["models_tried"] == ["MiniMaxAI/MiniMax-M3"] for event in model_events)
     assert len(snapshot["stage_definitions"]) >= 5
-    # The test harness applies SQL directly and records no schema_migrations rows. The snapshot
-    # preserves that absence instead of filling it from the current package.
-    assert snapshot["applied_migrations"] == []
     assert all(
         "host" not in event and "error_message" not in event
         for event in snapshot["pipeline_events"]
     )
+
+    # The applied migrations are the rows schema_migrations holds, never the current package's
+    # list. Which rows those are depends on what ran before on this worker: the harness applies
+    # migrations without recording them, and fixtures such as cli_database record them in the
+    # spine every test here shares. So the snapshot is held to the table as it stands, and then to
+    # the empty table the harness alone leaves, inside a transaction that is rolled back, because
+    # tests after this one read the rows that are there.
+    recorded = "select version, checksum, applied_at from schema_migrations order by version"
+    held = repository.connection.execute(recorded).fetchall()
+    assert snapshot["applied_migrations"] == [
+        {
+            "version": row["version"],
+            "sha256": bytes(row["checksum"]).hex(),
+            "applied_at": row["applied_at"].isoformat(),
+        }
+        for row in held
+    ]
+    with repository.connection.transaction():
+        repository.connection.execute("delete from schema_migrations")
+        emptied = execution_snapshot(repository.connection, workspace_id, sources)
+        assert emptied["applied_migrations"] == []
+        raise psycopg.Rollback()
+    assert repository.connection.execute(recorded).fetchall() == held
 
 
 def test_execution_snapshot_names_a_source_that_was_never_run(repository, workspace_id):
