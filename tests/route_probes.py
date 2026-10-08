@@ -590,6 +590,10 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"base_tick": 0, "base_state_sha256": _ZERO_DIGEST},
     },
+    "POST /world/versions/{version_id}/society/things/{thing_id}/look": {
+        **_IN_WORLD,
+        "json": {"look": dict(placeable_kind().document["looks"][0])},
+    },
     "POST /world/versions/{version_id}/things": {
         **_IN_WORLD,
         "json": {
@@ -882,6 +886,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/world/versions/{version_id}/society/inputs/{input_seq}": Owned(
         build.society_input_seq, build.invented_input_seq
     ),
+    "/world/versions/{version_id}/society/things/{thing_id}": Owned(build.society_thing),
     "/world/versions/{version_id}/things/{thing_id}": Owned(
         build.placed_thing, build.invented_thing
     ),

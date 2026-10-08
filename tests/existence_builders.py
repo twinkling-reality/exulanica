@@ -49,6 +49,7 @@ from exulanica.world.society_experiments import DEVELOPMENT_SEEDS
 from exulanica.world.society_repository import SocietyRepository
 
 import comparison_support
+import things_society_support as things_support
 from conftest import (
     DEFAULT_PAYLOAD,
     CountingVisionModel,
@@ -80,6 +81,8 @@ REGION = "region-a"
 PURPOSEFUL = "exulanica-society/v2"
 SOCIAL = "exulanica-society/v3"
 LIVING = "exulanica-society/v4"
+#: A society of things, whose card and look routes ask about a thing by the id the society gives it.
+THINGS = "exulanica-society/v7"
 
 
 def _ok(response, *expected: int) -> Any:
@@ -338,6 +341,51 @@ def placed_thing(owner) -> dict[str, Any]:
 
 def invented_thing() -> str:
     return f"thing:{uuid.uuid4().hex}"
+
+
+def society_thing(owner) -> dict[str, Any]:
+    """A thing of a society of things, by the id the society gives it, in a version of its own:
+    the small square with the first placeable kind placed in it, composed for that version, and
+    the society made on the things engine, which the application then offers (API)."""
+    owner.app.state.services = dataclasses.replace(
+        owner.app.state.services, societies_of_things=True
+    )
+    snapshot = world(owner)["snapshot_id"]
+    version = _ok(
+        in_world(
+            owner,
+            "POST",
+            "/world/versions",
+            json={"title": "existence things", "source_snapshot_id": snapshot},
+        ),
+        201,
+    )
+    version_id = uuid.UUID(version["version_id"])
+    kind = placeable_kind()
+    owner.society_inputs[version_id] = things_support.compose(
+        [things_support.thing("existence-thing", kind.kind, kind.version, 0, 0)],
+        version_id=version_id,
+        world_id=WORLD,
+        source_snapshot_id=uuid.UUID(str(snapshot)),
+    )
+    society = _ok(
+        in_world(
+            owner,
+            "POST",
+            f"/world/versions/{version_id}/society",
+            json={
+                "place_id": str(_place(owner)),
+                "region_id": "region:starter",
+                "profile": THINGS,
+            },
+        ),
+        200,
+    )
+    [thing] = [t for t in society["state"]["things"] if t["placed_id"] == "existence-thing"]
+    return {
+        "/world/versions/{version_id}": version_id,
+        "/world/versions/{version_id}/society/things/{thing_id}": thing["id"],
+    }
 
 
 # -- admitted environment sources --------------------------------------------------------------

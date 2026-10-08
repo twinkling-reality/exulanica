@@ -12099,6 +12099,172 @@
     }
    }
   },
+  "/world/versions/{version_id}/society/things/{thing_id}": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "One thing or being of the version's society of things, as its card shows it.",
+    "operationId": "thing_card_read_world_versions__version_id__society_things__thing_id__get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "thing_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Thing Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/society/things/{thing_id}/look": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The world's owner chooses a shipped look for a thing; answers its card.",
+    "operationId": "thing_look_choose_world_versions__version_id__society_things__thing_id__look_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "thing_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Thing Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ThingLookBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/objects": {
    "post": {
     "tags": [
@@ -29072,6 +29238,35 @@
     ],
     "title": "LookBody"
    },
+   "LookChoiceBody": {
+    "properties": {
+     "look": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,47}$",
+      "title": "Look"
+     },
+     "version": {
+      "type": "integer",
+      "maximum": 10000.0,
+      "minimum": 1.0,
+      "title": "Version"
+     },
+     "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "look",
+     "version",
+     "sha256"
+    ],
+    "title": "LookChoiceBody",
+    "description": "A shipped look, by key, version and digest, for the thing to wear."
+   },
    "LookOfferView": {
     "properties": {
      "state": {
@@ -39120,6 +39315,27 @@
     ],
     "title": "ThingKindBody"
    },
+   "ThingLookBody": {
+    "properties": {
+     "look": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/LookChoiceBody"
+       },
+       {
+        "$ref": "#/components/schemas/WorkspaceLookBody"
+       }
+      ],
+      "title": "Look"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "look"
+    ],
+    "title": "ThingLookBody"
+   },
    "ThingPoseBody": {
     "properties": {
      "x_mm": {
@@ -40082,6 +40298,28 @@
     ],
     "title": "WorkspaceAssetSourceBody",
     "description": "A person's own admitted asset, by the id ``POST /workspace-assets`` returned.\n\n``prepared_sha256`` pins the prepared bytes: optional in a preview, which reports the digest it\nresolved, and required in an apply, so a confirmed apply places exactly what was previewed."
+   },
+   "WorkspaceLookBody": {
+    "properties": {
+     "source": {
+      "type": "string",
+      "const": "workspace",
+      "title": "Source"
+     },
+     "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "source",
+     "sha256"
+    ],
+    "title": "WorkspaceLookBody",
+    "description": "A look the workspace keeps, by the digest of its document alone."
    },
    "WorldCountPolicyView": {
     "properties": {

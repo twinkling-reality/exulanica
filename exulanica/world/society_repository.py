@@ -76,6 +76,13 @@ from exulanica.world.world_clock_repository import WorldClockRepository
 INPUT_PROFILES = INPUT_ENGINES
 #: The most events one read returns: the read's own bound, a page of a society's history.
 EVENTS_READ_MAXIMUM = 256
+#: A being's lines, newest first: what :meth:`SocietyRepository.lines_said` asks, which migration
+#: 0167's index of said events by speaker serves.
+LINES_SAID_SQL = (
+    "select tick,document from world_society_event "
+    "where workspace_id=%s and society_id=%s and subject_id=%s and event_kind='said' "
+    "order by tick desc, (document->>'order')::integer nulls last, event_id limit %s"
+)
 
 
 class InvalidEventCursor(ValueError):
@@ -1039,6 +1046,26 @@ class SocietyRepository:
             if authored is None
             else {"edit_seq": authored["edit_seq"], "delta_sha256": authored["delta_sha256"]},
         }
+
+    def lines_said(
+        self, version_id: uuid.UUID, subject_id: uuid.UUID, *, limit: int = 8
+    ) -> list[dict[str, Any]]:
+        """The lines ``subject_id`` said, newest first, at most ``limit``: each said event's minute
+        and document, read under the same authorization as every events read (the current state's,
+        then the input each line shown was said under). Said events are indexed by their speaker
+        (migration 0167), so this reads only the lines it shows."""
+        self.snapshot(version_id)
+        row = self._row(version_id)
+        rows = self.connection.execute(
+            LINES_SAID_SQL,
+            (self.workspace_id, row["society_id"], subject_id, max(1, min(limit, 64))),
+        ).fetchall()
+        if row["engine_version"] in INPUT_PROFILES:
+            shown = {value["document"]["input_seq"] for value in rows}
+            documents = self._inputs(row, shown)
+            for sequence in sorted(shown):
+                self._authorize(documents[sequence])
+        return [{"tick": int(r["tick"]), "document": r["document"]} for r in rows]
 
     def events(self, version_id: uuid.UUID, *, limit: int = 256) -> tuple[dict[str, Any], ...]:
         return self.events_page(version_id, limit=limit)[0]

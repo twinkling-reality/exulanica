@@ -644,6 +644,11 @@ NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
             "records the same choice as POST /world/versions/{version_id}/models/{role_key}, which "
             "is projected for every role, for existing callers"
         ),
+        ("POST", "/world/versions/{version_id}/society/things/{thing_id}/look"): (
+            "chosen from the thing's card (GET "
+            "/world/versions/{version_id}/society/things/{thing_id}), which names the looks it "
+            "may wear; its subject is a society's thing, which no version operation enumerates"
+        ),
         ("POST", "/world/versions/{version_id}/society/experiments"): (
             "experiments run over an owned district's living society, which no saved world holds"
         ),

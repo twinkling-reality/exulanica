@@ -7,6 +7,14 @@ names the version state it was made against and runs in
 :func:`exulanica.api.world_edit.commit_edit`, like every other authored edit, and answers with the
 whole version. ``GET .../thing-looks`` answers the latest look chosen for each thing of the
 version (:mod:`exulanica.world.thing_looks`), never cached.
+
+``GET .../society/things/{thing_id}`` answers one thing or being of the version's society of
+things as its card (``exulanica.thing-card/v1``, :mod:`exulanica.api.thing_card`), by the id the
+society gives it, which is never an author's placed id (the move and remove routes above take
+those); ``POST .../society/things/{thing_id}/look`` records the world's owner's choice of a look
+made for its body and answers the card again, its minute and state digest those of the same
+read, so a reader sees that only the look changed. Both answer 424 by name where the society's
+input names something no longer available, as the society read does.
 """
 
 from __future__ import annotations
@@ -18,7 +26,9 @@ from fastapi import APIRouter, Path, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
-from exulanica.api.dependencies import CurrentSession
+from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
+from exulanica.api.routes.society_models import _society
+from exulanica.api.thing_card import choose_look, thing_card
 from exulanica.api.world_edit import (
     BaseStateBody,
     EntryBoundEditBody,
@@ -26,11 +36,13 @@ from exulanica.api.world_edit import (
     WriteObjects,
     commit_edit,
 )
+from exulanica.api.world_scope import WorldId
 from exulanica.api.world_version_document import AlternateVersionView
 from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.objects import MAX_YAW_MICRORADIANS, ObjectOrigin, Transform
 from exulanica.world.placed_things import UNSCALED_MILLI, ThingPlacement, named_kind
-from exulanica.world.thing_looks import look_choices
+from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.thing_looks import ThingLookRefused, look_choices
 
 router = APIRouter(prefix="/world", tags=["world"])
 
@@ -185,3 +197,96 @@ def thing_looks(version_id: Annotated[uuid.UUID, Path()], repository: ReadObject
         ),
         headers={"Cache-Control": "private, no-store"},
     )
+
+
+class LookChoiceBody(BaseModel):
+    """A shipped look, by key, version and digest, for the thing to wear."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    look: str = Field(pattern=r"^[a-z][a-z0-9-]{0,47}$")
+    version: StrictInt = Field(ge=1, le=10_000)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class WorkspaceLookBody(BaseModel):
+    """A look the workspace keeps, by the digest of its document alone."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["workspace"]
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class ThingLookBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    look: LookChoiceBody | WorkspaceLookBody
+
+
+def _unavailable(exc: UnavailableSocietyInput) -> JSONResponse:
+    return JSONResponse(
+        status_code=424, content={"code": "unavailable_society_input", "detail": str(exc)}
+    )
+
+
+@router.get(
+    "/versions/{version_id}/society/things/{thing_id}",
+    summary="One thing or being of the version's society of things, as its card shows it.",
+)
+def thing_card_read(
+    version_id: Annotated[uuid.UUID, Path()],
+    thing_id: Annotated[uuid.UUID, Path()],
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+) -> JSONResponse:
+    society = _society(connection, session, request, world_id)
+    try:
+        card = thing_card(
+            connection,
+            get_services(request),
+            society,
+            workspace_id=session.workspace_id,
+            world_id=world_id,
+            version_id=version_id,
+            thing_id=thing_id,
+        )
+    except UnavailableSocietyInput as exc:
+        return _unavailable(exc)
+    return JSONResponse(content=card, headers={"Cache-Control": "private, no-store"})
+
+
+@router.post(
+    "/versions/{version_id}/society/things/{thing_id}/look",
+    summary="The world's owner chooses a shipped look for a thing; answers its card.",
+)
+def thing_look_choose(
+    version_id: Annotated[uuid.UUID, Path()],
+    thing_id: Annotated[uuid.UUID, Path()],
+    body: ThingLookBody,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+) -> JSONResponse:
+    society = _society(connection, session, request, world_id)
+    try:
+        with connection.transaction():
+            card = choose_look(
+                connection,
+                get_services(request),
+                society,
+                workspace_id=session.workspace_id,
+                world_id=world_id,
+                version_id=version_id,
+                thing_id=thing_id,
+                look=body.look.model_dump(),
+                actor=session.actor,
+            )
+    except ThingLookRefused as exc:
+        return JSONResponse(status_code=422, content={"code": exc.code, "detail": exc.detail})
+    except UnavailableSocietyInput as exc:
+        return _unavailable(exc)
+    return JSONResponse(content=card, headers={"Cache-Control": "private, no-store"})

@@ -296,6 +296,20 @@ class ThingStore:
             return None
         return self.look(row["key"], row["version"], include_withdrawn=include_withdrawn)
 
+    def looks_held(self) -> list[Look]:
+        """Every look this workspace holds and has not withdrawn, read again, in key and version
+        order: a document the reader now refuses is left out, as :meth:`look` leaves it."""
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            rows = cursor.execute(
+                "select l.key, l.version from look_version l "
+                "left join look_withdrawal w on w.workspace_id=l.workspace_id and w.key=l.key "
+                "and w.version=l.version where l.workspace_id=%s and w.key is null "
+                "order by l.key, l.version",
+                (self.workspace_id,),
+            ).fetchall()
+        found = [self.look(row["key"], row["version"]) for row in rows]
+        return [kept.look for kept in found if kept is not None]
+
     def kind(self, key: str, version: int) -> ThingKind | None:
         """A kind this workspace holds by key and version, read again with its looks and its plan
         resolved here, or None: no such row, or a document the reader now refuses.

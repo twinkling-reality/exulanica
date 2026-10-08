@@ -68,12 +68,20 @@ def compose(
     input_seq: int = 1,
     edit_seq: int | None = None,
     arrival: ArrivalDescriptor | None = None,
+    version_id: uuid.UUID | None = None,
+    world_id: str | None = None,
+    source_snapshot_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """The things input of a starter version holding the small square and ``things``, at the
-    opening pose ``arrival`` pins, or the ground's own."""
+    opening pose ``arrival`` pins, or the ground's own; the starter's own version unless the
+    version, world and snapshot are given, as a test holding a version of its own gives them."""
     held = tuple(square.square_objects() if objects is None else objects)
+    starter = square.version(held, edit_seq)
     version = dataclasses.replace(
-        square.version(held, edit_seq),
+        starter,
+        version_id=version_id or starter.version_id,
+        world_id=world_id or starter.world_id,
+        source_snapshot_id=source_snapshot_id or starter.source_snapshot_id,
         things=tuple(things),
         state_sha256=delta_sha256(
             objects=held,
@@ -84,7 +92,12 @@ def compose(
         ),
     )
     return build_authored_ground_society_input_v5(
-        ground=authored.endless(),
+        # The starter's ground, in the version's own world and over its own snapshot.
+        ground=dataclasses.replace(
+            authored.endless(),
+            world_id=version.world_id,
+            snapshot_id=version.source_snapshot_id,
+        ),
         version=version,
         arrival=arrival,
         input_seq=input_seq,
