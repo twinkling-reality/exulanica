@@ -48,6 +48,7 @@ from exulanica.world.deciders import BRIDGE, DECIDED_BY
 __all__ = [
     "ARRIVAL_PROFILE",
     "ARRIVAL_REFUSALS",
+    "CALLED_BY",
     "CROSSINGS_PER_MINUTE",
     "DEPARTURE_PROFILE",
     "DEPARTURE_REASONS",
@@ -69,6 +70,9 @@ ARRIVAL_PROFILE: Final = "exulanica.thing-arrival/v1"
 DEPARTURE_PROFILE: Final = "exulanica.thing-departure/v1"
 #: Why a departure happens: the program sent its visitor away, or the grant it came under ended.
 DEPARTURE_REASONS: Final = ("sent_away", "grant_ended")
+#: Who called a visitor home, where a departure says: its player, beside a ``sent_away`` only. A
+#: departure that names nobody is the world's owner sending it away.
+CALLED_BY: Final = ("player",)
 #: Why a crossing the society cannot read at all is refused, arrival or departure: its document
 #: fails its check, so the society names nothing from it.
 MALFORMED: Final = "malformed_crossing"
@@ -100,9 +104,12 @@ _ARRIVAL_FIELDS: Final = frozenset(
         "gate",
     }
 )
-#: What an arrival may state beside its fields; absent, its program decides for its visitor.
-_ARRIVAL_MAY: Final = frozenset({"decided_by"})
+#: What an arrival may state beside its fields: who decides for its visitor (absent, its program),
+#: and whether its grant lets the visitor carry the world's things out (present only as true).
+_ARRIVAL_MAY: Final = frozenset({"decided_by", "may_carry_out"})
 _DEPARTURE_FIELDS: Final = frozenset({"profile", "departure_id", "thing_id", "reason"})
+#: What a departure may state beside its fields: who called its visitor home.
+_DEPARTURE_MAY: Final = frozenset({"called_by"})
 #: The most things one visitor carries in.
 CARRIED_MAXIMUM: Final = 16
 _KEY: Final = re.compile(r"[a-z][a-z0-9_]{0,47}")
@@ -225,6 +232,8 @@ def check_arrival(document: object) -> Mapping[str, Any]:
         raise CrossingRefused("an arrival states exactly its fields")
     if document.get("decided_by", "program") not in DECIDED_BY:
         raise CrossingRefused(f"an arrival's decided_by is one of {list(DECIDED_BY)}, or none")
+    if document.get("may_carry_out", True) is not True:
+        raise CrossingRefused("an arrival's may_carry_out is true, or absent")
     if document["profile"] != ARRIVAL_PROFILE:
         raise CrossingRefused(f"an arrival is an {ARRIVAL_PROFILE} document")
     _uuid("arrival_id", document["arrival_id"])
@@ -264,7 +273,7 @@ def check_arrival(document: object) -> Mapping[str, Any]:
 
 def check_departure(document: object) -> Mapping[str, Any]:
     """``document`` held to the departure's shape, or :class:`CrossingRefused`."""
-    if not isinstance(document, dict) or set(document) != _DEPARTURE_FIELDS:
+    if not isinstance(document, dict) or set(document) - _DEPARTURE_MAY != _DEPARTURE_FIELDS:
         raise CrossingRefused("a departure states exactly its fields")
     if document["profile"] != DEPARTURE_PROFILE:
         raise CrossingRefused(f"a departure is an {DEPARTURE_PROFILE} document")
@@ -272,6 +281,10 @@ def check_departure(document: object) -> Mapping[str, Any]:
     _uuid("thing_id", document["thing_id"])
     if document["reason"] not in DEPARTURE_REASONS:
         raise CrossingRefused(f"a departure's reason is one of {list(DEPARTURE_REASONS)}")
+    if "called_by" in document and (
+        document["called_by"] not in CALLED_BY or document["reason"] != "sent_away"
+    ):
+        raise CrossingRefused("a departure's called_by is player, beside sent_away only")
     return document
 
 

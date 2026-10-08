@@ -100,6 +100,10 @@ CAME_BY: Final = ("populated", "placed", "crossed")
 #: The most visitors a society of things holds at once, so outside programs never crowd out the
 #: world its own people live in: a visitor past it is refused (``visitor_limit``).
 VISITORS_MAXIMUM: Final = 16
+#: The most placed things the visitors of one grant carry out of a world in any
+#: :data:`CARRY_OUT_WINDOW_TICKS` minutes; a thing past it stays, put down where its visitor stood.
+CARRY_OUT_MAXIMUM: Final = 8
+CARRY_OUT_WINDOW_TICKS: Final = 60
 #: Every kind of event the things phase records.
 THING_EVENT_KINDS: Final = (
     "thing_arrived",
@@ -187,8 +191,12 @@ _HANDS_ACTS: Final = {
 #: away, which is another engine's.
 _DEPARTURE_REASONS: Final = {"sent_away": "sent_home", "grant_ended": "grant_ended"}
 _PERSON_FIELDS: Final = frozenset({"kind", "came_by", "placed_id", "placed_at_mm", "crossing"})
-#: What a visitor's crossing record states; ``decided_by`` beside them only where its arrival said.
+#: What a visitor's crossing record states; ``decided_by`` beside them only where its arrival said,
+#: and ``may_carry_out`` (true) only where its arrival said so in a society running hands.
 _CROSSING_FIELDS: Final = frozenset({"arrival_id", "bridge", "grant_id"})
+_CROSSING_MAY: Final = frozenset({"decided_by", "may_carry_out"})
+#: What each carried-out placement states, so the thing is never put back while it stands.
+_CARRIED_OUT_FIELDS: Final = frozenset({"placed_id", "kind", "placed_at_mm", "grant_id", "tick"})
 _THING_FIELDS: Final = frozenset(
     {"id", "placed_id", "kind", "position_mm", "yaw_microradians", "held_by"}
 )
@@ -281,16 +289,49 @@ def _gone_home(thing: Mapping[str, Any], here: set[str]) -> bool:
     )
 
 
+def _placement(entry: Mapping[str, Any]) -> tuple[Any, ...]:
+    """A placement as the author made it: its id, its kind and where it was put."""
+    return (entry["placed_id"], dict(entry["kind"]), list(entry["placed_at_mm"]))
+
+
+def _carries_out(person: Mapping[str, Any], reason: str, extra: Mapping[str, Any] | None) -> bool:
+    """Whether a leaving visitor carries out the world's placed things it holds: only where its
+    arrival let it (``may_carry_out``), and only when it leaves by its own choice or its player
+    calls it home; never when the world's owner sends it away, its grant ends or its program is
+    lost."""
+    crossing = person.get("crossing") or {}
+    if person["came_by"] != "crossed" or crossing.get("may_carry_out") is not True:
+        return False
+    return reason == "chose_to_leave" or (
+        reason == "sent_home" and (extra or {}).get("called_by") == "player"
+    )
+
+
+def _carry_out_room(state: Mapping[str, Any], grant_id: str) -> int:
+    """How many more placed things the visitors of ``grant_id`` may carry out now: the bound less
+    those carried out under it in the last :data:`CARRY_OUT_WINDOW_TICKS` minutes."""
+    lately = sum(
+        1
+        for entry in state.get("carried_out", ())
+        if entry["grant_id"] == grant_id and state["tick"] - entry["tick"] < CARRY_OUT_WINDOW_TICKS
+    )
+    return max(0, CARRY_OUT_MAXIMUM - lately)
+
+
 def _moved_things(state: Mapping[str, Any], document: Mapping[str, Any]) -> list[dict[str, Any]]:
     """A hands society's things as the latest input places them: a placed thing the author left
     where it was stays as the society has it (held, or where a being put it down), and one nobody
     moved from its place takes the author's turn and height; one the author moved or changed is
     where the author put it, out of any hand; one the author removed is gone, from any hand; a new
-    one is where it was placed; and a thing nobody placed (carried in) stays as it is."""
+    one is where it was placed; a thing a visitor carried out stays out while its placement
+    stands; and a thing nobody placed (carried in) stays as it is."""
     current = {t["placed_id"]: t for t in state["things"] if t["placed_id"] is not None}
+    gone = [_placement(entry) for entry in state.get("carried_out", ())]
     kept = []
     for entry in _things_of(document, hands=True):
         found = current.get(entry["placed_id"])
+        if found is None and _placement(entry) in gone:
+            continue
         if (
             found is None
             or found["kind"] != entry["kind"]
@@ -444,12 +485,16 @@ class _Minute:
     ) -> SocietyEvent:
         """``person`` leaves the society. In a society running hands, a visitor takes home what it
         brought, in its hands or wherever it stands here, but not what a being still here holds;
-        everything else it holds, and everything a being of the world holds, is put down where it
-        stood, and a thing put down whose bringer has left already goes home to it
-        (:func:`_gone_home`). In a society without hands, whatever it holds leaves with it."""
+        a visitor whose arrival let it carry the world's things out, leaving by its own choice or
+        called home by its player, also takes the placed things it holds, within its grant's bound
+        (:func:`_carries_out`); everything else it holds, and everything a being of the world
+        holds, is put down where it stood, and a thing put down whose bringer has left already
+        goes home to it (:func:`_gone_home`). In a society without hands, whatever it holds leaves
+        with it."""
         held = [thing for thing in self.state["things"] if thing["held_by"] == person["id"]]
         left: list[dict[str, Any]] = []
         returned: list[dict[str, Any]] = []
+        limited = False
         if _runs_hands(self.state):
             carried = [
                 thing
@@ -458,6 +503,23 @@ class _Minute:
                 and thing.get("brought_by") == person["id"]
                 and thing["held_by"] in (None, person["id"])
             ]
+            if _carries_out(person, reason, extra):
+                grant = person["crossing"]["grant_id"]
+                placed = [thing for thing in held if thing["placed_id"] is not None]
+                room = _carry_out_room(self.state, grant)
+                limited = len(placed) > room
+                for thing in placed[:room]:
+                    self.state["carried_out"] = [
+                        *self.state.get("carried_out", ()),
+                        {
+                            "placed_id": thing["placed_id"],
+                            "kind": dict(thing["kind"]),
+                            "placed_at_mm": list(thing["placed_at_mm"]),
+                            "grant_id": grant,
+                            "tick": self.state["tick"],
+                        },
+                    ]
+                carried = [*carried, *placed[:room]]
             left = [thing for thing in held if not any(thing is c for c in carried)]
             for thing in left:
                 thing["held_by"] = None
@@ -486,9 +548,23 @@ class _Minute:
                 "kind": person["kind"],
                 "came_by": person["came_by"],
                 "placed_id": person["placed_id"],
-                "carried": [{"id": thing["id"], "kind": thing["kind"]} for thing in carried],
+                "carried": [
+                    {
+                        "id": thing["id"],
+                        "kind": thing["kind"],
+                        # A thing of the world it carried out names its placement.
+                        **(
+                            {"placed_id": thing["placed_id"]}
+                            if thing["placed_id"] is not None
+                            else {}
+                        ),
+                    }
+                    for thing in carried
+                ],
                 # What stayed, put down where it stood: stated only where something did.
                 **({"left": [thing["id"] for thing in left]} if left else {}),
+                # The grant's bound held some of the world's things back: only where it did.
+                **({"carry_out_limited": True} if limited else {}),
                 # What it put down that went home to a visitor that had left: only where any did.
                 **({"returned": [thing["id"] for thing in returned]} if returned else {}),
                 **(extra or {}),
@@ -672,6 +748,16 @@ def _reconcile(minute: _Minute) -> None:
     _place_beings(minute, record=True)
     if _runs_hands(state):
         state["things"] = _moved_things(state, document)
+        if "carried_out" in state:
+            # A carried-out placement the author has since moved, changed or removed no longer
+            # keeps anything out; it is dropped once the bound no longer counts it either.
+            standing = [_placement(entry) for entry in _things_of(document, hands=True)]
+            state["carried_out"] = [
+                entry
+                for entry in state["carried_out"]
+                if _placement(entry) in standing
+                or state["tick"] - entry["tick"] < CARRY_OUT_WINDOW_TICKS
+            ]
         return
     state["things"] = [
         *_things_of(document),
@@ -760,6 +846,13 @@ def _arrive(minute: _Minute, crossing: Crossing, document: Mapping[str, Any]) ->
             "grant_id": document["grant_id"],
             # Who decides for it here, as its arrival said; stated only where it said so.
             **({"decided_by": document["decided_by"]} if "decided_by" in document else {}),
+            # Whether it may carry the world's things out, as its arrival said: kept on the
+            # visitor, so a later leaving reads it here and never the grant.
+            **(
+                {"may_carry_out": True}
+                if document.get("may_carry_out") is True and _runs_hands(state)
+                else {}
+            ),
         },
     )
     state["inhabitants"].append(person)
@@ -856,7 +949,13 @@ def _depart(minute: _Minute, crossing: Crossing, document: Mapping[str, Any]) ->
         )
         return BoundCrossing(crossing.crossing_id, "not_here", "not_here", event.event_id)
     event = minute.leave(
-        person, _DEPARTURE_REASONS[document["reason"]], {"crossing_id": str(crossing.crossing_id)}
+        person,
+        _DEPARTURE_REASONS[document["reason"]],
+        {
+            "crossing_id": str(crossing.crossing_id),
+            # Its player called it home, where the departure says so.
+            **({"called_by": document["called_by"]} if "called_by" in document else {}),
+        },
     )
     return BoundCrossing(crossing.crossing_id, "departed", None, event.event_id)
 
@@ -1487,10 +1586,13 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
             crossing is None
             or (
                 isinstance(crossing, dict)
-                and set(crossing) - {"decided_by"} == _CROSSING_FIELDS
+                and set(crossing) - _CROSSING_MAY == _CROSSING_FIELDS
                 and crossing.get("decided_by", "program") in DECIDED_BY
+                and crossing.get("may_carry_out", True) is True
+                and ("may_carry_out" not in crossing or _runs_hands(state))
             ),
-            "a visitor's crossing names its arrival, bridge and grant, and who decides for it",
+            "a visitor's crossing names its arrival, bridge and grant, who decides for it, and "
+            "whether it may carry the world's things out",
         )
     things = state["things"]
     hands = _runs_hands(state)
@@ -1554,6 +1656,26 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
             or thing["brought_by"] in present,
             "a thing a visitor brought stays only while its bringer is here or a being holds it",
         )
+    carried_out = state.get("carried_out")
+    _require(
+        carried_out is None
+        or (
+            hands
+            and isinstance(carried_out, list)
+            and all(
+                isinstance(entry, dict)
+                and set(entry) == _CARRIED_OUT_FIELDS
+                and isinstance(entry["placed_id"], str)
+                and _reference_shape(entry["kind"])
+                and _point_shape(entry["placed_at_mm"])
+                and isinstance(entry["grant_id"], str)
+                and type(entry["tick"]) is int
+                and 0 <= entry["tick"] <= state["tick"]
+                for entry in carried_out
+            )
+        ),
+        "only a society running hands states what visitors carried out, each by its placement",
+    )
     refused = state["refused_placements"]
     _require(isinstance(refused, list), "refused placements are a list")
     for held in refused:

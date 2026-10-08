@@ -169,9 +169,11 @@ def arrival(
     gate: str | None = None,
     grant_id: uuid.UUID = GRANT,
     decided_by: str | None = None,
+    may_carry_out: bool = False,
 ) -> Crossing:
     """The ``index``th arrival a door hands over: a visitor, by default of the shipped visitor
-    kind, under the test grant, stating who decides for it only when ``decided_by`` is given."""
+    kind, under the test grant, stating who decides for it only when ``decided_by`` is given and
+    that it may carry the world's things out only when ``may_carry_out`` is."""
     arrival_id = uuid.uuid5(grant_id, f"arrival:{index}")
     document = {
         "profile": ARRIVAL_PROFILE,
@@ -186,10 +188,16 @@ def arrival(
     }
     if decided_by is not None:
         document["decided_by"] = decided_by
+    if may_carry_out:
+        document["may_carry_out"] = True
     return Crossing(arrival_id, document)
 
 
-def departure(thing_id: str, index: int, *, reason: str = "sent_away") -> Crossing:
+def departure(
+    thing_id: str, index: int, *, reason: str = "sent_away", called_by: str | None = None
+) -> Crossing:
+    """The ``index``th departure a door hands over: the world's owner sending its visitor away by
+    default, its player calling it home where ``called_by`` is ``player``."""
     departure_id = uuid.uuid5(GRANT, f"departure:{index}")
     return Crossing(
         departure_id,
@@ -198,6 +206,7 @@ def departure(thing_id: str, index: int, *, reason: str = "sent_away") -> Crossi
             "departure_id": str(departure_id),
             "thing_id": thing_id,
             "reason": reason,
+            **({"called_by": called_by} if called_by is not None else {}),
         },
     )
 

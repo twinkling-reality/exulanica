@@ -78,6 +78,11 @@
       "sha256": "b6d706c190d3fe873595c92797c59598f69237dbea75debb96769559582e7a3b"
     },
     {
+      "kind": "traveller",
+      "version": 2,
+      "sha256": "9bef88928a049223b1b79ecbb9b1a07f8a26fe3f4d583c85adb2b9dcdfeef19a"
+    },
+    {
       "kind": "villager",
       "version": 1,
       "sha256": "c2d6681e1727bb24886c1a20b3b1ee5ad9fb8bd15608f8bef3e71e73213ddeca"

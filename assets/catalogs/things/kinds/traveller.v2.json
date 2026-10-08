@@ -1,0 +1,143 @@
+{
+  "profile": "exulanica.thing-kind/v1",
+  "kind": "traveller",
+  "version": 2,
+  "label": "traveller",
+  "summary": "A traveller passing through, who walks, carries things, hands them over and talks; one that came from outside goes home when it chooses.",
+  "class": "being",
+  "body": {
+    "plan": "humanoid/v1",
+    "height_mm": {
+      "from": 1550,
+      "to": 1800
+    }
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  },
+  "moves": [
+    "exulanica-movement/walking/v1"
+  ],
+  "abilities": [
+    {
+      "key": "wait",
+      "parameters": {}
+    },
+    {
+      "key": "stand",
+      "parameters": {}
+    },
+    {
+      "key": "talk",
+      "parameters": {}
+    },
+    {
+      "key": "rest",
+      "parameters": {}
+    },
+    {
+      "key": "visit",
+      "parameters": {}
+    },
+    {
+      "key": "pick_up",
+      "parameters": {}
+    },
+    {
+      "key": "put_down",
+      "parameters": {}
+    },
+    {
+      "key": "give",
+      "parameters": {}
+    },
+    {
+      "key": "take",
+      "parameters": {}
+    },
+    {
+      "key": "follow",
+      "parameters": {}
+    },
+    {
+      "key": "say",
+      "parameters": {}
+    },
+    {
+      "key": "leave",
+      "parameters": {
+        "quiet_minutes": 5
+      }
+    }
+  ],
+  "offers": [
+    {
+      "key": "talk_to",
+      "parameters": {}
+    },
+    {
+      "key": "hear",
+      "parameters": {}
+    },
+    {
+      "key": "receive",
+      "parameters": {}
+    },
+    {
+      "key": "be_followed",
+      "parameters": {}
+    }
+  ],
+  "routine": {
+    "weights": {
+      "rest": 700,
+      "visit": 1000,
+      "stand": 300,
+      "talk": 500,
+      "pick_up": 200,
+      "put_down": 100,
+      "give": 100,
+      "take": 100,
+      "follow": 150
+    },
+    "follow_holders_of": [],
+    "reason": "As the knight's, a little readier to follow and a little slower to give."
+  },
+  "deciders": {
+    "default": "routine",
+    "allowed": [
+      "routine",
+      "model",
+      "person",
+      "external"
+    ]
+  },
+  "looks": [
+    {
+      "look": "blocky-traveller",
+      "version": 1,
+      "sha256": "45d65686f899ae246d0c01e1a679213e67bb7935a157f26ec304c7dada339e3d"
+    }
+  ],
+  "ext": {}
+}

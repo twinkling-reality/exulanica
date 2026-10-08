@@ -417,10 +417,15 @@ never changed, kept to its workspace, and inserted by the runtime only, and inde
 departures by the thing that left, which is how the door finds a visitor's. Not built yet: the
 lines and events a visitor hears, as frames. Whether a grant's visitors may speak (`may_speak`) is
 recorded and shown; no line crosses the door yet, so nothing reads it. A visitor whose kind has
-hands may take hold of a thing of the world in a society running hands, but no arrival records its
-grant's `may_carry_out`, so the society keeps every such thing behind: a visitor going home puts a
-thing of the world down where it stood, and `may_carry_out` names no game item yet. It takes home
-what it brought, from its hands or from where it lies in the world, unless a being still here holds
+hands may take hold of a thing of the world in a society running hands. A society of things reads
+two optional crossing fields for what may leave with it: an arrival's `may_carry_out` (present only
+as true; the society keeps it on the visitor, so a later departure never reads the grant) and a
+departure's `called_by: "player"` (beside `sent_away` only; a departure naming nobody is the
+owner's). A visitor with that right that leaves by its own choice or is called home by its player
+carries out the placed things it holds, each named in its departure's `carried` with its
+`placed_id`, at most eight for one grant in any sixty minutes; otherwise it puts a thing of the
+world down where it stood (the [synthetic society contract](synthetic-society-contract.md) states
+the rule). It takes home what it brought, from its hands or from where it lies in the world, unless a being still here holds
 it. Such a thing leaves the world when that being puts it down, undelivered: its bringer gave it
 away, a departure's frame names only what went home with that visitor, and no later frame tells the
 bringer's program of it. A departure's `carried` lists what went home with the visitor. The adapters that send visitors live in the repository's

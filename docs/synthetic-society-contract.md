@@ -1623,8 +1623,17 @@ gone, from any hand. What belongs to the world stays in it, and what a visitor b
 with it. Each thing a visitor carries in states the visitor that brought it (`brought_by`), and
 stays in the world only while its bringer is here or a being here holds it. A visitor going home
 takes what it brought, in its hands or wherever it lies here, but not what a being still here
-holds; everything else it holds (a placed thing of the world, since no arrival records a right to
-carry the world's things out, or a thing another visitor brought) it puts down where it stood. A
+holds. A visitor whose arrival let it carry the world's things out (`may_carry_out`, kept on its
+crossing record) also takes the placed things it holds, but only when it leaves by its own choice
+(`chose_to_leave`) or its player calls it home (a departure stating `called_by: "player"`), never
+when the world's owner sends it away, its grant ends or its program is lost; each is named in the
+departure's `carried` with its `placed_id`. A carried-out placement is recorded in the state
+(`carried_out`: its id, kind and place, the grant and the minute), and the thing is not put back
+while the author's placement stands, so it is never in two places; an author who moves or changes
+the placement makes a new one, and the thing is placed again. The visitors of one grant carry out
+at most eight placed things in any sixty minutes; one past that is put down where its visitor
+stood, and the departure says so (`carry_out_limited`). Everything else a visitor holds (a placed
+thing it may not carry out, or a thing another visitor brought) it puts down where it stood. A
 being of the world that leaves (an author's edit removing a placed being) puts down everything it
 holds. A thing put down after the visitor that brought it has left goes home to it then, but it
 leaves the world undelivered: its bringer gave it away, the door tells a visitor's program only what
