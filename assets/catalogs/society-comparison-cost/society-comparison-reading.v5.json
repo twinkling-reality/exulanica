@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-comparison-reading",
+  "catalog_version": 5,
+  "source_build": "Derived from the immutable evaluation record each entry names, by the reader exulanica.world.society_comparison_reading states for its extraction. An entry names the window it was measured over where that is longer than an hour (window_ticks), and a state family no entry names over an hour reads the comparison protocol's own line.",
+  "entries": [
+    {
+      "key": "living",
+      "state_family": "living",
+      "source": "docs/evaluation/2026-10-07-living-comparison-replay.json",
+      "source_sha256": "e78589482c7242717f36a8fd3f4e92bf62cf32c005f7c675b4a83639958b70ca",
+      "extraction": "replay_line",
+      "replay_fixed_ms": 39,
+      "replay_per_person_us": 10608,
+      "replay_per_decided_person_us": 4272,
+      "replay_per_decided_pair_us": 78,
+      "reason": "Derived: the least-margin line on or above every 95th percentile read the record states, measured on the living town's own replay (generated towns at their median and largest populations and a stress town at the society ground's bound), read by the extraction this entry names; the pair budget stays the protocol's."
+    },
+    {
+      "key": "living-1440",
+      "state_family": "living",
+      "window_ticks": 1440,
+      "source": "docs/evaluation/2026-10-07-living-day-replay.json",
+      "source_sha256": "3b58e30f9f94461693660bd118ca5df5f24e466b2d79ab19d8e5feca2354c0e4",
+      "extraction": "replay_line",
+      "replay_fixed_ms": 10,
+      "replay_per_person_us": 14559,
+      "replay_per_decided_person_us": 3294,
+      "replay_per_decided_pair_us": 60,
+      "reason": "Derived: the least-margin line on or above every point's dearest read the record states, of any hour of a day or of the day's own read, measured on the living town's own replay of a day hour by hour (generated towns at their median and largest populations and a stress town at the society ground's bound), read by the extraction this entry names; the pair budget stays the protocol's."
+    }
+  ]
+}

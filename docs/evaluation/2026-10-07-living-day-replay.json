@@ -1,0 +1,8657 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "derived": {
+   "decided_most": [
+    {
+     "decided_most": 38,
+     "estimate_everybody_us": 775054,
+     "population": 38
+    },
+    {
+     "decided_most": 52,
+     "estimate_everybody_us": 1100596,
+     "population": 52
+    },
+    {
+     "decided_most": 74,
+     "estimate_everybody_us": 1659682,
+     "population": 74
+    },
+    {
+     "decided_most": 88,
+     "estimate_everybody_us": 2045704,
+     "population": 88
+    },
+    {
+     "decided_most": 128,
+     "estimate_everybody_us": 3278224,
+     "population": 128
+    }
+   ],
+   "pair_replay_budget_ms": 10000,
+   "population_most": 341,
+   "run_budget_us": 5000000
+  },
+  "discard": false,
+  "engine": "exulanica-society/v5",
+  "graphs": [
+   {
+    "index": 6,
+    "nodes": 612,
+    "outside_specification": false,
+    "population": 38,
+    "preset": "small_town",
+    "world_id": "world:generated:living-replay-measured-small_town-6"
+   },
+   {
+    "index": 7,
+    "nodes": 658,
+    "outside_specification": false,
+    "population": 52,
+    "preset": "small_town",
+    "world_id": "world:generated:living-replay-measured-small_town-7"
+   },
+   {
+    "index": 6,
+    "nodes": 914,
+    "outside_specification": false,
+    "population": 74,
+    "preset": "market_town",
+    "world_id": "world:generated:living-replay-measured-market_town-6"
+   },
+   {
+    "index": 1,
+    "nodes": 990,
+    "outside_specification": false,
+    "population": 88,
+    "preset": "market_town",
+    "world_id": "world:generated:living-replay-measured-market_town-1"
+   },
+   {
+    "index": 0,
+    "nodes": 1210,
+    "outside_specification": true,
+    "population": 128,
+    "preset": "market_town",
+    "world_id": "world:generated:living-replay-measured-stress-0"
+   }
+  ],
+  "hour_ticks": 60,
+  "kind": "exulanica.living-day-replay-measurement/v1",
+  "limits": [
+   "Scripted answers the engine applies: the most receipts a run can hold, not any model's behaviour.",
+   "Each graph is measured at its own population only, nobody, everybody and each stated group decided for.",
+   "A sealed hour's asking facts are left out: scripted answers make no provider call.",
+   "The stress town is outside the admitted specification and is never offered as a world.",
+   "Composing and playing are neither gated nor timed; only the reads are."
+  ],
+  "line": {
+   "margins": [
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 106049,
+     "p95_us": 457193,
+     "population": 38
+    },
+    {
+     "decided": 38,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 12171,
+     "p95_us": 762883,
+     "population": 38
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 82299,
+     "p95_us": 503239,
+     "population": 38
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 39701,
+     "p95_us": 568133,
+     "population": 38
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 12084,
+     "p95_us": 640342,
+     "population": 38
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 221062,
+     "p95_us": 546006,
+     "population": 52
+    },
+    {
+     "decided": 52,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 63645,
+     "p95_us": 1036951,
+     "population": 52
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 154506,
+     "p95_us": 638218,
+     "population": 52
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 83603,
+     "p95_us": 734777,
+     "population": 52
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 333,
+     "p95_us": 869359,
+     "population": 52
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 335505,
+     "p95_us": 751861,
+     "population": 74
+    },
+    {
+     "decided": 74,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 197877,
+     "p95_us": 1461805,
+     "population": 74
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 322619,
+     "p95_us": 795683,
+     "population": 74
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 186177,
+     "p95_us": 963061,
+     "population": 74
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 148229,
+     "p95_us": 1062881,
+     "population": 74
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 397465,
+     "p95_us": 893727,
+     "population": 88
+    },
+    {
+     "decided": 88,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 3397,
+     "p95_us": 2042307,
+     "population": 88
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 294977,
+     "p95_us": 1030511,
+     "population": 88
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 182310,
+     "p95_us": 1177474,
+     "population": 88
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 587,
+     "p95_us": 1427789,
+     "population": 88
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 517510,
+     "p95_us": 1356042,
+     "population": 128
+    },
+    {
+     "decided": 128,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 7197,
+     "p95_us": 3271027,
+     "population": 128
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 177502,
+     "p95_us": 1739946,
+     "population": 128
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 177084,
+     "p95_us": 1784260,
+     "population": 128
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 104713,
+     "p95_us": 1944423,
+     "population": 128
+    }
+   ],
+   "replay_fixed_ms": 10,
+   "replay_per_decided_pair_us": 60,
+   "replay_per_decided_person_us": 3294,
+   "replay_per_person_us": 14559
+  },
+  "line_without_pairs": {
+   "margins": [
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 80583,
+     "p95_us": 457193,
+     "population": 38
+    },
+    {
+     "decided": 38,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 208245,
+     "p95_us": 762883,
+     "population": 38
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 80153,
+     "p95_us": 503239,
+     "population": 38
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 60875,
+     "p95_us": 568133,
+     "population": 38
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 79898,
+     "p95_us": 640342,
+     "population": 38
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 189898,
+     "p95_us": 546006,
+     "population": 52
+    },
+    {
+     "decided": 52,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 291961,
+     "p95_us": 1036951,
+     "population": 52
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 143302,
+     "p95_us": 638218,
+     "population": 52
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 92359,
+     "p95_us": 734777,
+     "population": 52
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 49009,
+     "p95_us": 869359,
+     "population": 52
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 295387,
+     "p95_us": 751861,
+     "population": 74
+    },
+    {
+     "decided": 74,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 429339,
+     "p95_us": 1461805,
+     "population": 74
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 297181,
+     "p95_us": 795683,
+     "population": 74
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 175419,
+     "p95_us": 963061,
+     "population": 74
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 166831,
+     "p95_us": 1062881,
+     "population": 74
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 351649,
+     "p95_us": 893727,
+     "population": 88
+    },
+    {
+     "decided": 88,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 206621,
+     "p95_us": 2042307,
+     "population": 88
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 260481,
+     "p95_us": 1030511,
+     "population": 88
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 159134,
+     "p95_us": 1177474,
+     "population": 88
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 51,
+     "p95_us": 1427789,
+     "population": 88
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 455414,
+     "p95_us": 1356042,
+     "population": 128
+    },
+    {
+     "decided": 128,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 141,
+     "p95_us": 3271027,
+     "population": 128
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 117126,
+     "p95_us": 1739946,
+     "population": 128
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 118428,
+     "p95_us": 1784260,
+     "population": 128
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 49497,
+     "p95_us": 1944423,
+     "population": 128
+    }
+   ],
+   "replay_fixed_ms": 0,
+   "replay_per_decided_person_us": 11404,
+   "replay_per_person_us": 14152
+  },
+  "machine": {
+   "cpus": 18,
+   "python": "3.11.6",
+   "system": "macOS-26.7-arm64-arm-64bit"
+  },
+  "phases": {
+   "compose": {
+    "gated": false,
+    "load_before": "16:51  up 1 day,  9:28, 2 users, load averages: 6.55 7.34 14.14",
+    "timed": false
+   },
+   "gate": {
+    "gated": true,
+    "idle_percent": "83.33",
+    "idle_percent_least": "70.0",
+    "refused": null,
+    "wait_seconds_most": 1200,
+    "waited_seconds": 12
+   },
+   "play": {
+    "days": 25,
+    "gated": false,
+    "load_after": "16:58  up 1 day,  9:35, 2 users, load averages: 4.88 5.59 10.60",
+    "timed": false
+   },
+   "reads": {
+    "gated": true,
+    "idle_percent_after": "92.28",
+    "idle_percent_before": "83.33",
+    "idle_percent_mean": "87.805",
+    "idle_percent_mean_least": "50.0",
+    "load_after": "17:21  up 1 day,  9:59, 2 users, load averages: 3.41 4.62 6.02",
+    "load_before": "16:58  up 1 day,  9:36, 2 users, load averages: 5.14 5.62 10.55",
+    "load_most_after_each_point": "8.0",
+    "load_most_before_each_point": "8.0",
+    "load_wait_seconds_most": 600,
+    "reads_again_most": 2,
+    "timed": true
+   }
+  },
+  "points": [
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "5.8",
+       "before": "5.14"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 9,
+       "p95": 457193
+      }
+     }
+    ],
+    "day_body_bytes": 90031,
+    "day_read_wall_us": {
+     "max": 4449,
+     "median": 3992,
+     "min": 3893,
+     "p95": 4449
+    },
+    "decided": 0,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "hours": [
+     {
+      "body_bytes": 912574,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 375158,
+       "median": 209896,
+       "min": 209405,
+       "p95": 375158
+      },
+      "receipts": 0,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 986739,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 368098,
+       "median": 233622,
+       "min": 225928,
+       "p95": 368098
+      },
+      "receipts": 0,
+      "state_bytes": 81762
+     },
+     {
+      "body_bytes": 969828,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 355819,
+       "median": 222059,
+       "min": 219237,
+       "p95": 355819
+      },
+      "receipts": 0,
+      "state_bytes": 83324
+     },
+     {
+      "body_bytes": 957624,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 352834,
+       "median": 223763,
+       "min": 216193,
+       "p95": 352834
+      },
+      "receipts": 0,
+      "state_bytes": 79732
+     },
+     {
+      "body_bytes": 950178,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 208892,
+       "median": 207533,
+       "min": 206721,
+       "p95": 208892
+      },
+      "receipts": 0,
+      "state_bytes": 85434
+     },
+     {
+      "body_bytes": 969833,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 360316,
+       "median": 218180,
+       "min": 217313,
+       "p95": 360316
+      },
+      "receipts": 0,
+      "state_bytes": 82317
+     },
+     {
+      "body_bytes": 946049,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 342786,
+       "median": 219939,
+       "min": 206937,
+       "p95": 342786
+      },
+      "receipts": 0,
+      "state_bytes": 79139
+     },
+     {
+      "body_bytes": 963834,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 215432,
+       "median": 212775,
+       "min": 212085,
+       "p95": 215432
+      },
+      "receipts": 0,
+      "state_bytes": 79416
+     },
+     {
+      "body_bytes": 1032844,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 383963,
+       "median": 264452,
+       "min": 253355,
+       "p95": 383963
+      },
+      "receipts": 0,
+      "state_bytes": 81198
+     },
+     {
+      "body_bytes": 1068442,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 457193,
+       "median": 298031,
+       "min": 286043,
+       "p95": 457193
+      },
+      "receipts": 0,
+      "state_bytes": 89597
+     },
+     {
+      "body_bytes": 1037255,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 423257,
+       "median": 261834,
+       "min": 257614,
+       "p95": 423257
+      },
+      "receipts": 0,
+      "state_bytes": 87568
+     },
+     {
+      "body_bytes": 1064639,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 406394,
+       "median": 272094,
+       "min": 271432,
+       "p95": 406394
+      },
+      "receipts": 0,
+      "state_bytes": 89608
+     },
+     {
+      "body_bytes": 1051645,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 393605,
+       "median": 262747,
+       "min": 262573,
+       "p95": 393605
+      },
+      "receipts": 0,
+      "state_bytes": 90216
+     },
+     {
+      "body_bytes": 1074969,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 430864,
+       "median": 409101,
+       "min": 272721,
+       "p95": 430864
+      },
+      "receipts": 0,
+      "state_bytes": 98229
+     },
+     {
+      "body_bytes": 1059643,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 272094,
+       "median": 268156,
+       "min": 263103,
+       "p95": 272094
+      },
+      "receipts": 0,
+      "state_bytes": 91488
+     },
+     {
+      "body_bytes": 943770,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 333459,
+       "median": 198720,
+       "min": 196507,
+       "p95": 333459
+      },
+      "receipts": 0,
+      "state_bytes": 90438
+     },
+     {
+      "body_bytes": 906506,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 312696,
+       "median": 171733,
+       "min": 171463,
+       "p95": 312696
+      },
+      "receipts": 0,
+      "state_bytes": 86716
+     },
+     {
+      "body_bytes": 907057,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 185415,
+       "median": 180377,
+       "min": 173296,
+       "p95": 185415
+      },
+      "receipts": 0,
+      "state_bytes": 86749
+     },
+     {
+      "body_bytes": 907102,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 303984,
+       "median": 171649,
+       "min": 171551,
+       "p95": 303984
+      },
+      "receipts": 0,
+      "state_bytes": 86746
+     },
+     {
+      "body_bytes": 907981,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 171875,
+       "median": 171854,
+       "min": 170870,
+       "p95": 171875
+      },
+      "receipts": 0,
+      "state_bytes": 86750
+     },
+     {
+      "body_bytes": 911157,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 302736,
+       "median": 172530,
+       "min": 172501,
+       "p95": 302736
+      },
+      "receipts": 0,
+      "state_bytes": 86762
+     },
+     {
+      "body_bytes": 940517,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 331295,
+       "median": 208858,
+       "min": 191429,
+       "p95": 331295
+      },
+      "receipts": 0,
+      "state_bytes": 86772
+     },
+     {
+      "body_bytes": 1032128,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 396181,
+       "median": 256311,
+       "min": 247566,
+       "p95": 396181
+      },
+      "receipts": 0,
+      "state_bytes": 87132
+     },
+     {
+      "body_bytes": 1058942,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 424217,
+       "median": 264048,
+       "min": 263569,
+       "p95": 424217
+      },
+      "receipts": 0,
+      "state_bytes": 92085
+     }
+    ],
+    "load_1m": {
+     "after": "5.8",
+     "before": "5.14"
+    },
+    "population": 38,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 9,
+     "p95": 457193
+    },
+    "receipts": 0
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "6.17",
+       "before": "5.8"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 14,
+       "p95": 762883
+      }
+     }
+    ],
+    "day_body_bytes": 86077,
+    "day_read_wall_us": {
+     "max": 3483,
+     "median": 3152,
+     "min": 2962,
+     "p95": 3483
+    },
+    "decided": 38,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "hours": [
+     {
+      "body_bytes": 930295,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 575065,
+       "median": 438410,
+       "min": 434108,
+       "p95": 575065
+      },
+      "receipts": 84,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 998536,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 465786,
+       "median": 465193,
+       "min": 464309,
+       "p95": 465786
+      },
+      "receipts": 75,
+      "state_bytes": 72739
+     },
+     {
+      "body_bytes": 977217,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 550684,
+       "median": 407606,
+       "min": 405883,
+       "p95": 550684
+      },
+      "receipts": 62,
+      "state_bytes": 78579
+     },
+     {
+      "body_bytes": 949343,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 474978,
+       "median": 343850,
+       "min": 343518,
+       "p95": 474978
+      },
+      "receipts": 41,
+      "state_bytes": 81301
+     },
+     {
+      "body_bytes": 942898,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 337366,
+       "median": 334635,
+       "min": 333328,
+       "p95": 337366
+      },
+      "receipts": 38,
+      "state_bytes": 80184
+     },
+     {
+      "body_bytes": 958875,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 510038,
+       "median": 399675,
+       "min": 372814,
+       "p95": 510038
+      },
+      "receipts": 49,
+      "state_bytes": 79392
+     },
+     {
+      "body_bytes": 935821,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 422485,
+       "median": 299046,
+       "min": 291170,
+       "p95": 422485
+      },
+      "receipts": 27,
+      "state_bytes": 79345
+     },
+     {
+      "body_bytes": 1010137,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 629447,
+       "median": 520784,
+       "min": 497598,
+       "p95": 629447
+      },
+      "receipts": 82,
+      "state_bytes": 79282
+     },
+     {
+      "body_bytes": 1042093,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 698191,
+       "median": 564922,
+       "min": 558924,
+       "p95": 698191
+      },
+      "receipts": 96,
+      "state_bytes": 83435
+     },
+     {
+      "body_bytes": 1023449,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 686113,
+       "median": 518367,
+       "min": 515844,
+       "p95": 686113
+      },
+      "receipts": 89,
+      "state_bytes": 86644
+     },
+     {
+      "body_bytes": 1023566,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 538852,
+       "median": 527706,
+       "min": 527022,
+       "p95": 538852
+      },
+      "receipts": 85,
+      "state_bytes": 87060
+     },
+     {
+      "body_bytes": 1049893,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 702713,
+       "median": 564062,
+       "min": 558197,
+       "p95": 702713
+      },
+      "receipts": 95,
+      "state_bytes": 88200
+     },
+     {
+      "body_bytes": 1052549,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 736593,
+       "median": 613104,
+       "min": 591278,
+       "p95": 736593
+      },
+      "receipts": 115,
+      "state_bytes": 89967
+     },
+     {
+      "body_bytes": 1066632,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 716984,
+       "median": 587166,
+       "min": 581244,
+       "p95": 716984
+      },
+      "receipts": 106,
+      "state_bytes": 94142
+     },
+     {
+      "body_bytes": 1058254,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 762883,
+       "median": 586657,
+       "min": 586614,
+       "p95": 762883
+      },
+      "receipts": 109,
+      "state_bytes": 89726
+     },
+     {
+      "body_bytes": 988543,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 593507,
+       "median": 487130,
+       "min": 456467,
+       "p95": 593507
+      },
+      "receipts": 83,
+      "state_bytes": 91501
+     },
+     {
+      "body_bytes": 917136,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 213717,
+       "median": 213199,
+       "min": 210191,
+       "p95": 213717
+      },
+      "receipts": 9,
+      "state_bytes": 86866
+     },
+     {
+      "body_bytes": 910938,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 327671,
+       "median": 172059,
+       "min": 170665,
+       "p95": 327671
+      },
+      "receipts": 0,
+      "state_bytes": 86867
+     },
+     {
+      "body_bytes": 911048,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 171882,
+       "median": 171870,
+       "min": 171580,
+       "p95": 171882
+      },
+      "receipts": 0,
+      "state_bytes": 86864
+     },
+     {
+      "body_bytes": 912198,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 301006,
+       "median": 172311,
+       "min": 172249,
+       "p95": 301006
+      },
+      "receipts": 0,
+      "state_bytes": 86865
+     },
+     {
+      "body_bytes": 914763,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 307696,
+       "median": 171709,
+       "min": 170591,
+       "p95": 307696
+      },
+      "receipts": 0,
+      "state_bytes": 86876
+     },
+     {
+      "body_bytes": 948338,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 305195,
+       "median": 302621,
+       "min": 294092,
+       "p95": 305195
+      },
+      "receipts": 26,
+      "state_bytes": 86893
+     },
+     {
+      "body_bytes": 969777,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 517917,
+       "median": 374083,
+       "min": 370442,
+       "p95": 517917
+      },
+      "receipts": 47,
+      "state_bytes": 86886
+     },
+     {
+      "body_bytes": 1035625,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 662986,
+       "median": 543355,
+       "min": 523574,
+       "p95": 662986
+      },
+      "receipts": 91,
+      "state_bytes": 91310
+     }
+    ],
+    "load_1m": {
+     "after": "6.17",
+     "before": "5.8"
+    },
+    "population": 38,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 14,
+     "p95": 762883
+    },
+    "receipts": 1409
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "5.48",
+       "before": "6.17"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 9,
+       "p95": 503239
+      }
+     }
+    ],
+    "day_body_bytes": 89171,
+    "day_read_wall_us": {
+     "max": 4095,
+     "median": 3980,
+     "min": 3911,
+     "p95": 4095
+    },
+    "decided": 4,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "hours": [
+     {
+      "body_bytes": 912599,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 368447,
+       "median": 230440,
+       "min": 230247,
+       "p95": 368447
+      },
+      "receipts": 5,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 993139,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 441166,
+       "median": 271673,
+       "min": 270432,
+       "p95": 441166
+      },
+      "receipts": 10,
+      "state_bytes": 81354
+     },
+     {
+      "body_bytes": 970808,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 242086,
+       "median": 237109,
+       "min": 236489,
+       "p95": 242086
+      },
+      "receipts": 4,
+      "state_bytes": 83222
+     },
+     {
+      "body_bytes": 954622,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 366892,
+       "median": 249579,
+       "min": 233074,
+       "p95": 366892
+      },
+      "receipts": 5,
+      "state_bytes": 79724
+     },
+     {
+      "body_bytes": 958287,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 381861,
+       "median": 250192,
+       "min": 240646,
+       "p95": 381861
+      },
+      "receipts": 6,
+      "state_bytes": 80614
+     },
+     {
+      "body_bytes": 957482,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 372298,
+       "median": 246472,
+       "min": 244879,
+       "p95": 372298
+      },
+      "receipts": 7,
+      "state_bytes": 80105
+     },
+     {
+      "body_bytes": 949790,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 357694,
+       "median": 219589,
+       "min": 219354,
+       "p95": 357694
+      },
+      "receipts": 3,
+      "state_bytes": 79265
+     },
+     {
+      "body_bytes": 966553,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 274898,
+       "median": 272921,
+       "min": 272097,
+       "p95": 274898
+      },
+      "receipts": 13,
+      "state_bytes": 80735
+     },
+     {
+      "body_bytes": 1025902,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 454388,
+       "median": 323299,
+       "min": 321659,
+       "p95": 454388
+      },
+      "receipts": 12,
+      "state_bytes": 83487
+     },
+     {
+      "body_bytes": 1068451,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 503239,
+       "median": 355807,
+       "min": 353062,
+       "p95": 503239
+      },
+      "receipts": 14,
+      "state_bytes": 86603
+     },
+     {
+      "body_bytes": 1042943,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 461191,
+       "median": 323072,
+       "min": 317650,
+       "p95": 461191
+      },
+      "receipts": 10,
+      "state_bytes": 91210
+     },
+     {
+      "body_bytes": 1057176,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 477284,
+       "median": 316816,
+       "min": 315569,
+       "p95": 477284
+      },
+      "receipts": 9,
+      "state_bytes": 91206
+     },
+     {
+      "body_bytes": 1072565,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 495575,
+       "median": 368920,
+       "min": 364350,
+       "p95": 495575
+      },
+      "receipts": 17,
+      "state_bytes": 90943
+     },
+     {
+      "body_bytes": 1039612,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 446783,
+       "median": 312305,
+       "min": 301089,
+       "p95": 446783
+      },
+      "receipts": 9,
+      "state_bytes": 91710
+     },
+     {
+      "body_bytes": 1060582,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 445999,
+       "median": 322354,
+       "min": 312088,
+       "p95": 445999
+      },
+      "receipts": 9,
+      "state_bytes": 91853
+     },
+     {
+      "body_bytes": 949647,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 375002,
+       "median": 239747,
+       "min": 238005,
+       "p95": 375002
+      },
+      "receipts": 9,
+      "state_bytes": 93626
+     },
+     {
+      "body_bytes": 906823,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 174479,
+       "median": 172139,
+       "min": 171017,
+       "p95": 174479
+      },
+      "receipts": 0,
+      "state_bytes": 86784
+     },
+     {
+      "body_bytes": 907451,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 308105,
+       "median": 179474,
+       "min": 171300,
+       "p95": 308105
+      },
+      "receipts": 0,
+      "state_bytes": 86821
+     },
+     {
+      "body_bytes": 907501,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 308008,
+       "median": 179198,
+       "min": 171273,
+       "p95": 308008
+      },
+      "receipts": 0,
+      "state_bytes": 86818
+     },
+     {
+      "body_bytes": 908210,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 171638,
+       "median": 171438,
+       "min": 171169,
+       "p95": 171638
+      },
+      "receipts": 0,
+      "state_bytes": 86822
+     },
+     {
+      "body_bytes": 911337,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 303810,
+       "median": 171527,
+       "min": 171294,
+       "p95": 303810
+      },
+      "receipts": 0,
+      "state_bytes": 86826
+     },
+     {
+      "body_bytes": 937563,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 208200,
+       "median": 207322,
+       "min": 205623,
+       "p95": 208200
+      },
+      "receipts": 4,
+      "state_bytes": 86846
+     },
+     {
+      "body_bytes": 1011099,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 383907,
+       "median": 245556,
+       "min": 243595,
+       "p95": 383907
+      },
+      "receipts": 2,
+      "state_bytes": 86441
+     },
+     {
+      "body_bytes": 1033236,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 402712,
+       "median": 272548,
+       "min": 270913,
+       "p95": 402712
+      },
+      "receipts": 5,
+      "state_bytes": 89542
+     }
+    ],
+    "load_1m": {
+     "after": "5.48",
+     "before": "6.17"
+    },
+    "population": 38,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 9,
+     "p95": 503239
+    },
+    "receipts": 153
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "5.29",
+       "before": "5.48"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 8,
+       "p95": 568133
+      }
+     }
+    ],
+    "day_body_bytes": 88715,
+    "day_read_wall_us": {
+     "max": 5115,
+     "median": 4770,
+     "min": 4152,
+     "p95": 5115
+    },
+    "decided": 8,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "hours": [
+     {
+      "body_bytes": 921989,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 413241,
+       "median": 275863,
+       "min": 274470,
+       "p95": 413241
+      },
+      "receipts": 14,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 994642,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 458650,
+       "median": 300539,
+       "min": 293985,
+       "p95": 458650
+      },
+      "receipts": 16,
+      "state_bytes": 77921
+     },
+     {
+      "body_bytes": 969095,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 402248,
+       "median": 262677,
+       "min": 262377,
+       "p95": 402248
+      },
+      "receipts": 10,
+      "state_bytes": 81247
+     },
+     {
+      "body_bytes": 961547,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 266800,
+       "median": 250970,
+       "min": 247678,
+       "p95": 266800
+      },
+      "receipts": 7,
+      "state_bytes": 80379
+     },
+     {
+      "body_bytes": 948155,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 411737,
+       "median": 245050,
+       "min": 242640,
+       "p95": 411737
+      },
+      "receipts": 9,
+      "state_bytes": 80512
+     },
+     {
+      "body_bytes": 968126,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 425356,
+       "median": 293149,
+       "min": 292442,
+       "p95": 425356
+      },
+      "receipts": 17,
+      "state_bytes": 80438
+     },
+     {
+      "body_bytes": 938631,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 370528,
+       "median": 245631,
+       "min": 238988,
+       "p95": 370528
+      },
+      "receipts": 7,
+      "state_bytes": 80452
+     },
+     {
+      "body_bytes": 975461,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 274616,
+       "median": 272479,
+       "min": 272401,
+       "p95": 274616
+      },
+      "receipts": 12,
+      "state_bytes": 82260
+     },
+     {
+      "body_bytes": 1044995,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 568133,
+       "median": 405094,
+       "min": 398905,
+       "p95": 568133
+      },
+      "receipts": 31,
+      "state_bytes": 82571
+     },
+     {
+      "body_bytes": 1038796,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 469818,
+       "median": 326341,
+       "min": 325900,
+       "p95": 469818
+      },
+      "receipts": 14,
+      "state_bytes": 89872
+     },
+     {
+      "body_bytes": 1047024,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 548638,
+       "median": 378840,
+       "min": 378218,
+       "p95": 548638
+      },
+      "receipts": 28,
+      "state_bytes": 88292
+     },
+     {
+      "body_bytes": 1057892,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 517062,
+       "median": 373347,
+       "min": 372058,
+       "p95": 517062
+      },
+      "receipts": 21,
+      "state_bytes": 88859
+     },
+     {
+      "body_bytes": 1051622,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 488720,
+       "median": 360698,
+       "min": 358757,
+       "p95": 488720
+      },
+      "receipts": 20,
+      "state_bytes": 93075
+     },
+     {
+      "body_bytes": 1047072,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 494953,
+       "median": 369731,
+       "min": 363758,
+       "p95": 494953
+      },
+      "receipts": 23,
+      "state_bytes": 89374
+     },
+     {
+      "body_bytes": 1043224,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 469666,
+       "median": 362374,
+       "min": 337348,
+       "p95": 469666
+      },
+      "receipts": 18,
+      "state_bytes": 91815
+     },
+     {
+      "body_bytes": 951403,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 402451,
+       "median": 266172,
+       "min": 264902,
+       "p95": 402451
+      },
+      "receipts": 17,
+      "state_bytes": 92242
+     },
+     {
+      "body_bytes": 909934,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 187898,
+       "median": 185950,
+       "min": 184913,
+       "p95": 187898
+      },
+      "receipts": 3,
+      "state_bytes": 86736
+     },
+     {
+      "body_bytes": 907807,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 307984,
+       "median": 172272,
+       "min": 172231,
+       "p95": 307984
+      },
+      "receipts": 0,
+      "state_bytes": 86684
+     },
+     {
+      "body_bytes": 907873,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 309897,
+       "median": 173812,
+       "min": 171481,
+       "p95": 309897
+      },
+      "receipts": 0,
+      "state_bytes": 86681
+     },
+     {
+      "body_bytes": 908929,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 171638,
+       "median": 171415,
+       "min": 171059,
+       "p95": 171638
+      },
+      "receipts": 0,
+      "state_bytes": 86684
+     },
+     {
+      "body_bytes": 911706,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 306311,
+       "median": 171799,
+       "min": 171785,
+       "p95": 306311
+      },
+      "receipts": 0,
+      "state_bytes": 86699
+     },
+     {
+      "body_bytes": 929206,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 198405,
+       "median": 198132,
+       "min": 197863,
+       "p95": 198405
+      },
+      "receipts": 3,
+      "state_bytes": 86707
+     },
+     {
+      "body_bytes": 1004444,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 435123,
+       "median": 293893,
+       "min": 291416,
+       "p95": 435123
+      },
+      "receipts": 14,
+      "state_bytes": 86935
+     },
+     {
+      "body_bytes": 1019963,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 414255,
+       "median": 287575,
+       "min": 280010,
+       "p95": 414255
+      },
+      "receipts": 8,
+      "state_bytes": 89932
+     }
+    ],
+    "load_1m": {
+     "after": "5.29",
+     "before": "5.48"
+    },
+    "population": 38,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 8,
+     "p95": 568133
+    },
+    "receipts": 292
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "4.77",
+       "before": "5.29"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 12,
+       "p95": 640342
+      }
+     }
+    ],
+    "day_body_bytes": 88227,
+    "day_read_wall_us": {
+     "max": 3889,
+     "median": 3783,
+     "min": 3538,
+     "p95": 3889
+    },
+    "decided": 16,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "hours": [
+     {
+      "body_bytes": 932989,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 550905,
+       "median": 398339,
+       "min": 388362,
+       "p95": 550905
+      },
+      "receipts": 47,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 1001950,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 494210,
+       "median": 426568,
+       "min": 369575,
+       "p95": 494210
+      },
+      "receipts": 35,
+      "state_bytes": 79008
+     },
+     {
+      "body_bytes": 970455,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 442126,
+       "median": 310130,
+       "min": 309044,
+       "p95": 442126
+      },
+      "receipts": 22,
+      "state_bytes": 80621
+     },
+     {
+      "body_bytes": 962293,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 311511,
+       "median": 311285,
+       "min": 309641,
+       "p95": 311511
+      },
+      "receipts": 23,
+      "state_bytes": 80185
+     },
+     {
+      "body_bytes": 964723,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 500218,
+       "median": 338277,
+       "min": 322989,
+       "p95": 500218
+      },
+      "receipts": 24,
+      "state_bytes": 81645
+     },
+     {
+      "body_bytes": 956945,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 431918,
+       "median": 294228,
+       "min": 293427,
+       "p95": 431918
+      },
+      "receipts": 19,
+      "state_bytes": 82534
+     },
+     {
+      "body_bytes": 960825,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 435191,
+       "median": 301378,
+       "min": 300583,
+       "p95": 435191
+      },
+      "receipts": 21,
+      "state_bytes": 80223
+     },
+     {
+      "body_bytes": 972454,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 365508,
+       "median": 349238,
+       "min": 345064,
+       "p95": 365508
+      },
+      "receipts": 35,
+      "state_bytes": 81821
+     },
+     {
+      "body_bytes": 1047091,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 588858,
+       "median": 457903,
+       "min": 455216,
+       "p95": 588858
+      },
+      "receipts": 46,
+      "state_bytes": 82068
+     },
+     {
+      "body_bytes": 1041294,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 588466,
+       "median": 479752,
+       "min": 452563,
+       "p95": 588466
+      },
+      "receipts": 46,
+      "state_bytes": 86221
+     },
+     {
+      "body_bytes": 1058111,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 580330,
+       "median": 444763,
+       "min": 442264,
+       "p95": 580330
+      },
+      "receipts": 44,
+      "state_bytes": 90325
+     },
+     {
+      "body_bytes": 1055465,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 546119,
+       "median": 414662,
+       "min": 410593,
+       "p95": 546119
+      },
+      "receipts": 35,
+      "state_bytes": 87809
+     },
+     {
+      "body_bytes": 1075876,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 640342,
+       "median": 503076,
+       "min": 502438,
+       "p95": 640342
+      },
+      "receipts": 57,
+      "state_bytes": 93876
+     },
+     {
+      "body_bytes": 1039510,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 581710,
+       "median": 409182,
+       "min": 408550,
+       "p95": 581710
+      },
+      "receipts": 38,
+      "state_bytes": 94110
+     },
+     {
+      "body_bytes": 1047622,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 557006,
+       "median": 420916,
+       "min": 418214,
+       "p95": 557006
+      },
+      "receipts": 40,
+      "state_bytes": 88358
+     },
+     {
+      "body_bytes": 959367,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 454446,
+       "median": 335490,
+       "min": 319662,
+       "p95": 454446
+      },
+      "receipts": 29,
+      "state_bytes": 91938
+     },
+     {
+      "body_bytes": 908040,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 174284,
+       "median": 171426,
+       "min": 170972,
+       "p95": 174284
+      },
+      "receipts": 0,
+      "state_bytes": 86553
+     },
+     {
+      "body_bytes": 908641,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 321625,
+       "median": 187042,
+       "min": 176597,
+       "p95": 321625
+      },
+      "receipts": 0,
+      "state_bytes": 86590
+     },
+     {
+      "body_bytes": 908688,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 342309,
+       "median": 217168,
+       "min": 177838,
+       "p95": 342309
+      },
+      "receipts": 0,
+      "state_bytes": 86587
+     },
+     {
+      "body_bytes": 909780,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 181193,
+       "median": 178814,
+       "min": 171730,
+       "p95": 181193
+      },
+      "receipts": 0,
+      "state_bytes": 86591
+     },
+     {
+      "body_bytes": 912689,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 303367,
+       "median": 172110,
+       "min": 171849,
+       "p95": 303367
+      },
+      "receipts": 0,
+      "state_bytes": 86599
+     },
+     {
+      "body_bytes": 936330,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 375129,
+       "median": 235337,
+       "min": 235119,
+       "p95": 375129
+      },
+      "receipts": 12,
+      "state_bytes": 86618
+     },
+     {
+      "body_bytes": 991691,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 381845,
+       "median": 381372,
+       "min": 372109,
+       "p95": 381845
+      },
+      "receipts": 38,
+      "state_bytes": 86693
+     },
+     {
+      "body_bytes": 1076107,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 623546,
+       "median": 503483,
+       "min": 482000,
+       "p95": 623546
+      },
+      "receipts": 56,
+      "state_bytes": 89529
+     }
+    ],
+    "load_1m": {
+     "after": "4.77",
+     "before": "5.29"
+    },
+    "population": 38,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 12,
+     "p95": 640342
+    },
+    "receipts": 667
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "4.8",
+       "before": "4.77"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 8,
+       "p95": 546006
+      }
+     }
+    ],
+    "day_body_bytes": 120253,
+    "day_read_wall_us": {
+     "max": 5679,
+     "median": 5543,
+     "min": 5273,
+     "p95": 5679
+    },
+    "decided": 0,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "hours": [
+     {
+      "body_bytes": 1244626,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 439508,
+       "median": 297581,
+       "min": 294597,
+       "p95": 439508
+      },
+      "receipts": 0,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 1333340,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 452222,
+       "median": 448122,
+       "min": 308810,
+       "p95": 452222
+      },
+      "receipts": 0,
+      "state_bytes": 109518
+     },
+     {
+      "body_bytes": 1312079,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 467893,
+       "median": 301644,
+       "min": 299606,
+       "p95": 467893
+      },
+      "receipts": 0,
+      "state_bytes": 108182
+     },
+     {
+      "body_bytes": 1314427,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 440821,
+       "median": 326234,
+       "min": 309575,
+       "p95": 440821
+      },
+      "receipts": 0,
+      "state_bytes": 108393
+     },
+     {
+      "body_bytes": 1315911,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 443479,
+       "median": 302207,
+       "min": 299990,
+       "p95": 443479
+      },
+      "receipts": 0,
+      "state_bytes": 108598
+     },
+     {
+      "body_bytes": 1305112,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 435625,
+       "median": 303458,
+       "min": 292535,
+       "p95": 435625
+      },
+      "receipts": 0,
+      "state_bytes": 112783
+     },
+     {
+      "body_bytes": 1311016,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 439410,
+       "median": 310088,
+       "min": 297423,
+       "p95": 439410
+      },
+      "receipts": 0,
+      "state_bytes": 108437
+     },
+     {
+      "body_bytes": 1331963,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 442849,
+       "median": 307603,
+       "min": 306965,
+       "p95": 442849
+      },
+      "receipts": 0,
+      "state_bytes": 110936
+     },
+     {
+      "body_bytes": 1450841,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 546006,
+       "median": 520684,
+       "min": 394785,
+       "p95": 546006
+      },
+      "receipts": 0,
+      "state_bytes": 112655
+     },
+     {
+      "body_bytes": 1431940,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 500205,
+       "median": 369087,
+       "min": 368729,
+       "p95": 500205
+      },
+      "receipts": 0,
+      "state_bytes": 122281
+     },
+     {
+      "body_bytes": 1433672,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 506015,
+       "median": 373263,
+       "min": 372101,
+       "p95": 506015
+      },
+      "receipts": 0,
+      "state_bytes": 121125
+     },
+     {
+      "body_bytes": 1430366,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 536823,
+       "median": 514423,
+       "min": 368899,
+       "p95": 536823
+      },
+      "receipts": 0,
+      "state_bytes": 120442
+     },
+     {
+      "body_bytes": 1411664,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 492451,
+       "median": 371759,
+       "min": 354620,
+       "p95": 492451
+      },
+      "receipts": 0,
+      "state_bytes": 120653
+     },
+     {
+      "body_bytes": 1419054,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 489344,
+       "median": 360281,
+       "min": 359258,
+       "p95": 489344
+      },
+      "receipts": 0,
+      "state_bytes": 132119
+     },
+     {
+      "body_bytes": 1409175,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 501318,
+       "median": 490186,
+       "min": 353556,
+       "p95": 501318
+      },
+      "receipts": 0,
+      "state_bytes": 123312
+     },
+     {
+      "body_bytes": 1287524,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 418479,
+       "median": 278228,
+       "min": 277970,
+       "p95": 418479
+      },
+      "receipts": 0,
+      "state_bytes": 121466
+     },
+     {
+      "body_bytes": 1222332,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 400501,
+       "median": 233492,
+       "min": 232208,
+       "p95": 400501
+      },
+      "receipts": 0,
+      "state_bytes": 118101
+     },
+     {
+      "body_bytes": 1223221,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 239796,
+       "median": 239647,
+       "min": 237753,
+       "p95": 239796
+      },
+      "receipts": 0,
+      "state_bytes": 118142
+     },
+     {
+      "body_bytes": 1223335,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 389190,
+       "median": 249287,
+       "min": 232769,
+       "p95": 389190
+      },
+      "receipts": 0,
+      "state_bytes": 118139
+     },
+     {
+      "body_bytes": 1224470,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 378073,
+       "median": 234293,
+       "min": 233705,
+       "p95": 378073
+      },
+      "receipts": 0,
+      "state_bytes": 118141
+     },
+     {
+      "body_bytes": 1228720,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 372603,
+       "median": 233720,
+       "min": 233690,
+       "p95": 372603
+      },
+      "receipts": 0,
+      "state_bytes": 118157
+     },
+     {
+      "body_bytes": 1258751,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 395004,
+       "median": 256923,
+       "min": 253494,
+       "p95": 395004
+      },
+      "receipts": 0,
+      "state_bytes": 118172
+     },
+     {
+      "body_bytes": 1402433,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 519660,
+       "median": 359687,
+       "min": 343318,
+       "p95": 519660
+      },
+      "receipts": 0,
+      "state_bytes": 118627
+     },
+     {
+      "body_bytes": 1435128,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 501849,
+       "median": 373208,
+       "min": 370083,
+       "p95": 501849
+      },
+      "receipts": 0,
+      "state_bytes": 122741
+     }
+    ],
+    "load_1m": {
+     "after": "4.8",
+     "before": "4.77"
+    },
+    "population": 52,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 8,
+     "p95": 546006
+    },
+    "receipts": 0
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "4.84",
+       "before": "4.8"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 8,
+       "p95": 1036951
+      }
+     }
+    ],
+    "day_body_bytes": 115597,
+    "day_read_wall_us": {
+     "max": 4717,
+     "median": 4188,
+     "min": 4127,
+     "p95": 4717
+    },
+    "decided": 52,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "hours": [
+     {
+      "body_bytes": 1250688,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 842151,
+       "median": 833973,
+       "min": 678874,
+       "p95": 842151
+      },
+      "receipts": 130,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 1316521,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 746740,
+       "median": 607518,
+       "min": 606190,
+       "p95": 746740
+      },
+      "receipts": 81,
+      "state_bytes": 97320
+     },
+     {
+      "body_bytes": 1323942,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 834159,
+       "median": 763172,
+       "min": 701599,
+       "p95": 834159
+      },
+      "receipts": 96,
+      "state_bytes": 103732
+     },
+     {
+      "body_bytes": 1289295,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 573709,
+       "median": 549382,
+       "min": 549188,
+       "p95": 573709
+      },
+      "receipts": 64,
+      "state_bytes": 109359
+     },
+     {
+      "body_bytes": 1314858,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 777340,
+       "median": 768042,
+       "min": 647500,
+       "p95": 777340
+      },
+      "receipts": 83,
+      "state_bytes": 109798
+     },
+     {
+      "body_bytes": 1292790,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 711518,
+       "median": 608814,
+       "min": 566644,
+       "p95": 711518
+      },
+      "receipts": 61,
+      "state_bytes": 112486
+     },
+     {
+      "body_bytes": 1322035,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 757077,
+       "median": 676028,
+       "min": 623375,
+       "p95": 757077
+      },
+      "receipts": 79,
+      "state_bytes": 113110
+     },
+     {
+      "body_bytes": 1348799,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 916279,
+       "median": 744187,
+       "min": 718726,
+       "p95": 916279
+      },
+      "receipts": 107,
+      "state_bytes": 109225
+     },
+     {
+      "body_bytes": 1446401,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 1036951,
+       "median": 953790,
+       "min": 902337,
+       "p95": 1036951
+      },
+      "receipts": 148,
+      "state_bytes": 116029
+     },
+     {
+      "body_bytes": 1396036,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 977136,
+       "median": 806967,
+       "min": 805426,
+       "p95": 977136
+      },
+      "receipts": 128,
+      "state_bytes": 118920
+     },
+     {
+      "body_bytes": 1425886,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 1018850,
+       "median": 1004337,
+       "min": 873698,
+       "p95": 1018850
+      },
+      "receipts": 141,
+      "state_bytes": 119963
+     },
+     {
+      "body_bytes": 1419575,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 997195,
+       "median": 886628,
+       "min": 861238,
+       "p95": 997195
+      },
+      "receipts": 142,
+      "state_bytes": 121754
+     },
+     {
+      "body_bytes": 1407323,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 973858,
+       "median": 833104,
+       "min": 824039,
+       "p95": 973858
+      },
+      "receipts": 132,
+      "state_bytes": 119414
+     },
+     {
+      "body_bytes": 1419460,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 1016803,
+       "median": 991339,
+       "min": 862868,
+       "p95": 1016803
+      },
+      "receipts": 138,
+      "state_bytes": 119288
+     },
+     {
+      "body_bytes": 1429401,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 998802,
+       "median": 862938,
+       "min": 855573,
+       "p95": 998802
+      },
+      "receipts": 137,
+      "state_bytes": 122218
+     },
+     {
+      "body_bytes": 1314224,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 727174,
+       "median": 596634,
+       "min": 595322,
+       "p95": 727174
+      },
+      "receipts": 80,
+      "state_bytes": 121027
+     },
+     {
+      "body_bytes": 1245756,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 486129,
+       "median": 356863,
+       "min": 356460,
+       "p95": 486129
+      },
+      "receipts": 20,
+      "state_bytes": 118233
+     },
+     {
+      "body_bytes": 1228691,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 234682,
+       "median": 233889,
+       "min": 233062,
+       "p95": 234682
+      },
+      "receipts": 0,
+      "state_bytes": 118209
+     },
+     {
+      "body_bytes": 1230611,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 379524,
+       "median": 260383,
+       "min": 254610,
+       "p95": 379524
+      },
+      "receipts": 2,
+      "state_bytes": 118207
+     },
+     {
+      "body_bytes": 1232188,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 385160,
+       "median": 249439,
+       "min": 246343,
+       "p95": 385160
+      },
+      "receipts": 2,
+      "state_bytes": 118216
+     },
+     {
+      "body_bytes": 1233128,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 372992,
+       "median": 233951,
+       "min": 233469,
+       "p95": 372992
+      },
+      "receipts": 0,
+      "state_bytes": 118215
+     },
+     {
+      "body_bytes": 1265618,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 509808,
+       "median": 378802,
+       "min": 378554,
+       "p95": 509808
+      },
+      "receipts": 24,
+      "state_bytes": 118234
+     },
+     {
+      "body_bytes": 1333186,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 752957,
+       "median": 618388,
+       "min": 617796,
+       "p95": 752957
+      },
+      "receipts": 75,
+      "state_bytes": 121002
+     },
+     {
+      "body_bytes": 1372444,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 872175,
+       "median": 743970,
+       "min": 726173,
+       "p95": 872175
+      },
+      "receipts": 112,
+      "state_bytes": 120101
+     }
+    ],
+    "load_1m": {
+     "after": "4.84",
+     "before": "4.8"
+    },
+    "population": 52,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 8,
+     "p95": 1036951
+    },
+    "receipts": 1982
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "4.42",
+       "before": "4.84"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 10,
+       "p95": 638218
+      }
+     }
+    ],
+    "day_body_bytes": 120245,
+    "day_read_wall_us": {
+     "max": 5771,
+     "median": 5542,
+     "min": 5297,
+     "p95": 5771
+    },
+    "decided": 4,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "hours": [
+     {
+      "body_bytes": 1235306,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 464826,
+       "median": 323931,
+       "min": 322934,
+       "p95": 464826
+      },
+      "receipts": 6,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 1341452,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 519085,
+       "median": 406406,
+       "min": 382142,
+       "p95": 519085
+      },
+      "receipts": 11,
+      "state_bytes": 104650
+     },
+     {
+      "body_bytes": 1316205,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 476253,
+       "median": 358079,
+       "min": 334603,
+       "p95": 476253
+      },
+      "receipts": 5,
+      "state_bytes": 111612
+     },
+     {
+      "body_bytes": 1293393,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 432988,
+       "median": 297449,
+       "min": 296439,
+       "p95": 432988
+      },
+      "receipts": 1,
+      "state_bytes": 107684
+     },
+     {
+      "body_bytes": 1324550,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 489514,
+       "median": 481717,
+       "min": 356197,
+       "p95": 489514
+      },
+      "receipts": 7,
+      "state_bytes": 108550
+     },
+     {
+      "body_bytes": 1308783,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 451341,
+       "median": 312616,
+       "min": 309169,
+       "p95": 451341
+      },
+      "receipts": 2,
+      "state_bytes": 115762
+     },
+     {
+      "body_bytes": 1321199,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 463170,
+       "median": 341298,
+       "min": 339228,
+       "p95": 463170
+      },
+      "receipts": 4,
+      "state_bytes": 108038
+     },
+     {
+      "body_bytes": 1324925,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 501737,
+       "median": 372802,
+       "min": 369091,
+       "p95": 501737
+      },
+      "receipts": 12,
+      "state_bytes": 109767
+     },
+     {
+      "body_bytes": 1439852,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 566820,
+       "median": 426611,
+       "min": 425685,
+       "p95": 566820
+      },
+      "receipts": 8,
+      "state_bytes": 113388
+     },
+     {
+      "body_bytes": 1443049,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 606686,
+       "median": 604405,
+       "min": 467969,
+       "p95": 606686
+      },
+      "receipts": 13,
+      "state_bytes": 122637
+     },
+     {
+      "body_bytes": 1443210,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 638218,
+       "median": 496933,
+       "min": 474702,
+       "p95": 638218
+      },
+      "receipts": 17,
+      "state_bytes": 124303
+     },
+     {
+      "body_bytes": 1431850,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 563109,
+       "median": 558730,
+       "min": 424377,
+       "p95": 563109
+      },
+      "receipts": 8,
+      "state_bytes": 120887
+     },
+     {
+      "body_bytes": 1416935,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 634490,
+       "median": 454124,
+       "min": 444406,
+       "p95": 634490
+      },
+      "receipts": 12,
+      "state_bytes": 121724
+     },
+     {
+      "body_bytes": 1400816,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 592691,
+       "median": 425096,
+       "min": 408441,
+       "p95": 592691
+      },
+      "receipts": 8,
+      "state_bytes": 128229
+     },
+     {
+      "body_bytes": 1415247,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 554023,
+       "median": 544618,
+       "min": 410666,
+       "p95": 554023
+      },
+      "receipts": 8,
+      "state_bytes": 125615
+     },
+     {
+      "body_bytes": 1288544,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 448774,
+       "median": 331868,
+       "min": 310886,
+       "p95": 448774
+      },
+      "receipts": 5,
+      "state_bytes": 120695
+     },
+     {
+      "body_bytes": 1222735,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 234053,
+       "median": 233708,
+       "min": 232761,
+       "p95": 234053
+      },
+      "receipts": 0,
+      "state_bytes": 118105
+     },
+     {
+      "body_bytes": 1223690,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 363035,
+       "median": 233305,
+       "min": 232965,
+       "p95": 363035
+      },
+      "receipts": 0,
+      "state_bytes": 118155
+     },
+     {
+      "body_bytes": 1223832,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 372323,
+       "median": 246705,
+       "min": 237974,
+       "p95": 372323
+      },
+      "receipts": 0,
+      "state_bytes": 118152
+     },
+     {
+      "body_bytes": 1225149,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 366304,
+       "median": 236663,
+       "min": 233797,
+       "p95": 366304
+      },
+      "receipts": 0,
+      "state_bytes": 118156
+     },
+     {
+      "body_bytes": 1229447,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 363686,
+       "median": 234169,
+       "min": 232653,
+       "p95": 363686
+      },
+      "receipts": 0,
+      "state_bytes": 118172
+     },
+     {
+      "body_bytes": 1259538,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 418780,
+       "median": 279279,
+       "min": 278451,
+       "p95": 418780
+      },
+      "receipts": 4,
+      "state_bytes": 118181
+     },
+     {
+      "body_bytes": 1392948,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 500732,
+       "median": 370783,
+       "min": 365691,
+       "p95": 500732
+      },
+      "receipts": 4,
+      "state_bytes": 120006
+     },
+     {
+      "body_bytes": 1487263,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 625900,
+       "median": 433222,
+       "min": 432496,
+       "p95": 625900
+      },
+      "receipts": 4,
+      "state_bytes": 126710
+     }
+    ],
+    "load_1m": {
+     "after": "4.42",
+     "before": "4.84"
+    },
+    "population": 52,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 10,
+     "p95": 638218
+    },
+    "receipts": 139
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "4.77",
+       "before": "4.42"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 8,
+       "p95": 734777
+      }
+     }
+    ],
+    "day_body_bytes": 119814,
+    "day_read_wall_us": {
+     "max": 5802,
+     "median": 5786,
+     "min": 5761,
+     "p95": 5802
+    },
+    "decided": 8,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "hours": [
+     {
+      "body_bytes": 1249513,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 617555,
+       "median": 586605,
+       "min": 448853,
+       "p95": 617555
+      },
+      "receipts": 31,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 1316222,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 492937,
+       "median": 343085,
+       "min": 341110,
+       "p95": 492937
+      },
+      "receipts": 7,
+      "state_bytes": 102970
+     },
+     {
+      "body_bytes": 1301483,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 482641,
+       "median": 342082,
+       "min": 335247,
+       "p95": 482641
+      },
+      "receipts": 8,
+      "state_bytes": 109304
+     },
+     {
+      "body_bytes": 1307415,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 488632,
+       "median": 344827,
+       "min": 344067,
+       "p95": 488632
+      },
+      "receipts": 8,
+      "state_bytes": 108972
+     },
+     {
+      "body_bytes": 1307643,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 491857,
+       "median": 345973,
+       "min": 345209,
+       "p95": 491857
+      },
+      "receipts": 8,
+      "state_bytes": 109007
+     },
+     {
+      "body_bytes": 1306669,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 502169,
+       "median": 361309,
+       "min": 361086,
+       "p95": 502169
+      },
+      "receipts": 12,
+      "state_bytes": 111720
+     },
+     {
+      "body_bytes": 1306813,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 463286,
+       "median": 353420,
+       "min": 324729,
+       "p95": 463286
+      },
+      "receipts": 5,
+      "state_bytes": 109629
+     },
+     {
+      "body_bytes": 1319052,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 560703,
+       "median": 410889,
+       "min": 385912,
+       "p95": 560703
+      },
+      "receipts": 14,
+      "state_bytes": 109788
+     },
+     {
+      "body_bytes": 1452824,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 734777,
+       "median": 711757,
+       "min": 623945,
+       "p95": 734777
+      },
+      "receipts": 25,
+      "state_bytes": 113532
+     },
+     {
+      "body_bytes": 1438351,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 705980,
+       "median": 562587,
+       "min": 560438,
+       "p95": 705980
+      },
+      "receipts": 28,
+      "state_bytes": 120685
+     },
+     {
+      "body_bytes": 1448293,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 686080,
+       "median": 663961,
+       "min": 538948,
+       "p95": 686080
+      },
+      "receipts": 26,
+      "state_bytes": 124838
+     },
+     {
+      "body_bytes": 1439030,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 642934,
+       "median": 511273,
+       "min": 510946,
+       "p95": 642934
+      },
+      "receipts": 20,
+      "state_bytes": 125189
+     },
+     {
+      "body_bytes": 1436690,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 685695,
+       "median": 563776,
+       "min": 555461,
+       "p95": 685695
+      },
+      "receipts": 26,
+      "state_bytes": 124386
+     },
+     {
+      "body_bytes": 1419025,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 637488,
+       "median": 635596,
+       "min": 474178,
+       "p95": 637488
+      },
+      "receipts": 18,
+      "state_bytes": 122508
+     },
+     {
+      "body_bytes": 1416053,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 615467,
+       "median": 496480,
+       "min": 467357,
+       "p95": 615467
+      },
+      "receipts": 18,
+      "state_bytes": 125018
+     },
+     {
+      "body_bytes": 1288596,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 466224,
+       "median": 336385,
+       "min": 335734,
+       "p95": 466224
+      },
+      "receipts": 11,
+      "state_bytes": 123197
+     },
+     {
+      "body_bytes": 1222905,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 367339,
+       "median": 235049,
+       "min": 233718,
+       "p95": 367339
+      },
+      "receipts": 0,
+      "state_bytes": 118158
+     },
+     {
+      "body_bytes": 1224101,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 368251,
+       "median": 233315,
+       "min": 232839,
+       "p95": 368251
+      },
+      "receipts": 0,
+      "state_bytes": 118208
+     },
+     {
+      "body_bytes": 1224344,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 373588,
+       "median": 234855,
+       "min": 233152,
+       "p95": 373588
+      },
+      "receipts": 0,
+      "state_bytes": 118205
+     },
+     {
+      "body_bytes": 1225434,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 233812,
+       "median": 232974,
+       "min": 232700,
+       "p95": 233812
+      },
+      "receipts": 0,
+      "state_bytes": 118209
+     },
+     {
+      "body_bytes": 1229475,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 372142,
+       "median": 254182,
+       "min": 233799,
+       "p95": 372142
+      },
+      "receipts": 0,
+      "state_bytes": 118224
+     },
+     {
+      "body_bytes": 1265246,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 404613,
+       "median": 273824,
+       "min": 271651,
+       "p95": 404613
+      },
+      "receipts": 2,
+      "state_bytes": 118236
+     },
+     {
+      "body_bytes": 1392285,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 516860,
+       "median": 387002,
+       "min": 385145,
+       "p95": 516860
+      },
+      "receipts": 8,
+      "state_bytes": 120433
+     },
+     {
+      "body_bytes": 1457926,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 714055,
+       "median": 707857,
+       "min": 570561,
+       "p95": 714055
+      },
+      "receipts": 26,
+      "state_bytes": 126049
+     }
+    ],
+    "load_1m": {
+     "after": "4.77",
+     "before": "4.42"
+    },
+    "population": 52,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 8,
+     "p95": 734777
+    },
+    "receipts": 301
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "5.56",
+       "before": "4.77"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 11,
+       "p95": 869359
+      }
+     }
+    ],
+    "day_body_bytes": 118806,
+    "day_read_wall_us": {
+     "max": 5495,
+     "median": 4965,
+     "min": 4857,
+     "p95": 5495
+    },
+    "decided": 16,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "hours": [
+     {
+      "body_bytes": 1240921,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 687015,
+       "median": 599817,
+       "min": 542356,
+       "p95": 687015
+      },
+      "receipts": 47,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 1328274,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 611884,
+       "median": 499012,
+       "min": 476471,
+       "p95": 611884
+      },
+      "receipts": 33,
+      "state_bytes": 103140
+     },
+     {
+      "body_bytes": 1304481,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 550303,
+       "median": 410384,
+       "min": 408872,
+       "p95": 550303
+      },
+      "receipts": 20,
+      "state_bytes": 107019
+     },
+     {
+      "body_bytes": 1302525,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 569485,
+       "median": 436275,
+       "min": 434114,
+       "p95": 569485
+      },
+      "receipts": 24,
+      "state_bytes": 109326
+     },
+     {
+      "body_bytes": 1317699,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 601298,
+       "median": 599677,
+       "min": 461024,
+       "p95": 601298
+      },
+      "receipts": 28,
+      "state_bytes": 110500
+     },
+     {
+      "body_bytes": 1303312,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 505380,
+       "median": 363633,
+       "min": 362342,
+       "p95": 505380
+      },
+      "receipts": 12,
+      "state_bytes": 108022
+     },
+     {
+      "body_bytes": 1313105,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 597616,
+       "median": 460981,
+       "min": 452501,
+       "p95": 597616
+      },
+      "receipts": 27,
+      "state_bytes": 107750
+     },
+     {
+      "body_bytes": 1326089,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 563552,
+       "median": 446765,
+       "min": 426580,
+       "p95": 563552
+      },
+      "receipts": 21,
+      "state_bytes": 109621
+     },
+     {
+      "body_bytes": 1407240,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 715643,
+       "median": 546764,
+       "min": 545194,
+       "p95": 715643
+      },
+      "receipts": 32,
+      "state_bytes": 111401
+     },
+     {
+      "body_bytes": 1425129,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 737622,
+       "median": 615313,
+       "min": 577285,
+       "p95": 737622
+      },
+      "receipts": 37,
+      "state_bytes": 121087
+     },
+     {
+      "body_bytes": 1447809,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 805751,
+       "median": 789317,
+       "min": 668494,
+       "p95": 805751
+      },
+      "receipts": 47,
+      "state_bytes": 121252
+     },
+     {
+      "body_bytes": 1445881,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 869359,
+       "median": 740687,
+       "min": 739713,
+       "p95": 869359
+      },
+      "receipts": 56,
+      "state_bytes": 121202
+     },
+     {
+      "body_bytes": 1404812,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 704311,
+       "median": 677701,
+       "min": 540820,
+       "p95": 704311
+      },
+      "receipts": 32,
+      "state_bytes": 123977
+     },
+     {
+      "body_bytes": 1420153,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 719770,
+       "median": 582355,
+       "min": 574115,
+       "p95": 719770
+      },
+      "receipts": 44,
+      "state_bytes": 128913
+     },
+     {
+      "body_bytes": 1406105,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 719141,
+       "median": 555004,
+       "min": 548905,
+       "p95": 719141
+      },
+      "receipts": 35,
+      "state_bytes": 123054
+     },
+     {
+      "body_bytes": 1290691,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 539559,
+       "median": 403753,
+       "min": 401637,
+       "p95": 539559
+      },
+      "receipts": 23,
+      "state_bytes": 120749
+     },
+     {
+      "body_bytes": 1233064,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 449013,
+       "median": 315189,
+       "min": 312404,
+       "p95": 449013
+      },
+      "receipts": 13,
+      "state_bytes": 118145
+     },
+     {
+      "body_bytes": 1227880,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 403621,
+       "median": 253940,
+       "min": 248864,
+       "p95": 403621
+      },
+      "receipts": 2,
+      "state_bytes": 118253
+     },
+     {
+      "body_bytes": 1226465,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 377595,
+       "median": 241413,
+       "min": 240611,
+       "p95": 377595
+      },
+      "receipts": 1,
+      "state_bytes": 118297
+     },
+     {
+      "body_bytes": 1231025,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 387132,
+       "median": 255524,
+       "min": 254148,
+       "p95": 387132
+      },
+      "receipts": 3,
+      "state_bytes": 118254
+     },
+     {
+      "body_bytes": 1229864,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 374958,
+       "median": 234219,
+       "min": 233106,
+       "p95": 374958
+      },
+      "receipts": 0,
+      "state_bytes": 118298
+     },
+     {
+      "body_bytes": 1264373,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 283827,
+       "median": 280244,
+       "min": 279679,
+       "p95": 283827
+      },
+      "receipts": 4,
+      "state_bytes": 118317
+     },
+     {
+      "body_bytes": 1396977,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 637151,
+       "median": 628596,
+       "min": 496257,
+       "p95": 637151
+      },
+      "receipts": 27,
+      "state_bytes": 120376
+     },
+     {
+      "body_bytes": 1401087,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 624237,
+       "median": 496310,
+       "min": 491862,
+       "p95": 624237
+      },
+      "receipts": 26,
+      "state_bytes": 123168
+     }
+    ],
+    "load_1m": {
+     "after": "5.56",
+     "before": "4.77"
+    },
+    "population": 52,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 11,
+     "p95": 869359
+    },
+    "receipts": 594
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "6.04",
+       "before": "5.56"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 23,
+       "p95": 751861
+      }
+     }
+    ],
+    "day_body_bytes": 166010,
+    "day_read_wall_us": {
+     "max": 7658,
+     "median": 7538,
+     "min": 7285,
+     "p95": 7658
+    },
+    "decided": 0,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "hours": [
+     {
+      "body_bytes": 1879822,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 649016,
+       "median": 630842,
+       "min": 487545,
+       "p95": 649016
+      },
+      "receipts": 0,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 2047311,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 719502,
+       "median": 709543,
+       "min": 533722,
+       "p95": 719502
+      },
+      "receipts": 0,
+      "state_bytes": 163910
+     },
+     {
+      "body_bytes": 1985486,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 663584,
+       "median": 647311,
+       "min": 509576,
+       "p95": 663584
+      },
+      "receipts": 0,
+      "state_bytes": 179757
+     },
+     {
+      "body_bytes": 1947678,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 634393,
+       "median": 623351,
+       "min": 494602,
+       "p95": 634393
+      },
+      "receipts": 0,
+      "state_bytes": 165271
+     },
+     {
+      "body_bytes": 1907747,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 622210,
+       "median": 621036,
+       "min": 466346,
+       "p95": 622210
+      },
+      "receipts": 0,
+      "state_bytes": 169720
+     },
+     {
+      "body_bytes": 1913743,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 649109,
+       "median": 486201,
+       "min": 471441,
+       "p95": 649109
+      },
+      "receipts": 0,
+      "state_bytes": 177197
+     },
+     {
+      "body_bytes": 1903577,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 622464,
+       "median": 603135,
+       "min": 464813,
+       "p95": 622464
+      },
+      "receipts": 0,
+      "state_bytes": 167121
+     },
+     {
+      "body_bytes": 1882404,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 597003,
+       "median": 459070,
+       "min": 458924,
+       "p95": 597003
+      },
+      "receipts": 0,
+      "state_bytes": 166844
+     },
+     {
+      "body_bytes": 1922186,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 624688,
+       "median": 610384,
+       "min": 480146,
+       "p95": 624688
+      },
+      "receipts": 0,
+      "state_bytes": 167995
+     },
+     {
+      "body_bytes": 1953115,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 671150,
+       "median": 653258,
+       "min": 496249,
+       "p95": 671150
+      },
+      "receipts": 0,
+      "state_bytes": 169341
+     },
+     {
+      "body_bytes": 1958241,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 663158,
+       "median": 654447,
+       "min": 534513,
+       "p95": 663158
+      },
+      "receipts": 0,
+      "state_bytes": 172033
+     },
+     {
+      "body_bytes": 2026404,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 690496,
+       "median": 687079,
+       "min": 543615,
+       "p95": 690496
+      },
+      "receipts": 0,
+      "state_bytes": 172126
+     },
+     {
+      "body_bytes": 2065365,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 737193,
+       "median": 697755,
+       "min": 558947,
+       "p95": 737193
+      },
+      "receipts": 0,
+      "state_bytes": 178393
+     },
+     {
+      "body_bytes": 2017384,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 682731,
+       "median": 669340,
+       "min": 527953,
+       "p95": 682731
+      },
+      "receipts": 0,
+      "state_bytes": 173794
+     },
+     {
+      "body_bytes": 2023837,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 687973,
+       "median": 661448,
+       "min": 546585,
+       "p95": 687973
+      },
+      "receipts": 0,
+      "state_bytes": 182213
+     },
+     {
+      "body_bytes": 1842668,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 540086,
+       "median": 406338,
+       "min": 403569,
+       "p95": 540086
+      },
+      "receipts": 0,
+      "state_bytes": 177667
+     },
+     {
+      "body_bytes": 1741859,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 471491,
+       "median": 345825,
+       "min": 332861,
+       "p95": 471491
+      },
+      "receipts": 0,
+      "state_bytes": 167729
+     },
+     {
+      "body_bytes": 1741568,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 483045,
+       "median": 473203,
+       "min": 331409,
+       "p95": 483045
+      },
+      "receipts": 0,
+      "state_bytes": 167787
+     },
+     {
+      "body_bytes": 1741704,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 465481,
+       "median": 330923,
+       "min": 329804,
+       "p95": 465481
+      },
+      "receipts": 0,
+      "state_bytes": 167784
+     },
+     {
+      "body_bytes": 1743834,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 476001,
+       "median": 333665,
+       "min": 331979,
+       "p95": 476001
+      },
+      "receipts": 0,
+      "state_bytes": 167792
+     },
+     {
+      "body_bytes": 1749058,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 475335,
+       "median": 332114,
+       "min": 331163,
+       "p95": 475335
+      },
+      "receipts": 0,
+      "state_bytes": 167819
+     },
+     {
+      "body_bytes": 1809995,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 540609,
+       "median": 391077,
+       "min": 380538,
+       "p95": 540609
+      },
+      "receipts": 0,
+      "state_bytes": 167828
+     },
+     {
+      "body_bytes": 2044631,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 677158,
+       "median": 675535,
+       "min": 523278,
+       "p95": 677158
+      },
+      "receipts": 0,
+      "state_bytes": 172003
+     },
+     {
+      "body_bytes": 2166805,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 751861,
+       "median": 750189,
+       "min": 738685,
+       "p95": 751861
+      },
+      "receipts": 0,
+      "state_bytes": 180512
+     }
+    ],
+    "load_1m": {
+     "after": "6.04",
+     "before": "5.56"
+    },
+    "population": 74,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 23,
+     "p95": 751861
+    },
+    "receipts": 0
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "5.78",
+       "before": "6.04"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 13,
+       "p95": 1461805
+      }
+     }
+    ],
+    "day_body_bytes": 159507,
+    "day_read_wall_us": {
+     "max": 6054,
+     "median": 5710,
+     "min": 5653,
+     "p95": 6054
+    },
+    "decided": 74,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "hours": [
+     {
+      "body_bytes": 1836905,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 1356871,
+       "median": 1331666,
+       "min": 1184076,
+       "p95": 1356871
+      },
+      "receipts": 184,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 2006961,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 1415883,
+       "median": 1395387,
+       "min": 1253375,
+       "p95": 1415883
+      },
+      "receipts": 174,
+      "state_bytes": 146045
+     },
+     {
+      "body_bytes": 2011221,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 1452039,
+       "median": 1360871,
+       "min": 1313982,
+       "p95": 1452039
+      },
+      "receipts": 175,
+      "state_bytes": 170535
+     },
+     {
+      "body_bytes": 1905254,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 1264549,
+       "median": 1194124,
+       "min": 1118251,
+       "p95": 1264549
+      },
+      "receipts": 119,
+      "state_bytes": 167831
+     },
+     {
+      "body_bytes": 1914474,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 1298333,
+       "median": 1288449,
+       "min": 1159637,
+       "p95": 1298333
+      },
+      "receipts": 133,
+      "state_bytes": 164834
+     },
+     {
+      "body_bytes": 1899094,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 1213858,
+       "median": 1195387,
+       "min": 1053913,
+       "p95": 1213858
+      },
+      "receipts": 115,
+      "state_bytes": 164963
+     },
+     {
+      "body_bytes": 1881243,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 1181458,
+       "median": 1041543,
+       "min": 1009452,
+       "p95": 1181458
+      },
+      "receipts": 109,
+      "state_bytes": 164568
+     },
+     {
+      "body_bytes": 1863649,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 1140641,
+       "median": 1127880,
+       "min": 996336,
+       "p95": 1140641
+      },
+      "receipts": 97,
+      "state_bytes": 161729
+     },
+     {
+      "body_bytes": 1914646,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 1281174,
+       "median": 1266618,
+       "min": 1109019,
+       "p95": 1281174
+      },
+      "receipts": 127,
+      "state_bytes": 164316
+     },
+     {
+      "body_bytes": 1899843,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 1209492,
+       "median": 1054981,
+       "min": 1052506,
+       "p95": 1209492
+      },
+      "receipts": 115,
+      "state_bytes": 171372
+     },
+     {
+      "body_bytes": 1953703,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 1444846,
+       "median": 1368392,
+       "min": 1259651,
+       "p95": 1444846
+      },
+      "receipts": 158,
+      "state_bytes": 169509
+     },
+     {
+      "body_bytes": 1962543,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 1371115,
+       "median": 1350722,
+       "min": 1240043,
+       "p95": 1371115
+      },
+      "receipts": 148,
+      "state_bytes": 170804
+     },
+     {
+      "body_bytes": 1948711,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 1320072,
+       "median": 1194052,
+       "min": 1186499,
+       "p95": 1320072
+      },
+      "receipts": 145,
+      "state_bytes": 171536
+     },
+     {
+      "body_bytes": 2000007,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 1461805,
+       "median": 1448918,
+       "min": 1308862,
+       "p95": 1461805
+      },
+      "receipts": 173,
+      "state_bytes": 175297
+     },
+     {
+      "body_bytes": 1994076,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 1432492,
+       "median": 1395959,
+       "min": 1250647,
+       "p95": 1432492
+      },
+      "receipts": 163,
+      "state_bytes": 172692
+     },
+     {
+      "body_bytes": 1936974,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 1401752,
+       "median": 1400445,
+       "min": 1262920,
+       "p95": 1401752
+      },
+      "receipts": 189,
+      "state_bytes": 171235
+     },
+     {
+      "body_bytes": 1760360,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 574898,
+       "median": 467304,
+       "min": 436027,
+       "p95": 574898
+      },
+      "receipts": 12,
+      "state_bytes": 167955
+     },
+     {
+      "body_bytes": 1764888,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 572911,
+       "median": 425538,
+       "min": 422620,
+       "p95": 572911
+      },
+      "receipts": 10,
+      "state_bytes": 169536
+     },
+     {
+      "body_bytes": 1754244,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 522759,
+       "median": 512492,
+       "min": 376312,
+       "p95": 522759
+      },
+      "receipts": 5,
+      "state_bytes": 167583
+     },
+     {
+      "body_bytes": 1751528,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 476832,
+       "median": 347774,
+       "min": 333094,
+       "p95": 476832
+      },
+      "receipts": 0,
+      "state_bytes": 167821
+     },
+     {
+      "body_bytes": 1755622,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 500959,
+       "median": 332070,
+       "min": 331604,
+       "p95": 500959
+      },
+      "receipts": 0,
+      "state_bytes": 167781
+     },
+     {
+      "body_bytes": 1824117,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 840755,
+       "median": 670768,
+       "min": 666176,
+       "p95": 840755
+      },
+      "receipts": 47,
+      "state_bytes": 167800
+     },
+     {
+      "body_bytes": 1924523,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 1190003,
+       "median": 1180517,
+       "min": 1075756,
+       "p95": 1190003
+      },
+      "receipts": 118,
+      "state_bytes": 167788
+     },
+     {
+      "body_bytes": 1994491,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 1426383,
+       "median": 1376507,
+       "min": 1275096,
+       "p95": 1426383
+      },
+      "receipts": 162,
+      "state_bytes": 171007
+     }
+    ],
+    "load_1m": {
+     "after": "5.78",
+     "before": "6.04"
+    },
+    "population": 74,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 13,
+     "p95": 1461805
+    },
+    "receipts": 2678
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "5.06",
+       "before": "5.78"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 11,
+       "p95": 795683
+      }
+     }
+    ],
+    "day_body_bytes": 165115,
+    "day_read_wall_us": {
+     "max": 7493,
+     "median": 7311,
+     "min": 7137,
+     "p95": 7493
+    },
+    "decided": 4,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "hours": [
+     {
+      "body_bytes": 1869224,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 714164,
+       "median": 712139,
+       "min": 607994,
+       "p95": 714164
+      },
+      "receipts": 9,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 2026829,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 694288,
+       "median": 693240,
+       "min": 551940,
+       "p95": 694288
+      },
+      "receipts": 3,
+      "state_bytes": 160694
+     },
+     {
+      "body_bytes": 2002789,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 761305,
+       "median": 742251,
+       "min": 605150,
+       "p95": 761305
+      },
+      "receipts": 8,
+      "state_bytes": 167917
+     },
+     {
+      "body_bytes": 1957933,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 727518,
+       "median": 693116,
+       "min": 539758,
+       "p95": 727518
+      },
+      "receipts": 5,
+      "state_bytes": 167796
+     },
+     {
+      "body_bytes": 1928661,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 763102,
+       "median": 744335,
+       "min": 606402,
+       "p95": 763102
+      },
+      "receipts": 14,
+      "state_bytes": 166906
+     },
+     {
+      "body_bytes": 1958327,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 757646,
+       "median": 667614,
+       "min": 603483,
+       "p95": 757646
+      },
+      "receipts": 11,
+      "state_bytes": 170597
+     },
+     {
+      "body_bytes": 1891292,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 602632,
+       "median": 595123,
+       "min": 470377,
+       "p95": 602632
+      },
+      "receipts": 1,
+      "state_bytes": 173010
+     },
+     {
+      "body_bytes": 1866319,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 661031,
+       "median": 657607,
+       "min": 508739,
+       "p95": 661031
+      },
+      "receipts": 7,
+      "state_bytes": 166338
+     },
+     {
+      "body_bytes": 1890824,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 690936,
+       "median": 570220,
+       "min": 541507,
+       "p95": 690936
+      },
+      "receipts": 9,
+      "state_bytes": 168224
+     },
+     {
+      "body_bytes": 1953744,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 725525,
+       "median": 708769,
+       "min": 570839,
+       "p95": 725525
+      },
+      "receipts": 8,
+      "state_bytes": 168772
+     },
+     {
+      "body_bytes": 1974863,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 757252,
+       "median": 744068,
+       "min": 603635,
+       "p95": 757252
+      },
+      "receipts": 10,
+      "state_bytes": 169227
+     },
+     {
+      "body_bytes": 2026702,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 795683,
+       "median": 774721,
+       "min": 677264,
+       "p95": 795683
+      },
+      "receipts": 10,
+      "state_bytes": 173198
+     },
+     {
+      "body_bytes": 2050615,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 775222,
+       "median": 748117,
+       "min": 617105,
+       "p95": 775222
+      },
+      "receipts": 6,
+      "state_bytes": 195612
+     },
+     {
+      "body_bytes": 1997448,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 754509,
+       "median": 721184,
+       "min": 575398,
+       "p95": 754509
+      },
+      "receipts": 5,
+      "state_bytes": 174931
+     },
+     {
+      "body_bytes": 2022670,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 779483,
+       "median": 771377,
+       "min": 606446,
+       "p95": 779483
+      },
+      "receipts": 8,
+      "state_bytes": 179963
+     },
+     {
+      "body_bytes": 1849898,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 590050,
+       "median": 461787,
+       "min": 452022,
+       "p95": 590050
+      },
+      "receipts": 4,
+      "state_bytes": 175441
+     },
+     {
+      "body_bytes": 1743356,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 480460,
+       "median": 473367,
+       "min": 342024,
+       "p95": 480460
+      },
+      "receipts": 1,
+      "state_bytes": 167935
+     },
+     {
+      "body_bytes": 1742063,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 463907,
+       "median": 332331,
+       "min": 331082,
+       "p95": 463907
+      },
+      "receipts": 0,
+      "state_bytes": 167988
+     },
+     {
+      "body_bytes": 1742277,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 471397,
+       "median": 335688,
+       "min": 330693,
+       "p95": 471397
+      },
+      "receipts": 0,
+      "state_bytes": 167985
+     },
+     {
+      "body_bytes": 1744267,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 487050,
+       "median": 337415,
+       "min": 331010,
+       "p95": 487050
+      },
+      "receipts": 0,
+      "state_bytes": 167993
+     },
+     {
+      "body_bytes": 1749486,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 474653,
+       "median": 335450,
+       "min": 333123,
+       "p95": 474653
+      },
+      "receipts": 0,
+      "state_bytes": 168019
+     },
+     {
+      "body_bytes": 1785870,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 535250,
+       "median": 507587,
+       "min": 359051,
+       "p95": 535250
+      },
+      "receipts": 0,
+      "state_bytes": 168040
+     },
+     {
+      "body_bytes": 1921342,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 686768,
+       "median": 502017,
+       "min": 488756,
+       "p95": 686768
+      },
+      "receipts": 3,
+      "state_bytes": 169678
+     },
+     {
+      "body_bytes": 2106937,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 779578,
+       "median": 770971,
+       "min": 621443,
+       "p95": 779578
+      },
+      "receipts": 5,
+      "state_bytes": 173180
+     }
+    ],
+    "load_1m": {
+     "after": "5.06",
+     "before": "5.78"
+    },
+    "population": 74,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 11,
+     "p95": 795683
+    },
+    "receipts": 127
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "6.02",
+       "before": "5.06"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 12,
+       "p95": 963061
+      }
+     }
+    ],
+    "day_body_bytes": 165141,
+    "day_read_wall_us": {
+     "max": 7747,
+     "median": 7627,
+     "min": 7375,
+     "p95": 7747
+    },
+    "decided": 8,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "hours": [
+     {
+      "body_bytes": 1875006,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 899439,
+       "median": 880927,
+       "min": 867393,
+       "p95": 899439
+      },
+      "receipts": 28,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 2033692,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 962744,
+       "median": 949363,
+       "min": 793149,
+       "p95": 962744
+      },
+      "receipts": 29,
+      "state_bytes": 162216
+     },
+     {
+      "body_bytes": 1992279,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 916767,
+       "median": 743125,
+       "min": 735260,
+       "p95": 916767
+      },
+      "receipts": 23,
+      "state_bytes": 164977
+     },
+     {
+      "body_bytes": 1918184,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 755462,
+       "median": 735014,
+       "min": 649093,
+       "p95": 755462
+      },
+      "receipts": 15,
+      "state_bytes": 163464
+     },
+     {
+      "body_bytes": 1937589,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 831559,
+       "median": 808166,
+       "min": 658717,
+       "p95": 831559
+      },
+      "receipts": 20,
+      "state_bytes": 163620
+     },
+     {
+      "body_bytes": 1919900,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 752623,
+       "median": 739243,
+       "min": 604254,
+       "p95": 752623
+      },
+      "receipts": 16,
+      "state_bytes": 162896
+     },
+     {
+      "body_bytes": 1895844,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 713192,
+       "median": 712148,
+       "min": 560701,
+       "p95": 713192
+      },
+      "receipts": 12,
+      "state_bytes": 163106
+     },
+     {
+      "body_bytes": 1848329,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 741514,
+       "median": 577745,
+       "min": 574038,
+       "p95": 741514
+      },
+      "receipts": 16,
+      "state_bytes": 161639
+     },
+     {
+      "body_bytes": 1921102,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 786833,
+       "median": 765007,
+       "min": 611982,
+       "p95": 786833
+      },
+      "receipts": 15,
+      "state_bytes": 167480
+     },
+     {
+      "body_bytes": 1970122,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 828534,
+       "median": 805075,
+       "min": 671088,
+       "p95": 828534
+      },
+      "receipts": 19,
+      "state_bytes": 176110
+     },
+     {
+      "body_bytes": 1954323,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 850897,
+       "median": 828820,
+       "min": 678005,
+       "p95": 850897
+      },
+      "receipts": 20,
+      "state_bytes": 172763
+     },
+     {
+      "body_bytes": 2036960,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 807982,
+       "median": 794659,
+       "min": 658596,
+       "p95": 807982
+      },
+      "receipts": 12,
+      "state_bytes": 179683
+     },
+     {
+      "body_bytes": 2066416,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 963061,
+       "median": 930128,
+       "min": 787974,
+       "p95": 963061
+      },
+      "receipts": 23,
+      "state_bytes": 181234
+     },
+     {
+      "body_bytes": 2011713,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 880494,
+       "median": 832629,
+       "min": 686341,
+       "p95": 880494
+      },
+      "receipts": 17,
+      "state_bytes": 180134
+     },
+     {
+      "body_bytes": 2047945,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 885826,
+       "median": 879989,
+       "min": 749080,
+       "p95": 885826
+      },
+      "receipts": 21,
+      "state_bytes": 172551
+     },
+     {
+      "body_bytes": 1849226,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 641846,
+       "median": 540290,
+       "min": 510381,
+       "p95": 641846
+      },
+      "receipts": 11,
+      "state_bytes": 174764
+     },
+     {
+      "body_bytes": 1749599,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 487884,
+       "median": 487787,
+       "min": 353105,
+       "p95": 487884
+      },
+      "receipts": 2,
+      "state_bytes": 167913
+     },
+     {
+      "body_bytes": 1742482,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 477328,
+       "median": 351245,
+       "min": 334172,
+       "p95": 477328
+      },
+      "receipts": 0,
+      "state_bytes": 167892
+     },
+     {
+      "body_bytes": 1742687,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 472670,
+       "median": 335627,
+       "min": 329668,
+       "p95": 472670
+      },
+      "receipts": 0,
+      "state_bytes": 167889
+     },
+     {
+      "body_bytes": 1744727,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 482975,
+       "median": 333812,
+       "min": 328388,
+       "p95": 482975
+      },
+      "receipts": 0,
+      "state_bytes": 167896
+     },
+     {
+      "body_bytes": 1749780,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 521682,
+       "median": 367304,
+       "min": 341656,
+       "p95": 521682
+      },
+      "receipts": 0,
+      "state_bytes": 167920
+     },
+     {
+      "body_bytes": 1818068,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 592691,
+       "median": 589045,
+       "min": 450361,
+       "p95": 592691
+      },
+      "receipts": 8,
+      "state_bytes": 167935
+     },
+     {
+      "body_bytes": 2024730,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 838205,
+       "median": 825358,
+       "min": 689230,
+       "p95": 838205
+      },
+      "receipts": 17,
+      "state_bytes": 174913
+     },
+     {
+      "body_bytes": 2128742,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 831393,
+       "median": 816212,
+       "min": 700671,
+       "p95": 831393
+      },
+      "receipts": 11,
+      "state_bytes": 179838
+     }
+    ],
+    "load_1m": {
+     "after": "6.02",
+     "before": "5.06"
+    },
+    "population": 74,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 12,
+     "p95": 963061
+    },
+    "receipts": 335
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "5.23",
+       "before": "6.02"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 0,
+       "p95": 1062881
+      }
+     }
+    ],
+    "day_body_bytes": 164382,
+    "day_read_wall_us": {
+     "max": 7278,
+     "median": 7273,
+     "min": 6917,
+     "p95": 7278
+    },
+    "decided": 16,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "hours": [
+     {
+      "body_bytes": 1863686,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 1062881,
+       "median": 1035700,
+       "min": 899636,
+       "p95": 1062881
+      },
+      "receipts": 58,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 2029957,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 936088,
+       "median": 919151,
+       "min": 787851,
+       "p95": 936088
+      },
+      "receipts": 34,
+      "state_bytes": 166898
+     },
+     {
+      "body_bytes": 1997652,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 993118,
+       "median": 947337,
+       "min": 814055,
+       "p95": 993118
+      },
+      "receipts": 40,
+      "state_bytes": 169205
+     },
+     {
+      "body_bytes": 1933546,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 858218,
+       "median": 832389,
+       "min": 702493,
+       "p95": 858218
+      },
+      "receipts": 26,
+      "state_bytes": 172356
+     },
+     {
+      "body_bytes": 1935419,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 870915,
+       "median": 828446,
+       "min": 694524,
+       "p95": 870915
+      },
+      "receipts": 25,
+      "state_bytes": 164335
+     },
+     {
+      "body_bytes": 1944077,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 884061,
+       "median": 873838,
+       "min": 732873,
+       "p95": 884061
+      },
+      "receipts": 30,
+      "state_bytes": 167021
+     },
+     {
+      "body_bytes": 1884416,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 817997,
+       "median": 804232,
+       "min": 666765,
+       "p95": 817997
+      },
+      "receipts": 27,
+      "state_bytes": 168121
+     },
+     {
+      "body_bytes": 1876382,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 836775,
+       "median": 690926,
+       "min": 686951,
+       "p95": 836775
+      },
+      "receipts": 29,
+      "state_bytes": 164087
+     },
+     {
+      "body_bytes": 1900337,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 804559,
+       "median": 789783,
+       "min": 655687,
+       "p95": 804559
+      },
+      "receipts": 23,
+      "state_bytes": 167195
+     },
+     {
+      "body_bytes": 1946974,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 835215,
+       "median": 828125,
+       "min": 684403,
+       "p95": 835215
+      },
+      "receipts": 23,
+      "state_bytes": 176724
+     },
+     {
+      "body_bytes": 1963527,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 959779,
+       "median": 948599,
+       "min": 811650,
+       "p95": 959779
+      },
+      "receipts": 36,
+      "state_bytes": 175847
+     },
+     {
+      "body_bytes": 2038646,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 1002817,
+       "median": 995465,
+       "min": 866587,
+       "p95": 1002817
+      },
+      "receipts": 37,
+      "state_bytes": 176303
+     },
+     {
+      "body_bytes": 2019693,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 1061314,
+       "median": 1041402,
+       "min": 914852,
+       "p95": 1061314
+      },
+      "receipts": 45,
+      "state_bytes": 170811
+     },
+     {
+      "body_bytes": 2011992,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 998009,
+       "median": 980438,
+       "min": 841636,
+       "p95": 998009
+      },
+      "receipts": 42,
+      "state_bytes": 179449
+     },
+     {
+      "body_bytes": 2026020,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 933350,
+       "median": 913369,
+       "min": 780792,
+       "p95": 933350
+      },
+      "receipts": 28,
+      "state_bytes": 178416
+     },
+     {
+      "body_bytes": 1855832,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 781403,
+       "median": 775304,
+       "min": 644457,
+       "p95": 781403
+      },
+      "receipts": 37,
+      "state_bytes": 177394
+     },
+     {
+      "body_bytes": 1744239,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 472784,
+       "median": 332745,
+       "min": 331244,
+       "p95": 472784
+      },
+      "receipts": 0,
+      "state_bytes": 167553
+     },
+     {
+      "body_bytes": 1743352,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 460707,
+       "median": 332255,
+       "min": 329698,
+       "p95": 460707
+      },
+      "receipts": 0,
+      "state_bytes": 167613
+     },
+     {
+      "body_bytes": 1743617,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 472607,
+       "median": 331546,
+       "min": 329735,
+       "p95": 472607
+      },
+      "receipts": 0,
+      "state_bytes": 167611
+     },
+     {
+      "body_bytes": 1746020,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 471550,
+       "median": 464330,
+       "min": 330387,
+       "p95": 471550
+      },
+      "receipts": 0,
+      "state_bytes": 167620
+     },
+     {
+      "body_bytes": 1750780,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 469740,
+       "median": 332799,
+       "min": 329664,
+       "p95": 469740
+      },
+      "receipts": 0,
+      "state_bytes": 167643
+     },
+     {
+      "body_bytes": 1799175,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 585533,
+       "median": 439000,
+       "min": 438418,
+       "p95": 585533
+      },
+      "receipts": 10,
+      "state_bytes": 167661
+     },
+     {
+      "body_bytes": 1966159,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 885227,
+       "median": 880320,
+       "min": 732172,
+       "p95": 885227
+      },
+      "receipts": 33,
+      "state_bytes": 168356
+     },
+     {
+      "body_bytes": 2105485,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 982516,
+       "median": 968444,
+       "min": 862797,
+       "p95": 982516
+      },
+      "receipts": 29,
+      "state_bytes": 170823
+     }
+    ],
+    "load_1m": {
+     "after": "5.23",
+     "before": "6.02"
+    },
+    "population": 74,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 0,
+     "p95": 1062881
+    },
+    "receipts": 612
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "4.86",
+       "before": "5.23"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 23,
+       "p95": 893727
+      }
+     }
+    ],
+    "day_body_bytes": 197981,
+    "day_read_wall_us": {
+     "max": 9098,
+     "median": 8913,
+     "min": 8762,
+     "p95": 9098
+    },
+    "decided": 0,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "hours": [
+     {
+      "body_bytes": 2154424,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 697452,
+       "median": 691877,
+       "min": 542546,
+       "p95": 697452
+      },
+      "receipts": 0,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 2351527,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 762930,
+       "median": 743101,
+       "min": 604092,
+       "p95": 762930
+      },
+      "receipts": 0,
+      "state_bytes": 186642
+     },
+     {
+      "body_bytes": 2308174,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 742026,
+       "median": 724941,
+       "min": 723674,
+       "p95": 742026
+      },
+      "receipts": 0,
+      "state_bytes": 197100
+     },
+     {
+      "body_bytes": 2257864,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 711757,
+       "median": 691700,
+       "min": 557614,
+       "p95": 711757
+      },
+      "receipts": 0,
+      "state_bytes": 202328
+     },
+     {
+      "body_bytes": 2254102,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 699123,
+       "median": 690987,
+       "min": 545240,
+       "p95": 699123
+      },
+      "receipts": 0,
+      "state_bytes": 193580
+     },
+     {
+      "body_bytes": 2261153,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 710892,
+       "median": 685667,
+       "min": 547312,
+       "p95": 710892
+      },
+      "receipts": 0,
+      "state_bytes": 197008
+     },
+     {
+      "body_bytes": 2239606,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 716943,
+       "median": 561743,
+       "min": 534350,
+       "p95": 716943
+      },
+      "receipts": 0,
+      "state_bytes": 191291
+     },
+     {
+      "body_bytes": 2224638,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 683738,
+       "median": 679592,
+       "min": 678681,
+       "p95": 683738
+      },
+      "receipts": 0,
+      "state_bytes": 190754
+     },
+     {
+      "body_bytes": 2390429,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 813607,
+       "median": 788914,
+       "min": 630031,
+       "p95": 813607
+      },
+      "receipts": 0,
+      "state_bytes": 203267
+     },
+     {
+      "body_bytes": 2399218,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 862231,
+       "median": 776768,
+       "min": 634937,
+       "p95": 862231
+      },
+      "receipts": 0,
+      "state_bytes": 213518
+     },
+     {
+      "body_bytes": 2420584,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 830827,
+       "median": 807962,
+       "min": 785955,
+       "p95": 830827
+      },
+      "receipts": 0,
+      "state_bytes": 211508
+     },
+     {
+      "body_bytes": 2486680,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 826004,
+       "median": 821498,
+       "min": 694060,
+       "p95": 826004
+      },
+      "receipts": 0,
+      "state_bytes": 207508
+     },
+     {
+      "body_bytes": 2459864,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 850241,
+       "median": 831248,
+       "min": 816884,
+       "p95": 850241
+      },
+      "receipts": 0,
+      "state_bytes": 219616
+     },
+     {
+      "body_bytes": 2428336,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 815982,
+       "median": 812541,
+       "min": 651085,
+       "p95": 815982
+      },
+      "receipts": 0,
+      "state_bytes": 210049
+     },
+     {
+      "body_bytes": 2484883,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 836068,
+       "median": 832070,
+       "min": 822085,
+       "p95": 836068
+      },
+      "receipts": 0,
+      "state_bytes": 213008
+     },
+     {
+      "body_bytes": 2185563,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 637456,
+       "median": 620234,
+       "min": 481121,
+       "p95": 637456
+      },
+      "receipts": 0,
+      "state_bytes": 212820
+     },
+     {
+      "body_bytes": 2057788,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 551601,
+       "median": 400295,
+       "min": 393328,
+       "p95": 551601
+      },
+      "receipts": 0,
+      "state_bytes": 199625
+     },
+     {
+      "body_bytes": 2058914,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 525262,
+       "median": 394317,
+       "min": 392025,
+       "p95": 525262
+      },
+      "receipts": 0,
+      "state_bytes": 199283
+     },
+     {
+      "body_bytes": 2058977,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 532714,
+       "median": 528546,
+       "min": 395713,
+       "p95": 532714
+      },
+      "receipts": 0,
+      "state_bytes": 199280
+     },
+     {
+      "body_bytes": 2061200,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 539392,
+       "median": 408285,
+       "min": 397418,
+       "p95": 539392
+      },
+      "receipts": 0,
+      "state_bytes": 199287
+     },
+     {
+      "body_bytes": 2068469,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 537456,
+       "median": 393495,
+       "min": 391800,
+       "p95": 537456
+      },
+      "receipts": 0,
+      "state_bytes": 199313
+     },
+     {
+      "body_bytes": 2132766,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 593186,
+       "median": 574113,
+       "min": 446849,
+       "p95": 593186
+      },
+      "receipts": 0,
+      "state_bytes": 199343
+     },
+     {
+      "body_bytes": 2359133,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 778991,
+       "median": 753176,
+       "min": 592785,
+       "p95": 778991
+      },
+      "receipts": 0,
+      "state_bytes": 203670
+     },
+     {
+      "body_bytes": 2533743,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 893727,
+       "median": 852490,
+       "min": 842676,
+       "p95": 893727
+      },
+      "receipts": 0,
+      "state_bytes": 212089
+     }
+    ],
+    "load_1m": {
+     "after": "4.86",
+     "before": "5.23"
+    },
+    "population": 88,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 23,
+     "p95": 893727
+    },
+    "receipts": 0
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "4.79",
+       "before": "4.86"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 11,
+       "p95": 2042307
+      }
+     }
+    ],
+    "day_body_bytes": 189768,
+    "day_read_wall_us": {
+     "max": 7103,
+     "median": 6831,
+     "min": 6755,
+     "p95": 7103
+    },
+    "decided": 88,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "hours": [
+     {
+      "body_bytes": 2150238,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 1610618,
+       "median": 1552850,
+       "min": 1421808,
+       "p95": 1610618
+      },
+      "receipts": 207,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 2249542,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 1440564,
+       "median": 1438434,
+       "min": 1266596,
+       "p95": 1440564
+      },
+      "receipts": 148,
+      "state_bytes": 167424
+     },
+     {
+      "body_bytes": 2293446,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 1646629,
+       "median": 1627569,
+       "min": 1453992,
+       "p95": 1646629
+      },
+      "receipts": 171,
+      "state_bytes": 189245
+     },
+     {
+      "body_bytes": 2200307,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 1404470,
+       "median": 1346338,
+       "min": 1236670,
+       "p95": 1404470
+      },
+      "receipts": 121,
+      "state_bytes": 187665
+     },
+     {
+      "body_bytes": 2208491,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 1390980,
+       "median": 1338060,
+       "min": 1208781,
+       "p95": 1390980
+      },
+      "receipts": 119,
+      "state_bytes": 191693
+     },
+     {
+      "body_bytes": 2218284,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 1400155,
+       "median": 1397417,
+       "min": 1382416,
+       "p95": 1400155
+      },
+      "receipts": 122,
+      "state_bytes": 195290
+     },
+     {
+      "body_bytes": 2242930,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 1514547,
+       "median": 1457269,
+       "min": 1315419,
+       "p95": 1514547
+      },
+      "receipts": 132,
+      "state_bytes": 192285
+     },
+     {
+      "body_bytes": 2246409,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 1515190,
+       "median": 1464549,
+       "min": 1325907,
+       "p95": 1515190
+      },
+      "receipts": 139,
+      "state_bytes": 194698
+     },
+     {
+      "body_bytes": 2316857,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 1578633,
+       "median": 1557219,
+       "min": 1431660,
+       "p95": 1578633
+      },
+      "receipts": 153,
+      "state_bytes": 196980
+     },
+     {
+      "body_bytes": 2379794,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 1840013,
+       "median": 1837554,
+       "min": 1831849,
+       "p95": 1840013
+      },
+      "receipts": 208,
+      "state_bytes": 196775
+     },
+     {
+      "body_bytes": 2378610,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 1857244,
+       "median": 1808972,
+       "min": 1700321,
+       "p95": 1857244
+      },
+      "receipts": 201,
+      "state_bytes": 212652
+     },
+     {
+      "body_bytes": 2409602,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 2042307,
+       "median": 1974020,
+       "min": 1969052,
+       "p95": 2042307
+      },
+      "receipts": 253,
+      "state_bytes": 203061
+     },
+     {
+      "body_bytes": 2445181,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 1985311,
+       "median": 1980780,
+       "min": 1844522,
+       "p95": 1985311
+      },
+      "receipts": 245,
+      "state_bytes": 204872
+     },
+     {
+      "body_bytes": 2395787,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 1875514,
+       "median": 1853828,
+       "min": 1747930,
+       "p95": 1875514
+      },
+      "receipts": 220,
+      "state_bytes": 205511
+     },
+     {
+      "body_bytes": 2417525,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 1927360,
+       "median": 1902163,
+       "min": 1897131,
+       "p95": 1927360
+      },
+      "receipts": 235,
+      "state_bytes": 204283
+     },
+     {
+      "body_bytes": 2247634,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 1551745,
+       "median": 1546870,
+       "min": 1413851,
+       "p95": 1551745
+      },
+      "receipts": 178,
+      "state_bytes": 207039
+     },
+     {
+      "body_bytes": 2093818,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 815451,
+       "median": 813032,
+       "min": 668644,
+       "p95": 815451
+      },
+      "receipts": 28,
+      "state_bytes": 200714
+     },
+     {
+      "body_bytes": 2071595,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 566514,
+       "median": 435932,
+       "min": 434885,
+       "p95": 566514
+      },
+      "receipts": 4,
+      "state_bytes": 198949
+     },
+     {
+      "body_bytes": 2069251,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 536993,
+       "median": 406114,
+       "min": 405097,
+       "p95": 536993
+      },
+      "receipts": 1,
+      "state_bytes": 199001
+     },
+     {
+      "body_bytes": 2071067,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 528310,
+       "median": 526185,
+       "min": 392532,
+       "p95": 528310
+      },
+      "receipts": 0,
+      "state_bytes": 198995
+     },
+     {
+      "body_bytes": 2076254,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 534970,
+       "median": 393423,
+       "min": 392576,
+       "p95": 534970
+      },
+      "receipts": 0,
+      "state_bytes": 199025
+     },
+     {
+      "body_bytes": 2117161,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 760652,
+       "median": 759381,
+       "min": 614777,
+       "p95": 760652
+      },
+      "receipts": 21,
+      "state_bytes": 199068
+     },
+     {
+      "body_bytes": 2203991,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 1211591,
+       "median": 1197127,
+       "min": 1043012,
+       "p95": 1211591
+      },
+      "receipts": 89,
+      "state_bytes": 199151
+     },
+     {
+      "body_bytes": 2349290,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 1711360,
+       "median": 1704966,
+       "min": 1572835,
+       "p95": 1711360
+      },
+      "receipts": 184,
+      "state_bytes": 202119
+     }
+    ],
+    "load_1m": {
+     "after": "4.79",
+     "before": "4.86"
+    },
+    "population": 88,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 11,
+     "p95": 2042307
+    },
+    "receipts": 3179
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "5.48",
+       "before": "4.79"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 12,
+       "p95": 1030511
+      }
+     }
+    ],
+    "day_body_bytes": 196803,
+    "day_read_wall_us": {
+     "max": 8829,
+     "median": 8738,
+     "min": 8552,
+     "p95": 8829
+    },
+    "decided": 4,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "hours": [
+     {
+      "body_bytes": 2159604,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 840611,
+       "median": 790447,
+       "min": 647447,
+       "p95": 840611
+      },
+      "receipts": 10,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 2314820,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 872956,
+       "median": 852627,
+       "min": 713573,
+       "p95": 872956
+      },
+      "receipts": 12,
+      "state_bytes": 186332
+     },
+     {
+      "body_bytes": 2297979,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 854396,
+       "median": 828744,
+       "min": 681129,
+       "p95": 854396
+      },
+      "receipts": 9,
+      "state_bytes": 200819
+     },
+     {
+      "body_bytes": 2254736,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 819559,
+       "median": 811815,
+       "min": 672157,
+       "p95": 819559
+      },
+      "receipts": 10,
+      "state_bytes": 193097
+     },
+     {
+      "body_bytes": 2250256,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 734962,
+       "median": 729719,
+       "min": 581412,
+       "p95": 734962
+      },
+      "receipts": 3,
+      "state_bytes": 191184
+     },
+     {
+      "body_bytes": 2248677,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 734855,
+       "median": 723991,
+       "min": 598289,
+       "p95": 734855
+      },
+      "receipts": 5,
+      "state_bytes": 197485
+     },
+     {
+      "body_bytes": 2237329,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 798137,
+       "median": 773224,
+       "min": 771819,
+       "p95": 798137
+      },
+      "receipts": 9,
+      "state_bytes": 189989
+     },
+     {
+      "body_bytes": 2239342,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 805277,
+       "median": 759472,
+       "min": 604860,
+       "p95": 805277
+      },
+      "receipts": 6,
+      "state_bytes": 192228
+     },
+     {
+      "body_bytes": 2393634,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 898704,
+       "median": 896234,
+       "min": 758583,
+       "p95": 898704
+      },
+      "receipts": 11,
+      "state_bytes": 196183
+     },
+     {
+      "body_bytes": 2389290,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 952830,
+       "median": 931250,
+       "min": 756382,
+       "p95": 952830
+      },
+      "receipts": 11,
+      "state_bytes": 207167
+     },
+     {
+      "body_bytes": 2414109,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 974918,
+       "median": 972457,
+       "min": 972355,
+       "p95": 974918
+      },
+      "receipts": 15,
+      "state_bytes": 205215
+     },
+     {
+      "body_bytes": 2438467,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 980434,
+       "median": 920318,
+       "min": 791213,
+       "p95": 980434
+      },
+      "receipts": 10,
+      "state_bytes": 220603
+     },
+     {
+      "body_bytes": 2470131,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 1030511,
+       "median": 1025398,
+       "min": 1022727,
+       "p95": 1030511
+      },
+      "receipts": 16,
+      "state_bytes": 227455
+     },
+     {
+      "body_bytes": 2453249,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 939758,
+       "median": 937691,
+       "min": 937360,
+       "p95": 939758
+      },
+      "receipts": 11,
+      "state_bytes": 213090
+     },
+     {
+      "body_bytes": 2463409,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 969665,
+       "median": 963415,
+       "min": 958659,
+       "p95": 969665
+      },
+      "receipts": 12,
+      "state_bytes": 209489
+     },
+     {
+      "body_bytes": 2181261,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 712048,
+       "median": 564451,
+       "min": 563502,
+       "p95": 712048
+      },
+      "receipts": 7,
+      "state_bytes": 211663
+     },
+     {
+      "body_bytes": 2059355,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 554813,
+       "median": 543004,
+       "min": 394313,
+       "p95": 554813
+      },
+      "receipts": 0,
+      "state_bytes": 199191
+     },
+     {
+      "body_bytes": 2059419,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 523521,
+       "median": 392137,
+       "min": 392054,
+       "p95": 523521
+      },
+      "receipts": 0,
+      "state_bytes": 199219
+     },
+     {
+      "body_bytes": 2059603,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 527392,
+       "median": 397268,
+       "min": 393364,
+       "p95": 527392
+      },
+      "receipts": 0,
+      "state_bytes": 199216
+     },
+     {
+      "body_bytes": 2062097,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 531023,
+       "median": 526052,
+       "min": 392636,
+       "p95": 531023
+      },
+      "receipts": 0,
+      "state_bytes": 199226
+     },
+     {
+      "body_bytes": 2069357,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 536517,
+       "median": 395271,
+       "min": 394622,
+       "p95": 536517
+      },
+      "receipts": 0,
+      "state_bytes": 199253
+     },
+     {
+      "body_bytes": 2150422,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 612298,
+       "median": 611786,
+       "min": 461437,
+       "p95": 612298
+      },
+      "receipts": 1,
+      "state_bytes": 199290
+     },
+     {
+      "body_bytes": 2329027,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 834523,
+       "median": 826648,
+       "min": 682434,
+       "p95": 834523
+      },
+      "receipts": 12,
+      "state_bytes": 199754
+     },
+     {
+      "body_bytes": 2457115,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 898748,
+       "median": 897451,
+       "min": 741848,
+       "p95": 898748
+      },
+      "receipts": 6,
+      "state_bytes": 204325
+     }
+    ],
+    "load_1m": {
+     "after": "5.48",
+     "before": "4.79"
+    },
+    "population": 88,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 12,
+     "p95": 1030511
+    },
+    "receipts": 176
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "5.22",
+       "before": "5.48"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 11,
+       "p95": 1177474
+      }
+     }
+    ],
+    "day_body_bytes": 197601,
+    "day_read_wall_us": {
+     "max": 138006,
+     "median": 8979,
+     "min": 8974,
+     "p95": 138006
+    },
+    "decided": 8,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "hours": [
+     {
+      "body_bytes": 2159170,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 935389,
+       "median": 892769,
+       "min": 873930,
+       "p95": 935389
+      },
+      "receipts": 19,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 2339878,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 987336,
+       "median": 985361,
+       "min": 843933,
+       "p95": 987336
+      },
+      "receipts": 22,
+      "state_bytes": 185235
+     },
+     {
+      "body_bytes": 2304034,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 937304,
+       "median": 917881,
+       "min": 768076,
+       "p95": 937304
+      },
+      "receipts": 16,
+      "state_bytes": 195028
+     },
+     {
+      "body_bytes": 2267489,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 869439,
+       "median": 853359,
+       "min": 719592,
+       "p95": 869439
+      },
+      "receipts": 16,
+      "state_bytes": 194352
+     },
+     {
+      "body_bytes": 2238305,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 808959,
+       "median": 791112,
+       "min": 662838,
+       "p95": 808959
+      },
+      "receipts": 12,
+      "state_bytes": 191738
+     },
+     {
+      "body_bytes": 2247262,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 859230,
+       "median": 843056,
+       "min": 835649,
+       "p95": 859230
+      },
+      "receipts": 14,
+      "state_bytes": 195739
+     },
+     {
+      "body_bytes": 2233857,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 804295,
+       "median": 679146,
+       "min": 650691,
+       "p95": 804295
+      },
+      "receipts": 11,
+      "state_bytes": 192650
+     },
+     {
+      "body_bytes": 2266430,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 954673,
+       "median": 927947,
+       "min": 914989,
+       "p95": 954673
+      },
+      "receipts": 20,
+      "state_bytes": 189783
+     },
+     {
+      "body_bytes": 2377527,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 1011233,
+       "median": 1001519,
+       "min": 877093,
+       "p95": 1011233
+      },
+      "receipts": 22,
+      "state_bytes": 200737
+     },
+     {
+      "body_bytes": 2372527,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 1021833,
+       "median": 988451,
+       "min": 972065,
+       "p95": 1021833
+      },
+      "receipts": 20,
+      "state_bytes": 199452
+     },
+     {
+      "body_bytes": 2417430,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 1028822,
+       "median": 995607,
+       "min": 864070,
+       "p95": 1028822
+      },
+      "receipts": 19,
+      "state_bytes": 209190
+     },
+     {
+      "body_bytes": 2452910,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 1177474,
+       "median": 1126861,
+       "min": 1126002,
+       "p95": 1177474
+      },
+      "receipts": 29,
+      "state_bytes": 215225
+     },
+     {
+      "body_bytes": 2509245,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 1101166,
+       "median": 1095604,
+       "min": 1094631,
+       "p95": 1101166
+      },
+      "receipts": 20,
+      "state_bytes": 213730
+     },
+     {
+      "body_bytes": 2447320,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 1110025,
+       "median": 1094255,
+       "min": 1093660,
+       "p95": 1110025
+      },
+      "receipts": 26,
+      "state_bytes": 216785
+     },
+     {
+      "body_bytes": 2453484,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 1040754,
+       "median": 1038624,
+       "min": 875535,
+       "p95": 1040754
+      },
+      "receipts": 20,
+      "state_bytes": 214557
+     },
+     {
+      "body_bytes": 2186479,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 755970,
+       "median": 754765,
+       "min": 626114,
+       "p95": 755970
+      },
+      "receipts": 12,
+      "state_bytes": 215227
+     },
+     {
+      "body_bytes": 2058617,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 570489,
+       "median": 394062,
+       "min": 393057,
+       "p95": 570489
+      },
+      "receipts": 0,
+      "state_bytes": 199056
+     },
+     {
+      "body_bytes": 2060075,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 528629,
+       "median": 524516,
+       "min": 391415,
+       "p95": 528629
+      },
+      "receipts": 0,
+      "state_bytes": 199135
+     },
+     {
+      "body_bytes": 2060235,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 532922,
+       "median": 392165,
+       "min": 390882,
+       "p95": 532922
+      },
+      "receipts": 0,
+      "state_bytes": 199132
+     },
+     {
+      "body_bytes": 2062467,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 547122,
+       "median": 539647,
+       "min": 403645,
+       "p95": 547122
+      },
+      "receipts": 0,
+      "state_bytes": 199137
+     },
+     {
+      "body_bytes": 2069672,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 527437,
+       "median": 397496,
+       "min": 391052,
+       "p95": 527437
+      },
+      "receipts": 0,
+      "state_bytes": 199164
+     },
+     {
+      "body_bytes": 2121780,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 603182,
+       "median": 467455,
+       "min": 467235,
+       "p95": 603182
+      },
+      "receipts": 3,
+      "state_bytes": 199194
+     },
+     {
+      "body_bytes": 2364222,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 904621,
+       "median": 902974,
+       "min": 896836,
+       "p95": 904621
+      },
+      "receipts": 13,
+      "state_bytes": 201218
+     },
+     {
+      "body_bytes": 2534629,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 1024442,
+       "median": 985525,
+       "min": 856626,
+       "p95": 1024442
+      },
+      "receipts": 12,
+      "state_bytes": 210214
+     }
+    ],
+    "load_1m": {
+     "after": "5.22",
+     "before": "5.48"
+    },
+    "population": 88,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 11,
+     "p95": 1177474
+    },
+    "receipts": 326
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "5.44",
+       "before": "5.22"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 12,
+       "p95": 1427789
+      }
+     }
+    ],
+    "day_body_bytes": 196418,
+    "day_read_wall_us": {
+     "max": 8814,
+     "median": 8717,
+     "min": 8497,
+     "p95": 8814
+    },
+    "decided": 16,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "hours": [
+     {
+      "body_bytes": 2149904,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 934924,
+       "median": 915105,
+       "min": 781334,
+       "p95": 934924
+      },
+      "receipts": 30,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 2322539,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 1076427,
+       "median": 1027199,
+       "min": 897686,
+       "p95": 1076427
+      },
+      "receipts": 30,
+      "state_bytes": 181106
+     },
+     {
+      "body_bytes": 2298171,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 1077378,
+       "median": 1053691,
+       "min": 1027648,
+       "p95": 1077378
+      },
+      "receipts": 30,
+      "state_bytes": 187748
+     },
+     {
+      "body_bytes": 2225179,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 930462,
+       "median": 920603,
+       "min": 779635,
+       "p95": 930462
+      },
+      "receipts": 23,
+      "state_bytes": 191701
+     },
+     {
+      "body_bytes": 2252245,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 849727,
+       "median": 834091,
+       "min": 744552,
+       "p95": 849727
+      },
+      "receipts": 14,
+      "state_bytes": 192145
+     },
+     {
+      "body_bytes": 2238056,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 886307,
+       "median": 848453,
+       "min": 696245,
+       "p95": 886307
+      },
+      "receipts": 18,
+      "state_bytes": 194341
+     },
+     {
+      "body_bytes": 2235685,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 902665,
+       "median": 874254,
+       "min": 737908,
+       "p95": 902665
+      },
+      "receipts": 18,
+      "state_bytes": 189862
+     },
+     {
+      "body_bytes": 2258140,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 1025456,
+       "median": 985266,
+       "min": 860486,
+       "p95": 1025456
+      },
+      "receipts": 35,
+      "state_bytes": 190470
+     },
+     {
+      "body_bytes": 2374383,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 1172285,
+       "median": 1154455,
+       "min": 1018082,
+       "p95": 1172285
+      },
+      "receipts": 41,
+      "state_bytes": 194508
+     },
+     {
+      "body_bytes": 2399754,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 1171821,
+       "median": 1163534,
+       "min": 1134178,
+       "p95": 1171821
+      },
+      "receipts": 34,
+      "state_bytes": 202940
+     },
+     {
+      "body_bytes": 2405614,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 1206667,
+       "median": 1200856,
+       "min": 1166640,
+       "p95": 1206667
+      },
+      "receipts": 35,
+      "state_bytes": 214688
+     },
+     {
+      "body_bytes": 2432509,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 1260476,
+       "median": 1233932,
+       "min": 1103378,
+       "p95": 1260476
+      },
+      "receipts": 42,
+      "state_bytes": 204743
+     },
+     {
+      "body_bytes": 2467934,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 1427789,
+       "median": 1313347,
+       "min": 1298326,
+       "p95": 1427789
+      },
+      "receipts": 42,
+      "state_bytes": 207070
+     },
+     {
+      "body_bytes": 2438370,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 1276560,
+       "median": 1228228,
+       "min": 1089615,
+       "p95": 1276560
+      },
+      "receipts": 47,
+      "state_bytes": 212112
+     },
+     {
+      "body_bytes": 2434044,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 1219022,
+       "median": 1216072,
+       "min": 1195265,
+       "p95": 1219022
+      },
+      "receipts": 36,
+      "state_bytes": 208320
+     },
+     {
+      "body_bytes": 2192925,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 929977,
+       "median": 926620,
+       "min": 769695,
+       "p95": 929977
+      },
+      "receipts": 35,
+      "state_bytes": 210501
+     },
+     {
+      "body_bytes": 2061361,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 570602,
+       "median": 446750,
+       "min": 430625,
+       "p95": 570602
+      },
+      "receipts": 4,
+      "state_bytes": 199200
+     },
+     {
+      "body_bytes": 2060670,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 525450,
+       "median": 405420,
+       "min": 392795,
+       "p95": 525450
+      },
+      "receipts": 0,
+      "state_bytes": 199237
+     },
+     {
+      "body_bytes": 2060871,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 536453,
+       "median": 526799,
+       "min": 390755,
+       "p95": 536453
+      },
+      "receipts": 0,
+      "state_bytes": 199234
+     },
+     {
+      "body_bytes": 2063404,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 536164,
+       "median": 421816,
+       "min": 391645,
+       "p95": 536164
+      },
+      "receipts": 0,
+      "state_bytes": 199242
+     },
+     {
+      "body_bytes": 2069991,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 527157,
+       "median": 396635,
+       "min": 392202,
+       "p95": 527157
+      },
+      "receipts": 0,
+      "state_bytes": 199269
+     },
+     {
+      "body_bytes": 2141447,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 648597,
+       "median": 599104,
+       "min": 479204,
+       "p95": 648597
+      },
+      "receipts": 2,
+      "state_bytes": 199298
+     },
+     {
+      "body_bytes": 2340922,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 1069884,
+       "median": 1044290,
+       "min": 916458,
+       "p95": 1069884
+      },
+      "receipts": 37,
+      "state_bytes": 208247
+     },
+     {
+      "body_bytes": 2509107,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 1275473,
+       "median": 1273027,
+       "min": 1270816,
+       "p95": 1275473
+      },
+      "receipts": 45,
+      "state_bytes": 212610
+     }
+    ],
+    "load_1m": {
+     "after": "5.44",
+     "before": "5.22"
+    },
+    "population": 88,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 12,
+     "p95": 1427789
+    },
+    "receipts": 598
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "6.63",
+       "before": "5.44"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 23,
+       "p95": 1356042
+      }
+     }
+    ],
+    "day_body_bytes": 284332,
+    "day_read_wall_us": {
+     "max": 13342,
+     "median": 12979,
+     "min": 12962,
+     "p95": 13342
+    },
+    "decided": 0,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "hours": [
+     {
+      "body_bytes": 3165416,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 1182302,
+       "median": 1046376,
+       "min": 1007689,
+       "p95": 1182302
+      },
+      "receipts": 0,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 3393943,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 1188144,
+       "median": 1082260,
+       "min": 908349,
+       "p95": 1188144
+      },
+      "receipts": 0,
+      "state_bytes": 275888
+     },
+     {
+      "body_bytes": 3350578,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 1203768,
+       "median": 1055629,
+       "min": 883341,
+       "p95": 1203768
+      },
+      "receipts": 0,
+      "state_bytes": 279414
+     },
+     {
+      "body_bytes": 3325497,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 1205307,
+       "median": 1047388,
+       "min": 876974,
+       "p95": 1205307
+      },
+      "receipts": 0,
+      "state_bytes": 290763
+     },
+     {
+      "body_bytes": 3316202,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 1159713,
+       "median": 1095619,
+       "min": 868913,
+       "p95": 1159713
+      },
+      "receipts": 0,
+      "state_bytes": 283169
+     },
+     {
+      "body_bytes": 3307059,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 1145026,
+       "median": 852606,
+       "min": 847487,
+       "p95": 1145026
+      },
+      "receipts": 0,
+      "state_bytes": 283345
+     },
+     {
+      "body_bytes": 3246906,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 1118942,
+       "median": 943508,
+       "min": 812653,
+       "p95": 1118942
+      },
+      "receipts": 0,
+      "state_bytes": 281329
+     },
+     {
+      "body_bytes": 3285867,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 1143810,
+       "median": 1138321,
+       "min": 840274,
+       "p95": 1143810
+      },
+      "receipts": 0,
+      "state_bytes": 278431
+     },
+     {
+      "body_bytes": 3428113,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 1122505,
+       "median": 1107886,
+       "min": 935675,
+       "p95": 1122505
+      },
+      "receipts": 0,
+      "state_bytes": 293963
+     },
+     {
+      "body_bytes": 3536713,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 1308601,
+       "median": 1168540,
+       "min": 1151664,
+       "p95": 1308601
+      },
+      "receipts": 0,
+      "state_bytes": 330286
+     },
+     {
+      "body_bytes": 3495906,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 1307211,
+       "median": 1148803,
+       "min": 1115448,
+       "p95": 1307211
+      },
+      "receipts": 0,
+      "state_bytes": 303527
+     },
+     {
+      "body_bytes": 3567069,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 1199799,
+       "median": 1190727,
+       "min": 1168973,
+       "p95": 1199799
+      },
+      "receipts": 0,
+      "state_bytes": 310420
+     },
+     {
+      "body_bytes": 3598927,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 1331298,
+       "median": 1199498,
+       "min": 1196899,
+       "p95": 1331298
+      },
+      "receipts": 0,
+      "state_bytes": 311482
+     },
+     {
+      "body_bytes": 3543677,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 1314455,
+       "median": 1170294,
+       "min": 1144327,
+       "p95": 1314455
+      },
+      "receipts": 0,
+      "state_bytes": 319703
+     },
+     {
+      "body_bytes": 3601517,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 1212877,
+       "median": 1193006,
+       "min": 1190970,
+       "p95": 1212877
+      },
+      "receipts": 0,
+      "state_bytes": 310989
+     },
+     {
+      "body_bytes": 3191112,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 933278,
+       "median": 927647,
+       "min": 742646,
+       "p95": 933278
+      },
+      "receipts": 0,
+      "state_bytes": 319999
+     },
+     {
+      "body_bytes": 2967543,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 730761,
+       "median": 720329,
+       "min": 574112,
+       "p95": 730761
+      },
+      "receipts": 0,
+      "state_bytes": 289236
+     },
+     {
+      "body_bytes": 2968502,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 742714,
+       "median": 725132,
+       "min": 576241,
+       "p95": 742714
+      },
+      "receipts": 0,
+      "state_bytes": 289205
+     },
+     {
+      "body_bytes": 2968719,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 726037,
+       "median": 719832,
+       "min": 577845,
+       "p95": 726037
+      },
+      "receipts": 0,
+      "state_bytes": 289203
+     },
+     {
+      "body_bytes": 2971761,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 739297,
+       "median": 707063,
+       "min": 575467,
+       "p95": 739297
+      },
+      "receipts": 0,
+      "state_bytes": 289208
+     },
+     {
+      "body_bytes": 2981731,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 747750,
+       "median": 731768,
+       "min": 597194,
+       "p95": 747750
+      },
+      "receipts": 0,
+      "state_bytes": 289243
+     },
+     {
+      "body_bytes": 3150821,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 898987,
+       "median": 845473,
+       "min": 763492,
+       "p95": 898987
+      },
+      "receipts": 0,
+      "state_bytes": 289281
+     },
+     {
+      "body_bytes": 3509428,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 1256685,
+       "median": 1127770,
+       "min": 1118405,
+       "p95": 1256685
+      },
+      "receipts": 0,
+      "state_bytes": 295026
+     },
+     {
+      "body_bytes": 3646159,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 1356042,
+       "median": 1221487,
+       "min": 1183850,
+       "p95": 1356042
+      },
+      "receipts": 0,
+      "state_bytes": 312898
+     }
+    ],
+    "load_1m": {
+     "after": "6.63",
+     "before": "5.44"
+    },
+    "population": 128,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 23,
+     "p95": 1356042
+    },
+    "receipts": 0
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "4.62",
+       "before": "6.63"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 10,
+       "p95": 3271027
+      }
+     }
+    ],
+    "day_body_bytes": 272644,
+    "day_read_wall_us": {
+     "max": 9854,
+     "median": 9827,
+     "min": 9447,
+     "p95": 9854
+    },
+    "decided": 128,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "hours": [
+     {
+      "body_bytes": 3185237,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 2881211,
+       "median": 2864892,
+       "min": 2857670,
+       "p95": 2881211
+      },
+      "receipts": 360,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 3318234,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 2679250,
+       "median": 2590151,
+       "min": 2573417,
+       "p95": 2679250
+      },
+      "receipts": 257,
+      "state_bytes": 250870
+     },
+     {
+      "body_bytes": 3340866,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 2686777,
+       "median": 2686051,
+       "min": 2680790,
+       "p95": 2686777
+      },
+      "receipts": 261,
+      "state_bytes": 265774
+     },
+     {
+      "body_bytes": 3239626,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 2489250,
+       "median": 2328830,
+       "min": 2323675,
+       "p95": 2489250
+      },
+      "receipts": 191,
+      "state_bytes": 279798
+     },
+     {
+      "body_bytes": 3243543,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 2422768,
+       "median": 2404992,
+       "min": 2393216,
+       "p95": 2422768
+      },
+      "receipts": 202,
+      "state_bytes": 277186
+     },
+     {
+      "body_bytes": 3265397,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 2456492,
+       "median": 2455156,
+       "min": 2452428,
+       "p95": 2456492
+      },
+      "receipts": 214,
+      "state_bytes": 281263
+     },
+     {
+      "body_bytes": 3186539,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 2315945,
+       "median": 2176047,
+       "min": 2039477,
+       "p95": 2315945
+      },
+      "receipts": 166,
+      "state_bytes": 278742
+     },
+     {
+      "body_bytes": 3265958,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 2554007,
+       "median": 2431937,
+       "min": 2259827,
+       "p95": 2554007
+      },
+      "receipts": 205,
+      "state_bytes": 278252
+     },
+     {
+      "body_bytes": 3411038,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 2869069,
+       "median": 2847193,
+       "min": 2832768,
+       "p95": 2869069
+      },
+      "receipts": 268,
+      "state_bytes": 287185
+     },
+     {
+      "body_bytes": 3423376,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 3150053,
+       "median": 3014232,
+       "min": 3003690,
+       "p95": 3150053
+      },
+      "receipts": 303,
+      "state_bytes": 304581
+     },
+     {
+      "body_bytes": 3500836,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 3271027,
+       "median": 3148277,
+       "min": 3143770,
+       "p95": 3271027
+      },
+      "receipts": 324,
+      "state_bytes": 295286
+     },
+     {
+      "body_bytes": 3413538,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 2973916,
+       "median": 2847777,
+       "min": 2826630,
+       "p95": 2973916
+      },
+      "receipts": 282,
+      "state_bytes": 310083
+     },
+     {
+      "body_bytes": 3451362,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 3033151,
+       "median": 3028834,
+       "min": 3012060,
+       "p95": 3033151
+      },
+      "receipts": 308,
+      "state_bytes": 296839
+     },
+     {
+      "body_bytes": 3436267,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 3050187,
+       "median": 2905545,
+       "min": 2890869,
+       "p95": 3050187
+      },
+      "receipts": 288,
+      "state_bytes": 294820
+     },
+     {
+      "body_bytes": 3503926,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 3241001,
+       "median": 3094335,
+       "min": 3082614,
+       "p95": 3241001
+      },
+      "receipts": 318,
+      "state_bytes": 311301
+     },
+     {
+      "body_bytes": 3261008,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 2590538,
+       "median": 2435632,
+       "min": 2425100,
+       "p95": 2590538
+      },
+      "receipts": 240,
+      "state_bytes": 305906
+     },
+     {
+      "body_bytes": 3028838,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 1256754,
+       "median": 1240719,
+       "min": 1096166,
+       "p95": 1256754
+      },
+      "receipts": 46,
+      "state_bytes": 288919
+     },
+     {
+      "body_bytes": 2992770,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 860573,
+       "median": 715049,
+       "min": 714580,
+       "p95": 860573
+      },
+      "receipts": 11,
+      "state_bytes": 288882
+     },
+     {
+      "body_bytes": 2996495,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 901001,
+       "median": 878248,
+       "min": 875895,
+       "p95": 901001
+      },
+      "receipts": 12,
+      "state_bytes": 288812
+     },
+     {
+      "body_bytes": 2990897,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 774643,
+       "median": 634518,
+       "min": 633920,
+       "p95": 774643
+      },
+      "receipts": 4,
+      "state_bytes": 288838
+     },
+     {
+      "body_bytes": 2991718,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 722120,
+       "median": 711718,
+       "min": 575366,
+       "p95": 722120
+      },
+      "receipts": 0,
+      "state_bytes": 288784
+     },
+     {
+      "body_bytes": 3057474,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 1227825,
+       "median": 1216090,
+       "min": 1214205,
+       "p95": 1227825
+      },
+      "receipts": 44,
+      "state_bytes": 288828
+     },
+     {
+      "body_bytes": 3227965,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 2152998,
+       "median": 2152862,
+       "min": 2150263,
+       "p95": 2152998
+      },
+      "receipts": 169,
+      "state_bytes": 289238
+     },
+     {
+      "body_bytes": 3356011,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 2557254,
+       "median": 2542461,
+       "min": 2529524,
+       "p95": 2557254
+      },
+      "receipts": 235,
+      "state_bytes": 293743
+     }
+    ],
+    "load_1m": {
+     "after": "4.62",
+     "before": "6.63"
+    },
+    "population": 128,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 10,
+     "p95": 3271027
+    },
+    "receipts": 4708
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "4.48",
+       "before": "4.62"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 14,
+       "p95": 1739946
+      }
+     }
+    ],
+    "day_body_bytes": 282879,
+    "day_read_wall_us": {
+     "max": 12831,
+     "median": 12726,
+     "min": 12336,
+     "p95": 12831
+    },
+    "decided": 4,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "hours": [
+     {
+      "body_bytes": 3164711,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 1204248,
+       "median": 1197269,
+       "min": 1195986,
+       "p95": 1204248
+      },
+      "receipts": 11,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 3400217,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 1197224,
+       "median": 1195043,
+       "min": 1189068,
+       "p95": 1197224
+      },
+      "receipts": 7,
+      "state_bytes": 273991
+     },
+     {
+      "body_bytes": 3354345,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 1081639,
+       "median": 1073698,
+       "min": 1073139,
+       "p95": 1081639
+      },
+      "receipts": 3,
+      "state_bytes": 294315
+     },
+     {
+      "body_bytes": 3330842,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 1129245,
+       "median": 1121516,
+       "min": 1116888,
+       "p95": 1129245
+      },
+      "receipts": 6,
+      "state_bytes": 286055
+     },
+     {
+      "body_bytes": 3322520,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 1241166,
+       "median": 1119423,
+       "min": 1111904,
+       "p95": 1241166
+      },
+      "receipts": 5,
+      "state_bytes": 279739
+     },
+     {
+      "body_bytes": 3309614,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 1206988,
+       "median": 905137,
+       "min": 901674,
+       "p95": 1206988
+      },
+      "receipts": 3,
+      "state_bytes": 279903
+     },
+     {
+      "body_bytes": 3239376,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 1121768,
+       "median": 953046,
+       "min": 819582,
+       "p95": 1121768
+      },
+      "receipts": 1,
+      "state_bytes": 292353
+     },
+     {
+      "body_bytes": 3263069,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 1139260,
+       "median": 972401,
+       "min": 969753,
+       "p95": 1139260
+      },
+      "receipts": 1,
+      "state_bytes": 281528
+     },
+     {
+      "body_bytes": 3471822,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 1242046,
+       "median": 1237908,
+       "min": 1234091,
+       "p95": 1242046
+      },
+      "receipts": 6,
+      "state_bytes": 295800
+     },
+     {
+      "body_bytes": 3470830,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 1191605,
+       "median": 1186499,
+       "min": 1185243,
+       "p95": 1191605
+      },
+      "receipts": 3,
+      "state_bytes": 294293
+     },
+     {
+      "body_bytes": 3502206,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 1472051,
+       "median": 1316566,
+       "min": 1312307,
+       "p95": 1472051
+      },
+      "receipts": 10,
+      "state_bytes": 305291
+     },
+     {
+      "body_bytes": 3508599,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 1383065,
+       "median": 1359800,
+       "min": 1352729,
+       "p95": 1383065
+      },
+      "receipts": 12,
+      "state_bytes": 314411
+     },
+     {
+      "body_bytes": 3646696,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 1525897,
+       "median": 1516214,
+       "min": 1352313,
+       "p95": 1525897
+      },
+      "receipts": 7,
+      "state_bytes": 329840
+     },
+     {
+      "body_bytes": 3574844,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 1518534,
+       "median": 1504437,
+       "min": 1482728,
+       "p95": 1518534
+      },
+      "receipts": 17,
+      "state_bytes": 303060
+     },
+     {
+      "body_bytes": 3616214,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 1739946,
+       "median": 1594308,
+       "min": 1567613,
+       "p95": 1739946
+      },
+      "receipts": 20,
+      "state_bytes": 320949
+     },
+     {
+      "body_bytes": 3188680,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 988614,
+       "median": 987940,
+       "min": 985714,
+       "p95": 988614
+      },
+      "receipts": 8,
+      "state_bytes": 339290
+     },
+     {
+      "body_bytes": 2970863,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 783241,
+       "median": 761399,
+       "min": 620285,
+       "p95": 783241
+      },
+      "receipts": 3,
+      "state_bytes": 289513
+     },
+     {
+      "body_bytes": 2968837,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 731891,
+       "median": 721199,
+       "min": 578984,
+       "p95": 731891
+      },
+      "receipts": 0,
+      "state_bytes": 289432
+     },
+     {
+      "body_bytes": 2968944,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 724216,
+       "median": 708879,
+       "min": 578786,
+       "p95": 724216
+      },
+      "receipts": 0,
+      "state_bytes": 289429
+     },
+     {
+      "body_bytes": 2971763,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 727321,
+       "median": 712494,
+       "min": 576322,
+       "p95": 727321
+      },
+      "receipts": 0,
+      "state_bytes": 289434
+     },
+     {
+      "body_bytes": 2981706,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 729065,
+       "median": 709910,
+       "min": 570657,
+       "p95": 729065
+      },
+      "receipts": 0,
+      "state_bytes": 289475
+     },
+     {
+      "body_bytes": 3070231,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 812557,
+       "median": 780978,
+       "min": 646853,
+       "p95": 812557
+      },
+      "receipts": 0,
+      "state_bytes": 289511
+     },
+     {
+      "body_bytes": 3398419,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 1037036,
+       "median": 1033016,
+       "min": 1025510,
+       "p95": 1037036
+      },
+      "receipts": 1,
+      "state_bytes": 299443
+     },
+     {
+      "body_bytes": 3693903,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 1658523,
+       "median": 1652662,
+       "min": 1493462,
+       "p95": 1658523
+      },
+      "receipts": 13,
+      "state_bytes": 311068
+     }
+    ],
+    "load_1m": {
+     "after": "4.48",
+     "before": "4.62"
+    },
+    "population": 128,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 14,
+     "p95": 1739946
+    },
+    "receipts": 137
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "5.18",
+       "before": "4.48"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 12,
+       "p95": 1784260
+      }
+     }
+    ],
+    "day_body_bytes": 281994,
+    "day_read_wall_us": {
+     "max": 12553,
+     "median": 12400,
+     "min": 12392,
+     "p95": 12553
+    },
+    "decided": 8,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "hours": [
+     {
+      "body_bytes": 3180438,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 1632701,
+       "median": 1481147,
+       "min": 1478751,
+       "p95": 1632701
+      },
+      "receipts": 34,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 3392164,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 1206288,
+       "median": 1203901,
+       "min": 1199956,
+       "p95": 1206288
+      },
+      "receipts": 8,
+      "state_bytes": 291793
+     },
+     {
+      "body_bytes": 3332805,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 1197976,
+       "median": 1193792,
+       "min": 1191348,
+       "p95": 1197976
+      },
+      "receipts": 9,
+      "state_bytes": 292851
+     },
+     {
+      "body_bytes": 3294557,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 1243916,
+       "median": 1243295,
+       "min": 1241310,
+       "p95": 1243916
+      },
+      "receipts": 13,
+      "state_bytes": 280818
+     },
+     {
+      "body_bytes": 3310223,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 1295196,
+       "median": 1162359,
+       "min": 993309,
+       "p95": 1295196
+      },
+      "receipts": 9,
+      "state_bytes": 296034
+     },
+     {
+      "body_bytes": 3311994,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 1201034,
+       "median": 1074706,
+       "min": 905643,
+       "p95": 1201034
+      },
+      "receipts": 3,
+      "state_bytes": 279550
+     },
+     {
+      "body_bytes": 3241466,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 1182771,
+       "median": 882794,
+       "min": 878581,
+       "p95": 1182771
+      },
+      "receipts": 4,
+      "state_bytes": 274421
+     },
+     {
+      "body_bytes": 3269239,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 1212125,
+       "median": 1047719,
+       "min": 915544,
+       "p95": 1212125
+      },
+      "receipts": 5,
+      "state_bytes": 283295
+     },
+     {
+      "body_bytes": 3449710,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 1492542,
+       "median": 1353810,
+       "min": 1353794,
+       "p95": 1492542
+      },
+      "receipts": 13,
+      "state_bytes": 281926
+     },
+     {
+      "body_bytes": 3485849,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 1429924,
+       "median": 1277661,
+       "min": 1269507,
+       "p95": 1429924
+      },
+      "receipts": 8,
+      "state_bytes": 303249
+     },
+     {
+      "body_bytes": 3491464,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 1458497,
+       "median": 1428031,
+       "min": 1426648,
+       "p95": 1458497
+      },
+      "receipts": 18,
+      "state_bytes": 304905
+     },
+     {
+      "body_bytes": 3486935,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 1625636,
+       "median": 1499862,
+       "min": 1478564,
+       "p95": 1625636
+      },
+      "receipts": 19,
+      "state_bytes": 297236
+     },
+     {
+      "body_bytes": 3593608,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 1784260,
+       "median": 1636911,
+       "min": 1611702,
+       "p95": 1784260
+      },
+      "receipts": 24,
+      "state_bytes": 317846
+     },
+     {
+      "body_bytes": 3550446,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 1597902,
+       "median": 1489319,
+       "min": 1442228,
+       "p95": 1597902
+      },
+      "receipts": 15,
+      "state_bytes": 315302
+     },
+     {
+      "body_bytes": 3591797,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 1565730,
+       "median": 1417847,
+       "min": 1400126,
+       "p95": 1565730
+      },
+      "receipts": 12,
+      "state_bytes": 312456
+     },
+     {
+      "body_bytes": 3188536,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 1116783,
+       "median": 1080380,
+       "min": 948676,
+       "p95": 1116783
+      },
+      "receipts": 13,
+      "state_bytes": 313945
+     },
+     {
+      "body_bytes": 2970103,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 750001,
+       "median": 742091,
+       "min": 595978,
+       "p95": 750001
+      },
+      "receipts": 1,
+      "state_bytes": 289766
+     },
+     {
+      "body_bytes": 2969151,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 732529,
+       "median": 715017,
+       "min": 576048,
+       "p95": 732529
+      },
+      "receipts": 0,
+      "state_bytes": 289424
+     },
+     {
+      "body_bytes": 2969487,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 733575,
+       "median": 719896,
+       "min": 580040,
+       "p95": 733575
+      },
+      "receipts": 0,
+      "state_bytes": 289421
+     },
+     {
+      "body_bytes": 2972111,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 727280,
+       "median": 708059,
+       "min": 577500,
+       "p95": 727280
+      },
+      "receipts": 0,
+      "state_bytes": 289427
+     },
+     {
+      "body_bytes": 2982222,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 728134,
+       "median": 709091,
+       "min": 574903,
+       "p95": 728134
+      },
+      "receipts": 0,
+      "state_bytes": 289462
+     },
+     {
+      "body_bytes": 3047889,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 804690,
+       "median": 787133,
+       "min": 644837,
+       "p95": 804690
+      },
+      "receipts": 1,
+      "state_bytes": 289520
+     },
+     {
+      "body_bytes": 3346617,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 1186639,
+       "median": 1179911,
+       "min": 1173876,
+       "p95": 1186639
+      },
+      "receipts": 12,
+      "state_bytes": 292816
+     },
+     {
+      "body_bytes": 3623248,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 1699162,
+       "median": 1684292,
+       "min": 1518883,
+       "p95": 1699162
+      },
+      "receipts": 19,
+      "state_bytes": 306836
+     }
+    ],
+    "load_1m": {
+     "after": "5.18",
+     "before": "4.48"
+    },
+    "population": 128,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 12,
+     "p95": 1784260
+    },
+    "receipts": 240
+   },
+   {
+    "attempts": [
+     {
+      "load_1m": {
+       "after": "3.83",
+       "before": "5.18"
+      },
+      "read_wall_us": {
+       "from": "hour",
+       "hour": 11,
+       "p95": 1944423
+      }
+     }
+    ],
+    "day_body_bytes": 282517,
+    "day_read_wall_us": {
+     "max": 11796,
+     "median": 11391,
+     "min": 11125,
+     "p95": 11796
+    },
+    "decided": 16,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "hours": [
+     {
+      "body_bytes": 3141241,
+      "hour": 0,
+      "read_wall_us": {
+       "max": 1491564,
+       "median": 1484012,
+       "min": 1478440,
+       "p95": 1491564
+      },
+      "receipts": 41,
+      "state_bytes": 0
+     },
+     {
+      "body_bytes": 3410287,
+      "hour": 1,
+      "read_wall_us": {
+       "max": 1663868,
+       "median": 1506433,
+       "min": 1504821,
+       "p95": 1663868
+      },
+      "receipts": 29,
+      "state_bytes": 284492
+     },
+     {
+      "body_bytes": 3354356,
+      "hour": 2,
+      "read_wall_us": {
+       "max": 1549153,
+       "median": 1544488,
+       "min": 1539437,
+       "p95": 1549153
+      },
+      "receipts": 33,
+      "state_bytes": 282294
+     },
+     {
+      "body_bytes": 3295619,
+      "hour": 3,
+      "read_wall_us": {
+       "max": 1485349,
+       "median": 1483535,
+       "min": 1475164,
+       "p95": 1485349
+      },
+      "receipts": 28,
+      "state_bytes": 285037
+     },
+     {
+      "body_bytes": 3294498,
+      "hour": 4,
+      "read_wall_us": {
+       "max": 1332228,
+       "median": 1323484,
+       "min": 1322114,
+       "p95": 1332228
+      },
+      "receipts": 21,
+      "state_bytes": 292626
+     },
+     {
+      "body_bytes": 3317081,
+      "hour": 5,
+      "read_wall_us": {
+       "max": 1406614,
+       "median": 1397123,
+       "min": 1395424,
+       "p95": 1406614
+      },
+      "receipts": 24,
+      "state_bytes": 279119
+     },
+     {
+      "body_bytes": 3288522,
+      "hour": 6,
+      "read_wall_us": {
+       "max": 1486222,
+       "median": 1467329,
+       "min": 1457288,
+       "p95": 1486222
+      },
+      "receipts": 29,
+      "state_bytes": 299461
+     },
+     {
+      "body_bytes": 3298169,
+      "hour": 7,
+      "read_wall_us": {
+       "max": 1324824,
+       "median": 1309589,
+       "min": 1302113,
+       "p95": 1324824
+      },
+      "receipts": 22,
+      "state_bytes": 282007
+     },
+     {
+      "body_bytes": 3447269,
+      "hour": 8,
+      "read_wall_us": {
+       "max": 1571078,
+       "median": 1431886,
+       "min": 1416473,
+       "p95": 1571078
+      },
+      "receipts": 18,
+      "state_bytes": 285733
+     },
+     {
+      "body_bytes": 3455130,
+      "hour": 9,
+      "read_wall_us": {
+       "max": 1591896,
+       "median": 1568109,
+       "min": 1567287,
+       "p95": 1591896
+      },
+      "receipts": 28,
+      "state_bytes": 335464
+     },
+     {
+      "body_bytes": 3518334,
+      "hour": 10,
+      "read_wall_us": {
+       "max": 1643531,
+       "median": 1507814,
+       "min": 1483884,
+       "p95": 1643531
+      },
+      "receipts": 24,
+      "state_bytes": 301291
+     },
+     {
+      "body_bytes": 3546760,
+      "hour": 11,
+      "read_wall_us": {
+       "max": 1944423,
+       "median": 1794561,
+       "min": 1738196,
+       "p95": 1944423
+      },
+      "receipts": 40,
+      "state_bytes": 299659
+     },
+     {
+      "body_bytes": 3626522,
+      "hour": 12,
+      "read_wall_us": {
+       "max": 1887223,
+       "median": 1855070,
+       "min": 1749217,
+       "p95": 1887223
+      },
+      "receipts": 46,
+      "state_bytes": 312802
+     },
+     {
+      "body_bytes": 3524653,
+      "hour": 13,
+      "read_wall_us": {
+       "max": 1612555,
+       "median": 1602404,
+       "min": 1591299,
+       "p95": 1612555
+      },
+      "receipts": 41,
+      "state_bytes": 309006
+     },
+     {
+      "body_bytes": 3560621,
+      "hour": 14,
+      "read_wall_us": {
+       "max": 1590719,
+       "median": 1465673,
+       "min": 1450741,
+       "p95": 1590719
+      },
+      "receipts": 29,
+      "state_bytes": 314640
+     },
+     {
+      "body_bytes": 3188563,
+      "hour": 15,
+      "read_wall_us": {
+       "max": 1188561,
+       "median": 1181651,
+       "min": 1181609,
+       "p95": 1188561
+      },
+      "receipts": 31,
+      "state_bytes": 315879
+     },
+     {
+      "body_bytes": 2975530,
+      "hour": 16,
+      "read_wall_us": {
+       "max": 751194,
+       "median": 734958,
+       "min": 626732,
+       "p95": 751194
+      },
+      "receipts": 7,
+      "state_bytes": 289329
+     },
+     {
+      "body_bytes": 2975737,
+      "hour": 17,
+      "read_wall_us": {
+       "max": 721762,
+       "median": 716175,
+       "min": 588923,
+       "p95": 721762
+      },
+      "receipts": 4,
+      "state_bytes": 289427
+     },
+     {
+      "body_bytes": 2970315,
+      "hour": 18,
+      "read_wall_us": {
+       "max": 658467,
+       "median": 642179,
+       "min": 537623,
+       "p95": 658467
+      },
+      "receipts": 0,
+      "state_bytes": 289341
+     },
+     {
+      "body_bytes": 2973242,
+      "hour": 19,
+      "read_wall_us": {
+       "max": 664828,
+       "median": 643757,
+       "min": 533982,
+       "p95": 664828
+      },
+      "receipts": 0,
+      "state_bytes": 289349
+     },
+     {
+      "body_bytes": 2983346,
+      "hour": 20,
+      "read_wall_us": {
+       "max": 663607,
+       "median": 648725,
+       "min": 533247,
+       "p95": 663607
+      },
+      "receipts": 0,
+      "state_bytes": 289389
+     },
+     {
+      "body_bytes": 3084508,
+      "hour": 21,
+      "read_wall_us": {
+       "max": 779782,
+       "median": 767093,
+       "min": 656667,
+       "p95": 779782
+      },
+      "receipts": 4,
+      "state_bytes": 289430
+     },
+     {
+      "body_bytes": 3421661,
+      "hour": 22,
+      "read_wall_us": {
+       "max": 1577685,
+       "median": 1446281,
+       "min": 1436458,
+       "p95": 1577685
+      },
+      "receipts": 37,
+      "state_bytes": 300405
+     },
+     {
+      "body_bytes": 3643092,
+      "hour": 23,
+      "read_wall_us": {
+       "max": 1601479,
+       "median": 1484246,
+       "min": 1462801,
+       "p95": 1601479
+      },
+      "receipts": 30,
+      "state_bytes": 316877
+     }
+    ],
+    "load_1m": {
+     "after": "3.83",
+     "before": "5.18"
+    },
+    "population": 128,
+    "read_wall_us": {
+     "from": "hour",
+     "hour": 11,
+     "p95": 1944423
+    },
+    "receipts": 566
+   }
+  ],
+  "repeats": 3,
+  "script": "scripts/measure_living_day_replay.py",
+  "smoke": false,
+  "source": {
+   "changed_paths": [
+    "docs/evaluation/2026-10-07-living-comparison-replay.json"
+   ],
+   "drawing_code_sha256": "7bfced1cfda4534abe4a0458241a50e861693f374f0a21dc411a53c03fa103d4",
+   "head": "bf33d9dc4732a4cb907bb0178dc4cb9bc0163653"
+  },
+  "stress_measured": true,
+  "surveyed_populations": {
+   "market_town": [
+    56,
+    64,
+    66,
+    72,
+    74,
+    82,
+    82,
+    88
+   ],
+   "small_town": [
+    30,
+    32,
+    36,
+    38,
+    38,
+    46,
+    48,
+    52
+   ]
+  },
+  "window_ticks": 1440
+ },
+ "record_sha256": "529aff4d490b6b93592a1811da1f441d290e66b9d01417ca917ef200e531b5cb"
+}
