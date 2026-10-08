@@ -33,6 +33,8 @@ export interface CardMind {
   /** Who runs it, large: a model's served name, or "Their own routine". */
   readonly name: string;
   readonly line: string;
+  /** What became of its mind's latest answer where it was not taken, in a sentence; null or absent leaves it out. */
+  readonly lately?: string | null;
   readonly mark: CardMark | null;
   /** Empty where its mind cannot be changed here. */
   readonly choices: readonly CardMindChoice[];
@@ -176,6 +178,7 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
       box.append(
         el('p', { class: 'thing-card-mind-name', text: mind.name }),
         el('p', { class: 'thing-card-muted', text: mind.line }),
+        ...(mind.lately == null ? [] : [el('p', { class: 'thing-card-faint thing-card-lately', text: mind.lately })]),
       );
     } else {
       box.append(el('p', { class: 'thing-card-muted', text: mind.ask }));

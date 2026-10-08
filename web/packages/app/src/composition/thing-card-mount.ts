@@ -13,7 +13,7 @@
 
 import type { ThingLibrary } from '@exulanica/atlas-react/things';
 import { buildThingCard, type CardLine, type CardLookOutcome, type CardLooks, type CardMark, type CardMind, type CardMindChoice, type ThingCardModel } from '../ui/thing-card.js';
-import { cameWords, costWords, modelLine, outsideShort } from '../ui/society-models.js';
+import { cameWords, costWords, modelLine, outsideLatestWords, outsideShort } from '../ui/society-models.js';
 import type { ModelRef, SocietyModel } from '../society-models-api.js';
 import type { Credentials } from '../config.js';
 import { openThingLibrary } from '../things-library.js';
@@ -112,8 +112,9 @@ export function personCard(
   if (being !== null && (outsideEntry !== null || (crossing !== null && crossing.decidedBy === 'program'))) {
     const outside = markOf(being.mark) ?? (crossing === null ? null : markOf({ running: null, crossing, bridge: crossing.entry }));
     const mind: CardMind = outsideEntry !== null && about.mind !== null
-      // Who decides' own words for it, never a copy: an outside program decides, so no Change.
-      ? { name: outsideShort(outsideEntry), line: about.mind.words, mark: outside === null ? null : cardMark(outside), choices: [], ask: '', when: '' }
+      // Who decides' own words for it, never a copy: an outside program decides, so no Change; and
+      // what became of its program's latest answer where it was not taken (Who decides' Lately).
+      ? { name: outsideShort(outsideEntry), line: about.mind.words, lately: outsideLatestWords(outsideEntry), mark: outside === null ? null : cardMark(outside), choices: [], ask: '', when: '' }
       : outsideMind(outside, crossing);
     return {
       subject: subjectId,

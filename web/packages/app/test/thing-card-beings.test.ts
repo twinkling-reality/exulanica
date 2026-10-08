@@ -10,12 +10,13 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import type { ThingLibrary } from '@exulanica/atlas-react/things';
 import { mountThingCard, personCard } from '../src/composition/thing-card-mount.js';
+import { buildThingCard } from '../src/ui/thing-card.js';
 import type { SelectedBeing, SelectedPerson } from '../src/composition/environment-selection.js';
 import type { DoorBridge } from '../src/door-bridges-api.js';
 import type { LookReference } from '../src/thing-card-api.js';
 import { readKindFacts, readLookFacts } from '../src/thing-card-api.js';
 import { readCrossingManifest } from '../src/crossing-manifest-api.js';
-import { cameWords, outsideShort, outsideWords } from '../src/ui/society-models.js';
+import { cameWords, outsideLatestWords, outsideShort, outsideWords } from '../src/ui/society-models.js';
 import type { OutsideDecider } from '../src/society-models-api.js';
 import { AN_AI_MODEL, markLabel, markOf } from '../src/composition/thing-marks.js';
 
@@ -124,6 +125,20 @@ describe('who decides for a visitor, from Who decides\' read and its arrival', (
     expect(card.mind).toMatchObject({ name: outsideShort(decider), line: outsideWords(decider), choices: [] });
     expect(card.cameFrom).toBe(cameWords(decider));
     expect(card.mark?.text).toBe('from Block Game');
+  });
+
+  it('says lately when its program\'s latest answer was not taken, in Who decides\' own words, and nothing while it was', () => {
+    const crossed = being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'a', decidedBy: 'program' } });
+    const late = entry({ latest: { decisionSeq: 3, baseTick: 6, consumedTick: 7, status: 'unavailable', reason: 'no_answer_in_time' } });
+    const card = personCard('visitor-1', outsideAbout(late, crossed), [QWEN]);
+    expect(outsideLatestWords(late)).not.toBeNull();
+    expect(card.mind?.lately).toBe(outsideLatestWords(late));
+    const taken = entry({ latest: { decisionSeq: 4, baseTick: 7, consumedTick: 8, status: 'accepted', reason: 'accepted' } });
+    expect(personCard('visitor-1', outsideAbout(taken, crossed), [QWEN]).mind?.lately ?? null).toBeNull();
+    // Drawn under the mind's line, as text.
+    const view = buildThingCard({ onChoose: async () => '', onAllMinds: () => undefined, onCompare: null });
+    view.render(card);
+    expect(view.root.querySelector('.thing-card-lately')?.textContent).toBe(outsideLatestWords(late));
   });
 
   it('one of the world\'s own people a grant lets a program run: decided from outside, no Change', () => {
