@@ -596,6 +596,21 @@ the model settings in 5.1 apply; the decision contract's spend bounds are in
 | `EXULANICA_DATABASE_URL` | The bootstrap owner's connection. Migrations and role grants run in one command because there is one correct order |
 | `EXULANICA_APP_ROLE_PASSWORD`, `EXULANICA_EXECUTOR_ROLE_PASSWORD`, `EXULANICA_PURGE_ROLE_PASSWORD`, `EXULANICA_ACCOUNT_ROLE_PASSWORD`, `EXULANICA_TILES_ROLE_PASSWORD` | Passwords for `exulanica_app`, `exulanica_ro`, `exulanica_purge`, `exulanica_accounts` and `exulanica_tiles`. Each is optional and set only when supplied, because a role that authenticates by certificate or by peer has none |
 
+The migrations run as a superuser, as `compose.yaml`'s database owner is: migration 0161 creates
+`exulanica_definer`, a role that cannot log in, and makes it the owner of every SECURITY DEFINER
+function, pinning each one's search path with `pg_catalog` first and `pg_temp` last
+([security floor](security-floor.md#5-database-roles)). After provisioning, `exulanica-db` refuses
+a database where any such function has another owner or search path or is executable by PUBLIC;
+where that role can log in, holds a privileged attribute, belongs to a role or has a member, owns
+anything else, can create in the schema or the database, or is named by a default privilege; where
+its table, column, sequence or function privileges differ from the set the bodies use; or where
+another role, neither a superuser nor a member of the schema's owner, can create in the schema. A
+migration that recreates a definer, or a restore that loads one without its owner, hands it back
+to the migrating role, and a migration that strips or recreates a table takes its grants away;
+this check stops the deployment rather than a request. Every process that serves runs the same
+check at start once 0161 is recorded, a local restore runs it before offering the copy, and each
+maintenance pass reports a drift as `definer_role_unsafe`.
+
 Every path that creates or upgrades a serving database then runs
 `exulanica-character-catalog publish --apply`. It uses the same owner connection and the data
 directory, or object-store settings, that the API serves its store from.

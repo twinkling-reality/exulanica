@@ -93,9 +93,19 @@ def verify_schema(database: Database) -> None:
     Called at boot by anything that is about to serve queries. An edited migration is a silent
     schema fork: two deployments claim the same version and have different tables, and the
     difference surfaces much later as a wrong answer rather than as an error.
+
+    Once migration 0161 is recorded it also refuses a definer owner that drifted
+    (:func:`~exulanica.db.definer_role.assert_definer_role`), so a process does not start serving
+    on a database whose SECURITY DEFINER functions run as anyone else or with other grants.
     """
+    # Imported here: definer_role reads the applied migrations from this module.
+    from exulanica.db.definer_role import DEFINER_MIGRATION, assert_definer_role
+
     with database.unscoped() as connection:
-        verify_applied(applied_migrations(connection))
+        applied = applied_migrations(connection)
+        verify_applied(applied)
+        if DEFINER_MIGRATION in applied:
+            assert_definer_role(connection)
 
 
 def apply_pending(database: Database) -> MigrationReport:
@@ -153,8 +163,9 @@ def provision_workspace(connection: psycopg.Connection, workspace_id: uuid.UUID)
     name = sql.Identifier(partition)
     with connection.transaction():
         connection.execute(
-            sql.SQL("create table if not exists {} partition of embedding for values in ({})")
-            .format(name, sql.Literal(workspace_id))
+            sql.SQL(
+                "create table if not exists {} partition of embedding for values in ({})"
+            ).format(name, sql.Literal(workspace_id))
         )
         connection.execute(
             sql.SQL("create index if not exists {} on {} (family, ref_type, ref_id)").format(

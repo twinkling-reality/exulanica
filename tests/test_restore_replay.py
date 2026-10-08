@@ -13,6 +13,7 @@ import pytest
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
+from exulanica.db.definer_role import assert_definer_role, hand_definers_to_owner
 from exulanica.db.local.cluster import client_program
 from exulanica.db.local.refusals import LocalDatabaseRefused
 from exulanica.db.roles import provision_purge_role, provision_runtime_role
@@ -136,6 +137,13 @@ def _restore(purged, dump, blobs):
     with purged.database().unscoped() as connection:
         provision_runtime_role(connection, role=_APP_ROLE, password=_APP_PASSWORD)
         provision_purge_role(connection, role=_PURGE_ROLE, password=_PURGE_PASSWORD)
+        # The dump carries no owners, so the load made the harness role own every SECURITY
+        # DEFINER function, and every test after this one in the process would run them past
+        # row-level security. Handed back as migration 0161 hands them, by its own text, then
+        # checked as a deployment checks them, privileges included.
+        connection.execute(f'set search_path to "{purged.scratch}", public')
+        hand_definers_to_owner(connection)
+        assert_definer_role(connection)
     # Provisioning grants; it never revokes PUBLIC's execute, because the migrations do that where
     # they create the function. So a restore is the one moment those revokes can be lost, and this
     # schema is the session's, shared with every test that runs after this file. Asked as a
@@ -545,3 +553,17 @@ def test_only_a_skip_on_bytes_a_live_record_holds_leaves_a_tombstone_open(purged
         "update capture set deleted_at=now() where capture_id=%s", (holder,)
     )
     assert held() is None, "nothing holds the bytes now: the purge should have destroyed them"
+
+
+def test_a_restore_without_owners_leaves_every_definer_with_its_narrow_owner(purged, tmp_path):
+    """The session's schema is shared: a restore here that left the definers with the harness
+    role would run every later test's definer past row-level security, and fail the ownership
+    tests that come after it in the same process."""
+    dump, blobs = _backup(purged, tmp_path)
+    _restore(purged, dump, blobs)
+    owners = purged.rows(
+        "select distinct pg_get_userbyid(p.proowner) as owner from pg_proc p "
+        "join pg_namespace n on n.oid = p.pronamespace where n.nspname = %s and p.prosecdef",
+        purged.scratch,
+    )
+    assert owners == [{"owner": "exulanica_definer"}]

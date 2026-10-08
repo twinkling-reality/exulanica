@@ -147,10 +147,11 @@ class Database:
         superuser, a BYPASSRLS role, or an owner of a row-level-security table, so deployment
         drift cannot silently select the second bullet.
 
-        **The migration path relies on neither bullet.** It needs DDL rights and
-        ``schema_migrations``, which carries no row-level security at all, so it works under
-        either role that can run the DDL. The reason it declares no workspace is that there is no
-        workspace to name before the schema exists, not that the emptiness is useful to it.
+        **The migration path relies on neither bullet.** It needs a superuser, because migration
+        0161 creates the login-less definer owner and hands it every SECURITY DEFINER function,
+        and ``schema_migrations``, which carries no row-level security at all. The reason it
+        declares no workspace is that there is no workspace to name before the schema exists, not
+        that the emptiness is useful to it.
         """
         with psycopg.connect(self.url, row_factory=dict_row) as connection:
             connection.execute("set time zone 'UTC'")

@@ -370,76 +370,43 @@ def test_a_withdrawal_records_who_withdrew_it_and_why(bench):
 def test_the_day_limit_and_the_ledger_s_end_hold_under_an_owner_that_does_not_bypass(
     bench, spine_schema
 ):
-    """0155 reads nothing past row-level security: the grant and the event trigger, owned by a
-    login-less role that is neither superuser nor BYPASSRLS, still refuse the day's third guest
-    and still end the live policy on a reauthorization."""
-    from psycopg import sql
-
+    """0155 reads nothing past row-level security: the grant and the event trigger, owned by
+    exulanica_definer (0161), a login-less role that is neither superuser nor BYPASSRLS, still
+    refuse the day's third guest and still end the live policy on a reauthorization."""
     from pg_harness import open_scratch_connection
 
     psycopg_module, scratch = spine_schema
-    owner = "guest_definer_" + uuid.uuid4().hex[:12]
     admin = open_scratch_connection(psycopg_module, scratch)
     try:
-        admin.execute(
-            sql.SQL("create role {} nologin nosuperuser nobypassrls").format(sql.Identifier(owner))
-        )
-        for statement in (
-            "grant usage on schema {s} to {r}",
-            "grant all on all tables in schema {s} to {r}",
-            "grant execute on all functions in schema {s} to {r}",
-        ):
-            admin.execute(
-                sql.SQL(statement).format(s=sql.Identifier(scratch), r=sql.Identifier(owner))
-            )
-        for function in (
-            "spending_grant_guest(uuid,text,uuid,text,jsonb)",
-            "tg_spending_event_ends_guest_policies()",
-        ):
-            admin.execute(
-                sql.SQL("alter function {}." + function + " owner to {}").format(
-                    sql.Identifier(scratch), sql.Identifier(owner)
-                )
-            )
-        flags = admin.execute(
-            "select rolsuper, rolbypassrls from pg_roles where rolname = %s", (owner,)
-        ).fetchone()
-        assert tuple(flags) == (False, False)
-        admin.commit()
-
-        authority = bench.issue(ceiling="1.00", calls=10_000)
-        _policy(bench, authority, per_day=2)
-        durable = bench.durable()
-        durable.grant_guest(uuid.uuid4(), provider=PROVIDER)
-        durable.grant_guest(uuid.uuid4(), provider=PROVIDER)
-        with pytest.raises(SpendingRefused) as refused:
-            durable.grant_guest(uuid.uuid4(), provider=PROVIDER)
-        assert refused.value.detail == "guest_grants_exhausted"
-        bench.operator.reauthorize(
-            authority,
-            ceiling_usd=Decimal("1.00"),
-            max_calls=10_000,
-            valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(days=30),
-            operator="test-operator",
-            reason="as after a restore",
-        )
-        (shown,) = [
-            p for p in bench.operator.guest_policies() if p["authority_id"] == str(authority)
-        ]
-        assert shown["live"] is False and shown["ended"]["as"] == "reauthorized"
+        owners = admin.execute(
+            "select p.proname, r.rolsuper, r.rolbypassrls, r.rolcanlogin from pg_proc p "
+            "join pg_roles r on r.oid = p.proowner "
+            "where p.pronamespace = current_schema()::regnamespace "
+            "and p.proname in ('spending_grant_guest', 'tg_spending_event_ends_guest_policies') "
+            "and r.rolname = 'exulanica_definer'"
+        ).fetchall()
     finally:
-        admin.rollback()
-        admin.execute("reset role")
-        for function in (
-            "spending_grant_guest(uuid,text,uuid,text,jsonb)",
-            "tg_spending_event_ends_guest_policies()",
-        ):
-            admin.execute(
-                sql.SQL("alter function {}." + function + " owner to current_user").format(
-                    sql.Identifier(scratch)
-                )
-            )
-        admin.execute(sql.SQL("drop owned by {}").format(sql.Identifier(owner)))
-        admin.execute(sql.SQL("drop role {}").format(sql.Identifier(owner)))
-        admin.commit()
         admin.close()
+    assert sorted(tuple(row) for row in owners) == [
+        ("spending_grant_guest", False, False, False),
+        ("tg_spending_event_ends_guest_policies", False, False, False),
+    ]
+
+    authority = bench.issue(ceiling="1.00", calls=10_000)
+    _policy(bench, authority, per_day=2)
+    durable = bench.durable()
+    durable.grant_guest(uuid.uuid4(), provider=PROVIDER)
+    durable.grant_guest(uuid.uuid4(), provider=PROVIDER)
+    with pytest.raises(SpendingRefused) as refused:
+        durable.grant_guest(uuid.uuid4(), provider=PROVIDER)
+    assert refused.value.detail == "guest_grants_exhausted"
+    bench.operator.reauthorize(
+        authority,
+        ceiling_usd=Decimal("1.00"),
+        max_calls=10_000,
+        valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(days=30),
+        operator="test-operator",
+        reason="as after a restore",
+    )
+    (shown,) = [p for p in bench.operator.guest_policies() if p["authority_id"] == str(authority)]
+    assert shown["live"] is False and shown["ended"]["as"] == "reauthorized"

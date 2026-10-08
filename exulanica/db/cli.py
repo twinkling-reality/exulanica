@@ -21,6 +21,7 @@ import sys
 from typing import Any, Final
 
 from exulanica.db.account_roles import ACCOUNT_ROLE, provision_account_role
+from exulanica.db.definer_role import DEFINER_ROLE, assert_definer_role, definer_role_installed
 from exulanica.db.migrate import apply_pending
 from exulanica.db.roles import (
     BACKUP_ROLE,
@@ -89,6 +90,13 @@ def provision_database(database: Database, stream: Any) -> int:
         # the worker (migration 0138). Below 0138 there is no publish function to lend or check.
         if publish_function_installed(connection):
             assert_tiles_role(connection, role=TILES_ROLE)
+        # Every SECURITY DEFINER function still belongs to the narrow owner, and that owner is
+        # still narrow (migration 0161): a migration that recreated a definer, or a restore
+        # without owners, hands it back to the migrating role, and a role can be widened on a
+        # server this code never sees. Asked by the recorded migration, so a database whose
+        # definers all went back is checked too.
+        if definer_role_installed(connection):
+            assert_definer_role(connection)
     print(
         f"roles: {RUNTIME_ROLE} may select, insert and update and may not delete; "
         f"{EXECUTOR_ROLE} may select and nothing else; {PURGE_ROLE} may mark bytes purged "
@@ -96,7 +104,9 @@ def provision_database(database: Database, stream: Any) -> int:
         "blob makes unanswerable inside one workspace; "
         f"{ACCOUNT_ROLE} may access only account persistence; "
         f"{BACKUP_ROLE} may read every row for a backup and write nothing; "
-        f"{TILES_ROLE} may publish a baked tile and do nothing else",
+        f"{TILES_ROLE} may publish a baked tile and do nothing else; every SECURITY DEFINER "
+        f"function runs as {DEFINER_ROLE}, which cannot log in and holds only the grants its "
+        "bodies use",
         file=stream,
     )
     return 0

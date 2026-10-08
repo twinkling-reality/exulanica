@@ -36,6 +36,7 @@ from typing import Any, Final
 from psycopg.rows import dict_row
 
 from exulanica.api.installation import MAINTENANCE_STATUS_PROFILE, RecoveryPolicy
+from exulanica.db.definer_role import DefinerRoleUnsafe, assert_definer_role, definer_role_installed
 from exulanica.db.local.files import write_private
 from exulanica.db.roles import backup_role_gaps
 from exulanica.db.session import Database
@@ -228,6 +229,19 @@ class Maintenance:
         if kept is not None and kept["n"]:
             status["failures"].append("set_aside_database_present")
 
+    def _check_definer(self, status: dict[str, Any]) -> None:
+        """The SECURITY DEFINER functions' owner is still the narrow role with its grants, every
+        pass: a role widened, a grant stripped or a definer handed back after the deployment's
+        check is reported here rather than at the next deployment."""
+        with self._database.unscoped() as connection:
+            if not definer_role_installed(connection):
+                return
+            try:
+                assert_definer_role(connection)
+            except DefinerRoleUnsafe as unsafe:
+                status["failures"].append("definer_role_unsafe")
+                status.setdefault("detail", {})["definer_role_unsafe"] = str(unsafe)
+
     def _export(self, status: dict[str, Any]) -> None:
         now = self.now()
         signal = self._change_signal()
@@ -401,6 +415,7 @@ class Maintenance:
         status: dict[str, Any] = {"profile": MAINTENANCE_STATUS_PROFILE, "failures": []}
         steps: tuple[tuple[str, Callable[[dict[str, Any]], None]], ...] = (
             ("backup_role_check_failed", self._check_role),
+            ("definer_role_check_failed", self._check_definer),
             ("withdrawal_export_failed", self._export),
             ("purge_failed", self._purge),
             ("backup_copy_purge_failed", self._purge_backup_copies),

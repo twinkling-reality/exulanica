@@ -556,7 +556,8 @@ adds append-only `saved_world_source_detach_operation` and `saved_world_source_d
 current.
 
 The pointer is derived state and only the database moves it. Insert triggers on attachment and
-detach rows, running with the table owner's rights, maintain it: an attach inserts it and is
+detach rows, running as the definer owner `exulanica_definer` under row-level security with the
+grants their bodies use (migration 0161), maintain it: an attach inserts it and is
 refused if the photograph has any membership on that world; a rebind fills a null pointer and is
 refused unless exactly one removed row changes; a detach clears the pointer only when it names
 the attachment the pointer holds. A write to the pointer from anywhere else is refused by its own

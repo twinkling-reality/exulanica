@@ -16,6 +16,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from exulanica.db.definer_role import DEFINER_ROLE, DefinerRoleUnsafe, assert_definer_role
 from exulanica.db.local.cluster import HOST, scratch_cluster
 from exulanica.db.roles import provision_backup_role, provision_purge_role, provision_runtime_role
 from exulanica.db.session import Database
@@ -152,6 +153,66 @@ def test_a_lost_source_is_recovered_into_an_isolated_server(purged, source, tmp_
         assert "are not restored" in result["loss_window"]
         assert result["recovery_seconds"] > 0
         print(f"RECOVERY_SECONDS {result['recovery_seconds']}")
+
+
+def _checking_provision(scratch):
+    """The roles, then the definer check ``exulanica-db`` runs after them (migration 0161)."""
+    roles = _provision(scratch)
+
+    def provision(database: Database) -> None:
+        roles(database)
+        with database.unscoped() as connection:
+            connection.execute(f'set search_path to "{scratch}", public')
+            assert_definer_role(connection)
+
+    return provision
+
+
+@pytest.mark.parametrize("widened", [False, True])
+def test_a_recovery_keeps_the_definer_owner_and_refuses_one_the_server_widened(
+    purged, source, tmp_path, widened
+):
+    """The installation restore keeps a role the target server already has. Restored onto a
+    fresh server, every definer comes back with its narrow owner and grants; onto one whose
+    exulanica_definer can log in, the role is kept as found and the check refuses it."""
+    _require_server_binaries()
+    taken, backup_store = source
+    export, _ = _export(purged, tmp_path)
+    declaration = _declare(tmp_path, export, dt.datetime.now(dt.UTC))
+    loaded = read_backup_set(taken.directory)
+    owner, database = loaded.database.owner_role, loaded.database.database
+    with scratch_cluster(owner=owner) as (cluster, port):
+        if widened:
+            with psycopg.connect(cluster.url(port, owner, "postgres"), autocommit=True) as admin:
+                admin.execute(f"create role {DEFINER_ROLE} login")
+        target = _target(cluster, port, owner, database, purged.scratch, tmp_path)
+
+        def recover():
+            return recover_declared(
+                backup_set=taken.directory,
+                backup_stores={"blobs": backup_store},
+                export=export,
+                custody=export.parent,
+                declaration=declaration,
+                max_export_lag=_LAG,
+                marker=tmp_path / "control" / "restore.json",
+                target=target,
+                provision=_checking_provision(purged.scratch),
+            )
+
+        if widened:
+            with pytest.raises(DefinerRoleUnsafe, match="can log in"):
+                recover()
+            return
+        recover()
+        with Database(target.database_url).unscoped() as connection:
+            owners = connection.execute(
+                "select distinct pg_get_userbyid(p.proowner) as owner from pg_proc p "
+                "where p.pronamespace = current_schema()::regnamespace and p.prosecdef"
+            ).fetchall()
+            assert [row["owner"] for row in owners] == [DEFINER_ROLE]
+            # A definer runs in the copy as its narrow owner, with the restored grants.
+            connection.execute("select * from spending_authority_facts()").fetchall()
 
 
 def test_a_stale_authority_leaves_the_target_refusing(purged, source, tmp_path):

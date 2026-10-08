@@ -27,6 +27,7 @@ from typing import Any, Final, NoReturn, TextIO
 import psycopg
 from psycopg import sql
 
+from exulanica.db.definer_role import DefinerRoleUnsafe, assert_definer_role, definer_role_installed
 from exulanica.db.local.adopt import adopt
 from exulanica.db.local.backup import (
     Backup,
@@ -310,7 +311,12 @@ def _restore(arguments: argparse.Namespace, stream: TextIO) -> None:
             connection.execute("analyze")
             counts = compare_with_manifest(connection, backup)
             state = schema_state(connection)
-    except (LocalDatabaseRefused, psycopg.Error) as error:
+            # The roles came back with the attributes the manifest recorded, and nothing here
+            # provisions; a restored definer owner wider, or a definer owned by anyone else, is
+            # refused before the copy is offered for use.
+            if definer_role_installed(connection):
+                assert_definer_role(connection)
+    except (LocalDatabaseRefused, psycopg.Error, DefinerRoleUnsafe) as error:
         _stop_after_failure(database, error, Refusal.RESTORE_FAILED)
     print(
         f"restored {backup.dump.name} into {database.root}, running on port {port}: "
