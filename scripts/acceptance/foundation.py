@@ -3943,11 +3943,12 @@ WORLDS_ROWS = (
         "worlds.look",
         "worlds-look",
         "N1.l's town, its tiles baked, opened with no look in the address states in the shell's "
-        "data-world-look the cozy pack (exulanica.cozy-town) drawn, chosen by default; opened with "
+        "data-world-look the cozy pack (exulanica.cozy-town) drawn, chosen by the world, since a "
+        "town is made naming the library's default pack (A-87); opened with "
         "?look=today the tile look (no pack) and with ?look=toon the toon pack "
         "(exulanica.toon-town) drawn, each chosen by the address; once the town's appearance names "
         "the toon pack (preview and apply through the API), opened with no look it states the toon "
-        "pack drawn, chosen by the world; each time under the town's title (A-65, A-69). "
+        "pack drawn, chosen by the world; each time under the town's title (A-65, A-69, A-87). "
         "Functional only; how each look appears stays with the experience owner.",
     ),
     (
@@ -3988,7 +3989,50 @@ WORLDS_ROWS = (
         "draws the world's own cozy pack again (by the redraw); the saved entry still names a "
         "style version whose pack is cozy (A-81). Functional only.",
     ),
+    (
+        "N1.r",
+        "worlds.create_in_a_look",
+        "worlds-create-look",
+        "Create a world, opened from Your worlds with N, shows the Look row naming the pack GET "
+        "/world/style-packs marks default; Change look opens the Look sheet choosing (its action "
+        "says Choose this look); choosing toon, the row names toon and says it is the person's "
+        "choice; making a small town opens it drawn in toon, chosen by the world, and its saved "
+        "entry names a style version whose pack is toon (A-95). Functional only.",
+    ),
+    (
+        "N1.u",
+        "worlds.look_earlier_version",
+        "worlds-look-earlier",
+        "A town made through the API in the cozy pack's earliest published version, opened, its "
+        "Look sheet shows that version as Now (caption Now · version N, before the pack's current "
+        "version captioned Version M), says This world is drawn in version N, offers to Keep "
+        "version N and no Use on the Now card; resting on the current version offers Use version "
+        "M; Escape applies nothing and the entry keeps version N (A-98). Functional only.",
+    ),
 )
+
+#: The people session's rows (A-96, A-97): on a browser stack with the scripted comparisons plan.
+PEOPLE_ROWS = (
+    (
+        "N1.s",
+        "people.card_mind",
+        "people-card",
+        "In the workspace's starter with a stall and its people (A-101), a person chosen in the "
+        "inspector shows their card "
+        "(section.thing-card for that person) with their mind; Change, then one offered model, "
+        "changes it in two clicks; the card says what changed and GET .../models reads that "
+        "model chosen for the person (A-96, A-101). Scripted model; functional only.",
+    ),
+    (
+        "N1.t",
+        "people.ai_marks",
+        "people-marks",
+        "After N1.s, the canvas states data-thing-marks above 0 and the person carries an AI mark "
+        "(data-mark ai, data-subject the person) (A-97). Scripted model; functional only.",
+    ),
+)
+#: The session the people rows drive, and the stack it needs.
+PEOPLE_PLAN = Path("scripts") / "acceptance" / "plans" / "comparisons.json"
 
 
 def _rehearsal() -> Any:
@@ -4012,6 +4056,13 @@ def browser(arguments: argparse.Namespace) -> int:
         raise SystemExit(
             "browser needs a stack started with --production --society-playback --tiles"
         )
+    people = arguments.session == "people"
+    served = (stack.state.get("scripted_model") or {}).get("plan_sha256")
+    if people != (served == hashlib.sha256((REPOSITORY / PEOPLE_PLAN).read_bytes()).hexdigest()):
+        raise SystemExit(
+            "the people session needs --scripted-model scripts/acceptance/plans/comparisons.json "
+            "--spending process on its stack, and the main session needs no scripted model"
+        )
     rehearse = _rehearsal()
     steps = json.loads((REPOSITORY / "scripts" / "rehearsal" / "steps.json").read_text())
     out = Path(arguments.out).resolve()
@@ -4020,7 +4071,11 @@ def browser(arguments: argparse.Namespace) -> int:
     started = dt.datetime.now(dt.UTC).isoformat()
     ports = stack.state["ports"]
     plan = {
-        "session": {"id": "n1j", "budget_seconds": JOURNEY_BUDGET_SECONDS},
+        "session": {
+            "id": "n1s" if people else "n1j",
+            "budget_seconds": JOURNEY_BUDGET_SECONDS,
+            **({"steps": [step for _, _, step, _ in PEOPLE_ROWS]} if people else {}),
+        },
         "out": str(session_dir),
         "runtime": {
             "app_url": f"http://localhost:{ports['vite']}/",
@@ -4088,7 +4143,7 @@ def browser(arguments: argparse.Namespace) -> int:
     }
     row.close()
     worlds_rows = []
-    for row_id, check, step, statement in WORLDS_ROWS:
+    for row_id, check, step, statement in PEOPLE_ROWS if people else WORLDS_ROWS:
         worlds_row = Row(row_id, check, statement)
         outcome = outcomes.get(step) or {}
         worlds_row.expect(
@@ -4101,7 +4156,8 @@ def browser(arguments: argparse.Namespace) -> int:
             "build": app.get("build", {}).get("index_html_sha256"),
         }
         worlds_rows.append(worlds_row.close())
-    rows = [row, *worlds_rows]
+    # The people session drives only its own steps, so it states no journey row.
+    rows = worlds_rows if people else [row, *worlds_rows]
     results = {
         "profile": "q10-foundation-acceptance-results/v1",
         "candidate": stack.state["tree"],
@@ -4162,6 +4218,13 @@ def build_parser() -> argparse.ArgumentParser:
     page = commands.add_parser("browser")
     page.add_argument("--worktree", required=True)
     page.add_argument("--out", required=True)
+    page.add_argument(
+        "--session",
+        choices=("main", "people"),
+        default="main",
+        help="main: the journey and Your worlds rows; people: a person's card and marks, on a "
+        "stack with the scripted comparisons plan (default: main)",
+    )
     talk = commands.add_parser("companion")
     talk.add_argument("--worktree", required=True)
     talk.add_argument("--out", required=True)

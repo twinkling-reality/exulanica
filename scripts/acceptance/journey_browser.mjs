@@ -44,10 +44,19 @@ const MOVE_KEY = 'ArrowRight';
 // signing in (N1.k), the journey follows (N1.j), and Your worlds with two worlds and Create a world
 // close it (N1.l), so neither changes the world the journey uses. N1.l's town is then opened in each
 // look (N1.m), its values shown in Create a world (N1.n) and its look chosen in the Look sheet (N1.o);
-// then what the shell states of the look that Use drew (N1.p) and browsing looks live (N1.q).
-const STEPS = ['worlds-first', 'journey-open', 'journey-stall', 'journey-people', 'journey-bench',
+// then what the shell states of the look that Use drew (N1.p) and browsing looks live (N1.q); then a
+// town made in a look chosen in Create a world (N1.r) and a town kept in an earlier look version (N1.u).
+const MAIN_STEPS = ['worlds-first', 'journey-open', 'journey-stall', 'journey-people', 'journey-bench',
   'journey-response', 'journey-why', 'worlds-create', 'worlds-look', 'worlds-values', 'worlds-look-sheet', 'worlds-look-stated',
-  'worlds-look-browse'];
+  'worlds-look-browse', 'worlds-create-look', 'worlds-look-earlier'];
+// The people session (a stack with a scripted model): a person's card and its mind changed in two
+// clicks (N1.s), then the mark over that person (N1.t).
+const PEOPLE_STEPS = ['people-card', 'people-marks'];
+// The world the people session opens: the workspace's starter with a stall placed, so its people
+// have somewhere to go and stand near where a person arrives (as N1.h prepares it; A-101).
+const PEOPLE_STARTER = { title: 'Q10 people' };
+const PEOPLE_STALL = { asset: 'cc0.market-stall', subject: 'stall', at: [6000, 0, 0] };
+const PEOPLE_SOCIETY = { region_id: 'region:starter', profile: 'exulanica-society/v2' };
 // The second saved world N1.l makes through the API, so Your worlds lists two.
 const SECOND_WORLD_TITLE = 'Q10 second world';
 const SECOND_WORLD_RECIPE = 'small_town';
@@ -56,11 +65,12 @@ const RECIPES = `document.querySelector('section.world-recipes')`;
 // What the shell states of a generated world's look (docs/style-pack-contract.md): the pack asked
 // for, whether it was drawn and why not, as JSON.
 const WORLD_LOOK = `document.querySelector('#shell')?.getAttribute('data-world-look') ?? null`;
-// N1.m (A-65, A-69): the town opened with no look named, with the tile look and with the toon pack,
-// and what the shell states for each, from the contract's words for the team's packs; then, once the
-// town's own appearance names the toon pack, opened with no look named.
+// N1.m (A-65, A-69, A-87): the town opened with no look named, with the tile look and with the toon
+// pack, and what the shell states for each, from the contract's words for the team's packs; then, once
+// the town's own appearance names the toon pack, opened with no look named. A town is made naming the
+// library's default pack (cozy), so with no look named it states that pack chosen by the world.
 const LOOKS = [
-  { query: '', look: { pack: 'exulanica.cozy-town', source: 'default', drawn: true, reason: null } },
+  { query: '', look: { pack: 'exulanica.cozy-town', source: 'world', drawn: true, reason: null } },
   { query: '?look=today', look: { pack: null, source: 'address', drawn: false, reason: null } },
   { query: '?look=toon', look: { pack: 'exulanica.toon-town', source: 'address', drawn: true, reason: null } },
 ];
@@ -94,6 +104,7 @@ function whyWords() {
 }
 
 const plan = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const STEPS = plan.session.steps ?? MAIN_STEPS;
 const out = plan.out;
 const token = readFileSync(plan.runtime.token_file, 'utf8').trim();
 const report = {
@@ -464,6 +475,166 @@ const STEP_HANDLERS = {
     ctx.observe('entry-still-names-cozy', named?.style_pack?.pack_id === 'exulanica.cozy-town',
       { style_version_id: entry?.style_version_id ?? null, style_pack: named?.style_pack ?? null });
     await ctx.screenshot('browse-closed', 'the town in its own look after Escape');
+  },
+  async 'worlds-create-look'(ctx) {
+    // N1.r (A-95): Create a world shows the host's default look; Change look opens the Look sheet
+    // in choosing mode, toon is chosen, the town is made in it and opens stating it.
+    const listed = (await ctx.api('GET', '/world/style-packs')).body?.packs ?? [];
+    const byId = Object.fromEntries(listed.map((p) => [p.pack_id, p]));
+    const fallback = listed.find((p) => p.default) ?? null;
+    const before = new Set(((await ctx.api('GET', '/world-entries')).body ?? []).map((e) => e.entry_id));
+    // Your worlds through the World menu, as N1.l returns to it (a page load reopens the last world).
+    await enter(ctx, () => chooseMenu(ctx.page, 'worlds'), undefined, { choose: false });
+    await ctx.page.waitFor(`${SAVED_WORLD_LIST}?.checkVisibility() ? true : null`, SETTLE_MS, 'Your worlds');
+    await ctx.page.evaluate(`${SAVED_WORLD_CARDS}[0].focus()`);
+    await ctx.page.key('KeyN', 'n', { text: 'n' });
+    const ROW = `document.querySelector('section.world-recipes .look-row')`;
+    const rowTitle = `(() => { const r = ${ROW}; return r && !r.hidden ? r.querySelector('.look-row-title')?.textContent ?? null : null; })()`;
+    const shown = await ctx.page.waitFor(rowTitle, SETTLE_MS, 'the Look row to name the default look');
+    ctx.observe('row-names-the-default', fallback !== null && shown === fallback.title, { shown, default: fallback?.pack_id ?? null });
+    await ctx.page.click(ACTION('look.change', `document.querySelector('section.world-recipes')`), 'Change look');
+    const SHEET = `document.querySelector('section.look-sheet')`;
+    await ctx.page.waitFor(`(${SHEET}?.querySelectorAll('button.look-sheet-card').length ?? 0) > 0 ? true : null`,
+      SETTLE_MS, 'the Look sheet in choosing mode');
+    const words = await ctx.page.evaluate(`${SHEET}.querySelector('button.look-sheet-use span')?.textContent ?? null`);
+    await ctx.page.click(`${SHEET}.querySelector('button.look-sheet-card[data-pack-id="exulanica.toon-town"]')`, 'the toon look');
+    await ctx.page.click(ACTION('look.use', SHEET), 'Choose this look');
+    const toonTitle = byId['exulanica.toon-town']?.title ?? 'exulanica.toon-town';
+    const chosen = await ctx.page.waitFor(`(() => { const t = ${rowTitle}; return t === ${JSON.stringify(toonTitle)} ? t : null; })()`,
+      SETTLE_MS, 'the Look row to name the chosen look');
+    const line = await ctx.page.evaluate(`${ROW}?.querySelector('.look-row-line')?.textContent ?? null`);
+    ctx.observe('chosen-in-the-sheet', words === 'Choose this look' && chosen === toonTitle && (line ?? '').startsWith('Your choice'),
+      { use_words: words, row: chosen, line });
+    await ctx.screenshot('look-chosen', 'Create a world with the toon look chosen');
+    await ctx.page.click(`document.querySelector('section.world-recipes button.world-recipes-choice[data-recipe="small_town"]')`, 'the small town');
+    await ctx.page.waitFor(`document.querySelector('section.world-recipes button.world-recipes-make')?.hidden === false ? true : null`,
+      SETTLE_MS, 'Create this town to be offered');
+    await ctx.page.click(`document.querySelector('section.world-recipes button.world-recipes-make')`, 'Create this town');
+    const made = await ctx.page.waitFor(`(() => { const v = ${WORLD_LOOK}; if (!v) return null; const r = JSON.parse(v);
+      return r.pack === 'exulanica.toon-town' && r.source === 'world' && r.drawn ? v : null; })()`, BAKE_MS, 'the new town drawn in toon')
+      .catch(() => null);
+    ctx.observe('town-drawn-in-the-chosen-look', made !== null, { stated: made === null ? await ctx.page.evaluate(WORLD_LOOK) : JSON.parse(made) });
+    const entries = (await ctx.api('GET', '/world-entries')).body ?? [];
+    const fresh = entries.filter((e) => !before.has(e.entry_id));
+    const entry = fresh.length === 1 ? (await ctx.api('GET', `/world-entries/${fresh[0].entry_id}`)).body : null;
+    const query = `?world_id=${encodeURIComponent(entry?.world_id ?? '')}`;
+    const versions = entry === null ? [] : (await ctx.api('GET', `/world/styles/versions${query}`)).body ?? [];
+    const named = versions.find((v) => v.version_id === entry?.style_version_id) ?? null;
+    ctx.observe('entry-names-toon', fresh.length === 1 && named?.style_pack?.pack_id === 'exulanica.toon-town',
+      { made: fresh.map((e) => e.entry_id), style_pack: named?.style_pack ?? null });
+    await ctx.screenshot('made-in-toon', 'the town made in the chosen look');
+  },
+  async 'worlds-look-earlier'(ctx) {
+    // N1.u (A-98): a town made (through the API) in the cozy pack's earliest published version; its
+    // Look sheet shows that version as Now and offers the current version by number; nothing applied.
+    const listed = (await ctx.api('GET', '/world/style-packs')).body?.packs ?? [];
+    const cozy = listed.find((p) => p.pack_id === 'exulanica.cozy-town') ?? null;
+    const oldest = [...(cozy?.earlier_versions ?? [])].sort((a, b) => a.version - b.version)[0] ?? null;
+    if (cozy === null || oldest === null) throw new Error('the library lists no earlier cozy version');
+    const binding = { pack_id: cozy.pack_id, version: oldest.version, manifest_sha256: oldest.manifest_sha256 };
+    const made = await ctx.api('POST', '/worlds/generated', { recipe: 'small_town', title: 'Q10 earlier look', style_pack: binding });
+    ctx.observe('town-made-in-an-earlier-version', made.status === 201, { status: made.status, binding });
+    const town = made.body?.entry_id;
+    const deadline = Date.now() + BAKE_MS;
+    while (Date.now() < deadline) {
+      const tiles = (await ctx.api('GET', `/world-entries/${town}`)).body?.generated_ground?.tiles ?? [];
+      if (tiles.length > 0 && tiles.every((t) => t.state !== 'baking')) break;
+      await sleep(BAKE_LOOK_MS);
+    }
+    await enter(ctx, () => ctx.page.navigate(ctx.runtime.app_url), town);
+    await ctx.page.waitFor(WORLD_LOOK, SETTLE_MS * 2, 'the town drawn in its look');
+    await ctx.page.key('KeyO', 'o', { text: 'o' });
+    await ctx.page.click(ACTION('look.open'), 'Change look');
+    const SHEET = `document.querySelector('section.look-sheet')`;
+    await ctx.page.waitFor(`(${SHEET}?.querySelectorAll('button.look-sheet-card').length ?? 0) > 0 ? true : null`,
+      SETTLE_MS, 'the Look sheet to offer its packs');
+    const read = () => ctx.page.evaluate(`(() => { const s = ${SHEET};
+      return { cards: [...s.querySelectorAll('button.look-sheet-card')].map(b => ({ pack: b.dataset.packId ?? null,
+        version: b.dataset.version ?? null, caption: b.querySelector('.look-sheet-caption')?.textContent ?? null })),
+        use: s.querySelector('button.look-sheet-use')?.hidden ? null : s.querySelector('button.look-sheet-use span')?.textContent ?? null,
+        keep: s.querySelector('button.look-sheet-keep span')?.textContent ?? null,
+        version_line: s.querySelector('.look-sheet-version')?.textContent ?? null }; })()`);
+    const atNow = await read();
+    const nowCard = atNow.cards.find((c) => c.version === String(oldest.version)) ?? null;
+    const nowIndex = atNow.cards.indexOf(nowCard);
+    const next = atNow.cards[nowIndex + 1] ?? null;
+    ctx.observe('earlier-version-is-now', nowCard !== null && nowCard.pack === 'exulanica.cozy-town'
+      && nowCard.caption === `Now · version ${oldest.version}` && next?.pack === 'exulanica.cozy-town'
+      && next?.version === null && next?.caption === `Version ${cozy.version}`
+      && atNow.keep === `Keep version ${oldest.version}` && atNow.use === null
+      && (atNow.version_line ?? '').includes(`This world is drawn in version ${oldest.version}.`), { read: atNow, oldest: oldest.version, current: cozy.version });
+    await ctx.screenshot('earlier-now', 'the Look sheet with the earlier version as Now');
+    await ctx.page.click(`${SHEET}.querySelector('button.look-sheet-card[data-pack-id="exulanica.cozy-town"]:not([data-version])')`, 'the current cozy version');
+    await sleep(PAGE_SETTLE_MS);
+    const atCurrent = await read();
+    ctx.observe('current-version-offered-by-number', atCurrent.use === `Use version ${cozy.version}`, { read: atCurrent });
+    await ctx.page.key('Escape', 'Escape');
+    await sleep(PAGE_SETTLE_MS);
+    const entry = (await ctx.api('GET', `/world-entries/${town}`)).body;
+    const query = `?world_id=${encodeURIComponent(entry?.world_id ?? '')}`;
+    const versions = (await ctx.api('GET', `/world/styles/versions${query}`)).body ?? [];
+    const named = versions.find((v) => v.version_id === entry?.style_version_id) ?? null;
+    ctx.observe('town-keeps-the-earlier-version', same(named?.style_pack ?? null, binding), { style_pack: named?.style_pack ?? null, binding });
+  },
+  async 'people-card'(ctx) {
+    // N1.s (A-96, A-101): the starter with a stall and its people; a person chosen in the inspector
+    // shows their card with their mind; Change then a model changes it in two clicks, said on the
+    // card and read from the API.
+    const made = await ctx.api('POST', '/world-entries/starter', PEOPLE_STARTER);
+    if (made.status !== 200) throw new Error(`the starter answered ${made.status}`);
+    const town = made.body.entry_id;
+    const read = async () => (await ctx.api('GET', `/world-entries/${town}`)).body;
+    let entry = await read();
+    const query = `?world_id=${encodeURIComponent(entry.world_id)}`;
+    const [x_mm, y_mm, z_mm] = PEOPLE_STALL.at;
+    const stall = await ctx.api('POST', `/world/versions/${entry.authored_version_id}/compositions/apply${query}`, {
+      base_state_sha256: entry.authored_state_sha256,
+      source: { kind: 'reviewed_asset', asset_key: PEOPLE_STALL.asset },
+      placement: { subject_id: PEOPLE_STALL.subject, region_id: PEOPLE_SOCIETY.region_id,
+        transform: { x_mm, y_mm, z_mm, yaw_microradians: 0, scale_milli: 1000 }, origin_role: 'fictional' },
+      saved_entry: { entry_id: entry.entry_id, base_revision: entry.revision,
+        authored_state_sha256: entry.authored_state_sha256, authored_edit_seq: entry.authored_edit_seq },
+    });
+    entry = await read();
+    const brought = await ctx.api('POST', `/world/versions/${entry.authored_version_id}/society${query}`, PEOPLE_SOCIETY);
+    ctx.observe('people-brought-in', [200, 201].includes(stall.status) && [200, 201].includes(brought.status),
+      { stall: stall.status, society: brought.status });
+    await enter(ctx, () => ctx.page.navigate(ctx.runtime.app_url), town);
+    await openPeopleNearby(ctx.page);
+    const nearby = await ctx.page.waitFor(`(() => { const o = [...(${INSPECT})?.options ?? []].map(o => o.value).filter(Boolean);
+      return o.length > 0 ? o : null; })()`, SETTLE_MS, 'someone nearby to choose');
+    const subject = nearby[0];
+    await ctx.page.setValue(INSPECT, subject);
+    const CARD = `document.querySelector('section.thing-card[data-subject="${subject}"]')`;
+    await ctx.page.waitFor(`${CARD}?.checkVisibility() ? true : null`, SETTLE_MS, "the person's card");
+    const mindBefore = await ctx.page.evaluate(`${CARD}.querySelector('.thing-card-mind-name')?.textContent ?? null`);
+    await ctx.page.click(`${CARD}.querySelector('[data-action="card.mind.change"]')`, 'Change');
+    const key = await ctx.page.waitFor(`(() => { const b = [...${CARD}.querySelectorAll('[data-action="card.mind.choose"]')]
+      .find(b => b.dataset.key && b.dataset.key !== 'routine' && !b.hasAttribute('data-now')); return b ? b.dataset.key : null; })()`,
+      SETTLE_MS, 'a model the card offers');
+    await ctx.page.click(`${CARD}.querySelector('[data-action="card.mind.choose"][data-key=${JSON.stringify(key)}]')`, 'the model');
+    const outcome = await ctx.page.waitFor(`${CARD}?.querySelector('.thing-card-outcome')?.textContent || null`, SETTLE_MS, 'the card to say what changed');
+    const [provider, ...rest] = key.split(' ');
+    const modelId = rest.join(' ');
+    entry = await read();
+    const roles = (await ctx.api('GET', `/world/versions/${entry.authored_version_id}/models${query}`)).body?.roles ?? [];
+    const view = roles.find((r) => r.key === 'society_decision')?.view ?? {};
+    const mine = (view.choices ?? []).filter((c) => c.subject_id === subject).sort((a, b) => (b.choice_seq ?? 0) - (a.choice_seq ?? 0))[0] ?? null;
+    ctx.observe('mind-changed-in-two-clicks', !!outcome && mine?.model?.provider === provider && mine?.model?.model_id === modelId,
+      { subject, before: mindBefore, chosen: key, outcome, recorded: mine?.model ?? null });
+    Object.assign(ctx.facts, { people_town: town, people_subject: subject, people_model: key });
+    await ctx.screenshot('card-changed', "the person's card after the mind was changed");
+  },
+  async 'people-marks'(ctx) {
+    // N1.t (A-97): the person whose mind is a model carries an AI mark over their head.
+    const subject = ctx.facts.people_subject;
+    const marked = await ctx.page.waitFor(`(() => { const c = document.querySelector('[data-thing-marks]');
+      const pill = document.querySelector('.thing-mark-pill[data-mark="ai"][data-subject="${subject}"]');
+      return c && Number(c.dataset.thingMarks) > 0 && pill ? { marks: Number(c.dataset.thingMarks), word: pill.querySelector('.thing-mark-word')?.textContent ?? null } : null; })()`,
+      SETTLE_MS * 2, 'the AI mark over the person').catch(() => null);
+    ctx.observe('ai-mark-over-the-person', marked !== null, { subject, marked,
+      marks: await ctx.page.evaluate(`document.querySelector('[data-thing-marks]')?.dataset.thingMarks ?? null`) });
+    await ctx.screenshot('marks', 'the marks over people');
   },
   async 'journey-open'(ctx) {
     await open(ctx);

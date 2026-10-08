@@ -4005,7 +4005,11 @@ def packs(arguments: argparse.Namespace) -> int:
     started = dt.datetime.now(dt.UTC).isoformat()
     s1 = row_s1(stack, transcripts, worktree)
     listing = F.client(stack, transcripts, "w1", "token").call("S2", "GET", "/world/style-packs")[1]
-    rows = [s1, row_s2(stack, transcripts, listing or {})]
+    rows = [
+        s1,
+        row_s2(stack, transcripts, listing or {}, worktree),
+        row_s3(stack, transcripts, listing or {}, worktree),
+    ]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
 
@@ -4036,13 +4040,19 @@ def preview_body(current: Mapping[str, Any], **changes: Any) -> dict[str, Any]:
     return body
 
 
-def row_s2(stack: Stack, transcripts: Any, listing: Mapping[str, Any]) -> Row:
+#: The committed library document naming the pack a world without a chosen look is made in.
+STYLE_LIBRARY = Path("assets") / "style-packs" / "library.v1.json"
+
+
+def row_s2(stack: Stack, transcripts: Any, listing: Mapping[str, Any], worktree: Path) -> Row:
     row = Row(
         "S2",
         "style_packs.world_binding",
-        "On a generated town: a whole-world preview naming the toon pack as the library lists it "
+        "The library lists exactly one pack as default, the one the committed library document "
+        "names; a generated town is made naming that pack (A-86). On it: a whole-world preview "
+        "naming the toon pack as the library lists it "
         "states that pack and writes no version; applying it makes a version naming it, which the "
-        "current style reads; rolling back to the base version reads no pack; the toon pack named "
+        "current style reads; rolling back to the base version reads the default pack; the toon pack named "
         "with a digest the library does not hold, and a regional proposal naming a pack, are "
         "refused invalid_style_data and write nothing; the other workspace is answered 404.",
     )
@@ -4055,6 +4065,13 @@ def row_s2(stack: Stack, transcripts: Any, listing: Mapping[str, Any]) -> Row:
         return {k: found.get(k) for k in ("pack_id", "version", "manifest_sha256")}
 
     toon, cozy = named("exulanica.toon-town"), named("exulanica.cozy-town")
+    committed_default = json.loads((worktree / STYLE_LIBRARY).read_text())["default"]
+    listed_default = [p.get("pack_id") for p in listing.get("packs") or [] if p.get("default")]
+    default = named(committed_default)
+    row.expect(
+        listed_default == [committed_default] and default["version"] is not None,
+        f"the library lists {listed_default} as default; the committed default is {committed_default}",
+    )
     status_town, town = w1.call(
         "S2", "POST", "/worlds/generated", body={"recipe": "small_town", "title": "Q10 S2 town"}
     )
@@ -4071,6 +4088,8 @@ def row_s2(stack: Stack, transcripts: Any, listing: Mapping[str, Any]) -> Row:
 
     base = current()
     base_id = (base.get("current") or {}).get("version_id")
+    made_in = (base.get("current") or {}).get("style_pack")
+    row.expect(made_in == default, f"the town was made naming {made_in}, not {default}")
     count = versions()
     status_preview, preview = w1.call(
         "S2",
@@ -4121,7 +4140,7 @@ def row_s2(stack: Stack, transcripts: Any, listing: Mapping[str, Any]) -> Row:
     )
     rolled = current()
     row.expect(
-        status_back == 200 and (rolled.get("current") or {}).get("style_pack") is None,
+        status_back == 200 and (rolled.get("current") or {}).get("style_pack") == default,
         f"rollback answered {status_back} {F.problem_code(back)}; the pack reads "
         f"{(rolled.get('current') or {}).get('style_pack')}",
     )
@@ -4158,6 +4177,8 @@ def row_s2(stack: Stack, transcripts: Any, listing: Mapping[str, Any]) -> Row:
     row.observed = {
         "town": town.get("entry_id"),
         "toon": toon,
+        "default": {"committed": committed_default, "listed": listed_default},
+        "made_in": made_in,
         "preview": [status_preview, candidate],
         "apply": [status_apply, applied.get("style_pack")],
         "rollback": [status_back, (rolled.get("current") or {}).get("style_pack")],
@@ -4165,6 +4186,93 @@ def row_s2(stack: Stack, transcripts: Any, listing: Mapping[str, Any]) -> Row:
         "regional": [status_region, F.problem_code(regional)],
         "stranger": status_stranger,
         "mutant_cozy_fails": mutant_fails,
+    }
+    return row.close()
+
+
+#: Every published version of every pack, committed beside the current packs (dbc09bac).
+PUBLISHED_PACKS = Path("assets") / "style-packs" / "published.v1.json"
+PUBLISHED_DIRECTORY = Path("assets") / "style-packs" / "published"
+
+
+def row_s3(stack: Stack, transcripts: Any, listing: Mapping[str, Any], worktree: Path) -> Row:
+    row = Row(
+        "S3",
+        "style_packs.earlier_versions",
+        "Every published version the committed published list names that is not a pack's current "
+        "version is listed among that pack's earlier versions with its digest, and served by that "
+        "digest as the committed manifest's canonical bytes; a town made naming an earlier version "
+        "is 201 and its current style names that version; a version the library never published is "
+        "refused 422 invalid_style_data (A-92).",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    current = {p.get("pack_id"): p for p in listing.get("packs") or []}
+    published = json.loads((worktree / PUBLISHED_PACKS).read_text())["versions"]
+    earlier = [
+        v for v in published if (current.get(v["pack_id"]) or {}).get("version") != v["version"]
+    ]
+    row.expect(bool(earlier), "the committed list names no earlier version")
+    served = []
+    for version in earlier:
+        pack = current.get(version["pack_id"]) or {}
+        listed = {
+            (e.get("version"), e.get("manifest_sha256")) for e in pack.get("earlier_versions") or []
+        }
+        raw = (
+            worktree
+            / PUBLISHED_DIRECTORY
+            / version["pack_id"]
+            / str(version["version"])
+            / "manifest.json"
+        ).read_bytes()
+        canonical = canonical_manifest(raw) or raw
+        status, _, body = raw_call(
+            stack, "token", "GET", f"/world/style-packs/{version['manifest_sha256']}"
+        )
+        ok = (
+            (version["version"], version["manifest_sha256"]) in listed
+            and hashlib.sha256(canonical).hexdigest() == version["manifest_sha256"]
+            and status == 200
+            and body == canonical
+        )
+        row.expect(ok, f"{version['pack_id']} {version['version']} answered {status}")
+        served.append([version["pack_id"], version["version"], status, ok])
+    oldest = min(earlier, key=lambda v: (v["pack_id"] != "exulanica.toon-town", v["version"]))
+    chosen = {k: oldest[k] for k in ("pack_id", "version", "manifest_sha256")}
+    status_town, town = w1.call(
+        "S3",
+        "POST",
+        "/worlds/generated",
+        body={"recipe": "small_town", "title": "Q10 S3 town", "style_pack": chosen},
+    )
+    named = None
+    if status_town == 201:
+        named = (
+            (w1.call("S3", "GET", "/world/styles/current", query=style_query(town))[1] or {}).get(
+                "current"
+            )
+            or {}
+        ).get("style_pack")
+    row.expect(
+        status_town == 201 and named == chosen,
+        f"the town in an earlier version answered {status_town} {F.problem_code(town)} naming "
+        f"{named}",
+    )
+    never = {**chosen, "version": 99}
+    status_never, refused = w1.call(
+        "S3",
+        "POST",
+        "/worlds/generated",
+        body={"recipe": "small_town", "title": "Q10 S3 never", "style_pack": never},
+    )
+    row.expect(
+        status_never == 422 and F.problem_code(refused) == "invalid_style_data",
+        f"an unpublished version answered {status_never} {F.problem_code(refused)}",
+    )
+    row.observed = {
+        "earlier": served,
+        "town": [status_town, (town or {}).get("entry_id"), chosen, named],
+        "unpublished": [status_never, F.problem_code(refused)],
     }
     return row.close()
 
@@ -4896,9 +5004,16 @@ def row_t2(stack: Stack, transcripts: Any) -> Row:
     return row.close()
 
 
-def build_scene(stack: Stack, worktree: Path, record: Path) -> subprocess.CompletedProcess[str]:
-    """The demo scene builder, as workspace 2's account runs it; the token is handed to it in its
-    environment only (A-79)."""
+def build_scene(
+    stack: Stack,
+    worktree: Path,
+    record: Path,
+    *,
+    token_file: str = "token-2",
+    minds: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    """The demo scene builder, as a workspace's account runs it (workspace 2's unless named); the
+    token is handed to it in its environment only (A-79)."""
     return subprocess.run(
         [
             str(worktree / ".venv" / "bin" / "python"),
@@ -4908,11 +5023,12 @@ def build_scene(stack: Stack, worktree: Path, record: Path) -> subprocess.Comple
             stack.base_url,
             "--record",
             str(record),
+            *(["--minds"] if minds else []),
         ],
         cwd=worktree,
         env={
             **LAUNCH.clean_environment(),
-            "EXULANICA_TOKEN": stack.token_file("token-2").read_text().strip(),
+            "EXULANICA_TOKEN": stack.token_file(token_file).read_text().strip(),
         },
         capture_output=True,
         text=True,
@@ -4986,6 +5102,190 @@ def row_sc1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
     return row.close()
 
 
+LOOK_CHOICES = "exulanica.thing-look-choices/v1"
+
+
+def scene_entry(c: Any, step: str, built: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The saved world a scene build recorded, read back, or None when the build left none."""
+    return F.read_entry(c, step, built["entry_id"]) if built.get("entry_id") else None
+
+
+def row_t3(stack: Stack, transcripts: Any, built: Mapping[str, Any]) -> Row:
+    row = Row(
+        "T3",
+        "things.looks_worn",
+        "On SC1's scene version: GET .../thing-looks answers 200 with profile "
+        f"{LOOK_CHOICES}, the version's id and no choice (looks are written by a visitor's "
+        "crossing, and the scene's things were placed by its owner, so each wears its kind's first "
+        "look), never stored by a cache; another workspace and an unknown version are 404 (A-93).",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    entry = scene_entry(w2, "T3", built)
+    row.expect(entry is not None, "SC1 left no scene to read")
+    if entry is None:
+        return row.close()
+    path = F.version_path(entry, "/thing-looks")
+    query = F.world_query(entry)
+    status, read = w2.call("T3", "GET", path, query=query)
+    row.expect(
+        status == 200
+        and (read or {}).get("profile") == LOOK_CHOICES
+        and (read or {}).get("version_id") == entry["authored_version_id"]
+        and (read or {}).get("looks") == [],
+        f"the looks read answered {status} {read}",
+    )
+    raw_status, headers, _ = raw_call(
+        stack, "token-2", "GET", f"{path}?{urllib.parse.urlencode(query)}"
+    )
+    cache = {k.lower(): v for k, v in headers.items()}.get("cache-control", "")
+    row.expect(raw_status == 200 and "no-store" in cache, f"Cache-Control {cache!r}")
+    status_stranger, _ = w1.call("T3", "GET", path, query=query)
+    row.expect(status_stranger == 404, f"another workspace was answered {status_stranger}")
+    unknown = f"/world/versions/{uuid.uuid4()}/thing-looks"
+    status_unknown, _ = w2.call("T3", "GET", unknown, query=query)
+    row.expect(status_unknown == 404, f"an unknown version was answered {status_unknown}")
+    row.observed = {
+        "read": [status, (read or {}).get("profile"), (read or {}).get("looks")],
+        "cache_control": cache,
+        "stranger": status_stranger,
+        "unknown": status_unknown,
+    }
+    return row.close()
+
+
+#: The engine of a society of things, as the demo scene names it.
+THINGS_ENGINE = "exulanica-society/v7"
+
+
+def row_t4a(stack: Stack, transcripts: Any, built: Mapping[str, Any], worktree: Path) -> Row:
+    row = Row(
+        "T4a",
+        "things.society_not_offered",
+        f"On a host that does not offer the society of things, starting a {THINGS_ENGINE} society "
+        "on SC1's scene version is refused 409 society_engine_not_offered and starts nothing "
+        "(A-94).",
+    )
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    entry = scene_entry(w2, "T4a", built)
+    row.expect(entry is not None, "SC1 left no scene to start a society on")
+    if entry is None or stack.state.get("society_of_things"):
+        if stack.state.get("society_of_things"):
+            row.blocked_by.append("this stack offers the society of things")
+        return row.close()
+    scene = json.loads((worktree / DEMO_SCENE).read_text())
+    row.expect(scene.get("engine") == THINGS_ENGINE, f"the scene names {scene.get('engine')}")
+    status, refused = w2.call(
+        "T4a",
+        "POST",
+        F.version_path(entry, "/society"),
+        query=F.world_query(entry),
+        body={"region_id": F.STARTER_REGION, "profile": THINGS_ENGINE},
+    )
+    row.expect(
+        status == 409 and F.problem_code(refused) == "society_engine_not_offered",
+        f"the society of things answered {status} {F.problem_code(refused)}",
+    )
+    status_read, _ = F.society(w2, "T4a", entry)
+    row.expect(status_read == 404, f"after the refusal the society read answered {status_read}")
+    row.observed = {"start": [status, F.problem_code(refused)], "read_after": status_read}
+    return row.close()
+
+
+def row_t4(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
+    row = Row(
+        "T4",
+        "things.society_lives",
+        f"On a host offering the society of things (a fresh database): the demo scene built as "
+        f"workspace 1 and a {THINGS_ENGINE} society started on its version in the arrival's "
+        "region; the society runs that engine and counts every scene being that has a mind among "
+        "its people, placed; a step advances it; its replay answers the live state; the scene's "
+        "own --minds step is run and what it answers is recorded, not judged (scene v1 names a "
+        "model not offered to beings; A-89, A-94).",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    scene = json.loads((worktree / DEMO_SCENE).read_text())
+    record_path = out / "evidence" / "t4-scene-build.json"
+    built = build_scene(stack, worktree, record_path, token_file="token")
+    (out / "evidence" / "t4-scene-build.txt").write_text(built.stdout + built.stderr)
+    row.expect(
+        built.returncode == 0 and record_path.exists(), f"the build exited {built.returncode}"
+    )
+    if not record_path.exists():
+        return row.close()
+    record = json.loads(record_path.read_text())
+    entry = F.read_entry(w1, "T4", record["entry_id"])
+    status, society = w1.call(
+        "T4",
+        "POST",
+        F.version_path(entry, "/society"),
+        query=F.world_query(entry),
+        body={"region_id": record["arrival"]["region_id"], "profile": THINGS_ENGINE},
+    )
+    society = society if isinstance(society, dict) else {}
+    placed_people = {
+        p.get("placed_id")
+        for p in (society.get("state") or {}).get("inhabitants") or []
+        if p.get("came_by") == "placed"
+    }
+    beings = {m["thing_id"] for m in scene.get("minds") or []}
+    row.expect(
+        status in (200, 201) and society.get("profile") == THINGS_ENGINE,
+        f"the society answered {status} {F.problem_code(society)} running {society.get('profile')}",
+    )
+    row.expect(
+        beings and beings <= placed_people,
+        f"the society's placed people are {sorted(placed_people)}, the scene's beings {sorted(beings)}",
+    )
+    status_step, stepped = F.advance(w1, "T4", entry, society) if society else (None, {})
+    stepped = stepped if isinstance(stepped, dict) else {}
+    row.expect(
+        status_step == 200 and stepped.get("current_tick", -1) > society.get("current_tick", 0),
+        f"a step answered {status_step} {F.problem_code(stepped)}",
+    )
+    _, live = F.society(w1, "T4", entry)
+    status_replay, replayed = w1.call(
+        "T4", "GET", F.version_path(entry, "/society/replay"), query=F.world_query(entry)
+    )
+    row.expect(
+        status_replay == 200
+        and (replayed or {}).get("state_sha256") == (live or {}).get("state_sha256"),
+        f"the replay answered {status_replay} with another state",
+    )
+    minds_record = out / "evidence" / "t4-scene-minds.json"
+    minds = build_scene(stack, worktree, minds_record, token_file="token", minds=True)
+    (out / "evidence" / "t4-scene-minds.txt").write_text(minds.stdout + minds.stderr)
+    row.observed = {
+        "scene": record.get("scene"),
+        "society": [status, society.get("profile"), society.get("society_id")],
+        "placed_people": sorted(placed_people),
+        "beings": sorted(beings),
+        "step": [status_step, society.get("current_tick"), stepped.get("current_tick")],
+        "replay": status_replay,
+        "minds_observed": {
+            "exit": minds.returncode,
+            "said": (minds.stdout + minds.stderr).strip().splitlines()[-3:],
+        },
+    }
+    return row.close()
+
+
+def society_of_things(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if not stack.state.get("society_of_things"):
+        raise SystemExit(
+            "society-of-things needs a stack started with --society-of-things on a fresh database"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_t4(stack, transcripts, worktree, out)]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
 def things(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -4995,10 +5295,13 @@ def things(arguments: argparse.Namespace) -> int:
     (out / "evidence").mkdir(parents=True, exist_ok=True)
     transcripts = Transcripts(out / "transcripts")
     started = dt.datetime.now(dt.UTC).isoformat()
+    sc1 = row_sc1(stack, transcripts, worktree, out)
     rows = [
         row_t1(stack, transcripts, worktree),
         row_t2(stack, transcripts),
-        row_sc1(stack, transcripts, worktree, out),
+        sc1,
+        row_t3(stack, transcripts, sc1.observed),
+        row_t4a(stack, transcripts, sc1.observed, worktree),
     ]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
@@ -5037,16 +5340,36 @@ def door_call(
             return refused.code, raw.decode(errors="replace")
 
 
+def deciders(c: Any, step: str, entry: Mapping[str, Any], people: Sequence[str]) -> dict[str, Any]:
+    """Who decides each of ``people`` as the people role's view reads it: the newest choice's
+    decider kind, or None for a person no choice names (the routine)."""
+    view = (roles_read(c, step, entry).get(PERSON_ROLE) or {}).get("view") or {}
+    newest: dict[str, Any] = {}
+    for choice in view.get("choices") or []:
+        subject = choice.get("subject_id")
+        if subject in people and (
+            subject not in newest
+            or choice.get("choice_seq", 0) >= newest[subject].get("choice_seq", 0)
+        ):
+            newest[subject] = choice
+    return {p: ((newest.get(p) or {}).get("decider") or {}).get("kind") for p in people}
+
+
 def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
     row = Row(
         "D1",
         "door.grants",
-        "With AGENTS' example bridge declared: GET /door/bridges lists it; a grant admitting the "
-        "visitor kind for one visitor is 201 and the same request again 200 with the same grant; a "
-        "grant naming a world's thing is 409 named_things_unavailable; an unknown bridge is 422 "
+        "With AGENTS' example bridge declared: GET /door/bridges lists it; a visitor grant is 201 "
+        "and the same request again 200 with the same grant; an unknown bridge is 422 "
         "bridge_not_offered; the read-only grant is refused 403; the other workspace reads no grant "
-        "of workspace 1's (404); a channel hello on the grant's credential is accepted, and after "
-        "the grant is revoked it reads ended and the same hello is refused.",
+        "of workspace 1's (404) (A-80). Named things (A-88): on a generated town with its society, "
+        "a grant naming two of its people and the version is 201 and the people role reads them "
+        "decided from outside; things without the version, or the version without things, are 422 "
+        "invalid_scope; a person not in the world is 422 person_not_in_this_world. One channel "
+        "credential is live: a hello on it is 200, a second credential ends it (its next request 401 "
+        "unauthenticated), the second polls only after its own hello (409 hello_first, then 200); "
+        "revoking reads ended, hands the people back to their routine, and the hello after is "
+        "refused.",
     )
     w1 = F.client(stack, transcripts, "w1", "token")
     w2 = F.client(stack, transcripts, "w2", "token-2")
@@ -5084,7 +5407,6 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
     )
     refusals = {}
     for name, change, client, status, code in (
-        ("named thing", {"things": [str(uuid.uuid4())]}, w1, 409, "named_things_unavailable"),
         ("unknown bridge", {"bridge": "q10-nobody"}, w1, 422, "bridge_not_offered"),
         ("read-only", {}, read_only, 403, None),
     ):
@@ -5102,30 +5424,112 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
         )
     status_stranger, _ = w2.call("D1", "GET", f"/door/grants/{grant_id}", query=query)
     row.expect(status_stranger == 404, f"the other workspace was answered {status_stranger}")
-    status_credential, issued_credential = w1.call(
-        "D1", "POST", f"/door/grants/{grant_id}/channel-credentials", query=query, body={}
+
+    # Named things: two people of a generated town's society, bound in its version (A-88).
+    town = generated_town(w1, "D1 town", "Q10 D1 town")
+    town_query = F.world_query(town)
+    _, society = F.society(w1, "D1 town", town)
+    people = [p.get("id") for p in ((society or {}).get("state") or {}).get("inhabitants") or []][
+        :2
+    ]
+    named = {
+        **body,
+        "kinds": [],
+        "visitors_maximum": 0,
+        "things": people,
+        "version_id": town["authored_version_id"],
+    }
+    scope = {}
+    for name, change, status, code in (
+        ("things without the version", {"version_id": None}, 422, "invalid_scope"),
+        ("the version without things", {"things": []}, 422, "invalid_scope"),
+        (
+            "a person not in the world",
+            {"things": [str(uuid.uuid4())]},
+            422,
+            "person_not_in_this_world",
+        ),
+    ):
+        got, answer = w1.call(
+            "D1 named",
+            "POST",
+            "/door/grants",
+            query=town_query,
+            body={**named, **change, "idempotency_key": str(uuid.uuid4())},
+        )
+        scope[name] = [got, F.problem_code(answer)]
+        row.expect(
+            got == status and F.problem_code(answer) == code,
+            f"{name} answered {got} {F.problem_code(answer)}",
+        )
+    status_named, bound = w1.call(
+        "D1 named",
+        "POST",
+        "/door/grants",
+        query=town_query,
+        body={**named, "idempotency_key": str(uuid.uuid4())},
     )
-    credential = (issued_credential or {}).get("credential")
+    named_id = ((bound or {}).get("grant") or {}).get("grant_id")
     row.expect(
-        status_credential == 201 and credential,
-        f"the channel credential answered {status_credential}",
+        status_named == 201 and named_id and len(people) == 2,
+        f"the named grant answered {status_named} {F.problem_code(bound)} for {len(people)} people",
     )
+    decided = deciders(w1, "D1 named", town, people)
+    row.expect(
+        all(kind == "external" for kind in decided.values()),
+        f"the people role reads the named people decided by {decided}",
+    )
+
+    # One live channel credential, and a hello under each (544fc5f6).
     hello = {
         "adapter_version": declared["adapter_versions"][0],
         "mapping": json.loads((worktree / DOOR_MAPPING).read_text()),
         "reads": list(DOOR_READS),
     }
-    status_hello, said = door_call(stack, credential, "POST", "/door/channel/hello", hello)
+    path = f"/door/grants/{named_id}/channel-credentials"
+    _, first = w1.call("D1 credential", "POST", path, query=town_query, body={})
+    first_credential = (first or {}).get("credential")
+    status_hello, said = door_call(stack, first_credential, "POST", "/door/channel/hello", hello)
     row.expect(status_hello == 200, f"the hello answered {status_hello} {F.problem_code(said)}")
-    status_revoke, _ = w1.call(
-        "D1", "POST", f"/door/grants/{grant_id}/revoke", query=query, body={}
+    status_second, second = w1.call("D1 credential", "POST", path, query=town_query, body={})
+    second_credential = (second or {}).get("credential")
+    row.expect(
+        status_second == 201 and second_credential,
+        f"the second credential answered {status_second}",
     )
-    _, read = w1.call("D1", "GET", f"/door/grants/{grant_id}", query=query)
+    status_ended, ended_answer = door_call(
+        stack, first_credential, "POST", "/door/channel/hello", hello
+    )
+    row.expect(
+        status_ended == 401 and F.problem_code(ended_answer) == "unauthenticated",
+        f"the ended credential answered {status_ended} {F.problem_code(ended_answer)}",
+    )
+    status_early, early = door_call(stack, second_credential, "GET", "/door/channel/frames")
+    row.expect(
+        status_early == 409 and F.problem_code(early) == "hello_first",
+        f"a poll before its hello answered {status_early} {F.problem_code(early)}",
+    )
+    status_hello_2, _ = door_call(stack, second_credential, "POST", "/door/channel/hello", hello)
+    status_poll, _ = door_call(stack, second_credential, "GET", "/door/channel/frames")
+    row.expect(
+        status_hello_2 == 200 and status_poll == 200,
+        f"the second credential's hello answered {status_hello_2} and its poll {status_poll}",
+    )
+
+    status_revoke, _ = w1.call(
+        "D1 revoke", "POST", f"/door/grants/{named_id}/revoke", query=town_query, body={}
+    )
+    _, read = w1.call("D1 revoke", "GET", f"/door/grants/{named_id}", query=town_query)
     ended = ((read or {}).get("grant") or read or {}).get("ended")
     row.expect(
         status_revoke == 200 and ended, f"the revoke answered {status_revoke}; ended {ended}"
     )
-    status_after, after = door_call(stack, credential, "POST", "/door/channel/hello", hello)
+    handed_back = deciders(w1, "D1 revoke", town, people)
+    row.expect(
+        all(kind != "external" for kind in handed_back.values()),
+        f"after the revoke the people are decided by {handed_back}",
+    )
+    status_after, after = door_call(stack, second_credential, "POST", "/door/channel/hello", hello)
     row.expect(400 <= status_after < 500, f"the hello after the revoke answered {status_after}")
     row.observed = {
         "bridge": declared["bridge"],
@@ -5133,10 +5537,149 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
         "again": status_again,
         "refusals": refusals,
         "stranger": status_stranger,
-        "credential": status_credential,
-        "hello": [status_hello, F.problem_code(said)],
+        "named": {
+            "grant": [status_named, named_id],
+            "people": people,
+            "deciders": decided,
+            "scope_refusals": scope,
+        },
+        "credentials": {
+            "first_hello": [status_hello, F.problem_code(said)],
+            "second": status_second,
+            "first_after_second": [status_ended, F.problem_code(ended_answer)],
+            "poll_before_hello": [status_early, F.problem_code(early)],
+            "second_hello_and_poll": [status_hello_2, status_poll],
+        },
         "revoke": [status_revoke, ended],
+        "deciders_after_revoke": handed_back,
         "hello_after_revoke": [status_after, F.problem_code(after)],
+    }
+    return row.close()
+
+
+#: The outside agent AG1 runs: the agent library as shipped (bridges/agents), in its own process,
+#: with a fixed policy instead of a mind (the first offered action), and no model anywhere.
+AGENT_LIBRARY = Path("bridges") / "agents"
+SCRIPTED_AGENT = r"""
+import json, sys, time
+from exulanica_agent import Body
+seen = {"turn": None, "answer": None, "outcome": None, "happened": [], "ended": None}
+body = Body.connect(name="Q10 scripted agent", maker="acceptance", mind="first offered action")
+try:
+    turn = body.next_turn(float(sys.argv[1]))
+    if turn is not None:
+        action = turn.options[0].action
+        answer = turn.act(action, "Hello." if turn.options[0].says_line else None)
+        seen["turn"] = {"minute": turn.minute, "options": [o.action for o in turn.options],
+                        "acted": action}
+        seen["answer"] = {"received": answer.received, "refusal": answer.refusal}
+        # The host takes or refuses a received answer at a later minute, as a happening.
+        deadline = time.monotonic() + float(sys.argv[2])
+        while time.monotonic() < deadline and seen["outcome"] is None:
+            for happening in body.happened():
+                seen["happened"].append(happening.as_dict())
+                if happening.what in ("answer_taken", "answer_not_taken"):
+                    seen["outcome"] = happening.as_dict()
+            time.sleep(1)
+    seen["happened"] = seen["happened"][:20]
+    seen["ended"] = body.ended
+finally:
+    body.close(wait_seconds=20)
+print(json.dumps(seen))
+"""
+AGENT_TURN_SECONDS = 300
+#: How long after its answer the agent waits for the host to say whether it was taken (A-100).
+AGENT_OUTCOME_SECONDS = 180
+
+
+def row_ag1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
+    row = Row(
+        "AG1",
+        "door.outside_agent_turn",
+        "An outside agent built on the shipped agent library, with a fixed first-offered-action "
+        "policy and no model, holds a grant naming one person of a generated town the host plays: "
+        "it says hello, its person's turn reaches it within 300 s of the society playing, its act "
+        "is received by the door, and within 180 s the host tells it the answer was taken "
+        "(answer_taken; A-100); then it closes. What the library's leaving calls are answered is recorded, not "
+        "judged (A-99).",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    declared = json.loads((worktree / DOOR_BRIDGE_ENTRY).read_text())
+    town = generated_town(w1, "AG1", "Q10 AG1 town")
+    query = F.world_query(town)
+    _, society = F.society(w1, "AG1", town)
+    person = next(
+        (p.get("id") for p in ((society or {}).get("state") or {}).get("inhabitants") or []), None
+    )
+    status_grant, granted = w1.call(
+        "AG1",
+        "POST",
+        "/door/grants",
+        query=query,
+        body={
+            "idempotency_key": str(uuid.uuid4()),
+            "bridge": declared["bridge"],
+            "things": [person],
+            "version_id": town["authored_version_id"],
+            "minutes": 30,
+        },
+    )
+    grant_id = ((granted or {}).get("grant") or {}).get("grant_id")
+    row.expect(status_grant == 201 and grant_id, f"the grant answered {status_grant}")
+    if not grant_id:
+        return row.close()
+    _, issued = w1.call(
+        "AG1", "POST", f"/door/grants/{grant_id}/channel-credentials", query=query, body={}
+    )
+    credential = (issued or {}).get("credential")
+    status_play, _ = control(w1, "AG1", town, "playing")
+    row.expect(status_play == 200, f"playing the society answered {status_play}")
+    agent = subprocess.run(
+        [
+            str(worktree / ".venv" / "bin" / "python"),
+            "-c",
+            SCRIPTED_AGENT,
+            str(AGENT_TURN_SECONDS),
+            str(AGENT_OUTCOME_SECONDS),
+        ],
+        cwd=worktree,
+        env={
+            **LAUNCH.clean_environment(),
+            "PYTHONPATH": str(worktree / AGENT_LIBRARY),
+            "EXULANICA_URL": stack.base_url,
+            "EXULANICA_AGENT_KEY": credential or "",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=AGENT_TURN_SECONDS + AGENT_OUTCOME_SECONDS + 120,
+    )
+    status_pause, _ = control(w1, "AG1", town, "paused")
+    (out / "evidence" / "ag1-agent.txt").write_text(agent.stderr)
+    try:
+        seen = json.loads(agent.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        seen = {}
+    row.expect(agent.returncode == 0, f"the agent exited {agent.returncode}")
+    turn, answer = seen.get("turn") or {}, seen.get("answer") or {}
+    row.expect(bool(turn), "no turn reached the agent")
+    row.expect(answer.get("received") is True, f"the act was answered {answer}")
+    outcome = seen.get("outcome") or {}
+    row.expect(
+        outcome.get("what") == "answer_taken",
+        f"the host's word on the answer was {outcome or 'none within the wait'}",
+    )
+    w1.call("AG1", "POST", f"/door/grants/{grant_id}/revoke", query=query, body={})
+    row.observed = {
+        "grant": [status_grant, grant_id],
+        "person": person,
+        "play": [status_play, status_pause],
+        "agent": {"exit": agent.returncode, **seen},
+        "outcome": outcome,
+        "leaving_routes_not_served": [
+            "/door/channel/gone",
+            "/door/channel/departures/{id}/delivered",
+        ],
     }
     return row.close()
 
@@ -5153,6 +5696,8 @@ def door(arguments: argparse.Namespace) -> int:
     transcripts = Transcripts(out / "transcripts")
     started = dt.datetime.now(dt.UTC).isoformat()
     rows = [row_d1(stack, transcripts, worktree)]
+    if stack.state.get("society_playback") and stack.state.get("scripted_model"):
+        rows.append(row_ag1(stack, transcripts, worktree, out))
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
 
@@ -5517,6 +6062,9 @@ def build_parser() -> argparse.ArgumentParser:
     shipped = commands.add_parser("things")
     shipped.add_argument("--worktree", required=True)
     shipped.add_argument("--out", required=True)
+    lived = commands.add_parser("society-of-things")
+    lived.add_argument("--worktree", required=True)
+    lived.add_argument("--out", required=True)
     entered = commands.add_parser("guests")
     entered.add_argument("--worktree", required=True)
     entered.add_argument("--out", required=True)
@@ -5543,6 +6091,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "things": things,
         "door": door,
         "guests": guests,
+        "society-of-things": society_of_things,
     }
     return commands[arguments.command](arguments)
 

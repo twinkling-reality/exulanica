@@ -74,11 +74,16 @@ def test_every_step_a_row_reads_is_a_step_the_runner_runs():
     sys.modules[spec.name] = driver
     spec.loader.exec_module(driver)
     runner = RUNNER.read_text()
-    listed = re.search(r"const STEPS = \[(.*?)\];", runner, re.S)
-    assert listed is not None
-    runs = re.findall(r"'([a-z-]+)'", listed.group(1))
+
+    def listed(name: str) -> list[str]:
+        found = re.search(rf"const {name} = \[(.*?)\];", runner, re.S)
+        assert found is not None, name
+        return re.findall(r"'([a-z-]+)'", found.group(1))
+
+    main, people = listed("MAIN_STEPS"), listed("PEOPLE_STEPS")
     read = [*driver.JOURNEY_STEPS, *(step for _, _, step, _ in driver.WORLDS_ROWS)]
 
-    assert sorted(read) == sorted(runs)
-    for step in runs:
+    assert sorted(read) == sorted(main)
+    assert [step for _, _, step, _ in driver.PEOPLE_ROWS] == people
+    for step in [*main, *people]:
         assert f"async '{step}'(ctx)" in runner, step

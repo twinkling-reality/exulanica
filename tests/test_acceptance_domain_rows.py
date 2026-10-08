@@ -455,3 +455,24 @@ def test_h1_takes_a_resent_start_whose_state_moved_on_and_nothing_else():
     assert not DRIVE.same_start(answer("waiting"), answer("lost"))
     assert not DRIVE.same_start(answer("waiting"), answer("waiting", "c2"))
     assert not DRIVE.same_start(answer("waiting"), {"comparisons": []})
+
+
+def test_d1_reads_each_persons_newest_choice_and_the_routine_where_none_names_them():
+    choices = [
+        {"subject_id": "a", "choice_seq": 1, "decider": {"kind": "model"}},
+        {"subject_id": "a", "choice_seq": 2, "decider": {"kind": "external"}},
+        {"subject_id": "b", "choice_seq": 3, "decider": {"kind": "external"}},
+        {"subject_id": "b", "choice_seq": 4, "decider": {"kind": "routine"}},
+    ]
+
+    class Client:
+        def call(self, step, method, path, query=None):
+            view = {"choices": choices}
+            return 200, {"roles": [{"key": "society_decision", "view": view}]}
+
+    entry = {"authored_version_id": "v", "world_id": "w"}
+    assert DRIVE.deciders(Client(), "D1", entry, ["a", "b", "c"]) == {
+        "a": "external",
+        "b": "routine",
+        "c": None,
+    }
