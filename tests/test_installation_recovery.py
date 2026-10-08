@@ -16,7 +16,12 @@ from pathlib import Path
 
 import psycopg
 import pytest
-from exulanica.db.definer_role import DEFINER_ROLE, DefinerRoleUnsafe, assert_definer_role
+from exulanica.db.definer_role import (
+    DEFINER_ROLE,
+    DefinerRoleUnsafe,
+    assert_definer_role,
+    shipped_versions,
+)
 from exulanica.db.local.cluster import HOST, scratch_cluster
 from exulanica.db.roles import provision_backup_role, provision_purge_role, provision_runtime_role
 from exulanica.db.session import Database
@@ -163,7 +168,8 @@ def _checking_provision(scratch):
         roles(database)
         with database.unscoped() as connection:
             connection.execute(f'set search_path to "{scratch}", public')
-            assert_definer_role(connection)
+            # The test schema records no migration; it holds every one.
+            assert_definer_role(connection, applied=shipped_versions())
 
     return provision
 

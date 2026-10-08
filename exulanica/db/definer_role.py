@@ -11,39 +11,49 @@ than as the superuser that applies migrations. Nothing keeps it that way by itse
     membership on a server this code never sees.
 
 :func:`assert_definer_role` refuses each of these by name, and any privilege the role holds
-beyond the set its bodies use or lacks from it (:data:`TABLE_PRIVILEGES`, :data:`SPENDING_STEPS`):
-a later migration that strips or recreates one of those tables, or a hand grant, would otherwise
-show only as a refused call at runtime. ``exulanica-db`` runs it after every migration and
+beyond, or lacks from, what the migrations the database records grant it
+(:data:`GRANTS_BY_MIGRATION`, one entry per migration that grants or revokes): a later migration
+that strips or recreates one of those tables, or a hand grant, would otherwise show only as a
+refused call at runtime. ``exulanica-db`` runs it after every migration and
 provisioning, :func:`~exulanica.db.migrate.verify_schema` at every process start, the installation's
 maintenance pass each time, and a local restore after its load, so a database whose definers drifted
 stops a deployment or a process start rather than a request.
 
-:data:`HAND_OVER` is 0161's own hand-over, kept here once: a restore that loaded a dump without
-its owners runs it again (:func:`hand_definers_to_owner`), and a test holds that the migration
-carries the same text.
+:data:`MIGRATION_HAND_OVER` is 0161's own hand-over, kept here as it ran, and a test holds that the
+migration carries the same text. :data:`HAND_OVER` is what a restore that loaded a dump without its
+owners runs (:func:`hand_definers_to_owner`): the same loop behind a refusal of any routine a role
+other than a superuser, the schema's owner or the definer owner owns.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 from typing import Final
 
 import psycopg
 from psycopg.rows import dict_row
 
 from exulanica.db.migrate import applied_migrations
+from exulanica.migrations import migrations
 
 __all__ = [
     "COLUMN_PRIVILEGES",
     "DEFINER_MIGRATION",
     "DEFINER_ROLE",
+    "GRANTS_BY_MIGRATION",
     "HAND_OVER",
+    "MIGRATION_HAND_OVER",
     "SPENDING_STEPS",
     "TABLE_PRIVILEGES",
+    "DefinerGrants",
     "DefinerRoleUnsafe",
+    "ExpectedGrants",
     "assert_definer_role",
     "definer_role_installed",
+    "expected_grants",
     "hand_definers_to_owner",
+    "shipped_versions",
 ]
 
 DEFINER_ROLE: Final = "exulanica_definer"
@@ -62,73 +72,200 @@ _ATTRIBUTES: Final = {
     "rolinherit": "inherits",
 }
 
-#: What the owner may do to each table: what the definer bodies, and the triggers their writes
-#: fire, read and write. Migration 0161 grants exactly this, with a comment naming the functions
-#: behind each line; a relation absent here may be reached in no way, column grants included.
-TABLE_PRIVILEGES: Final[Mapping[str, frozenset[str]]] = {
-    name: frozenset(privileges)
-    for name, privileges in {
-        "baked_tile": ("SELECT", "INSERT", "UPDATE"),
-        "baked_tile_stage": ("SELECT",),
-        "door_redemption_refusal": ("SELECT", "DELETE"),
-        "door_secret": ("SELECT", "DELETE"),
-        "embedding": ("SELECT",),
-        "material_bake": ("SELECT",),
-        "material_recipe": ("SELECT",),
-        "material_recipe_source": ("SELECT",),
-        "person_derivative_dependency": ("SELECT",),
-        "restore_control": ("SELECT",),
-        "saved_world_source_attachment_operation": ("SELECT",),
-        "saved_world_source_current_membership": ("SELECT", "INSERT", "UPDATE"),
-        "spending_authority": ("SELECT",),
-        "spending_authority_revocation": ("SELECT",),
-        "spending_authority_state": ("SELECT", "UPDATE"),
-        "spending_authority_term": ("SELECT",),
-        "spending_event": ("INSERT",),
-        "spending_grant": ("SELECT", "INSERT"),
-        "spending_grant_revocation": ("SELECT", "INSERT"),
-        "spending_grant_state": ("SELECT", "INSERT", "UPDATE"),
-        "spending_guest_policy": ("SELECT", "UPDATE"),
-        "spending_guest_policy_day": ("SELECT", "INSERT", "UPDATE"),
-        "spending_reservation": ("SELECT", "INSERT", "UPDATE"),
-        "tombstone": ("SELECT",),
-        "tombstone_embedding_target": ("SELECT",),
-        "world_project": ("SELECT", "UPDATE"),
-        "world_project_item": ("SELECT", "UPDATE"),
-        "world_project_item_revision": ("SELECT", "UPDATE"),
-        "world_project_item_source": ("SELECT",),
-        "world_project_share": ("SELECT", "UPDATE"),
-    }.items()
+
+@dataclass(frozen=True)
+class DefinerGrants:
+    """What one migration grants exulanica_definer, and what it takes back.
+
+    ``tables``: table name to table-level privileges. ``columns``: table name to column name to
+    privileges, for a body that may write one column of a table and nothing else of it.
+    ``functions``: functions outside the definers that the owner may execute and PUBLIC may not.
+    The ``revoked_`` fields are what a migration takes away from what earlier ones granted.
+    """
+
+    tables: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    columns: Mapping[str, Mapping[str, frozenset[str]]] = field(default_factory=dict)
+    functions: frozenset[str] = frozenset()
+    revoked_tables: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    revoked_columns: Mapping[str, Mapping[str, frozenset[str]]] = field(default_factory=dict)
+    revoked_functions: frozenset[str] = frozenset()
+
+
+@dataclass(frozen=True)
+class ExpectedGrants:
+    """What the owner holds on a database whose recorded migrations are given: the union of
+    those migrations' :class:`DefinerGrants`, in version order, less what each took back."""
+
+    tables: Mapping[str, frozenset[str]]
+    columns: Mapping[str, Mapping[str, frozenset[str]]]
+    functions: frozenset[str]
+
+
+#: What each migration grants the owner, by its version. The definer migration's own entry is
+#: what its bodies (the definers that exist when it runs) read and write, with a comment in the
+#: migration naming the functions behind each line. A later migration that grants or revokes
+#: anything to the owner adds its own entry, in the same package as its grants, so a database one
+#: migration behind the code is held to the grants of the migrations it records, not the code's.
+GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
+    DEFINER_MIGRATION: DefinerGrants(
+        tables={
+            name: frozenset(privileges)
+            for name, privileges in {
+                "baked_tile": ("SELECT", "INSERT", "UPDATE"),
+                "baked_tile_stage": ("SELECT",),
+                "door_redemption_refusal": ("SELECT", "DELETE"),
+                "door_secret": ("SELECT", "DELETE"),
+                "embedding": ("SELECT",),
+                "material_bake": ("SELECT",),
+                "material_recipe": ("SELECT",),
+                "material_recipe_source": ("SELECT",),
+                "person_derivative_dependency": ("SELECT",),
+                "restore_control": ("SELECT",),
+                "saved_world_source_attachment_operation": ("SELECT",),
+                "saved_world_source_current_membership": ("SELECT", "INSERT", "UPDATE"),
+                "spending_authority": ("SELECT",),
+                "spending_authority_revocation": ("SELECT",),
+                "spending_authority_state": ("SELECT", "UPDATE"),
+                "spending_authority_term": ("SELECT",),
+                "spending_event": ("INSERT",),
+                "spending_grant": ("SELECT", "INSERT"),
+                "spending_grant_revocation": ("SELECT", "INSERT"),
+                "spending_grant_state": ("SELECT", "INSERT", "UPDATE"),
+                "spending_guest_policy": ("SELECT", "UPDATE"),
+                "spending_guest_policy_day": ("SELECT", "INSERT", "UPDATE"),
+                "spending_reservation": ("SELECT", "INSERT", "UPDATE"),
+                "tombstone": ("SELECT",),
+                "tombstone_embedding_target": ("SELECT",),
+                "world_project": ("SELECT", "UPDATE"),
+                "world_project_item": ("SELECT", "UPDATE"),
+                "world_project_item_revision": ("SELECT", "UPDATE"),
+                "world_project_item_source": ("SELECT",),
+                "world_project_share": ("SELECT", "UPDATE"),
+            }.items()
+        },
+        # The internal spending steps the spending definers call, which 0124 revoked from
+        # PUBLIC.
+        functions=frozenset(
+            {
+                "spending__append",
+                "spending__charge",
+                "spending__live_grant",
+                "spending__refusal",
+                "spending__refusal_without_grant",
+                "spending__release_stale",
+                "spending__verdict",
+                "spending__witness",
+                "spending__witness_authority",
+                "spending__witness_position",
+            }
+        ),
+    ),
 }
 
-#: What the owner may do to single columns, beyond its table-level privileges: table name to
-#: column name to privileges, for a body that may write one column of a table and nothing else
-#: of it. Checked exactly: a column grant missing, or one on a column not named here, is refused.
-COLUMN_PRIVILEGES: Final[Mapping[str, Mapping[str, frozenset[str]]]] = {}
 
-#: The internal spending steps the spending definers call, which 0124 revoked from PUBLIC: the
-#: only functions outside the definers themselves that the owner may execute and PUBLIC may not.
-SPENDING_STEPS: Final = frozenset(
-    {
-        "spending__append",
-        "spending__charge",
-        "spending__live_grant",
-        "spending__refusal",
-        "spending__refusal_without_grant",
-        "spending__release_stale",
-        "spending__verdict",
-        "spending__witness",
-        "spending__witness_authority",
-        "spending__witness_position",
-    }
-)
+def expected_grants(applied: Iterable[str]) -> ExpectedGrants:
+    """The owner's privileges on a database that records the migration versions ``applied``.
 
-#: Every SECURITY DEFINER routine in the schema, found rather than listed, handed to the owner.
-#: Migration 0161 runs this text; a restore without owners runs it again.
-HAND_OVER: Final = """do $owners$
+    The rules a migration's entry follows, as PostgreSQL applies its statements:
+
+    1. Within one entry, its revocations apply before its grants, so an entry that revokes a
+       privilege and grants it back in one migration expects it held.
+    2. A table-level revocation also takes that privilege from every column of the table, as
+       ``REVOKE ... ON <table>`` clears the column grants of that privilege.
+    3. A migration that drops a listed table or function lists it in its ``revoked_`` fields,
+       or the check expects a privilege on an object that no longer exists ("missing").
+
+    When listing what a body needs: ``INSERT ... ON CONFLICT (columns) DO NOTHING`` needs SELECT
+    on the table as well as INSERT (with INSERT alone it is refused "permission denied for
+    table"), while a bare ``ON CONFLICT DO NOTHING`` needs INSERT alone; a WHERE, RETURNING or
+    FOR UPDATE reads, so it needs SELECT, and FOR UPDATE needs UPDATE too.
+    """
+    if isinstance(applied, str):
+        raise TypeError("applied is a collection of migration versions, not one version")
+    recorded = set(applied)
+    tables: dict[str, set[str]] = {}
+    columns: dict[str, dict[str, set[str]]] = {}
+    functions: set[str] = set()
+    for version in sorted(GRANTS_BY_MIGRATION):
+        if version not in recorded:
+            continue
+        grants = GRANTS_BY_MIGRATION[version]
+        for name, privileges in grants.revoked_tables.items():
+            tables.setdefault(name, set()).difference_update(privileges)
+            for held in columns.get(name, {}).values():
+                held.difference_update(privileges)
+        for name, by_column in grants.revoked_columns.items():
+            for column, privileges in by_column.items():
+                columns.setdefault(name, {}).setdefault(column, set()).difference_update(privileges)
+        functions -= grants.revoked_functions
+        for name, privileges in grants.tables.items():
+            tables.setdefault(name, set()).update(privileges)
+        for name, by_column in grants.columns.items():
+            for column, privileges in by_column.items():
+                columns.setdefault(name, {}).setdefault(column, set()).update(privileges)
+        functions |= grants.functions
+    return ExpectedGrants(
+        tables={name: frozenset(held) for name, held in tables.items() if held},
+        columns={
+            name: {column: frozenset(held) for column, held in by_column.items() if held}
+            for name, by_column in columns.items()
+            if any(by_column.values())
+        },
+        functions=frozenset(functions),
+    )
+
+
+def shipped_versions() -> frozenset[str]:
+    """Every migration version this code ships."""
+    return frozenset(migration.version for migration in migrations())
+
+
+_EVERY = expected_grants(GRANTS_BY_MIGRATION)
+
+#: What the owner holds on a database that records every migration this code ships: views
+#: derived from :data:`GRANTS_BY_MIGRATION`, for readers that want the whole set.
+TABLE_PRIVILEGES: Final[Mapping[str, frozenset[str]]] = _EVERY.tables
+COLUMN_PRIVILEGES: Final[Mapping[str, Mapping[str, frozenset[str]]]] = _EVERY.columns
+SPENDING_STEPS: Final = _EVERY.functions
+
+#: Every SECURITY DEFINER routine in the schema, found rather than listed, handed to the owner,
+#: as migration 0161 ran it (its text, kept so a test holds the migration to it).
+MIGRATION_HAND_OVER: Final = """do $owners$
 declare
   f record;
 begin
+  for f in
+    select p.oid::regprocedure as signature
+      from pg_proc p
+     where p.pronamespace = current_schema()::regnamespace and p.prosecdef
+  loop
+    execute format('alter routine %s owner to exulanica_definer', f.signature);
+  end loop;
+end $owners$;"""
+
+#: The hand-over a restore runs again: only routines owned by a superuser (as a load without
+#: owners leaves them), a member of the schema's owner, or the role itself; any other owner is
+#: named and nothing is handed over, because a routine some other role planted would otherwise
+#: gain every grant the definer owner holds.
+HAND_OVER: Final = """do $owners$
+declare
+  f record;
+  strangers text;
+begin
+  select string_agg(format('%s (owned by %s)', p.oid::regprocedure, o.rolname), ', '
+                    order by p.oid::regprocedure::text)
+    into strangers
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    join pg_roles o on o.oid = p.proowner
+   where p.pronamespace = current_schema()::regnamespace and p.prosecdef
+     and not o.rolsuper and o.rolname <> 'exulanica_definer'
+     and not pg_has_role(o.oid, n.nspowner, 'MEMBER');
+  if strangers is not null then
+    raise exception 'not handed to exulanica_definer, owned by a role that is neither a '
+                    'superuser, the schema''s owner nor the definer owner: %', strangers
+      using errcode = '42501';
+  end if;
   for f in
     select p.oid::regprocedure as signature
       from pg_proc p
@@ -152,7 +289,7 @@ _COLUMN_PRIVILEGES: Final = ("SELECT", "INSERT", "UPDATE", "REFERENCES")
 
 
 class DefinerRoleUnsafe(RuntimeError):
-    """The definer owner is wider or narrower than migration 0161 made it, or a definer has
+    """The definer owner is wider or narrower than the recorded migrations made it, or a definer has
     another owner or search path."""
 
 
@@ -168,24 +305,35 @@ def hand_definers_to_owner(connection: psycopg.Connection) -> None:
     connection.execute(HAND_OVER)
 
 
-def assert_definer_role(connection: psycopg.Connection, role: str = DEFINER_ROLE) -> None:
-    """Refuse a definer owner other than the one migration 0161 made, each finding by name.
+def assert_definer_role(
+    connection: psycopg.Connection,
+    role: str = DEFINER_ROLE,
+    *,
+    applied: Iterable[str] | None = None,
+) -> None:
+    """Refuse a definer owner other than the one the recorded migrations made, each finding by
+    name.
 
     Refused: no current schema; a missing role; any of LOGIN, SUPERUSER, BYPASSRLS, CREATEDB,
     CREATEROLE, REPLICATION or INHERIT; a membership in a role or a member of it; any object in
-    this database or on the server it owns other than SECURITY DEFINER routines (row-level
-    security does not bind a table's owner); CREATE on the schema or the database; a default
-    privilege naming it; a table privilege, column privilege, sequence privilege or function
-    EXECUTE beyond :data:`TABLE_PRIVILEGES` and :data:`SPENDING_STEPS`, or one of those missing;
-    a SECURITY DEFINER routine owned by another role, executable by PUBLIC, or whose search path
-    does not put ``pg_catalog`` first and ``pg_temp`` last; and another role, neither a
-    superuser nor a member of the schema's owner, that can create in the schema, where it could
-    plant an object a definer's search path would find.
+    this database or on the server it owns other than SECURITY DEFINER routines in this schema
+    or another installation's (row-level security does not bind a table's owner); an explicit
+    grant on a relation in a schema that is no installation; CREATE on the schema or the
+    database; a default privilege naming it; a table privilege, column privilege, sequence
+    privilege or function EXECUTE beyond what the migrations the database records grant it
+    (:func:`expected_grants` over ``applied``, read from ``schema_migrations`` when not given),
+    or one of those missing (an entry for a migration this code does not ship is never recorded,
+    so it fails closed: its grants read beyond, its revocations missing); a SECURITY DEFINER
+    routine in the schema owned by another role; any routine the role owns, wherever it is,
+    executable by PUBLIC or whose search path does not put ``pg_catalog`` first and ``pg_temp``
+    last; and another role, neither a superuser nor a member of the schema's owner, that can
+    create in the schema, where it could plant an object a definer's search path would find.
     """
     with connection.cursor(row_factory=dict_row) as cursor:
         schema = cursor.execute("select current_schema() as name").fetchone()["name"]
         if schema is None:
             raise DefinerRoleUnsafe("no current schema; the definers are checked in one schema")
+        expected = expected_grants(applied_migrations(connection) if applied is None else applied)
         row = cursor.execute(
             "select oid, " + ", ".join(_ATTRIBUTES) + " from pg_roles where rolname = %s", (role,)
         ).fetchone()
@@ -212,18 +360,42 @@ def assert_definer_role(connection: psycopg.Connection, role: str = DEFINER_ROLE
         if wider:
             raise DefinerRoleUnsafe(f"{role} " + ", ".join(wider))
         # Everything it owns in this database and on the server, as the catalog records owners,
-        # but SECURITY DEFINER routines: those are its whole purpose, in this schema and in any
-        # other installation's schema in the same database, which is checked as its own.
-        owned = cursor.execute(
-            "select pg_describe_object(d.classid, d.objid, d.objsubid) name from pg_shdepend d "
+        # but SECURITY DEFINER routines in this schema or in another installation's schema in the
+        # same database (one holding schema_migrations), which is checked as its own.
+        rows = cursor.execute(
+            "select pg_describe_object(d.classid, d.objid, d.objsubid) as name, "
+            "(select n.nspname from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+            "where d.classid = 'pg_proc'::regclass and p.oid = d.objid and p.prosecdef) "
+            "as definer_schema "
+            "from pg_shdepend d "
             "where d.refclassid = 'pg_authid'::regclass and d.refobjid = %(oid)s "
             "and d.deptype = 'o' "
             "and d.dbid in (0, (select oid from pg_database where datname = current_database())) "
-            "and not (d.classid = 'pg_proc'::regclass and exists (select 1 from pg_proc p "
-            "where p.oid = d.objid and p.prosecdef)) "
             "order by 1",
             {"oid": oid},
         ).fetchall()
+        installations = _installations(
+            cursor, {r["definer_schema"] for r in rows if r["definer_schema"]} - {schema}
+        )
+        owned = [
+            r
+            for r in rows
+            if r["definer_schema"] is None
+            or (r["definer_schema"] != schema and r["definer_schema"] not in installations)
+        ]
+        elsewhere = cursor.execute(
+            "select format('%%s on %%I.%%I', a.privilege_type, n.nspname, c.relname) as name, "
+            "n.nspname as schema from pg_class c join pg_namespace n on n.oid = c.relnamespace, "
+            "lateral aclexplode(c.relacl) a "
+            "where a.grantee = %(oid)s and n.nspname <> %(schema)s order by 1",
+            {"oid": oid, "schema": schema},
+        ).fetchall()
+        outside = _installations(cursor, {r["schema"] for r in elsewhere})
+        stray = [r["name"] for r in elsewhere if r["schema"] not in outside]
+        if stray:
+            raise DefinerRoleUnsafe(
+                f"{role} holds grants outside any installation's schema: " + ", ".join(stray)
+            )
         if owned:
             raise DefinerRoleUnsafe(
                 f"{role} owns "
@@ -247,7 +419,7 @@ def assert_definer_role(connection: psycopg.Connection, role: str = DEFINER_ROLE
         ).fetchone()
         if defaults:
             raise DefinerRoleUnsafe(f"{role} is named by a default privilege")
-        _assert_privileges(cursor, role, schema)
+        _assert_privileges(cursor, role, schema, expected)
         _assert_definers(cursor, oid, role, schema)
         planters = cursor.execute(
             "select r.rolname name from pg_roles r, pg_namespace n "
@@ -263,8 +435,26 @@ def assert_definer_role(connection: psycopg.Connection, role: str = DEFINER_ROLE
             )
 
 
-def _assert_privileges(cursor: psycopg.Cursor, role: str, schema: str) -> None:
-    """The table, column, sequence and EXECUTE privileges equal the expected set exactly."""
+def _installations(cursor: psycopg.Cursor, schemas: Iterable[str]) -> frozenset[str]:
+    """Which of ``schemas`` are installations: those holding a schema_migrations table, which
+    each check as their own. Not whether it records the definer migration: a test harness applies
+    every migration without recording any, and an installation the caller cannot read checks
+    itself. A schema without one is not an installation; nothing of the owner's belongs there."""
+    names = sorted(schemas)
+    if not names:
+        return frozenset()
+    rows = cursor.execute(
+        "select n.nspname as name from pg_class c join pg_namespace n on n.oid = c.relnamespace "
+        "where n.nspname = any(%s) and c.relname = 'schema_migrations' and c.relkind = 'r'",
+        (names,),
+    ).fetchall()
+    return frozenset(row["name"] for row in rows)
+
+
+def _assert_privileges(
+    cursor: psycopg.Cursor, role: str, schema: str, expected: ExpectedGrants
+) -> None:
+    """The table, column, sequence and EXECUTE privileges equal ``expected`` exactly."""
     held: dict[str, set[str]] = {}
     for row in cursor.execute(
         "select c.relname, p.privilege from pg_class c, unnest(%(table)s::text[]) p(privilege) "
@@ -301,23 +491,33 @@ def _assert_privileges(cursor: psycopg.Cursor, role: str, schema: str) -> None:
     ).fetchall():
         whole.setdefault(row["relname"], set()).add(row["privilege"])
     findings = []
-    for name in sorted(set(columns) | set(COLUMN_PRIVILEGES)):
-        expected_columns = COLUMN_PRIVILEGES.get(name, {})
+    for name in sorted(set(columns) | set(expected.columns)):
+        expected_columns = expected.columns.get(name, {})
         for column in sorted(set(columns.get(name, {})) | set(expected_columns)):
             found = columns.get(name, {}).get(column, set())
             wanted = set(expected_columns.get(column, frozenset()))
             if found - wanted:
                 findings.append(f"{name}.{column} {'/'.join(sorted(found - wanted))} beyond")
-            if wanted - found:
-                findings.append(f"{name}.{column} {'/'.join(sorted(wanted - found))} missing")
-    for name in sorted(set(held) | set(TABLE_PRIVILEGES)):
-        expected = TABLE_PRIVILEGES.get(name, frozenset())
+            # The column privilege held for the whole table instead is more than the bodies' use,
+            # not a missing grant.
+            widened = (wanted - found) & whole.get(name, set())
+            if widened:
+                findings.append(
+                    f"{name} {'/'.join(sorted(widened))} beyond its bodies' use "
+                    f"(held for the whole table; only {column} is theirs)"
+                )
+            if wanted - found - widened:
+                findings.append(
+                    f"{name}.{column} {'/'.join(sorted(wanted - found - widened))} missing"
+                )
+    for name in sorted(set(held) | set(expected.tables)):
+        table_wanted = expected.tables.get(name, frozenset())
         # A column grant is held through has_any_column_privilege too; it is the column map's.
         column_granted = {
-            privilege for wanted in COLUMN_PRIVILEGES.get(name, {}).values() for privilege in wanted
+            privilege for wanted in expected.columns.get(name, {}).values() for privilege in wanted
         }
-        extra = held.get(name, set()) - expected - column_granted
-        missing = expected - whole.get(name, set())
+        extra = held.get(name, set()) - table_wanted - column_granted
+        missing = table_wanted - whole.get(name, set())
         if extra:
             findings.append(f"{name} {'/'.join(sorted(extra))} beyond its bodies' use")
         if missing:
@@ -340,11 +540,14 @@ def _assert_privileges(cursor: psycopg.Cursor, role: str, schema: str) -> None:
         ).fetchall()
     }
     findings += [
-        f"{name} executable beyond its bodies' use" for name in sorted(executable - SPENDING_STEPS)
+        f"{name} executable beyond its bodies' use"
+        for name in sorted(executable - expected.functions)
     ]
-    findings += [f"{name} not executable" for name in sorted(SPENDING_STEPS - executable)]
+    findings += [f"{name} not executable" for name in sorted(expected.functions - executable)]
     if findings:
-        raise DefinerRoleUnsafe(f"{role}'s privileges differ from 0161's: " + "; ".join(findings))
+        raise DefinerRoleUnsafe(
+            f"{role}'s privileges differ from its migrations' grants: " + "; ".join(findings)
+        )
 
 
 def _assert_definers(cursor: psycopg.Cursor, oid: int, role: str, schema: str) -> None:
@@ -366,9 +569,9 @@ def _assert_definers(cursor: psycopg.Cursor, oid: int, role: str, schema: str) -
     public = cursor.execute(
         "select p.oid::regprocedure::text signature from pg_proc p, "
         "lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a "
-        "where p.pronamespace = %s::regnamespace and p.prosecdef and a.grantee = 0 "
-        "and a.privilege_type = 'EXECUTE' order by 1",
-        (schema,),
+        "where (p.pronamespace = %s::regnamespace or p.proowner = %s) and p.prosecdef "
+        "and a.grantee = 0 and a.privilege_type = 'EXECUTE' order by 1",
+        (schema, oid),
     ).fetchall()
     if public:
         raise DefinerRoleUnsafe(
@@ -377,10 +580,10 @@ def _assert_definers(cursor: psycopg.Cursor, oid: int, role: str, schema: str) -
         )
     unpinned = cursor.execute(
         "select p.oid::regprocedure::text signature from pg_proc p "
-        "where p.pronamespace = %s::regnamespace and p.prosecdef and not exists ("
-        "select 1 from unnest(p.proconfig) c where c ~ '^search_path=pg_catalog,(.*,)? *pg_temp$')"
-        " order by 1",
-        (schema,),
+        "where (p.pronamespace = %s::regnamespace or p.proowner = %s) and p.prosecdef "
+        "and not exists (select 1 from unnest(p.proconfig) c "
+        "where c ~ '^search_path=pg_catalog,(.*,)? *pg_temp$') order by 1",
+        (schema, oid),
     ).fetchall()
     if unpinned:
         raise DefinerRoleUnsafe(

@@ -24,6 +24,7 @@ from exulanica.canonical import canonical_json
 from exulanica.corpus import build_plan
 from exulanica.corpus.photograph import compose, encode_jpeg
 from exulanica.db import Database, apply_pending, provision_workspace
+from exulanica.db.definer_role import DEFINER_MIGRATION, DEFINER_ROLE
 from exulanica.db.reference_target import COPY_DATABASE, COPY_URL, writable_reference_url
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.privacy import authorize_synthetic_capture, record_synthetic_exemption
@@ -67,6 +68,16 @@ def _scratch_database() -> Iterator[tuple[Database, str]]:
                 "dry_run_database",
                 "Have the database operator install the required extensions in public: "
                 + ", ".join(sorted(missing)),
+            )
+        # Migration DEFINER_MIGRATION creates the server-wide definer owner and hands it every
+        # SECURITY DEFINER function, which only a superuser may do; refused here by name, before a
+        # schema is made, rather than part way through the migrations. The role it creates stays
+        # on the server after the scratch schema is dropped, as a role belongs to the server.
+        if owner.execute("select current_setting('is_superuser')").fetchone()[0] != "on":
+            raise FrontierDemonstrationError(
+                "dry_run_database",
+                f"Connect the reference copy as a superuser: migration {DEFINER_MIGRATION} "
+                f"creates the server-wide role {DEFINER_ROLE} and hands it the definer functions.",
             )
         owner.execute(sql.SQL("create schema {}").format(sql.Identifier(schema)))
         try:

@@ -26,9 +26,12 @@ from exulanica.db.definer_role import (
     DEFINER_MIGRATION,
     DEFINER_ROLE,
     HAND_OVER,
+    MIGRATION_HAND_OVER,
     DefinerRoleUnsafe,
     assert_definer_role,
     definer_role_installed,
+    hand_definers_to_owner,
+    shipped_versions,
 )
 from exulanica.db.migrate import MigrationReport
 from psycopg import sql
@@ -138,13 +141,14 @@ def admin(spine_schema):
     connection = open_scratch_connection(psycopg_module, scratch)
     connection.autocommit = False
     connection.row_factory = dict_row
-    # The harness applies the migrations without recording them; exulanica-db records each, and
-    # asks for this one before it checks the owner.
-    connection.execute(
-        "insert into schema_migrations (version, checksum) values (%s, %s) "
-        "on conflict (version) do nothing",
-        (DEFINER_MIGRATION, b"recorded"),
-    )
+    # The harness applies every migration without recording them; exulanica-db records each,
+    # asks for this one before it checks the owner, and expects the grants of those recorded.
+    for version in sorted(shipped_versions()):
+        connection.execute(
+            "insert into schema_migrations (version, checksum) values (%s, %s) "
+            "on conflict (version) do nothing",
+            (version, b"recorded"),
+        )
     try:
         yield connection
     finally:
@@ -165,8 +169,9 @@ def _definers(admin) -> dict[str, str]:
 
 def test_every_definer_belongs_to_the_login_less_owner_and_the_check_passes(admin):
     definers = _definers(admin)
-    # 0044, 0066, 0090, 0107, 0124, 0126, 0127, 0139, 0144, 0149 and 0155 define these 22. A
-    # create or replace that drops SECURITY DEFINER leaves this set, so it fails here.
+    # 0044, 0066, 0090, 0107, 0124, 0126, 0127, 0139, 0144, 0149 (door_prune, whose body 0157
+    # replaced) and 0155 define these 22. A create or replace that drops SECURITY DEFINER leaves
+    # this set, so it fails here.
     assert set(definers) == set(DEFINERS), definers
     assert {owner for owner in definers.values()} == {DEFINER_ROLE}, definers
     schema = admin.execute("select current_schema() s").fetchone()["s"]
@@ -264,8 +269,11 @@ def test_a_new_definer_the_migrating_role_creates_is_refused(admin):
 
 
 def test_the_migration_hands_the_definers_over_by_the_text_a_restore_runs():
-    """A restore without owners runs :data:`HAND_OVER` again; it is the migration's own loop."""
-    assert HAND_OVER in MIGRATION.read_text(encoding="utf-8")
+    """The migration's own loop is kept as it ran; a restore runs the same hand-over behind a
+    refusal of routines no trusted role owns."""
+    assert MIGRATION_HAND_OVER in MIGRATION.read_text(encoding="utf-8")
+    loop = MIGRATION_HAND_OVER.split("begin\n", 1)[1].split("end $owners$;")[0]
+    assert loop.strip() in HAND_OVER
     assert "alter routine %s owner to exulanica_definer" in HAND_OVER
 
 
@@ -446,11 +454,25 @@ def test_a_process_start_and_a_maintenance_pass_refuse_a_drifted_definer(admin, 
 def test_a_column_the_set_names_is_held_exactly(admin, monkeypatch):
     """A body that writes one column of a table is granted that column alone: the check refuses
     the column grant missing, and accepts it once made."""
+    import dataclasses
+
+    base = definer_role.GRANTS_BY_MIGRATION[DEFINER_MIGRATION]
+    with_column = dataclasses.replace(
+        base, columns={"embedding": {"embedding_id": frozenset({"UPDATE"})}}
+    )
     monkeypatch.setattr(
-        definer_role, "COLUMN_PRIVILEGES", {"embedding": {"embedding_id": frozenset({"UPDATE"})}}
+        definer_role,
+        "GRANTS_BY_MIGRATION",
+        {**definer_role.GRANTS_BY_MIGRATION, DEFINER_MIGRATION: with_column},
     )
     with pytest.raises(DefinerRoleUnsafe, match=r"embedding\.embedding_id UPDATE missing"):
         assert_definer_role(admin)
+    # Held for the whole table instead: more than the bodies' use, said so.
+    admin.execute("savepoint whole_table")
+    admin.execute(sql.SQL("grant update on embedding to {}").format(sql.Identifier(DEFINER_ROLE)))
+    with pytest.raises(DefinerRoleUnsafe, match=r"embedding UPDATE beyond .*whole table"):
+        assert_definer_role(admin)
+    admin.execute("rollback to savepoint whole_table")
     admin.execute(
         sql.SQL("grant update (embedding_id) on embedding to {}").format(
             sql.Identifier(DEFINER_ROLE)
@@ -464,4 +486,259 @@ def test_a_column_the_set_names_is_held_exactly(admin, monkeypatch):
         )
     )
     with pytest.raises(DefinerRoleUnsafe, match=r"embedding\.workspace_id UPDATE beyond"):
+        assert_definer_role(admin)
+
+
+LATER, LATEST = "9998", "9999"
+
+
+@pytest.fixture
+def later_migrations(monkeypatch):
+    """Two later migrations this code ships, which the fixture's database does not record until a
+    test does. The first grants SELECT on capture and UPDATE of embedding.embedding_id, and takes
+    back SELECT on tombstone and EXECUTE on spending__charge. The second takes back that column
+    grant, and revokes and grants back SELECT on capture in one migration."""
+    grants = {
+        **definer_role.GRANTS_BY_MIGRATION,
+        LATER: definer_role.DefinerGrants(
+            tables={"capture": frozenset({"SELECT"})},
+            columns={"embedding": {"embedding_id": frozenset({"UPDATE"})}},
+            revoked_tables={"tombstone": frozenset({"SELECT"})},
+            revoked_functions=frozenset({"spending__charge"}),
+        ),
+        LATEST: definer_role.DefinerGrants(
+            tables={"capture": frozenset({"SELECT"})},
+            revoked_tables={"capture": frozenset({"SELECT"})},
+            revoked_columns={"embedding": {"embedding_id": frozenset({"UPDATE"})}},
+        ),
+    }
+    monkeypatch.setattr(definer_role, "GRANTS_BY_MIGRATION", grants)
+
+
+def _record(admin, *versions: str) -> None:
+    for version in versions:
+        admin.execute(
+            "insert into schema_migrations (version, checksum) values (%s, %s) "
+            "on conflict (version) do nothing",
+            (version, b"later"),
+        )
+
+
+def _charge(admin) -> str:
+    (row,) = admin.execute(
+        "select p.oid::regprocedure::text s from pg_proc p "
+        "where p.pronamespace = current_schema()::regnamespace and p.proname = 'spending__charge'"
+    ).fetchall()
+    return row["s"]
+
+
+def _production_callers(admin, monkeypatch):
+    """The process-start check and a maintenance pass, as each reads the database's records."""
+    from exulanica.db import migrate
+    from exulanica.orchestration.installation.maintenance import Maintenance
+
+    @contextlib.contextmanager
+    def unscoped():
+        yield admin
+
+    database = SimpleNamespace(unscoped=unscoped)
+    monkeypatch.setattr(migrate, "verify_applied", lambda applied: None)
+
+    def start() -> None:
+        migrate.verify_schema(database)
+
+    def maintenance() -> list[str]:
+        status: dict = {"failures": []}
+        Maintenance._check_definer(SimpleNamespace(_database=database), status)
+        return status["failures"]
+
+    return start, maintenance
+
+
+def test_a_database_behind_the_code_is_held_to_the_grants_it_records(
+    admin, later_migrations, monkeypatch
+):
+    start, maintenance = _production_callers(admin, monkeypatch)
+    role = sql.Identifier(DEFINER_ROLE)
+    # Neither later migration recorded: their grants are not expected, everywhere it is checked.
+    assert_definer_role(admin)
+    start()
+    assert maintenance() == []
+    # The first recorded but not applied: its grants missing, its revocations not made.
+    _record(admin, LATER)
+    with pytest.raises(DefinerRoleUnsafe) as refused:
+        assert_definer_role(admin)
+    for finding in (
+        "capture SELECT missing",
+        "embedding.embedding_id UPDATE missing",
+        "tombstone SELECT beyond",
+        "spending__charge executable beyond",
+    ):
+        assert finding in str(refused.value), finding
+    with pytest.raises(DefinerRoleUnsafe):
+        start()
+    assert maintenance() == ["definer_role_unsafe"]
+    # Applied: each as the first says, the revoked function and column included.
+    admin.execute(sql.SQL("grant select on capture to {}").format(role))
+    admin.execute(sql.SQL("grant update (embedding_id) on embedding to {}").format(role))
+    admin.execute(sql.SQL("revoke select on tombstone from {}").format(role))
+    admin.execute(
+        sql.SQL("revoke execute on function {} from {}").format(sql.SQL(_charge(admin)), role)
+    )
+    assert_definer_role(admin)
+    start()
+    # The second recorded: the column grant it takes back is now beyond, and the capture SELECT
+    # it revoked and granted back in one migration is still expected.
+    _record(admin, LATEST)
+    with pytest.raises(DefinerRoleUnsafe, match=r"embedding\.embedding_id UPDATE beyond"):
+        assert_definer_role(admin)
+    admin.execute(sql.SQL("revoke update (embedding_id) on embedding from {}").format(role))
+    assert_definer_role(admin)
+    # The caller may name what is applied instead of the records.
+    with pytest.raises(DefinerRoleUnsafe, match="capture SELECT beyond"):
+        assert_definer_role(admin, applied=[DEFINER_MIGRATION])
+
+
+def test_an_entry_for_the_newest_migration_a_database_has_not_applied_passes_until_recorded(
+    admin, monkeypatch, tmp_path
+):
+    """The drop_last case: code that ships one more migration than the database records, whose
+    entry grants the owner something. The migration directory is left without the newest file, as
+    the one-behind tests do; the check reads the database's records alone, so it passes, and once
+    the newest version is recorded it refuses the grant as missing."""
+    import shutil
+
+    from exulanica import migrations as migrations_module
+
+    newest = max(shipped_versions())
+    trimmed = tmp_path / "migrations"
+    trimmed.mkdir()
+    for path in migrations_module.migration_directory().glob("*.sql"):
+        if not path.name.startswith(newest + "_"):
+            shutil.copy2(path, trimmed / path.name)
+    grants = {
+        **definer_role.GRANTS_BY_MIGRATION,
+        newest: definer_role.DefinerGrants(tables={"capture": frozenset({"SELECT"})}),
+    }
+    monkeypatch.setattr(definer_role, "GRANTS_BY_MIGRATION", grants)
+    monkeypatch.setattr(migrations_module, "migration_directory", lambda: trimmed)
+    admin.execute("delete from schema_migrations where version = %s", (newest,))
+    start, _maintenance = _production_callers(admin, monkeypatch)
+    assert_definer_role(admin)
+    start()
+    _record(admin, newest)
+    with pytest.raises(DefinerRoleUnsafe, match="capture SELECT missing"):
+        assert_definer_role(admin)
+
+
+def test_every_listed_migration_is_one_the_code_ships():
+    assert set(definer_role.GRANTS_BY_MIGRATION) <= shipped_versions()
+    assert DEFINER_MIGRATION in definer_role.GRANTS_BY_MIGRATION
+
+
+def test_a_restores_hand_over_refuses_a_definer_another_role_planted(admin):
+    """A routine owned by a role that is neither a superuser, the schema's owner nor the definer
+    owner is named and nothing is handed over: it would otherwise gain every grant the owner
+    holds."""
+    planter = "definer_planter_" + uuid.uuid4().hex[:10]
+    admin.execute(sql.SQL("create role {} nologin").format(sql.Identifier(planter)))
+    admin.execute(
+        "create function a_planted_definer() returns int language sql security definer "
+        "set search_path = pg_catalog, pg_temp as 'select 1'"
+    )
+    admin.execute(
+        sql.SQL("alter function a_planted_definer() owner to {}").format(sql.Identifier(planter))
+    )
+    admin.execute("alter function spending_authority_facts() owner to current_user")
+    admin.execute("savepoint before_hand_over")
+    with pytest.raises(psycopg.errors.InsufficientPrivilege, match=r"a_planted_definer\(\)"):
+        hand_definers_to_owner(admin)
+    admin.execute("rollback to savepoint before_hand_over")
+    # Nothing was handed over: the superuser's routine still waits for its owner.
+    (owner,) = admin.execute(
+        "select pg_get_userbyid(proowner) as owner from pg_proc "
+        "where oid = 'spending_authority_facts()'::regprocedure"
+    ).fetchall()
+    assert owner["owner"] != DEFINER_ROLE
+    # Without the planted routine, the superuser's is handed over.
+    admin.execute("drop function a_planted_definer()")
+    hand_definers_to_owner(admin)
+    assert_definer_role(admin)
+
+
+def _other_schema(admin, *, installation: bool) -> str:
+    """A second schema in the same database: another installation (it holds schema_migrations),
+    or a schema that is not one."""
+    name = "definer_other_schema_" + uuid.uuid4().hex[:8]
+    admin.execute(sql.SQL("create schema {}").format(sql.Identifier(name)))
+    if installation:
+        admin.execute(
+            sql.SQL("create table {}.schema_migrations (version text, checksum bytea)").format(
+                sql.Identifier(name)
+            )
+        )
+        admin.execute(
+            sql.SQL("insert into {}.schema_migrations values (%s, 'x')").format(
+                sql.Identifier(name)
+            ),
+            (DEFINER_MIGRATION,),
+        )
+    return name
+
+
+def _definer_in(admin, name: str, path: str, *, public: bool = False) -> None:
+    admin.execute(
+        sql.SQL(
+            "create function {}.elsewhere() returns int language sql security definer "
+            "set search_path = " + path + " as 'select 1'"
+        ).format(sql.Identifier(name))
+    )
+    if not public:
+        admin.execute(
+            sql.SQL("revoke all on function {}.elsewhere() from public").format(
+                sql.Identifier(name)
+            )
+        )
+    admin.execute(
+        sql.SQL("alter function {}.elsewhere() owner to {}").format(
+            sql.Identifier(name), sql.Identifier(DEFINER_ROLE)
+        )
+    )
+
+
+def test_another_installations_definer_is_its_own_but_must_still_be_pinned_and_private(admin):
+    name = _other_schema(admin, installation=True)
+    _definer_in(admin, name, "pg_catalog, pg_temp")
+    # Another installation's definer, pinned and not PUBLIC's: checked as its own, so it passes.
+    assert_definer_role(admin)
+    admin.execute("savepoint pinned")
+    admin.execute(
+        sql.SQL("alter function {}.elsewhere() set search_path = {}, pg_catalog, pg_temp").format(
+            sql.Identifier(name), sql.Identifier(name)
+        )
+    )
+    with pytest.raises(DefinerRoleUnsafe, match=r"does not put pg_catalog first.*elsewhere"):
+        assert_definer_role(admin)
+    admin.execute("rollback to savepoint pinned")
+    admin.execute(
+        sql.SQL("grant execute on function {}.elsewhere() to public").format(sql.Identifier(name))
+    )
+    with pytest.raises(DefinerRoleUnsafe, match=r"PUBLIC may execute.*elsewhere"):
+        assert_definer_role(admin)
+
+
+def test_a_definer_or_a_grant_in_a_schema_that_is_no_installation_is_refused(admin):
+    name = _other_schema(admin, installation=False)
+    admin.execute("savepoint plain")
+    _definer_in(admin, name, "pg_catalog, pg_temp")
+    with pytest.raises(DefinerRoleUnsafe, match=r"owns function .*elsewhere"):
+        assert_definer_role(admin)
+    admin.execute("rollback to savepoint plain")
+    admin.execute(sql.SQL("create table {}.kept (x int)").format(sql.Identifier(name)))
+    admin.execute(
+        sql.SQL("grant select on {}.kept to {}").format(
+            sql.Identifier(name), sql.Identifier(DEFINER_ROLE)
+        )
+    )
+    with pytest.raises(DefinerRoleUnsafe, match=r"grants outside any installation.*kept"):
         assert_definer_role(admin)

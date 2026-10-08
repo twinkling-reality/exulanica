@@ -13,7 +13,11 @@ import pytest
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
-from exulanica.db.definer_role import assert_definer_role, hand_definers_to_owner
+from exulanica.db.definer_role import (
+    assert_definer_role,
+    hand_definers_to_owner,
+    shipped_versions,
+)
 from exulanica.db.local.cluster import client_program
 from exulanica.db.local.refusals import LocalDatabaseRefused
 from exulanica.db.roles import provision_purge_role, provision_runtime_role
@@ -143,7 +147,8 @@ def _restore(purged, dump, blobs):
         # checked as a deployment checks them, privileges included.
         connection.execute(f'set search_path to "{purged.scratch}", public')
         hand_definers_to_owner(connection)
-        assert_definer_role(connection)
+        # The harness applies every migration without recording any.
+        assert_definer_role(connection, applied=shipped_versions())
     # Provisioning grants; it never revokes PUBLIC's execute, because the migrations do that where
     # they create the function. So a restore is the one moment those revokes can be lost, and this
     # schema is the session's, shared with every test that runs after this file. Asked as a

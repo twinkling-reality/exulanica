@@ -610,7 +610,8 @@ function, pinning each one's search path with `pg_catalog` first and `pg_temp` l
 a database where any such function has another owner or search path or is executable by PUBLIC;
 where that role can log in, holds a privileged attribute, belongs to a role or has a member, owns
 anything else, can create in the schema or the database, or is named by a default privilege; where
-its table, column, sequence or function privileges differ from the set the bodies use; or where
+its table, column, sequence or function privileges differ from what the migrations the database
+records grant it (`GRANTS_BY_MIGRATION`); or where
 another role, neither a superuser nor a member of the schema's owner, can create in the schema. A
 migration that recreates a definer, or a restore that loads one without its owner, hands it back
 to the migrating role, and a migration that strips or recreates a table takes its grants away;

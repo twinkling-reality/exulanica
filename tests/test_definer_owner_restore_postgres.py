@@ -135,3 +135,19 @@ def test_a_later_migration_that_adds_a_definer_without_handing_it_over_stops_the
     assert result.status != 0
     assert "a_later_definer()" in result.err, result.err
     assert "not owned by exulanica_definer" in result.err, result.err
+
+
+def test_a_restore_carrying_a_widened_definer_owner_is_refused(module_machine, servers, tmp_path):
+    """The manifest records the role as the source held it; a role widened on the source (here
+    given LOGIN) comes back widened, and the restore refuses the copy before offering it."""
+    database = _init(servers, tmp_path / "database")
+    with database.connect(database.cluster.running_port()) as connection:
+        connection.execute(f"alter role {DEFINER_ROLE} login")
+    stopped = cli("stop", "--directory", database.root)
+    assert stopped.status == 0, stopped.err
+    backup = _only_backup(database, "stop")
+    (recorded,) = [role for role in backup.manifest["roles"] if role["name"] == DEFINER_ROLE]
+    assert recorded["rolcanlogin"]
+    restored = cli("restore", "--directory", tmp_path / "restored", backup.dump)
+    assert restored.status != 0
+    assert "can log in" in restored.err, restored.err
