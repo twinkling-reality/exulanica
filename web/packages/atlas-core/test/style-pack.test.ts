@@ -10,6 +10,7 @@ import {
   resolveLookRole,
   resolveStylePack,
   stretchCoordinate,
+  swatchKeyOf,
   variantIndex,
   type LookFamily,
   type StylePackContext,
@@ -79,6 +80,27 @@ describe('resolving a look role', () => {
     expect(pack.surfaces['path.footway']).toEqual(root.surfaces['path.footway']);
     expect(() => resolveStylePack([root, dusk])).toThrow(/does not name/);
     expect(() => resolveStylePack([dusk])).toThrow(/ends at a pack that names a base/);
+  });
+
+  it('draws a generated look through its base: its new pieces, and everything else the base\'s', () => {
+    const generated = named('a generated pack drawn on a base, stating only its new pieces');
+    const pack = resolveStylePack([generated, root]);
+    expect(pack.light).toEqual(root.light);
+    expect(pack.shading).toEqual(root.shading);
+    expect(pack.edge).toEqual(root.edge);
+    expect(pack.surfaces).toEqual(root.surfaces);
+    expect([...pack.swatches.keys()]).toEqual(root.palette.swatches.map((swatch) => swatch.key));
+    for (const role of Object.keys(generated.modules)) {
+      const module = pack.modules[role]!;
+      expect(module.stated).toBe(0);
+      for (const variant of module.variants) expect(module.files.has(variant.file)).toBe(true);
+    }
+    for (const role of Object.keys(root.modules).filter((role) => !(role in generated.modules))) {
+      expect(pack.modules[role]!.stated).toBe(1);
+    }
+    // A generated piece is coloured from the base's palette: the look it was made in.
+    const swatch = root.palette.swatches[0]!;
+    expect(swatchKeyOf(pack, pack.modules['fixture.well']!, swatch.srgb8)).toBe(swatch.key);
   });
 
   it('dresses the leaf, then the family default, then nothing', () => {

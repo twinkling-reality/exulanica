@@ -459,6 +459,122 @@
    }
   },
   {
+   "name": "a generated pack drawn on a base, stating only its new pieces",
+   "manifest": {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-town.own",
+    "version": 1,
+    "title": "Case town, with new pieces",
+    "description": "Case town with generated pieces for 2 parts in place of its own.",
+    "tags": [],
+    "origin": "generated",
+    "provenance": {
+     "kind": "generated",
+     "receipts": [
+      "0000000000000000000000000000000000000000000000000000000000000f01",
+      "0000000000000000000000000000000000000000000000000000000000000f02",
+      "0000000000000000000000000000000000000000000000000000000000000f03"
+     ]
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "TRELLIS-image-large"
+    ],
+    "preview": null,
+    "base": {
+     "pack_id": "exulanica.case-town",
+     "version": 1,
+     "manifest_sha256": "18f4d09e7a84990e3465a155415e9dc28a027db7e63d509929ea7b1fbbb3e178"
+    },
+    "light": null,
+    "shading": null,
+    "edge": null,
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": []
+    },
+    "surfaces": {},
+    "modules": {
+     "fixture.well": {
+      "variants": [
+       {
+        "file": "generated/0000000000000000000000000000000000000000000000000000000000000001.glb",
+        "lod1": null,
+        "size_mm": [
+         1200,
+         1200,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "generated/0000000000000000000000000000000000000000000000000000000000000002.glb",
+        "lod1": null,
+        "size_mm": [
+         1200,
+         1200,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "generated/0000000000000000000000000000000000000000000000000000000000000003.glb",
+        "lod1": null,
+        "size_mm": [
+         1900,
+         4600,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "generated/0000000000000000000000000000000000000000000000000000000000000001.glb",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "bytes": 1001,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "generated/0000000000000000000000000000000000000000000000000000000000000002.glb",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "bytes": 1002,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "generated/0000000000000000000000000000000000000000000000000000000000000003.glb",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+      "bytes": 1003,
+      "media_type": "model/gltf-binary"
+     }
+    ]
+   },
+   "expect": {
+    "sha256": "98a532757fbaddefc0ac2684617d33a222a05d9750fac085ae1d0ef52d25e09c"
+   }
+  },
+  {
    "name": "an unknown key at the top",
    "manifest": {
     "profile": "exulanica.style-pack/v1",
@@ -3191,6 +3307,119 @@
    "expect": {
     "refusal": "reference",
     "path": "provenance.kind"
+   }
+  },
+  {
+   "name": "a generated pack naming no receipt",
+   "manifest": {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-town.own",
+    "version": 1,
+    "title": "Case town, with new pieces",
+    "description": "Case town with generated pieces for 2 parts in place of its own.",
+    "tags": [],
+    "origin": "generated",
+    "provenance": {
+     "kind": "generated",
+     "receipts": []
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "TRELLIS-image-large"
+    ],
+    "preview": null,
+    "base": {
+     "pack_id": "exulanica.case-town",
+     "version": 1,
+     "manifest_sha256": "18f4d09e7a84990e3465a155415e9dc28a027db7e63d509929ea7b1fbbb3e178"
+    },
+    "light": null,
+    "shading": null,
+    "edge": null,
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": []
+    },
+    "surfaces": {},
+    "modules": {
+     "fixture.well": {
+      "variants": [
+       {
+        "file": "generated/0000000000000000000000000000000000000000000000000000000000000001.glb",
+        "lod1": null,
+        "size_mm": [
+         1200,
+         1200,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "generated/0000000000000000000000000000000000000000000000000000000000000002.glb",
+        "lod1": null,
+        "size_mm": [
+         1200,
+         1200,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "generated/0000000000000000000000000000000000000000000000000000000000000003.glb",
+        "lod1": null,
+        "size_mm": [
+         1900,
+         4600,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "generated/0000000000000000000000000000000000000000000000000000000000000001.glb",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "bytes": 1001,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "generated/0000000000000000000000000000000000000000000000000000000000000002.glb",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "bytes": 1002,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "generated/0000000000000000000000000000000000000000000000000000000000000003.glb",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+      "bytes": 1003,
+      "media_type": "model/gltf-binary"
+     }
+    ]
+   },
+   "expect": {
+    "refusal": "range",
+    "path": "provenance.receipts"
    }
   },
   {
