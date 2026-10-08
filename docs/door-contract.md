@@ -408,8 +408,11 @@ lines and events a visitor hears, as frames. Whether a grant's visitors may spea
 recorded and shown; no line crosses the door yet, so nothing reads it. A visitor whose kind has
 hands may take hold of a thing of the world in a society running hands, but no arrival records its
 grant's `may_carry_out`, so the society keeps every such thing behind: a visitor going home puts a
-thing of the world down where it stood and takes only what it carried in, and `may_carry_out` names
-no game item yet. The adapters that send visitors live in the repository's
+thing of the world down where it stood, and `may_carry_out` names no game item yet. It takes home
+what it brought, from its hands or from where it lies in the world, unless a being still here holds
+it. Such a thing leaves the world when that being puts it down, undelivered: its bringer gave it
+away, a departure's frame names only what went home with that visitor, and no later frame tells the
+bringer's program of it. A departure's `carried` lists what went home with the visitor. The adapters that send visitors live in the repository's
 `bridges/` folder, outside the product, each with its own licence notes.
 
 ## Implementation and evidence

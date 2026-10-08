@@ -1525,7 +1525,8 @@ first, unchanged, and every event they record names v7; then the things phase:
   unavailable input changes nobody;
 * the crossings a door handed over, in the order it wrote them: a visitor arrives at the open node
   nearest a gate's arrival point, holding what it carried in, and leaves when its program calls it
-  back (`sent_home`) or its grant ends (`grant_ended`), taking what it holds. An arrival is refused
+  back (`sent_home`) or its grant ends (`grant_ended`), taking what it holds (in a society running
+  hands, what it brought: things that move, below). An arrival is refused
   by name where the version holds no gate to arrive through or not the one named
   (`no_arrival_place`), the society holds 16 visitors already (`visitor_limit`), its kind is not
   a shipped being an outside program may decide for, or what it carries not a shipped holdable
@@ -1546,11 +1547,11 @@ first, unchanged, and every event they record names v7; then the things phase:
   keeps are read from the contract a society of things' lines were first said under (version 3 of
   the person's catalogs, `LINES_CONTRACT`), never from whatever terms the registry states later, so
   every stored minute replays as it ran. A visitor that chose to leave departs (`thing_departed`,
-  `chose_to_leave`), taking what it holds, as every departing visitor does. A visitor whose program
-  had no live connection, gave no answer in time or whose grant was revoked or has expired counts
-  that minute as quiet, and any other answer or a pass ends the count; one quiet for as many minutes
+  `chose_to_leave`), taking what it carries home as every departing visitor does. A visitor whose
+  program had no live connection, gave no answer in time or whose grant was revoked or has expired
+  counts that minute as quiet, and any other answer or a pass ends the count; one quiet for as many minutes
   in a row as its kind's leave ability waits (a visitor of `visitor` version 1: five) departs
-  (`thing_departed`, `decider_lost`), taking what it holds home to the program that sent it. A
+  (`thing_departed`, `decider_lost`), taking what it carries home to the program that sent it. A
   program's answer refused for its line (`line_out_of_bounds`) is an answer, never a quiet minute;
 * where the society runs the hands module, what each being's hands do, in the order of the beings'
   numbers. A hands act a decider chose (picking a thing up, putting it down, giving it to a being,
@@ -1603,18 +1604,35 @@ holds to a being whose kind offers `receive` and has a free socket for it, and t
 a being whose kind offers `let_take`. A being is told what it holds. An act out of reach is offered
 when an open node within reach of the thing or the other being remains; choosing it sends the
 being to stand a while at that node, as a chosen stand does, and the act is done on arrival; an act
-within reach makes it wait where it stands that minute. Such a decision is rejected `thing_gone` or
-`out_of_reach` when what it was for is gone or no open node within reach is left.
+within reach makes it wait where it stands that minute. While something is under way for a being
+only acts within reach are offered, since the planner reads no new goal then. An act whose parties
+stood within reach as the minute began is done where they stood then (`at_ms` 0), whichever of them
+a walk that minute carries away: one chosen while the being walks on and a hand-over whose receiver
+walks off alike. Such a decision is rejected
+`thing_gone` or `out_of_reach` when what it was for is gone or no open node within reach is left; a
+chosen act not done within the module's minutes of walking is dropped as `out_of_reach`
+(`hands_missed`), which names any act that waited too long, for a free hand or a thing another
+being took first as well as for distance.
 
 **Things that move.** In a society running the hands module a placed thing states where its
 author placed it (`placed_at_mm`) and, while held, the socket it is in (`socket`; its `position_mm`
 is null). A placed thing its author leaves where it was stays as the society has it, held or where
 a being put it down, and one nobody moved from its place takes the author's new turn or height; one
 the author moves or changes is where the author put it, out of any hand; one the author removes is
-gone, from any hand. What belongs to the world stays in it: a visitor going home puts down a placed
-thing it holds where it stood, since no arrival records a right to carry the world's things out,
-and takes only what it carried in; a being of the world that leaves (an author's edit removing a
-placed being) puts down everything it holds. The departure names what stayed (`left`).
+gone, from any hand. What belongs to the world stays in it, and what a visitor brought goes home
+with it. Each thing a visitor carries in states the visitor that brought it (`brought_by`), and
+stays in the world only while its bringer is here or a being here holds it. A visitor going home
+takes what it brought, in its hands or wherever it lies here, but not what a being still here
+holds; everything else it holds (a placed thing of the world, since no arrival records a right to
+carry the world's things out, or a thing another visitor brought) it puts down where it stood. A
+being of the world that leaves (an author's edit removing a placed being) puts down everything it
+holds. A thing put down after the visitor that brought it has left goes home to it then, but it
+leaves the world undelivered: its bringer gave it away, the door tells a visitor's program only what
+that visitor's own departure carried, and no later word tells it of such a thing. So the
+things nobody placed are at most what the visitors here brought and what the beings here hold,
+and the state check refuses any other. The departure names what it took home (`carried`), what
+stayed (`left`) and what it put down that went home to a visitor gone before it (`returned`); a
+`put_down` of such a thing says so (`returned: true`).
 
 **Who decides.** The world's owner may choose a model for a person as in a purposeful society, but
 only a decider the person's kind allows (`decider_not_allowed`, the kind's `deciders.allowed`), and

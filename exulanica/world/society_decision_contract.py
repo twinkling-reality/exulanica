@@ -720,12 +720,15 @@ def choice_options(
     stand = _off_place(routine, document, "open") if "stand" in contract.words else None
     if stand is not None and not places_to_stand(state, document, subject_id):
         stand = None
-    # Places and people by the walk to each, a place before a person at the same walk, then by id.
+    # Places and people by the walk to each, a place before a person at the same walk, then by id:
+    # as many as the options left beside waiting, standing and the things a society offers, and
+    # none where those fill them (a negative bound would cut from the end instead).
+    room = contract.value("options_maximum") - 1 - (stand is not None) - len(things)
     nearest = sorted(
         [(walk, 0, target_id, target) for walk, target_id, target in found]
         + [(walk, 1, other["id"], other) for walk, other in partners],
         key=lambda row: row[:3],
-    )[: contract.value("options_maximum") - 1 - (stand is not None) - len(things)]
+    )[: max(0, room)]
     kept = [(walk, key, entry) for walk, kind, key, entry in nearest if kind == 0]
     near = [(walk, entry) for walk, kind, _key, entry in nearest if kind == 1]
     if not kept and not near and stand is None and not things:

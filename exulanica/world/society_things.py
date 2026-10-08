@@ -202,7 +202,7 @@ MODES: Final = ("walking", "flight")
 #: A thing of a society running the hands module also states where its author placed it
 #: (``placed_at_mm``, for a placed thing), so an author's move is told from a being's, and the
 #: socket a being holds it in (``socket``, while held).
-_THING_MAY: Final = frozenset({"height_mm", "placed_at_mm", "socket"})
+_THING_MAY: Final = frozenset({"brought_by", "height_mm", "placed_at_mm", "socket"})
 #: A flyer's velocity, whole millimetres a second: x and y along the ground (``position_mm``'s
 #: two axes), z up (the rate of ``height_mm``), each within this bound.
 _VELOCITY_MM_S: Final = 100_000
@@ -270,6 +270,15 @@ def _runs_hands(state: Mapping[str, Any]) -> bool:
     from exulanica.abilities.registry import HANDS
 
     return HANDS in state.get("modules", ())
+
+
+def _gone_home(thing: Mapping[str, Any], here: set[str]) -> bool:
+    """Whether a thing on the ground goes home: one a visitor brought stays in a world only while
+    its bringer is here or a being here holds it, so the things nobody placed are at most what the
+    visitors here brought and what the beings here hold."""
+    return (
+        thing["placed_id"] is None and thing["held_by"] is None and thing["brought_by"] not in here
+    )
 
 
 def _moved_things(state: Mapping[str, Any], document: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -433,26 +442,35 @@ class _Minute:
     def leave(
         self, person: dict[str, Any], reason: str, extra: Mapping[str, Any] | None = None
     ) -> SocietyEvent:
-        """``person`` leaves the society. In a society running hands, what belongs to the world
-        stays: a placed thing it holds is put down where it stood (no arrival records a right to
-        carry the world's things out), and so is everything a being of the world holds; only what
-        a visitor carried in leaves with it. In a society without hands, whatever it holds leaves
-        with it."""
+        """``person`` leaves the society. In a society running hands, a visitor takes home what it
+        brought, in its hands or wherever it stands here, but not what a being still here holds;
+        everything else it holds, and everything a being of the world holds, is put down where it
+        stood, and a thing put down whose bringer has left already goes home to it
+        (:func:`_gone_home`). In a society without hands, whatever it holds leaves with it."""
         held = [thing for thing in self.state["things"] if thing["held_by"] == person["id"]]
         left: list[dict[str, Any]] = []
+        returned: list[dict[str, Any]] = []
         if _runs_hands(self.state):
-            left = [
+            carried = [
                 thing
-                for thing in held
-                if thing["placed_id"] is not None or person["came_by"] != "crossed"
+                for thing in self.state["things"]
+                if person["came_by"] == "crossed"
+                and thing.get("brought_by") == person["id"]
+                and thing["held_by"] in (None, person["id"])
             ]
+            left = [thing for thing in held if not any(thing is c for c in carried)]
             for thing in left:
                 thing["held_by"] = None
                 thing.pop("socket", None)
                 thing["position_mm"] = list(person["position_mm"])
-        carried = [thing for thing in held if thing not in left]
+            staying = {other["id"] for other in self.state["inhabitants"] if other is not person}
+            returned = [thing for thing in left if _gone_home(thing, staying)]
+            left = [thing for thing in left if not any(thing is r for r in returned)]
+        else:
+            carried = held
+        gone = [*carried, *returned]
         self.state["things"] = [
-            thing for thing in self.state["things"] if not any(thing is c for c in carried)
+            thing for thing in self.state["things"] if not any(thing is g for g in gone)
         ]
         self.state["inhabitants"] = [
             other for other in self.state["inhabitants"] if other is not person
@@ -471,6 +489,8 @@ class _Minute:
                 "carried": [{"id": thing["id"], "kind": thing["kind"]} for thing in carried],
                 # What stayed, put down where it stood: stated only where something did.
                 **({"left": [thing["id"] for thing in left]} if left else {}),
+                # What it put down that went home to a visitor that had left: only where any did.
+                **({"returned": [thing["id"] for thing in returned]} if returned else {}),
                 **(extra or {}),
             },
         )
@@ -753,8 +773,9 @@ def _arrive(minute: _Minute, crossing: Crossing, document: Mapping[str, Any]) ->
                 "position_mm": None,
                 "yaw_microradians": None,
                 "held_by": identity,
-                # With hands, the socket it is in, found from its holder's plan when first used.
-                **({"socket": None} if _runs_hands(state) else {}),
+                # With hands, the socket it is in, found from its holder's plan when first used,
+                # and the visitor that brought it, which it goes home with.
+                **({"socket": None, "brought_by": identity} if _runs_hands(state) else {}),
             }
         )
     event = minute.emit(
@@ -930,6 +951,15 @@ def advance_things(
     they were handed over."""
     _require(state["profile"] == THINGS_PROFILE, "the things phase is a society of things'")
     _require(len(crossings) <= CROSSINGS_PER_MINUTE, "a minute takes a bounded number of crossings")
+    # A hands society made before bringers were recorded holds a carried-in thing that names no
+    # bringer, so whether it stays or goes home cannot be told: refused by name here rather than
+    # failing part way through the minute.
+    _require(
+        not _runs_hands(state)
+        or all("brought_by" in thing for thing in state["things"] if thing["placed_id"] is None),
+        "a carried-in thing names no visitor that brought it: this society of things was made "
+        "before bringers were recorded and cannot be played on",
+    )
     result = deepcopy(state)
     minute = _Minute(previous, result, seed, document, events)
     _reconcile(minute)
@@ -1139,15 +1169,32 @@ def _hands(minute: _Minute, previous: Mapping[str, Any]) -> None:
         intent = person.get("hands")
         if intent is None:
             continue
+        chosen = (intent["ability"], intent["thing"], intent["with"])
         found = next(
             (
                 act
                 for act in acts_open(state, person, minute.document, taken=frozenset(taken))
-                if (act.ability, act.thing_id, act.other_id)
-                == (intent["ability"], intent["thing"], intent["with"])
+                if (act.ability, act.thing_id, act.other_id) == chosen
             ),
             None,
         )
+        if found is None and person["id"] in began:
+            # Within reach as the minute began, though a walk then took one of them away: done as
+            # the minute began (at_ms 0), so an act chosen while walking is not missed.
+            moved = {
+                **state,
+                "inhabitants": [_as_began(other, began) for other in state["inhabitants"]],
+            }
+            found = next(
+                (
+                    act
+                    for act in acts_open(
+                        moved, _as_began(person, began), minute.document, taken=frozenset(taken)
+                    )
+                    if (act.ability, act.thing_id, act.other_id) == chosen
+                ),
+                None,
+            )
         reason = "chose_to_" + intent["ability"]
         if found is None:
             things = {thing["id"] for thing in state["things"]}
@@ -1187,6 +1234,11 @@ def _hands(minute: _Minute, previous: Mapping[str, Any]) -> None:
             at_ms = min(59_999, -(-walked * 60_000 // budget)) if budget > 0 else 0
         details = carry_out(state, found, at=person["position_mm"])
         taken.add(found.thing_id)
+        put = next(thing for thing in state["things"] if thing["id"] == found.thing_id)
+        if _gone_home(put, {other["id"] for other in state["inhabitants"]}):
+            # Put down after the visitor that brought it left: it goes home to it.
+            state["things"] = [thing for thing in state["things"] if thing is not put]
+            details = {**details, "returned": True}
         person.pop("hands")
         minute.emit(
             _HANDS_ACTS[found.ability],
@@ -1198,6 +1250,12 @@ def _hands(minute: _Minute, previous: Mapping[str, Any]) -> None:
             details={"ability": found.ability, **details},
             at_ms=at_ms,
         )
+
+
+def _as_began(person: Mapping[str, Any], began: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    """``person`` where it stood as the minute began, where it was here then."""
+    then = began.get(person["id"])
+    return dict(person) if then is None else {**person, "position_mm": then["position_mm"]}
 
 
 def _distance_mm(a: Sequence[int] | None, b: Sequence[int] | None) -> int:
@@ -1458,8 +1516,8 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
         )
         if not hands:
             _require(
-                "placed_at_mm" not in thing and "socket" not in thing,
-                "only a society running the hands module states placements and sockets",
+                "placed_at_mm" not in thing and "socket" not in thing and "brought_by" not in thing,
+                "only a society running the hands module states placements, sockets and bringers",
             )
             _require(
                 (thing["placed_id"] is None) == (thing["held_by"] is not None),
@@ -1484,6 +1542,17 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
                 "socket" not in thing or thing["socket"] is None or isinstance(thing["socket"], str)
             ),
             "a held thing states the socket it is in",
+        )
+        _require(
+            ("brought_by" in thing) == (thing["placed_id"] is None)
+            and ("brought_by" not in thing or isinstance(thing["brought_by"], str)),
+            "a thing nobody placed states the visitor that brought it",
+        )
+        _require(
+            thing["placed_id"] is not None
+            or thing["held_by"] is not None
+            or thing["brought_by"] in present,
+            "a thing a visitor brought stays only while its bringer is here or a being holds it",
         )
     refused = state["refused_placements"]
     _require(isinstance(refused, list), "refused placements are a list")

@@ -16,6 +16,7 @@ scripted model, before a minute. What is shown:
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import json
 import time
@@ -239,6 +240,24 @@ class _Greeter(FakeTransport):
         return HttpResponse(200, json.dumps(body))
 
 
+class _Staying(outside._Door):
+    """An outside program that keeps its visitor where it is: it waits whenever it may."""
+
+    def answer(self, workspace_id, world_id, request, ends_at):
+        options = request["context"]["options"]
+        wait = next((option for option in options if option["kind"] == "wait"), None)
+        if wait is None:
+            return super().answer(workspace_id, world_id, request, ends_at)
+        found = super().answer(
+            workspace_id,
+            world_id,
+            {**request, "context": {**request["context"], "options": [wait]}},
+            ends_at,
+        )
+        self.asked[-1] = copy.deepcopy(request)
+        return found
+
+
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_a_heard_line_carrying_a_name_saved_later_is_left_out_of_an_outside_ask(app, monkeypatch):
     """A visitor heard a line naming nobody the account holder had saved; the holder then saves
@@ -256,11 +275,9 @@ def test_a_heard_line_carrying_a_name_saved_later_is_left_out_of_an_outside_ask(
         things_api._place(client, world, "gate", "gate", 1, 0, 6_000)
         things_api._place(client, world, "knight", "knight", 1, 2_000, 4_000)
         snapshot = things_api._make_society(client, world)
-        stream.hand(
-            uuid.UUID(snapshot["society_id"]), things_support.arrival(1, grant_id=outside.GRANT)
-        )
-        snapshot = stays._step(world, client, snapshot)
-        [visitor] = [p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "crossed"]
+        # The knight's model is chosen before its first minute, so its routine never walks it away:
+        # the scripted model says something or waits a minute. A villager's routine may still stop
+        # to talk to it, which keeps it where it stands, so it is asked again once the talk ends.
         [knight] = [p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "placed"]
         manifest, model_id = decisions._offered()
         model = {"provider": manifest.spec(model_id).provider, "model_id": model_id}
@@ -269,26 +286,35 @@ def test_a_heard_line_carrying_a_name_saved_later_is_left_out_of_an_outside_ask(
         speaking = decisions._host(
             world, decisions._client(manifest, transport), services, manifest
         )
-        door = outside._Door()
+        door = _Staying()
         listening = outside._doorkeeping_host(world, services, door)
 
-        def minute(snapshot):
+        def minute(snapshot, *, visited=True):
             claim = decisions._claim(world, snapshot)
             assert speaking.before_minute(claim, time.monotonic() + LEASE_SECONDS)
-            assert listening.before_minute(claim, time.monotonic() + LEASE_SECONDS)
+            # Before the visitor is here, its program has nobody to be asked for.
+            asked = listening.before_minute(claim, time.monotonic() + LEASE_SECONDS)
+            assert asked or not visited
             return stays._step(world, client, snapshot)
+
+        stream.hand(
+            uuid.UUID(snapshot["society_id"]), things_support.arrival(1, grant_id=outside.GRANT)
+        )
+        snapshot = minute(snapshot, visited=False)
+        [visitor] = [p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "crossed"]
 
         def heard(snapshot):
             person = next(p for p in snapshot["state"]["inhabitants"] if p["id"] == visitor["id"])
             return [line["line"] for line in person.get("heard", ())]
 
-        # Each test's town is drawn anew, so when the knight is next at a choice point varies.
-        for _ in range(20):
+        # The visitor stays by the gate, near the knight, so it hears the knight's line the minute
+        # the knight is next asked, at once unless a villager's talk holds the knight a while.
+        for _ in range(30):
             snapshot = minute(snapshot)
             if HEARD in heard(snapshot):
                 break
         else:
-            raise AssertionError("the visitor never heard the knight in twenty minutes")
+            raise AssertionError("the visitor never heard the knight in thirty minutes")
         # The positive control: asked now, its program is shown the line it heard.
         door.asked.clear()
         snapshot = minute(snapshot)

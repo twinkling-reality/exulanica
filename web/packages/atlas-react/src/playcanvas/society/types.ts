@@ -33,6 +33,8 @@ export interface SocietyThingSnapshot {
   readonly placed_at_mm?: readonly [number, number];
   /** While held there: the holder's socket it is in, such as `hand.right`; absent (or null) otherwise. */
   readonly socket?: string | null;
+  /** In a society whose beings have hands: the visitor that carried it in, which it goes home with. */
+  readonly brought_by?: string;
 }
 
 /**

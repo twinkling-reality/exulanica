@@ -255,3 +255,59 @@ def test_a_request_that_fails_its_own_check_leaves_the_others_asked(app, monkeyp
         raise AssertionError("both knights were never due in one minute")
     # The second knight was asked in that minute although the first one's request was not made.
     assert len(transport.requests) == asked + 1
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_the_models_reads_judge_the_budget_by_the_terms_a_society_of_things_asks_under(app):
+    """What is left fits the cheapest ask under the role's own terms only by taking the part kept
+    for other work, and fits no ask under the longer terms a society of things asks its people
+    under. Both models reads of a version whose society is a society of things say the whole
+    budget is spent, where the role's own terms would say only the share is."""
+    from decimal import Decimal
+
+    from exulanica.api.decision_host import smallest_ask_usd
+    from exulanica.models.budget import BudgetGuard
+    from exulanica.models.client import ModelClient
+    from exulanica.world.society_decision_contract import person_role
+
+    world, client = app
+    role = person_role()
+    own, things = role.contract(), role.contract(role.terms("exulanica-society/v7").versions)
+    manifest, _model_id = decisions._offered()
+    probe = BudgetGuard(ceiling_usd=Decimal(1), max_calls=100)
+    cheapest_own = smallest_ask_usd(role, probe, manifest, own)
+    cheapest_things = smallest_ask_usd(role, probe, manifest, things)
+    # The positive control: a ceiling between the two cheapest asks.
+    assert cheapest_own < cheapest_things, (cheapest_own, cheapest_things)
+    ceiling = ((cheapest_own + cheapest_things) / 2).quantize(Decimal("0.00000001"))
+    model_client = ModelClient(
+        api_key="test-key-not-real",
+        manifest=manifest,
+        transport=_Hands(),
+        budget=BudgetGuard(ceiling_usd=ceiling, max_calls=100),
+    )
+    client.app.state.services = dataclasses.replace(
+        client.app.state.services, societies_of_things=True
+    )
+    things_api._place(client, world, "well", "well", 2, -4_000, 2_000)
+    things_api._place(client, world, "knight", "knight", 1, 3_000, 3_000)
+    things_api._make_society(client, world)
+    listed = dataclasses.replace(
+        client.app.state.services,
+        model_client=model_client,
+        society_control_workspaces=(world["workspace"],),
+    )
+    client.app.state.services = listed
+    assert listed.model_host_refusal(world["workspace"], role) == "process_share_spent"
+    assert (
+        listed.model_host_refusal(world["workspace"], role, "exulanica-society/v7")
+        == "process_budget_spent"
+    )
+    scope, version, society = routes(world)
+    read = client.get(society + "/models", headers=OWNER, params=scope)
+    assert read.status_code == 200, read.text
+    assert read.json()["host_refusal"] == "process_budget_spent"
+    read = client.get(version + "/models", headers=OWNER, params=scope)
+    assert read.status_code == 200, read.text
+    [person] = [entry for entry in read.json()["roles"] if entry["key"] == role.key]
+    assert person["host_refusal"] == "process_budget_spent"

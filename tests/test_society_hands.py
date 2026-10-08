@@ -20,6 +20,7 @@ from exulanica.abilities.registry import HANDS
 from exulanica.world.role_decisions import DecisionDisposition
 from exulanica.world.society_decision_contract import (
     DecisionOption,
+    at_choice_point,
     choice_options,
     person_role,
 )
@@ -70,6 +71,10 @@ def _minute(state, document, decisions=(), crossings=(), *, previous=None):
     inputs = [document] if previous is None else [previous, document]
     planned, events = advance_purposeful_society(state, SEED, inputs, goal_policy=policies)
     return advance_things(state, planned, SEED, document, events, crossings, decisions=decisions)
+
+
+def _distance(a, b) -> int:
+    return math.isqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
 def _beside(state, being, point):
@@ -221,6 +226,184 @@ def test_a_visitor_leaves_the_world_s_things_behind_and_takes_what_it_brought():
     validate_things_state(after)
 
 
+def _two_visitors(document, lanterns=1):
+    """Visitor A arrives carrying ``lanterns`` lanterns and visitor B carrying nothing; B stands
+    beside A."""
+    brought = [str(uuid.uuid5(SOCIETY, f"lantern {n}")) for n in range(lanterns)]
+    state = initial_things_society(SOCIETY, SEED, document, population=POPULATION)
+    state, _, _ = _minute(
+        state,
+        document,
+        crossings=[
+            arrival(
+                1,
+                kind=_traveller(),
+                carried=[{"thing_id": b, "kind": support.reference("lantern", 1)} for b in brought],
+            ),
+            arrival(2, kind=_traveller()),
+        ],
+    )
+    a, b = sorted(
+        (p for p in state["inhabitants"] if p["came_by"] == "crossed"),
+        key=lambda p: p["crossing"]["arrival_id"] != str(uuid.uuid5(support.GRANT, "arrival:1")),
+    )
+    return _beside(state, b, a["position_mm"]), a["id"], b["id"], brought
+
+
+def _person(state, identity):
+    return next(p for p in state["inhabitants"] if p["id"] == identity)
+
+
+def _give(state, document, giver, to):
+    person = _person(state, giver)
+    options = choice_options(state, document, giver, _contract(), seed=SEED)
+    give = next(o for o in options if o.kind == "give" and o.addressee_id == to)
+    after, events, _ = _minute(state, document, [_receipt(person, give)])
+    assert [e for e in events if e.kind == "gave"], [e.kind for e in events]
+    return after
+
+
+def test_a_visitor_takes_home_only_what_it_brought_and_what_it_brought_goes_home_with_it():
+    """A gives its lantern to B, and B is sent home: B never brought it, so B puts it down where it
+    stood. Then A is sent home: its lantern, on the ground, goes home with it."""
+    document = compose((GATE, KNIGHT, SWORD))
+    state, a, b, [lantern] = _two_visitors(document)
+    assert next(t for t in state["things"] if t["id"] == lantern)["brought_by"] == a
+    state = _give(state, document, a, b)
+    state, events, _ = _minute(state, document, crossings=[departure(b, 1)])
+    [left] = [e for e in events if e.kind == "thing_departed"]
+    assert left.document["thing"]["carried"] == []
+    assert left.document["thing"]["left"] == [lantern]
+    found = next(t for t in state["things"] if t["id"] == lantern)
+    assert (found["held_by"], found["position_mm"]) == (None, left.document["position_mm"])
+    validate_things_state(state)
+    state, events, _ = _minute(state, document, crossings=[departure(a, 2)])
+    [gone] = [e for e in events if e.kind == "thing_departed"]
+    assert [held["id"] for held in gone.document["thing"]["carried"]] == [lantern]
+    assert lantern not in {t["id"] for t in state["things"]}
+    validate_things_state(state)
+
+
+def test_a_thing_a_being_here_holds_stays_until_it_is_put_down_after_its_bringer_left():
+    """A gives its lantern to B, then A goes home: B still holds it, so it stays. When B goes home
+    too it puts the lantern down, and with its bringer gone the lantern goes home as well."""
+    document = compose((GATE, KNIGHT, SWORD))
+    state, a, b, [lantern] = _two_visitors(document)
+    state = _give(state, document, a, b)
+    state, events, _ = _minute(state, document, crossings=[departure(a, 1)])
+    [gone] = [e for e in events if e.kind == "thing_departed"]
+    assert gone.document["thing"]["carried"] == []
+    assert next(t for t in state["things"] if t["id"] == lantern)["held_by"] == b
+    validate_things_state(state)
+    state, events, _ = _minute(state, document, crossings=[departure(b, 2)])
+    [left] = [e for e in events if e.kind == "thing_departed"]
+    assert left.document["thing"]["returned"] == [lantern] and "left" not in left.document["thing"]
+    assert lantern not in {t["id"] for t in state["things"]}
+    validate_things_state(state)
+
+
+def test_a_thing_put_down_after_its_bringer_left_goes_home_to_it():
+    """A gives its lantern to the knight and goes home; the knight keeps it while it holds it, and
+    when it puts the lantern down, the lantern goes home to A."""
+    document = compose((GATE, KNIGHT, SWORD))
+    state, a, _b, [lantern] = _two_visitors(document)
+    state = _beside(state, _knight(state), _person(state, a)["position_mm"])
+    state = _give(state, document, a, _knight(state)["id"])
+    state, _, _ = _minute(state, document, crossings=[departure(a, 1)])
+    knight = _knight(state)
+    assert next(t for t in state["things"] if t["id"] == lantern)["held_by"] == knight["id"]
+    options = choice_options(state, document, knight["id"], _contract(), seed=SEED)
+    put = next(o for o in options if o.kind == "put_down" and o.target_id == lantern)
+    state, events, _ = _minute(state, document, [_receipt(knight, put)])
+    [done] = [e for e in events if e.kind == "put_down"]
+    assert done.document["thing"]["returned"] is True
+    assert lantern not in {t["id"] for t in state["things"]}
+    validate_things_state(state)
+
+
+def test_visitors_coming_and_going_leave_no_things_behind():
+    """An outside program sending a visitor with sixteen things, handing one to another visitor and
+    sending both home, leaves the society's things as many as its author placed."""
+    document = compose((GATE, KNIGHT, SWORD))
+    placed = len(initial_things_society(SOCIETY, SEED, document, population=POPULATION)["things"])
+    state, a, b, brought = _two_visitors(document, lanterns=16)
+    assert len(state["things"]) == placed + 16
+    state = _give(state, document, a, b)
+    state, events, _ = _minute(state, document, crossings=[departure(a, 1)])
+    [gone] = [e for e in events if e.kind == "thing_departed"]
+    assert len(gone.document["thing"]["carried"]) == 15
+    state, events, _ = _minute(state, document, crossings=[departure(b, 2)])
+    [left] = [e for e in events if e.kind == "thing_departed"]
+    assert len(left.document["thing"]["returned"]) == 1
+    assert len(state["things"]) == placed
+    assert not set(brought) & {t["id"] for t in state["things"]}
+    validate_things_state(state)
+
+
+def test_the_state_check_refuses_a_brought_thing_its_bringer_left_behind():
+    document = compose((GATE, KNIGHT, SWORD))
+    state, a, _b, [lantern] = _two_visitors(document)
+    stray = copy.deepcopy(state)
+    stray["inhabitants"] = [p for p in stray["inhabitants"] if p["id"] != a]
+    thing = next(t for t in stray["things"] if t["id"] == lantern)
+    thing.update(held_by=None, position_mm=[0, 0])
+    thing.pop("socket")
+    with pytest.raises(ValueError, match="bringer"):
+        validate_things_state(stray)
+    unmarked = copy.deepcopy(state)
+    next(t for t in unmarked["things"] if t["id"] == lantern).pop("brought_by")
+    with pytest.raises(ValueError, match="visitor that brought it"):
+        validate_things_state(unmarked)
+
+
+def test_a_society_whose_carried_in_thing_names_no_bringer_is_refused_by_name():
+    """A hands society stored before bringers were recorded: its visitor leaving would find no
+    bringer for the lantern it carried in. The minute refuses it by name before doing anything."""
+    document = compose((GATE, KNIGHT, SWORD))
+    state, a, _b, [lantern] = _two_visitors(document)
+    next(t for t in state["things"] if t["id"] == lantern).pop("brought_by")
+    with pytest.raises(ValueError, match="made before bringers were recorded"):
+        _minute(state, document, crossings=[departure(a, 1)])
+
+
+def test_an_act_chosen_while_walking_is_done_where_both_stood_as_the_minute_began():
+    """A knight walking somewhere is offered the sword lying where it stands, chooses to pick it
+    up, and walks on in that minute: the act is done as the minute began, not missed."""
+    document = compose((GATE, KNIGHT, SWORD))
+    state = initial_things_society(SOCIETY, SEED, document, population=POPULATION)
+    # At a slow pace, so a walk takes minutes.
+    state["movement_budget_mm_per_tick"] = 2_500
+    # A minute in which the knight, with something under way, walks on out of reach of where it
+    # stood, so the minute's end alone would find the sword out of reach.
+    for _ in range(60):
+        knight = _knight(state)
+        walks_on, _ = advance_purposeful_society(state, SEED, [document], goal_policy={})
+        if not at_choice_point(knight) and (
+            _distance(_knight(walks_on)["position_mm"], knight["position_mm"]) > reach_mm()
+        ):
+            break
+        state, _, _ = _minute(state, document)
+    else:
+        raise AssertionError("the knight never walked out of reach with something under way")
+    # The sword lies where the knight stands, mid-walk.
+    sword = _sword(state)
+    sword["position_mm"] = list(knight["position_mm"])
+    options = choice_options(state, document, knight["id"], _contract(), seed=SEED)
+    [pick] = [o for o in options if o.kind == "pick_up"]
+    # Under way, the planner reads no new goal: the knight walks on, and the hands step acts.
+    planned, events = advance_purposeful_society(state, SEED, [document], goal_policy={})
+    after, events, _ = advance_things(
+        state, planned, SEED, document, events, (), decisions=[_receipt(knight, pick)]
+    )
+    walked = _knight(after)
+    # It ended the minute out of reach of where the sword lay.
+    assert _distance(walked["position_mm"], knight["position_mm"]) > reach_mm()
+    [done] = [e for e in events if e.kind == "picked_up"]
+    assert done.document["at_ms"] == 0
+    assert _sword(after)["held_by"] == knight["id"]
+    validate_things_state(after)
+
+
 def test_a_placed_being_removed_puts_down_what_it_holds():
     document = compose((GATE, KNIGHT, SWORD))
     after, _ = _picked_up(document)
@@ -263,6 +446,32 @@ def test_an_author_s_turn_applies_to_a_thing_nobody_moved():
     later, _, _ = _minute(state, turned, previous=document)
     assert _sword(later)["yaw_microradians"] == 1_570_796
     validate_things_state(later)
+
+
+def test_an_author_s_height_applies_to_a_thing_nobody_moved():
+    document = compose((GATE, KNIGHT, SWORD))
+    state = initial_things_society(SOCIETY, SEED, document, population=POPULATION)
+    raised = compose(
+        (GATE, KNIGHT, thing("sword", "sword", 2, 2_400, 2_600, y_mm=800)),
+        input_seq=2,
+        edit_seq=EDITS + 1,
+    )
+    later, _, _ = _minute(state, raised, previous=document)
+    assert _sword(later)["height_mm"] == 800
+    lowered = compose((GATE, KNIGHT, SWORD), input_seq=3, edit_seq=EDITS + 2)
+    again, _, _ = _minute(later, lowered, previous=raised)
+    assert "height_mm" not in _sword(again)
+    validate_things_state(again)
+
+
+def test_two_things_carried_in_are_held_in_two_sockets():
+    from exulanica.world.society_hands import socket_of_held
+
+    document = compose((GATE, KNIGHT, SWORD))
+    state, _a, _b, brought = _two_visitors(document, lanterns=2)
+    held = [t for t in state["things"] if t["id"] in brought]
+    sockets = [socket_of_held(state, thing) for thing in held]
+    assert None not in sockets and len(set(sockets)) == 2, sockets
 
 
 def _traveller():

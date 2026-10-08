@@ -501,6 +501,45 @@ def test_a_request_that_would_carry_a_saved_name_is_undone_and_not_sent(app, mon
     assert _decisions(services, world, snapshot) == []
 
 
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_an_outside_request_that_fails_its_own_check_leaves_the_others_asked(app, monkeypatch):
+    """A request for one of a program's people refused by its own check is undone alone: the
+    minute's other people of the program are still reserved and sent through the door."""
+    from exulanica.world import society_decision_repository as repository_module
+
+    world, client = app
+    services = _services(client)
+    snapshot = stays._inhabited(world, client)
+    people = sorted(person["id"] for person in snapshot["state"]["inhabitants"][:2])
+    _grant(services, world, people)
+    refused, other = people
+    live = repository_module.SocietyDecisionRepository.prepare_role
+    attempted: list[str] = []
+
+    def prepare_role(self, role, version_id, **kwargs):
+        attempted.append(str(kwargs["subject_id"]))
+        if str(kwargs["subject_id"]) == refused:
+            raise ValueError("a society_decision decision offers each label once")
+        return live(self, role, version_id, **kwargs)
+
+    monkeypatch.setattr(repository_module.SocietyDecisionRepository, "prepare_role", prepare_role)
+    door = _Door()
+    host = _doorkeeping_host(world, services, door)
+    for _ in range(30):
+        attempted.clear()
+        asked = len(door.asked)
+        assert host.before_minute(_claim(world, snapshot), time.monotonic() + LEASE_SECONDS)
+        # A minute in which both were due: the first one's request failed its own check.
+        if set(attempted) == {refused, other}:
+            break
+        snapshot = stays._step(world, client, snapshot)
+    else:
+        raise AssertionError("both people were never due in one minute")
+    # The other person was sent through the door in that minute; the refused one never was.
+    assert [request["subject_id"] for request in door.asked[asked:]] == [other]
+    assert refused not in {request["subject_id"] for request in door.asked}
+
+
 def test_the_test_door_answers_in_the_receipt_s_one_shape():
     """The scripted door's answer passes the shape check every outside answer meets, so the tests
     above read the host, not a malformed fixture."""
