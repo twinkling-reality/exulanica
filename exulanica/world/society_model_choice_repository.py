@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Mapping, Sequence
+from datetime import UTC, datetime, timedelta
 from typing import Any, Final
 
 import psycopg
@@ -52,6 +53,7 @@ from exulanica.world.deciders import (
 )
 from exulanica.world.decision_roles import DecisionContract, DecisionRole, decision_roles
 from exulanica.world.society import UnknownSociety
+from exulanica.world.society_engines import society_engine
 from exulanica.world.society_planner import input_sha256
 from exulanica.world.society_things import kind_allows
 
@@ -61,8 +63,11 @@ __all__ = [
     "ModelChoiceRefused",
     "SocietyModelChoiceRepository",
     "decider_of",
+    "decides_at",
 ]
 
+#: How a gate's choice states its end: an RFC 3339 instant in UTC, to the second.
+_ENDS_AT: Final = "%Y-%m-%dT%H:%M:%SZ"
 #: The groups a choice may name instead of subjects: every visitor that arrives under one grant and
 #: whose arrival said the world decides for it.
 GROUPS: Final = ("arrivals_under_grant",)
@@ -90,10 +95,20 @@ CHOICE_REFUSALS: Final = {
         "somebody this choice names came into the world from outside, and the program they came "
         "with decides for them; end its grant or send them away instead"
     ),
+    "engine_takes_no_traveller_choice": (
+        "only a society of things takes visitors, so only its engine takes the mind a gate's "
+        "travellers get"
+    ),
     "decider_not_allowed": (
         "somebody this choice names is a kind of thing that kind of decider may not decide for"
     ),
 }
+
+
+def decides_at(ends_at: str | None, now: datetime) -> bool:
+    """Whether a gate's choice ending at ``ends_at`` (as the group states it, to the second in
+    UTC, or None for a group stored with no end) decides at ``now``: strictly before its end."""
+    return ends_at is None or now < datetime.strptime(ends_at, _ENDS_AT).replace(tzinfo=UTC)
 
 
 class ModelChoiceRefused(ValueError):
@@ -103,6 +118,26 @@ class ModelChoiceRefused(ValueError):
         super().__init__(CHOICE_REFUSALS[code])
         self.code = code
         self.detail = CHOICE_REFUSALS[code]
+
+
+def _came_from_outside(state: Mapping[str, Any], subject_id: str) -> bool:
+    return any(
+        person.get("id") == subject_id and person.get("came_by") == "crossed"
+        for person in state.get("inhabitants", ())
+    )
+
+
+def _counted(
+    society: Mapping[str, Any], role: DecisionRole, choices: Mapping[str, Any]
+) -> list[str]:
+    """The subjects whose choices count toward the bound on the subjects models run: in a society
+    of things only those still in it, since a visitor that left never comes back by its id;
+    in any other society every subject a choice names, a person sent away among them, who may
+    be brought back."""
+    if society_engine(str(society["engine_version"])).state_family != "things":
+        return list(choices)
+    present = set(role.adapter.subjects(society["state"]))
+    return [subject for subject in choices if subject in present]
 
 
 def decider_of(document: Mapping[str, Any]) -> dict[str, Any]:
@@ -231,6 +266,7 @@ class SocietyModelChoiceRepository:
                 continue
             described = decider_of(document)
             found[group["grant_id"]] = {
+                "ends_at": group.get("ends_at"),
                 "decider": described,
                 "model": model_of(described),
                 "choice_seq": document["choice_seq"],
@@ -242,9 +278,23 @@ class SocietyModelChoiceRepository:
     def traveller_choices(
         self, version_id: uuid.UUID, role: DecisionRole
     ) -> dict[str, dict[str, Any]]:
-        """Each grant's latest group choice of ``role``: the mind its arriving visitors get when
-        their arrival says the world decides for them, by grant id."""
-        return self._groups(role, self._rows(self._society(version_id, lock=False)["society_id"]))
+        """Each grant's latest group choice of ``role`` that still decides: the mind its arriving
+        visitors get when their arrival says the world decides for them, by grant id; one past
+        its end is left out, as :meth:`deciding` leaves it out."""
+        rows = self._rows(self._society(version_id, lock=False)["society_id"])
+        return self._deciding_groups(role, rows)
+
+    def _deciding_groups(
+        self, role: DecisionRole, rows: Sequence[Mapping[str, Any]]
+    ) -> dict[str, dict[str, Any]]:
+        """Each grant's latest group choice that decides now: strictly before its end, as the
+        database's clock reads it, or with no end."""
+        now = self.connection.execute("select statement_timestamp() as now").fetchone()["now"]
+        return {
+            grant_id: choice
+            for grant_id, choice in self._groups(role, rows).items()
+            if decides_at(choice["ends_at"], now)
+        }
 
     def deciding(
         self, version_id: uuid.UUID, role: DecisionRole, contract: DecisionContract
@@ -262,12 +312,15 @@ class SocietyModelChoiceRepository:
             subject: {**choice, "from": "choice"}
             for subject, choice in self._current(role, rows).items()
         }
-        groups = self._groups(role, rows)
+        # A gate's choice decides strictly before its end, as the database's clock reads it.
+        groups = self._deciding_groups(role, rows)
         if not groups:
             return found
         state = society["state"]
         room = contract.value(role.subjects_bound) - sum(
-            1 for choice in found.values() if choice["decider"]["kind"] == "model"
+            1
+            for subject in _counted(society, role, found)
+            if found[subject]["decider"]["kind"] == "model"
         )
         present = set(role.adapter.subjects(state))
         visitors = sorted(
@@ -288,6 +341,9 @@ class SocietyModelChoiceRepository:
                 continue
             if choice["decider"]["kind"] == "model":
                 if room <= 0:
+                    if not kind_allows(state, person["id"], "routine"):
+                        # Past the bound, a kind the routine may not run is run by nobody here.
+                        continue
                     found[person["id"]] = {
                         **choice,
                         "decider": {"kind": "routine"},
@@ -389,21 +445,33 @@ class SocietyModelChoiceRepository:
         chosen_by: uuid.UUID,
         manifest: Manifest,
         contract: DecisionContract,
+        ends_at: datetime,
     ) -> dict[str, Any]:
         """Record the mind every visitor arriving under ``grant_id`` gets when its arrival says the
         world decides for it: a model the manifest offers the role, or the routine for none.
         Called by the route that records the grant, in its transaction, which holds the grant to
         this world; refused as any owner's choice of a model is. Returns the choice, or the one
-        this key already recorded."""
+        this key already recorded. ``ends_at``, the grant's own end (aware, in UTC; every grant
+        ends), ends the choice: it decides strictly before then, to the second, by the database's
+        clock, so no host reserves an ask under it for the grant's visitors once the grant has
+        ended, whenever their departures are written. An ask reserved before the end runs as
+        reserved, and an owner's own choice naming a visitor is not ended by it."""
 
         def described() -> dict[str, Any]:
             return of_model(_model_record(role, manifest, contract, model))
 
+        if ends_at.tzinfo is None or ends_at.utcoffset() != timedelta(0):
+            raise ValueError("a gate's choice ends at an instant stated in UTC")
+        group = {
+            "kind": "arrivals_under_grant",
+            "grant_id": str(grant_id),
+            "ends_at": ends_at.strftime(_ENDS_AT),
+        }
         return self._record_group(
             version_id,
             role,
             request_id=request_id,
-            group={"kind": "arrivals_under_grant", "grant_id": str(grant_id)},
+            group=group,
             asked=_asked_model(model),
             described=described,
             chosen_by=chosen_by,
@@ -422,14 +490,25 @@ class SocietyModelChoiceRepository:
     ) -> dict[str, Any] | None:
         """Hand the visitors arriving under ``grant_id`` back to the routine, as one group choice:
         called by the route that revokes the grant, in its transaction, so no later grant of the
-        same id inherits a mind. None, recording nothing, when no group choice names the grant."""
-        group = {"kind": "arrivals_under_grant", "grant_id": str(grant_id)}
+        same id inherits a mind. It ends with the grant, as the choice it releases does. None,
+        recording nothing, when no group choice names the grant."""
         with self.connection.transaction():
             society = self._society(version_id, lock=True)
             rows = self._rows(society["society_id"])
             existing = next((row for row in rows if row["request_id"] == request_id), None)
-            if existing is None and str(grant_id) not in self._groups(role, rows):
+            latest = self._groups(role, rows).get(str(grant_id))
+            if existing is None and latest is None:
                 return None
+            ends_at = (
+                existing["document"]["group"]["ends_at"]
+                if existing is not None and "group" in existing["document"]
+                else None
+                if latest is None
+                else latest["ends_at"]
+            )
+            group = {"kind": "arrivals_under_grant", "grant_id": str(grant_id)}
+            if ends_at is not None:
+                group["ends_at"] = ends_at
             return self._record_group(
                 version_id,
                 role,
@@ -472,6 +551,8 @@ class SocietyModelChoiceRepository:
                 return _view(document, existing["recorded_at"])
             if not role.hosted_by(society["engine_version"]):
                 raise ModelChoiceRefused("engine_takes_no_model_choice")
+            if society_engine(str(society["engine_version"])).state_family != "things":
+                raise ModelChoiceRefused("engine_takes_no_traveller_choice")
             record = described()
             sequence = (rows[-1]["choice_seq"] if rows else 0) + 1
             document: dict[str, Any] = {
@@ -600,6 +681,12 @@ class SocietyModelChoiceRepository:
                 raise ModelChoiceRefused("person_not_in_this_world")
             if any(decided_from_outside(society["state"], subject) for subject in chosen):
                 raise ModelChoiceRefused("decided_from_outside")
+            if record["kind"] == "external" and any(
+                _came_from_outside(society["state"], subject) for subject in chosen
+            ):
+                # A visitor is never handed to another outside program: its own program, or the
+                # world, decides for it.
+                raise ModelChoiceRefused("decided_from_outside")
             state = society["state"]
             if not all(kind_allows(state, subject, record["kind"]) for subject in chosen):
                 raise ModelChoiceRefused("decider_not_allowed")
@@ -622,7 +709,8 @@ class SocietyModelChoiceRepository:
             after = self._current(role, rows)
             for subject in chosen:
                 after[subject] = {"decider": record}
-            run = sum(1 for choice in after.values() if choice["decider"]["kind"] == "model")
+            counted = _counted(society, role, after)
+            run = sum(1 for subject in counted if after[subject]["decider"]["kind"] == "model")
             if run > contract.value(role.subjects_bound):
                 raise ModelChoiceRefused("too_many_model_people")
             sequence = (rows[-1]["choice_seq"] if rows else 0) + 1

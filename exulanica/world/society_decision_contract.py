@@ -61,6 +61,7 @@ from typing import Any, Final
 
 from exulanica.models.choice import ChoiceRequest
 from exulanica.models.manifest import AnsweringMechanism
+from exulanica.things.lines import HEARD_LINES_MAXIMUM, LINE_CHARACTERS_MAXIMUM
 from exulanica.world.decision_roles import (
     FEWEST_OPTIONS,
     GENERIC_REASONS,
@@ -99,6 +100,7 @@ __all__ = [
     "LINE_KINDS",
     "PERSON_REASONS",
     "POLICY_KEYS_FROM",
+    "POLICY_RANGES",
     "ContractError",
     "DecisionContract",
     "DecisionOption",
@@ -179,6 +181,17 @@ POLICY_KEYS_FROM: Final = {
             "say_options_maximum",
         }
     )
+}
+#: The range each policy value a society of things adds must fall in, so a contract stating
+#: another is refused when it loads: a line carries one metre to fifty, holds at most what the
+#: line rule admits, and is kept among at least one and at most the field's bound of lines; a
+#: person may say something to at least one being by name beside everyone near, and at most to
+#: fifteen.
+POLICY_RANGES: Final = {
+    "hearing_reach_mm": (1_000, 50_000),
+    "line_characters_maximum": (1, LINE_CHARACTERS_MAXIMUM),
+    "lines_heard_maximum": (1, HEARD_LINES_MAXIMUM),
+    "say_options_maximum": (2, 16),
 }
 #: What every recorded option states; one to talk with also states who, as ``partner_id``, so an
 #: option of the first contract records exactly the bytes it always did.

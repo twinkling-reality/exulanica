@@ -205,18 +205,30 @@ recorded.
 
 **A gate's travellers.** A visitor whose arrival says the world decides for it (`decided_by`
 `world`, [crossings](synthetic-society-contract.md#the-society-of-things-v7)) is decided for as any
-being of the world is, and the world's owner names the mind a gate's travellers get once, when
-opening the gate, before any of them has arrived: a choice of the same profile naming a group
-instead of people, `group: {kind: "arrivals_under_grant", grant_id}` with `people: []` (the table
-admits exactly one of the two, migration "a choice may name a gate's visitors"). The route that
-records the grant records it in the grant's own transaction
-(`SocietyModelChoiceRepository.record_traveller_choice`, refused as any choice of a model is), and
-revoking the grant hands its travellers back to the routine (`release_traveller_choice`). Who
-decides for such a visitor is, in order: a choice naming it, the latest group choice of its grant
-where its kind allows that decider, and the routine. The bound on the people models run applies to a
-group's visitors when a minute asks, in the order they came; past it the routine decides for the
-rest (`travellers_over_bound`). The host asks by `SocietyModelChoiceRepository.deciding`, and its
-program is never asked.
+being of the world is, and a gate's travellers may be given one mind, named before any of them has
+arrived: a choice of the same profile naming a group instead of people, `group: {kind:
+"arrivals_under_grant", grant_id, ends_at}` with `people: []`, only in a society of things
+(`engine_takes_no_traveller_choice`). The table admits exactly one of the two, and a group only of
+that shape (the grant's id in canonical form, its end, which every grant has, an instant in UTC to
+the second that exists on the calendar) with the world's own decider, the routine or a model
+(migrations "a choice may name a gate's visitors" and "a gate's choice names its grant and a
+mind"). The repository records one (`SocietyModelChoiceRepository.record_traveller_choice`, refused
+as any choice of a model is) and hands a grant's travellers back to the routine
+(`release_traveller_choice`). Nothing calls either yet: the door's grant route is planned to record
+the choice in the grant's own transaction, to record it again with the grant's new end when that
+end moves, to release it when the grant is revoked, and to need `model.invoke` for naming a model,
+as naming any model does. A gate's choice decides strictly before its `ends_at`, by the database's
+clock: once the grant has ended, no host reserves an ask under it for the grant's visitors, whenever
+their departures are written. An ask reserved before the end still runs as reserved, and the end
+does not touch the owner's own choice naming one of those visitors, which decides until the owner
+changes it or the visitor leaves. Who decides for such a visitor is, in order: a choice naming
+it, the latest group choice of its grant where its kind allows that decider, and the routine. The
+bound on the people models run counts, in a society of things, only the beings still in it, and
+applies to a group's visitors when a minute asks, in the order they came; past it the routine
+decides for the rest (`travellers_over_bound`). The host and the Companion's plan read who decides
+by `SocietyModelChoiceRepository.deciding`, under the contract the society's engine is asked under,
+and the visitor's program is never asked. No visitor, whoever decides for it, may be handed to
+another outside program (`decided_from_outside`).
 
 A choice may name only people of this society and a model the manifest declares, offers the
 person's role and the contract can ask by a verified mechanism; otherwise it is refused by name
@@ -278,7 +290,8 @@ with no model client asks no model.
   `EXTERNAL_RECORD`), each naming its kind; a model's keep exactly their fields, so every stored one
   reads as written. The receipt names the adapter's version (whole numbers joined by dots), the
   digest of the answer frame the program sent and how long it took, and no cost: an outside answer
-  spends nothing. It carries no free text from the program; a correlation token, where one is
+  spends nothing. It carries no free text from the program but the line an accepted say option
+  says, held to the line rule and the saved-name screen below; a correlation token, where one is
   needed, is a SHA-256 digest or none. The answer is checked as a model's is, when it arrives and
   again when it is recorded: one offered label exactly, for a reason the role records, naming the
   bridge, grant, grant revision and mapping file it was asked under, and an accepted one always
@@ -424,6 +437,9 @@ the prompt `society-person-choice/v2`. Version 3 keeps version 2's actions and b
 | `lines_heard_maximum` | 8 | Lines each being keeps, the oldest dropped first |
 | `say_options_maximum` | 4 | Ways of saying something offered: to each of the three nearest who hear, and to everyone near |
 
+A contract stating any of these four outside its range is refused when it loads: 1,000 to 50,000 mm,
+1 to 200 characters, 1 to 64 lines and 2 to 16 ways (`POLICY_RANGES`).
+
 **When they are asked.** At the routine's own choice point, as every person; and also the minute
 after a line was said to them, whatever is under way. A being an outside program decides for is
 asked every minute.
@@ -448,9 +464,16 @@ carries a line, for a door to state. An answer naming a say option with no line,
 with one, is asked once more with the second prompt's note. A line that breaks the line rule is
 refused `line_out_of_bounds`, and one the workspace's rules would change, as they change a saved
 name, `line_refused_by_rules`; either way the receipt is rejected, nothing is said and the routine
-decides that turn. An accepted receipt's proposal is the label, the option and the line. An outside
-program's answer carries the line in its proposal too, held to the same rule, and a line naming a
-name the account holder saved is refused `line_refused_by_rules`.
+decides that turn. An accepted receipt's proposal is the label, the option and the line. A model's
+line is said composed (Unicode NFC) whatever form it came in, and a line carrying any name the
+account holder saved is refused `line_refused_by_rules` whatever right releases that name to the
+model, since every later decider, an outside program among them, reads what was said. An outside
+program's answer carries the line in its proposal too, held to the same rule: an offered say option
+answered with no line, or another option with one, or a line that breaks the rule, is recorded
+rejected `line_out_of_bounds` (the program's answer, never a quiet minute), and a line naming a name
+the account holder saved is refused `line_refused_by_rules`. An outside program is never shown a
+heard line that now carries a saved name (one saved after it was said): the request leaves that line
+out of what it heard rather than going unsent.
 
 **What it does in its minute.** Going on, saying and leaving set no goal: the routine goes on as it
 would, and the society of things carries out the line and the leaving
@@ -478,8 +501,13 @@ In order:
    or the share has left (`MODEL_REFUSALS`) is not asked. The models route says which, for the host
    and for each choice.
 3. **Let the workspace's rules judge the question.** Once a minute, with no lock held, the
-   workspace's rules judge the role's fixed choice description and every label anybody due could be
-   offered, in one pass for each chosen model. A description the rules would change, as a saved
+   workspace's rules judge the fixed choice description the society's engine asks by (its terms'
+   own, or the role's) and every label anybody due could be offered, in one pass for each chosen
+   model; a description only another engine asks by is not judged here, so a saved name matching a
+   word of the society of things' description stops no other engine's asks in the host. The models
+   route and a comparison's start still judge every description the role states, so there such a
+   name reports `question_changed_by_rules`, or refuses the start, for any engine. A description
+   the rules would change, as a saved
    name one of whose parts is a word of it would, asks nobody of that model and writes nothing
    (`question_changed_by_rules` on the models route). A label they would change, a place a saved
    name happens to match, is left out of that person's options.
@@ -628,7 +656,7 @@ stored request the loop does not rebuild stops it by name.
 | Registry and adapters | `assets/catalogs/roles/decision-roles.v5.json`, `exulanica/world/decision_roles.py`, `exulanica/world/role_catalogs.py`, `exulanica/world/roles/` | `tests/test_decision_roles.py`, with the test role in `tests/decision_role_fixtures/` |
 | Deciders and outside programs | `exulanica/world/deciders.py`, `exulanica/api/external_asking.py`, the host's outside path in `exulanica/api/decision_host.py`, migration 0146 | `tests/test_outside_deciders.py` (each answer and statement a door may give, late, failing or malformed, costing its own subject alone; a context carrying a saved name in any field), `tests/test_outside_deciders_postgres.py` (a request left open by a stopped host; a request carrying a saved name undone and not sent; a released grant's retry) |
 | Requests, receipts, the minute loop and replay | `exulanica/world/role_decisions.py` | `tests/test_decision_roles.py` |
-| The person's contract and minute | `exulanica/world/society_decision_contract.py`, `exulanica/world/society_model_decisions.py`, `assets/catalogs/society/society-decision-action.v2.json`, `assets/catalogs/society/society-decision-policy.v2.json` | `tests/test_society_person_decisions.py`, `tests/test_society_model_actions.py`, `tests/test_person_role_goldens.py` |
+| The person's contract and minute | `exulanica/world/society_decision_contract.py`, `exulanica/world/society_model_decisions.py`, `assets/catalogs/society/society-decision-action.v2.json`, `assets/catalogs/society/society-decision-policy.v2.json`, `assets/catalogs/society/society-decision-action.v3.json`, `assets/catalogs/society/society-decision-policy.v3.json` | `tests/test_society_person_decisions.py`, `tests/test_society_model_actions.py`, `tests/test_person_role_goldens.py`, `tests/test_society_lines.py`, `tests/test_society_lines_postgres.py` |
 | One choice among labels | `exulanica/models/choice.py` | `tests/test_model_choice.py` |
 | The owner's choice and its read | `exulanica/world/society_model_choice_repository.py`, `exulanica/api/routes/society_models.py`, migrations 0110 and 0117 | `tests/test_society_person_decisions_postgres.py`, `tests/test_decision_roles_postgres.py` |
 | Reservations, receipts and their tables | `exulanica/world/society_decision_repository.py`, migrations 0055, 0110 and 0117 | `tests/test_society_decision_migration.py`, `tests/test_person_role_goldens_postgres.py` |

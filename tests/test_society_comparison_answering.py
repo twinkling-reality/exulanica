@@ -164,6 +164,8 @@ def _plan(arm: dict) -> types.SimpleNamespace:
         provider_config=arm["provider_config"],
         others={},
         contract=decision_contract(),
+        # The engine a comparison's people are asked under, whose description alone is judged.
+        engine_profile="exulanica-society/v2",
     )
 
 

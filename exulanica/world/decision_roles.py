@@ -489,7 +489,10 @@ class DecisionRole:
         person), or None where it offers none: what an outside program answers for a subject when
         nobody there acts for it, read from the request's own context."""
         kinds = getattr(self.adapter, "IDLE_KINDS", (self.adapter.IDLE_KIND,))
-        offered = {option.get("kind"): option["label"] for option in context["options"]}
+        offered: dict[Any, str] = {}
+        for option in context["options"]:
+            # The first offered option of each kind, in the request's own order.
+            offered.setdefault(option.get("kind"), option["label"])
         return next((offered[kind] for kind in kinds if kind in offered), None)
 
     def line_labels(self, context: Mapping[str, Any]) -> tuple[str, ...]:
@@ -953,6 +956,9 @@ def _contract(role: DecisionRole, versions: Mapping[str, int]) -> DecisionContra
             )
         words[kind], action_keys[kind] = text, entry.key
     policy = {entry.key: _whole(dict(entry.values)["value"]) for entry in policy_catalog.entries}
+    for key, (low, high) in getattr(role.adapter, "POLICY_RANGES", {}).items():
+        if key in policy and not low <= policy[key] <= high:
+            raise ContractError(f"the {role.key} policy's {key} is {low} to {high}")
     if not policy["decision_deadline_ms"] < LEASE_SECONDS * 1000:
         raise ContractError("a decision's deadline ends inside the playback lease it is asked in")
     ranks = [policy[f"answer_rank_{m.value}"] for m in AnsweringMechanism]

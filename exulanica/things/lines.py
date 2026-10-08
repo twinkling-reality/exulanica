@@ -15,10 +15,12 @@ from __future__ import annotations
 import unicodedata
 from typing import Final
 
-__all__ = ["LINE_CHARACTERS_MAXIMUM", "LineRefused", "check_line"]
+__all__ = ["HEARD_LINES_MAXIMUM", "LINE_CHARACTERS_MAXIMUM", "LineRefused", "check_line"]
 
 #: The most code points one line holds.
 LINE_CHARACTERS_MAXIMUM: Final = 200
+#: The most lines one being may keep, whatever a contract keeps: the bound on the field.
+HEARD_LINES_MAXIMUM: Final = 64
 #: Characters no line holds: they would break a line, hide text or carry no meaning a reader sees.
 _REFUSED_CATEGORIES: Final = frozenset({"Cc", "Cf", "Cs", "Co", "Zl", "Zp"})
 

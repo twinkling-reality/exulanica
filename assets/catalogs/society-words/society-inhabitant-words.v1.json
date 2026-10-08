@@ -741,7 +741,7 @@
       "kind": "outcome",
       "code": "said",
       "words": "said something",
-      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+      "reason": "Authored: what a said event says happened to a being: it said a line. These words name no line; the line itself is in the event, chosen by the being's decider and held to the line rule."
     },
     {
       "key": "event_reason.sent_away",

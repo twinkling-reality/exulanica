@@ -804,6 +804,12 @@ def _spawn_nodes(document: dict[str, Any]) -> tuple[dict[str, Any], list[str], b
     return nodes, spawn_nodes, authored
 
 
+def spawn_nodes(document: dict[str, Any]) -> list[str]:
+    """The nodes anybody new may start at over this input, by the rule genesis spreads its people
+    by: reachable, and in a saved world clear of where a person arrives and of every destination."""
+    return _spawn_nodes(document)[1]
+
+
 def _newcomers(
     society_id: uuid.UUID,
     seed: str,

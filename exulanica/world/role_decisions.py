@@ -294,14 +294,17 @@ def role_request(
     seed: str,
     provider_config: Mapping[str, Any],
     offer: Callable[[Sequence[RoleOption]], Sequence[RoleOption]] | None = None,
+    withhold: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> tuple[dict | None, str]:
     """A subject's sealed request over the options they have in ``state``, asked over ``source``.
 
     Pure: the host's reservation and a run of minutes build a request here, and so does a replay,
-    which rebuilds it to the byte. ``offer`` keeps the options that may be offered, in their
-    order. ``(None, "nothing_to_choose")`` when fewer than the fewest options are left or nothing
-    but the role's idle action, and ``(None, "context_limit_exceeded")`` when the observation is
-    larger than the contract's bound; otherwise the request and ``"in_progress"``.
+    which rebuilds it to the byte. ``offer`` keeps the options that may be offered, in their order.
+    ``withhold`` takes out of the observation what the one asked may not be shown (an outside
+    program is never shown a heard line carrying a saved name), before it is sealed. ``(None,
+    "nothing_to_choose")`` when fewer than the fewest options are left or nothing but the role's
+    idle action, and ``(None, "context_limit_exceeded")`` when the observation is larger than the
+    contract's bound; otherwise the request and ``"in_progress"``.
     """
     options = role.adapter.options(role, state, source, subject_id, contract, seed=seed)
     if offer is not None and options:
@@ -311,6 +314,8 @@ def role_request(
     ):
         return None, "nothing_to_choose"
     context = role.adapter.context(role, state, source, subject_id, options)
+    if withhold is not None:
+        context = withhold(context)
     if context_bytes(context) > contract.value("context_bytes_maximum"):
         return None, "context_limit_exceeded"
     request = seal(

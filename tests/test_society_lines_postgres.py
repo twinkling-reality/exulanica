@@ -6,9 +6,9 @@ scripted model, before a minute. What is shown:
 
 *   the host asks under the society of things' terms (the second prompt, a choice taking a line),
     and the receipt keeps the line beside the option it chose;
-*   the minute says the line: a ``said`` event names it, whom it was said to and who heard it, the
-    other knight keeps it among the lines it heard, and it is asked the next minute, whatever is
-    under way for it;
+*   the minute says the line: a ``said`` event names it, whom it was said to and who heard it, and
+    the other knight keeps it among the lines it heard (that it is then due, whatever is under way
+    for it, is shown in memory, ``test_society_things.py``);
 *   replay regenerates the history from what was stored and asks no model;
 *   a visitor's own program's line naming a name the account holder saved is never said
     (``line_refused_by_rules``), and the same answer naming nobody is.
@@ -23,6 +23,8 @@ import uuid
 
 import pytest
 from exulanica.api import decision_host as host_module
+from exulanica.epistemics.assertions import AssertionWriter
+from exulanica.identity import IdentityRepository, rename_entity
 from exulanica.models.transport import HttpResponse
 from exulanica.world.crossings import register_crossing_stream
 from exulanica.world.society_controls import LEASE_SECONDS
@@ -198,3 +200,133 @@ def test_an_outside_program_s_line_naming_nobody_is_taken(app, monkeypatch):
     world, client = app
     [receipt] = _visitor_says(world, client, "Hello, everyone.", monkeypatch)
     assert (receipt["status"], receipt["proposal"]["line"]) == ("accepted", "Hello, everyone.")
+
+
+#: The line the knight's model says, and the name the account holder saves after it was said.
+HEARD = "Hello, Hazel."
+NAME = "Hazel Moss"
+
+
+class _Greeter(FakeTransport):
+    """A scripted model that says ``HEARD`` to everyone near when it may, and otherwise waits."""
+
+    def post_json(self, url, *, headers, payload, timeout):
+        self.requests.append({"url": url, "headers": dict(headers), "payload": dict(payload)})
+        properties = payload["tools"][0]["function"]["parameters"]["properties"]
+        labels = properties["action"]["enum"]
+        say = next((label for label in labels if label.startswith("say something to every")), None)
+        if say is not None:
+            arguments = {"action": say, "line": HEARD}
+        else:
+            wait = next(label for label in labels if label.startswith("wait"))
+            arguments = {"action": wait, **({"line": None} if "line" in properties else {})}
+        body = chat_body("", model=payload["model"], finish_reason="tool_calls")
+        body["choices"][0]["message"]["content"] = None
+        body["choices"][0]["message"]["tool_calls"] = [
+            {
+                "id": "c",
+                "type": "function",
+                "function": {"name": "act", "arguments": json.dumps(arguments)},
+            }
+        ]
+        return HttpResponse(200, json.dumps(body))
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_heard_line_carrying_a_name_saved_later_is_left_out_of_an_outside_ask(app, monkeypatch):
+    """A visitor heard a line naming nobody the account holder had saved; the holder then saves
+    the name it carries. The visitor's program is still asked every minute, and is never shown
+    that line again; a model's new line carrying the name is never said."""
+    world, client = app
+    client.app.state.services = dataclasses.replace(
+        client.app.state.services, societies_of_things=True
+    )
+    services = decisions._services(client)
+    stream = things_support.MemoryCrossings()
+    register_crossing_stream(stream)
+    try:
+        things_api._place(client, world, "well", "well", 2, -4_000, 2_000)
+        things_api._place(client, world, "gate", "gate", 1, 0, 6_000)
+        things_api._place(client, world, "knight", "knight", 1, 2_000, 4_000)
+        snapshot = things_api._make_society(client, world)
+        stream.hand(
+            uuid.UUID(snapshot["society_id"]), things_support.arrival(1, grant_id=outside.GRANT)
+        )
+        snapshot = stays._step(world, client, snapshot)
+        [visitor] = [p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "crossed"]
+        [knight] = [p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "placed"]
+        manifest, model_id = decisions._offered()
+        model = {"provider": manifest.spec(model_id).provider, "model_id": model_id}
+        decisions._choose(services, world, [knight["id"]], model, manifest=manifest)
+        transport = _Greeter()
+        speaking = decisions._host(
+            world, decisions._client(manifest, transport), services, manifest
+        )
+        door = outside._Door()
+        listening = outside._doorkeeping_host(world, services, door)
+
+        def minute(snapshot):
+            claim = decisions._claim(world, snapshot)
+            assert speaking.before_minute(claim, time.monotonic() + LEASE_SECONDS)
+            assert listening.before_minute(claim, time.monotonic() + LEASE_SECONDS)
+            return stays._step(world, client, snapshot)
+
+        def heard(snapshot):
+            person = next(p for p in snapshot["state"]["inhabitants"] if p["id"] == visitor["id"])
+            return [line["line"] for line in person.get("heard", ())]
+
+        for _ in range(10):
+            snapshot = minute(snapshot)
+            if HEARD in heard(snapshot):
+                break
+        else:
+            raise AssertionError("the visitor never heard the knight in ten minutes")
+        # The positive control: asked now, its program is shown the line it heard.
+        door.asked.clear()
+        snapshot = minute(snapshot)
+        [shown] = [r for r in door.asked if r["subject_id"] == visitor["id"]]
+        assert HEARD in [line["line"] for line in shown["context"]["heard"]]
+        # The account holder saves the name the line carries.
+        connection = world["connection"]
+        identity = IdentityRepository(connection, world["workspace"])
+        rename_entity(
+            identity,
+            AssertionWriter(connection, world["workspace"]),
+            entity_id=identity.entities.create(entity_class="person"),
+            display_name=NAME,
+            actor=world["session"].actor,
+        )
+        connection.commit()
+        door.asked.clear()
+        before = len(transport.requests)
+        # What every model ask is handed from now on: the names no line it writes may carry.
+        handed: list[tuple[str, ...]] = []
+        asking = host_module.ask
+
+        def recording(client, asked, *args, **kwargs):
+            handed.append(tuple(name.name for name in asked.names))
+            return asking(client, asked, *args, **kwargs)
+
+        monkeypatch.setattr(host_module, "ask", recording)
+        snapshot = minute(snapshot)
+        # Still asked, and never shown the line again, though the visitor still holds it.
+        assert HEARD in heard(snapshot)
+        [asked] = [r for r in door.asked if r["subject_id"] == visitor["id"]]
+        assert HEARD not in [line["line"] for line in asked["context"]["heard"]]
+        assert NAME.split()[0] not in json.dumps(asked["context"])
+        # And the knight's model, asked again, may not say the name now saved: its next line
+        # carrying it is refused, though the rules alone would let it through.
+        for _ in range(10):
+            if len(transport.requests) > before:
+                break
+            snapshot = minute(snapshot)
+        else:
+            raise AssertionError("the knight's model was never asked again in ten minutes")
+        receipts = decisions._decisions(services, world, snapshot)
+        latest = [r for r in receipts if r["subject_id"] == knight["id"]][-1]
+        assert (latest["status"], latest["reason"]) == ("rejected", "line_refused_by_rules")
+        # The host handed the knight's ask the name the account holder saved, so a line carrying it
+        # is refused even where the workspace's rules would release it to the model.
+        assert handed and all(NAME in names for names in handed)
+    finally:
+        register_crossing_stream(None)

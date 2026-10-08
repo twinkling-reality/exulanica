@@ -315,6 +315,7 @@ class _Asking:
         keeps_share: bool = False,
         cancelled: Callable[[], bool] = lambda: False,
         gate: BoundGate | None = None,
+        engine: str | None = None,
     ) -> None:
         self.client = client
         self.manifest = manifest
@@ -337,6 +338,8 @@ class _Asking:
         self.cancelled = cancelled
         #: This run's gate under the start's durable bounds, where the authority holds them.
         self.gate = gate
+        #: The engine the run's people are asked under, whose description alone is judged.
+        self.engine = engine
 
     def offerable(
         self, tick: int, due: Mapping[str, Sequence[RoleOption]]
@@ -383,7 +386,7 @@ class _Asking:
                     for option in options
                 }
             )
-            found = sendable_labels(self.role, self.client, model_id, labels)
+            found = sendable_labels(self.role, self.client, model_id, labels, self.engine)
             if found is None:
                 raise _RunStopped(QUESTION_CHANGED)
             sendable[model_id] = found
@@ -1316,6 +1319,7 @@ class SocietyComparisonRunner:
             keeps_share=self.keeps_share,
             cancelled=cancelled if cancelled is not None else (lambda: False),
             gate=gate,
+            engine=plan.engine_profile,
         )
 
     @staticmethod

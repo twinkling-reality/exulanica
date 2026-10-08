@@ -20,6 +20,7 @@ from exulanica.api.decision_host import (
 )
 from exulanica.api.decision_host import ask_bound_usd as _ask_bound_usd
 from exulanica.api.decision_host import model_refusal as _model_refusal
+from exulanica.epistemics.saved_names import SavedName
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec
@@ -36,6 +37,8 @@ class PersonAsk:
     request: dict[str, Any]
     spec: ModelSpec
     mechanism: AnsweringMechanism
+    #: The names the account holder saved, which no line the model writes may carry.
+    names: tuple[SavedName, ...] = ()
 
 
 def ask_person(
@@ -50,7 +53,7 @@ def ask_person(
     """A person's answer, asked through the one generic path, :func:`decision_host.ask`."""
     return ask(
         client,
-        RoleAsk(person_role(), asked.request, asked.spec, asked.mechanism),
+        RoleAsk(person_role(), asked.request, asked.spec, asked.mechanism, asked.names),
         contract,
         ends_at,
         keep_usd=keep_usd,

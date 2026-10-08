@@ -239,16 +239,19 @@ class SocietyDecisionRepository:
         contract: DecisionContract,
         provider_config: dict,
         offer: Callable[[Sequence[RoleOption]], Sequence[RoleOption]] | None = None,
+        withhold: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     ) -> tuple[dict, bool]:
         """Reserve a subject's request of ``role`` over the options they have now, or return the
         one reserved.
 
         ``offer`` keeps the options that may be offered, in their order: the caller leaves out
-        any the rules its ask is sent under would change. ``None`` in place of a request when the
-        subject has nothing to choose this minute, fewer than two options or nothing but the
-        role's idle action among what is offered: nothing is reserved and no model is asked. The
-        context is refused before any reservation when it is larger than the contract's bound.
-        The caller commits and closes its connection before asking the model.
+        any the rules its ask is sent under would change; ``withhold`` takes out of the observation
+        what the one asked may not be shown (:func:`~exulanica.world.role_decisions.role_request`).
+        ``None`` in place of a request when the subject has nothing to choose this minute, fewer
+        than two options or nothing but the role's idle action among what is offered: nothing is
+        reserved and no model is asked. The context is refused before any reservation when it is
+        larger than the contract's bound. The caller commits and closes its connection before asking
+        the model.
         """
         row = self._row(version_id)
         if not role.hosted_by(row["engine_version"]):
@@ -285,6 +288,7 @@ class SocietyDecisionRepository:
             seed=row["seed"],
             provider_config=provider_config,
             offer=offer,
+            withhold=withhold,
         )
         if request is None:
             return {"request": None, "decision": None, "status": status}, False

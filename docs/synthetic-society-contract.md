@@ -1521,17 +1521,23 @@ first, unchanged, and every event they record names v7; then the things phase:
   (`malformed_crossing`), with an event naming the crossing and nothing from the document, so no
   crossing ever stops a society's minutes;
 * what the minute's decisions do beside the planner's goals, in decision order: a line a decider
-  chose to say is said (`said`, `chose_to_say`), with the line, whom it was said to, or none for
-  everyone near, the speaker and that one each by kind and number as the minute began (so the event
-  alone names both), the decider kind (a model or an outside program) and who heard it: every being
-  within the hearing reach of the society of things' contract (8 m) of where the speaker stood as
-  the minute began, whose kind offers hearing and who is still here; each hearer keeps it among the
-  last lines it heard (at most the contract's `lines_heard_maximum`, the oldest dropped first), with
-  when, who said it by kind and number, and to whom. A visitor that chose to leave departs
-  (`thing_departed`, `chose_to_leave`), taking what it holds. A visitor whose program had no live
-  connection or gave no answer in time counts that minute as quiet, and any other answer or a pass
-  ends the count; one quiet for as many minutes in a row as its kind's leave ability waits (a
-  visitor of `visitor` version 1: five) departs (`thing_departed`, `decider_lost`).
+  chose to say is said (`said`, `chose_to_say`), with the request it answered, the line, whom it was
+  said to, or none for everyone near, the speaker and that one each by kind and number as the minute
+  began (so the event alone names both), the decider kind (a model or an outside program) and who
+  heard it: every being within the hearing reach of the society of things' contract (8 m) of where
+  the speaker stood as the minute began, whose kind offers hearing and who is still here; each
+  hearer keeps it among the last lines it heard (at most the contract's `lines_heard_maximum`, the
+  oldest dropped first), with when, who said it by kind and number, and to whom. How far a line
+  carries and how many a being keeps are read from the contract a society of things' lines were
+  first said under (version 3 of the person's catalogs, `LINES_CONTRACT`), never from whatever terms
+  the registry states later, so every stored minute replays as it ran. A visitor that chose to leave
+  departs (`thing_departed`, `chose_to_leave`), taking what it holds, as every departing visitor
+  does. A visitor whose program had no live connection, gave no answer in time or whose grant was
+  revoked or has expired counts that minute as quiet, and any other answer or a pass ends the count;
+  one quiet for as many minutes in a row as its kind's leave ability waits (a visitor of `visitor`
+  version 1: five) departs (`thing_departed`, `decider_lost`), taking what it holds home to the
+  program that sent it. A program's answer refused for its line (`line_out_of_bounds`) is an answer,
+  never a quiet minute.
 
 Each event of the things phase carries `at_ms` 0: it takes effect as the minute begins (`at_ms`
 is the moment within the minute, 0 to 59,999). A minute with nothing to reconcile and no crossing

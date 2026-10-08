@@ -244,8 +244,11 @@ def society_models_view(
     contract = role.contract()
     repository = SocietyModelChoiceRepository(connection, session.workspace_id, world_id=world_id)
     # Each person a choice decides for, with where it comes from: their own choice, or the group
-    # choice of the gate a visitor came through (within the contract's bound).
-    choices = repository.deciding(version_id, role, contract)
+    # choice of the gate a visitor came through (within the bound of the contract the society's
+    # engine is asked under, as the host reads it).
+    choices = repository.deciding(
+        version_id, role, role.contract(role.terms(snapshot["profile"]).versions)
+    )
     travellers = repository.traveller_choices(version_id, role)
     decisions = (
         SocietyDecisionRepository(society).role_decisions(

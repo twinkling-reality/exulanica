@@ -24,6 +24,7 @@ import dataclasses
 import logging
 import threading
 import time
+import unicodedata
 import uuid
 from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -312,21 +313,33 @@ def model_refusal(
 
 
 def _line_refusal(
-    client: ModelClient, role: DecisionRole, model_id: str, line: object, maximum: int
+    client: ModelClient,
+    role: DecisionRole,
+    model_id: str,
+    line: object,
+    maximum: int,
+    names: Sequence[SavedName],
 ) -> str | None:
     """Why a line a model wrote may not be said in the world, or None: ``line_out_of_bounds`` when
     it breaks the line rule at the request's bound, ``line_refused_by_rules`` when the workspace's
-    rules would change it, as they would a saved name, so it never enters the world changed."""
+    rules would change it, as they would a saved name, or when it carries any name the account
+    holder saved, whatever right releases that name to this model: a line said is read again by
+    every later decider, an outside program among them, which no right releases a name to."""
     try:
         checked = check_line(line, maximum=maximum)
     except LineRefused:
         return "line_out_of_bounds"
+    if recognised_spans(checked, names):
+        return "line_refused_by_rules"
     (kept,) = client.unchanged_by_policies(role.chosen, model_id, [checked])
     return None if kept else "line_refused_by_rules"
 
 
-def _descriptions(role: DecisionRole) -> list[str]:
-    """Every fixed choice description the role asks by: its own, then each engine's."""
+def _descriptions(role: DecisionRole, engine: str | None = None) -> list[str]:
+    """The fixed choice description ``engine``'s people are asked by, the terms it states or the
+    role's own; with no engine named, every one the role asks by: its own, then each engine's."""
+    if engine is not None:
+        return [role.terms(engine).choice_description]
     return [terms.choice_description for terms in role.every_terms()]
 
 
@@ -344,15 +357,20 @@ def question_refusal(role: DecisionRole, client: ModelClient, model_id: str) -> 
 
 
 def sendable_labels(
-    role: DecisionRole, client: ModelClient, model_id: str, labels: Sequence[str]
+    role: DecisionRole,
+    client: ModelClient,
+    model_id: str,
+    labels: Sequence[str],
+    engine: str | None = None,
 ) -> frozenset[str] | None:
     """The labels the client's rules send as they are for ``model_id``, judged in one pass with
-    the role's choice description; None when the rules would change the description.
+    the choice description ``engine``'s people are asked by (every one the role states, with no
+    engine named); None when the rules would change the description.
 
     An option whose words a rule would change, a saved name that matches a catalog word, is left
     out rather than refusing the whole ask each minute; the subject has fewer options.
     """
-    descriptions = _descriptions(role)
+    descriptions = _descriptions(role, engine)
     kept = client.unchanged_by_policies(role.chosen, model_id, [*descriptions, *labels])
     if not all(kept[: len(descriptions)]):
         return None
@@ -362,13 +380,16 @@ def sendable_labels(
 
 
 def outside_sendable_labels(
-    names: Sequence[SavedName], role: DecisionRole, labels: Sequence[str]
+    names: Sequence[SavedName],
+    role: DecisionRole,
+    labels: Sequence[str],
+    engine: str | None = None,
 ) -> frozenset[str] | None:
-    """The labels an outside program may be sent as they are, judged with ``role``'s fixed
-    description: none of them may carry a name the account holder saved, of any kind, since no
-    right releases a name to a program outside the policy boundary; None when the description
-    itself carries one, and then nobody is asked it."""
-    if any(recognised_spans(description, names) for description in _descriptions(role)):
+    """The labels an outside program may be sent as they are, judged with the fixed description
+    ``engine``'s people are asked by: none of them may carry a name the account holder saved, of
+    any kind, since no right releases a name to a program outside the policy boundary; None when
+    the description itself carries one, and then nobody is asked it."""
+    if any(recognised_spans(description, names) for description in _descriptions(role, engine)):
         return None
     return frozenset(label for label in labels if not recognised_spans(label, names))
 
@@ -384,6 +405,55 @@ def _texts(value: object) -> Iterator[str]:
     elif isinstance(value, list | tuple):
         for held in value:
             yield from _texts(held)
+
+
+def _line_out_of_bounds(asked: OutsideAsk, result: Mapping[str, Any]) -> bool:
+    """Whether an outside program accepted one of the options its request offered, by its label,
+    with a line where it says nothing, none where it says something, or one that breaks the line
+    rule at the request's bound."""
+    proposal = result["proposal"]
+    context = asked.request["context"]
+    if result["status"] != "accepted" or not isinstance(proposal, Mapping):
+        return False
+    option = proposal.get("option")
+    if (
+        not isinstance(option, Mapping)
+        or option not in context["options"]
+        or proposal.get("label") != option["label"]
+        or not set(proposal) <= {"label", "option", "line"}
+    ):
+        return False
+    takes_line = option.get("kind") in getattr(asked.role.adapter, "LINE_KINDS", frozenset())
+    line = proposal.get("line")
+    if not takes_line:
+        return line is not None
+    try:
+        return check_line(line, maximum=context["line_characters_maximum"]) != line
+    except LineRefused:
+        return True
+
+
+def without_named_lines(
+    names: Sequence[SavedName],
+) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    """An observation for an outside program without the heard lines that carry a name the account
+    holder saved, in the line or in who said it: a name saved after a line was said, or one a
+    right released to the speaker's model, never reaches a program outside the policy boundary,
+    and one such line no longer stops the program being asked."""
+
+    def withhold(context: dict[str, Any]) -> dict[str, Any]:
+        heard = context.get("heard")
+        if not heard:
+            return context
+        kept = [
+            line
+            for line in heard
+            if not recognised_spans(line["line"], names)
+            and not recognised_spans(line["from"], names)
+        ]
+        return context if len(kept) == len(heard) else {**context, "heard": kept}
+
+    return withhold
 
 
 def outside_context_sendable(names: Sequence[SavedName], context: Mapping[str, Any]) -> bool:
@@ -448,6 +518,9 @@ class RoleAsk:
     request: dict[str, Any]
     spec: ModelSpec
     mechanism: AnsweringMechanism
+    #: The names the account holder saved, which no line the model writes may carry: a line is
+    #: said into the world, where every later reader, an outside program among them, reads it.
+    names: tuple[SavedName, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -567,13 +640,32 @@ def ask(
         proposal = {"label": chosen.label, "option": option}
         status, reason = "accepted", "validated_choice"
         if takes_line:
-            refused = _line_refusal(
-                client, role, asked.spec.model_id, chosen.line, context["line_characters_maximum"]
+            # A model's line in another normal form is the same line: it is said composed (NFC),
+            # as the line rule holds every line, rather than refused for its encoding.
+            line = (
+                unicodedata.normalize("NFC", chosen.line)
+                if isinstance(chosen.line, str)
+                else chosen.line
             )
+            try:
+                refused = _line_refusal(
+                    client,
+                    role,
+                    asked.spec.model_id,
+                    line,
+                    context["line_characters_maximum"],
+                    asked.names,
+                )
+            except Exception as exc:
+                # The rules failing on a line end the ask as a failed call, every attempt it paid
+                # for on the record, as any other failure after the call does.
+                _LOG.error(_ASK_FAILED, role.key, _error_class(exc))
+                status, reason, proposal = "unavailable", "model_call_failed", None
+                break
             if refused is not None:
                 status, reason, proposal = "rejected", refused, None
                 break
-            proposal["line"] = check_line(chosen.line, maximum=context["line_characters_maximum"])
+            proposal["line"] = check_line(line, maximum=context["line_characters_maximum"])
         break
     calls = [
         {
@@ -940,7 +1032,7 @@ class DecisionHost:
                 )
             }
         )
-        sendable = outside_sendable_labels(names, role, labels)
+        sendable = outside_sendable_labels(names, role, labels, row["engine_version"])
         if sendable is None:
             return [], []
         stated = self._stated(
@@ -971,6 +1063,7 @@ class DecisionHost:
                                 contract=contract,
                                 provider_config=config,
                                 offer=_only(sendable),
+                                withhold=without_named_lines(names),
                             )
                             request = reserved["request"]
                             if (
@@ -1123,7 +1216,9 @@ class DecisionHost:
                     )
                 )
         return {
-            (key, model_id): sendable_labels(roles[key], asking, model_id, sorted(found))
+            (key, model_id): sendable_labels(
+                roles[key], asking, model_id, sorted(found), row["engine_version"]
+            )
             for (key, model_id), found in labels.items()
         }
 
@@ -1145,6 +1240,8 @@ class DecisionHost:
         refused: list[tuple[uuid.UUID, dict[str, Any]]] = []
         attempts = contract.value("answer_attempts_maximum")
         asked, spent = world_hour(connection, claim.workspace_id, claim.world_id, role)
+        # The names no line may carry, read once for the role's asks of this minute.
+        names = tuple(saved_names(connection, claim.workspace_id))
         with connection.transaction():
             for subject, choice, spec, mechanism in due:
                 model = choice["model"]
@@ -1191,7 +1288,15 @@ class DecisionHost:
                     continue
                 asked += 1
                 spent += bound
-                asks.append(RoleAsk(role, request, spec, mechanism))
+                asks.append(
+                    RoleAsk(
+                        role,
+                        request,
+                        spec,
+                        mechanism,
+                        names if role.takes_line(request["context"]) else (),
+                    )
+                )
         return asks, refused
 
     def _asked_by_every_role(
@@ -1265,6 +1370,12 @@ class DecisionHost:
             result = dict(answered)
             if result["status"] not in _ANSWER_STATUSES:
                 raise ValueError("an answer is accepted, rejected or unavailable")
+            if _line_out_of_bounds(asked, result):
+                # An offered option answered with a line that breaks the line rule, or with none
+                # where it says something, is the program's answer, rejected by name: never a
+                # quiet minute, which only no connection or no answer in time is.
+                result = {**result, "status": "rejected", "reason": "line_out_of_bounds"}
+                result["proposal"] = None
             check_role_result(asked.role, result, asked.request)
         except Exception as exc:
             _LOG.error("A %s outside answer was refused with %s", asked.role.key, _error_class(exc))

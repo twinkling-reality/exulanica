@@ -18,6 +18,7 @@ adapter module for each, imported from one package. What is shown here:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import time
@@ -33,6 +34,7 @@ from exulanica.api.decision_host import (
     ask_bound_usd,
     host_refusal,
     hour_refusal,
+    sendable_labels,
 )
 from exulanica.grammar.errors import CatalogError
 from exulanica.models.budget import BudgetGuard
@@ -50,6 +52,7 @@ from exulanica.world.decision_roles import (
     CHOICE_SUBJECT_FIELDS,
     PROFILE_PATTERNS,
     REGISTRY_DIRECTORY,
+    ContractError,
     RoleRefused,
     decision_roles,
     load_decision_roles,
@@ -480,8 +483,17 @@ def test_the_registry_spells_each_profile_as_migration_0117_admits_it():
     ).read_text(encoding="utf-8")
     for name in ("request_profile", "receipt_profile", "choice_profile"):
         assert f"'^{PROFILE_PATTERNS[name]}$'" in migration, name
-    # And a choice names its subjects under exactly the fields the migration admits.
-    admitted = set(re.findall(r"jsonb_typeof\(document->'([a-z_]+)'\) = 'array'", migration))
+    # And a choice names its subjects under exactly the fields admitted by the newest migration
+    # that states the check, which later migrations replace by its name.
+    stating = sorted(
+        path
+        for path in (ROOT / "exulanica" / "migrations").glob("*.sql")
+        if "add constraint world_society_model_choice_names_its_subjects"
+        in path.read_text(encoding="utf-8")
+    )
+    assert stating[0].name.startswith("0117_"), stating
+    newest = stating[-1].read_text(encoding="utf-8")
+    admitted = set(re.findall(r"jsonb_typeof\(document->'([a-z_]+)'\) = 'array'", newest))
     assert admitted == set(CHOICE_SUBJECT_FIELDS)
 
 
@@ -669,6 +681,9 @@ def test_a_role_names_the_offered_option_that_changes_nothing():
         ]
     }
     assert person.idle_label(offered) == "B"
+    # The first offered option of the idle kind, in the request's own order.
+    second = {"label": "D", "kind": person.adapter.IDLE_KIND}
+    assert person.idle_label({"options": [*offered["options"], second]}) == "B"
     assert person.idle_label({"options": offered["options"][:1]}) is None
     assert signal.idle_label({"options": [{"label": "C", "kind": signal.adapter.IDLE_KIND}]}) == "C"
     # A pass is an outside program's own reason, recorded at once, which every role records.
@@ -677,6 +692,24 @@ def test_a_role_names_the_offered_option_that_changes_nothing():
 
 
 THINGS = "exulanica-society/v7"
+
+#: Every published version of the decision role registry, by its file's digest: a published version
+#: is never edited; a change is a new version beside it.
+PUBLISHED_REGISTRIES = {
+    "decision-roles.v1.json": "f34f010defd844bdb344da3bca6b38e0fb665d3011f0522ebd3860d3b607230c",
+    "decision-roles.v2.json": "fceddc70b1c29bddfc64a5cfb6e1c714569803457fbb08ac00f7112c413a8f3f",
+    "decision-roles.v3.json": "3c67b327a7113b0b095235fd9be418656c45fe6fdd810fff5fba116fd09cec80",
+    "decision-roles.v4.json": "a516686bf682a8be9eee0e5d61357fad1336a52b1dddef0a5085931954cad134",
+    "decision-roles.v5.json": "97fcf977330c6043c1181c7d18302c1a09fa942193f368c2d2fba50713052f31",
+}
+
+
+def test_every_published_registry_version_keeps_its_bytes():
+    found = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in REGISTRY_DIRECTORY.glob("decision-roles.v*.json")
+    }
+    assert {name: found.get(name) for name in PUBLISHED_REGISTRIES} == PUBLISHED_REGISTRIES
 
 
 def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
@@ -758,3 +791,46 @@ def test_an_engine_states_terms_only_for_a_role_it_hosts_and_with_a_prompt_of_it
     with pytest.raises(RoleRefused) as refused:
         _things_registry(tmp_path / "shared", monkeypatch, shared)
     assert refused.value.code == "role_profile_shared"
+
+
+def test_a_contract_stating_a_line_bound_outside_its_range_is_refused_when_it_loads(monkeypatch):
+    person = load_decision_roles().role("society_decision")
+    versions = person.terms(THINGS).versions
+    # The positive control: v7's contract loads, its values within every range.
+    assert person.contract(versions).value("hearing_reach_mm") == 8_000
+    ranges = person.adapter.POLICY_RANGES
+    for key, (low, high) in ranges.items():
+        assert low <= person.contract(versions).value(key) <= high, key
+    # A range the stated value falls outside of refuses the contract by name, as a value of 0
+    # lines kept or 0 ways of saying something would be.
+    fresh = load_decision_roles().role("society_decision")
+    monkeypatch.setattr(fresh.adapter, "POLICY_RANGES", {**ranges, "lines_heard_maximum": (9, 64)})
+    with pytest.raises(ContractError, match="lines_heard_maximum is 9 to 64"):
+        fresh.contract(versions)
+
+
+def test_only_the_description_of_the_engine_asked_is_judged():
+    # A rule that changes a word only the society of things' description uses stops none of
+    # another engine's asks, and still stops the society of things' own.
+    person = decision_roles().role("society_decision")
+    own = set(re.findall(r"[a-z]+", person.terms().choice_description.lower()))
+    things = re.findall(r"[a-z]+", person.terms(THINGS).choice_description.lower())
+    word = next(found for found in things if found not in own and len(found) > 3)
+
+    class _Changes(RecordingPolicy):
+        def admit(self, request):
+            self.requests.append(request)
+            return tuple(re.sub(word, "x", text, flags=re.IGNORECASE) for text in request.texts)
+
+    manifest = _manifest()
+    client = ModelClient(
+        api_key="test-key-not-real",
+        manifest=manifest,
+        transport=FakeTransport([]),
+        budget=BudgetGuard(ceiling_usd=Decimal("1"), max_calls=10),
+    ).with_policy(_Changes())
+    labels = ["wait here a minute", "stand a while nearby"]
+    assert sendable_labels(person, client, MODEL_ID, labels, "exulanica-society/v2") == set(labels)
+    assert sendable_labels(person, client, MODEL_ID, labels, THINGS) is None
+    # With no engine named, as the models route judges a role, every description is judged.
+    assert sendable_labels(person, client, MODEL_ID, labels) is None

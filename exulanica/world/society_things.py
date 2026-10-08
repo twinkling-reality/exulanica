@@ -42,6 +42,7 @@ from copy import deepcopy
 from typing import Any, Final
 
 from exulanica.things.kinds import ThingKind
+from exulanica.things.lines import HEARD_LINES_MAXIMUM
 from exulanica.world.crossings import (
     ARRIVAL_PROFILE,
     CROSSINGS_PER_MINUTE,
@@ -144,8 +145,12 @@ THING_OUTCOMES: Final = (
     "said",
 )
 #: The reasons an outside program's request ends with for a visitor, counted as a quiet minute: it
-#: had no live connection, or it did not answer in time. A program that passed answered.
-QUIET_REASONS: Final = frozenset({"decider_disconnected", "no_answer_in_time"})
+#: had no live connection, it did not answer in time, or the grant it came under was revoked or
+#: has expired, so a visitor goes home even when no grant_ended crossing follows. A program that
+#: passed answered.
+QUIET_REASONS: Final = frozenset(
+    {"decider_disconnected", "no_answer_in_time", "grant_revoked", "grant_expired"}
+)
 #: The kinds of a decision whose minute the things phase carries out: a line said, or leaving.
 _SPOKEN_KINDS: Final = frozenset({"say_to", "say_all"})
 #: Why a visitor left, by the reason its departure states: the program that sent it called it
@@ -607,6 +612,8 @@ def _arrive(minute: _Minute, crossing: Crossing, document: Mapping[str, Any]) ->
         "placed_id": None,
         "crossing_id": str(crossing.crossing_id),
         "gate": gate,
+        # Who decides for it here, where its arrival said.
+        **({"decided_by": document["decided_by"]} if "decided_by" in document else {}),
     }
     if reason is not None:
         event = minute.emit(
@@ -769,9 +776,13 @@ def initial_things_society(
 
 def _population_steps_aside(state: dict[str, Any], document: Mapping[str, Any]) -> None:
     """At genesis, each person of the ground's population whose starting node a placed being took
-    steps to the open node nearest it, in ordinal order, as a person makes room; one with nowhere
-    to go stays where it was spread."""
+    steps to the nearest node it could have been spread to (:func:`spawn_nodes`: clear of where a
+    person arrives and of every destination) that nobody stands at, in ordinal order; one with
+    nowhere to go stays where it was spread."""
+    from exulanica.world.society_planner import spawn_nodes
+
     nodes = {n["node_id"]: n["position_mm"] for n in document["navigation"]["nodes"]}
+    allowed = spawn_nodes(dict(document))
     taken = {
         person["location"]["node_id"]
         for person in state["inhabitants"]
@@ -780,8 +791,13 @@ def _population_steps_aside(state: dict[str, Any], document: Mapping[str, Any]) 
     for person in state["inhabitants"]:
         if person["came_by"] != "populated" or person["location"]["node_id"] not in taken:
             continue
-        others = [other for other in state["inhabitants"] if other is not person]
-        node = open_node_near(dict(document), others, person["position_mm"])
+        held = {other["location"]["node_id"] for other in state["inhabitants"]}
+        x, y = person["position_mm"]
+        node = min(
+            (node for node in allowed if node not in held),
+            key=lambda node: ((nodes[node][0] - x) ** 2 + (nodes[node][1] - y) ** 2, node),
+            default=None,
+        )
         if node is None:
             continue
         point = list(nodes[node])
@@ -829,13 +845,19 @@ def advance_things(
     return result, tuple(minute.events), tuple(bound)
 
 
-def _say_bounds(profile: str) -> tuple[int, int]:
-    """How far a line carries and how many lines a being keeps, as the contract the people of a
-    society of ``profile`` are asked under states them."""
+#: The contract a society of things' lines were first said under: version 3 of the person's
+#: action and policy catalogs. A minute reads how far a line carries and how many a being keeps
+#: from it, never from whatever terms the registry states now, so a later version of the terms
+#: leaves every stored minute replaying as it ran.
+LINES_CONTRACT: Final = {"society-decision-action": 3, "society-decision-policy": 3}
+
+
+def _say_bounds() -> tuple[int, int]:
+    """How far a line carries and how many lines a being keeps, as :data:`LINES_CONTRACT` states
+    them."""
     from exulanica.world.society_decision_contract import person_role
 
-    role = person_role()
-    contract = role.contract(role.terms(profile).versions)
+    contract = person_role().contract(LINES_CONTRACT)
     return contract.value("hearing_reach_mm"), contract.value("lines_heard_maximum")
 
 
@@ -867,7 +889,7 @@ def _decided(
 
     if not decisions:
         return
-    reach, kept = _say_bounds(minute.state["profile"])
+    reach, kept = _say_bounds()
     began = {person["id"]: person for person in previous["inhabitants"]}
     for receipt, disposition in decisions:
         person = next(
@@ -910,6 +932,7 @@ def _decided(
                 person=person,
                 name=person["display_name"],
                 details={
+                    "request_id": str(receipt["request_id"]),
                     "line": line,
                     "to": to,
                     "to_kind": None if addressee is None else dict(addressee["kind"]),
@@ -957,8 +980,6 @@ def _reference_shape(value: Any) -> bool:
     )
 
 
-#: The most lines a state lets one being keep, whatever its contract keeps: a bound on the field.
-_HEARD_BOUND: Final = 64
 _HEARD_FIELDS: Final = frozenset({"tick", "from", "from_kind", "from_number", "to", "line"})
 
 
@@ -971,7 +992,7 @@ def _optional_lines(person: Mapping[str, Any]) -> None:
     heard = person.get("heard")
     if heard is not None:
         _require(
-            isinstance(heard, list) and 1 <= len(heard) <= _HEARD_BOUND,
+            isinstance(heard, list) and 1 <= len(heard) <= HEARD_LINES_MAXIMUM,
             "a being states the lines it heard only once it heard one",
         )
         ticks = [entry.get("tick") if isinstance(entry, dict) else None for entry in heard]

@@ -100,8 +100,9 @@ class _Door:
     def answer(self, workspace_id, world_id, request, ends_at):
         self.asked.append(copy.deepcopy(request))
         options = request["context"]["options"]
-        # The options come in a drawn order, and a say option needs a line this door never writes.
-        quiet = [o for o in options if o["kind"] not in LINE_KINDS]
+        # The options come in a drawn order: a say option needs a line this door never writes, and
+        # leaving would end the visitor these tests go on asking about.
+        quiet = [o for o in options if o["kind"] not in LINE_KINDS and o["kind"] != "leave"]
         option = next((o for o in quiet if o["kind"] == "target"), quiet[0])
         frame = canonical_json({"request_id": request["request_id"], "label": option["label"]})
         config = request["provider_config"]

@@ -413,7 +413,8 @@ WORDS = Path(__file__).resolve().parents[1] / (
 
 
 def _emitted() -> tuple[set[str], set[str]]:
-    """Every reason and outcome the things phase's source passes to an ``emit`` as text."""
+    """Every reason and outcome the things phase's source passes to an ``emit`` as text, and
+    every reason it passes to a ``leave``, which emits a departure for it."""
     reasons: set[str] = set()
     outcomes: set[str] = set()
 
@@ -434,6 +435,13 @@ def _emitted() -> tuple[set[str], set[str]]:
         ):
             reasons.update(texts(node.args[2]))
             outcomes.update(texts(node.args[3]))
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "leave"
+            and len(node.args) >= 2
+        ):
+            reasons.update(texts(node.args[1]))
     return reasons, outcomes
 
 
@@ -441,6 +449,8 @@ def test_every_reason_and_outcome_the_things_phase_records_is_stated_and_has_wor
     reasons, outcomes = _emitted()
     # The positive control: the scan reads the reasons and outcomes the phase writes as text.
     assert {"placed_by_author", "crossed_in"} <= reasons and {"arrived", "not_arrived"} <= outcomes
+    # And it reads the reasons a departure is given: a visitor's own, and an author's removal.
+    assert {"chose_to_leave", "decider_lost", "removed_by_author"} <= reasons
     assert reasons <= THING_REASONS
     assert outcomes <= set(THING_OUTCOMES)
     codes = {(entry["kind"], entry["code"]) for entry in json.loads(WORDS.read_text())["entries"]}
@@ -599,11 +609,12 @@ def test_a_line_is_heard_within_reach_and_makes_the_one_it_was_said_to_due():
     contract = _things_contract()
     options = choice_options(state, document, knight["id"], contract, seed=SEED)
     (to_near,) = [o for o in options if o.kind == "say_to" and o.addressee_id == near["id"]]
-    after, events, _ = _decided_minute(
-        state, document, [_receipt(knight, to_near, line="good morning")]
-    )
+    spoken = _receipt(knight, to_near, line="good morning")
+    after, events, _ = _decided_minute(state, document, [spoken])
     [said] = [e for e in events if e.kind == "said"]
     assert said.document["thing"]["line"] == "good morning"
+    # It names the request the line answered, so a reader joins it to its receipt by id.
+    assert said.document["thing"]["request_id"] == spoken[0]["request_id"]
     assert said.document["thing"]["to"] == near["id"]
     assert near["id"] in said.document["thing"]["heard_by"]
     assert far["id"] not in said.document["thing"]["heard_by"]
@@ -771,3 +782,49 @@ def test_an_author_s_beings_are_seated_before_the_population_steps_aside():
     nodes = [p["location"]["node_id"] for p in state["inhabitants"]]
     assert len(nodes) == len(set(nodes))
     validate_things_state(state)
+
+
+def test_a_minute_reads_how_far_a_line_carries_from_the_contract_lines_were_first_said_under(
+    monkeypatch,
+):
+    # A later version of the terms changes nothing in a minute already run: the reach and the
+    # lines kept are version 3's, whatever the registry states for v7 now.
+    document = compose((GATE, KNIGHT))
+    state = _genesis(GATE, KNIGHT)
+    knight = _person(state, came_by="placed")
+    near = next(p for p in state["inhabitants"] if p["came_by"] == "populated")
+    state = _beside(state, near, knight)
+    options = choice_options(state, document, knight["id"], _things_contract(), seed=SEED)
+    (to_near,) = [o for o in options if o.kind == "say_to" and o.addressee_id == near["id"]]
+    spoken = [_receipt(knight, to_near, line="good morning")]
+    before = _decided_minute(state, document, spoken)
+    assert society_things.LINES_CONTRACT == {
+        "society-decision-action": 3,
+        "society-decision-policy": 3,
+    }
+    role = person_role()
+
+    def other_terms(self, engine=None):
+        raise AssertionError("the minute read the registry's current terms")
+
+    monkeypatch.setattr(type(role), "terms", other_terms)
+    after = _decided_minute(state, document, spoken)
+    assert society_state_sha256(after[0]) == society_state_sha256(before[0])
+    assert [e.document for e in after[1]] == [e.document for e in before[1]]
+
+
+@pytest.mark.parametrize("reason", ["grant_revoked", "grant_expired"])
+def test_a_visitor_whose_grant_ended_goes_quiet_and_home_even_with_no_departure(reason):
+    # Agreed with the door: a grant that ended is no answer, so its visitor counts quiet minutes
+    # and goes home after its kind's wait even when no grant_ended crossing arrives.
+    document = compose((GATE, KNIGHT))
+    state = _genesis(GATE, KNIGHT)
+    state, _, _ = _minute(state, document, [arrival(1)])
+    visitor = _person(state, came_by="crossed")
+    ended = _receipt(visitor, None, status="unavailable", reason=reason)
+    current = state
+    for minute in range(4):
+        current, _events, _ = _decided_minute(current, document, [ended])
+        assert _person(current, came_by="crossed")["quiet_minutes"] == minute + 1
+    current, events, _ = _decided_minute(current, document, [ended])
+    assert [e.document["reason"] for e in events if e.kind == "thing_departed"] == ["decider_lost"]

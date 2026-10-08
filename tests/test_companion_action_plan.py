@@ -631,8 +631,9 @@ def test_simulation_controls_no_server_states_or_no_grant_holds_are_refused_befo
     assert refused(_simulation_world(**held_by_none)) == "action_not_permitted"
 
 
-def _choosing(people, lights):
-    """Stand-ins for the two choice reads: whether a person and a light have a chosen model."""
+def _choosing(people, lights, *, travellers=False):
+    """Stand-ins for the two choice reads: whether a person and a light have a chosen model, and
+    whether a gate's travellers do, which only a read of who decides as the host asks sees."""
     model = {"provider": "nebius", "model_id": "a-chosen-model"}
 
     class People:
@@ -641,6 +642,12 @@ def _choosing(people, lights):
 
         def current(self, version_id, role):
             return {"person-1": {"model": model if people else None}}
+
+        def deciding(self, version_id, role, contract):
+            found = {"person-1": {"model": model if people else None, "from": "choice"}}
+            if travellers:
+                found["visitor-1"] = {"model": model, "from": "travellers"}
+            return found
 
     class Lights:
         def __init__(self, connection, workspace_id, world_id, version_id):
@@ -755,3 +762,14 @@ def test_people_brought_in_read_back_by_the_region_and_the_engine_the_step_named
     session = Session(workspace_id=uuid.UUID(int=1), actor=uuid.UUID(int=2))
     read = action_outcome._bring_people_step(_OneRow(row), session, "world:test", VERSION, step)
     assert read["state"] == state
+
+
+def test_time_spends_where_only_a_gate_s_travellers_are_run_by_a_model(monkeypatch):
+    # No person's own choice names a model; the gate's mind runs its visitor, which the host asks.
+    chooser, signals = _choosing(False, False, travellers=True)
+    monkeypatch.setattr(plan, "SocietyModelChoiceRepository", chooser)
+    monkeypatch.setattr(plan, "TrafficSignalRepository", signals)
+    session = Session(workspace_id=uuid.UUID(int=1), actor=uuid.UUID(int=2))
+    assert plan.time_spends(None, session, _simulation_world(), _clock()) == (  # type: ignore[arg-type]
+        plan.TimeSpending(playing=("society_decision",))
+    )

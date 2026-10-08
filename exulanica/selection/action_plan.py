@@ -1485,10 +1485,14 @@ def time_spends(
     choices = SocietyModelChoiceRepository(
         connection, session.workspace_id, world_id=world.world_id
     )
-    for role in decision_roles().hosted_by(str(society["engine"])):
+    engine = str(society["engine"])
+    for role in decision_roles().hosted_by(engine):
+        # Whoever a model decides for as the host asks: a person's own choice, or the mind their
+        # gate names for the travellers it lets in, under the contract the engine's terms state.
+        contract = role.contract(role.terms(engine).versions)
         if any(
             choice["model"] is not None
-            for choice in choices.current(world.version_id, role).values()
+            for choice in choices.deciding(world.version_id, role, contract).values()
         ):
             people.append(role.key)
     lights: list[str] = []

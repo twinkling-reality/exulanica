@@ -58,6 +58,7 @@ export const CHOICE_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   subject_chosen_under_another_role: 'That subject is already assigned to a model under another kind of decision.',
   decided_from_outside: 'Someone you chose came into this world from outside, and the program they came with decides for them.',
   decider_not_allowed: 'Someone you chose is a kind of being that this kind of decider may not decide for.',
+  engine_takes_no_traveller_choice: 'Only a society of things takes visitors, so only it takes a mind for a gate\'s travellers.',
 };
 
 const decisionWords = (code: string): string =>

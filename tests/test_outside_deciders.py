@@ -29,7 +29,12 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from exulanica.api.decision_host import DecisionHost, OutsideAsk, outside_context_sendable
+from exulanica.api.decision_host import (
+    DecisionHost,
+    OutsideAsk,
+    outside_context_sendable,
+    without_named_lines,
+)
 from exulanica.canonical import canonical_json
 from exulanica.epistemics.saved_names import SavedName
 from exulanica.world.deciders import (
@@ -569,3 +574,21 @@ def test_a_door_s_statement_that_fails_or_comes_late_leaves_its_own_subject_unas
     config, refusal = stated["d"]
     assert refusal is None and config["contract"] == contract.binding()
     assert elapsed < 2, elapsed
+
+
+def test_an_outside_program_is_never_shown_a_heard_line_carrying_a_saved_name():
+    heard = [
+        {"from": "the villager (person 1)", "to_you": True, "line": "Good morning.", "tick": 3},
+        {"from": "the villager (person 2)", "to_you": False, "line": "Ask Hazel.", "tick": 4},
+        {"from": "the knight (person 9)", "to_you": False, "line": "Hello.", "tick": 5},
+    ]
+    context = {"options": [], "heard": heard}
+    hazel = SavedName(uuid.UUID(int=3), "person", "Hazel Moss")
+    knight = SavedName(uuid.UUID(int=4), "person", "Knight Errant")
+    kept = without_named_lines((hazel,))(dict(context))
+    assert [line["line"] for line in kept["heard"]] == ["Good morning.", "Hello."]
+    # Who said it is screened too: a saved name matching a speaker's words leaves that line out.
+    kept = without_named_lines((knight,))(dict(context))
+    assert [line["line"] for line in kept["heard"]] == ["Good morning.", "Ask Hazel."]
+    # The positive control: with nothing saved that any of it carries, everything is shown.
+    assert without_named_lines((SavedName(uuid.UUID(int=5), "person", "Bo"),))(context) == context

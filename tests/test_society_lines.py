@@ -19,11 +19,15 @@ import hashlib
 import json
 import os
 import time
+import unicodedata
 import uuid
 from decimal import Decimal
+from types import SimpleNamespace
 
+from exulanica.api.decision_host import DecisionHost, OutsideAsk
 from exulanica.api.society_person_decisions import PersonAsk, ask_person
 from exulanica.canonical import canonical_json
+from exulanica.epistemics.saved_names import SavedName
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import MANIFEST_PATH, AnsweringMechanism, parse_manifest
@@ -125,7 +129,7 @@ def _reply(arguments: dict, model: str) -> HttpResponse:
     return HttpResponse(200, json.dumps(body))
 
 
-def _ask(replies, *, rules=None):
+def _ask(replies, *, rules=None, names=()):
     state, document, knight, contract, options = _asked()
     manifest, model_id = _manifest()
     request = _request(state, document, knight["id"], options, contract, model=model_id)
@@ -139,7 +143,7 @@ def _ask(replies, *, rules=None):
     )
     result = ask_person(
         client,
-        PersonAsk(request, manifest.spec(model_id), AnsweringMechanism.TOOL_CALL),
+        PersonAsk(request, manifest.spec(model_id), AnsweringMechanism.TOOL_CALL, tuple(names)),
         contract,
         time.monotonic() + 20.0,
     )
@@ -236,3 +240,134 @@ def test_the_second_prompt_is_kept_as_bytes():
     if os.environ.get("EXULANICA_LINE_GOLDENS") == "print":
         print(json.dumps(found, indent=2))
     assert found == MESSAGES_SHA256
+
+
+def test_a_line_carrying_any_saved_name_is_never_said_whatever_the_rules_release():
+    # The rules here change nothing, as when a right releases a place's name to this model; the
+    # line is still never said, since every later decider, an outside program among them, reads it.
+    _state, _document, _knight, _contract, options = _asked()
+    say = _say_all(options)
+    names = (SavedName(uuid.UUID(int=7), "place", f"{SAVED} Lane"),)
+    line = f"See you on {SAVED} Lane."
+    _request_doc, result, _transport, _options = _ask(
+        [{"action": say.label, "line": line}], names=names
+    )
+    assert (result["status"], result["reason"], result["proposal"]) == (
+        "rejected",
+        "line_refused_by_rules",
+        None,
+    )
+    # The positive control: the same line, with no such name saved, is said.
+    _request_doc, result, _transport, _options = _ask([{"action": say.label, "line": line}])
+    assert result["proposal"]["line"] == line
+
+
+def test_a_model_s_line_in_another_normal_form_is_said_composed():
+    _state, _document, _knight, _contract, options = _asked()
+    say = _say_all(options)
+    decomposed = unicodedata.normalize("NFD", "The caf\u00e9 is open.")
+    assert decomposed != "The caf\u00e9 is open."
+    _request_doc, result, _transport, _options = _ask([{"action": say.label, "line": decomposed}])
+    assert (result["status"], result["proposal"]["line"]) == ("accepted", "The caf\u00e9 is open.")
+
+
+class _Door:
+    """An outside program's door that answers every request with ``proposal``."""
+
+    def __init__(self, proposal):
+        self.proposal = proposal
+
+    def answer(self, workspace_id, world_id, request, ends_at):
+        config = request["provider_config"]
+        return {
+            "status": "accepted",
+            "reason": "validated_choice",
+            "proposal": self.proposal(request["context"]["options"]),
+            "provider": {
+                "kind": "external",
+                "bridge": config["bridge"],
+                "adapter_version": "0.1.0",
+                "grant_id": config["grant_id"],
+                "grant_seq": config["grant_seq"],
+                "mapping_sha256": config["mapping_sha256"],
+                "answer_sha256": "d" * 64,
+                "latency_ms": 5,
+                "source_ref_sha256": None,
+            },
+        }
+
+
+def _outside_answer(proposal):
+    """What the host records of an outside program's answer to the knight's request."""
+    state, document, knight, contract, options = _asked()
+    request = _request(state, document, knight["id"], options, contract, model="unused")
+    request = seal(
+        {
+            **{k: v for k, v in request.items() if k != "document_sha256"},
+            "provider_config": {
+                "kind": "external",
+                "bridge": "testbridge",
+                "grant_id": str(uuid.UUID(int=0x9A)),
+                "grant_seq": 1,
+                "mapping_sha256": "e" * 64,
+                "contract": contract.binding(),
+                "deadline_ms": 2_500,
+            },
+        }
+    )
+    host = DecisionHost(
+        database=None,  # type: ignore[arg-type]
+        runtime=None,  # type: ignore[arg-type]
+        client=None,
+        workspaces=frozenset(),
+        policy_for=lambda _workspace: None,  # type: ignore[arg-type,return-value]
+        manifest=None,  # type: ignore[arg-type]
+        manifest_sha256="a" * 64,
+        external=_Door(proposal),
+    )
+    asked = OutsideAsk(person_role(), request, 2_500, time.monotonic() + 10)
+    claim = SimpleNamespace(workspace_id=uuid.UUID(int=4), world_id="w")
+    return host._outside_answer(claim, asked, time.monotonic() + 5)  # type: ignore[arg-type]
+
+
+def _option(options, kind):
+    return next(option for option in options if option["kind"] == kind)
+
+
+def test_an_outside_program_s_line_that_breaks_the_rule_is_its_answer_rejected_never_quiet():
+    say = lambda options: {"label": _option(options, "say_all")["label"]}  # noqa: E731
+    cases = {
+        "a say with no line": lambda options: {
+            **say(options),
+            "option": _option(options, "say_all"),
+        },
+        "a line that breaks the rule": lambda options: {
+            **say(options),
+            "option": _option(options, "say_all"),
+            "line": "one line\nand another",
+        },
+        "a line where nothing is said": lambda options: {
+            "label": _option(options, "wait")["label"],
+            "option": _option(options, "wait"),
+            "line": "Hello.",
+        },
+    }
+    for name, proposal in cases.items():
+        result = _outside_answer(proposal)
+        assert (result["status"], result["reason"], result["proposal"]) == (
+            "rejected",
+            "line_out_of_bounds",
+            None,
+        ), name
+        # The program's own record stays on the receipt: it answered.
+        assert result["provider"]["kind"] == "external", name
+    # The positive control: a line within the rule is the program's accepted answer.
+    accepted = _outside_answer(
+        lambda options: {**say(options), "option": _option(options, "say_all"), "line": "Hello."}
+    )
+    assert (accepted["status"], accepted["proposal"]["line"]) == ("accepted", "Hello.")
+    # And an option nobody offered is still no answer a receipt may record.
+    malformed = _outside_answer(
+        lambda options: {"label": "fly away", "option": {"label": "fly away", "kind": "wait"}}
+    )
+    assert malformed["reason"] == "decider_disconnected"
