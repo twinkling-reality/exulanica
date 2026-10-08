@@ -99,10 +99,19 @@ def site_records(generation: Generation) -> tuple[object, ...]:
 
 def _inside(record: object, extent: SiteExtentRecord) -> bool:
     if isinstance(record, SiteFixtureRecord):
-        half = max(record.width_mm, record.depth_mm) // 2
+        # Its footprint as it is turned (width across its front, depth front to back), as the
+        # society's place blocks it: a long fixture along a lot's edge lies inside the site.
+        along_x, along_y = (
+            (record.width_mm, record.depth_mm)
+            if record.yaw_quarter_turns % 2 == 0
+            else (record.depth_mm, record.width_mm)
+        )
+        x0, y0 = record.x_mm - along_x // 2, record.y_mm - along_y // 2
         return (
-            half <= record.x_mm <= extent.width_mm - half
-            and half <= record.y_mm <= extent.depth_mm - half
+            x0 >= 0
+            and x0 + along_x <= extent.width_mm
+            and y0 >= 0
+            and y0 + along_y <= extent.depth_mm
         )
     if hasattr(record, "max_x_mm"):
         return record.max_x_mm <= extent.width_mm and record.max_y_mm <= extent.depth_mm  # type: ignore[attr-defined]

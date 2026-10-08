@@ -63,3 +63,23 @@ def arrays_followed_by_a_property(schema: Mapping[str, Any]) -> list[str]:
             if _is_array(obj["properties"][name], schema):
                 found.append(f"{path}.{name} (followed by {names[position + 1]})")
     return found
+
+
+def properties_after_an_array(schema: Mapping[str, Any]) -> list[str]:
+    """Every property, at every level, that is not an array and follows an array in its object.
+
+    For a form with several lists in one object, where only one can be listed last: listed after
+    every other property, a list is followed only by another list or its object's closing brace.
+    """
+    found: list[str] = []
+    for path, obj in _objects(schema, schema, "$", set()):
+        names = list(obj["properties"])
+        arrays = [_is_array(obj["properties"][name], schema) for name in names]
+        if True in arrays:
+            first = arrays.index(True)
+            found.extend(
+                f"{path}.{name}"
+                for name, is_array in zip(names[first:], arrays[first:], strict=True)
+                if not is_array
+            )
+    return found

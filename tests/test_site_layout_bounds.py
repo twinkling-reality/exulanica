@@ -242,6 +242,62 @@ def test_a_crowded_site_s_walking_graph_is_the_one_asking_every_obstacle_gives(m
     assert _places(kind) == indexed
 
 
+def test_a_fixture_whose_front_a_structure_stands_on_is_approached_from_its_back():
+    """The layout keeps only its clearance round a fixture, nearer than a gathering spot's
+    approach: where something stands on the approach in front, it is approached from its back,
+    its places face that way, and it is reached; where nothing does, its place is as it was."""
+    import dataclasses
+
+    from exulanica.grammar.grammars.site.records import SiteStructureRecord
+
+    kind = read_kind(_farm())
+    values = kind.values("small_farm")
+    records = list(site_records(generate_site(kind.plan(values), seed=SEED, subject_identity=ROOT)))
+    routine = kind_routine(kind)
+
+    def place(laid: list[object]) -> dict[str, Any]:
+        return society_site_place.place_from_site_records(
+            place_id="p", records=laid, society=kind.society(values), routine=routine
+        )
+
+    rail = next(
+        r for r in records if isinstance(r, SiteFixtureRecord) and r.part_key == "pond_rail"
+    )
+    dx, dy = society_site_place._FRONT[rail.yaw_quarter_turns]
+    reach = rail.depth_mm // 2 + society_site_place.APPROACH_MM
+    reach += routine.policy["standing_spacing_mm"]
+    front = [rail.x_mm + dx * reach, rail.y_mm + dy * reach]
+    back = [rail.x_mm - dx * reach, rail.y_mm - dy * reach]
+
+    def node(made: dict[str, Any]) -> list[int]:
+        found = next(d for d in made["destinations"] if d["label"] == "pond rail")
+        return next(n["position_mm"] for n in made["nodes"] if n["node_id"] == found["node_id"])
+
+    assert node(place(records)) == front
+    # A barn moved onto the approach in front of the rail.
+    index, barn = next(
+        (i, r)
+        for i, r in enumerate(records)
+        if isinstance(r, SiteStructureRecord) and r.part_key == "barn"
+    )
+    records[index] = dataclasses.replace(
+        barn,
+        min_x_mm=front[0] - 400,
+        min_y_mm=front[1] - 400,
+        max_x_mm=front[0] + 400,
+        max_y_mm=front[1] + 400,
+    )
+    moved = place(records)
+    assert node(moved) == back
+    rail_node = next(d for d in moved["destinations"] if d["label"] == "pond rail")["node_id"]
+    assert rail_node in kind_samples._reached(moved, "entry")
+    spots = [spot for spot in moved["spots"] if spot["node_id"] == rail_node]
+    assert spots and all(
+        (spot["position_mm"][0] - rail.x_mm) * dx + (spot["position_mm"][1] - rail.y_mm) * dy < 0
+        for spot in spots
+    )
+
+
 def test_a_world_is_laid_out_again_within_the_budget_it_was_made_under(monkeypatch):
     from exulanica.world.composers import site_plan
     from exulanica.world.errors import InvalidStructuralData

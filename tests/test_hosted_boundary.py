@@ -77,6 +77,7 @@ from exulanica.selection.environment_proposal import (
     EnvironmentOperation,
     propose_environment_operation,
 )
+from exulanica.selection.kind_drafting import KindVerdict, draft_kind
 from exulanica.selection.plan import (
     Intent,
     SelectionPlan,
@@ -93,6 +94,7 @@ from exulanica.world.society_decision_contract import decision_contract, person_
 
 from conftest import ingest_observed, write_photo
 from creature_support import form_of
+from kind_briefs import brief_of, fixture_kind, held_to_form
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
 from test_companion_saved_names import (
     PERSON,
@@ -145,6 +147,7 @@ HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
     "reference reader": ("exulanica.references.drafting", "read_notes"),
     "reference picture reader": ("exulanica.references.pictures", "read_picture"),
     "creature drafter": ("exulanica.selection.creature_drafting", "draft_creature"),
+    "kind drafter": ("exulanica.selection.kind_drafting", "draft_kind"),
 }
 
 _PATH_AT = {site: path for path, site in HOSTED_CALL_PATHS.items()}
@@ -563,6 +566,28 @@ def run_creature_drafting(world: World) -> Witness:
     return transport
 
 
+def run_kind_drafting(world: World) -> Witness:
+    """The kind drafter, handed a person's words. It has no role of its own until a measured
+    choice gives it one; it is run on the role its measurement drives it with."""
+    from exulanica.world.kinds.document import read_kind
+    from exulanica.world.kinds.samples import check_samples
+
+    def check(document: dict[str, Any]) -> KindVerdict:
+        kind = read_kind(document)
+        return KindVerdict(True, kind, check_samples(kind))
+
+    form = held_to_form(brief_of(fixture_kind("farm")))
+    client, transport = world.hosted([_json_reply(form, Role.SPECIFICATION_DRAFTER)])
+    outcome = draft_kind(
+        client,
+        f"a farm with a duck pond where {PERSON} lives beside {PLACE}",
+        role=Role.SPECIFICATION_DRAFTER,
+        check=check,
+    )
+    assert outcome.document is not None, outcome.refusal
+    return transport
+
+
 def run_reference_planning(world: World) -> Witness:
     """The reference planner, handed a description as a reference job hands it."""
     plan = {"subjects": [{"aspect": "buildings", "text": "whitewashed island houses"}]}
@@ -757,6 +782,7 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "reference reader": (run_reference_reading, "Whitewashed houses"),
     "reference picture reader": (run_reference_picture, "The picture:"),
     "creature drafter": (run_creature_drafting, "a striped beast that circles"),
+    "kind drafter": (run_kind_drafting, "a farm with a duck pond"),
 }
 
 #: The paths whose call site replaces saved names itself, and the modules it replaces them with.

@@ -169,8 +169,10 @@ The site place producer
 a society place (`society-place` version 2): a walking lattice over open ground and corridors that
 stays clear of every blocker, doors into structures, rooms, fields reached at their access point,
 fixtures with places along their fronts, and the kind's homes, workplaces and shops as
-destinations. People the kind states as off-site residents live in one home at the entry
-(`home:offsite`) and come in through it.
+destinations. A fixture is approached from its front; where something the layout set within its
+clearance stands on that approach, from its back, and its places then face its back. People the
+kind states as off-site residents live in one home at the entry (`home:offsite`) and come in
+through it.
 
 A kind's routine is the living town's routine with an **overlay**
 ([`routine.py`](../exulanica/world/kinds/routine.py)), `exulanica.routine-overlay/v1`: the kind's
@@ -186,7 +188,7 @@ A site world's society uses the walking-surfaces input profile
 `site-walking-surfaces/v1`, site record subjects and a `site_place` dependency in place of a
 city's `city_place`. The living engine is `exulanica-society/v5`, unchanged; the
 [society contract](synthetic-society-contract.md) owns inputs and engines. A site world's society
-ground is the society ground catalog's `generated_site` entry (catalog version 3). The page hosts
+ground is the society ground catalog's `generated_site` entry. The page hosts
 a site world's people in the site's frame, as it hosts a town's. The place a site world's society
 walks is made in the kind worker from the world's receipt, never on a request's thread, and kept by
 the workspace, the receipt and the place; the place the world's checks built is kept when the world
@@ -308,6 +310,27 @@ register a world. Nothing is written when any is refused. A stranger is told a w
 exist, as for every world route. The browser offers no upload: keeping a kind is the API path a
 creator or an agent uses.
 
+## A kind drafted from words
+
+The kind drafter ([`kind_drafting.py`](../exulanica/selection/kind_drafting.py)) asks a model to
+fill a **brief** ([`kind_brief.py`](../exulanica/selection/kind_brief.py)) for a person's
+description: zones holding their structures, rooms, areas and fixtures, each part's use stated
+where it stands, with no key and no reference, and every closed word a list the form offers. Code
+compiles the brief into a kind document: the keys and references, a use class for each use, the
+spine and the boundary, seat and standing places trimmed to the society's spacing, a bed's
+sleepers, and who comes in where nobody lives there.
+
+The compiler then sizes the site. The site is made at least as deep as the layout's need function
+says its zones need; then its sample worlds are built as the checks build them, and each refusal
+sizing can answer is answered from the layout's own figures, for at most 64 rounds: a side of the
+spine short by its stated shortfall, a zone too shallow for its structure, a zone across the far
+edge given more of the depth, a structure too small for its rooms grown a quarter each way, a
+walking graph over budget shrunk. Once the samples pass, each structure sizing grew is trimmed to
+the smallest that passes, and a site holding no area to twice its smallest passing size each way.
+Both stages of the checks stay the one authority: a kind they refuse is refused by name. The
+drafter sends one brief and at most two repairs, each naming the check's code, the place in the
+brief and the check's own sentence, never the reply's words; there is no fallback model.
+
 ## The town as a kind
 
 The library lists the town through an adapter (`exulanica.world-kind-adapter/v1`,
@@ -322,8 +345,9 @@ town's receipt or digest depends on the adapter.
 
 - The application draws a site's slots as the engine's primitives in fallback colours; no style
   pack dresses them.
-- No model drafts a kind through the product. The API keeps only a creator's upload; `drafted` is
-  an origin the document states.
+- No route drafts a kind, and the drafter has no model chosen for it; only
+  `scripts/measure_kind_drafting_models.py` runs it. The API keeps only a creator's upload;
+  `drafted` is an origin the document states.
 - The library ships the town's adapter and no site-grammar kind. The three kinds under
   `tests/fixtures/world-kinds` are hand-written test fixtures.
 - Only the ground storey of a structure is walked inside.

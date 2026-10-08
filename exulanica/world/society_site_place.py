@@ -696,11 +696,22 @@ def place_from_site_records(
         use_key = part.use_class
         if not use_key:
             continue
-        fx, fy = _FRONT[fixture.yaw_quarter_turns]
-        across = (-fy, fx)
+        front = _FRONT[fixture.yaw_quarter_turns]
         half_depth = fixture.depth_mm // 2
-        node = f"fixture:{fixture.identity}"
         reach = half_depth + APPROACH_MM + (spacing if "seat" not in roles else 0)
+        # Approached from its front, or from its back where the layout set something nearer its
+        # front than the approach (it keeps only its clearance round a fixture); its places then
+        # face its back. Where both are blocked it is approached from its front, unreached.
+        fx, fy = next(
+            (
+                (dx, dy)
+                for dx, dy in (front, (-front[0], -front[1]))
+                if graph.free((fixture.x_mm + dx * reach, fixture.y_mm + dy * reach))
+            ),
+            front,
+        )
+        across = (-fy, fx)
+        node = f"fixture:{fixture.identity}"
         graph.add(node, (fixture.x_mm + fx * reach, fixture.y_mm + fy * reach))
         join_into_zone(node, fixture.owner_identity, "furniture_access")
         places_at = half_depth - 200 if "seat" in roles else half_depth + spacing

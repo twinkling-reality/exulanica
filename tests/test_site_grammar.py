@@ -142,6 +142,31 @@ def _footprint(record: SiteFixtureRecord) -> tuple[int, int, int, int]:
     )
 
 
+def test_a_fixture_lies_inside_the_site_by_its_footprint_as_it_is_turned():
+    """A long fixture along the site's edge lies inside it, as the society's place blocks it; a
+    millimetre past the edge does not, whichever way it is turned."""
+    import dataclasses
+
+    from exulanica.grammar.grammars.site import _inside
+
+    records = _records(_plan("farm"))
+    extent = next(r for r in records if isinstance(r, SiteExtentRecord))
+    fixture = next(r for r in records if isinstance(r, SiteFixtureRecord))
+    shelf = dataclasses.replace(
+        fixture, width_mm=3000, depth_mm=300, yaw_quarter_turns=0, x_mm=1500, y_mm=150
+    )
+    assert _inside(shelf, extent)
+    assert not _inside(dataclasses.replace(shelf, x_mm=1499), extent)
+    assert not _inside(dataclasses.replace(shelf, y_mm=149), extent)
+    far = dataclasses.replace(shelf, x_mm=extent.width_mm - 1500)
+    assert _inside(far, extent)
+    assert not _inside(dataclasses.replace(far, x_mm=extent.width_mm - 1499), extent)
+    turned = dataclasses.replace(shelf, yaw_quarter_turns=1, x_mm=150, y_mm=1500)
+    assert _inside(turned, extent)
+    assert not _inside(dataclasses.replace(turned, x_mm=149), extent)
+    assert not _inside(dataclasses.replace(turned, y_mm=1499), extent)
+
+
 def _apart(a: tuple[int, int, int, int], b: tuple[int, int, int, int], gap: int) -> bool:
     return a[2] + gap <= b[0] or b[2] + gap <= a[0] or a[3] + gap <= b[1] or b[3] + gap <= a[1]
 
