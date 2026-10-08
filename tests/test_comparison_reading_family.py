@@ -124,13 +124,16 @@ def test_the_pair_budget_is_the_protocols_for_every_family(tmp_path, monkeypatch
     assert (living.fixed_us, living.per_decided_us) == (150_000, 12_000)
 
 
-def test_a_family_the_catalog_does_not_name_reads_the_protocols_line(tmp_path, monkeypatch):
+def test_only_the_family_the_protocol_s_line_was_measured_on_reads_it(tmp_path, monkeypatch):
+    # The protocol's own line was measured on a purposeful society: that family reads it, and any
+    # other the catalog names no line for is refused by name rather than read by another's line.
     monkeypatch.setattr(reading, "READING_CATALOG", _catalog(tmp_path, []))
+    purposeful = _catalogs(COMPARISON_SCORE_BY_FAMILY["purposeful"])
+    assert reading.population_maximum(purposeful) == _by_hand(_protocol_line())
     living = _catalogs(COMPARISON_SCORE_BY_FAMILY["living"])
-    assert reading.population_maximum(living) == _by_hand(_protocol_line())
-    assert reading.reading_refusal(living, 84, _everybody(84))[0] == (
-        "decided_over_comparison_bound"
-    )
+    with pytest.raises(ComparisonRefused) as refused:
+        reading.population_maximum(living)
+    assert refused.value.code == reading.NO_READING_LINE
 
 
 @pytest.mark.parametrize(

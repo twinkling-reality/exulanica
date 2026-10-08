@@ -115,6 +115,7 @@ from exulanica.world.society_comparison import (
     HOUR_TICKS,
     HourStart,
     ReplayMismatch,
+    compared_people,
     first_hour,
     hours_of,
     replay_hour,
@@ -350,6 +351,7 @@ def plan_society_comparison(
         catalogs = window_catalogs(services.comparison_catalogs, window, engine)
     except StartRefused:
         catalogs = None
+    comparable = set(compared_people(society["state"]))
     document: dict[str, Any] = {
         "profile": PLAN_PROFILE,
         "refusal": refused,
@@ -367,10 +369,12 @@ def plan_society_comparison(
         "decided_most": chosen["decided_most"],
         # Everybody a named group may be chosen from, by id and name, as the society's state
         # names them: a group of more people than one owner's choice holds is chosen from these.
+        # A visitor is never one of them: no run holds it.
         "people": sorted(
             (
                 {"id": person["id"], "name": person_label(person)}
                 for person in society["state"]["inhabitants"]
+                if person["id"] in comparable
             ),
             key=lambda person: (person["name"], person["id"]),
         )
@@ -479,7 +483,7 @@ def _minutes(prepared: _Prepared, population: int, navigation: str | None) -> li
     the small square (``answers_per_minute`` in :mod:`exulanica.api.society_comparison_start`),
     None where it has no measured time. Where more
     people than that have a choice in one minute, the rest follow their routine."""
-    contract = prepared.role.contract()
+    contract = prepared.role.contract_for(prepared.runner.engine)
     decided = decided_people(prepared.body, population)
     manifest = load_manifest()
     seed = prepared.body["seeds"][0]
@@ -497,6 +501,7 @@ def _minutes(prepared: _Prepared, population: int, navigation: str | None) -> li
             at_once=1,
             navigation_profile=navigation,
             runs_left=[(key, seed)],
+            engine=prepared.runner.engine,
         )
         found.append(
             {
@@ -873,6 +878,7 @@ def _prepare(
         runner,
         decision_role=role,
         catalogs=window_catalogs(services.comparison_catalogs, window, engine),
+        engine=engine,
     )
     population = int(society["population_size"])
     family = society_engine(engine).state_family
@@ -948,6 +954,7 @@ def _prepare(
         load_manifest(),
         at_once=protocol_value(runner.catalogs, "runs_at_once"),
         navigation_profile=navigation,
+        engine=engine,
     )
     return _Prepared(runner, role, seeds, body, cost, newest if input_seq is None else input_seq)
 
@@ -999,7 +1006,7 @@ def _choices(
                         else {**model, "name": manifest.model_name(model["model_id"])},
                     }
                 )
-        contract = role.contract()
+        contract = role.contract_for(str(society["engine_version"]))
         models = [
             {
                 "provider": spec.provider,
@@ -1237,7 +1244,7 @@ def _spent(context: VersionContext, engine: str) -> SpendingRefused | None:
     return spending.every(
         provider
         for role in decision_roles().hosted_by(engine)
-        for provider in offered_providers(role, manifest, role.contract())
+        for provider in offered_providers(role, manifest, role.contract_for(engine))
     )
 
 

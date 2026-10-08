@@ -104,7 +104,7 @@ export const SOCIETY_ENGINES_V2_JSON = String.raw`{
       "takes_inputs": true
     },
     {
-      "comparisons": false,
+      "comparisons": true,
       "creatable": true,
       "directed_actions": true,
       "engine": "exulanica-society/v7",
@@ -115,7 +115,7 @@ export const SOCIETY_ENGINES_V2_JSON = String.raw`{
       "playback_refusal": null,
       "population": {"maximum": 512, "minimum": 1},
       "presence": false,
-      "reason": "The purposeful society with things, over a saved world's own ground, where everybody is a thing of a stated kind. Its people are the villagers its ground's population brings, the beings the world's author placed in its version, and visitors that cross in from an outside program: each visitor arrives at the arrival point of a gate the author placed, and leaves when its program sends it away or its grant ends. An author's placed objects stand where the version puts them, block walking where their kind says and offer the rests and visits their kind offers. The world's owner may choose a model for a person, and the program that sent a visitor decides for it: each takes, at the planner's own choice points, a validated choice from a stored receipt, replayed without a call. It takes directed actions for anybody but a visitor; its people are not sent away; and no comparison runs it, because no person score has been measured over things. Its population is its ground's, with the beings placed and the visitors arrived beside it, so its floor is one.",
+      "reason": "The purposeful society with things, over a saved world's own ground, where everybody is a thing of a stated kind. Its people are the villagers its ground's population brings, the beings the world's author placed in its version, and visitors that cross in from an outside program: each visitor arrives at the arrival point of a gate the author placed, and leaves when its program sends it away or its grant ends. An author's placed objects stand where the version puts them, block walking where their kind says and offer the rests and visits their kind offers. The world's owner may choose a model for a person, and the program that sent a visitor decides for it: each takes, at the planner's own choice points, a validated choice from a stored receipt, replayed without a call. It takes directed actions for anybody but a visitor and its people are not sent away. A comparison of models runs an hour of it from its genesis, where nobody has crossed in, so it compares the world's own beings, scored by the sixth person score, which counts the lines they said and what they did with their hands; it is offered once a reading line has been measured for its runs. Its population is its ground's, with the beings placed and the visitors arrived beside it, so its floor is one.",
       "saved_world": true,
       "state_family": "things",
       "takes_inputs": true

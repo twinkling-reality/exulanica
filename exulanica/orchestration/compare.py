@@ -191,6 +191,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             catalogs=window_catalogs(
                 services.comparison_catalogs, arguments.window, str(society["engine_version"])
             ),
+            # Its models are asked under the terms the society's engine asks its people under.
+            engine=str(society["engine_version"]),
         )
     except StartRefused as exc:
         raise SystemExit(str(exc)) from exc

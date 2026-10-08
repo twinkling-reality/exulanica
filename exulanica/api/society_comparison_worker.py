@@ -308,7 +308,7 @@ class SocietyComparisonWorker:
             return
         bound = None
         keep_usd, keep_calls = (
-            share_kept(budget, role.contract())
+            share_kept(budget, role.contract(definition["contract"]["catalog_versions"]))
             if budget is not None and self.keeps_share
             else (Decimal(0), 0)
         )

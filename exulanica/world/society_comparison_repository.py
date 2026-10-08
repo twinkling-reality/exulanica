@@ -51,7 +51,7 @@ from exulanica.world.society_catalogs import (
     ComparisonCatalogs,
     load_comparison_catalogs,
 )
-from exulanica.world.society_comparison import RunPlan
+from exulanica.world.society_comparison import RunPlan, compared_people
 from exulanica.world.society_comparison_drawing import StoredDrawing
 from exulanica.world.society_comparison_reading import WINDOW_NOT_OFFERED, reading_refusal
 from exulanica.world.society_comparison_result import (
@@ -197,7 +197,8 @@ class SocietyComparisonRepository:
         catalogs = load_comparison_catalogs() if catalogs is None else catalogs
         family = society_engine(row["engine_version"]).state_family
         required_score = COMPARISON_SCORE_BY_FAMILY.get(family)
-        if required_score == 4 and catalogs.versions[PERSON_SCORE_CATALOG] == 3:
+        # An hour's default catalogs (the third score) are scored as the family's own hour score.
+        if required_score not in (None, 3) and catalogs.versions[PERSON_SCORE_CATALOG] == 3:
             scored = load_comparison_catalogs(
                 versions={**catalogs.versions, PERSON_SCORE_CATALOG: required_score}
             )
@@ -233,7 +234,8 @@ class SocietyComparisonRepository:
         frozen = self.society._inputs(row, [chosen])[chosen]
         # One input alone: its own stored bytes are read before the lock its authorization takes.
         self.society._authorize(frozen)
-        contract = role.contract()
+        # Asked under the contract the society's engine asks its people under.
+        contract = role.contract_for(row["engine_version"])
         group, others = self._people(version_id, row, body, role)
         _held_asking(body, others, contract, role)
         document = _sealed(
@@ -302,9 +304,19 @@ class SocietyComparisonRepository:
         records: each person one of the society's, named as its state names them; a group from an
         owner's choice exactly that choice's people; and each other person's decider exactly what
         the owner's latest choice for them names, or their routine where none does."""
-        names = {person["id"]: person_label(person) for person in row["state"]["inhabitants"]}
+        compared = set(compared_people(row["state"]))
+        names = {
+            person["id"]: person_label(person)
+            for person in row["state"]["inhabitants"]
+            if person["id"] in compared
+        }
         group, source = body["group"]["people"], dict(body["group"]["source"])
         people = sorted(names) if group is None else list(group)
+        visitors = {person["id"] for person in row["state"]["inhabitants"]} - compared
+        if set(people) & visitors:
+            raise ComparisonRefused(
+                "group_visitor", "no run holds a visitor: it starts before anybody crossed in"
+            )
         if not set(people) <= set(names):
             raise ComparisonRefused("group_person_unknown", "the group names somebody not here")
         choices = SocietyModelChoiceRepository(

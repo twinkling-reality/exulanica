@@ -129,7 +129,31 @@ terms with the kinds each scored person did in it, held to that hour's own count
 day sums every count and unites each person's kinds, so a kind counts once per person in the day as
 it counts once in an hour's window. The assembled terms are the fourth score's over every minute
 of the day ([`tests/test_society_score_v5.py`](../tests/test_society_score_v5.py)). A day's raw
-urgency and variety are a day's, so a day's score is never compared with an hour's. A purposeful
+urgency and variety are a day's, so a day's score is never compared with an hour's. A society of
+things (`exulanica-society/v7`) is defined under the sixth score, declared in
+`assets/catalogs/society/society-person-score.v6.json` and computed by
+[`exulanica/world/society_score_v6.py`](../exulanica/world/society_score_v6.py): the third score's
+weights, anchors, floor, exclusions and reliability classes, with need relief read from the
+purposeful need every being of the society carries. Its variety also counts the acts the society's
+modules record for a scored person: a line said (`said`) and the hands acts (`picked_up`,
+`put_down`, `gave`, `took`), each read from its event, whose subject did it, and never from a
+decision's event, so no answer or disposition reaches a weighed term (the catalog states that read
+as `states_and_acts`, which only a weighed term of this version may declare). A line never changes
+what its speaker is doing and a hands act is recorded only by its event, so no kind counts twice;
+each counts once per person, so saying many lines adds one kind. The routine never speaks or uses
+its hands, so a model whose people also did scores above the routine's one. Reported with the
+terms and never weighed: how many of each act the group did, how many lines it said and how many of
+them nearly repeat an earlier one (a token-set Jaccard of at least a half with a line the speaker
+said earlier in the run or with the line it answers, the last said to it or to everyone near it
+that it heard before it spoke), and the hands acts dropped, by reason
+([`tests/test_society_things_comparison.py`](../tests/test_society_things_comparison.py)). A run of
+a society of things plays as its own minutes do, its things phase after the roles' events, from
+its genesis, where no visitor has crossed in, and nobody crosses in during it: the door's stream is
+not an arm's input, so a comparison of a world with visitors compares the world's own beings. The
+plan lists only those beings, and a group naming a visitor is refused by name (`group_visitor`,
+422). It
+asks the society's people under the terms its engine asks them under, with lines and hands among
+the options. A purposeful
 society is defined under the third score, declared in
 `assets/catalogs/society/society-person-score.v3.json` and computed by
 [`exulanica/world/society_score_v3.py`](../exulanica/world/society_score_v3.py): half need relief,
@@ -239,6 +263,13 @@ keys the verdict already reads, so neither the verdict module nor any binding an
 registered changes ([`tests/test_comparison_day_protocol.py`](../tests/test_comparison_day_protocol.py)).
 A day's comparison registers the fifth binding, which also names the fifth score's module and its
 reader, [`exulanica/world/society_comparison_verdict_v5.py`](../exulanica/world/society_comparison_verdict_v5.py).
+A comparison of a society of things registers the sixth binding, which names the third score's
+module beside the sixth's and its reader,
+[`exulanica/world/society_comparison_verdict_v6.py`](../exulanica/world/society_comparison_verdict_v6.py),
+which holds each run's terms to what they report and reads the third score's verdict over them. It
+runs over an hour under the third protocol and on the development seeds every seeds version
+commits; no held-out seeds have been drawn for it, so a held-out comparison of one is refused by
+name (`held_out_seeds_not_drawn`) until a seeds version lands with its pre-registration.
 
 ### Judged comparisons
 
@@ -444,8 +475,10 @@ run), a model may decide for everybody in each measured town, up to the stress t
 everybody-decided run the line puts at 3221592 µs; and it would let a run hold 463 people where a
 model decides for one of them, more than the 128 a town's ground allows, so for a living town the
 ground is the bound that applies. The plan route and a start judge a living town's society by this
-line, and every other engine by the protocol's, which stays at its third version. It reads an hour's
-run; a day is read by a line of its own (a day, below).
+line and a purposeful society by the protocol's, which stays at its third version and was measured
+on one. A society of any other family the reading catalog binds no line for, a society of things
+today, is refused by name (`no_reading_line`, 409) rather than read by a line measured on another
+engine's runs. It reads an hour's run; a day is read by a line of its own (a day, below).
 
 **A day.** A start and a plan name the window every run plays (`window`): `hour`, the default, or
 `day`. A day is a living town's, whose engine keeps the time of day: from its genesis at 06:00 to

@@ -2,10 +2,12 @@
 
 A living town's runs are read by the line measured on the living engine (the reading catalog), so
 a comparison of a generated town may give every one of its people to a model within the pair's
-unchanged read budget; under the protocol's own line, measured on the purposeful engine, the same
-comparison is refused by name. Through the application as deployed, as the runtime role: the plan,
-the start, the host's worker playing it with a scripted model, and the model run read back from
-what it stored, with no model call.
+unchanged read budget. A family is read only by its own measured line: with no living line in the
+reading catalog, the same comparison is refused by name (``no_reading_line``) where it is planned
+and where it is started, never read by the protocol's own line, measured on the purposeful engine.
+Through the application as deployed, as the runtime role: the plan, the start, the host's worker
+playing it with a scripted model, and the model run read back from what it stored, with no model
+call.
 """
 
 from __future__ import annotations
@@ -90,7 +92,7 @@ def _plan(town: dict[str, Any]) -> dict[str, Any]:
 
 
 def _protocol_line_only(monkeypatch, tmp_path: Path) -> None:
-    """The reading catalog as it would be with no line measured apart from the protocol's."""
+    """The reading catalog as it would be with no family's own line measured."""
     empty = tmp_path / "society-comparison-reading.json"
     empty.write_text(
         json.dumps(
@@ -106,11 +108,11 @@ def _protocol_line_only(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(reading, "READING_CATALOG", empty)
 
 
-def test_under_the_protocols_own_line_a_whole_town_is_refused_by_name(town, monkeypatch, tmp_path):
+def test_with_no_living_line_a_town_s_comparison_is_refused_by_name(town, monkeypatch, tmp_path):
     _protocol_line_only(monkeypatch, tmp_path)
     plan = _plan(town)
-    assert plan["decided_most"] < town["population"]
-    assert plan["plan_refusal"]["code"] == "decided_over_comparison_bound"
+    assert plan["decided_most"] is None
+    assert plan["plan_refusal"]["code"] == reading.NO_READING_LINE
     started = town["api"].post(
         f"{town['comparisons']}{town['scope']}",
         {
@@ -123,7 +125,7 @@ def test_under_the_protocols_own_line_a_whole_town_is_refused_by_name(town, monk
             "bound_usd": "1.00",
         },
     )
-    assert (started.status_code, started.json()["code"]) == (409, "decided_over_comparison_bound")
+    assert (started.status_code, started.json()["code"]) == (409, reading.NO_READING_LINE)
 
 
 def test_a_whole_town_decided_by_a_model_is_planned_started_played_and_read(town):

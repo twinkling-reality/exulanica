@@ -19,7 +19,9 @@ build their options every minute. A living town's people are asked only at the e
 choice points, and its replay costs several times less for the same people, so a line measured on
 that engine reads its runs. The catalog :data:`READING_CATALOG` states the line of each state
 family measured apart from the protocol's, bound to the measurement record it was read from by
-path and digest; a family it does not name reads the protocol's own line. Which family a
+path and digest. The protocol's own line was measured on a purposeful society and is read for
+that family alone; any other family the catalog names no line for is refused by name
+(:data:`NO_READING_LINE`), so a family's comparisons wait for its own line. Which family a
 comparison's runs are is the family whose score its catalogs hold
 (:data:`~exulanica.world.society_catalogs.COMPARISON_SCORE_BY_FAMILY`, and for a day
 :data:`~exulanica.world.society_catalogs.DAY_SCORE_BY_FAMILY`), the tables a definition is held
@@ -67,6 +69,7 @@ from exulanica.world.society_comparison_verdict import (
 
 __all__ = [
     "LINE_KEYS",
+    "NO_READING_LINE",
     "PAIR_RUNS",
     "READING_CATALOG",
     "READING_REFUSALS",
@@ -91,6 +94,11 @@ _US_PER_MS: Final = 1000
 READING_REFUSALS: Final = ("population_over_comparison_bound", "decided_over_comparison_bound")
 #: Why a comparison over a window is not offered: no line read over that window was measured.
 WINDOW_NOT_OFFERED: Final = "window_not_offered"
+#: Why a comparison of a family no line was measured for is not offered over an hour either: the
+#: protocol's own line was measured on a purposeful society, and is read for that family alone.
+NO_READING_LINE: Final = "no_reading_line"
+#: The families an hour's comparison reads by the protocol's own line: the one it was measured on.
+PROTOCOL_LINE_FAMILIES: Final = ("purposeful",)
 #: The window an entry of the reading catalog was measured over where it states none: an hour.
 _HOUR_TICKS: Final = 60
 #: The four figures a reading line states, by the names the protocol states its own under.
@@ -223,9 +231,11 @@ def reading_bound(catalogs: ComparisonCatalogs, family: str | None = None) -> Re
     """The protocol's bound on reading one run of a comparison of ``family`` (left out, the family
     whose score ``catalogs`` hold), or None for a protocol that states no replay line, an earlier
     one stating its population maximum instead. The pair's budget is always the protocol's; the
-    line is the family's measured one where the reading catalog states it, else the protocol's.
-    A window longer than an hour is read by its family's line over that window alone, and one the
-    catalog states none for is refused by name (``window_not_offered``)."""
+    line is the family's measured one where the reading catalog states it, else the protocol's,
+    which is read for the family it was measured on alone: a comparison of any other family the
+    catalog states no line for is refused by name (``no_reading_line``). A window longer than an
+    hour is read by its family's line over that window alone, and one the catalog states none for
+    is refused by name (``window_not_offered``)."""
     values = protocol_values(catalogs)
     if "pair_replay_budget_ms" not in values:
         return None
@@ -237,6 +247,12 @@ def reading_bound(catalogs: ComparisonCatalogs, family: str | None = None) -> Re
             WINDOW_NOT_OFFERED,
             f"no line has been measured for reading a {named or 'society'}'s runs over "
             f"{window} minutes",
+        )
+    if measured is None and named is not None and named not in PROTOCOL_LINE_FAMILIES:
+        raise ComparisonRefused(
+            NO_READING_LINE,
+            f"no line has been measured for reading a {named} society's runs, so how many of its "
+            "people a comparison can run is not known",
         )
     line = values if measured is None else measured
     if (

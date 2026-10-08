@@ -93,8 +93,9 @@ def test_each_capability_is_claimed_only_by_engines_that_implement_it():
         "town": LIVING_TOWN_PROFILE,
     }
     assert EXPERIMENT_ENGINES == (LIVING_PROFILE,)
-    # Comparisons play the purposeful society or living town through each engine's choice seam.
-    assert COMPARISON_ENGINES == (PURPOSEFUL_PROFILE, LIVING_TOWN_PROFILE)
+    # Comparisons play the purposeful society, the living town or a society of things through each
+    # engine's choice seam.
+    assert COMPARISON_ENGINES == (PURPOSEFUL_PROFILE, LIVING_TOWN_PROFILE, THINGS_PROFILE)
     assert SAVED_WORLD_ENGINES == (
         PURPOSEFUL_PROFILE,
         SOCIAL_PROFILE,

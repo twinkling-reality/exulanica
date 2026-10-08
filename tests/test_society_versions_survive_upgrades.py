@@ -155,6 +155,9 @@ RELEASED_CATALOGS = {
     "society-person-score.v5.json": (
         "bcce3e884eb496ad5cfdaa575b0608db73bdf89c41f2c663491c9e3b0f11eff1"
     ),
+    "society-person-score.v6.json": (
+        "c3d6a88c1daba83b0735702fb57b1698f3ec9a98986db72ca6c8712b07145264"
+    ),
     "society-comparison-protocol.v4.json": (
         "490f77d4da11cfd2ba0e567a6c5ea4cdf23663a6cdfe1e5878d8d6b4e0f3622b"
     ),

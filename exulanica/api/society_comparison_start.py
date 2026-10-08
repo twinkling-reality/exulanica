@@ -169,12 +169,16 @@ START_REFUSALS: Final = {
     "choice_unknown": 422,
     "group_empty": 422,
     "group_person_unknown": 422,
+    # A named group holding a visitor, whom no run holds.
+    "group_visitor": 422,
     "seeds_out_of_range": 422,
     # The input it freezes: a sequence the society holds no input at.
     "input_not_in_society": 422,
     # The window: a day of a society whose engine keeps no day, or one no reading line has been
     # measured for (exulanica/world/society_comparison_reading.py).
     "window_not_offered": 409,
+    # A society of a family no reading line has been measured for, over any window.
+    "no_reading_line": 409,
     # The bound: above the most the comparison can cost, or more than this server's model budget
     # has left beside the part its decision contract keeps for other work, or, where a durable
     # spending authority admits this server's calls, more than the live grant of a provider it
@@ -627,6 +631,7 @@ def comparison_cost(
     navigation_profile: str | None,
     runs_left: Sequence[tuple[str, str]] | None = None,
     dearest_elsewhere: bool = False,
+    engine: str | None = None,
 ) -> ComparisonCost:
     """What the comparison ``body`` states can cost at most, over a society of ``population``
     people, asking ``role``: every run's asks at their bound. ``at_once`` is how many runs are
@@ -636,8 +641,14 @@ def comparison_cost(
     count, by arm and seed digest; left out, every run the body plans. With
     ``dearest_elsewhere``, where the society's own ground has no figure for every model it asks,
     each model is taken at the dearest figure any ground has for it rather than the small
-    square's, which a town's people are asked more often than: what a host admits a seed by."""
-    contract = role.contract()
+    square's, which a town's people are asked more often than: what a host admits a seed by. A
+    stored definition is costed under the contract it recorded; a body not yet defined under the
+    one a society on ``engine`` asks its people under."""
+    contract = (
+        role.contract(body["contract"]["catalog_versions"])
+        if "contract" in body
+        else role.contract_for(engine)
+    )
     window = int(body["window_ticks"])
     people = population if body["group"]["people"] is None else len(body["group"]["people"])
     others = [

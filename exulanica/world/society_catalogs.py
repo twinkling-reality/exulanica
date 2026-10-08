@@ -97,6 +97,7 @@ __all__ = [
     "ROUTINE_DIRECTORY",
     "ROUTINE_VERSIONS",
     "SHIFT_CATALOG",
+    "STATES_AND_ACTS",
     "TOWN_ROUTINE_VERSIONS",
     "UNRECORDED_ROUTINE_VERSIONS",
     "Activity",
@@ -216,7 +217,7 @@ COMPARISON_VERSIONS: Final = {
 }
 #: A run keeps the score semantics for the state family its stored engine writes. The
 #: comparison protocol and seed catalog remain the same for both families.
-COMPARISON_SCORE_BY_FAMILY: Final = {"purposeful": 3, "living": 4}
+COMPARISON_SCORE_BY_FAMILY: Final = {"purposeful": 3, "living": 4, "things": 6}
 #: The windows a comparison runs over: an hour, under the versions above, or a day.
 COMPARISON_WINDOWS: Final = ("hour", "day")
 #: The versions a comparison over a day is defined under: the fifth score, the fourth's terms over
@@ -237,6 +238,10 @@ DAY_SCORE_BY_FAMILY: Final = {"living": 5}
 #: score reads.
 SCORE_PARTS: Final = ("primary", "held_out")
 SCORE_READS: Final = ("states", "events", "calls")
+#: What the sixth score's variety reads beside a run's minutes: the events that record what a
+#: being of a society of things did (a line said, a hands act), never a decision's event, so no
+#: answer or disposition reaches a weighed term. Only a weighed term of that version reads it.
+STATES_AND_ACTS: Final = "states_and_acts"
 #: The second score's parts: its one weighed term, what each model answered, reported beside the
 #: score and never weighed, and the measures it reports with no weight.
 RELIABILITY_PART: Final = "reliability"
@@ -407,6 +412,18 @@ def _score_v2_bounds(where: str, values: dict[str, FieldValue]) -> None:
         raise CatalogError(f"{where}: exactly a reliability term names the dispositions it counts")
     if values["reasons"] and part != RELIABILITY_PART:
         raise CatalogError(f"{where}: only a reliability term names reason codes")
+
+
+def _score_v6_bounds(where: str, values: dict[str, FieldValue]) -> None:
+    """The second score's rule, with the sixth's one addition: a weighed term may read the acts a
+    society of things records beside its minutes (:data:`STATES_AND_ACTS`), and no other term
+    reads them."""
+    if values["reads"] == STATES_AND_ACTS:
+        if values["part"] != "primary":
+            raise CatalogError(f"{where}: only a weighed term reads states and acts")
+        _score_v2_bounds(where, {**values, "reads": "states"})
+        return
+    _score_v2_bounds(where, values)
 
 
 def _seed_text(where: str, value: object) -> FieldValue:
@@ -656,6 +673,19 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         )
         for version in (2, 3, 4, 5)
     },
+    (PERSON_SCORE_CATALOG, 6): CatalogSchema(
+        PERSON_SCORE_CATALOG,
+        6,
+        (
+            ("part", _choice(SCORE_V2_PARTS)),
+            ("weight_milli", integer_field(-1000, 1000)),
+            ("reads", _choice((*SCORE_READS, STATES_AND_ACTS))),
+            ("dispositions", key_list_field),
+            ("reasons", key_list_field),
+            ("reason", text_field),
+        ),
+        entry_check=_score_v6_bounds,
+    ),
     **{
         (COMPARISON_PROTOCOL_CATALOG, version): CatalogSchema(
             COMPARISON_PROTOCOL_CATALOG,

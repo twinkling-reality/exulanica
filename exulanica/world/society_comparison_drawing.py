@@ -41,8 +41,11 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, Final
 
+from exulanica.abilities.registry import MODULES_PATH as ABILITY_MODULES_PATH
 from exulanica.canonical import canonical_json
 from exulanica.movement.registry import MODULES_PATH
+from exulanica.things.catalogs import CATALOG_DIRECTORY as THING_CATALOG_DIRECTORY
+from exulanica.things.kinds import KINDS_DIRECTORY
 from exulanica.world.decision_roles import REGISTRY_DIRECTORY
 from exulanica.world.society_catalogs import ROUTINE_DIRECTORY
 from exulanica.world.society_comparison_seeds import COMPARISON_SEEDS_CATALOG
@@ -64,11 +67,14 @@ __all__ = [
 #: tracing one, with the builder of the plan they replay: a change to any of them may change what
 #: is drawn, so each is covered by :func:`drawing_sha256`.
 DRAWING_MODULES: Final = (
+    "exulanica.abilities.registry",
     "exulanica.canonical",
     "exulanica.movement.registry",
     "exulanica.movement.steps",
     "exulanica.movement.walking",
+    "exulanica.things.lines",
     "exulanica.world.deciders",
+    "exulanica.world.placed_things",
     "exulanica.world.decision_roles",
     "exulanica.world.role_decisions",
     "exulanica.world.roles.person",
@@ -82,6 +88,7 @@ DRAWING_MODULES: Final = (
     "exulanica.world.society_comparison_result",
     "exulanica.world.society_decision_contract",
     "exulanica.world.society_engines",
+    "exulanica.world.society_hands",
     "exulanica.world.society_input_policy",
     "exulanica.world.society_legacy",
     "exulanica.world.society_living",
@@ -91,6 +98,8 @@ DRAWING_MODULES: Final = (
     "exulanica.world.society_person_label",
     "exulanica.world.society_place",
     "exulanica.world.society_score",
+    "exulanica.world.society_thing_inputs",
+    "exulanica.world.society_things",
 )
 #: What a stored drawing names in place of a model's name: the name is filled in on read.
 _NAME_FILLED_ON_READ: Final = ""
@@ -110,7 +119,8 @@ def _module_path(name: str) -> Path:
 
 def drawing_data() -> tuple[Path, ...]:
     """Every data file a verified replay and its drawing read: the society catalogs, the movement
-    modules walking reads, the society engines and the decision role registry and catalogs. The
+    modules walking reads, the society engines, the decision role registry and catalogs, and for a
+    society of things the ability modules, the thing catalogs and the shipped thing kinds. The
     seeds catalog's files are left out: a drawing names no seed and its replay reads no comparison
     catalog, so a new set of held-out seeds leaves stored drawings current
     (:mod:`exulanica.world.society_comparison_seeds`)."""
@@ -125,6 +135,9 @@ def drawing_data() -> tuple[Path, ...]:
                 MODULES_PATH,
                 ENGINES_PATH,
                 *REGISTRY_DIRECTORY.glob("*.json"),
+                ABILITY_MODULES_PATH,
+                *THING_CATALOG_DIRECTORY.glob("*.json"),
+                *KINDS_DIRECTORY.glob("*.json"),
             }
         )
     )

@@ -42,11 +42,13 @@ from exulanica.world import (
     society_comparison_verdict,
     society_comparison_verdict_v4,
     society_comparison_verdict_v5,
+    society_comparison_verdict_v6,
     society_score,
     society_score_v2,
     society_score_v3,
     society_score_v4,
     society_score_v5,
+    society_score_v6,
 )
 from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
 from exulanica.world.society_catalogs import (
@@ -141,13 +143,15 @@ def replay_profile(plan: RunPlan) -> str:
 
 #: The binding a comparison registers by the version of the score it is scored under, naming every
 #: module it is scored and judged by. The first version's binding has no profile: it names its
-#: scorer and claim by digest alone. The third also names the third score's module, and the fifth,
-#: a living town's day, the module that assembles a day's terms from its hours and its reader.
+#: scorer and claim by digest alone. The third also names the third score's module, the fifth,
+#: a living town's day, the module that assembles a day's terms from its hours and its reader, and
+#: the sixth, a society of things' hour, its terms' module and its reader.
 BINDING_PROFILES: Final = {
     2: "exulanica.society-comparison-binding/v2",
     3: "exulanica.society-comparison-binding/v3",
     4: "exulanica.society-comparison-binding/v4",
     5: "exulanica.society-comparison-binding/v5",
+    6: "exulanica.society-comparison-binding/v6",
 }
 BINDING_PROFILE: Final = BINDING_PROFILES[3]
 #: What an arm is to its comparison, in the order a reader lists them: a model compared, the same
@@ -175,16 +179,20 @@ _ANCHORS: Final = {ROUTINE_ROLE: "routine", WAITING_ROLE: "wait"}
 _DEFINED_VERSION: Final = 2
 #: The score versions a definition of that version is scored under: each groups the people it
 #: scores and reports what each model answered apart, the second weighing need relief alone, the
-#: third need relief and variety, the fourth a living town's hour and the fifth its day.
+#: third need relief and variety, the fourth a living town's hour, the fifth its day and the sixth
+#: a society of things' hour.
 _DEFINED_SCORES: Final = (
     2,
     society_score_v3.CATALOG_VERSION,
     society_score_v4.CATALOG_VERSION,
     society_score_v5.CATALOG_VERSION,
+    society_score_v6.CATALOG_VERSION,
 )
 #: The score versions a living town's runs are scored under: the fourth over an hour, the fifth
 #: over a day.
 _LIVING_SCORES: Final = (society_score_v4.CATALOG_VERSION, society_score_v5.CATALOG_VERSION)
+#: The score version a society of things' runs are scored under, over an hour.
+_THINGS_SCORES: Final = (society_score_v6.CATALOG_VERSION,)
 #: Places a decimal the server writes carries. A score is exact until it is written; four places
 #: tell apart seeds whose relief differs by a ten-thousandth of what the routine spares, which is
 #: finer than any difference a comparison of eight seeds can claim.
@@ -239,6 +247,18 @@ _BOUND_MODULES: Final[dict[int, dict[str, ModuleType]]] = {
             society_comparison_verdict,
             society_comparison_verdict_v4,
             society_comparison_verdict_v5,
+        )
+    },
+    6: {
+        module.__name__: module
+        for module in (
+            society_score,
+            society_score_v2,
+            society_score_v3,
+            society_score_v6,
+            society_comparison_claim,
+            society_comparison_verdict,
+            society_comparison_verdict_v6,
         )
     },
 }
@@ -408,6 +428,12 @@ def check_definition_body(body: Mapping[str, Any], catalogs: ComparisonCatalogs)
     phase = body["phase"]
     if phase not in SEED_PHASES:
         raise ComparisonRefused("phase_unknown", f"no phase {phase!r}")
+    if phase == "held_out" and score_version(catalogs) in _THINGS_SCORES:
+        # Held-out seeds are drawn when a judged comparison is planned, with its pre-registration.
+        raise ComparisonRefused(
+            "held_out_seeds_not_drawn",
+            "no held-out seeds have been drawn for a society of things' comparisons",
+        )
     if score_version(catalogs) not in _DEFINED_SCORES:
         raise ComparisonRefused(
             "catalogs_not_the_definition_version",
@@ -539,10 +565,13 @@ def run_outcome(
     version = definition_version(definition)
     score_version_now = score_version(catalogs)
     family = society_engine(plan.engine_profile).state_family
-    if (family == "living") != (score_version_now in _LIVING_SCORES):
+    if (family == "living") != (score_version_now in _LIVING_SCORES) or (family == "things") != (
+        score_version_now in _THINGS_SCORES
+    ):
         raise ComparisonRefused(
             "score_engine_mismatch",
-            "a living run uses the fourth score or, over a day, the fifth; other runs keep theirs",
+            "a living run uses the fourth score or, over a day, the fifth, a society of things' "
+            "the sixth; other runs keep theirs",
         )
     threshold = (
         0 if family == "living" else society_score.need_threshold(routine_of(plan.inputs[-1]))
@@ -570,6 +599,15 @@ def run_outcome(
                 score=_turn_classes(catalogs),
             )
             if family == "living"
+            else society_score_v6.run_terms(
+                played.states,
+                played.events,
+                people=people,
+                threshold=threshold,
+                choice_points=points,
+                score=_turn_classes(catalogs),
+            )
+            if family == "things"
             else society_score_v2.run_terms(
                 played.states,
                 played.events,
@@ -597,8 +635,10 @@ def run_outcome(
 
 def _turn_classes(catalogs: ComparisonCatalogs) -> society_score_v2.PersonScore:
     """The classes a group's turns are counted in, as the score the catalogs hold declares them:
-    the second's own, or the third's, which reports the second's unchanged, as the fourth and the
-    fifth do."""
+    the second's own, or the third's, which reports the second's unchanged, as the fourth, the
+    fifth and the sixth do."""
+    if score_version(catalogs) == society_score_v6.CATALOG_VERSION:
+        return society_score_v6.score(catalogs.score).reliability
     if score_version(catalogs) in (
         society_score_v3.CATALOG_VERSION,
         society_score_v4.CATALOG_VERSION,
@@ -775,6 +815,7 @@ def comparison_result(
     verdict_reader = {
         society_score_v4.CATALOG_VERSION: society_comparison_verdict_v4.read_comparison,
         society_score_v5.CATALOG_VERSION: society_comparison_verdict_v5.read_comparison,
+        society_score_v6.CATALOG_VERSION: society_comparison_verdict_v6.read_comparison,
     }.get(score_version(found_catalogs), read_comparison)
     reading = verdict_reader(
         definition, runs, found_catalogs, binding_held=binding_holds(recorded, catalogs)

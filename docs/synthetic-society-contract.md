@@ -1666,7 +1666,10 @@ to_kind, line}`), so its decider is shown what it already said. A visitor its pr
 hands act its decider chose waits to be done (`{ability, thing, with, since}`). A society states
 `modules` only where its first input recorded them.
 
-It runs no comparison of models and no experiment, and its people are not sent away. A placed
+It runs no experiment, and its people are not sent away. A comparison of models runs an hour of it
+from its genesis, where nobody has crossed in, so it compares the world's own beings, scored by the
+sixth person score ([society experiments](society-experiments.md#score)); it is offered once a reading
+line has been measured for its runs, and refused by name until then (`no_reading_line`). A placed
 thing's footprint is its kind's whole box, so a kind whose box overhangs its base (a tree's
 canopy) blocks all of it.
 

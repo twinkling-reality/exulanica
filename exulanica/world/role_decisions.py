@@ -61,6 +61,7 @@ __all__ = [
     "RESULT_BYTES",
     "Asking",
     "DecisionDisposition",
+    "Finish",
     "PlayedMinutes",
     "ReplayMismatch",
     "append_role_events",
@@ -68,6 +69,7 @@ __all__ = [
     "check_envelope",
     "check_role_request",
     "check_role_result",
+    "consumed_receipts",
     "context_bytes",
     "play_minutes",
     "replay_minutes",
@@ -463,6 +465,19 @@ def apply_receipts(
     return seam, tuple(sorted(dispositions, key=lambda disposition: disposition.decision_seq))
 
 
+def consumed_receipts(
+    receipts: Sequence[Mapping[str, Any]], dispositions: Sequence[Any]
+) -> list[tuple[Mapping[str, Any], Any]]:
+    """Each receipt a minute consumed with what the minute did with it, in decision order: what an
+    engine's own phase after the roles' (a society of things' lines, leaving and hands) reads."""
+    by_request = {str(disposition.request_id): disposition for disposition in dispositions}
+    return [
+        (receipt, by_request[str(receipt["request_id"])])
+        for receipt in receipts
+        if str(receipt["request_id"]) in by_request
+    ]
+
+
 def append_role_events(
     roles: Sequence[DecisionRole],
     previous_state: Mapping[str, Any],
@@ -509,6 +524,19 @@ class Asking(Protocol):
 #: How an engine advances one minute: from a state, its seed, the inputs the minute consumes and
 #: the seam the roles left, to the next state and the minute's events.
 Step = Callable[[Mapping[str, Any], str, list[Mapping[str, Any]], Any], tuple[Any, tuple[Any, ...]]]
+#: An engine's phase after the roles' events: from the state a minute began in, the state and
+#: events so far, the input it consumed last and the receipts it consumed with what it did with
+#: each (:func:`consumed_receipts`), the minute's state and events.
+Finish = Callable[
+    [
+        Mapping[str, Any],
+        Any,
+        Mapping[str, Any],
+        tuple[Any, ...],
+        list[tuple[Mapping[str, Any], Any]],
+    ],
+    tuple[Any, tuple[Any, ...]],
+]
 
 
 @dataclass(slots=True)
@@ -551,6 +579,7 @@ def play_minutes(
     on_minute: Callable[[int, Sequence[dict[str, Any]], Sequence[dict[str, Any]]], None]
     | None = None,
     first_sequence: int = 0,
+    finish: Finish | None = None,
 ) -> PlayedMinutes:
     """Play ``ticks`` minutes from ``start``, asking ``asking`` for ``role``'s subjects.
 
@@ -563,6 +592,8 @@ def play_minutes(
     receipts)`` is called after each minute's answers are receipted and before the minute
     advances. ``first_sequence`` is the decision sequence of the last receipt recorded before
     ``start``, from which the receipts of minutes played on from a later state are numbered.
+    ``finish``, where an engine has a phase after the roles' events (a society of things'), ends
+    each minute as the engine's own minute does.
     """
     contract = contract or role.contract()
     state = start
@@ -610,6 +641,10 @@ def play_minutes(
         applied, decided = apply_receipts(roles, state, latest, receipts, seam(state, due))
         after, events = step(state, seed, consumed, applied)
         events = append_role_events(roles, state, after, latest, receipts, decided, events)
+        if finish is not None:
+            after, events = finish(
+                state, after, latest, events, consumed_receipts(receipts, decided)
+            )
         played.states.append(after)
         played.events.extend(events)
         played.requests.extend(requests)

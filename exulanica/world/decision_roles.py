@@ -480,6 +480,11 @@ class DecisionRole:
             and int(version) <= int(newest)
         )
 
+    def contract_for(self, engine: str | None) -> DecisionContract:
+        """The contract a society on ``engine`` asks this role's subjects under: the engine's own
+        terms where the entry states them, the role's otherwise (and for no engine)."""
+        return self.contract(self.terms(engine).versions)
+
     def contract(self, versions: Mapping[str, int] | None = None) -> DecisionContract:
         """The contract of these catalog versions; left out, the one a new request records."""
         chosen = dict(self.contract_versions if versions is None else versions)

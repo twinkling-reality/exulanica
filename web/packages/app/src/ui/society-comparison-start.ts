@@ -48,6 +48,7 @@ export const START_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   choice_unknown: 'That group is no longer one of your choices. Choose again.',
   group_empty: 'The group names nobody.',
   group_person_unknown: 'Someone in the group is no longer in this world. Choose again.',
+  group_visitor: 'A visitor cannot be in a comparison: every run starts before anybody crossed in. Choose again.',
   seeds_out_of_range: 'This server holds fewer seeds than that.',
   bound_out_of_range: 'State a bound above $0 and at most the most the comparison can cost.',
   bound_over_budget: 'This server\'s model budget has too little left for that bound.',
@@ -55,6 +56,7 @@ export const START_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   input_not_in_society: 'This world\'s people have no starting point with that number. Choose another.',
   bound_exceeds_grant: 'This workspace\'s spending grant has less left than the bound you set. Set a smaller bound.',
   window_not_offered: 'This world cannot be compared over a whole day here. Compare one hour instead.',
+  no_reading_line: 'Comparisons of this kind of world are not offered yet: how long one takes to read has not been measured.',
 };
 
 /**

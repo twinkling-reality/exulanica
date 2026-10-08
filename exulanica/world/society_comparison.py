@@ -44,6 +44,12 @@ the minutes after them. A minute's state is a function of the state before it, t
 the minute's receipts alone, so an hour played on from the state its previous hour ended in is
 that hour of the whole run, minute for minute and receipt for receipt.
 
+**A society of things** (``exulanica-society/v7``) runs as its own minutes do: the purposeful
+minute, the roles' events, then its things phase over the receipts the minute consumed (lines said,
+leaving, and hands acts where its first input records the hands module). A run starts at genesis,
+where no visitor has crossed, and no crossing is handed to it: the door's stream is not an arm's
+input, so a comparison of a world with visitors compares the world's own beings.
+
 Nothing here reads or writes a database or the live society: a run is its own, and the world it
 ran over is unchanged by it.
 """
@@ -61,6 +67,7 @@ from typing import Any, Final
 from exulanica.world.decision_roles import DecisionRole, decision_roles
 from exulanica.world.role_decisions import (
     Asking,
+    Finish,
     PlayedMinutes,
     ReplayMismatch,
     play_minutes,
@@ -84,6 +91,7 @@ from exulanica.world.society_planner import (
     initial_purposeful_society,
     ordered_events_document,
 )
+from exulanica.world.society_things import advance_things, initial_things_society
 
 __all__ = [
     "DECIDER_KINDS",
@@ -95,6 +103,7 @@ __all__ = [
     "PlayedRun",
     "ReplayMismatch",
     "RunPlan",
+    "compared_people",
     "first_hour",
     "hours_of",
     "plan_role",
@@ -187,6 +196,15 @@ def _check_decider(
         raise ValueError(f"exactly a model {who} records what its requests ask")
 
 
+def compared_people(state: Mapping[str, Any]) -> list[str]:
+    """The people a comparison of a society may name, by subject id: everybody but a visitor that
+    crossed in, whom no run holds, since a run starts at the society's genesis, where nobody has
+    crossed in."""
+    return sorted(
+        person["id"] for person in state["inhabitants"] if person.get("came_by") != "crossed"
+    )
+
+
 def plan_role(plan: RunPlan) -> DecisionRole:
     """The decision role a run asks: the registered role whose contract is the one the run is
     asked under (:meth:`~exulanica.world.decision_roles.RoleRegistry.for_contract`), so a run
@@ -234,6 +252,12 @@ def _purposeful_genesis(plan: RunPlan) -> dict[str, Any]:
     )
 
 
+def _things_genesis(plan: RunPlan) -> dict[str, Any]:
+    return initial_things_society(
+        plan.society_id, plan.seed, plan.inputs[0], population=plan.population
+    )
+
+
 def _living_genesis(plan: RunPlan) -> dict[str, Any]:
     source = plan.inputs[0]
     routine = input_routine(source)
@@ -260,6 +284,8 @@ class _RunFamily:
         [Mapping[str, Any], str, list[Mapping[str, Any]], Any], tuple[Any, tuple[Any, ...]]
     ]
     memo: Callable[[int], Any]
+    #: The engine's phase after the roles' events, where it has one, for a run's seed.
+    finish: Callable[[str], Finish] | None = None
 
 
 def _purposeful_seam(
@@ -311,10 +337,32 @@ def _living_step(
     return living_step(dict(state), seed, seam)
 
 
+def _things_finish(seed: str) -> Finish:
+    """A society of things' phase after the roles' events, as its own minute runs it, with no
+    crossing handed over."""
+
+    def finish(
+        before: Mapping[str, Any],
+        after: Any,
+        latest: Mapping[str, Any],
+        events: tuple[Any, ...],
+        decisions: list[tuple[Mapping[str, Any], Any]],
+    ) -> tuple[Any, tuple[Any, ...]]:
+        state, found, _crossed = advance_things(
+            before, after, seed, latest, events, (), decisions=decisions
+        )
+        return state, found
+
+    return finish
+
+
 RUN_FAMILIES: Final = {
     "purposeful": _RunFamily(_purposeful_genesis, _purposeful_seam, _purposeful_step, input_memo),
     "living": _RunFamily(
         _living_genesis, _living_wait_seam, _living_step, lambda _n: nullcontext()
+    ),
+    "things": _RunFamily(
+        _things_genesis, _purposeful_seam, _purposeful_step, input_memo, _things_finish
     ),
 }
 
@@ -398,6 +446,7 @@ def _minutes(
             contract=plan.contract,
             on_minute=on_minute,
             first_sequence=first_sequence,
+            finish=None if family.finish is None else family.finish(seed),
         )
 
 

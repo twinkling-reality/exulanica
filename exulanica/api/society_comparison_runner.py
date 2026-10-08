@@ -75,6 +75,7 @@ from exulanica.world.society_comparison import (
     PlayedRun,
     ReplayMismatch,
     RunPlan,
+    compared_people,
     first_hour,
     hours_of,
     plan_role,
@@ -492,6 +493,10 @@ class SocietyComparisonRunner:
     decision_role: DecisionRole = field(
         default_factory=lambda: decision_roles().deciding_for(PEOPLE)
     )
+    #: The engine of the society this runner defines comparisons of, whose terms its models are
+    #: asked under (:meth:`~exulanica.world.decision_roles.DecisionRole.contract_for`); None for
+    #: the role's own.
+    engine: str | None = None
     #: The bound a comparison started from the application runs under, a part of the process's
     #: budget; None for the local command, whose whole process budget is the comparison's.
     bound: BoundedBudget | None = None
@@ -524,7 +529,7 @@ class SocietyComparisonRunner:
         :meth:`~exulanica.world.society_decision_contract.DecisionContract.answering`), since the
         mechanism a model answers by changes what it chooses, not only how long it takes."""
         role = self.decision_role
-        contract = role.contract()
+        contract = role.contract_for(self.engine)
         try:
             spec = self.manifest.offered(role.chosen, arm.model_id)
         except ManifestError as exc:
@@ -574,7 +579,7 @@ class SocietyComparisonRunner:
         choices = SocietyModelChoiceRepository(
             connection, self.workspace_id, world_id=self.world_id
         ).history(version_id, self.decision_role)
-        return sorted(person["id"] for person in row["state"]["inhabitants"]), choices
+        return compared_people(row["state"]), choices
 
     def group_of_choice(
         self, version_id: uuid.UUID, choice_seq: int, *, connection: Any = None
@@ -674,7 +679,7 @@ class SocietyComparisonRunner:
         """Every model a definition names, an arm's or a person's outside the group, is recorded
         with the answering the contract and its manifest entry give it now: a definition that
         says otherwise could never run as it states itself (:meth:`_asking`)."""
-        contract = self.decision_role.contract()
+        contract = self.decision_role.contract_for(self.engine)
         for held in [*body["arms"].values(), *body["others"]]:
             config = held.get("provider_config")
             if config is None:

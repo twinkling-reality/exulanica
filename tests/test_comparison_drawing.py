@@ -18,10 +18,13 @@ from pathlib import Path
 import exulanica
 import psycopg
 import pytest
+from exulanica.abilities.registry import MODULES_PATH as ABILITY_MODULES_PATH
 from exulanica.api.routes import society_comparisons
 from exulanica.api.society_comparison_runner import SocietyComparisonRunner
 from exulanica.models.manifest import load_manifest
 from exulanica.movement.registry import MODULES_PATH
+from exulanica.things.catalogs import CATALOG_DIRECTORY as THING_CATALOG_DIRECTORY
+from exulanica.things.kinds import KINDS_DIRECTORY
 from exulanica.world import society_comparison_drawing as drawing_module
 from exulanica.world.decision_roles import REGISTRY_DIRECTORY
 from exulanica.world.society_catalogs import ROUTINE_DIRECTORY
@@ -86,18 +89,9 @@ def test_the_digest_covers_every_module_a_verified_replay_and_its_drawing_execut
     assert executed <= set(DRAWING_MODULES), sorted(executed - set(DRAWING_MODULES))
 
 
-def test_living_drawing_trace_is_covered_by_its_digest():
-    from test_society_living_comparison import _Choosing, _plan
-
-    plan = _plan("model")
-    played = play(plan, _Choosing())
-    stored = list(zip(played.requests, played.receipts, strict=True))
-    outcome = {
-        "status": "completed",
-        "minutes": {"state_sha256": played.minute_digests},
-        "events_sha256": played.events_sha256,
-        "receipts": {"count": len(played.receipts), "sha256": played.receipts_sha256},
-    }
+@pytest.mark.parametrize("family", ["living", "things"])
+def test_a_family_s_drawing_trace_is_covered_by_its_digest(family):
+    plan, stored, outcome = _living_played() if family == "living" else _things_played()
     executed: set[str] = set()
 
     def traced(frame, event, _arg):
@@ -112,7 +106,11 @@ def test_living_drawing_trace_is_covered_by_its_digest():
         drawing = replay_document(plan, {}, "model", "0" * 64, replayed, model_name=str)
     finally:
         sys.setprofile(None)
-    assert drawing["profile"] == "exulanica.society-comparison-run-replay/v3"
+    assert drawing["profile"] == (
+        "exulanica.society-comparison-run-replay/v3"
+        if family == "living"
+        else "exulanica.society-comparison-run-replay/v2"
+    )
     assert executed <= set(DRAWING_MODULES), sorted(executed - set(DRAWING_MODULES))
 
 
@@ -123,9 +121,29 @@ def test_the_digest_covers_the_data_a_replay_reads_as_well_as_its_code():
     seeds = set(ROUTINE_DIRECTORY.glob("society-comparison-seeds.v*.json"))
     assert len(seeds) >= 6
     assert set(ROUTINE_DIRECTORY.glob("*.json")) - seeds <= data
+    # A society of things' replay reads the ability modules, the thing catalogs and the kinds.
+    assert {ABILITY_MODULES_PATH, *KINDS_DIRECTORY.glob("*.json")} <= data
+    assert set(THING_CATALOG_DIRECTORY.glob("*.json")) <= data
     # A drawing names no seed and its replay reads no comparison catalog (below), so a new set of
     # held-out seeds is no drawing input.
     assert not seeds & data
+
+
+def _outcome(played):
+    return {
+        "status": "completed",
+        "minutes": {"state_sha256": played.minute_digests},
+        "events_sha256": played.events_sha256,
+        "receipts": {"count": len(played.receipts), "sha256": played.receipts_sha256},
+    }
+
+
+def _things_played():
+    from test_society_things_comparison import _Choosing, _knights, _plan
+
+    plan = _plan("model", group=_knights(), ticks=20)
+    played = play(plan, _Choosing())
+    return plan, list(zip(played.requests, played.receipts, strict=True)), _outcome(played)
 
 
 def _living_played():
@@ -143,11 +161,17 @@ def _living_played():
     return plan, stored, outcome
 
 
-@pytest.mark.parametrize("arm", ["model", "group", "routine", "living"])
+@pytest.mark.parametrize("arm", ["model", "group", "routine", "living", "things"])
 def test_a_replay_and_its_drawing_read_no_comparison_catalog(monkeypatch, arm):
     from exulanica.world import society_catalogs
 
-    plan, stored, outcome = _living_played() if arm == "living" else _played(arm)
+    plan, stored, outcome = (
+        _living_played()
+        if arm == "living"
+        else _things_played()
+        if arm == "things"
+        else _played(arm)
+    )
     read: list[str] = []
 
     def refused(*_args, **_kwargs):
@@ -171,7 +195,12 @@ def test_a_replay_and_its_drawing_read_no_comparison_catalog(monkeypatch, arm):
     monkeypatch.setattr(society_catalogs, "load_catalog", load)
     replayed = verified_replay(plan, stored, outcome)
     drawn = replay_document(
-        plan, {}, "model" if arm == "living" else arm, "0" * 64, replayed, model_name=str
+        plan,
+        {},
+        "model" if arm in ("living", "things") else arm,
+        "0" * 64,
+        replayed,
+        model_name=str,
     )
     assert drawn["profile"]
     assert read == []
