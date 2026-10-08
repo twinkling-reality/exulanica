@@ -470,12 +470,18 @@ them), four variants, route A. So a kind nobody has written anything for, a mode
 included, generates with no catalog edit. A drafted creature's recipe states route C, the creature
 route, with its appearance words and its extent (length along the depth) as its box; a being with no
 box of its own (a person, a light) has nothing to generate. The catalog
-[`assets/catalogs/generation/piece-recipes.v1.json`](../assets/catalogs/generation/piece-recipes.v1.json)
-holds only what was measured to do better for one kind version: plain words for the concept picture
-(lower case, no numeral, at most 80 characters), a variant count, or a box fill bar other than 800
-per mille, each entry with the measurement that justified it. Version 1 describes the well, the
-lamp post and the cafe table, each measured on Nebius against the bare kind name; the gate's arch
-wording was never run against the bare name, so the gate has no entry. An entry's words are catalog
+(`assets/catalogs/generation/piece-recipes.v<N>.json`) holds only what was measured to do better
+for one kind version: plain words for the concept picture (lower case, no numeral, at most 80
+characters), a variant count, or a box fill bar other than 800 per mille, each entry with the
+measurement that justified it. Every published version stays unchanged and is read by its number, so
+a request naming version 1 finds its words in version 1; new requests use the newest.
+[Version 1](../assets/catalogs/generation/piece-recipes.v1.json) describes the well, the lamp post
+and the cafe table, each measured on Nebius against the bare kind name.
+[Version 2](../assets/catalogs/generation/piece-recipes.v2.json) keeps those three and adds words
+measured in two warm sessions against the bare name and a second wording: the gate and the market
+stall (three of four within, from none), the bench (one of four, from none) and the seating planter
+(a long planter seat instead of a square pot, still short of its box); the second session's evidence
+is in `ml/appearance/evidence/generated-assets-session-2/`. An entry's words are catalog
 content, so a piece made with them is shared across workspaces; any other description is cached
 within its workspace.
 
@@ -623,11 +629,12 @@ decides, and runs every later step.
   3D model has to infer from a single painted view.
 
 **Planned, not built:** the operator's choice of route from the blind side-by-side pictures, route
-B's zero-area refusals, pieces that fill a thin box (gates, benches, lamp posts), a shopfront
-request shaped for a shallow fill slot, the admission's `generated` rights
-basis, a measured figure for how soon a file written from this Mac appears in the mount's listing
-and for a session's memory with two routes loaded, the product's own writer to the queue under the spending
-authority, and the Companion's offer of new pieces for a pack. Route C's camera on the plan's
-front left, as its words say, and a creature's body built on its sketch's own voxels, so the 3D
-model only details and paints it, are planned for a second pre-registered trial.
+B's zero-area refusals, pieces that fill a thin box (benches, seating planters, and lamp posts,
+whose 250 mm deep box no generated post has filled), a shopfront request shaped for a shallow fill
+slot, the admission's `generated` rights basis, a measured figure for how soon a file written from
+this Mac appears in the mount's listing and for a session's memory with two routes loaded, the
+product's own writer to the queue under the spending authority, and the Companion's offer of new
+pieces for a pack. Route C's camera on the plan's front left, as its words say, and a creature's
+body built on its sketch's own voxels, so the 3D model only details and paints it, are planned for a
+second pre-registered trial.
 

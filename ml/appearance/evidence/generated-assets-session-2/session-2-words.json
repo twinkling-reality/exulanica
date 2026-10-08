@@ -1,0 +1,12 @@
+{
+ "bench": ["a long slim park bench, a thin seat and low backrest, far longer than it is deep",
+           "a long backless wooden bench, one narrow plank on short legs"],
+ "gate": ["a wide flat wooden village gate: two thin posts and a wide open arch, flat",
+          "a wide open village archway of thin timber, flat and shallow"],
+ "lamp_post": ["a very tall slim iron street lamp, a thin bare pole, one arm, a small lamp",
+               "a tall slender pole street light, no base, one side arm, a small hanging lamp"],
+ "market_stall": ["a shallow market stall: a long counter under a high canopy on tall thin poles",
+                  "a wide shallow market stall, open front, tall thin poles, a high cloth roof"],
+ "seating_planter": ["a long low rectangular planter box with a wooden bench seat along its front",
+                     "a long narrow raised flower bed with a plank seat on its edge"]
+}

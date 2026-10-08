@@ -26,10 +26,12 @@ from exulanica_pieces.recipes import (
     BEING_ROUTE,
     DEFAULT_VARIANTS,
     OBJECT_ROUTE,
-    RECIPES_PATH,
+    load_recipe_versions,
     load_recipes,
     read_recipes,
     recipe_for_kind,
+    recipe_words,
+    recipes_path,
 )
 from exulanica_pieces.records import (
     BOX_FILL_MINIMUM_PER_MILLE,
@@ -46,6 +48,13 @@ from creature_support import form_of
 ROOT = Path(__file__).resolve().parents[1]
 BUDGETS = piece_budgets.read_budgets(ROOT)
 RECIPES = load_recipes(ROOT)
+VERSIONS = load_recipe_versions(ROOT)
+#: Every published catalog version's file digest, as each was published: a version is never edited,
+#: so a request naming it finds the words it was made with (version 1 as it landed in c0a78dc6).
+PUBLISHED = {
+    1: "2a29cf444f1a9059cace0afb8cddc5cfc962aed86675ef1e19aef401b73124d9",
+    2: "132aec490235269e09700f876e5dd4fe671f813477836b04f13c19c49107f791",
+}
 KINDS = ROOT / "assets/catalogs/things/kinds"
 PACK = {
     "id": "test.toon-town",
@@ -78,8 +87,8 @@ def _kind(name: str) -> dict[str, Any]:
     return json.loads((KINDS / name).read_text(encoding="utf-8"))
 
 
-def _catalog(**changes: Any) -> dict[str, Any]:
-    document = json.loads((ROOT / RECIPES_PATH).read_text(encoding="utf-8"))
+def _catalog(version: int = 2, **changes: Any) -> dict[str, Any]:
+    document = json.loads((ROOT / recipes_path(version)).read_text(encoding="utf-8"))
     document.update(changes)
     return document
 
@@ -98,23 +107,64 @@ def test_the_hand_section_is_the_body_plan_catalog_s_figure() -> None:
     assert sections == {HAND_SECTION_MM}
 
 
-def test_every_entry_names_a_shipped_kind_version_and_its_digest_is_its_bytes() -> None:
+def test_every_published_version_reads_unchanged_and_names_shipped_kind_versions() -> None:
     shipped = shipped_thing_kinds()
-    document = _catalog()
-    assert RECIPES.catalog_version == document["catalog_version"] == 1
-    assert RECIPES.sha256 == _digest(document)
-    assert len(RECIPES.entries) == len(document["entries"]) == 3
-    for raw in document["entries"]:
-        reference = (raw["kind"]["key"], raw["kind"]["version"])
-        assert reference in shipped
-        assert RECIPES.entries[reference].sha256 == _digest(raw)
+    assert sorted(VERSIONS) == sorted(PUBLISHED) and VERSIONS[2] == RECIPES
+    counts = {1: 3, 2: 7}
+    for version, digest in PUBLISHED.items():
+        raw_file = (ROOT / recipes_path(version)).read_bytes()
+        assert hashlib.sha256(raw_file).hexdigest() == digest
+        document = _catalog(version)
+        catalog = VERSIONS[version]
+        assert catalog.catalog_version == document["catalog_version"] == version
+        assert catalog.sha256 == _digest(document)
+        assert len(catalog.entries) == len(document["entries"]) == counts[version]
+        for raw in document["entries"]:
+            reference = (raw["kind"]["key"], raw["kind"]["version"])
+            assert reference in shipped
+            assert catalog.entries[reference].sha256 == _digest(raw)
+    # A newer version keeps every older entry as it was.
+    for reference, entry in VERSIONS[1].entries.items():
+        assert VERSIONS[2].entries[reference] == entry
+
+
+def test_a_request_finds_its_words_in_the_catalog_version_it_names() -> None:
+    well = _kind("well.v1.json")
+    one = recipe_for_kind(well, _digest(well), VERSIONS[1]).request_arguments()["recipe"]
+    two = recipe_for_kind(well, _digest(well), RECIPES).request_arguments()["recipe"]
+    words = "a round stone village water well with a small wooden roof and a bucket"
+    assert one == {"catalog_version": 1, "sha256": two["sha256"]}
+    assert two["catalog_version"] == 2
+    assert recipe_words(one, VERSIONS) == recipe_words(two, VERSIONS) == words
+    gate = _kind("gate.v1.json")
+    made = recipe_for_kind(gate, _digest(gate), RECIPES).request_arguments()
+    assert (
+        made["description"]
+        == "a wide flat wooden village gate: two thin posts and a wide open arch, flat"
+    )
+    assert recipe_words(made["recipe"], VERSIONS) == made["description"]
+    # Version 1 has no gate entry, so a request claiming one there finds no words.
+    assert recipe_words({**made["recipe"], "catalog_version": 1}, VERSIONS) is None
+    assert recipe_words({**made["recipe"], "catalog_version": 3}, VERSIONS) is None
+    assert recipe_for_kind(gate, _digest(gate), VERSIONS[1]).words is None
+
+
+def test_a_catalog_file_must_hold_the_version_its_name_states(tmp_path: Path) -> None:
+    directory = tmp_path / "assets/catalogs/generation"
+    directory.mkdir(parents=True)
+    (directory / "piece-recipes.v3.json").write_text(json.dumps(_catalog(1)), encoding="utf-8")
+    with pytest.raises(Refused, match="holds catalog_version 1"):
+        load_recipe_versions(tmp_path)
+    (directory / "piece-recipes.v3.json").unlink()
+    (directory / "piece-recipes.v03.json").write_text(json.dumps(_catalog(1)), encoding="utf-8")
+    with pytest.raises(Refused, match="not named"):
+        load_recipe_versions(tmp_path)
 
 
 def test_a_described_kind_s_request_is_the_hand_built_one() -> None:
     well = _kind("well.v1.json")
     recipe = recipe_for_kind(well, _digest(well), RECIPES)
-    entry = _catalog()["entries"][2]
-    assert entry["kind"] == {"key": "well", "version": 1}
+    entry = next(e for e in _catalog()["entries"] if e["kind"] == {"key": "well", "version": 1})
     built = build_request(
         pack=PACK, route=OBJECT_ROUTE, budgets=BUDGETS, **recipe.request_arguments()
     )
@@ -123,7 +173,7 @@ def test_a_described_kind_s_request_is_the_hand_built_one() -> None:
         slot_mm={"width": 1600, "depth": 1600, "height": 2200},
         description="a round stone village water well with a small wooden roof and a bucket",
         thing_kind={"key": "well", "version": 1, "sha256": _digest(well)},
-        recipe={"catalog_version": 1, "sha256": _digest(entry)},
+        recipe={"catalog_version": 2, "sha256": _digest(entry)},
         variants=4,
         pack=PACK,
         route="A",

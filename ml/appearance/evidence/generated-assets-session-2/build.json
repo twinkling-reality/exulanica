@@ -1,0 +1,114 @@
+{
+ "code_sha256": "60840d5ebf509dbf597517c8847c799cb2690d937679305a4d7c59b187c9e5d9",
+ "components_sha256": "97f9a5bba87ee08838f13673f8d749fd30260c92565f1be04cb670e17b4f94f3",
+ "entries": [
+  {
+   "items": 20,
+   "job_sha256": "aeecfd4568f42f6a077dd8c7148d26cd81e5d75b6b1862191ece8f83543c4f6f",
+   "pieces": [
+    {
+     "kind": "bench/v1",
+     "look_role": "fixture.bench",
+     "recipe": false,
+     "request_sha256": "bb2c870e66e35dfb5af33eaa8f307e6584878234c18a9267c3f947b66cc7523a",
+     "variants": 4,
+     "words": "a long slim park bench, a thin seat and low backrest, far longer than it is deep"
+    },
+    {
+     "kind": "gate/v1",
+     "look_role": "fixture.gate",
+     "recipe": false,
+     "request_sha256": "aa017a39760d0eb762f7efc0faa1fdc281a6b9fbbd9acfbc7cc6b55493b7bdd1",
+     "variants": 4,
+     "words": "a wide flat wooden village gate: two thin posts and a wide open arch, flat"
+    },
+    {
+     "kind": "lamp_post/v1",
+     "look_role": "fixture.lamp_post",
+     "recipe": true,
+     "request_sha256": "f5997a9faba43b36e2743305699f118b76232694baec03bd23a328ceaed95da8",
+     "variants": 4,
+     "words": "a very tall slim iron street lamp, a thin bare pole, one arm, a small lamp"
+    },
+    {
+     "kind": "market_stall/v1",
+     "look_role": "fixture.market_stall",
+     "recipe": false,
+     "request_sha256": "681f04e1250ae3fcf849ac5a44b1b88dde93f3189c82dbd395760554da71fc37",
+     "variants": 4,
+     "words": "a shallow market stall: a long counter under a high canopy on tall thin poles"
+    },
+    {
+     "kind": "seating_planter/v1",
+     "look_role": "fixture.seating_planter",
+     "recipe": false,
+     "request_sha256": "52915169fc96141e662dfc2536998be54f2e62aa474875d57abe7427e1592281",
+     "variants": 4,
+     "words": "a long low rectangular planter box with a wooden bench seat along its front"
+    }
+   ],
+   "stop": {
+    "estimate_seconds": 300,
+    "stop_at_seconds": 450
+   }
+  },
+  {
+   "items": 20,
+   "job_sha256": "dab326fa0e2c481ec2bda743e35450c3acc816a8c7d0dd6494626fd29a18328d",
+   "pieces": [
+    {
+     "kind": "bench/v1",
+     "look_role": "fixture.bench",
+     "recipe": false,
+     "request_sha256": "b5734e7979003580e5ee4fe5ce1e0abe79ef985d7c1d0b7df2013ccb31e7fe1d",
+     "variants": 4,
+     "words": "a long backless wooden bench, one narrow plank on short legs"
+    },
+    {
+     "kind": "gate/v1",
+     "look_role": "fixture.gate",
+     "recipe": false,
+     "request_sha256": "c1f5320472fe350916c25fea2b45082ecbc1de469c3615930d0d7ab881a12b18",
+     "variants": 4,
+     "words": "a wide open village archway of thin timber, flat and shallow"
+    },
+    {
+     "kind": "lamp_post/v1",
+     "look_role": "fixture.lamp_post",
+     "recipe": true,
+     "request_sha256": "c515ab97509d49368efc0ac4a6fc38ec92f53e9ca3451a9ba0e78e15250d1efa",
+     "variants": 4,
+     "words": "a tall slender pole street light, no base, one side arm, a small hanging lamp"
+    },
+    {
+     "kind": "market_stall/v1",
+     "look_role": "fixture.market_stall",
+     "recipe": false,
+     "request_sha256": "b4a870371407e3f29d74e58901738724183b981e8067aa0a9f2846573f96ae9d",
+     "variants": 4,
+     "words": "a wide shallow market stall, open front, tall thin poles, a high cloth roof"
+    },
+    {
+     "kind": "seating_planter/v1",
+     "look_role": "fixture.seating_planter",
+     "recipe": false,
+     "request_sha256": "a015e3664e5582f3a97106b899c51b6bb66275f03cd3462a061b049ba9a2fe83",
+     "variants": 4,
+     "words": "a long narrow raised flower bed with a plank seat on its edge"
+    }
+   ],
+   "stop": {
+    "estimate_seconds": 300,
+    "stop_at_seconds": 450
+   }
+  }
+ ],
+ "hand_section_mm": 60,
+ "pack": {
+  "id": "exulanica.cozy-town",
+  "sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+  "version": 3
+ },
+ "recipes_sha256": "17a25eee34e31c1577d1b70a04ca10d46b6745f021f7a45ad910f728e6ecff0c",
+ "words_sha256": "fd36bf81716e40a757e0d9ad1b40f793fac9b2a83c6fd82120c65c0da8c64183"
+}

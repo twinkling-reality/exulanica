@@ -1,0 +1,104 @@
+"""Build the second warm session's queue entries (route A): candidate recipe words for five kinds.
+
+Run: cd <worktree>; .venv/bin/python <this file> <out dir>
+Each request comes from exulanica_pieces.recipes.recipe_for_kind on a shipped kind document (its box,
+its look role, its grip when held, and the recipe catalog's words where an entry was measured); the
+hand's widest section is the body plan catalog's. Pack: exulanica.cozy-town as shipped, as the demo
+jobs used it. Session 1 made these five kinds too small for their boxes (the box's thin depth bound
+every contain fit), so each request here carries candidate words (session-2-words.json, beside this
+file) in place of the kind's key; a candidate enters the recipe catalog only once measured. Two
+entries, taken by the session in turn: the first candidate of every kind, then the second.
+Writes <out>/entry-<n>/requests/, <out>/entry-<n>/job.json and <out>/build.json. No network, no credential.
+"""
+
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, "ml/appearance")
+
+from exulanica.things.catalogs import thing_catalogs
+from exulanica.things.kinds import shipped_thing_kinds
+from exulanica.world.style_packs import manifest_sha256
+from exulanica_pieces.budgets import read_budgets
+from exulanica_pieces.canonical import canonical_bytes, sha256_hex
+from exulanica_pieces.recipes import load_recipes, recipe_for_kind
+from exulanica_pieces.records import build_job, build_request
+
+from exulanica_appearance.assets import nebius
+from exulanica_appearance.assets.remote import ROUTE_WEIGHTS
+
+repository = Path(".").resolve()
+out = Path(sys.argv[1]).resolve()
+out.mkdir(parents=True, exist_ok=False)
+budgets = read_budgets(repository)
+recipes = load_recipes(repository)
+kinds = shipped_thing_kinds()
+sections = {
+    socket.grip_section_mm_maximum
+    for plan in thing_catalogs().plans.values()
+    for socket in plan.sockets
+    if socket.grip_section_mm_maximum is not None
+}
+(section,) = sections
+
+manifest = json.loads((repository / "assets/style-packs/packs/exulanica.cozy-town/manifest.json").read_text())
+PACK = {
+    "id": manifest["pack_id"],
+    "palette": [s["srgb8"] for s in manifest["palette"]["swatches"]],
+    "sha256": manifest_sha256(manifest),
+    "style": "cozy faceted low-poly toon style, warm terracotta, cream and sage colours, chunky simple shapes",
+    "version": manifest["version"],
+}
+
+
+def latest(key: str) -> tuple[str, int]:
+    return max((k for k in kinds if k[0] == key), key=lambda k: k[1])
+
+
+WORDS = json.loads((Path(__file__).resolve().parent / "session-2-words.json").read_text())
+KEYS = ("bench", "gate", "lamp_post", "market_stall", "seating_planter")
+ENTRIES = [([latest(k) for k in KEYS], 300, choice) for choice in (0, 1)]
+
+manifests = {
+    name: sha256_hex((repository / "ml/appearance/weights" / name).read_bytes()) for name in ROUTE_WEIGHTS["A"]
+}
+components_sha256 = sha256_hex(
+    canonical_bytes({"profile": "exulanica.generated-asset-components/v1", "route": "A", "weights": manifests})
+)
+code_sha256 = sha256_hex(nebius.code_archive(repository))
+summary = {"words_sha256": sha256_hex((Path(__file__).resolve().parent / "session-2-words.json").read_bytes()),
+           "code_sha256": code_sha256, "components_sha256": components_sha256, "entries": [],
+           "hand_section_mm": section,
+           "pack": {"id": PACK["id"], "sha256": PACK["sha256"], "version": PACK["version"]},
+           "recipes_sha256": recipes.sha256}
+for number, (references, estimate, choice) in enumerate(ENTRIES, start=1):
+    folder = out / f"entry-{number}"
+    (folder / "requests").mkdir(parents=True)
+    requests = []
+    pieces = []
+    for reference in references:
+        kind = kinds[reference]
+        recipe = recipe_for_kind(kind.document, kind.sha256, recipes, section_mm_maximum=section)
+        arguments = recipe.request_arguments()
+        arguments["description"] = WORDS[reference[0]][choice]
+        raw = build_request(pack=PACK, route=recipe.route, budgets=budgets, **arguments)
+        requests.append(raw)
+        (folder / "requests" / f"{sha256_hex(raw)}.json").write_bytes(raw)
+        pieces.append({"kind": f"{reference[0]}/v{reference[1]}", "look_role": recipe.look_role,
+                       "recipe": recipe.entry is not None, "request_sha256": sha256_hex(raw),
+                       "variants": recipe.variants, "words": arguments["description"]})
+    job = build_job(
+        route="A",
+        components_sha256=components_sha256,
+        requests=requests,
+        code_sha256=code_sha256,
+        container="sha256:" + nebius.IMAGE.split("@sha256:")[1],
+        estimate_seconds=estimate,
+        budgets=budgets,
+    )
+    (folder / "job.json").write_bytes(job)
+    summary["entries"].append({"items": len(json.loads(job)["items"]), "job_sha256": sha256_hex(job),
+                               "pieces": pieces, "stop": json.loads(job)["stop"]})
+(out / "build.json").write_text(json.dumps(summary, indent=1, sort_keys=True) + "\n")
+print(json.dumps(summary, indent=1, sort_keys=True))

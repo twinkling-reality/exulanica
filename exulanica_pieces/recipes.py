@@ -14,12 +14,14 @@ a model drafted, a kind added next week) generates with no catalog edit:
 - an object's piece is made by route A, the production route; a being's look by route C, the
   creature route, which reads the recipe's words and box.
 
-The catalog ``assets/catalogs/generation/piece-recipes.v1.json`` holds only what was measured to
+The catalog ``assets/catalogs/generation/piece-recipes.v<N>.json`` holds only what was measured to
 do better than that for one kind version: plain words for the concept picture, how many variants
 to make, and a box fill bar other than :data:`~exulanica_pieces.records.BOX_FILL_MINIMUM_PER_MILLE`,
 each entry with the reason that measured it. An entry applies to exactly the kind version it
 names. A request built with an entry names it (the catalog's version and the entry's sha256), so a
-cached piece leads to the recipe that wrote its words.
+cached piece leads to the recipe that wrote its words. Every published version stays in the
+repository unchanged and readable by its number, so a request naming an older version still finds
+its words there; new recipes come from the newest version.
 
 Plain Python: the product reads this module, and a kind document reaches it as the mapping the
 product's own reader already checked.
@@ -49,17 +51,22 @@ __all__ = [
     "DEFAULT_VARIANTS",
     "OBJECT_ROUTE",
     "RECIPES_CATALOG_ID",
-    "RECIPES_PATH",
+    "RECIPES_DIRECTORY",
     "PieceRecipes",
     "Recipe",
     "RecipeEntry",
+    "load_recipe_versions",
+    "load_recipes",
     "read_recipes",
     "recipe_for_kind",
+    "recipe_words",
+    "recipes_path",
 ]
 
-#: Relative to the repository root.
-RECIPES_PATH: Final = "assets/catalogs/generation/piece-recipes.v1.json"
+#: Relative to the repository root; version N is ``piece-recipes.v<N>.json`` there.
+RECIPES_DIRECTORY: Final = "assets/catalogs/generation"
 RECIPES_CATALOG_ID: Final = "piece-recipes"
+_RECIPES_FILE: Final = re.compile(r"piece-recipes\.v([1-9][0-9]*)\.json")
 #: Variants a request asks for when its recipe states none: four, as every demo job made.
 DEFAULT_VARIANTS: Final = 4
 #: Route A (concept picture, TRELLIS-image-large) is the route the trial chose for pieces.
@@ -185,10 +192,16 @@ def _line(value: object, limit: int, where: str) -> str:
     return value
 
 
-def read_recipes(raw: bytes) -> PieceRecipes:
+def recipes_path(version: int) -> str:
+    """Where version ``version`` of the catalog lives, relative to the repository root."""
+    if not is_count(version, 1):
+        raise Refused("a recipe catalog version is a whole number from 1")
+    return f"{RECIPES_DIRECTORY}/{RECIPES_CATALOG_ID}.v{version}.json"
+
+
+def read_recipes(raw: bytes, where: str = "the piece recipe catalog") -> PieceRecipes:
     """The catalog, strictly: the house envelope, exact keys, each kind version once, every value
     in its bounds, and each entry improving on the derived recipe in at least one way."""
-    where = RECIPES_PATH
     document = exact_keys(parse_strict(raw, where), _CATALOG_KEYS, where)
     if document["schema_version"] != 1 or document["catalog_id"] != RECIPES_CATALOG_ID:
         raise Refused(f"{where} is schema version 1 of catalog {RECIPES_CATALOG_ID!r}")
@@ -250,9 +263,38 @@ def read_recipes(raw: bytes) -> PieceRecipes:
     )
 
 
-def load_recipes(repository: Path) -> PieceRecipes:
-    """The committed catalog."""
-    return read_recipes((repository / RECIPES_PATH).read_bytes())
+def load_recipe_versions(repository: Path) -> Mapping[int, PieceRecipes]:
+    """Every committed version of the catalog by its number, each held to its file's name."""
+    versions: dict[int, PieceRecipes] = {}
+    for path in sorted((repository / RECIPES_DIRECTORY).glob(f"{RECIPES_CATALOG_ID}.v*.json")):
+        match = _RECIPES_FILE.fullmatch(path.name)
+        if match is None:
+            raise Refused(f"{path.name} is not named {RECIPES_CATALOG_ID}.v<N>.json")
+        where = recipes_path(int(match.group(1)))
+        catalog = read_recipes(path.read_bytes(), where)
+        if catalog.catalog_version != int(match.group(1)):
+            raise Refused(f"{where} holds catalog_version {catalog.catalog_version}")
+        versions[catalog.catalog_version] = catalog
+    if not versions:
+        raise Refused(f"no {RECIPES_CATALOG_ID} catalog under {RECIPES_DIRECTORY}")
+    return MappingProxyType(versions)
+
+
+def load_recipes(repository: Path, version: int | None = None) -> PieceRecipes:
+    """One committed version of the catalog: ``version``, or the newest, which new requests use."""
+    versions = load_recipe_versions(repository)
+    chosen = max(versions) if version is None else version
+    if chosen not in versions:
+        raise Refused(f"no committed {recipes_path(chosen)}")
+    return versions[chosen]
+
+
+def recipe_words(recipe: Mapping[str, Any], versions: Mapping[int, PieceRecipes]) -> str | None:
+    """The words of the entry a request's ``recipe`` names, read in the catalog version it names,
+    or None when no committed version holds that entry."""
+    version = recipe.get("catalog_version")
+    catalog = versions.get(version) if isinstance(version, int) else None
+    return None if catalog is None else catalog.words_of(recipe)
 
 
 def _holdable(document: Mapping[str, Any]) -> Mapping[str, Any] | None:

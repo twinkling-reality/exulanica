@@ -177,18 +177,35 @@ def test_the_trial_evidence_reads_strictly_and_its_run_record_names_every_receip
     assert run["generations"] == sorted(receipts)
 
 
-def test_the_first_warm_session_s_evidence_reads_strictly_and_its_charges_are_its_markers(
-    repository: Path,
+@pytest.mark.parametrize(
+    ("folder", "record", "within_by_kind"),
+    [
+        (
+            "generated-assets-session-1",
+            "gpu-run-aijob-e05cx0ergby4xfwt0r.json",
+            {"well": 4, "cafe_table": 4, "lantern": 3, "planter_tree": 3},
+        ),
+        (
+            "generated-assets-session-2",
+            "gpu-run-aijob-e05ff25ssmw6nk0ey7.json",
+            {"gate": 3, "market_stall": 3, "bench": 1},
+        ),
+    ],
+)
+def test_a_warm_session_s_evidence_reads_strictly_and_its_charges_are_its_markers(
+    repository: Path, folder: str, record: str, within_by_kind: dict[str, int]
 ) -> None:
-    """One warm session served three queue entries in turn (evidence/generated-assets-session-1):
+    """A warm session served its queue entries in turn (evidence/generated-assets-session-N):
     every job runs the session's code, every receipt reads against its request, the entries were
-    claimed one after another, and the run record's charges are the done markers' milliseconds."""
+    claimed one after another, and the run record's charges are the done markers' milliseconds.
+    The pieces within every check, by kind, are the ones GEN's run reports counted from the
+    fetched results."""
     from exulanica_pieces.records import read_job
 
     from exulanica_appearance.assets.queue import charges_from_done, read_done, read_session
     from exulanica_appearance.gpu_run import read_gpu_run
 
-    root = repository / "ml/appearance/evidence/generated-assets-session-1"
+    root = repository / "ml/appearance/evidence" / folder
     session_raw = (root / "session.json").read_bytes()
     session = read_session(session_raw)
     session_sha256 = sha256_hex(session_raw)
@@ -211,15 +228,16 @@ def test_the_first_warm_session_s_evidence_reads_strictly_and_its_charges_are_it
         assert path.stem == sha256_hex(path.read_bytes()) and document["job_sha256"] in jobs
         receipts[path.stem] = document
     assert len(receipts) == sum(len(job["items"]) for job in jobs.values()) == 40
-    within = {}
+    within: dict[str, int] = {}
     for receipt in receipts.values():
-        kind = requests[receipt["request_sha256"]]["thing_kind"]["key"]
-        within[kind] = within.get(kind, 0) + receipt["verdict"]["within"]
-    assert sum(within.values()) == 14 and within["well"] == within["cafe_table"] == 4
+        if receipt["verdict"]["within"]:
+            kind = requests[receipt["request_sha256"]]["thing_kind"]["key"]
+            within[kind] = within.get(kind, 0) + 1
+    assert within == within_by_kind
 
     done = [p.read_bytes() for p in sorted((root / "done").glob("*.json"))]
     markers = sorted((read_done(raw) for raw in done), key=lambda marker: marker["claimed_at"])
-    assert [m["job_sha256"] for m in markers] and {m["job_sha256"] for m in markers} == set(jobs)
+    assert {m["job_sha256"] for m in markers} == set(jobs)
     for marker in markers:
         assert marker["session_sha256"] == session_sha256
         assert (root / "claimed" / f"{marker['job_sha256']}.json").is_file()
@@ -229,9 +247,7 @@ def test_the_first_warm_session_s_evidence_reads_strictly_and_its_charges_are_it
     for earlier, later in pairwise(markers):
         assert later["claimed_at"] >= earlier["ended_at"]
 
-    run = read_gpu_run(
-        (repository / "ml/appearance/evidence/gpu-run-aijob-e05cx0ergby4xfwt0r.json").read_bytes()
-    )
+    run = read_gpu_run((repository / "ml/appearance/evidence" / record).read_bytes())
     assert run["generations"] == sorted(receipts)
     account = run["charges"][0]["account"]
     expected = charges_from_done(done, session_sha256=session_sha256, account=account)
