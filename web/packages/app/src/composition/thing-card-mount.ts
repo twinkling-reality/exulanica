@@ -188,6 +188,8 @@ export function personCard(
       looks: routeLooks(facts?.route ?? null) ?? looksOf(facts?.look ?? null),
       holding: routeHolding(facts?.route ?? null) ?? facts?.holding ?? null,
       ...routeWords(facts?.route ?? null),
+      // What came across with a visitor the world decides for, as with one its program decides for.
+      crossing: facts?.crossing ?? null,
       said: cardLines(being.said, subjectId, models, true),
       heard: cardLines(being.heard, subjectId, models, false),
     }),

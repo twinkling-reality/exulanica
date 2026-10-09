@@ -265,6 +265,16 @@ describe('what came across with a visitor, on its card', () => {
     expect(asked).toEqual(['arrival-1']);
   });
 
+  it('shows what came across with a visitor the world decides for, as every game visitor of the demo is', async () => {
+    const { card, root, asked } = mountWith(async () => answer);
+    const decidedHere = being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'arrival-2', decidedBy: 'world' } });
+    card.view.show('visitor-2', about(decidedHere, { running: null, words: 'Their own routine.' }));
+    await settle();
+    expect(asked).toEqual(['arrival-2']);
+    expect(rowText(root, 'Came across')).toBe('Came acrossa steel sword is a sword herea player crosses as a travellerit crosses as a person of this world');
+    expect(rowText(root, 'Stayed behind')).toBe('Stayed behindthe player\'s healththis world has no health');
+  });
+
   it('reads a visitor\'s crossing even when its kind and look were read for another card first', async () => {
     const { card, root, asked } = mountWith(async () => answer);
     card.view.show('knight-0', about(being({})));
