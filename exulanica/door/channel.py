@@ -865,18 +865,18 @@ class ChannelRepository:
         """The departed frames of this grant's visitors after the first ``after``, at most
         ``limit``. A thing a visitor brought in goes home as the game item it came in as; a thing
         of the world it holds becomes the one item the mapping lets travel out for its kind only
-        under a grant that lets things be carried out, and otherwise none."""
+        where its arrival recorded that it may carry things out, and otherwise none."""
         rows = self._connection.execute(
-            "select e.event_id, e.subject_id, e.document, c.game_items "
+            "select e.event_id, e.subject_id, e.document, c.game_items, "
+            "coalesce((c.document->>'may_carry_out')::boolean, false) as may_carry_out "
             + _DEPARTURES
             + "order by e.tick, (e.document->>'order')::int offset %(after)s limit %(limit)s",
             {**self._ids, "after": after, "limit": limit},
         ).fetchall()
         if not rows:
             return []
-        may_carry_out = self.grant().scope.may_carry_out
-        # The mapping is read only where a thing of the world may travel out.
-        outbound = self._outbound() if may_carry_out else {}
+        # The mapping is read only where a visitor may carry a thing of the world out.
+        outbound = self._outbound() if any(row["may_carry_out"] for row in rows) else {}
         frames = []
         for row in rows:
             details = row["document"]["thing"]
@@ -890,7 +890,8 @@ class ChannelRepository:
                         details.get("carried", []),
                         came_as,
                         outbound,
-                        may_carry_out=may_carry_out,
+                        # The visitor's own right, fixed at its arrival, never the grant's now.
+                        may_carry_out=row["may_carry_out"],
                     ),
                 )
             )
@@ -1006,10 +1007,12 @@ class ChannelRepository:
         return written is not None
 
     def home(self, thing_id: uuid.UUID) -> dict[str, Any]:
-        """Call one of this grant's visitors home at the world's next minute, as its owner's
-        send-away does: the same departure (``sent_away``), so whichever of the two comes first
-        writes it and the other finds it written. Refused once the grant has ended, and for a thing
-        that is not one of its visitors here."""
+        """Call one of this grant's visitors home at the world's next minute, as its player asked:
+        the departure the owner's send-away writes (``sent_away``), stating that its player called
+        it (``called_by`` ``player``), so whichever of the two comes first writes it and the other
+        finds it written, and the society reads from it whether the visitor may take things of the
+        world home. Refused once the grant has ended, and for a thing that is not one of its
+        visitors here."""
         from exulanica.door.crossings import Visits, departure_id
 
         self._settle(self.grant())
@@ -1020,14 +1023,16 @@ class ChannelRepository:
                 self._connection, self._session.workspace_id, grant, self._session.actor
             )
             leaving = str(departure_id(grant.grant_id, thing_id, "sent_away"))
-            if visits.departure_written(thing_id, "sent_away"):
-                return {"departure_id": leaving, "recorded": False}
             if thing_id not in visits.present():
+                # Sent home already, by its owner or by an earlier call, whenever that committed.
+                if visits.departure_written(thing_id, "sent_away"):
+                    return {"departure_id": leaving, "recorded": False}
                 raise ChannelRefused(
                     "unknown_reference", 404, "nothing at this address is open to this channel"
                 )
-            visits.depart(thing_id, "sent_away")
-        return {"departure_id": leaving, "recorded": True}
+            # A send-away committed since is found under the same id: this call records nothing.
+            recorded = visits.depart(thing_id, "sent_away", called_by="player")
+        return {"departure_id": leaving, "recorded": recorded}
 
     def gone(self, thing_id: uuid.UUID) -> bool:
         """Record that the person behind one of this grant's visitors left the game: the visitor
@@ -1204,8 +1209,8 @@ def carried_home(
 ) -> list[dict[str, Any]]:
     """Each thing a departing visitor holds, with the game item it becomes: one it brought in
     goes home as the item it came in as; a thing of the world it holds becomes the one item the
-    mapping lets travel out for its kind (``outbound``) only under a grant that lets things be
-    carried out, and otherwise none."""
+    mapping lets travel out for its kind (``outbound``, by the kind's key) only where the visitor
+    may carry things out (its arrival's ``may_carry_out``), and otherwise none."""
     return [
         {
             "thing_id": held["id"],

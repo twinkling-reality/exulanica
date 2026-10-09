@@ -327,7 +327,10 @@ class Visits:
         ).fetchone()
         digest = sha256_of_canonical(dict(document)).hex()
         if held is not None:
-            if held["document_sha256"] != digest:
+            # A departure's id is derived from its grant, visitor and reason, so a row held under
+            # it is that departure whatever its words: an owner's send-away and a player's call
+            # home at the same moment differ only in who called, and the first written is the one.
+            if kind == "arrival" and held["document_sha256"] != digest:
                 raise ChannelRefused(
                     "crossing_id_reused", 409, "this id already names another crossing"
                 )
@@ -520,6 +523,11 @@ class Visits:
             # lock states it, never the bridge's; stated only where the world decides, so a
             # program's visitor's arrival keeps its bytes.
             **({"decided_by": "world"} if scope.visitors_decided_by == "world" else {}),
+            # Whether the visitor may take things of the world home, fixed as the grant says it at
+            # arrival: the society reads it from the visitor, and the door maps what it carries out
+            # by it, whatever the grant says later. Stated only where it may, so every other
+            # arrival keeps its bytes.
+            **({"may_carry_out": True} if scope.may_carry_out else {}),
         }
         check_arrival(document)
         with self.connection.transaction():
@@ -537,14 +545,17 @@ class Visits:
         ).fetchone()
         return row is not None
 
-    def depart(self, thing_id: uuid.UUID, reason: str) -> bool:
-        """Write the departure of one of this grant's visitors for ``reason``; True when new."""
+    def depart(self, thing_id: uuid.UUID, reason: str, *, called_by: str | None = None) -> bool:
+        """Write the departure of one of this grant's visitors for ``reason``; True when new.
+        ``called_by`` ``player`` says its player called it home (only with ``sent_away``); without
+        it a ``sent_away`` departure is its owner's."""
         society = self.society()
         document = {
             "profile": DEPARTURE_PROFILE,
             "departure_id": str(departure_id(self.grant.grant_id, thing_id, reason)),
             "thing_id": str(thing_id),
             "reason": reason,
+            **({} if called_by is None else {"called_by": called_by}),
         }
         check_departure(document)
         with self.connection.transaction():

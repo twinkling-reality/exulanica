@@ -488,12 +488,14 @@ def send_away(
         return _problem(404, "unknown_reference", "nothing at this address is available")
     visits = Visits(connection, session.workspace_id, grant, session.actor)
     try:
-        if visits.departure_written(thing_id, "sent_away"):
-            # Sent home already, by its owner or by its own bridge: the same departure.
-            return JSONResponse(status_code=202, content={"sent_away": str(thing_id)})
         if thing_id not in visits.present():
+            if visits.departure_written(thing_id, "sent_away"):
+                # Sent home already, by its owner or by its own bridge, whenever that committed:
+                # the same departure.
+                return JSONResponse(status_code=202, content={"sent_away": str(thing_id)})
             # The owner's own grant: saying it has no such visitor tells them nothing new.
             return _problem(404, "unknown_reference", "this grant has no visitor of that id here")
+        # A call home committed since is found under the same id: the same departure.
         visits.depart(thing_id, "sent_away")
     except ChannelRefused as exc:
         return _channel_problem(exc)
