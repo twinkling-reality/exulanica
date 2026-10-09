@@ -240,6 +240,12 @@ class _Greeter(FakeTransport):
         return HttpResponse(200, json.dumps(body))
 
 
+def _offers_a_line_to_everyone(sent: dict) -> bool:
+    """Whether a request the knight's model was sent offered saying something to everyone near."""
+    labels = sent["payload"]["tools"][0]["function"]["parameters"]["properties"]["action"]["enum"]
+    return any(label.startswith("say something to every") for label in labels)
+
+
 class _Staying(outside._Door):
     """An outside program that keeps its visitor where it is: it waits whenever it may."""
 
@@ -348,14 +354,18 @@ def test_a_heard_line_carrying_a_name_saved_later_is_left_out_of_an_outside_ask(
         [asked] = [r for r in door.asked if r["subject_id"] == visitor["id"]]
         assert HEARD not in [line["line"] for line in asked["context"]["heard"]]
         assert NAME.split()[0] not in json.dumps(asked["context"])
-        # And the knight's model, asked again, may not say the name now saved: its next line
-        # carrying it is refused, though the rules alone would let it through.
+        # And the knight's model, asked again with a line to everyone near offered, may not say
+        # the name now saved: its line carrying it is refused, though the rules alone would let
+        # it through. A minute in which nobody near hears the knight offers no such line, and the
+        # model waits; the ask that offers one is the one held here.
         for _ in range(10):
-            if len(transport.requests) > before:
+            if any(_offers_a_line_to_everyone(sent) for sent in transport.requests[before:]):
                 break
             snapshot = minute(snapshot)
         else:
-            raise AssertionError("the knight's model was never asked again in ten minutes")
+            raise AssertionError(
+                "the knight's model was never offered a line to everyone near in ten minutes"
+            )
         receipts = decisions._decisions(services, world, snapshot)
         latest = [r for r in receipts if r["subject_id"] == knight["id"]][-1]
         assert (latest["status"], latest["reason"]) == ("rejected", "line_refused_by_rules")
