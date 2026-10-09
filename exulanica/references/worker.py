@@ -157,9 +157,10 @@ class _Stopped(ExulanicaError):
 
 class _Admitted:
     """The workspace's request policy for one picture's reading. As the reading is sent it also asks
-    the picture's own re-check (exactly the rights it was read under still current, no person found
-    since), and it notes whether the request carrying the picture went through, so a picture is
-    named in the bundle even when no answer came back."""
+    the picture's own re-check (exactly the rights it was read under still current, none of its
+    requester's reading rights on it stopped since the request was made, no person found since),
+    and it notes whether the request carrying the picture went through, so a picture is named in
+    the bundle even when no answer came back."""
 
     def __init__(
         self, policy: HostedRequestPolicy, picture: ReferencePicture, capture_id: uuid.UUID

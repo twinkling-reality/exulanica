@@ -231,8 +231,9 @@ def test_a_picture_whose_requester_stopped_a_reading_right_since_asking_is_not_r
     source = reference_picture_source(upload.database.session, upload.store)
     picture = source(upload.workspace_id, capture_id, holder, asked)
     assert picture.recheck() is None
-    # The person stops one of their two current rights after asking: the other still stands, but
-    # the finish would withdraw whatever is read, so nothing is read.
+    # One of the person's two current rights is stopped alone after asking, as only a single-row
+    # stop outside the withdraw route (an operator's command) can do now: the other still stands,
+    # but the finish would withdraw whatever is read, so nothing is read.
     repository = IngestRepository(upload.repository.connection, upload.workspace_id)
     rights = upload.rows(
         "select right_id from personal_model_right where capture_id = %s and model_role = %s",
@@ -248,3 +249,41 @@ def test_a_picture_whose_requester_stopped_a_reading_right_since_asking_is_not_r
     assert refused.value.reason == "picture_not_admitted"
     # Asked after that stop, the remaining right is read.
     assert source(upload.workspace_id, capture_id, holder, _now(upload)).recheck() is None
+
+
+def test_stopping_one_picture_right_ends_its_grantor_s_other_current_ones(upload) -> None:
+    """Two admissions of one picture hold two reading rights; stopping one through the app's route
+    ends both, so asking again reads nothing, and the description right stays."""
+    from test_intake_upload import _TOKEN
+
+    capture_id = _admitted(upload, ("vision", "reference_vision"))
+    upload.drain(screened=False)
+    holder = _granted_by(upload, capture_id)
+    _admitted_again(upload, capture_id)
+    reading = upload.rows(
+        "select right_id from personal_model_right where capture_id = %s and model_role = %s "
+        "order by right_id",
+        capture_id,
+        "reference_vision",
+    )
+    assert len(reading) == 2
+    stopped = upload.client.post(
+        f"/personal-admission/model-rights/{reading[-1]['right_id']}/withdraw",
+        headers={"Authorization": f"Bearer {_TOKEN}"},
+    )
+    assert stopped.status_code == 200, stopped.text
+    assert stopped.json()["state"] == "ended"
+    states = upload.rows(
+        "select model_role, withdrawn_at is not null as ended from personal_model_right "
+        "where capture_id = %s order by model_role",
+        capture_id,
+    )
+    assert {(row["model_role"], row["ended"]) for row in states} == {
+        ("reference_vision", True),
+        ("vision", False),
+    }
+    with pytest.raises(PictureUnavailable) as refused:
+        reference_picture_source(upload.database.session, upload.store)(
+            upload.workspace_id, capture_id, holder, _now(upload)
+        )
+    assert refused.value.reason == "picture_not_admitted"

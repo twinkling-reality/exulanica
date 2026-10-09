@@ -57,6 +57,7 @@ import psycopg
 from fastapi import Depends, Header, Request
 from starlette.concurrency import run_in_threadpool
 
+from exulanica.api.account_repository import AccountRejected, AccountUnavailable
 from exulanica.api.admission import claim_workspace
 from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.api.permissions import (
@@ -94,6 +95,7 @@ __all__ = [
     "current_session",
     "get_services",
     "held_permissions",
+    "owns_workspace",
 ]
 
 
@@ -298,6 +300,23 @@ def held_permissions(request: Request, _session: CurrentSession) -> frozenset[Pe
 
 
 HeldPermissions = Annotated[frozenset[Permission], Depends(held_permissions)]
+
+
+def owns_workspace(request: Request, session: Session) -> bool:
+    """Whether the caller owns this session's workspace by its membership record (0058's
+    ``owner``): a browser session held in that role for this workspace. A bearer token is the
+    operator's grant to a program and holds no membership, so it answers no, as does a guest. The
+    account tables are the account role's alone, so the account runtime reads the role."""
+    if request.headers.get("authorization") is not None:
+        return False
+    accounts = get_services(request).accounts
+    if accounts is None:
+        return False
+    try:
+        account = accounts.browser_session(request)
+    except (AccountRejected, AccountUnavailable, TokenNotAccepted):
+        return False
+    return account.role == "owner" and account.session.workspace_id == session.workspace_id
 
 
 def scoped_connection(request: Request, session: CurrentSession) -> Iterator[psycopg.Connection]:

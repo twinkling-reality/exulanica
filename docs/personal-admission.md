@@ -86,9 +86,13 @@ subclass) otherwise, with `reason` one of `undeclared`, `missing`, `expired`, `w
 `changed`. It returns a `ModelRightDecision` naming the rights that permitted the hand-over.
 `grant_model_right`, `withdraw_model_right` and `model_rights_for_capture` are the writers and the
 reader. `POST /personal-admission/model-rights/{right_id}/withdraw` (permission `admission.write`)
-withdraws one right for the caller's workspace and answers with the right's reference and
-`"state": "ended"`; a second withdrawal changes nothing, and another workspace's right gets the same
-404 as an id nobody granted.
+withdraws a right for the caller's workspace and answers with that right's reference and
+`"state": "ended"`; a second withdrawal of it changes nothing, and another workspace's right gets
+the same 404 as an id nobody granted. A picture's reading right (role `reference_vision`) is
+stopped only by its grantor or an owner of the workspace (a browser session in the `owner`
+membership role), anyone else getting that same 404, and its stop also ends every reading right not
+yet withdrawn that its grantor holds on the picture, granted at or before the stop
+([reference notes, section 10](reference-notes-contract.md)).
 
 **Stopping a search right deletes the search entries made from the photograph.** Withdrawing a
 right for the `embedding` role, "Search index" in the photo drawer, writes a `caption_search`
@@ -245,7 +249,8 @@ granted against exactly those words. Neither answer is a permission. A search ri
 the role's earlier words, which said the search entries already made would stay, is listed with
 `notice_current` false, and the drawer shows it as allowed without the wording shown; stopping it
 deletes those entries as well, which removes more than those words said and nothing they promised
-to keep for the person. `POST /personal-admission/model-rights/{right_id}/withdraw` ends one right.
+to keep for the person. `POST /personal-admission/model-rights/{right_id}/withdraw` ends that right
+(a picture's reading right with its grantor's other reading rights on the picture, as above).
 
 For `review`, supply `reviewed_by_name`, `attestation`, and either `no-person` or `confirmed-regions`
 on every member. The attestation must exactly read:

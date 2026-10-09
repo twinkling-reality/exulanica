@@ -9245,7 +9245,7 @@
      "personal-admission"
     ],
     "summary": "Withdraw Right",
-    "description": "End one model right now. Final, and idempotent: a second withdrawal changes nothing.\n\nAnother workspace's right is answered exactly as an id nobody granted.",
+    "description": "End a model right now, and answer with that right. Final, and idempotent: a second\nwithdrawal of the same right changes nothing.\n\nAnother workspace's right is answered exactly as an id nobody granted. A picture's reading\nright is stopped only by the person who granted it or an owner of the workspace; anyone else\nis answered as for an id nobody granted. Stopping it ends, in this one transaction, every\nreading right not yet withdrawn that its grantor holds on that picture, so nothing more of it\nis sent whichever of them a request would have used; stopping it again ends only those granted\nat or before its own stop, never a consent given since.",
     "operationId": "withdraw_right_personal_admission_model_rights__right_id__withdraw_post",
     "parameters": [
      {

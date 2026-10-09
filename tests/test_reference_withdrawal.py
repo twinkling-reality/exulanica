@@ -1,12 +1,14 @@
 """Notes made from a person's own picture are withdrawn when the picture's right stops or the
-picture is deleted (migration 0160), whoever writes the stop, and however it races a job's finish.
+picture is deleted (migration 0160 and its follow-ups), whoever writes the stop, and however it
+races a job's finish.
 
 A photograph is ingested and admitted as the purge tests admit one, with a right for the picture
 reader's chain granted as the product grants it. A finished reference request's bundle names that
 picture and right, as the worker writes one. The stop is withdraw_model_right and the deletion is
-a capture tombstone, each written once as the runtime role (row security binds it) and once as the
-owner (a restore and an operator's command write as the owner). The races use two sessions and
-wait until one is blocked on the other's lock before letting it go.
+a tombstone of capture, interval or workspace scope, each written as the runtime role (row security
+binds it) and as the owner (a restore and an operator's command write as the owner). The races use
+two sessions and wait until one is blocked on the other's advisory lifecycle lock before letting it
+go.
 """
 
 from __future__ import annotations
@@ -342,15 +344,17 @@ class _Session(threading.Thread):
 
 
 def _blocked_or_done(pictured: Pictured, session: _Session) -> bool:
-    """Whether the session is seen waiting on a lock within the bound; False when it finished
-    without waiting, or never waited."""
+    """Whether the session is seen waiting on an advisory lock (the lifecycle lock every stop,
+    tombstone and finish takes) within the bound; False when it finished without waiting, never
+    waited, or waited on something else, such as a row."""
     deadline = time.monotonic() + _BLOCKED_WITHIN
     while time.monotonic() < deadline:
         if not session.is_alive():
             return False
         if session.pid is not None:
             waiting = pictured.fixture.rows(
-                "select 1 from pg_stat_activity where pid=%s and wait_event_type='Lock'",
+                "select 1 from pg_stat_activity where pid=%s and wait_event_type='Lock' "
+                "and wait_event='advisory'",
                 session.pid,
             )
             if waiting:
@@ -390,9 +394,9 @@ def test_a_finish_racing_a_deletion_it_waited_on_ends_withdrawn(pictured, scope)
 
 @pytest.mark.parametrize("stopped", ["read", "another", "granted_during"])
 def test_a_stop_racing_a_finish_it_waited_on_withdraws_what_the_finish_kept(pictured, stopped):
-    # The right the bundle was read under; another reading right its person holds on the picture,
-    # which the finish locks; or one the person grants while the finish is under way, which the
-    # finish never saw and which waits on the lifecycle lock instead.
+    # The right the bundle was read under; another reading right its person held on the picture
+    # before the finish; or one the person grants while the finish is under way. Each stop waits
+    # on the lifecycle lock the finish holds.
     claimed = _running(pictured, actor=ACCOUNT)
     right = None
     if stopped == "read":
@@ -533,6 +537,9 @@ def test_a_finish_after_its_person_stopped_another_right_on_the_picture_ends_wit
 
 
 def test_a_stop_made_before_the_request_was_asked_withdraws_nothing_new(pictured):
+    # A single-row stop, as only a writer outside the withdraw route (an operator's command) can
+    # make now: it leaves the person's other reading rights current, and a request asked after it
+    # is read under them.
     (again,) = pictured.granted_again()
     with pictured.runtime() as connection:
         _stop(connection, pictured.workspace_id, again.right_id)
@@ -554,3 +561,318 @@ def test_the_list_knows_whether_the_caller_holds_a_current_picture_right(picture
         for right in pictured.rights:
             _stop(stopping, pictured.workspace_id, right.right_id)
     assert not _holds_picture_right(connection, pictured.workspace_id, ACCOUNT)
+
+
+def test_a_finish_at_another_isolation_level_is_refused(pictured):
+    claimed = _running(pictured)
+    with (
+        pictured.runtime() as connection,
+        pytest.raises(psycopg.errors.SerializationFailure, match="READ COMMITTED"),
+        connection.transaction(),
+    ):
+        connection.execute("set transaction isolation level repeatable read")
+        _finish(connection, pictured, claimed)
+    assert pictured.request(claimed.request.reference_id).status == "running"
+
+
+def test_the_finish_check_refuses_a_request_it_cannot_find(pictured):
+    from psycopg.types.json import Jsonb
+
+    with (
+        pictured.runtime() as connection,
+        pytest.raises(psycopg.errors.CheckViolation, match="no reference request"),
+    ):
+        connection.execute(
+            "select reference_bundle_withdrawn(%s, %s, %s)",
+            (pictured.workspace_id, uuid.uuid4(), Jsonb(pictured.bundle().document())),
+        )
+
+
+def test_a_picture_stop_ends_its_grantor_s_other_reading_rights_and_no_one_else_s(pictured):
+    import datetime as dt
+    from types import SimpleNamespace
+
+    from exulanica.api.routes.personal_admission import withdraw_right
+    from exulanica.ingest.model_rights import grant_model_right
+    from exulanica.ingest.personal_admission import role_handoff
+    from exulanica.ingest.privacy import authorize_personal_capture
+
+    repository = pictured.fixture.repository
+    (again,) = pictured.granted_again()
+    someone_else = uuid.uuid4()
+    now = repository.connection.execute("select clock_timestamp() as at").fetchone()["at"]
+    authority = authorize_personal_capture(
+        repository,
+        capture_id=pictured.capture_id,
+        actor=someone_else,
+        account_authority_basis="I took this photograph too",
+        authorization_scope={"purpose": "Find my own photographs by what they show."},
+        purpose="Find my own photographs by what they show.",
+        authorized_at=now - dt.timedelta(hours=1),
+        valid_until=now + dt.timedelta(hours=2),
+    )
+    handoff = role_handoff("reference_vision")
+    (theirs,) = [
+        grant_model_right(
+            repository,
+            capture_id=pictured.capture_id,
+            authorization_id=authority.authorization_id,
+            identity=identity,
+            destination=handoff.destination,
+            granted_by=someone_else,
+            purpose="Find my own photographs by what they show.",
+            valid_until=now + dt.timedelta(minutes=60),
+        )
+        for identity in handoff.identities
+    ]
+    with pictured.runtime() as connection:
+        ended = withdraw_right(
+            again.right_id,
+            _BEARER,
+            connection,
+            SimpleNamespace(workspace_id=pictured.workspace_id, actor=ACCOUNT),
+        )
+    assert ended["state"] == "ended"
+    states = {
+        row["right_id"]: row["ended"]
+        for row in pictured.fixture.rows(
+            "select right_id, withdrawn_at is not null as ended from personal_model_right "
+            "where model_role = 'reference_vision'"
+        )
+    }
+    assert states[again.right_id] and all(states[r.right_id] for r in pictured.rights)
+    assert states[theirs.right_id] is False
+
+
+# -- the withdraw route: who stops a picture's reading right, what a stop ends, its locks ----------
+
+
+class _BearerRequest:
+    """What the withdraw route reads of a request a bearer token made: an Authorization header, so
+    no membership, as when the route is called directly."""
+
+    def __init__(self) -> None:
+        self.headers = {"authorization": "Bearer called-directly"}
+
+
+_BEARER = _BearerRequest()
+_SESSION_COOKIE = "__Host-exulanica-session"
+
+
+class _OwnerAccounts:
+    """The account runtime's methods the app calls, with one browser session: a fixed cookie
+    resolving to an ``owner`` membership of the workspace for ``actor``."""
+
+    def __init__(self, cookie: str, workspace_id: uuid.UUID, actor: uuid.UUID) -> None:
+        from exulanica.selection.validation import Session
+
+        self.cookie = cookie
+        self.session = Session(workspace_id, actor)
+
+    def browser_session(self, request):
+        from exulanica.api.account_repository import AccountSession
+        from exulanica.api.authorisation import TokenNotAccepted
+
+        if request.cookies.get(_SESSION_COOKIE) != self.cookie:
+            raise TokenNotAccepted("browser session was not accepted")
+        return AccountSession(uuid.uuid4(), self.session, "c" * 43, None, "owner")
+
+    def authenticate_request(self, request):
+        return self.browser_session(request).session
+
+    def active_owned_workspaces(self):
+        return ()
+
+    def recent_workspaces(self, _seconds):
+        return ()
+
+    def owned_workspace_active(self, _workspace_id) -> bool:
+        return True
+
+
+def _http(
+    pictured: Pictured, tmp_path, tokens: dict[str, uuid.UUID], owner: uuid.UUID | None = None
+):
+    """The app over the runtime role (row security binds it), each token a grant of every
+    permission for its actor, and, when ``owner`` is given, a browser session of the workspace's
+    owner held by that actor (cookie "owner-cookie")."""
+    import json
+
+    from exulanica.api.app import create_app
+    from exulanica.api.authorisation import load_token_directory
+    from exulanica.api.services import Services
+    from fastapi.testclient import TestClient
+
+    from tests_support_api import EVERY_PERMISSION
+
+    fixture = pictured.fixture
+    grants = {
+        token: {
+            "workspace_id": str(pictured.workspace_id),
+            "actor": str(actor),
+            "permissions": EVERY_PERMISSION,
+        }
+        for token, actor in tokens.items()
+    }
+    services = Services(
+        database=fixture.database(role=_APP_ROLE, password=_APP_PASSWORD),
+        readonly_database=fixture.database(role=_APP_ROLE, password=_APP_PASSWORD),
+        store=fixture.store,
+        tokens=load_token_directory({"EXULANICA_API_TOKENS": json.dumps(grants)}),
+        executor_shares_the_write_role=True,
+        model_client=None,
+        environment_admission_root=tmp_path / "admission",
+        accounts=(
+            None if owner is None else _OwnerAccounts("owner-cookie", pictured.workspace_id, owner)  # type: ignore[arg-type]
+        ),
+    )
+    return TestClient(create_app(services, verify=False))
+
+
+def _stop_over_http(http, right_id: uuid.UUID, *, token: str | None = None):
+    path = f"/personal-admission/model-rights/{right_id}/withdraw"
+    if token is not None:
+        return http.post(path, headers={"Authorization": f"Bearer {token}"})
+    return http.post(path, headers={"Cookie": f"{_SESSION_COOKIE}=owner-cookie"})
+
+
+def _reading_states(pictured: Pictured) -> dict[uuid.UUID, tuple[bool, uuid.UUID | None]]:
+    """Every reading right on the picture: whether it is withdrawn, and by whom."""
+    return {
+        row["right_id"]: (row["ended"], row["withdrawn_by"])
+        for row in pictured.fixture.rows(
+            "select right_id, withdrawn_at is not null as ended, withdrawn_by "
+            "from personal_model_right where capture_id = %s and model_role = 'reference_vision'",
+            pictured.capture_id,
+        )
+    }
+
+
+@pytest.mark.parametrize("who", ["grantor", "owner", "another"])
+def test_a_picture_right_is_stopped_only_by_its_grantor_or_the_workspace_s_owner(
+    pictured, tmp_path, who
+):
+    """Over HTTP as the runtime role. The grantor or an owner of the workspace (a browser session
+    in the owner role, another actor) ends every reading right the grantor holds on the picture,
+    each recorded as withdrawn by the caller, and the answer names the right asked for, here the
+    lowest id of them. Anyone else, holding every permission, is answered as for an id nobody
+    granted, and nothing changes."""
+    (again,) = pictured.granted_again()
+    held = sorted([*(right.right_id for right in pictured.rights), again.right_id])
+    caller = {"grantor": ACCOUNT, "owner": uuid.uuid4(), "another": uuid.uuid4()}[who]
+    tokens = {"grantor-token-long-enough-0000000000": ACCOUNT}
+    if who == "another":
+        tokens["another-token-long-enough-000000000"] = caller
+    with _http(pictured, tmp_path, tokens, owner=caller if who == "owner" else None) as http:
+        answered = _stop_over_http(
+            http,
+            held[0],
+            token={"grantor": "grantor-token-long-enough-0000000000", "owner": None}.get(
+                who, "another-token-long-enough-000000000"
+            ),
+        )
+    states = _reading_states(pictured)
+    if who == "another":
+        assert answered.status_code == 404, answered.text
+        assert answered.json()["detail"] == "no such model right"
+        assert all(ended is False for ended, _by in states.values())
+        return
+    assert answered.status_code == 200, answered.text
+    assert answered.json()["right_id"] == str(held[0])
+    assert answered.json()["state"] == "ended"
+    assert {right_id: states[right_id] for right_id in held} == {
+        right_id: (True, caller) for right_id in held
+    }
+
+
+def test_another_role_s_stop_through_the_route_leaves_the_picture_s_reading_rights(
+    pictured, tmp_path
+):
+    """A stop of the vision right, by its grantor, ends that right alone: the reading rights the
+    same person holds on the photograph stay current."""
+    (vision,) = pictured.vision[:1]
+    with _http(pictured, tmp_path, {"grantor-token-long-enough-0000000000": ACCOUNT}) as http:
+        answered = _stop_over_http(
+            http, vision.right_id, token="grantor-token-long-enough-0000000000"
+        )
+    assert answered.status_code == 200, answered.text
+    assert answered.json()["right_id"] == str(vision.right_id)
+    assert all(ended is False for ended, _by in _reading_states(pictured).values())
+
+
+def test_a_repeated_stop_ends_only_what_was_granted_before_the_first(pictured):
+    """A right stopped alone (a single-row stop, as an operator's command makes) leaves an older
+    sibling current: stopping it again through the route ends that sibling. A consent granted after
+    the stop is never ended by stopping the old right again."""
+    from types import SimpleNamespace
+
+    from exulanica.api.routes.personal_admission import withdraw_right
+
+    session = SimpleNamespace(workspace_id=pictured.workspace_id, actor=ACCOUNT)
+    (older,) = pictured.granted_again()
+    (stopped,) = pictured.rights[:1]
+    with pictured.runtime() as connection:
+        _stop(connection, pictured.workspace_id, stopped.right_id)
+    assert _reading_states(pictured)[older.right_id][0] is False
+    with pictured.runtime() as connection:
+        withdraw_right(stopped.right_id, _BEARER, connection, session)
+    assert _reading_states(pictured)[older.right_id][0] is True
+    (newer,) = pictured.granted_again()
+    with pictured.runtime() as connection:
+        answered = withdraw_right(stopped.right_id, _BEARER, connection, session)
+    assert answered["right_id"] == str(stopped.right_id)
+    assert _reading_states(pictured)[newer.right_id] == (False, None)
+
+
+def test_a_route_stop_locks_its_rights_before_it_takes_the_privacy_lock(pictured):
+    """A concurrent stop holds one sibling's row. The route's stop of another right waits on that
+    row lock holding no privacy-currency lock (a third session takes it at once), then ends both
+    once the row is free, with no deadlock. Were it to withdraw before locking its siblings, it
+    would wait on the row while holding privacy-currency: the deadlock the 3c3 review named."""
+    from types import SimpleNamespace
+
+    from exulanica.api.routes.personal_admission import withdraw_right
+
+    (sibling,) = pictured.granted_again()
+    (stopped,) = pictured.rights[:1]
+    session = SimpleNamespace(workspace_id=pictured.workspace_id, actor=ACCOUNT)
+    with pictured.runtime() as holder, holder.transaction():
+        holder.execute(
+            "select 1 from personal_model_right where workspace_id = %s and right_id = %s "
+            "for no key update",
+            (pictured.workspace_id, sibling.right_id),
+        )
+        route = _Session(
+            pictured,
+            lambda connection: withdraw_right(stopped.right_id, _BEARER, connection, session),
+        )
+        route.start()
+        assert _waits_on_a_row(pictured, route), "the route's stop never waited on the held row"
+        with pictured.runtime() as third, third.transaction():
+            free = third.execute(
+                "select pg_try_advisory_xact_lock("
+                "hashtextextended('privacy-currency:' || %s::text, 0)) as free",
+                (pictured.workspace_id,),
+            ).fetchone()
+            assert (free["free"] if isinstance(free, dict) else free[0]) is True
+    route.join(timeout=_BLOCKED_WITHIN)
+    assert not route.is_alive()
+    assert route.error is None, route.error
+    states = _reading_states(pictured)
+    assert states[stopped.right_id][0] is True and states[sibling.right_id][0] is True
+
+
+def _waits_on_a_row(pictured: Pictured, session: _Session) -> bool:
+    """Whether the session is seen waiting on a row lock (a transaction id or a tuple)."""
+    deadline = time.monotonic() + _BLOCKED_WITHIN
+    while time.monotonic() < deadline:
+        if not session.is_alive():
+            return False
+        if session.pid is not None and pictured.fixture.rows(
+            "select 1 from pg_stat_activity where pid = %s and wait_event_type = 'Lock' "
+            "and wait_event in ('transactionid', 'tuple')",
+            session.pid,
+        ):
+            return True
+        time.sleep(0.05)
+    return False

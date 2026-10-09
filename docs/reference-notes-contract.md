@@ -188,9 +188,9 @@ twice is 422 `pictures_repeated`. A request without web notes needs no grant for
 configured adapter, and still needs durable spending, because reading a picture is a model call.
 Naming pictures where they are not offered is 409 with the code the list's `pictures.code` states
 (`reference_pictures_not_offered`, or why a request without web notes is refused here), answered
-before anything about web notes, and naming one
-that may not be read is 409 `reference_picture_not_admitted` with its reason in the detail
-(section 10); either is refused before anything is queued.
+before anything about web notes, and naming one that may not be read is 409
+`reference_picture_not_admitted` with its reason in the detail (section 10); either is refused
+before anything is queued.
 
 The list's `pictures` is `{offered, code, maximum, consent?}`: `offered` is whether this workspace
 may name pictures here, `code` says why not (`reference_pictures_not_offered`, or the code a request
@@ -292,22 +292,28 @@ through, with the rights it was read under and the model that read it (the role'
 answer came back), and each note kept from a picture has basis `own_picture` and names its picture.
 A drafter is given web notes only unless it asks for picture notes (section 9).
 
-Stopping a picture's reading right, or deleting the picture, withdraws the notes made from it
-(migration 0160). A finished request whose bundle names the stopped right, or whose requester
-granted the stopped right and whose bundle names its picture (so a right that expired and was
-granted again is no way around a stop), or that names a picture a new tombstone blocks (scope
-`capture` or `interval` naming it, or `workspace`), becomes `withdrawn`: its
-bundle and the bundle's digest are cleared, its web notes go with it, and nothing else about it
-changes. A deletion withdraws when it is asked, whatever its effective time. Database triggers do
-this for every writer of a right's stop or a tombstone, in the writer's own workspace session, and a
-restore that replays the stop or the tombstone withdraws again. A job whose picture is stopped while
-it reads ends `withdrawn` rather than keep the notes: its finish ends withdrawn when a right its
-bundle names was stopped, when its requester stopped any reading right on one of its pictures after
+Only the person who granted a picture's reading right, or an owner of the workspace, may stop it;
+anyone else is answered 404 as for an id nobody granted. Stopping it ends every reading right not
+yet withdrawn that its grantor holds on that picture, in one transaction of the withdraw route (the
+rows locked in right id order before any changes), so nothing more of it is sent under another of
+them. Stopping an already stopped right again ends only the rights granted at or before its first
+stop, never a consent given since. Stopping it, or deleting the picture, withdraws the notes made
+from it (migration 0160). A finished request whose bundle names the stopped right, or whose
+requester granted the stopped right and whose bundle names its picture (so a right that expired and
+was granted again is no way around a stop), or that names a picture a new tombstone blocks (scope
+`capture` or `interval` naming it, or `workspace`), becomes `withdrawn`: its bundle and the bundle's
+digest are cleared, its web notes go with it, and nothing else about it changes. A deletion
+withdraws when it is asked, whatever its effective time. Database triggers do this for every writer
+of a right's stop or a tombstone, in the writer's own workspace session, and a restore that replays
+the stop or the tombstone withdraws again. A job whose picture is stopped while it reads ends
+`withdrawn` rather than keep the notes: its finish ends withdrawn when a right its bundle names was
+stopped, when its requester stopped any reading right on one of its pictures at or after the instant
 the request was made, or when a tombstone blocks one of its pictures. It asks under the
-per-workspace lifecycle lock that every stop of a reading right and every tombstone also takes before
-it withdraws, so a stop or deletion made while a finish is under way, of any right, including one
-granted meanwhile, is seen by one of the two. A drafter asking for a withdrawn request's notes is refused `reference_withdrawn`; a document already drafted
-from them keeps only the digest it recorded. An expired right is not a stop and withdraws nothing.
+per-workspace lifecycle lock that every stop of a reading right and every tombstone also takes
+before it withdraws, so a stop or deletion made while a finish is under way, of any right, including
+one granted meanwhile, is seen by one of the two. A drafter asking for a withdrawn request's notes
+is refused `reference_withdrawn`; a document already drafted from them keeps only the digest it
+recorded. An expired right is not a stop and withdraws nothing.
 
 ## 11. Limits
 
