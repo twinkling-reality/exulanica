@@ -272,6 +272,7 @@ answer the minute already holds is said to be taken and is never sent again, and
 limit says in how many seconds the next minute takes answers. A page opened again while the person still
 plays takes the band up again; the server gives a being back after its quiet minutes, and the band then
 says so. The inspector's words for a played being say its person chose what it does, never a model.
+While the band shows, toasts start below it rather than over it.
 
 ### The thing card
 

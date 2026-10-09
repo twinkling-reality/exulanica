@@ -13,7 +13,11 @@
   position: fixed;
   inset: 0;
   display: grid;
-  grid-template-rows: auto 1fr auto auto;
+  /*
+   * The strip scrolls sideways, so as a grid item it may shrink to nothing: its row and the offer's
+   * below it hold their whole content, or a page taller than the window lays the strip over the offer.
+   */
+  grid-template-rows: auto 1fr max-content max-content;
   grid-template-columns: minmax(0, 1fr);
   justify-content: stretch;
   align-content: stretch;

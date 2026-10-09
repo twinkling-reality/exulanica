@@ -82,7 +82,8 @@
 .x-region[data-region='dock'] > * { width: min(var(--dock-width), 100%); }
 .x-region[data-region='toast'] {
   z-index: var(--z-toast);
-  top: calc(var(--layout-top) + var(--space-2));
+  /* Below Play this one's band while it shows (ui/play-this-one.ts sets where it ends). */
+  top: max(calc(var(--layout-top) + var(--space-2)), calc(var(--play-band-bottom, 0px) + var(--space-2)));
   left: var(--layout-left);
   right: var(--layout-right);
   display: flex;

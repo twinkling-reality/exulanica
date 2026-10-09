@@ -213,4 +213,13 @@ describe('playing one being from the world', () => {
     await settle();
     expect(text(band, '.play-band-hint')).toBe('');
   });
+
+  it('holds where the band ends on the shell while it shows, so toasts start below it', async () => {
+    const { play, band } = harness([turnBody(3)]);
+    await play.play('knight');
+    expect(document.body.style.getPropertyValue('--play-band-bottom')).toMatch(/^\d+px$/u);
+    play.band.hide();
+    expect(document.body.style.getPropertyValue('--play-band-bottom')).toBe('');
+    expect(band.hidden).toBe(true);
+  });
 });

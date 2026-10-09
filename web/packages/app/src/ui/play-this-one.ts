@@ -98,6 +98,19 @@ export function buildPlayBand(handlers: {
     asking,
   ]);
 
+  /**
+   * Toasts share the top of the world with the band: while it shows, the shell holds where it ends
+   * (`--play-band-bottom`), and the toast region starts below it (ui/system/layout.css).
+   */
+  const reportSpace = (): void => {
+    const shell = root.parentElement;
+    if (shell === null) return;
+    if (root.hidden) { shell.style.removeProperty('--play-band-bottom'); return; }
+    const bottom = root.getBoundingClientRect().bottom - shell.getBoundingClientRect().top;
+    shell.style.setProperty('--play-band-bottom', `${Math.ceil(bottom)}px`);
+  };
+  if (typeof ResizeObserver === 'function') new ResizeObserver(reportSpace).observe(root);
+
   /** A field for a line: Enter says it, Escape leaves it; a count against the server's bound. */
   const lineField = (option: PlayOption, placeholder: string, maximum: number): HTMLElement => {
     const input = el('input', { type: 'text', class: 'play-band-line', maxlength: String(maximum), placeholder, 'aria-label': placeholder });
@@ -168,6 +181,7 @@ export function buildPlayBand(handlers: {
       } else {
         asking.replaceChildren();
       }
+      reportSpace();
     },
     hint(words) {
       if (hint.textContent !== (words ?? '')) hint.textContent = words ?? '';
@@ -183,9 +197,11 @@ export function buildPlayBand(handlers: {
       loose.replaceChildren();
       asking.replaceChildren();
       asking.hidden = true;
+      reportSpace();
     },
     hide() {
       root.hidden = true;
+      reportSpace();
     },
   };
 }
