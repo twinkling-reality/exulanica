@@ -10,11 +10,13 @@ or a separate playback process paired with an API that plays guests differently.
 
 from __future__ import annotations
 
+import contextlib
 import threading
 import uuid
 from types import SimpleNamespace
 
 import pytest
+from exulanica.api import decision_host
 from exulanica.api.account_runtime import (
     GUEST_PLAY_SECONDS_DEFAULT,
     GUEST_PLAYING_MAXIMUM_DEFAULT,
@@ -223,9 +225,20 @@ class _Reached(Exception):
     """Raised by the fake database: the host went past its workspace check."""
 
 
-def _host(discovered) -> DecisionHost:
-    def session(_workspace):
-        raise _Reached
+class _Unread:
+    """The connection a minute of a workspace whose models are not asked may open, which nothing
+    reads: the beings people play there are answered by ``answer_played``, replaced in the test."""
+
+    def execute(self, *_args, **_kwargs):
+        raise AssertionError("the minute read the database beyond answering played beings")
+
+
+def _host(discovered, *, answering: frozenset[uuid.UUID] = frozenset()) -> DecisionHost:
+    @contextlib.contextmanager
+    def session(workspace):
+        if workspace not in answering:
+            raise _Reached
+        yield _Unread()
 
     return DecisionHost(
         database=SimpleNamespace(session=session),  # type: ignore[arg-type]
@@ -240,17 +253,39 @@ def _host(discovered) -> DecisionHost:
 
 
 def _claim(workspace: uuid.UUID) -> SimpleNamespace:
-    return SimpleNamespace(workspace_id=workspace, actor=uuid.uuid4(), world_id="world:test")
+    return SimpleNamespace(
+        workspace_id=workspace, actor=uuid.uuid4(), world_id="world:test", version_id=uuid.uuid4()
+    )
 
 
-def test_the_decision_host_asks_for_a_discovered_workspace_and_no_other():
-    host = _host(lambda: frozenset({WATCHED}))
+def test_the_decision_host_asks_for_a_discovered_workspace_and_no_other(monkeypatch):
+    """A listed or a discovered workspace's minute goes on past the workspace check to ask its
+    models, which the fake database stops. Any other workspace's minute asks no model: it opens one
+    session to answer the beings people play there (``answer_played``, which asks nobody and spends
+    nothing) and runs alone exactly when one of them is played."""
+    answered: list[uuid.UUID] = []
+    played = [False]
+
+    def answer_played(_connection, society, *, version_id, actor):
+        answered.append(society.workspace_id)
+        return played[0]
+
+    monkeypatch.setattr(decision_host, "answer_played", answer_played)
+    host = _host(lambda: frozenset({WATCHED}), answering=frozenset({ELSEWHERE}))
     for asked in (LISTED, WATCHED):
         with pytest.raises(_Reached):
             host.before_minute(_claim(asked), lease_ends=0.0)  # type: ignore[arg-type]
+    assert answered == []
     assert host.before_minute(_claim(ELSEWHERE), lease_ends=0.0) is False  # type: ignore[arg-type]
-    # Without a discovered reader, as under process spending, only the listed one.
-    assert _host(None).before_minute(_claim(WATCHED), lease_ends=0.0) is False  # type: ignore[arg-type]
+    played[0] = True
+    assert host.before_minute(_claim(ELSEWHERE), lease_ends=0.0) is True  # type: ignore[arg-type]
+    assert answered == [ELSEWHERE, ELSEWHERE]
+    # Without a discovered reader, as under process spending, only the listed one's models are
+    # asked; the watched workspace's played beings are still answered.
+    played[0] = False
+    unlisted = _host(None, answering=frozenset({WATCHED}))
+    assert unlisted.before_minute(_claim(WATCHED), lease_ends=0.0) is False  # type: ignore[arg-type]
+    assert answered[-1] == WATCHED
     services = _services()
     assert services.society_runtime is None  # no runtime here, so no host is built
     assert _services(spending_mode=PROCESS).discovers_model_workspaces is False
