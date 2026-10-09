@@ -140,6 +140,8 @@ function mount() {
     showStatus: vi.fn(), admissionId: null,
     worldClient: worldClient as never, societyClient: societyClient as never, societyControlClient: controlClient as never,
     societyModelsClient: modelsClient as never,
+    // Bring people in reads the entry's engine when asked; this one states none (the saved world's own).
+    worldEntryClient: { entry: vi.fn(async () => ({ societyEngine: null })) } as never,
   });
   document.body.append(mounted.root);
   const panel = () => mounted.root.querySelector<HTMLElement>('section.world-inhabitants')!;
