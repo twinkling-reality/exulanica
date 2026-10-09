@@ -11,6 +11,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -190,3 +191,43 @@ def test_the_outcome_read_sends_each_confirmed_steps_own_answer():
     sent, bare = (body["steps"] for body in client.bodies)
     assert sent == [{"operation": "one", "answer": accepted}, {"operation": "two"}]
     assert bare == plan["steps"]
+
+
+def test_a_transcript_holds_no_door_credential_or_invite_code(tmp_path):
+    # A-136: a door grant's answer carries its channel credential, and an invite's its one-time
+    # code; the transcript keeps everything else of both bodies.
+    transcripts = DRIVE.Transcripts(tmp_path)
+    record = transcripts.recorder("w1", lambda: "D1")
+    secret = "J87" + "x" * 40
+    issued = {
+        "grant": {"grant_id": "g", "state": "active"},
+        "channel_credential": {"credential": secret, "shown": "once"},
+    }
+    invite = {"code": "invite-code-0123456789", "expires_at": "t", "shown": "once"}
+    problem = {"code": "grant_ended", "detail": "the grant has ended"}
+    for path, body in (
+        ("/door/grants", issued),
+        ("/door/grants/g/invites", invite),
+        ("/door/grants/g", problem),
+    ):
+        record(
+            DRIVE.Exchange(
+                "POST", path, {}, 201, {"secret": secret, "token": "topology_digest"}, body
+            )
+        )
+    written = (tmp_path / "w1.jsonl").read_text()
+    lines = [json.loads(line) for line in written.splitlines()]
+
+    assert secret not in written and "invite-code-0123456789" not in written
+    assert lines[0]["response_body"]["channel_credential"] == {
+        "credential": DRIVE.CREDENTIAL_PLACEHOLDER,
+        "shown": "once",
+    }
+    assert lines[0]["request_body"] == {
+        "secret": DRIVE.CREDENTIAL_PLACEHOLDER,
+        "token": "topology_digest",
+    }
+    assert lines[0]["response_body"]["grant"] == issued["grant"]
+    assert lines[1]["response_body"]["code"] == DRIVE.CREDENTIAL_PLACEHOLDER
+    # A problem's code is not an invite's: it is kept.
+    assert lines[2]["response_body"] == problem

@@ -185,8 +185,38 @@ class Row:
         }
 
 
+#: Keys whose string values are credentials wherever they appear in a body (A-136): the door's
+#: channel credentials, a secret, and a session's CSRF token. Not "token": the API names no bearer
+#: token in a body, and a capability descriptor's "token" names a digest's field, which is kept.
+CREDENTIAL_KEYS = frozenset({"credential", "secret", "csrf_token"})
+#: What a transcript holds in place of a credential.
+CREDENTIAL_PLACEHOLDER = "[credential]"
+
+
+def without_credentials(body: Any, path: str = "") -> Any:
+    """``body`` as a transcript holds it: every string under a credential key replaced, at any
+    depth, and the one-time code an invite is issued with (a body answering a path ending in
+    ``/invites``) replaced too."""
+    invite = path.rstrip("/").endswith("/invites")
+
+    def clean(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                k: CREDENTIAL_PLACEHOLDER
+                if isinstance(v, str) and (k in CREDENTIAL_KEYS or (invite and k == "code"))
+                else clean(v)
+                for k, v in value.items()
+            }
+        if isinstance(value, list):
+            return [clean(v) for v in value]
+        return value
+
+    return clean(body)
+
+
 class Transcripts:
-    """Every exchange of every client, by client name, as JSON lines. Never a credential."""
+    """Every exchange of every client, by client name, as JSON lines. Never a credential: every
+    body passes :func:`without_credentials` before it is written (A-136)."""
 
     def __init__(self, directory: Path) -> None:
         self.directory = directory
@@ -203,8 +233,8 @@ class Transcripts:
                 "path": exchange.path,
                 "query": dict(exchange.query),
                 "status": exchange.status,
-                "request_body": exchange.request_body,
-                "response_body": exchange.response_body,
+                "request_body": without_credentials(exchange.request_body, exchange.path),
+                "response_body": without_credentials(exchange.response_body, exchange.path),
             }
             with path.open("a") as handle:
                 handle.write(json.dumps(entry, sort_keys=True) + "\n")
@@ -4046,7 +4076,19 @@ THINGS_ROWS = (
         "turn offers the knight a line within the bound, the row is blocked, not failed. "
         "Scripted agent; functional only.",
     ),
+    (
+        "N1.y",
+        "things.card_in_page",
+        "things-card",
+        "In the same session, the knight's card in the page (candidate-35): its Can phrases are "
+        "the API card's abilities' words, in order; every thing the API card says it holds is "
+        "named under Holding; Change beside Looks like then a look not worn records the choice: "
+        "the API card wears another look, chosen by the owner, and the card says what changed. "
+        "Run whether or not a line was taken.",
+    ),
 )
+#: The steps of the things session that show a line, and so are blocked when none was taken.
+THINGS_LINE_STEPS = frozenset({"things-lines"})
 
 
 #: The scene, the being the agent decides for, the line it says, and the agent's bounds.
@@ -4433,6 +4475,7 @@ def prepare_things(stack: Stack, out: Path) -> dict[str, Any]:
     )
     return {
         "said": bool(seen.get("said")),
+        "ready": True,
         "why": None if seen.get("said") else f"no line was taken in {seen.get('turns')} turns",
         "things_world": entry["entry_id"],
         "speaker": speaker,
@@ -4481,6 +4524,12 @@ def browser(arguments: argparse.Namespace) -> int:
             "the things and outside sessions need --society-of-things and --door-bridges FILE"
         )
     rehearse = _rehearsal()
+
+    def shown(step: str) -> bool:
+        """Whether the page session drives a step: every step but a line's when none was said
+        (N1.y runs without a line, N1.v does not)."""
+        return not (things and step in THINGS_LINE_STEPS and not facts.get("said"))
+
     steps = json.loads((REPOSITORY / "scripts" / "rehearsal" / "steps.json").read_text())
     out = Path(arguments.out).resolve()
     session_dir = out / "session"
@@ -4509,7 +4558,11 @@ def browser(arguments: argparse.Namespace) -> int:
         "session": {
             "id": "n1s" if people else "n1v" if things else "n1w" if outside else "n1j",
             "budget_seconds": JOURNEY_BUDGET_SECONDS,
-            **({"steps": [step for _, _, step, _ in listed]} if people or staged else {}),
+            **(
+                {"steps": [step for _, _, step, _ in listed if shown(step)]}
+                if people or staged
+                else {}
+            ),
             **({"facts": facts} if staged else {}),
         },
         "out": str(session_dir),
@@ -4533,9 +4586,9 @@ def browser(arguments: argparse.Namespace) -> int:
         quiet if quiet.exists() else None,
         ["node", str(JOURNEY_RUNNER), str(plan_file)],
     )
-    if staged and not facts.get("said"):
+    if staged and not (facts.get("said") or (things and facts.get("ready"))):
         # Nothing was said (or the agent is not there), so there is nothing to show: no page
-        # session (A-108, A-116).
+        # session (A-108, A-116); a things session whose world is ready still shows its card.
         completed = subprocess.CompletedProcess(command, None, "", f"not run: {facts.get('why')}")
     else:
         completed = subprocess.run(
@@ -4606,9 +4659,10 @@ def browser(arguments: argparse.Namespace) -> int:
     # The people and things sessions drive only their own steps, so they state no journey row; a
     # things session whose agent said no line is blocked, not failed (A-108).
     if staged and not facts.get("said"):
-        for blocked in worlds_rows:
-            blocked.blocked_by.append(str(facts.get("why")))
-            blocked.close()
+        for blocked, (_, _, step, _) in zip(worlds_rows, listed, strict=True):
+            if not things or step in THINGS_LINE_STEPS or not facts.get("ready"):
+                blocked.blocked_by.append(str(facts.get("why")))
+                blocked.close()
     for one in worlds_rows if staged else []:
         one.observed["facts"] = facts
     rows = worlds_rows if people or staged else [row, *worlds_rows]

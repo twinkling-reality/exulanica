@@ -5581,7 +5581,8 @@ def row_v2(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
         "200 alike; another over the maximum 409 visitors_full; after a step the frames say "
         "arrived, the society holds the visitor (came_by crossed) with the torch it carried, the "
         "models view names it outside and the thing-looks read its look chosen by its crossing; "
-        "gone 202; send-away 202 and after a step departed sent_home carrying the torch; a delivery "
+        "gone 202; send-away 202 and after a step departed sent_home carrying the torch, which the "
+        "world then no longer holds (A-130); a delivery "
         "naming another thing 422 delivery_not_this_departure, the right one 202 recorded and again "
         "not recorded; the revoke then a step gives grant_ended and the next poll 410; the replay "
         "answers the live state; another workspace 404; read-only 403.",
@@ -5754,6 +5755,19 @@ def row_v2(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
         and [c.get("game_item") for c in carried] == [CROSSING_ITEM],
         f"send-away answered {status_away}; departed {departed}",
     )
+    # A-130 (b72a7dee): what the visitor brought went home with it, so the world holds it no more.
+    torch = [t.get("id") for t in held]
+    _, after_society = F.society(w1, "V2 after", entry)
+    left = [
+        t.get("id")
+        for t in ((after_society or {}).get("state") or {}).get("things") or []
+        if t.get("id") in torch
+    ]
+    row.expect(
+        bool(torch) and [c.get("thing_id") for c in carried] == torch and not left,
+        f"the departure carried {[c.get('thing_id') for c in carried]}; the brought {torch}; "
+        f"still in the world {left}",
+    )
     departure = departed.get("departure_id")
     report = {
         "delivered": [
@@ -5822,6 +5836,7 @@ def row_v2(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
         "look": worn,
         "gone": [status_gone, gone],
         "departed": departed,
+        "brought_left_in_world": left,
         "delivery": [
             status_wrong,
             F.problem_code(wrong_answer),
@@ -6271,7 +6286,9 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
         "grant naming no version is 422 invalid_scope and one naming the starter's version, whose "
         "society holds no things, is 409 world_not_open_to_visitors (A-109). Named things (A-88): "
         "on a generated town with its society, a grant naming two of its people and the version is "
-        "201, the same request again 200 with the same grant, and the people role reads them "
+        "201, the same request again 200 with the same grant, as is the same request with its "
+        "things reordered, neither carrying a second credential, and the first issue's credential "
+        "still says hello 200 (A-131); the people role reads them "
         "decided from outside; an unknown bridge is 422 bridge_not_offered; the read-only grant is "
         "refused 403; the other workspace reads no grant of workspace 1's (404); things without the version, or the version without things, are 422 "
         "invalid_scope; a person not in the world is 422 person_not_in_this_world. One channel "
@@ -6380,6 +6397,24 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
         status_again == 200 and ((again or {}).get("grant") or {}).get("grant_id") == named_id,
         f"the same request again answered {status_again}",
     )
+    # A-131 (e3e28f29): the same issue with its things in another order is the same grant, 200,
+    # carrying no second credential, so the first stays live.
+    status_reordered, reordered = w1.call(
+        "D1 named",
+        "POST",
+        "/door/grants",
+        query=town_query,
+        body={**named_body, "things": list(reversed(named_body["things"]))},
+    )
+    row.expect(
+        status_reordered == 200
+        and ((reordered or {}).get("grant") or {}).get("grant_id") == named_id
+        and not (reordered or {}).get("channel_credential")
+        and not (again or {}).get("channel_credential"),
+        f"the issue with its things reordered answered {status_reordered} "
+        f"{F.problem_code(reordered)}",
+    )
+    issued_credential = ((bound or {}).get("channel_credential") or {}).get("credential")
     refusals = {}
     for name, change, client, status, code in (
         ("unknown bridge", {"bridge": "q10-nobody"}, w1, 422, "bridge_not_offered"),
@@ -6411,6 +6446,13 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
         "mapping": json.loads((worktree / DOOR_MAPPING).read_text()),
         "reads": list(DOOR_READS),
     }
+    status_issued_hello, _ = door_call(
+        stack, issued_credential, "POST", "/door/channel/hello", hello
+    )
+    row.expect(
+        status_issued_hello == 200,
+        f"the credential the first issue gave answered {status_issued_hello} after the re-sends",
+    )
     path = f"/door/grants/{named_id}/channel-credentials"
     _, first = w1.call("D1 credential", "POST", path, query=town_query, body={})
     first_credential = (first or {}).get("credential")
@@ -6479,6 +6521,8 @@ def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
         },
         "credentials": {
             "first_hello": [status_hello, F.problem_code(said)],
+            "reordered_issue": [status_reordered, F.problem_code(reordered)],
+            "issued_credential_hello_after_resends": status_issued_hello,
             "second": status_second,
             "first_after_second": [status_ended, F.problem_code(ended_answer)],
             "poll_before_hello": [status_early, F.problem_code(early)],
@@ -6616,6 +6660,74 @@ def row_ag1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
     return row.close()
 
 
+#: How many grants a workspace may issue in any 24 hours (docs/door-contract.md, e3e28f29).
+GRANTS_A_DAY = 50
+
+
+def row_dr2(stack: Stack, transcripts: Any, worktree: Path) -> Row:
+    row = Row(
+        "DR2",
+        "door.grants_a_day",
+        f"A workspace issues at most {GRANTS_A_DAY} grants in any 24 hours (candidate-35): workspace 2 "
+        f"issues {GRANTS_A_DAY} grants naming one person of its own town, each 201; the next is 429 "
+        "too_many_grants with retry_after_s; workspace 1, whose own grants are fewer, still issues "
+        "one, 201.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    declared = json.loads((worktree / DOOR_BRIDGE_ENTRY).read_text())
+
+    def issue(c: Any, town: Mapping[str, Any], person: str) -> tuple[int, Any]:
+        return c.call(
+            "DR2",
+            "POST",
+            "/door/grants",
+            query=F.world_query(town),
+            body={
+                "idempotency_key": str(uuid.uuid4()),
+                "bridge": declared["bridge"],
+                "things": [person],
+                "version_id": town["authored_version_id"],
+                "minutes": 5,
+            },
+        )
+
+    def first_person(c: Any, town: Mapping[str, Any]) -> str | None:
+        _, society = F.society(c, "DR2", town)
+        return next(
+            (p.get("id") for p in ((society or {}).get("state") or {}).get("inhabitants") or []),
+            None,
+        )
+
+    town_2 = generated_town(w2, "DR2", "Q10 DR2 town")
+    person_2 = first_person(w2, town_2)
+    statuses = [issue(w2, town_2, person_2)[0] for _ in range(GRANTS_A_DAY)] if person_2 else []
+    status_over, over = issue(w2, town_2, person_2) if person_2 else (None, {})
+    town_1 = generated_town(w1, "DR2", "Q10 DR2 own town")
+    person_1 = first_person(w1, town_1)
+    status_other, other = issue(w1, town_1, person_1) if person_1 else (None, {})
+    row.expect(
+        len(statuses) == GRANTS_A_DAY and all(s == 201 for s in statuses),
+        f"workspace 2's grants answered {sorted(set(statuses))} ({statuses.count(201)} of "
+        f"{GRANTS_A_DAY} 201)",
+    )
+    retry = (over or {}).get("retry_after_s")
+    row.expect(
+        status_over == 429
+        and F.problem_code(over) == "too_many_grants"
+        and isinstance(retry, (int, float))
+        and retry > 0,
+        f"the grant past the bound answered {status_over} {F.problem_code(over)} retry {retry}",
+    )
+    row.expect(status_other == 201, f"workspace 1's grant answered {status_other}")
+    row.observed = {
+        "issued": {str(s): statuses.count(s) for s in sorted(set(statuses))},
+        "over": [status_over, F.problem_code(over), retry],
+        "other_workspace": [status_other, F.problem_code(other)],
+    }
+    return row.close()
+
+
 def door(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -6630,6 +6742,7 @@ def door(arguments: argparse.Namespace) -> int:
     rows = [row_d1(stack, transcripts, worktree)]
     if stack.state.get("society_playback") and stack.state.get("scripted_model"):
         rows.append(row_ag1(stack, transcripts, worktree, out))
+    rows.append(row_dr2(stack, transcripts, worktree))
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
 
@@ -7814,9 +7927,188 @@ def row_hn1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
             for e in hands
         ][:12],
         "sword": {k: held.get(k) for k in ("held_by", "socket", "position_mm")},
+        "entry_id": record["entry_id"],
         "scripted_calls": len(log),
         "chose": sorted({str(c.get("chose")).split(",")[0] for c in log if c.get("chose")})[:12],
         "replay": status_replay,
+    }
+    return row.close()
+
+
+THING_CARD_PROFILE = "exulanica.thing-card/v1"
+THING_CATALOGS = Path("assets") / "catalogs" / "things"
+
+
+def row_tc1(stack: Stack, transcripts: Any, worktree: Path, hn1: Mapping[str, Any]) -> Row:
+    abilities = {
+        a["key"]: a
+        for a in json.loads((worktree / THING_CATALOGS / "abilities.v1.json").read_text())[
+            "entries"
+        ]
+    }
+    shipped = [
+        json.loads(path.read_text())
+        for path in sorted((worktree / THING_CATALOGS / "looks").glob("*.json"))
+    ]
+    row = Row(
+        "TC1",
+        "things.card",
+        "A thing's card (candidate-35), on HN1's society: the knight's card is "
+        f"{THING_CARD_PROFILE} with its kind file's label and class, abilities exactly the kind's "
+        "abilities whose module the society runs (abilities.v1.json, the state's modules), holding "
+        "the sword, a decider and every shipped look for its body plan; the sword's card is held "
+        "by the knight in HN1's socket with no decider; choosing another shipped look answers the "
+        "card with only the look replaced (same minute and state digest); a sword look on the "
+        "knight is 422 look_unfit and an unknown digest 422 look_not_shipped, neither written; "
+        "another workspace reads it 404, and the author's placed id is not a card.",
+    )
+    beings = hn1.get("beings") or {}
+    knight, sword = beings.get("knight"), beings.get("sword")
+    if not hn1.get("entry_id") or not knight or not sword:
+        row.blocked_by.append("HN1 left no society with a knight and a sword")
+        return row.close()
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    entry = F.read_entry(w1, "TC1", hn1["entry_id"])
+    query = F.world_query(entry)
+    # Paused, so every read below sees one minute and the look's answer compares with the card.
+    status_paused, _ = control(w1, "TC1", entry, "paused")
+    time.sleep(GUEST_READ_SECONDS)
+    path = lambda thing: F.version_path(entry, f"/society/things/{thing}")  # noqa: E731
+    _, society = F.society(w1, "TC1", entry)
+    state = (society or {}).get("state") or {}
+    held = next((t for t in state.get("things") or [] if t.get("id") == sword), {})
+    status, card = w1.call("TC1", "GET", path(knight), query=query)
+    card = card if isinstance(card, dict) else {}
+    kind = card.get("kind") or {}
+    kind_file = (
+        json.loads(
+            (
+                worktree
+                / THING_CATALOGS
+                / "kinds"
+                / f"{kind.get('kind')}.v{kind.get('version')}.json"
+            ).read_text()
+        )
+        if kind.get("kind")
+        else {}
+    )
+    runs = set(state.get("modules") or [])
+    expected_abilities = [
+        {
+            "key": a["key"],
+            "words": abilities[a["key"]]["words"],
+            "module": abilities[a["key"]]["module"],
+        }
+        for a in kind_file.get("abilities") or []
+        if a["key"] in abilities and abilities[a["key"]]["module"] in runs
+    ]
+    plan = (kind_file.get("body") or {}).get("plan")
+    expected_looks = sorted(
+        (d["look"], d["version"]) for d in shipped if d.get("body_plan") == plan
+    )
+    listed_looks = sorted(
+        (entry_.get("look"), entry_.get("version"))
+        for entry_ in card.get("looks") or []
+        if entry_.get("source") != "workspace"
+    )
+    row.expect(
+        status == 200
+        and card.get("profile") == THING_CARD_PROFILE
+        and kind.get("label") == kind_file.get("label")
+        and kind.get("class") == kind_file.get("class") == "being",
+        f"the knight's card answered {status} {card.get('profile')} {kind.get('label')}",
+    )
+    row.expect(
+        card.get("abilities") == expected_abilities
+        and "follow" not in [a["key"] for a in card.get("abilities") or []],
+        f"the card's abilities are {[a.get('key') for a in card.get('abilities') or []]}, "
+        f"expected {[a['key'] for a in expected_abilities]}",
+    )
+    row.expect(
+        [h.get("thing_id") for h in card.get("holding") or []] == [sword],
+        f"the knight holds {card.get('holding')}",
+    )
+    row.expect(card.get("decider") is not None, "the knight's card names no decider")
+    row.expect(
+        listed_looks == expected_looks,
+        f"the card lists looks {listed_looks}, shipped {expected_looks}",
+    )
+    status_sword, sword_card = w1.call("TC1 sword", "GET", path(sword), query=query)
+    where = (sword_card or {}).get("where") or {}
+    row.expect(
+        status_sword == 200
+        and where.get("held_by") == knight
+        and where.get("socket") == held.get("socket")
+        and (sword_card or {}).get("decider") is None,
+        f"the sword's card answered {status_sword} where {where}",
+    )
+    worn = card.get("look") or {}
+    other = next(
+        (
+            one
+            for one in card.get("looks") or []
+            if one.get("source") != "workspace" and one.get("look") != worn.get("look")
+        ),
+        None,
+    )
+    sword_look = next(iter((sword_card or {}).get("looks") or []), None)
+    chosen = {k: other[k] for k in ("look", "version", "sha256")} if other else None
+    status_choose, chose = w1.call(
+        "TC1 look", "POST", path(knight) + "/look", query=query, body={"look": chosen}
+    )
+    chose = chose if isinstance(chose, dict) else {}
+    same_rest = {k: v for k, v in chose.items() if k != "look"} == {
+        k: v for k, v in card.items() if k != "look"
+    }
+    row.expect(
+        status_choose == 200
+        and (chose.get("look") or {}).get("look") == (chosen or {}).get("look")
+        and (chose.get("look") or {}).get("chosen_by_owner") is True
+        and same_rest,
+        f"choosing {chosen} answered {status_choose} wearing {(chose.get('look') or {}).get('look')}; "
+        f"the rest of the card unchanged {same_rest}",
+    )
+    refusals = {}
+    for label, look, code in (
+        (
+            "unfit",
+            {k: (sword_look or {}).get(k) for k in ("look", "version", "sha256")},
+            "look_unfit",
+        ),
+        ("not shipped", {**(chosen or {}), "sha256": "0" * 64}, "look_not_shipped"),
+    ):
+        got, answer = w1.call(
+            f"TC1 {label}", "POST", path(knight) + "/look", query=query, body={"look": look}
+        )
+        refusals[label] = [got, F.problem_code(answer)]
+        row.expect(
+            (got, F.problem_code(answer)) == (422, code),
+            f"{label}: answered {got} {F.problem_code(answer)}",
+        )
+    _, after = w1.call("TC1 after", "GET", path(knight), query=query)
+    row.expect(
+        ((after or {}).get("look") or {}).get("look") == (chosen or {}).get("look"),
+        f"after the refusals the knight wears {((after or {}).get('look') or {}).get('look')}",
+    )
+    status_foreign, _ = w2.call("TC1 w2", "GET", path(knight), query=query)
+    status_placed, _ = w1.call("TC1 placed id", "GET", path("knight"), query=query)
+    row.expect(status_foreign == 404, f"another workspace read the card {status_foreign}")
+    row.expect(status_placed in (404, 422), f"the placed id answered {status_placed}")
+    row.observed = {
+        "paused": status_paused,
+        "card": [status, card.get("profile"), kind.get("kind"), kind.get("label")],
+        "runs": sorted(runs),
+        "abilities": [a.get("key") for a in card.get("abilities") or []],
+        "holding": card.get("holding"),
+        "decider": card.get("decider"),
+        "looks": listed_looks,
+        "sword_where": where,
+        "worn_before": worn.get("look"),
+        "chosen": [status_choose, (chose.get("look") or {}).get("look"), same_rest],
+        "refusals": refusals,
+        "other_workspace": status_foreign,
+        "placed_id": status_placed,
     }
     return row.close()
 
@@ -7836,7 +8128,9 @@ def hands(arguments: argparse.Namespace) -> int:
     out = Path(arguments.out).resolve()
     (out / "evidence").mkdir(parents=True, exist_ok=True)
     started = dt.datetime.now(dt.UTC).isoformat()
-    rows = [row_hn1(stack, Transcripts(out / "transcripts"), worktree, out)]
+    transcripts = Transcripts(out / "transcripts")
+    hn1 = row_hn1(stack, transcripts, worktree, out)
+    rows = [hn1, row_tc1(stack, transcripts, worktree, hn1.observed)]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
 

@@ -54,7 +54,7 @@ const MAIN_STEPS = ['worlds-first', 'journey-open', 'journey-stall', 'journey-pe
 const PEOPLE_STEPS = ['people-card', 'people-marks'];
 // The things session (A-108): the lines a being said and heard, on its card, in a scene the driver
 // prepared (its facts name the world, the speaker, the line and a hearer).
-const THINGS_STEPS = ['things-lines'];
+const THINGS_STEPS = ['things-lines', 'things-card'];
 // The outside session (A-116): people an outside AI agent decides for, in Who decides and over their
 // heads, while the agent is connected (the driver's facts name the world, the people and the name).
 const OUTSIDE_STEPS = ['outside-deciders', 'outside-visitor-words'];
@@ -85,6 +85,8 @@ const sameLook = (read, look) => read?.pack === look.pack && read?.source === lo
   && read?.drawn === look.drawn && read?.reason === look.reason;
 // How long the town's tiles may take to bake before the page can draw it, and how often to look.
 const BAKE_MS = 600_000;
+/** How long N1.x watches the people a program runs for a Now line in the program's words (A-135). */
+const PROGRAM_NOW_MS = 360_000;
 const BAKE_LOOK_MS = 5_000;
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -675,6 +677,47 @@ const STEP_HANDLERS = {
     await ctx.screenshot('heard', "a hearer's card with the line it heard");
     ctx.note(`data-thing-lines-said ${await ctx.page.evaluate(`document.querySelector('[data-thing-lines-said]')?.dataset.thingLinesSaid ?? null`)}`);
   },
+  async 'things-card'(ctx) {
+    // N1.y (candidate-35): the knight's card in the page says what the API card says it can do
+    // and holds, and Change beside Looks like records another look, which the API card then wears.
+    const { things_world: world, speaker: subject } = ctx.facts;
+    const entry = (await ctx.api('GET', `/world-entries/${world}`)).body;
+    const query = `?world_id=${encodeURIComponent(entry?.world_id ?? '')}`;
+    const cardPath = `/world/versions/${entry?.authored_version_id}/society/things/${subject}${query}`;
+    const before = (await ctx.api('GET', cardPath)).body ?? {};
+    await enter(ctx, () => ctx.page.navigate(ctx.runtime.app_url), world);
+    await openPeopleNearby(ctx.page);
+    await ctx.page.waitFor(`[...(${INSPECT})?.options ?? []].some(o => o.value === ${JSON.stringify(subject)}) ? true : null`,
+      SETTLE_MS, 'the knight nearby');
+    await ctx.page.setValue(INSPECT, subject);
+    const CARD = `document.querySelector('section.thing-card[data-subject="${subject}"]')`;
+    const rowOf = (heading) => `[...${CARD}.querySelectorAll('div.thing-card-row')].find(r => r.querySelector('h4')?.textContent?.trim() === ${JSON.stringify(heading)})`;
+    const read = `(() => { const c = ${CARD}; if (!c || !c.checkVisibility()) return null;
+      const can = ${rowOf('Can')}; const holding = ${rowOf('Holding')};
+      return { can: can ? [...can.querySelectorAll('ul.thing-card-chips li')].map(li => li.textContent) : null,
+        holding: holding ? holding.textContent : null }; })()`;
+    const shown = await ctx.page.waitFor(`(() => { const r = ${read}; return r && r.can ? r : null; })()`,
+      SETTLE_MS * 3, "the card's Can row").catch(async () => ctx.page.evaluate(read));
+    const words = (before.abilities ?? []).map((a) => a.words);
+    ctx.observe('can-is-the-api-cards-abilities', shown !== null && same(shown.can, words), { page: shown?.can ?? null, api: words });
+    const held = (before.holding ?? []).map((h) => h.label);
+    ctx.observe('holding-names-what-the-api-card-holds',
+      held.every((label) => (shown?.holding ?? '').toLowerCase().includes(String(label).toLowerCase())),
+      { page: shown?.holding ?? null, api: held });
+    await ctx.screenshot('card-can', "the knight's card with what it can do");
+    await ctx.page.click(`${CARD}.querySelector('[data-action="card.look.change"]')`, 'Change beside Looks like');
+    const key = await ctx.page.waitFor(`(() => { const b = [...${CARD}.querySelectorAll('[data-action="card.look.choose"]')]
+      .find(b => !b.hasAttribute('data-now')); return b ? b.dataset.key : null; })()`, SETTLE_MS, 'a look not worn');
+    await ctx.page.click(`${CARD}.querySelector('[data-action="card.look.choose"][data-key=${JSON.stringify(key)}]')`, 'the look');
+    const outcome = await ctx.page.waitFor(`${CARD}?.querySelector('.thing-card-outcome')?.textContent || null`, SETTLE_MS, 'the card to say what changed');
+    const after = (await ctx.api('GET', cardPath)).body ?? {};
+    const was = before.look ?? {};
+    const now = after.look ?? {};
+    ctx.observe('look-chosen-on-the-card-is-worn',
+      !!outcome && now.chosen_by_owner === true && (now.look !== was.look || now.version !== was.version || now.sha256 !== was.sha256),
+      { key, outcome, before: [was.look, was.version], after: [now.look, now.version, now.chosen_by_owner] });
+    await ctx.screenshot('card-look', "the knight's card after its look was changed");
+  },
   async 'outside-deciders'(ctx) {
     // N1.w (A-116): Who decides marks the two people outside, disabled and left out of Choose
     // everyone, counts them, names the agent; over each of them the outside pill reads its name.
@@ -760,9 +803,27 @@ const STEP_HANDLERS = {
         name: mind?.querySelector('.thing-card-mind-name')?.textContent ?? null,
         line: mind?.querySelector('.thing-card-muted')?.textContent ?? null,
         now: c.querySelector('.thing-card-now span')?.textContent ?? null }; })()`;
-    const read = await ctx.page.waitFor(`(() => { const r = ${card}; return r && (r.now ?? '').includes(${JSON.stringify(program)}) ? r : null; })()`,
-      SETTLE_MS * 4, 'the card to say its program chose').catch(async () => ctx.page.evaluate(card));
+    const read = await ctx.page.waitFor(`(() => { const r = ${card}; return r && r.line ? r : null; })()`,
+      SETTLE_MS, "the person's card").catch(async () => ctx.page.evaluate(card));
     await ctx.screenshot('visitor-card', "the card of a person a program runs");
+    // A-135: a Now line names the act a person is doing, which may be one their routine began before
+    // the program's turn came; so each person the program runs is watched, until one is doing an act
+    // the program chose, within the page's bound. No Now line may ever credit a model.
+    const nowOf = (id) => `(() => { const c = document.querySelector('section.thing-card[data-subject="${id}"]');
+      return c && c.checkVisibility() ? c.querySelector('.thing-card-now span')?.textContent ?? '' : null; })()`;
+    const nows = [];
+    let programNow = null;
+    const until = Date.now() + PROGRAM_NOW_MS;
+    while (programNow === null && Date.now() < until) {
+      for (const id of people) {
+        await ctx.page.setValue(INSPECT, id).catch(() => null);
+        const now = await ctx.page.waitFor(`(() => { const n = ${nowOf(id)}; return n === null ? null : n; })()`, SETTLE_MS, 'a Now line')
+          .catch(() => null);
+        nows.push({ subject: id, now });
+        if ((now ?? '').includes(program)) { programNow = { subject: id, now }; break; }
+      }
+      if (programNow === null) await sleep(10_000);
+    }
     if (!await ctx.page.evaluate(`document.querySelector('#world-panel-decides')?.checkVisibility() ?? false`)) {
       await ctx.page.click(ACTION('people.decides'), 'Who decides');
     }
@@ -770,8 +831,8 @@ const STEP_HANDLERS = {
       SETTLE_MS, "Who decides' words for the person").catch(() => null);
     ctx.observe('card-offers-no-change', read !== null && read.change === false, { read });
     ctx.observe('card-mind-is-who-decides-words', read !== null && decider !== null && read.line === decider, { line: read?.line ?? null, decider });
-    ctx.observe('now-says-its-program-chose', read !== null && (read.now ?? '').includes(program) && !(read.now ?? '').includes(modelWords),
-      { now: read?.now ?? null, program, model_words: modelWords });
+    ctx.observe('now-says-its-program-chose', programNow !== null && nows.every((n) => !(n.now ?? '').includes(modelWords)),
+      { program_now: programNow, program, model_words: modelWords, read: nows.slice(-8), reads: nows.length });
   },
   async 'journey-open'(ctx) {
     await open(ctx);
