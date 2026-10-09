@@ -95,6 +95,19 @@ export interface SocietyPlace {
    * an input that does not, where the activity is used at its access node with no limit.
    */
   readonly placeNodeIds: readonly string[];
+  /**
+   * What a town's place calls a premises or a bench, on a society of things' input that says it:
+   * its use class, label and address number; null for any other target and for an input composed
+   * before the field.
+   */
+  readonly place?: SocietyPlaceName | null;
+}
+
+/** A town premises' or bench's use class, label and address number, as its place states them. */
+export interface SocietyPlaceName {
+  readonly useClass: string;
+  readonly label: string | null;
+  readonly addressNumber: number | null;
 }
 
 /** An object's activity the input says no inhabitant can reach, with the server's reason. */
@@ -313,6 +326,12 @@ function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null 
           !(places === undefined || (Array.isArray(places) && places.length > 0 && places.every(textValue)))) {
         throw new Error('Invalid society place');
       }
+      const called = target['place'] === undefined ? null : record(target['place']);
+      if (called !== null && (!textValue(called['use_class']) ||
+          !(called['label'] === null || textValue(called['label'])) ||
+          !(called['address_number'] === null || integer(called['address_number'])))) {
+        throw new Error('Invalid society place name');
+      }
       return Object.freeze({
         targetId: target['target_id'], subjectId: target['subject_id'],
         objectId: target['object_id'] as string | null, affordance: target['affordance'],
@@ -320,6 +339,11 @@ function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null 
         activity: named ? target['activity'] as string : null,
         enabled: target['enabled'] as boolean,
         placeNodeIds: Object.freeze([...((places ?? []) as string[])]),
+        place: called === null ? null : Object.freeze({
+          useClass: called['use_class'] as string,
+          label: called['label'] as string | null,
+          addressNumber: called['address_number'] as number | null,
+        }),
       });
     })),
     unreachable: Object.freeze(unreachable.map((value) => {

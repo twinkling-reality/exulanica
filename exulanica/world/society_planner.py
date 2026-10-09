@@ -45,8 +45,11 @@ from exulanica.world.society_input_policy import (
     LIVING_INPUTS,
     LOCAL_FAILURE_INPUTS,
     LOCAL_INPUT,
+    NAMED_TARGET_INPUTS,
+    NAMED_TARGET_ORIGINS,
     POPULATION_INPUTS,
     ROUTINE_INPUTS,
+    TARGET_PLACE_FIELD,
     THING_INPUTS,
     UNREAD_PLACEMENT_REASONS,
     WALKING_SURFACES_INPUT,
@@ -225,6 +228,21 @@ def _integer(value: Any, minimum: int, maximum: int) -> bool:
 
 def _text(value: Any) -> bool:
     return isinstance(value, str) and 0 < len(value) <= 1000
+
+
+def _validate_target_place(target: dict[str, Any]) -> None:
+    """What the town's place calls a premises or a bench target: its use class, its label or
+    none, and its address number or none."""
+    place = target[TARGET_PLACE_FIELD]
+    _require(
+        target["origin"] in NAMED_TARGET_ORIGINS
+        and isinstance(place, dict)
+        and set(place) == {"use_class", "label", "address_number"}
+        and _text(place["use_class"])
+        and (place["label"] is None or _text(place["label"]))
+        and (place["address_number"] is None or _integer(place["address_number"], 0, 10**9)),
+        "invalid target place",
+    )
 
 
 def _digest(value: Any) -> bool:
@@ -473,7 +491,13 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         target_fields.add("place_node_ids")
     target_ids = []
     for target in document["targets"]:
-        _require(set(target) == target_fields, "invalid target fields")
+        named = profile in NAMED_TARGET_INPUTS and TARGET_PLACE_FIELD in target
+        _require(
+            set(target) == (target_fields | {TARGET_PLACE_FIELD} if named else target_fields),
+            "invalid target fields",
+        )
+        if named:
+            _validate_target_place(target)
         _require(
             _text(target["target_id"]) and _text(target["subject_id"]) and _text(target["node_id"]),
             "invalid target reference",
@@ -1140,11 +1164,17 @@ STAY_TERMS: Final = ("duration_ticks", "activity")
 def same_destination(held: dict, current: dict) -> bool:
     """Whether ``current`` is the place ``held`` names, however each states the stay made there.
 
-    Two targets stated in the same terms are the same place only when they are equal. A target an
+    What the town's place calls a place (``place``) is set aside. Two targets stated in the same
+    terms are the same place only when they are equal. A target an
     input of a later profile restates in newer terms, a routine's activity for a fixed duration, is
     the same place for a person heading there when nothing else about it changed: the profile
     moving forward moves nobody's destination.
     """
+    if held == current:
+        return True
+    # What the town's place calls a place never moves anybody's destination.
+    held = {k: v for k, v in held.items() if k != TARGET_PLACE_FIELD}
+    current = {k: v for k, v in current.items() if k != TARGET_PLACE_FIELD}
     if held == current:
         return True
     if [term in held for term in STAY_TERMS] == [term in current for term in STAY_TERMS]:

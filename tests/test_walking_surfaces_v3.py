@@ -149,6 +149,11 @@ def _bare() -> dict[str, Any]:
     return _compose(as_things=False)
 
 
+def _unnamed(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Targets without what the town's place calls them, as a v1 input states them."""
+    return [{k: v for k, v in target.items() if k != "place"} for target in targets]
+
+
 def _node(predicate) -> dict[str, Any]:
     return next(node for node in _bare()["navigation"]["nodes"] if predicate(node))
 
@@ -180,7 +185,8 @@ def test_the_things_family_composes_v3_and_v3_carries_things():
     assert document["population"] == _bare()["population"]
     # With nothing placed, the town's surfaces and activities are v1's.
     assert document["navigation"]["nodes"] == _bare()["navigation"]["nodes"]
-    assert document["targets"] == _bare()["targets"]
+    # The same targets as v1's, each town target saying what the town's place calls it.
+    assert _unnamed(document["targets"]) == _bare()["targets"]
 
 
 def test_a_blocking_thing_removes_exactly_the_surface_within_its_clearance():
@@ -487,7 +493,7 @@ def test_a_removed_thing_gives_the_town_back_its_surfaces():
     removed = _compose(_thing("well", "well", 2, street["position_mm"], removed=True))
     assert removed["navigation"]["nodes"] == _bare()["navigation"]["nodes"]
     assert removed["navigation"]["edges"] == _bare()["navigation"]["edges"]
-    assert removed["targets"] == _bare()["targets"] and removed["things"] == []
+    assert _unnamed(removed["targets"]) == _bare()["targets"] and removed["things"] == []
 
 
 def test_a_society_of_things_reads_no_living_place_and_needs_a_blocking_test():

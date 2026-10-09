@@ -79,6 +79,7 @@ from exulanica.world.society_grounds import (
 )
 from exulanica.world.society_input_policy import (
     NO_AUTHORED_FRAME,
+    TARGET_PLACE_FIELD,
     UNREACHABLE,
     WALKING_SURFACES_COMPOSITION,
     WALKING_SURFACES_COMPOSITION_V2,
@@ -862,6 +863,18 @@ def build_walking_surfaces_input(
                 "version_id": str(version.version_id),
                 "enabled": True,
                 "place_node_ids": [node_id for node_id, _ in places],
+                # A society of things' input says what the town's place calls it.
+                **(
+                    {
+                        TARGET_PLACE_FIELD: {
+                            "use_class": destination["use_class"],
+                            "label": destination["label"],
+                            "address_number": destination["address_number"],
+                        }
+                    }
+                    if things
+                    else {}
+                ),
             }
         )
     placed = things_in_region(version, ground) if things else []

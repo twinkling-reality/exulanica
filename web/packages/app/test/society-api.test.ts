@@ -235,3 +235,30 @@ describe('place words served with a site world\'s places', () => {
     expect(() => parsePlaceWords({ here: 'on this farm', around: 'across the farm' })).toThrow('Invalid place words');
   });
 });
+
+describe('what a town\'s place calls a premises, on a society of things\' input', () => {
+  const target = (extra: Record<string, unknown> = {}) => ({
+    target_id: 'city.premises:p1:visit', subject_id: 'city.premises:p1', node_id: 'entrance:p1', affordance: 'visit',
+    activity: 'visit', origin: 'premises', object_id: 'p1', version_id: 'version', enabled: true,
+    place_node_ids: ['entrance:p1'], ...extra,
+  });
+  // A society of things over a town, which holds any number of people within its engine's bound.
+  const read = (targets: unknown[]) => parseSociety({
+    society_id: 'society', version_id: 'version', branch_id: 'version', place_id: 'p', population_size: 2,
+    current_tick: 9, state_sha256: '9'.repeat(64), input_seq: 3, input_sha256: 'b'.repeat(64),
+    state: { profile: 'exulanica-society/v7', society_id: 'society', branch_id: 'version', tick: 9, input_seq: 3,
+      input_sha256: 'b'.repeat(64), inhabitants: [] },
+    places: {
+      input_seq: 3, input_sha256: 'b'.repeat(64), availability: 'available', unavailable_reason: null,
+      walkable_area: null, clearance_mm: 450, targets, unavailable_affordances: [],
+    },
+  });
+
+  it('reads a stored input without names, and a new one that names the bakery at number 12', () => {
+    expect(read([target()]).places?.targets[0]?.place).toBeNull();
+    const named = read([target({ place: { use_class: 'bakery', label: 'bakery', address_number: 12 } })]);
+    expect(named.places?.targets[0]?.place).toEqual({ useClass: 'bakery', label: 'bakery', addressNumber: 12 });
+    expect(() => read([target({ place: { use_class: '', label: null, address_number: null } })]))
+      .toThrow('Invalid society place name');
+  });
+});

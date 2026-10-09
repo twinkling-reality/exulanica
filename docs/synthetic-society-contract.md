@@ -1580,12 +1580,19 @@ is the join; where none is, the place steps first to a corner of its thing's box
 standing radius along both faces (`round:`) and from there to the nearest point a line offers that
 corner, the shortest such way kept. A join at an end of a line is that end; any other point splits
 the line at a node of its own (`join:`), or at the place itself where the place stands on the line.
-Targets, subjects and places are named as on the authored ground. A being neither blocks nor offers:
-it lives in the society. The dependencies and the unknown-kind refusal are v5's. A town with nothing
-placed in it composes v1's surfaces and targets, and a town's v1 and v2 inputs do not change. A town
-states its arrival (its spawn, `navigation.arrival_mm`), so a v3 input pins no `arrival` of its own;
-a visitor crosses in through a gate placed on the town, at the open node nearest the gate's arrival
-point. A society of things reads only things inputs, and no other society reads one.
+Targets, subjects and places are named as on the authored ground. A premises' or a bench's target
+also says what the town's place calls it, `place`: its use class, label (or null) and address number
+(or null), copied from the place's destination, for the page to name it ("the bakery at number 12");
+a thing's target carries none. The field is optional: an input composed before it, stored since the
+town ground landed, reads as before, and the page then says only "a place". A name never moves a
+destination: a person heading to a premises when the first input naming it arrives keeps their
+target and route. Code from before the field refuses an input carrying it, so a society that has
+consumed one cannot be read by an older release. A being neither blocks nor offers: it lives in the
+society. The dependencies and the unknown-kind refusal are v5's. A town with nothing placed in it
+composes v1's surfaces and targets, and a town's v1 and v2 inputs do not change. A town states its
+arrival (its spawn, `navigation.arrival_mm`), so a v3 input pins no `arrival` of its own; a visitor
+crosses in through a gate placed on the town, at the open node nearest the gate's arrival point. A
+society of things reads only things inputs, and no other society reads one.
 
 **A minute.** The planner's minute, the person's direct requests and the people's decisions come
 first, unchanged, and every event they record names v7; then the things phase:

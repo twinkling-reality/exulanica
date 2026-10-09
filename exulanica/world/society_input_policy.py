@@ -131,6 +131,14 @@ ARRIVAL_INPUTS: Final = (AUTHORED_GROUND_INPUT_V4, AUTHORED_GROUND_INPUT_V5)
 #: Input profiles that carry the things the world's author placed in the version, which only a
 #: society of things reads.
 THING_INPUTS: Final = (AUTHORED_GROUND_INPUT_V5, WALKING_SURFACES_INPUT_V3)
+#: Input profiles whose town targets may say what the town's place calls them: a premises' or a
+#: bench's ``place``, its use class, label and address number as the place's destination states
+#: them. Optional, so an input composed before it stays valid; code from before it refuses an input
+#: carrying it.
+NAMED_TARGET_INPUTS: Final = (WALKING_SURFACES_INPUT_V3,)
+#: The target origins a ``place`` may name, and its fields.
+NAMED_TARGET_ORIGINS: Final = ("premises", "furniture")
+TARGET_PLACE_FIELD: Final = "place"
 #: Input profiles that record the population their ground's rule derived from the world.
 POPULATION_INPUTS: Final = (
     WALKING_SURFACES_INPUT,
