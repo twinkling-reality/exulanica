@@ -101,6 +101,8 @@ const server = {
   events: [] as SocietyEvent[],
   /** Who outside programs decide for now, as the models read lists them; nobody unless a test says. */
   outside: [] as NonNullable<SocietyModels['outside']>,
+  /** The targets the consumed input lists; none unless a test says. */
+  targets: [] as Record<string, unknown>[],
 };
 const society = (): SocietySnapshot => parseSociety({
   society_id: 'society', version_id: 'version', branch_id: 'version', place_id: 'derived-place',
@@ -110,7 +112,7 @@ const society = (): SocietySnapshot => parseSociety({
   places: {
     input_seq: 1, input_sha256: 'b'.repeat(64), availability: 'available', unavailable_reason: null,
     walkable_area: { source: 'declared', centre_mm: [0, 0], half_width_mm: 12000, half_depth_mm: 12000 },
-    clearance_mm: 450, targets: [], unavailable_affordances: [],
+    clearance_mm: 450, targets: server.targets, unavailable_affordances: [],
   },
 });
 
@@ -479,5 +481,58 @@ describe('what a person who came in from outside is, in Selected', () => {
     }
     expect(whatOf('knight-0')).toBe(fill(words('what'), { role: 'steward' }));
     mounted.dispose();
+  });
+});
+
+describe('where a person of a society of things on a town is going, in Selected', () => {
+  // Root 6's ruling (2026-10-08): a town's premises is a place the input lists that no object of the
+  // person's names; it is said plainly, and only a target the input does not list as open is gone. Words
+  // are the catalog's.
+  it('says a premises the input lists is a place, and a target it no longer lists is gone', async () => {
+    const words = (code: string) => catalog.entries.find((entry) => entry.kind === 'phrase' && entry.code === code)!.words;
+    const visiting = (target: string) => ({
+      goal: { kind: 'visit', reason: 'looking_around', target_id: target },
+      action: { kind: 'move', status: 'active', target_id: target, remaining_ticks: 0, reason: 'following_reachable_route' },
+    });
+    const premises = 'city.premises:ee384d1d-95ae-5b8a-aebd-38f0682c38ba:visit';
+    server.tick = 9;
+    server.people = [
+      person('knight-0', { kind: KNIGHT, came_by: 'placed', placed_id: 'knight-1', ...visiting(premises) }),
+      person('resident-1', { kind: KNIGHT, came_by: 'populated', placed_id: null, ...visiting('city.premises:gone:visit') }),
+      person('resident-2', { kind: KNIGHT, came_by: 'populated', placed_id: null, ...visiting('city.premises:shut:visit') }),
+    ];
+    server.things = [];
+    server.events = [];
+    server.targets = [{
+      target_id: premises, subject_id: 'city.premises:ee384d1d-95ae-5b8a-aebd-38f0682c38ba', node_id: 'entrance:e', affordance: 'visit',
+      activity: 'visit', origin: 'premises', object_id: 'ee384d1d-95ae-5b8a-aebd-38f0682c38ba', version_id: 'version', enabled: true,
+      place_node_ids: ['entrance:e'],
+    }, {
+      // Listed, but not enabled: nobody can go there now.
+      target_id: 'city.premises:shut:visit', subject_id: 'city.premises:shut', node_id: 'entrance:s', affordance: 'visit',
+      activity: 'visit', origin: 'premises', object_id: 'shut', version_id: 'version', enabled: false, place_node_ids: ['entrance:s'],
+    }];
+    try {
+      const { mounted, shown, crowd } = mount();
+      crowd.visibleInhabitantIds = ['knight-0', 'resident-1', 'resident-2'];
+      await mounted.begin();
+      await settle();
+      const pick = [...document.querySelectorAll('select')].find((one) => one.getAttribute('aria-label') === 'Inspect nearby inhabitant')!;
+      const nowOf = (id: string): string => {
+        pick.value = id;
+        pick.dispatchEvent(new Event('change'));
+        return shown.at(-1)!.about.note.activity;
+      };
+      const listed = nowOf('knight-0');
+      const gone = nowOf('resident-1');
+      expect(listed).not.toContain(words('place_gone'));
+      expect(gone).toContain(words('place_gone'));
+      expect(nowOf('resident-2')).toContain(words('place_gone'));
+      // The same sentence, with the plain place where the gone one stood.
+      expect(listed.split('.')[0]).toBe(gone.split('.')[0]!.replace(words('place_gone'), words('place_listed')));
+      mounted.dispose();
+    } finally {
+      server.targets = [];
+    }
   });
 });

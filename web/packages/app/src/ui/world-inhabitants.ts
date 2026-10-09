@@ -21,7 +21,7 @@ import {
   type SocietyPlaybackSpeed,
 } from '../society-control-api.js';
 import { societyEngine } from '../society-engines.js';
-import { inhabitantWordsFrom, type BridgeLabel, type InhabitantWords } from '../society-inhabitant-words.js';
+import { inhabitantWordsFrom, phrase, type BridgeLabel, type InhabitantWords } from '../society-inhabitant-words.js';
 import { say } from './copy.js';
 import { el, replace, setText } from './dom.js';
 import './world-inhabitants.css';
@@ -320,8 +320,9 @@ export { REASON_WORDS, type InhabitantWords } from '../society-inhabitant-words.
 
 /**
  * Who a simulated person is and what they are doing, in words. Places are named by the titles of
- * the person's own objects (`placeRows`); a place the rows do not name is said to be gone rather
- * than guessed at. Somebody talking is named with the other person, by the display name `people`
+ * the person's own objects (`placeRows`); a place the input still lists that no object names (a
+ * town's premises) is said plainly as a place, and one it does not list as open is said to be gone,
+ * never guessed at. Somebody talking is named with the other person, by the display name `people`
  * gives them; talking has no content, so nothing here says what about. The words and the choice
  * among them are `inhabitantWordsFrom`, which the server's Companion follows too.
  */
@@ -334,12 +335,18 @@ export function inhabitantWords(
   decidedFromOutside = false,
   /** The label the door lists for a bridge, for one who came in from outside (`inhabitantWordsFrom`). */
   bridgeLabel: BridgeLabel | null = null,
+  /**
+   * The targets the input their society consumed lists as enabled. One that no object of the
+   * person's names (a town's premises) is still there, so it is said plainly ("a place"); only a
+   * target the input does not list as enabled is said to be gone.
+   */
+  listed: ReadonlySet<string> | null = null,
 ): InhabitantWords {
   const named = new Map<string, string>();
   for (const row of rows) if (row.status.kind === 'usable') named.set(row.status.targetId, row.label);
   return inhabitantWordsFrom(
     person,
-    (targetId) => named.get(targetId) ?? null,
+    (targetId) => named.get(targetId) ?? (listed?.has(targetId) === true ? phrase('place_listed') : null),
     (id) => people.find((other) => other.id === id)?.display_name ?? null,
     profile,
     null,

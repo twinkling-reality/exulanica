@@ -324,6 +324,13 @@
       "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
     },
     {
+      "key": "phrase.place_listed",
+      "kind": "phrase",
+      "code": "place_listed",
+      "words": "a place",
+      "reason": "Authored: a place the input a person's society consumed lists as one they can go to, which no object of the person's names (a town's premises): said plainly, never as gone."
+    },
+    {
       "key": "phrase.place_none",
       "kind": "phrase",
       "code": "place_none",

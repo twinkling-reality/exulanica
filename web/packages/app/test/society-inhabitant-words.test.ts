@@ -168,3 +168,22 @@ describe('a person who came in from outside', () => {
     expect({ ...words({ came_by: 'crossed', crossing: { bridge: 'blockgame', decided_by: 'world' } }), what: '' }).toEqual({ ...plain, what: '' });
   });
 });
+
+describe('a place the input lists that no object of the person names', () => {
+  // A town's premises is still there: said plainly, never as gone (root 6's ruling, 2026-10-08).
+  const phrase = (code: string) => CATALOG.entries.find((entry) => entry.kind === 'phrase' && entry.code === code)!.words;
+  const target = 'city.premises:p1:visit';
+  const visitor = {
+    id: 'p-a', display_name: 'Ari Ash 1', role: 'resident',
+    goal: { kind: 'visit', reason: 'looking_around', target_id: target },
+    action: { kind: 'move', status: 'active', target_id: target, remaining_ticks: 0, reason: 'following_reachable_route' },
+  } as unknown as Parameters<typeof inhabitantWords>[0];
+
+  it('is a place where the input lists it, and gone only where it does not', () => {
+    const gone = inhabitantWords(visitor, []).doing;
+    expect(gone).toContain(phrase('place_gone'));
+    expect(inhabitantWords(visitor, [], [], null, false, null, new Set(['city.premises:other:visit'])).doing).toBe(gone);
+    const listed = inhabitantWords(visitor, [], [], null, false, null, new Set([target])).doing;
+    expect(listed).toBe(gone.replace(phrase('place_gone'), phrase('place_listed')));
+  });
+});
