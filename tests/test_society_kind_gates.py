@@ -283,6 +283,19 @@ def test_a_card_says_the_routine_s_abilities_are_served_by_the_version_the_socie
         assert spirit["wait"] == module and not set(spirit) & (routine - {"wait"})
         bench = {entry["key"]: entry["module"] for entry in _offers(_kind("bench"), runs)}
         assert bench["rest_at"] == module
+    # Nobody talks with a being whose kind does not talk, so its card offers no talk under the
+    # second version; a knight's still does, and under the first version so does the spirit's.
+    society = initial_things_society(SOCIETY, SEED, compose((GATE, SPIRIT, KNIGHT)), population=4)
+    spirit, knight = _being(society, "lantern_spirit"), _being(society, "knight")
+    offered = {
+        who: {
+            entry["key"] for entry in _offers(_kind(who), second, routine_withheld(society, being))
+        }
+        for who, being in (("lantern_spirit", spirit), ("knight", knight))
+    }
+    assert "talk_to" not in offered["lantern_spirit"] and "hear" in offered["lantern_spirit"]
+    assert "talk_to" in offered["knight"]
+    assert "talk_to" in {entry["key"] for entry in _offers(_kind("lantern_spirit"), first)}
     # A society that runs no version of a module lists none of its abilities.
     assert (
         not {entry["key"] for entry in _abilities(_kind("knight"), ["exulanica-ability/say/v1"])}

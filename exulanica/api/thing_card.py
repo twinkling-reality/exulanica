@@ -14,7 +14,7 @@ from __future__ import annotations
 import functools
 import json
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Container, Mapping, Sequence
 from typing import Any, Final
 
 import psycopg
@@ -29,6 +29,7 @@ from exulanica.world.placed_things import ThingKindReference, shipped_kind
 from exulanica.world.society_decision_contract import person_role
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
+from exulanica.world.society_planner import routine_withheld
 from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.society_things import kind_allows
 from exulanica.world.thing_library import shipped_looks
@@ -119,7 +120,7 @@ def _card(
         },
         "runs": runs,
         "abilities": _abilities(kind, runs),
-        "offers": _offers(kind, runs),
+        "offers": _offers(kind, runs, routine_withheld(state, person) if person else frozenset()),
         "where": _where(held, person is not None),
         "holding": _holding(state, wanted) if person is not None and hands else None,
         "decider": None
@@ -228,18 +229,26 @@ def _abilities(kind: Any, runs: Sequence[str]) -> list[dict[str, str]]:
     return found
 
 
-def _offers(kind: Any, runs: Sequence[str]) -> list[dict[str, str]]:
+def _offers(
+    kind: Any, runs: Sequence[str], withheld: Container[str] = frozenset()
+) -> list[dict[str, str]]:
     """The kind's offers a module this society runs reads: the target of one of its abilities, or
-    the offer a visitor arrives through, in the kind's order."""
+    the offer a visitor arrives through, in the kind's order. Where the being's own kind withholds
+    the activity that reads an offer (:func:`~exulanica.world.society_planner.routine_withheld`),
+    as a talk takes two beings whose kinds both list it, nobody takes it up, so it is left out."""
     catalogs = thing_catalogs()
     reads: dict[str, str] = {}
+    read_for: dict[str, str] = {}
     for ability in catalogs.abilities.values():
         if ability.target_offer is not None:
             reads.setdefault(ability.target_offer, ability.module)
+            read_for.setdefault(ability.target_offer, ability.key)
     reads.setdefault(*_ARRIVAL_OFFER)
     words = {key: offer.words for key, offer in catalogs.offers.items()}
     found = []
     for offer in kind.document.get("offers", ()):
+        if read_for.get(offer["key"]) in withheld:
+            continue
         read_by = reads.get(offer["key"])
         module = None if read_by is None else _running(read_by, runs)
         if module is not None:

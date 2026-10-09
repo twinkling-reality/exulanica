@@ -298,7 +298,9 @@ answers 424 `unavailable_society_input`, as the society read does. The card stat
 - what it can do here and what others can do with it (`abilities`, `offers`, each `{key, words,
   module}`): only what a module the society runs acts on, the modules listed as `runs`, each
   entry naming the version the society runs, so an ability or offer of a module that is not built,
-  as following is not, is never listed;
+  as following is not, is never listed; nor is an offer whose taking-up activity the being's own
+  kind does not do under the second purposeful module (a talk takes two beings whose kinds both
+  list it, so a lantern spirit's card offers no talk);
 - where it is (`where`: on the ground, held by whom and in which socket) and, for a being of a
   society running hands, what it holds (`holding`, null where hands are not run);
 - who decides for a being (`decider`): its own program where it came from outside, else the model
