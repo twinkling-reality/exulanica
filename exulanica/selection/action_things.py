@@ -547,7 +547,9 @@ def _town_name(target: Mapping[str, Any]) -> str | None:
     """What a town's place calls a premises or a bench target, where the input says: its label,
     with its address number where it has one ("bakery at number 12"); None where it names none."""
     named = target.get(TARGET_PLACE_FIELD)
-    label = named.get("label") if isinstance(named, Mapping) else None
+    if not isinstance(named, Mapping):
+        return None
+    label = named.get("label")
     if not isinstance(label, str) or not label:
         return None
     number = named.get("address_number")
