@@ -1,0 +1,24 @@
+{
+ "profile": "exulanica.film-take/v1",
+ "title": "Three strangers",
+ "sentence": "Add a stone well, a gate for travellers, a knight on guard by the well, a lantern spirit, and a sword and a lantern by the well.",
+ "minds": [
+  {
+   "being": "Knight",
+   "model": "Nemotron 3 Nano 30B"
+  },
+  {
+   "being": "Lantern spirit",
+   "model": "Qwen3 235B Instruct"
+  }
+ ],
+ "speed": 4,
+ "alive_seconds": 60,
+ "step_back_ms": 700,
+ "card": {
+  "being": "Knight",
+  "look": "Blocky knight",
+  "look_back": "Armoured knight",
+  "swap_mind": "Nemotron 3 Super 120B"
+ }
+}
