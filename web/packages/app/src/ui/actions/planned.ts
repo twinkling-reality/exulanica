@@ -34,9 +34,8 @@ export const PLAN_ACTIONS: Readonly<Record<string, string | null>> = Object.free
   direct_thing: 'people.direct',
   propose_appearance: null,
   apply_appearance: null,
-  // New generated pieces for a world's look (GEN's S1): not sent from a plan until the page shows its
-  // time and cost before Confirm.
-  request_pieces: null,
+  // New generated pieces for a world's look (GEN's S1): the sheet says their time and cost before Confirm.
+  request_pieces: 'pieces.request',
   other: null,
 });
 
@@ -136,6 +135,16 @@ export function stepAnswer(
   sent: { readonly status: number; readonly body?: unknown; readonly code?: string | null },
 ): StepAnswer {
   if (sent.status >= 400) return { status: sent.status, code: sent.code ?? null };
+  // An ask for new pieces is answered with its requests; the read credits the step with their ids.
+  if (operation === 'POST /world/piece-requests') {
+    const requests = sent.body !== null && typeof sent.body === 'object' ? (sent.body as Record<string, unknown>)['piece_requests'] : null;
+    const ids = Array.isArray(requests)
+      ? requests.flatMap((request) => (request !== null && typeof request === 'object'
+        && typeof (request as Record<string, unknown>)['piece_request_id'] === 'string'
+        ? [(request as Record<string, unknown>)['piece_request_id'] as string] : []))
+      : [];
+    return { status: sent.status, code: null, ...(ids.length === 0 ? {} : { piece_request_ids: ids }) };
+  }
   const shape = ANSWER_FIELDS[operation];
   const answer: Record<string, unknown> = { status: sent.status, code: null };
   if (shape === undefined) return answer as unknown as StepAnswer;

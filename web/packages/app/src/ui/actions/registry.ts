@@ -44,6 +44,11 @@ export interface ActionSpec {
   readonly bind?: Readonly<Record<string, string>>;
   /** Words for each refusal code the operation can answer, as a descriptor state or a response. */
   readonly refusals?: Readonly<Record<string, RefusalWords>>;
+  /**
+   * A world's route rather than a version's (new pieces of a world's look): no version's capability
+   * read lists it, so the plan step, or the route's own refusal, says whether it can be asked.
+   */
+  readonly worldScoped?: boolean;
 }
 
 export const GROUP_LABEL: Readonly<Record<ActionGroup, string>> = {
@@ -65,6 +70,7 @@ const ARRANGEMENT_PLACE = 'POST /world/versions/{version_id}/arrangements/apply'
 /** A thing added by its kind, and one of a world's beings asked to go to or use a place. */
 const THING_PLACE = 'POST /world/versions/{version_id}/things';
 const DIRECT = 'POST /world/versions/{version_id}/society/actions';
+const PIECES = 'POST /world/piece-requests';
 /** Making a town, read from the workspace's creation descriptors (`GET /worlds/capabilities`). */
 const MAKE_GENERATED = 'POST /worlds/generated';
 
@@ -173,6 +179,38 @@ const DIRECT_REFUSALS: Readonly<Record<string, RefusalWords>> = {
   },
 };
 
+/** What asking for new pieces of a world's look can meet: the plan's codes and the route's. */
+const PIECE_REFUSALS: Readonly<Record<string, RefusalWords>> = {
+  look_not_served: {
+    happened: 'This world wears no look new pieces can be made in.',
+    next: 'Choose a look for it first, then ask again.',
+  },
+  look_without_style_words: {
+    happened: 'This world\'s look does not say how its pieces should look.',
+    next: 'Choose another look, or ask its maker to describe it.',
+  },
+  no_piece_needed: {
+    happened: 'Everything you asked about already has pieces in this look.',
+    next: 'Ask about something else here.',
+  },
+  generation_session_off: {
+    happened: 'The piece maker is not running now, so nothing was asked.',
+    next: 'Ask again while it runs.',
+  },
+  budget_exceeded: {
+    happened: 'This would cost more than this world\'s allowance has left.',
+    next: 'Ask for fewer pieces, or wait for the allowance.',
+  },
+  piece_quota_exceeded: {
+    happened: 'This world has as many pieces waiting as it may.',
+    next: 'Ask again when some have been made.',
+  },
+  look_limit: {
+    happened: 'This world\'s look holds as many new pieces as it may.',
+    next: 'Take some back first, then ask again.',
+  },
+};
+
 /** What every clock action can meet, whether a rail button or a Companion plan step sent it. */
 const CLOCK_REFUSALS: Readonly<Record<string, RefusalWords>> = {
   society_unavailable: NOBODY_HERE,
@@ -218,6 +256,12 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     id: 'arrangements.place', label: 'Place an arrangement', hint: 'Place a published group of objects in one change',
     icon: 'place', group: 'build', placement: ['companion'], operation: ARRANGEMENT_PLACE,
     refusals: { stale_object_base: STALE_WORLD, invalidated_source_version: SOURCE_GONE },
+  },
+  {
+    id: 'pieces.request', label: 'Make new pieces for how things look here',
+    hint: 'Ask the piece maker for new pieces of this world\'s look, after seeing the time and the cost',
+    icon: 'spends', group: 'build', placement: ['companion'], operation: PIECES, worldScoped: true,
+    refusals: PIECE_REFUSALS,
   },
   {
     id: 'things.place', label: 'Add a thing', hint: 'Add a thing by its kind, beside something or where you are pointing',
@@ -395,6 +439,7 @@ export function availability(spec: ActionSpec, capabilities: OperationDescriptor
   if (spec.operation === undefined) {
     return { state: 'available', code: null, words: null, spends: false, descriptor: null };
   }
+  if (spec.worldScoped === true) return { state: 'available', code: null, words: null, spends: true, descriptor: null };
   const descriptor = descriptorFor(spec, capabilities);
   if (descriptor === null) {
     return { state: 'unknown', code: null, words: STATE_WORDS.unknown ?? null, spends: false, descriptor: null };

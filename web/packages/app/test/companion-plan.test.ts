@@ -287,6 +287,43 @@ describe('a confirmed plan', () => {
   });
 });
 
+describe('new pieces of a world\'s look from a plan', () => {
+  // The step GEN's S1 drafts (deliveries/GEN/package-s1): one request_pieces step, its estimate stated before the yes.
+  const piecesPlan = () => {
+    const drafted = fixture('world-edit-plan') as { steps: Record<string, unknown>[] };
+    return { ...drafted, spends: true, steps: [{
+      ...drafted.steps[0], index: 0,
+      action: { operation: 'request_pieces', kinds: ['gate', 'sword', 'well'], named: false },
+      operation: 'POST /world/piece-requests', bind: {}, bind_from: null, query: {}, body_from: null,
+      body: { world_id: 'world:test', look: { pack_id: 'exulanica.toon-town', version: 1, manifest_sha256: 'b'.repeat(64) },
+        kinds: [{ key: 'gate', version: 1 }, { key: 'sword', version: 3 }, { key: 'well', version: 2 }], idempotency_key: '00000000-0000-5000-8000-000000000001' },
+      spends: true, confirmation: 'required', titles: { kinds: 'gate, sword, well' },
+      estimate: { items: 12, first_seconds_warm: 24, all_seconds_warm: 96, cold_start_seconds: 680, usd_typical: '0.048',
+        usd_worst_case: '0.18', provider: 'nebius_ai_cloud_gpu', provider_label: 'Nebius AI Cloud', basis: { kind: 'measured_runs', runs: 2, items: 80 } },
+    }] };
+  };
+
+  it('says what it is for, how long and what it costs before Confirm, and sends it with its ids read back', async () => {
+    const h = harness({
+      plan: async () => piecesPlan(),
+      send: async () => ({ piece_requests: [{ piece_request_id: 'p-1' }, { piece_request_id: 'p-2' }, { piece_request_id: 'p-3' }] }),
+    });
+    await h.plans.route('make new pieces for the things here');
+    const row = h.sheet.root.querySelector('.companion-plan-step')!;
+    expect(row.querySelector('.companion-plan-step-label')?.textContent).toBe('Make new pieces for how things look here');
+    expect(row.querySelector('.companion-plan-step-detail')?.textContent).toBe('Gate, sword, well');
+    expect(h.sheet.root.querySelector('.companion-plan-estimate')?.textContent).toBe(
+      '12 new pieces: about 2 minutes while the piece maker runs (the first in under a minute), and about 11 minutes more if it has to start; '
+      + 'about $0.05, at most $0.18, on Nebius AI Cloud (figures from 2 measured runs of 80 pieces). Nothing is made or spent until you confirm.');
+    expect(h.sent).toEqual([]);
+    await confirmAndWait(h);
+    expect(h.sent.map((request) => [request.actionId, request.method, request.path])).toEqual([['pieces.request', 'POST', '/world/piece-requests']]);
+    expect(stepStates(h.sheet)).toEqual(['done']);
+    const answers = h.client.outcome.mock.calls.at(-1)![1] as Record<number, { piece_request_ids?: string[] }>;
+    expect(answers[0]?.piece_request_ids).toEqual(['p-1', 'p-2', 'p-3']);
+  });
+});
+
 describe('people brought in by a plan', () => {
   it('prepares the step again with the engine the world takes now when the first send is refused for its engine', async () => {
     const drafted = fixture('bring-people-plan') as { steps: { body: Record<string, unknown> }[] };

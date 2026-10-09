@@ -83,6 +83,7 @@ import { actionSpec, availability } from './ui/actions/registry.js';
 import type { PlannedRequest } from './ui/actions/planned.js';
 import { buildPlanSheet } from './ui/companion-plan.js';
 import { CompanionActionsClient, type ActionPageContext } from './companion-actions-api.js';
+import { PieceRequestsClient, watchPieceRequests } from './composition/piece-requests.js';
 import { CreatureDraftsClient } from './creature-drafts-api.js';
 import { mountCreatureMaker, placementInGeneratedRegion } from './composition/creature-maker.js';
 import { buildCreatureSheet } from './ui/creature-sheet.js';
@@ -1665,6 +1666,7 @@ async function mountWorld(): Promise<void> {
         },
       };
     };
+    let stopPieces: (() => void) | null = null;
     companionPlans = mountCompanionPlans({
       client: () => planClient,
       page: planPage,
@@ -1678,6 +1680,16 @@ async function mountWorld(): Promise<void> {
       waitMs: COMPANION_DRAFT_WAIT_MS,
       paused: () => environmentSelection.people.clock().mode === 'paused',
       onSaid: (utterance, said) => companion.panel.showAnswer(plannedAnswer(utterance, said)),
+      // New pieces asked for: their waiting line and outcomes, until each has one.
+      onPieces: (ids) => {
+        const active = state.activeWorldEntry;
+        if (active === null) return;
+        stopPieces?.();
+        stopPieces = watchPieceRequests({
+          ids, client: new PieceRequestsClient({ ...currentCredentials, worldId: active.worldId }),
+          hold: (words) => holdTravelStatus(words), toasts: actions?.host.toasts ?? null,
+        });
+      },
     });
   }
   reflectMake();

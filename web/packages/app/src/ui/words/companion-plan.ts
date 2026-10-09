@@ -7,6 +7,7 @@
  */
 
 import type { RefusalWords } from '../actions/registry.js';
+import type { PieceEstimate } from '../../companion-actions-api.js';
 
 export const PLAN_WORDS = Object.freeze({
   title: 'Check this plan',
@@ -125,6 +126,35 @@ export const PLAN_HANDS_WORDS: Readonly<Record<string, string>> = Object.freeze(
 
 export function planRefusalWords(code: string): RefusalWords {
   return PLAN_REFUSAL_WORDS[code] ?? PLAN_REFUSED;
+}
+
+/** A span of seconds in words: "under a minute", "about 1 minute", "about 12 minutes". */
+function minutesWords(seconds: number): string {
+  if (seconds < 45) return 'under a minute';
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  return `about ${minutes} minute${minutes === 1 ? '' : 's'}`;
+}
+
+/** US dollars from a decimal string: "$0.05", or "under $0.01". */
+function dollarsWords(usd: string): string {
+  const value = Number(usd);
+  return value < 0.01 ? 'under $0.01' : `$${value.toFixed(2)}`;
+}
+
+/**
+ * What new pieces would take, said before the yes (GEN's estimate, unchanged): the time while the
+ * piece maker runs and if it has to start, the cost typically and at most on the provider, and where
+ * the figures come from. Nothing is asked or spent until the person confirms.
+ */
+export function pieceEstimateWords(estimate: PieceEstimate): string {
+  const pieces = `${estimate.items} new piece${estimate.items === 1 ? '' : 's'}`;
+  const time = `${minutesWords(estimate.allSecondsWarm)} while the piece maker runs (the first in ${minutesWords(estimate.firstSecondsWarm)}), `
+    + `and ${minutesWords(estimate.coldStartSeconds)} more if it has to start`;
+  const cost = `about ${dollarsWords(estimate.usdTypical)}, at most ${dollarsWords(estimate.usdWorstCase)}, on ${estimate.providerLabel}`;
+  const basis = estimate.basis.kind === 'measured_runs'
+    ? `figures from ${estimate.basis.runs} measured run${estimate.basis.runs === 1 ? '' : 's'} of ${estimate.basis.items} pieces`
+    : 'figures from the piece maker\'s table, not from measured runs';
+  return `${pieces}: ${time}; ${cost} (${basis}). Nothing is made or spent until you confirm.`;
 }
 
 /**

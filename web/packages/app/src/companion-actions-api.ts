@@ -34,6 +34,25 @@ export interface StepAnswer {
   readonly society_id?: string;
   /** A direct request's own id, from the actions route's envelope (`request.request_id`). */
   readonly request_id?: string;
+  /** The piece requests an ask for new pieces was answered with, in its order. */
+  readonly piece_request_ids?: readonly string[];
+}
+
+/**
+ * What new pieces of a world's look would take, as the step states it before the person's yes:
+ * minutes on a running piece maker and from a start, and the cost on the provider, typical and at
+ * most, with where the figures come from.
+ */
+export interface PieceEstimate {
+  readonly items: number;
+  readonly firstSecondsWarm: number;
+  readonly allSecondsWarm: number;
+  readonly coldStartSeconds: number;
+  /** Decimal strings, US dollars. */
+  readonly usdTypical: string;
+  readonly usdWorstCase: string;
+  readonly providerLabel: string;
+  readonly basis: { readonly kind: 'measured_runs'; readonly runs: number; readonly items: number } | { readonly kind: 'fixed_table' };
 }
 
 export type PlanOutcome = 'plan' | 'clarify' | 'refused' | 'capabilities' | 'question';
@@ -67,6 +86,8 @@ export interface PlanStep {
    * added, `subject`, `place`, `affordance` and `act` for a being asked. Empty for any other step.
    */
   readonly titles: Readonly<Record<string, string>>;
+  /** For a step asking for new pieces, what they would take, stated before the yes; null otherwise. */
+  readonly estimate: PieceEstimate | null;
   /** The step as the server sent it, for the outcome read and the technical record. */
   readonly raw: Readonly<Record<string, unknown>>;
 }
@@ -185,7 +206,28 @@ function parseStep(value: unknown): PlanStep {
     titles: Object.freeze(Object.fromEntries(Object.entries(
       row['titles'] !== null && typeof row['titles'] === 'object' ? row['titles'] as Record<string, unknown> : {},
     ).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))),
+    estimate: pieceEstimate(row['estimate']),
     raw: Object.freeze({ ...row }),
+  });
+}
+
+/** A step's estimate, or null where it states none or one that does not read whole. */
+function pieceEstimate(value: unknown): PieceEstimate | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  const count = (key: string): number | null => (typeof row[key] === 'number' && Number.isFinite(row[key]) && (row[key] as number) >= 0 ? row[key] as number : null);
+  const usd = (key: string): string | null => (typeof row[key] === 'string' && /^\d+(\.\d+)?$/u.test(row[key] as string) ? row[key] as string : null);
+  const basis = row['basis'] !== null && typeof row['basis'] === 'object' ? row['basis'] as Record<string, unknown> : {};
+  const items = count('items'); const first = count('first_seconds_warm'); const all = count('all_seconds_warm');
+  const cold = count('cold_start_seconds'); const typical = usd('usd_typical'); const worst = usd('usd_worst_case');
+  const label = typeof row['provider_label'] === 'string' && row['provider_label'] !== '' ? row['provider_label'] as string
+    : typeof row['provider'] === 'string' ? row['provider'] as string : null;
+  if (items === null || first === null || all === null || cold === null || typical === null || worst === null || label === null) return null;
+  return Object.freeze({
+    items, firstSecondsWarm: first, allSecondsWarm: all, coldStartSeconds: cold, usdTypical: typical, usdWorstCase: worst,
+    providerLabel: label,
+    basis: basis['kind'] === 'measured_runs' && typeof basis['runs'] === 'number' && typeof basis['items'] === 'number'
+      ? { kind: 'measured_runs' as const, runs: basis['runs'], items: basis['items'] } : { kind: 'fixed_table' as const },
   });
 }
 

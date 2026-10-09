@@ -14,7 +14,7 @@ import { plannedEntry } from './actions/planned.js';
 import type { RefusalWords } from './actions/registry.js';
 import { button, panel, stateChip, technicalRecord, type InterfaceState } from './system/components.js';
 import { icon, type IconName } from './system/icon.js';
-import { PLAN_CLARIFY_SLOT_WORDS, PLAN_CLARIFY_WORDS, PLAN_HANDS_WORDS, PLAN_WORDS } from './words/companion-plan.js';
+import { PLAN_CLARIFY_SLOT_WORDS, PLAN_CLARIFY_WORDS, PLAN_HANDS_WORDS, PLAN_WORDS, pieceEstimateWords } from './words/companion-plan.js';
 import { filled, isObjectActivity, objectActivity } from '../society-activity-words.js';
 
 /** A step's words before anything is sent: what it is and whether it can be sent now. */
@@ -84,6 +84,8 @@ export function thePlace(title: string): string {
 export function thingDetail(step: PlanStep): string | null {
   const titles = step.titles;
   const capital = (words: string): string => words.charAt(0).toUpperCase() + words.slice(1);
+  // New pieces: the things they are for, as the server's reads label them ("gate, sword, well").
+  if (step.action.operation === 'request_pieces' && titles['kinds'] !== undefined) return capital(titles['kinds']);
   if (step.action.operation === 'place_thing' && titles['kind'] !== undefined) {
     const near = titles['near'];
     if (near === undefined) return capital(titles['kind']);
@@ -177,6 +179,12 @@ export function buildPlanSheet(options: PlanSheetOptions): PlanSheet {
         el('p', { class: 'companion-plan-spends', 'data-spends': String(plan.spends) }, [
           icon('spends', 'sm'), plan.spends ? PLAN_WORDS.spends : PLAN_WORDS.spendsNot,
         ]),
+        // What new pieces would take, in time and money, before the one Confirm (GEN's estimate).
+        ...plan.steps.flatMap((step) => (step.estimate === null ? [] : [
+          el('p', { class: 'companion-plan-estimate', 'data-step': String(step.index) }, [
+            icon('spends', 'sm'), pieceEstimateWords(step.estimate),
+          ]),
+        ])),
         el('p', { class: 'companion-plan-summary', role: 'status', 'aria-live': 'polite' }),
         record(plan),
       );

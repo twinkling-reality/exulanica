@@ -501,6 +501,16 @@ step's result: done, not done (in the action's words) or not reached, with "Part
 that stopped, and Play when a stopped chain left the world paused
 ([world actions](companion-question.md#the-browsers-path)).
 
+A third, Make new pieces for how things look here (`pieces.request`), asks the piece maker for new
+pieces of the world's look (`POST /world/piece-requests`, a world's route, so the plan step rather than a
+version's capability read says whether it can be asked). Its row names the things ("Gate, sword, well"),
+and before the one Confirm the sheet states what the step's estimate says: how many pieces, the time
+while the piece maker runs and from a start, the cost typically and at most on Nebius AI Cloud, and
+whether the figures come from measured runs (`pieceEstimateWords`). Once sent, the requests it made are
+read every 15 seconds while any waits (`composition/piece-requests.ts`): the status place holds "Making
+new pieces for the well. The piece maker runs until 19:30." (or that it waits for the piece maker to
+start), and each outcome is said once: arrived, with Take back; not used, and why; or not made.
+
 Two entries exist only as plan steps (placement `companion`): Add a thing (`things.place`) and Ask
 someone (`people.direct`). Their rows say the step in words from the names the server's reads gave
 it (`step.titles`, `thingDetail` in `ui/companion-plan.ts`): "Lantern, beside Knight", "Knight, go

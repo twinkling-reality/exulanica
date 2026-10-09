@@ -104,6 +104,8 @@ export interface CompanionPlansDeps {
    * plan now shown, or why there is none. Without it the Companion would still be asking.
    */
   readonly onSaid?: (utterance: string, said: Extract<PlanRouting, { readonly route: 'answer' }>) => void;
+  /** New pieces were asked for by a confirmed step: the page watches these requests to their outcome. */
+  readonly onPieces?: (pieceRequestIds: readonly string[]) => void;
 }
 
 export interface CompanionPlans {
@@ -335,6 +337,8 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
       const operation = actionSpec(built.request.actionId).operation ?? '';
       if (result.kind === 'ran') {
         answers[step.index] = stepAnswer(operation, { status: result.status, body: result.response });
+        const pieces = answers[step.index]?.piece_request_ids;
+        if (pieces !== undefined && pieces.length > 0) deps.onPieces?.(pieces);
       } else if (result.kind === 'refused' && result.status !== null) {
         answers[step.index] = stepAnswer(operation, { status: result.status, code: result.code });
       }
