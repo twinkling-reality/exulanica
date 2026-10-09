@@ -128,6 +128,7 @@
       "purpose": "Define acceptance methods and locate bounded execution evidence.",
       "documents": [
         {"path": "evaluation-methodology.md", "role": "reference", "owns": "How the project measures, where each evaluation lives, and the photograph and Companion metrics"},
+        {"path": "evaluation-corrections.md", "role": "reference", "owns": "Corrections, negative results and stated limits across the evaluation records, with the counts that summarize them"},
         {"path": "evaluation-corpus-contract.md", "role": "contract", "owns": "Evaluation bundles, split access, clean replay and run archives for exulanica-eval"},
         {"path": "visual-gate-targets.md", "role": "contract", "owns": "Visual-gate targets, authentication conditions, record bindings, halts and key limits"},
         {"path": "visual-gate-rubric.md", "role": "contract", "owns": "Human visual judgement procedure and evidence rules; a frozen input bound by digest"},

@@ -38,6 +38,45 @@ downloads).</sub>
   <br><sub>Product direction. The capability boundaries below distinguish implemented foundations from delivery targets.</sub>
 </p>
 
+## For hackathon judges
+
+The demonstration world is the scene "Three strangers": a knight, a lantern spirit and a gate that
+characters from games come through, each being's mind an open model on Nebius Token Factory. The scene
+is data ([three-strangers.v5.json](assets/catalogs/scenes/three-strangers.v5.json)), and
+`scripts/demo/build_scene.py` lays it into a saved world through the product's own routes;
+[Getting started](#getting-started) runs it. What each part shows, and where it is checked:
+
+| What you see | Checked by |
+| --- | --- |
+| A town made from one sentence, checked before it is made | [World creation](docs/capabilities/world-creation.md) |
+| Things placed, and beings asked to act, by saying so to the Companion and confirming once | `tests/test_companion_things_plan.py`, `tests/test_companion_things_postgres.py`, `tests/test_companion_hands_plan.py`, `tests/test_companion_hands_postgres.py` |
+| Each being's mind is an open model on Nebius Token Factory, two of the scene's three NVIDIA Nemotron | the scene's `minds` and `travellers` in [three-strangers.v5.json](assets/catalogs/scenes/three-strangers.v5.json); which models can be a being's mind: [the probe verdicts](docs/evaluation/2026-10-08-society-mind-probe-verdicts.json) |
+| Beings talk, pick things up and hand them over, and a replay regenerates the history without asking a model | `tests/test_society_hands_postgres.py` (a knight walks to a sword, picks it up and gives it to another knight), `tests/test_society_hands.py` |
+| A world made before a new ability keeps replaying as it ran | `tests/test_society_things_before_modules.py`, `tests/test_society_versions_survive_upgrades.py` |
+| Click a being: what it is, what it does here, what it holds, its mind, its look's licence and source | `tests/test_thing_card_postgres.py` (`test_a_thing_s_card_says_what_it_is_does_here_and_wears`) |
+| Drawing the knight in another look changes nothing it does | `tests/test_thing_card_postgres.py` (`test_choosing_a_look_changes_only_the_look`), and the card's own "How we know" line |
+| A player's character crosses in from Luanti through the gate, lives in the world with an open model as its mind, and goes home with what it holds | `bridges/luanti/run/check.py` (the check a crossing runs against a world), `tests/test_door_postgres.py` |
+| An outside AI agent takes its turns over MCP and is shown what the world's own minds are shown | [bridges/agents](bridges/agents/README.md) |
+| Every import and crossing says what came across and what did not | [translation manifests](docs/things-contract.md#translation-manifests), for example [the KayKit knight's](assets/catalogs/things/manifests/kaykit-knight.v1.json) |
+| Every being a model runs, and every line a model says, is marked AI | `web/packages/app/test/thing-marks.test.ts`, `web/packages/app/test/thing-lines.test.ts` |
+| A creature drafted from words; its sculpted look is made on Nebius AI Cloud and offered only where it passed every check (4 of 8 creatures in the second trial) | [the first rig trial](docs/evaluation/2026-10-07-creature-rig-trial.json), [the second](docs/evaluation/2026-10-07-creature-rig-trial-2.json) |
+| 3D pieces generated on Nebius AI Cloud GPUs as Serverless AI jobs, each with a receipt (52 pieces from 15 jobs, 43 within every check) | [the trial record](docs/evaluation/2026-10-07-nebius-generated-assets-trial.json) |
+
+**Built on:** Nebius Token Factory for every model call (the beings' minds, the world, kind and creature
+drafters, the Companion, reading pictures), with NVIDIA Nemotron 3 Super, Nano and Ultra and Nemotron
+3.5 Lightning in the roles the [model manifest](exulanica/models/models.manifest.json) names; NVIDIA
+NeMo Agent Toolkit for the outside agent example; Nebius AI Cloud Serverless AI jobs for 3D generation;
+Tavily for reference lookups (`exulanica/references/adapters/tavily.py`). One policy boundary holds every
+model call to its budget and allowlist and writes its receipt.
+
+**Credits:** KayKit Adventurers 2.0 and KayKit Character Animations 1.1 by Kay Lousberg (CC0,
+[assets/things/kaykit-adventurers-2](assets/things/kaykit-adventurers-2)). A Luanti player's own look is
+built at a deployment from the operator's copy of Minetest Game's default player picture
+(character.png by Jordach, CC BY-SA 3.0) and is never committed.
+
+**What the records show, including what they got wrong:**
+[Corrections and negative results in the evaluation records](docs/evaluation-corrections.md).
+
 ## Models inside the world
 
 A person builds a world, and open models run what happens inside it. The things in a world that
