@@ -26,7 +26,7 @@ from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.transport import HttpResponse
-from exulanica.selection.action_plan import ACTION_PROMPT_VERSION, DIRECT, THING_PLACE
+from exulanica.selection.action_plan import ACTION_PROMPT_VERSION, DIRECT, MAX_STEPS, THING_PLACE
 from exulanica.world.society_actions import ACTION_REFUSALS
 from fastapi.testclient import TestClient
 
@@ -296,6 +296,71 @@ def test_add_a_knight_by_the_well_is_the_add_thing_request_beside_the_well(compa
     [receipt] = read["steps"][0]["receipts"]
     assert (receipt["kind"], receipt["thing_id"]) == ("add_thing", body["thing_id"])
     assert read["steps"][0]["matches_preview"] is None
+
+
+def test_the_film_s_six_things_are_placed_once_their_origin_is_answered(companion):
+    """SCENE's opening sentence is six steps that place things. A plan that places asks first
+    where its things come from; the page sends the six typed actions back with the answer, and
+    then, as each step's receipt comes, the actions still to do: every list is prepared, its first
+    step ready and the rest pending, until all six things stand. A list longer than one request
+    may ask for is refused."""
+    world, client, transport = companion
+    sentence = (
+        "Add a stone well, a gate for travellers, a knight on guard by the well, a lantern "
+        "spirit, and a sword and a lantern by the well."
+    )
+    kinds = ["well", "gate", "knight", "lantern_spirit", "sword", "lantern"]
+    beside_the_well = (False, False, True, False, True, True)
+    transport.responses[:] = [
+        _reply({"kind": "world_edit"}),
+        _reply(
+            {
+                "steps": [
+                    {"operation": "place_thing", "options": [kind, "well"] if beside else [kind]}
+                    for kind, beside in zip(kinds, beside_the_well, strict=True)
+                ]
+            }
+        ),
+    ]
+    scope, _, _ = routes(world)
+    unanswered = {**_base_body(client, world), "utterance": sentence}
+    del unanswered["origin_role"]
+    asked = client.post("/selection/actions", headers=OWNER, params=scope, json=unanswered)
+    assert asked.status_code == 200, asked.text
+    question = asked.json()
+    assert question["outcome"] == "clarify", _why(question)
+    assert question["clarification"]["code"] == "origin_role_required"
+    actions = question["clarification"]["actions"]
+    assert [action["kind"] for action in actions] == kinds
+    well = actions[0]["thing_id"]
+    assert [action["near"] for action in actions] == [
+        f"thing:{well}" if beside else None for beside in beside_the_well
+    ]
+
+    placed = []
+    while actions:
+        plan = _prepare(client, world, actions)
+        assert plan["outcome"] == "plan", _why(plan)
+        assert [step["state"] for step in plan["steps"]] == ["prepared"] + ["pending"] * (
+            len(actions) - 1
+        )
+        sent = _send(client, plan["steps"][0])
+        assert sent.status_code == 201, sent.text
+        placed.append(actions[0]["thing_id"])
+        actions = actions[1:]
+
+    things = {thing["thing_id"]: thing for thing in _version(client, world)["things"]}
+    assert [things[thing_id]["kind"]["kind"] for thing_id in placed] == kinds
+    too_many = client.post(
+        "/selection/actions/prepare",
+        headers=OWNER,
+        params=scope,
+        json={
+            **_base_body(client, world),
+            "actions": [question["clarification"]["actions"][0]] * (MAX_STEPS + 1),
+        },
+    )
+    assert too_many.status_code == 422, too_many.text
 
 
 def test_send_the_knight_to_the_well_is_the_actions_route_s_request_at_this_minute(companion):

@@ -114,6 +114,7 @@ __all__ = [
     "DRAFT_OPERATIONS",
     "MAX_MINUTES",
     "MAX_PLAN_STEPS",
+    "MAX_STEPS",
     "PLAN_PROFILE",
     "SIMULATION_OPERATIONS",
     "THING_PLACE",

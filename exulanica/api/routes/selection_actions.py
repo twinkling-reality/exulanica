@@ -57,6 +57,7 @@ from exulanica.selection.action_plan import (
     ACTION_PROMPT_VERSION,
     MAX_MINUTES,
     MAX_PLAN_STEPS,
+    MAX_STEPS,
     ClockReader,
     Grant,
     Previewer,
@@ -180,9 +181,11 @@ class TypedSimulationBody(BaseModel):
 
 
 class PrepareRequest(ActionBase):
+    #: A plan's typed actions sent back with an answer (where its things come from, a slot
+    #: filled): as many as one request may ask for, the drafter's own bound.
     actions: list[
         Annotated[TypedActionBody | TypedSimulationBody, Field(discriminator="operation")]
-    ] = Field(min_length=1, max_length=3)
+    ] = Field(min_length=1, max_length=MAX_STEPS)
 
     @model_validator(mode="after")
     def _simulation_alone(self) -> PrepareRequest:
