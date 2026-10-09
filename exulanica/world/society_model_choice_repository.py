@@ -75,6 +75,7 @@ __all__ = [
     "SocietyModelChoiceRepository",
     "decider_of",
     "decides_at",
+    "latest_choices",
 ]
 
 #: How a gate's choice states its end: an RFC 3339 instant in UTC, to the second.
@@ -183,6 +184,31 @@ def _view(document: Mapping[str, Any], recorded_at: Any) -> dict[str, Any]:
     }
 
 
+def latest_choices(
+    role: DecisionRole, choices: Sequence[Mapping[str, Any]]
+) -> dict[str, Mapping[str, Any]]:
+    """Each subject's latest choice of ``role`` among ``choices``, read as
+    :meth:`SocietyModelChoiceRepository.history` reads them, in order. A choice ending a person's
+    play (``ended``) restores what the subject had before the play began: its own earlier choice,
+    or none. Every reader of who decides for a subject reads it here, the models read and a
+    comparison's definition alike."""
+    current: dict[str, Mapping[str, Any]] = {}
+    before: dict[str, Mapping[str, Any] | None] = {}
+    for choice in choices:
+        for subject in choice[role.choice_subjects]:
+            if "ended" in choice:
+                held = before.pop(subject, None)
+                if held is None:
+                    current.pop(subject, None)
+                else:
+                    current[subject] = held
+                continue
+            if is_played(choice["decider"]):
+                before[subject] = current.get(subject)
+            current[subject] = choice
+    return current
+
+
 def _asked_model(model: Any) -> dict[str, Any] | None:
     """The decider an owner's choice of ``model`` asks for, before anything checks the model: the
     routine for none, the model it names, or None for a body that names no model at all, which
@@ -264,34 +290,24 @@ class SocietyModelChoiceRepository:
     def _current(
         role: DecisionRole, rows: Sequence[Mapping[str, Any]]
     ) -> dict[str, dict[str, Any]]:
-        """Each subject's own latest choice of ``role``, by subject id. A choice ending a person's
-        play (``ended``) restores what the subject had before the play began: its own earlier
-        choice, or none."""
-        current: dict[str, dict[str, Any]] = {}
-        before: dict[str, dict[str, Any] | None] = {}
-        for row in SocietyModelChoiceRepository._of(role, rows):
-            document = row["document"]
-            described = decider_of(document)
-            for subject in document[role.choice_subjects]:
-                if "ended" in document:
-                    held = before.pop(subject, None)
-                    if held is None:
-                        current.pop(subject, None)
-                    else:
-                        current[subject] = held
-                    continue
-                if is_played(described):
-                    before[subject] = current.get(subject)
-                current[subject] = {
-                    "decider": described,
-                    "model": model_of(described),
-                    "choice_seq": document["choice_seq"],
-                    "chosen_by": document["chosen_by"],
-                    "recorded_at": row["recorded_at"],
-                    # The minute a person's play began, from which their quiet minutes count.
-                    **({"since_tick": document["since_tick"]} if "since_tick" in document else {}),
-                }
-        return current
+        """Each subject's own latest choice of ``role``, by subject id, as
+        :func:`latest_choices` reads it."""
+        views = [
+            _view(row["document"], row["recorded_at"])
+            for row in SocietyModelChoiceRepository._of(role, rows)
+        ]
+        return {
+            subject: {
+                "decider": view["decider"],
+                "model": view["model"],
+                "choice_seq": view["choice_seq"],
+                "chosen_by": view["chosen_by"],
+                "recorded_at": view["recorded_at"],
+                # The minute a person's play began, from which their quiet minutes count.
+                **({"since_tick": view["since_tick"]} if "since_tick" in view else {}),
+            }
+            for subject, view in latest_choices(role, views).items()
+        }
 
     @staticmethod
     def _groups(role: DecisionRole, rows: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:

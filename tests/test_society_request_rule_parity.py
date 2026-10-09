@@ -7,7 +7,8 @@ recorded, or one it refuses could be. Both are asked of the same people, under a
 the newest routine and one that records none: somebody free, each kind of stay the routine has,
 under way, a talker waiting for the other, a stay just over, somebody blocked, and somebody walking;
 and, in a society of things, a visitor from outside, whom no request may direct however free it is
-(its own program decides for it), beside a being the world's author placed, who may be.
+(its own program decides for it), a visitor whose arrival said the world decides for it, who may
+be, and a being the world's author placed, who may be.
 """
 
 from __future__ import annotations
@@ -73,6 +74,11 @@ def _people(stays: list[str]) -> dict[str, dict[str, Any]]:
             "came_by": "crossed",
         },
         "a blocked visitor from outside": {**_person("idle", "blocked"), "came_by": "crossed"},
+        "a free visitor the world decides for": {
+            **_person("idle", "active", goal=False),
+            "came_by": "crossed",
+            "crossing": {"arrival_id": "a", "bridge": "b", "grant_id": "g", "decided_by": "world"},
+        },
         "a free being its author placed": {
             **_person("idle", "active", goal=False),
             "came_by": "placed",
@@ -124,6 +130,7 @@ def test_the_database_admits_exactly_whom_the_society_may_direct(spine_schema, i
         assert answers[read_under, "a stay kind on an edge"] is False
         assert answers[read_under, "a free visitor from outside"] is False
         assert answers[read_under, "a blocked visitor from outside"] is False
+        assert answers[read_under, "a free visitor the world decides for"] is True
         assert answers[read_under, "a free being its author placed"] is True
     assert answers["the newest routine", "a talker waiting for the other"] is True
     assert answers["no routine", "a talker waiting for the other"] is False

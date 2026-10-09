@@ -112,7 +112,10 @@ from exulanica.world.society_comparison_result import (
 )
 from exulanica.world.society_comparison_verdict import ANCHOR_ROLES
 from exulanica.world.society_decision_contract import DecisionContract
-from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
+from exulanica.world.society_model_choice_repository import (
+    SocietyModelChoiceRepository,
+    latest_choices,
+)
 from exulanica.world.society_repository import SocietyRepository
 
 __all__ = [
@@ -610,10 +613,7 @@ class SocietyComparisonRunner:
         people, choices = self._choices(version_id, connection)
         if group is None:
             return []
-        latest: dict[str, dict[str, Any]] = {}
-        for made in choices:
-            for subject in made["people"]:
-                latest[subject] = made
+        latest = latest_choices(self.decision_role, choices)
         others = []
         for subject in sorted(set(people) - set(group)):
             choice = latest.get(subject)

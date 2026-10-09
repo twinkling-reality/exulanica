@@ -1766,9 +1766,10 @@ it is refused (`decided_from_outside`). A visitor the world decides for is decid
 here, where its kind allows that decider: by a choice naming it, else by the choice naming the group
 of arrivals under its grant (the mind the owner named for the gate's travellers, [decision
 roles](decision-roles-contract.md#who-decides-deciders-and-the-owners-choice)), else by the routine; its program is
-never asked, and it never goes quiet. Every visitor, either way, takes no person's direct request
-(`decided_from_outside`), in the society and in the database (`society_person_may_be_directed`,
-migration 0151).
+never asked, and it never goes quiet. A visitor its program decides for takes no person's direct
+request (`decided_from_outside`); one the world decides for takes one as any being here does, in
+the society and in the database alike (`society_person_may_be_directed`, migrations 0151 and
+0179).
 
 **What its state may state as it grows.** A being states `mode` only where it moves by more than
 walking (a walker states none), `height_mm` only while it flies, `velocity_mm_s` only while it flies

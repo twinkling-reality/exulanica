@@ -282,7 +282,10 @@ person decide (409, the last 422). While a being is played no other choice may n
 does not play it) records a choice naming the same person with `ended: given_back`; the being is
 then decided for as it was before the play began, by its own earlier choice or, with none, by its
 gate's group or its routine, so nothing is copied and nothing outlives a gate's release (migration
-"a person plays one being" admits the person and `ended` beside it alone).
+"a person plays one being" admits the person and `ended` beside it alone). Every reader of who
+decides for a being reads its choices by that one rule (`latest_choices` in
+`exulanica/world/society_model_choice_repository.py`): the models read, the card, the host and a
+comparison's definition of everybody outside its group alike.
 
 Each minute the being is due. `GET .../{subject_id}/turn` reads what it is offered in the minute to
 come, from the stored state, as its request will offer it: each option's label, kind, the place or

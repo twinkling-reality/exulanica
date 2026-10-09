@@ -15,7 +15,11 @@ import uuid
 import pytest
 from exulanica.world.deciders import DeciderRefused, decider, is_played, receipt_decider
 from exulanica.world.society_decision_contract import person_role
-from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
+from exulanica.world.society_model_choice_repository import (
+    SocietyModelChoiceRepository,
+    _view,
+    latest_choices,
+)
 from exulanica.world.society_play import answer_document, person_result
 
 ACCOUNT = str(uuid.UUID(int=0xA1))
@@ -48,11 +52,15 @@ def test_giving_a_being_back_restores_what_decided_for_it_before_the_play():
     role = person_role()
     # Its own choice of a model, then a play: the person decides; given back, the model again.
     assert current(role, [_row(1, MODEL), _row(2, PLAYED)])[SUBJECT]["decider"] == PLAYED
-    restored = current(role, [_row(1, MODEL), _row(2, PLAYED), _row(3, PLAYED, ended="given_back")])
+    restored_rows = [_row(1, MODEL), _row(2, PLAYED), _row(3, PLAYED, ended="given_back")]
+    restored = current(role, restored_rows)
     assert restored[SUBJECT]["decider"] == MODEL
     # With no own choice before, nothing is copied: no choice names it, so a gate's group or the
     # routine decides for it again.
     assert current(role, [_row(1, PLAYED), _row(2, PLAYED, ended="player_left")]) == {}
+    # A comparison names the same decider for it, by the same rule over the choices as read.
+    views = [_view(row["document"], None) for row in restored_rows]
+    assert latest_choices(role, views)[SUBJECT]["choice_seq"] == 1
 
 
 def test_a_minute_takes_the_person_s_answer_else_carries_on():

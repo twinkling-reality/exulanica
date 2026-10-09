@@ -254,6 +254,12 @@ def test_a_being_an_outside_program_decides_for_is_refused_by_name():
     )
     with pytest.raises(ValueError, match=r"^decided_from_outside$"):
         _ask(crossed, document, being, "pick_up", _thing(crossed, "sword")["id"])
+    # One whose arrival said the world decides for it is asked as any being here.
+    being["crossing"]["decided_by"] = "world"
+    request = _ask(crossed, document, being, "pick_up", _thing(crossed, "sword")["id"])
+    after, _events, dispositions, _ = _minute(crossed, document, [request])
+    assert [(d.disposition, d.reason) for d in dispositions] == [("applied", "validated_user_act")]
+    assert _thing(after, "sword")["held_by"] == being["id"]
 
 
 def test_a_request_for_a_target_keeps_its_v1_shape():

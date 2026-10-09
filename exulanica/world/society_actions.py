@@ -18,6 +18,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
+from exulanica.world.deciders import decided_by_world
 from exulanica.world.society import SOCIETY_NAMESPACE, SocietyEvent, society_state_sha256
 from exulanica.world.society_engines import ACTION_ENGINES
 from exulanica.world.society_planner import (
@@ -267,14 +268,15 @@ def _reachable(person: dict[str, Any], document: dict[str, Any], target: dict[st
 def may_be_directed(person: dict[str, Any], document: dict[str, Any]) -> bool:
     """Whether a direct request may send ``person`` somewhere, under the input it is made against.
 
-    Somebody who came in from outside never is: the program that sent them decides for them.
-    Anybody else may be when nobody is doing anything, what they did is over or blocked, or it is a
+    Somebody who came in from outside never is where the program that sent them decides for them;
+    one whose arrival said the world decides for it is directed as anybody here. Anybody else may
+    be when nobody is doing anything, what they did is over or blocked, or it is a
     stay the request ends (``ends_on_request``: a stay under a routine that draws its stays). A
     walk is left to arrive. The database holds a recorded request to this same rule
-    (``society_person_may_be_directed``, migrations 0108 and 0151), and
+    (``society_person_may_be_directed``, migrations 0108, 0151 and 0179), and
     tests/test_society_request_rule_parity.py holds the two equal.
     """
-    return person.get("came_by") != "crossed" and (
+    return (person.get("came_by") != "crossed" or decided_by_world(person)) and (
         person["goal"] is None
         or person["action"]["status"] in ("completed", "blocked")
         or ends_on_request(routine_of(document), person)
@@ -298,8 +300,9 @@ def _request_reason(
     person = _people(state).get(request["subject_id"])
     if person is None:
         return "rejected", "unknown_inhabitant"
-    if person.get("came_by") == "crossed":
-        # Their own program decides for a visitor from outside, never a person's request.
+    if person.get("came_by") == "crossed" and not decided_by_world(person):
+        # Their own program decides for a visitor from outside, never a person's request; one
+        # whose arrival said the world decides for it is asked as anybody here.
         return "rejected", "decided_from_outside"
     if not may_be_directed(person, document):
         return "rejected", "inhabitant_action_in_progress"

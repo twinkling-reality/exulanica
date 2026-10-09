@@ -65,7 +65,10 @@ from exulanica.world.society_comparison_result import (
     scoring_binding,
 )
 from exulanica.world.society_engines import society_engine
-from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
+from exulanica.world.society_model_choice_repository import (
+    SocietyModelChoiceRepository,
+    latest_choices,
+)
 from exulanica.world.society_person_label import person_label
 from exulanica.world.society_repository import SocietyRepository
 
@@ -378,10 +381,7 @@ class SocietyComparisonRepository:
                 raise ComparisonRefused(
                     "group_not_the_choice", "the group is exactly the people the choice named"
                 )
-        latest: dict[str, Mapping[str, Any]] = {}
-        for recorded in choices:
-            for subject in recorded["people"]:
-                latest[subject] = recorded
+        latest = latest_choices(role, choices)
         outside = sorted(set(names) - set(people))
         stated = {other["id"]: other for other in body["others"]}
         if sorted(stated) != outside:
