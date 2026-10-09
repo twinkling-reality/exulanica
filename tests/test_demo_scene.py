@@ -16,7 +16,10 @@ What is shown here, with no database and no server:
 *   against a server played here, the builder places every thing bound to the saved world, a
     second run places nothing, and a thing already placed as something else is refused by name;
 *   it then starts the scene's society and chooses each being's mind under keys a second run asks
-    with again, and refuses a society on another engine or a mind that reads back as another.
+    with again, and refuses a society on another engine or a mind that reads back as another;
+*   on a world whose things a person placed (the Companion's own ids), the society starter places
+    nothing, starts the scene's society, records the travellers coming through the world's own
+    gate and each placed being with the mind read back for it, and refuses a world with two gates.
 """
 
 from __future__ import annotations
@@ -46,6 +49,16 @@ def _builder():
     )
     module = importlib.util.module_from_spec(spec)
     sys.modules["build_scene"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _starter():
+    """The society starter, bound to the builder ``_builder`` loaded last."""
+    spec = importlib.util.spec_from_file_location(
+        "start_society", ROOT / "scripts/demo/start_society.py"
+    )
+    module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
@@ -203,6 +216,8 @@ class _Server:
     def call(self, method: str, path: str, body: Any = None, **query: str) -> Any:
         if (method, path) == ("POST", "/world-entries/starter"):
             return copy.deepcopy(self.entry)
+        if (method, path) == ("GET", "/world-entries"):
+            return [copy.deepcopy(self.entry)]
         if (method, path) == ("GET", "/world-entries/entry-1"):
             return copy.deepcopy(self.entry)
         if (method, path) == ("GET", "/world/versions/version-1"):
@@ -338,6 +353,54 @@ def test_the_builder_records_the_travellers_a_scene_names_and_refuses_a_gate_it_
     path.write_text(json.dumps(stray), encoding="utf-8")
     with pytest.raises(builder.SceneRefused, match="lacks"):
         builder.read_scene(path)
+
+
+def test_a_society_started_on_a_world_a_person_placed_places_nothing_and_takes_its_own_gate():
+    builder = _builder()
+    starter = _starter()
+    scene = builder.read_scene(
+        next(
+            path
+            for path in reversed(_newest_scenes())
+            if path.parent == CATALOG
+            and json.loads(path.read_text(encoding="utf-8"))["ground"]["kind"] == "starter"
+        )
+    )
+    assert scene["travellers"]["gate"], "the positive control: the scene lets travellers in"
+    server = _Server()
+    # The person placed the scene's kinds through the Companion: its own ids, its own layout.
+    for index, thing in enumerate(scene["things"]):
+        server.things.append(
+            {
+                "thing_id": f"companion:{thing['kind']['kind']}:{index:012x}",
+                "kind": {**thing["kind"], "sha256": "f" * 64},
+                "region_id": "region:starter",
+                "transform": {"x_mm": 1_000 * index, "y_mm": 0, "z_mm": 0, "yaw_microradians": 0},
+                "removed": False,
+            }
+        )
+    record = starter.start(server, scene)
+    assert server.bound == [] and server.edits == 0, "nothing is placed"
+    assert record["placed_by"] == "person" and record["society"]["engine"] == scene["engine"]
+    assert [t["thing_id"] for t in record["things"]] == [t["thing_id"] for t in server.things]
+    gate_kind = next(
+        t["kind"]["kind"] for t in scene["things"] if t["thing_id"] == scene["travellers"]["gate"]
+    )
+    world_gate = next(t["thing_id"] for t in server.things if t["kind"]["kind"] == gate_kind)
+    assert record["travellers"] == {**scene["travellers"], "gate": world_gate}
+    beings = sorted(t["thing_id"] for t in server.things if t["kind"]["kind"] in server.beings)
+    assert beings, "the positive control: the person placed beings"
+    assert {m["thing_id"]: m["model"] for m in record["society"]["minds"]} == dict.fromkeys(beings)
+    # A mind the person chose in Who decides is in the record made after it.
+    chosen = {"provider": "nebius_token_factory", "model_id": "a-model"}
+    server.chosen[f"person:{beings[0]}"] = chosen
+    again = starter.start(server, scene)
+    assert {m["thing_id"]: m["model"] for m in again["society"]["minds"]}[beings[0]] == chosen
+    second_gate = {**server.things[0], "thing_id": "companion:another"}
+    second_gate["kind"] = {**second_gate["kind"], "kind": gate_kind}
+    server.things.append(second_gate)
+    with pytest.raises(starter.SceneRefused, match=f"a {gate_kind}, and the world holds 2"):
+        starter.start(server, scene)
 
 
 def test_a_refusal_names_its_code_or_what_the_request_check_refused():
