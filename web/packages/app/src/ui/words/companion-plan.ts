@@ -126,3 +126,48 @@ export const PLAN_HANDS_WORDS: Readonly<Record<string, string>> = Object.freeze(
 export function planRefusalWords(code: string): RefusalWords {
   return PLAN_REFUSAL_WORDS[code] ?? PLAN_REFUSED;
 }
+
+/**
+ * The codes that mean the world moved on since the page read it. A prepare says so as a refused
+ * plan (`stale_version`), never as an error; a sent step's own route says so with 409
+ * `stale_structural_base`, `stale_object_base` or `stale_saved_world_entry` (a version edit) or
+ * `stale_society_state` (a society action or control).
+ */
+export const STALE_PREPARE_CODES: ReadonlySet<string> = new Set([
+  'stale_version', 'stale_structural_base', 'stale_object_base', 'stale_saved_world_entry', 'stale_society_state',
+]);
+
+/** The named errors a prepare itself can fail with, in words. */
+const PREPARE_ERROR_WORDS: Readonly<Record<string, RefusalWords>> = Object.freeze({
+  unknown_reference: {
+    happened: 'This world, or something the step names, is no longer there.',
+    next: 'Reload the page, then ask again.',
+  },
+  unavailable_asset: {
+    happened: 'That object’s files are not available right now.',
+    next: 'Choose another object, or ask again later.',
+  },
+});
+
+/** A prepare the server refused outright, by what it said: never "the world changed" unless it did. */
+export const PREPARE_FAILED: RefusalWords = {
+  happened: 'The world did not take the step I prepared.',
+  next: 'Reload the page, then ask again, or make the change yourself.',
+};
+
+/** A prepare that reached no server answer at all. */
+export const PREPARE_UNREACHED: RefusalWords = {
+  happened: 'I could not reach the world to prepare this step.',
+  next: 'Check the connection, then ask again.',
+};
+
+/**
+ * Why a prepare failed, by the server's code where it gave one (`status` set): a stale world's
+ * codes say the world changed, a code with words of its own says those, any other says the world
+ * did not take the step, and its code stays in the record; no answer at all says so.
+ */
+export function prepareFailureWords(failure: { readonly status: number; readonly code: string } | null): RefusalWords {
+  if (failure === null) return PREPARE_UNREACHED;
+  if (STALE_PREPARE_CODES.has(failure.code)) return PLAN_REFUSAL_WORDS['stale_version']!;
+  return PREPARE_ERROR_WORDS[failure.code] ?? PLAN_REFUSAL_WORDS[failure.code] ?? PREPARE_FAILED;
+}

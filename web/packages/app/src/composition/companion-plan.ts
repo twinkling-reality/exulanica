@@ -21,6 +21,7 @@
  * sentence takes the path it took before this module existed.
  */
 
+import { ApiError } from '@exulanica/graph-client';
 import type { CompanionProposal, WireProposal } from '../companion-ask-api.js';
 import { callsOf, proposalFromWire, type ModelCall } from '../companion-ask-api.js';
 import type {
@@ -36,7 +37,7 @@ import { PLAN_ACTIONS, plannedEntry, plannedRequest, stepAnswer } from '../ui/ac
 import { performPlanned, type ActionHost } from '../ui/actions/surfaces.js';
 import { plannedStepView, thePlace, type PlanSheet, type PlanStepView } from '../ui/companion-plan.js';
 import { OBJECT_ROLE_LABELS, isObjectRole } from '../world-objects-api.js';
-import { PLAN_WAITED, PLAN_WORDS, planRefusalWords } from '../ui/words/companion-plan.js';
+import { PLAN_WAITED, PLAN_WORDS, planRefusalWords, prepareFailureWords } from '../ui/words/companion-plan.js';
 
 /**
  * The codes a step asking one of the world's beings is prepared with while it must wait for the
@@ -251,6 +252,13 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
     const answers: Record<number, StepAnswer> = {};
     let done = 0;
     let stopped = false;
+    // A later step is prepared against the page as it is now, keeping what the person answered: the
+    // origin role is the one answer the page carries (every other is in the step's action), and a
+    // page read afresh has none, so a plan answered once would ask again at its second step.
+    const current = (): ActionPageContext => {
+      const fresh = deps.page();
+      return fresh === null ? page : { ...fresh, originRole: fresh.originRole ?? page.originRole };
+    };
     for (const step of plan.steps) deps.sheet.setStep(step.index, { kind: 'waiting' });
     for (const step of plan.steps) {
       if (stopped) { deps.sheet.setStep(step.index, { kind: 'not-reached' }); continue; }
@@ -261,7 +269,7 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
       const asking = step.action.operation === 'direct_thing';
       if ((plan.kind === 'world_edit' && step.index > 0) || asking) {
         try {
-          let again = await client.prepare(deps.page() ?? page, [step.action]);
+          let again = await client.prepare(current(), [step.action]);
           let waited = 0;
           // While it must wait for the world's next minute, it is prepared again now and then.
           while (asking && again.outcome === 'plan' && again.steps[0]?.state === 'pending'
@@ -271,7 +279,7 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
             });
             await pause(WAIT_POLL_MS);
             waited += WAIT_POLL_MS;
-            again = await client.prepare(deps.page() ?? page, [step.action]);
+            again = await client.prepare(current(), [step.action]);
           }
           sending = again.outcome === 'plan' ? again.steps[0] ?? null : null;
           if (sending !== null && sending.state === 'pending') {
@@ -285,8 +293,11 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
             continue;
           }
           deps.sheet.setStep(step.index, { kind: 'running' });
-        } catch {
-          deps.sheet.setStep(step.index, { kind: 'not-done', words: planRefusalWords('stale_version'), code: null });
+        } catch (error) {
+          // Said by what the server answered, its code kept in the record (a refused request, such
+          // as more steps than one prepare takes, is not a world that changed).
+          const failure = preparedFailure(error);
+          deps.sheet.setStep(step.index, { kind: 'not-done', words: prepareFailureWords(failure), code: failure?.code ?? null });
           stopped = true;
           continue;
         }
@@ -384,10 +395,15 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
           const first = asked.plan.raw['execution'] as { calls?: Parameters<typeof callsOf>[0] } | undefined;
           deps.onSaid?.(asked.utterance, { ...said, calls: [...callsOf(first?.calls), ...said.calls] });
         },
-        () => deps.sheet.say(planRefusalWords('stale_version')),
+        (error: unknown) => deps.sheet.say(prepareFailureWords(preparedFailure(error))),
       );
     },
   };
 }
 
 const PLAN_REFUSED_SENTENCE = planRefusalWords('not_drafted');
+
+/** A failed prepare's answer from the server (status and code), or null where none came. */
+function preparedFailure(error: unknown): { readonly status: number; readonly code: string } | null {
+  return error instanceof ApiError ? { status: error.status, code: error.code } : null;
+}

@@ -468,7 +468,13 @@ must wait for the next minute (the server's wait codes, `WAIT_CODES` in
 world's next minute", or "Waiting for a free place at the well." where every place there is taken this
 minute, or, while the world is paused, that it is paused and how to move it on, for at most 90
 seconds, after which the step is not sent and says so in the action's words. A question the plan needs first is asked by code and, where
-it differs, by slot ("Who is the other person?" for a give or take's other being).
+it differs, by slot ("Who is the other person?" for a give or take's other being). A prepare the server
+refuses outright is said by its answer (`prepareFailureWords` in `ui/words/companion-plan.ts`): "This
+world changed while I was reading what you asked." only for the codes that mean the world moved on
+(`STALE_PREPARE_CODES`), a code with words of its own in those words, any other as "The world did not
+take the step I prepared.", its code kept in the step's record, and no answer at all as not reaching
+the world. A later step is prepared against the page as it is then, keeping the answers already given (the
+origin role a person chose once holds for every step of the plan).
 
 Every interactive control a driver needs carries a `data-action` name (`people.bring-in`,
 `clock.advance`, `objects.place`, `objects.undo`, `object.remove`, `panel.people`, `confirm.accept`

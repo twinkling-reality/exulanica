@@ -322,6 +322,29 @@ describe('a question asked before a plan', () => {
     expect(said.calls.length).toBe(read.length);
     expect(read.length).toBeGreaterThan(0);
   });
+  it('keeps the answer for every step: a plan placing two objects, answered once, sends both', async () => {
+    // As the server prepares: with no origin role the bench asks for one; with one it is a step.
+    const planned = fixture('world-edit-plan') as { steps: Record<string, unknown>[] };
+    const step = planned.steps[0]!;
+    const twoBenches = { ...planned, steps: [step, { ...step, index: 1 }] };
+    const asking = (actions: unknown[]) => ({ ...planned, outcome: 'clarify', steps: [], clarification: {
+      code: 'origin_role_required', step: 0, slot: null,
+      candidates: [{ value: 'fictional', title: '', selected: false }, { value: 'personal', title: '', selected: false }],
+      actions,
+    } });
+    const h = harness({ plan: async () => asking([step['action'], step['action']]) });
+    h.client.prepare.mockImplementation(async (page: ActionPageContext, actions: unknown[]) => parseActionPlan(
+      page.originRole === null ? asking(actions)
+        : actions.length === 2 ? twoBenches : { ...planned, steps: [{ ...step, index: 0 }] }));
+    await h.plans.route('put two benches here');
+    h.sheet.root.querySelector<HTMLButtonElement>('[data-action="plan.choose"]')!.click();
+    for (let i = 0; i < 10 && h.sheet.root.querySelector('[data-action="plan.confirm"]') === null; i += 1) await settle();
+    await confirmAndWait(h);
+    // The second bench is prepared again against the page as it is now, with the role answered.
+    expect(h.client.prepare.mock.calls.at(-1)![0]).toMatchObject({ originRole: 'fictional' });
+    expect(h.sent.map((request) => request.actionId)).toEqual(['objects.place', 'objects.place']);
+    expect(stepStates(h.sheet)).toEqual(['done', 'done']);
+  });
 });
 
 describe('a plan of things', () => {
@@ -407,6 +430,24 @@ describe('a plan of things', () => {
     for (let i = 0; i < 50 && h.sheet.root.querySelector('[data-action="plan.close"]') === null; i += 1) await settle();
     expect(h.sent).toEqual([]);
     expect(h.sheet.root.querySelector('.companion-plan-step-held')?.textContent).toBe('Every place there is taken. Ask again when someone leaves.');
+  });
+
+  it('says a prepare the server refused by what it answered, and says the world changed only when it did', async () => {
+    const said = async (refusal: ApiError): Promise<string | null | undefined> => {
+      const h = harness({ plan: async () => fixture('thing-direct-plan'), prepare: async () => { throw refusal; } });
+      await h.plans.route('send the knight to the well');
+      confirmButton(h.sheet).click();
+      for (let i = 0; i < 50 && h.sheet.root.querySelector('[data-action="plan.close"]') === null; i += 1) await settle();
+      expect(h.sent).toEqual([]);
+      return h.sheet.root.querySelector('.companion-plan-step-held')?.textContent;
+    };
+    // A request the route will not take (its own 422, no problem code) is not a world that changed.
+    expect(await said(new ApiError(422, 'http_422', 'Unprocessable Entity')))
+      .toBe('The world did not take the step I prepared. Reload the page, then ask again, or make the change yourself.');
+    expect(await said(new ApiError(409, 'stale_society_state', 'the society moved on')))
+      .toBe('This world changed while I was reading what you asked. Ask again and I will plan against what it is now.');
+    expect(await said(new ApiError(404, 'unknown_reference', 'no such version')))
+      .toBe('This world, or something the step names, is no longer there. Reload the page, then ask again.');
   });
 
   it('says a step waits for a free place where every place is taken, and names an unnamed place plainly', async () => {
