@@ -704,6 +704,7 @@ PUBLISHED_REGISTRIES = {
     "decision-roles.v5.json": "97fcf977330c6043c1181c7d18302c1a09fa942193f368c2d2fba50713052f31",
     "decision-roles.v6.json": "032d55a2b260d8aeb5f17e73c771c649608ac9f62c8db86ac07a02d8c267ad57",
     "decision-roles.v7.json": "0caac20c8cab7e07d28115b72fc70e2bc8eaa5427b17be66e769da3885b04ca7",
+    "decision-roles.v8.json": "2e2e53a8402db44d4974f7e69e73b0c4e5135c7895e43fcb7f859c3244c6a5a8",
 }
 
 
@@ -720,10 +721,10 @@ def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
     own, things = person.terms(), person.terms(THINGS)
     assert own == person.terms("exulanica-society/v2") == person.terms("exulanica-society/v5")
     assert own.versions == {"society-decision-action": 2, "society-decision-policy": 2}
-    assert things.versions == {"society-decision-action": 4, "society-decision-policy": 4}
+    assert things.versions == {"society-decision-action": 5, "society-decision-policy": 5}
     assert (own.prompt_version, things.prompt_version) == (
         "society-person-choice/v1",
-        "society-person-choice/v4",
+        "society-person-choice/v5",
     )
     contract = person.contract(things.versions)
     assert {"carry_on", "say_to", "say_all", "leave"} <= set(contract.words)

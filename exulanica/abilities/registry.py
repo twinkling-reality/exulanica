@@ -38,7 +38,9 @@ __all__ = [
     "FOLLOW",
     "HANDS",
     "MODULES_PATH",
+    "NOTICE",
     "PURPOSEFUL",
+    "REMEMBER",
     "SAY",
     "AbilityError",
     "AbilityModule",
@@ -51,6 +53,7 @@ __all__ = [
     "current_modules",
     "load_ability_modules",
     "recorded_modules",
+    "recorded_row",
 ]
 
 MODULES_PATH: Final = Path(__file__).with_name("ability-modules.v1.json")
@@ -61,6 +64,8 @@ SAY: Final = "exulanica-ability/say/v1"
 CROSSING: Final = "exulanica-ability/crossing/v1"
 HANDS: Final = "exulanica-ability/hands/v1"
 FOLLOW: Final = "exulanica-ability/follow/v1"
+NOTICE: Final = "exulanica-ability/notice/v1"
+REMEMBER: Final = "exulanica-ability/remember/v1"
 #: The modules a society of things runs whose first input records none: the ones every society
 #: of things ran before inputs recorded them.
 BEFORE_RECORDED: Final = (PURPOSEFUL, SAY, CROSSING)
@@ -289,3 +294,17 @@ def recorded_modules(document: Mapping[str, Any]) -> tuple[str, ...]:
     for module in stated:
         built_module(module)
     return tuple(stated)
+
+
+def recorded_row(modules: Sequence[str], name: str) -> AbilityModule | None:
+    """The built row of the module called ``name`` that a society recorded among ``modules``, at the
+    version it recorded, or None where it recorded none: its figures are that version's, whatever
+    later rows of the same module state."""
+    found = [
+        built_module(module)
+        for module in modules
+        if (match := _NAME.fullmatch(module)) is not None and match.group(1) == name
+    ]
+    if len(found) > 1:
+        raise AbilityError(f"a society records one version of the {name} module, not {len(found)}")
+    return found[0] if found else None

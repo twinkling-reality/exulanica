@@ -110,7 +110,9 @@ DRAWING_MODULES: Final = (
     "exulanica.world.society_planner",
     "exulanica.world.society_person_label",
     "exulanica.world.society_place",
+    "exulanica.world.society_recollection",
     "exulanica.world.society_score",
+    "exulanica.world.society_surroundings",
     "exulanica.world.society_thing_inputs",
     "exulanica.world.society_things",
 )

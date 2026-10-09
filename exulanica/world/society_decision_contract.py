@@ -765,7 +765,7 @@ def observed_context(
         "doing": {"kind": action["kind"], "status": action["status"], "reason": action["reason"]},
         "last_activity": None if last is None else _activity_label(routine, last)[1],
         "options": [option.as_record() for option in options],
-        **_things_context(state, person),
+        **_things_context(state, person, document),
     }
 
 
@@ -822,10 +822,13 @@ def _minutes_ago(state: Mapping[str, Any], tick: int) -> int:
     return int(state["tick"]) - tick
 
 
-def _things_context(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str, Any]:
+def _things_context(
+    state: Mapping[str, Any], person: Mapping[str, Any], document: Mapping[str, Any]
+) -> dict[str, Any]:
     """What a society of things' person sees beside a purposeful person's: the engine they are
     asked under, whether something is under way for them, the most characters a line may hold,
-    and the lines they heard, oldest first, each with who said it, whether to them and when.
+    and the lines they heard, oldest first, each with who said it, whether to them and when; and,
+    where its society records the modules, what it notices around it and what it remembers.
     Nothing for any other society's people, whose requests read as they always did."""
     if not of_things(state["profile"]):
         return {}
@@ -848,6 +851,8 @@ def _things_context(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict
         **_being(person),
         **_said(state, person),
         **_holding(state, person),
+        **_noticed(state, document, person),
+        **_remembers(state, person),
     }
 
 
@@ -895,6 +900,55 @@ def _holding(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str, A
             if thing["held_by"] == person["id"]
         ]
     }
+
+
+def _noticed(
+    state: Mapping[str, Any], document: Mapping[str, Any], person: Mapping[str, Any]
+) -> dict[str, Any]:
+    """What the being notices around it (:mod:`exulanica.world.society_surroundings`), where its
+    society records the notice module: bounded by the row of the version it recorded, and who hears
+    it by the reach of the say version it recorded, the figure its lines carry by, so a society is
+    shown what the versions it recorded show whatever a later row or contract states. Stated only
+    there, so every other request reads as it did."""
+    from exulanica.abilities.registry import recorded_row
+    from exulanica.world.society_surroundings import NoticeTerms, surroundings
+
+    modules = state.get("modules", ())
+    row = recorded_row(modules, "notice")
+    say = recorded_row(modules, "say")
+    if row is None or say is None:
+        return {}
+    terms = NoticeTerms(
+        reach_mm=row.value("reach_mm"),
+        beings_maximum=row.value("beings_maximum"),
+        things_maximum=row.value("things_maximum"),
+        bytes_maximum=row.value("bytes_maximum"),
+        hearing_reach_mm=say.value("hearing_reach_mm"),
+        offers_version=row.value("offers_version"),
+    )
+    return {"surroundings": surroundings(state, document, person["id"], terms)}
+
+
+def _remembers(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str, Any]:
+    """What the being remembers (:mod:`exulanica.world.society_recollection`), where its society
+    records the memory module and it keeps one, a line it already sees as heard or said left out;
+    bounded by the row of the version its society recorded. Stated only there."""
+    from exulanica.abilities.registry import recorded_row
+    from exulanica.world.society_recollection import RecollectionBounds, remembered
+
+    row = recorded_row(state.get("modules", ()), "remember")
+    if row is None or "recollection" not in person:
+        return {}
+    bounds = RecollectionBounds(
+        beings_maximum=row.value("beings_maximum"),
+        places_maximum=row.value("places_maximum"),
+        handed_maximum=row.value("handed_maximum"),
+        bytes_maximum=row.value("bytes_maximum"),
+    )
+    shown = {(line["tick"], line["line"]) for line in person.get("heard", ())} | {
+        (line["tick"], line["line"]) for line in person.get("said", ())
+    }
+    return {"remembers": remembered(state, person, bounds, shown_lines=shown)}
 
 
 def decision_context(
@@ -955,6 +1009,10 @@ def situation(context: Mapping[str, Any]) -> list[str]:
             if held
             else "You hold nothing."
         )
+    if "surroundings" in context:
+        from exulanica.world.society_surroundings import surroundings_lines
+
+        lines.extend(surroundings_lines(context["surroundings"]))
     heard = context.get("heard") or []
     if heard:
         # Quoted, and named as what others said: never instructions, whoever reads them.
@@ -973,6 +1031,10 @@ def situation(context: Mapping[str, Any]) -> list[str]:
             f"{_quoted(line['line'])}"
             for line in said
         )
+    if "remembers" in context:
+        from exulanica.world.society_recollection import remembered_lines
+
+        lines.extend(remembered_lines(context["remembers"]))
     return lines
 
 

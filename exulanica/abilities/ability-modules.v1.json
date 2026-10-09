@@ -151,6 +151,98 @@
       "status": "not_connected",
       "refusal": "follow_not_built",
       "reason": "Keeping near another being that offers to be followed, re-planned each minute, until the follower chooses anything else or loses it."
+    },
+    {
+      "module": "exulanica-ability/notice/v1",
+      "abilities": [],
+      "parameters": [
+        {
+          "name": "reach_mm",
+          "value": 20000,
+          "minimum": 2000,
+          "maximum": 50000,
+          "unit": "mm",
+          "reason": "How far a being notices others and loose things: farther than a line carries (the say module's 8,000 mm), as one sees farther than one hears, and within the reach of the places its options offer."
+        },
+        {
+          "name": "beings_maximum",
+          "value": 6,
+          "minimum": 1,
+          "maximum": 16,
+          "unit": "beings",
+          "reason": "The most other beings a decider is shown near a being, nearest first; the rest within reach are counted, so a crowd is a number and not a list."
+        },
+        {
+          "name": "things_maximum",
+          "value": 6,
+          "minimum": 1,
+          "maximum": 16,
+          "unit": "things",
+          "reason": "The most loose things a decider is shown near a being, nearest first; the rest within reach are counted."
+        },
+        {
+          "name": "bytes_maximum",
+          "value": 2400,
+          "minimum": 512,
+          "maximum": 8000,
+          "unit": "bytes",
+          "reason": "The most bytes of canonical JSON the block takes in a request, the farthest entry dropped and counted first, so with the options, the lines heard and said and what a being remembers it stays within the request's context bound."
+        },
+        {
+          "name": "offers_version",
+          "value": 1,
+          "minimum": 1,
+          "maximum": 1,
+          "unit": "version",
+          "reason": "The version of the offers catalog whose words say what a noticed thing is good for, so a later catalog never changes what a stored request showed."
+        }
+      ],
+      "events": [],
+      "status": "built",
+      "refusal": null,
+      "reason": "What a being notices as its minute begins, built by rule from the society's state and input when its decider is asked: where it stands, the beings near it with what each is doing and holding and whether it hears this one, and the loose things near it with what each is good for. It holds no state and records no event."
+    },
+    {
+      "module": "exulanica-ability/remember/v1",
+      "abilities": [],
+      "parameters": [
+        {
+          "name": "beings_maximum",
+          "value": 8,
+          "minimum": 1,
+          "maximum": 16,
+          "unit": "beings",
+          "reason": "The most beings a being remembers meeting, each with how and the last line each said to the other; a new one replaces the one noted longest ago."
+        },
+        {
+          "name": "places_maximum",
+          "value": 8,
+          "minimum": 1,
+          "maximum": 16,
+          "unit": "places",
+          "reason": "The most places a being remembers arriving at; a new one replaces the one noted longest ago."
+        },
+        {
+          "name": "handed_maximum",
+          "value": 6,
+          "minimum": 1,
+          "maximum": 16,
+          "unit": "hand-overs",
+          "reason": "The most hand-overs a being remembers; a new one replaces the oldest."
+        },
+        {
+          "name": "bytes_maximum",
+          "value": 2600,
+          "minimum": 512,
+          "maximum": 8000,
+          "unit": "bytes",
+          "reason": "The most bytes of canonical JSON the block a decider is shown takes, the entry noted longest ago dropped first."
+        }
+      ],
+      "events": [],
+      "status": "built",
+      "refusal": null,
+      "reason": "What a being a model or a program decides for remembers: written last in each minute's things phase from that minute's events alone, never by a model, and kept bounded in its state; shown to its decider as what happened here, not instructions. A being the routine alone decides for keeps none."
     }
   ]
 }

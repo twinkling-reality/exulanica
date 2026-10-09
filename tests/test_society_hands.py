@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 import math
 import uuid
 from pathlib import Path
 
 import pytest
 from exulanica.abilities.registry import HANDS
+from exulanica.canonical import canonical_json
 from exulanica.world.role_decisions import DecisionDisposition
 from exulanica.world.society_decision_contract import (
     DecisionOption,
@@ -485,13 +487,13 @@ def _sword_id(document):
     return _sword(state)["id"]
 
 
-#: The data a hands society's minutes are replayed by, by its file's digest: the module's figures
-#: (reach, approach, minutes of walking) and the body plans whose sockets hold things. A recorded
-#: module version means these bytes; a change is a new version beside them.
+#: The data a hands society's minutes are replayed by: the hands module's row in the ability
+#: module table (its figures: reach, approach, minutes of walking), by the digest of the row's
+#: canonical JSON, and the body plans whose sockets hold things, by their file's digest. A recorded
+#: module version means these bytes; a change is a new version beside them, and a row added to the
+#: table beside it changes none of them.
+HANDS_ROW_SHA256 = "be1b97b54ef116a851ff9d4452a22fbf6311110c237f65b178ffd1f242d52719"
 HANDS_DATA = {
-    "exulanica/abilities/ability-modules.v1.json": (
-        "97791a777aab8eef9b73b8b40c7ee76068d26341d44bc270512e4a8d22856e94"
-    ),
     "assets/catalogs/things/body-plans.v1.json": (
         "7b18374f2a13803a29765571e833e645089bb6d708d418eaca040ce37246f781"
     ),
@@ -502,6 +504,13 @@ HANDS_DATA = {
 def test_the_data_hands_replay_by_keeps_its_bytes(path):
     root = Path(__file__).resolve().parents[1]
     assert hashlib.sha256((root / path).read_bytes()).hexdigest() == HANDS_DATA[path]
+
+
+def test_the_hands_module_s_row_keeps_its_bytes_whatever_rows_join_it():
+    root = Path(__file__).resolve().parents[1]
+    table = json.loads((root / "exulanica/abilities/ability-modules.v1.json").read_text())
+    [row] = [row for row in table["modules"] if row["module"] == HANDS]
+    assert hashlib.sha256(canonical_json(row)).hexdigest() == HANDS_ROW_SHA256
 
 
 def test_a_being_with_something_under_way_is_offered_only_acts_within_reach():

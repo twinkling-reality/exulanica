@@ -1,8 +1,10 @@
 """What a being of a society of things remembers, written by rule from the minutes it lived.
 
 Each case runs real minutes of a society of things in memory (the planner's minute, then the things
-phase with the receipts the case scripts) and writes the minute's events into the beings'
-recollections, as the things phase will. Expected values come from elsewhere than the module:
+phase with the receipts the case scripts), whose memory step writes the minute's events into the
+recollections of the beings a model or a program decides for: a being the case names is given a
+receipt its model did not answer in time, which leaves the routine deciding for it and makes it
+remember. Expected values come from elsewhere than the module:
 lines from the receipts this file writes, ticks and ids from the states the engine returns,
 activity words from the routine catalog file read here as JSON.
 """
@@ -87,13 +89,36 @@ def _receipt(person, option, *, line=None):
     )
 
 
+def _unanswered(being_id):
+    """A receipt the minute consumes for a being whose model did not answer in time: the routine
+    decides for it that minute, and it is a being a model decides for."""
+    receipt = {
+        "subject_id": being_id,
+        "request_id": str(uuid.uuid4()),
+        "status": "unavailable",
+        "reason": "no_answer_in_time",
+        "proposal": None,
+        "provider": None,
+    }
+    return receipt, DecisionDisposition(
+        decision_seq=1,
+        request_id=receipt["request_id"],
+        subject_id=being_id,
+        disposition="unavailable",
+        reason="no_answer_in_time",
+        decision_sha256="0" * 64,
+    )
+
+
 def _minute(state, document, decisions=(), crossings=(), *, minds=()):
-    """One minute run as the engine runs it, then remembered, as the things phase will."""
+    """One minute run as the engine runs it, its memory step included; each being in ``minds``
+    that the scripted decisions do not name is given an unanswered receipt."""
+    decided = {receipt["subject_id"] for receipt, _ in decisions}
+    decisions = [*decisions, *(_unanswered(m) for m in sorted(minds) if m not in decided)]
     planned, events = advance_purposeful_society(state, SEED, [document])
     after, events, _ = advance_things(
         state, planned, SEED, document, events, crossings, decisions=decisions
     )
-    remember(after, events, BOUNDS, minds, _words_of)
     return after, events
 
 
@@ -252,8 +277,7 @@ def test_a_hand_over_is_kept_by_both_beings_with_the_thing_and_who():
         _person(after, being["id"])["recollection"] = {"met": [], "places": [], "handed": []}
     options = choice_options(after, document, giver["id"], hands._contract(), seed=SEED)
     [give] = [o for o in options if o.kind == "give" and o.addressee_id == other["id"]]
-    state, events, _ = hands._minute(after, document, [hands._receipt(giver, give)])
-    remember(state, events, BOUNDS, (), _words_of)
+    state, _events, _ = hands._minute(after, document, [hands._receipt(giver, give)])
     sword = hands._sword(state)
     tick = state["tick"]
     gave = _person(state, giver["id"])["recollection"]
@@ -352,17 +376,19 @@ def test_a_being_remembered_who_left_is_noted_as_gone_when_it_left():
     assert said.label.startswith(f"say something to {being['who']}, ")
 
 
-def test_the_same_minute_remembered_twice_is_the_same_to_the_byte():
+def test_the_same_minute_played_twice_remembers_the_same_to_the_byte():
     state, document = _square(KNIGHT)
     minds = {p["id"] for p in _villagers(state)}
     for _ in range(20):
         state, _ = _minute(state, document, minds=minds)
-    planned, events = advance_purposeful_society(state, SEED, [document])
-    after, events, _ = advance_things(state, planned, SEED, document, events, ())
-    first, second = copy.deepcopy(after), copy.deepcopy(after)
-    remember(first, events, BOUNDS, minds, _words_of)
-    remember(second, events, BOUNDS, minds, _words_of)
+    first, _ = _minute(copy.deepcopy(state), document, minds=minds)
+    second, _ = _minute(copy.deepcopy(state), document, minds=minds)
     assert canonical_json(first) == canonical_json(second)
+    # The positive control: the beings remember something by now.
+    assert any(
+        _person(first, m)["recollection"]["met"] or _person(first, m)["recollection"]["places"]
+        for m in minds
+    )
 
 
 # -- the shape -------------------------------------------------------------------------------------

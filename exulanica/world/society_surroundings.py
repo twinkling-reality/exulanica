@@ -132,6 +132,24 @@ def _doing(
     return "waiting"
 
 
+def _of_input(document: Mapping[str, Any], name: str, build: Callable[[], Any]) -> Any:
+    """What ``build`` makes of the input alone, built once per input while a run of minutes holds
+    the planner's input memo, and where it is read otherwise. Read, never changed."""
+    from exulanica.world.society_planner import _input_value
+
+    return _input_value(document, ("surroundings", name), build)
+
+
+def _places(document: Mapping[str, Any]) -> list[tuple[Sequence[int], str, Mapping[str, Any]]]:
+    """Every enabled place of the input with the point its access node stands at."""
+    nodes = {node["node_id"]: node["position_mm"] for node in document["navigation"]["nodes"]}
+    return [
+        (nodes[target["node_id"]], target["target_id"], target)
+        for target in document["targets"]
+        if target["enabled"] and target["node_id"] in nodes
+    ]
+
+
 def _at(
     person: Mapping[str, Any],
     document: Mapping[str, Any],
@@ -143,11 +161,9 @@ def _at(
     what it is good for; None where it stands at none."""
     from exulanica.world.society_decision_contract import _activity_label
 
-    nodes = {node["node_id"]: node["position_mm"] for node in document["navigation"]["nodes"]}
     near = sorted(
-        (_distance(person["position_mm"], nodes[target["node_id"]]), target["target_id"], target)
-        for target in document["targets"]
-        if target["enabled"] and target["node_id"] in nodes
+        (_distance(person["position_mm"], point), target_id, target)
+        for point, target_id, target in _of_input(document, "places", lambda: _places(document))
     )
     if not near or near[0][0] > _AT_PLACE_MM:
         return None
@@ -175,8 +191,10 @@ def surroundings(
     if me is None:
         raise ValueError("the subject is not one of this society's beings")
     words = offers_of_version(terms.offers_version)
-    routine = routine_of(dict(document))
-    targets = {target["target_id"]: target for target in document["targets"]}
+    routine = _of_input(document, "routine", lambda: routine_of(dict(document)))
+    targets = _of_input(
+        document, "targets", lambda: {target["target_id"]: target for target in document["targets"]}
+    )
     held: dict[str, list[str]] = {}
     for thing in state["things"]:
         if thing["held_by"] is not None:

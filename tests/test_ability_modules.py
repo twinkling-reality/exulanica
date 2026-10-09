@@ -11,6 +11,7 @@ What is shown here, with no database:
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -29,6 +30,7 @@ from exulanica.abilities.registry import (
     load_ability_modules,
     recorded_modules,
 )
+from exulanica.canonical import canonical_json
 from exulanica.things.catalogs import thing_catalogs
 from exulanica.world.society_decision_contract import person_role
 from exulanica.world.society_things import THINGS_PROFILE
@@ -111,3 +113,39 @@ def test_a_table_that_breaks_a_rule_is_refused_by_name(tmp_path, change, message
     load_ability_modules(_table(tmp_path, lambda d: None))  # the positive control
     with pytest.raises(AbilityError, match=message):
         load_ability_modules(_table(tmp_path, change))
+
+
+#: Every row of the table, by the digest of its canonical JSON. A society replays by the rows its
+#: first input recorded, so a row is never edited: a change is a new version beside it, and a new
+#: row joins this list with its digest.
+ROWS_SHA256 = {
+    "exulanica-ability/crossing/v1": (
+        "fa49cfcedc547827a63dd9376ad2fd3f3b0c6401d810db711986f2ae4c086c27"
+    ),
+    "exulanica-ability/follow/v1": (
+        "ae012193437836a90eed9f9e1cb3cc1c4cc4db13626cee9b43777611ceddc491"
+    ),
+    "exulanica-ability/hands/v1": (
+        "be1b97b54ef116a851ff9d4452a22fbf6311110c237f65b178ffd1f242d52719"
+    ),
+    "exulanica-ability/notice/v1": (
+        "de80c0e505dcda86983300fbee44af82046e0817a21c4718f809af447a46e42c"
+    ),
+    "exulanica-ability/purposeful/v1": (
+        "1602c6b84373e041535ae6c4dd3ee7136ce18e51cb0887270c8d532f5ecf7903"
+    ),
+    "exulanica-ability/remember/v1": (
+        "b81b95345ce5f21521cc1f93cdf9c0f080bfe90aad9ee95cb75d0c1d7f01b1af"
+    ),
+    "exulanica-ability/say/v1": (
+        "8732fe7e835dfcc80892e8218c2d4817bbe200c5ee113de4158a48b6fe584778"
+    ),
+}
+
+
+def test_every_row_keeps_its_bytes_and_every_row_is_pinned():
+    table = json.loads(MODULES_PATH.read_text(encoding="utf-8"))
+    found = {
+        row["module"]: hashlib.sha256(canonical_json(row)).hexdigest() for row in table["modules"]
+    }
+    assert found == ROWS_SHA256

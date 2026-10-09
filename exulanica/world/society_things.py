@@ -1076,6 +1076,8 @@ def advance_things(
     _decided(minute, previous, decisions)
     if _runs_hands(result):
         _hands(minute, previous)
+    if _remembers(result):
+        _remember(minute, decisions)
     validate_things_state(result)
     return result, tuple(minute.events), tuple(bound)
 
@@ -1085,6 +1087,48 @@ def advance_things(
 #: from it, never from whatever terms the registry states now, so a later version of the terms
 #: leaves every stored minute replaying as it ran.
 LINES_CONTRACT: Final = {"society-decision-action": 3, "society-decision-policy": 3}
+
+
+def _remembers(state: Mapping[str, Any]) -> bool:
+    """Whether a society of things records the memory module, at any version, so its minute writes
+    what the beings a model or a program decides for remember."""
+    from exulanica.abilities.registry import recorded_row
+
+    return recorded_row(state.get("modules", ()), "remember") is not None
+
+
+def _remember(minute: _Minute, decisions: Sequence[tuple[Mapping[str, Any], Any]]) -> None:
+    """The memory step, last among the things phase's steps: the minute's events, every one in
+    the order it recorded them, written into the recollections of the beings that keep one
+    (:func:`exulanica.world.society_recollection.remember`). A being starts keeping one the first
+    minute a model or a program decides for it: one a receipt the minute consumed names, or a
+    visitor its own program decides for. Bounded by the row of the version the society recorded."""
+    from exulanica.abilities.registry import recorded_row
+    from exulanica.world.society_decision_contract import _activity_label
+    from exulanica.world.society_planner import _input_value, routine_of
+    from exulanica.world.society_recollection import RecollectionBounds, remember
+
+    row = recorded_row(minute.state.get("modules", ()), "remember")
+    assert row is not None
+    bounds = RecollectionBounds(
+        beings_maximum=row.value("beings_maximum"),
+        places_maximum=row.value("places_maximum"),
+        handed_maximum=row.value("handed_maximum"),
+        bytes_maximum=row.value("bytes_maximum"),
+    )
+    minds = {str(receipt["subject_id"]) for receipt, _disposition in decisions}
+    minds |= {person["id"] for person in minute.state["inhabitants"] if _program_decides(person)}
+    document = minute.document
+    routine = _input_value(
+        document, ("recollection", "routine"), lambda: routine_of(dict(document))
+    )
+    remember(
+        minute.state,
+        minute.events,
+        bounds,
+        minds,
+        lambda target: _activity_label(routine, target)[1],
+    )
 
 
 def _say_bounds() -> tuple[int, int]:
@@ -1558,6 +1602,14 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
         _require(_reference_shape(person["kind"]), "a person names its kind")
         _optional_movement(person)
         _optional_lines(person)
+        if "recollection" in person:
+            from exulanica.world.society_recollection import validate_recollection
+
+            _require(_remembers(state), "only a society running memory keeps a recollection")
+            try:
+                validate_recollection(person["recollection"])
+            except ValueError as exc:
+                raise ValueError(f"a being's recollection is out of shape: {exc}") from exc
         intent = person.get("hands")
         _require(
             intent is None

@@ -76,11 +76,11 @@ def test_a_say_option_names_its_listener_in_its_own_words():
     assert line_listener({"kind": "say_to", "label": "say hello"}, contract) is None
 
 
-def test_a_society_of_things_is_asked_under_the_fourth_prompt_with_the_listener_rule():
+def test_a_society_of_things_is_asked_under_its_newest_prompt_with_the_listener_rule():
     person = decision_roles().role("society_decision")
     things = person.terms(THINGS_PROFILE)
-    assert decision_roles().version >= 7
-    assert things.prompt_version == "society-person-choice/v4"
+    assert decision_roles().version >= 8
+    assert things.prompt_version == "society-person-choice/v5"
     assert things.line_rules == frozenset({"names_no_listener"}) <= LINE_RULES
     assert "without naming or describing them" in things.instruction
     assert "(the knight, a villager)" not in things.instruction

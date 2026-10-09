@@ -1505,8 +1505,10 @@ for its whole life and may move on to a later things composition, never back.
 (`modules`: sorted, each once, each a built row of
 [`ability-modules.v1.json`](../exulanica/abilities/ability-modules.v1.json)), and its minutes run
 exactly those for its whole life, whatever a later table adds; no later input states them. A new
-society records every built module at its newest version: today purposeful, say, crossing and hands
-(`exulanica-ability/hands/v1`). A society whose first input names none, made before modules were
+society records every built module at its newest version: today purposeful, say, crossing, hands
+(`exulanica-ability/hands/v1`), notice (`exulanica-ability/notice/v1`) and memory
+(`exulanica-ability/remember/v1`), the last two as the [minds contract](minds-contract.md) states.
+A society whose first input names none, made before modules were
 recorded, runs purposeful, say and crossing (`BEFORE_RECORDED`), so its people never use their
 hands and its things never move, and records every minute as it did then: a line's event and its
 hearers keep no model and no speaker's name, and nobody keeps what it said. Its stored minutes
@@ -1597,7 +1599,12 @@ first, unchanged, and every event they record names v7; then the things phase:
   `chose_to_<ability>`) naming the thing, the other being and the socket. An act is dropped
   (`hands_missed`) when the thing or the other being is gone (`thing_gone`) or the module's three
   minutes of walking pass first (`out_of_reach`). A hands act takes no line, and the routine never
-  chooses one.
+  chooses one;
+* where the society runs the memory module, last: the minute's events, in the order it recorded
+  them, are written into the memory of each being a model or a program decides for (one a receipt
+  the minute consumed names, or a visitor its own program decides for, from that minute on), as
+  the [minds contract](minds-contract.md) states. Nothing is recorded for it: a being's memory is
+  part of the state, so it replays with the minute.
 
 Each event of the things phase carries `at_ms` 0: it takes effect as the minute begins (`at_ms`
 is the moment within the minute, 0 to 59,999). A hands act done after a walk is the exception: it

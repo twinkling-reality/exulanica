@@ -144,7 +144,7 @@ def test_released_catalog_versions_never_change_in_place():
 
 
 #: Read from the files as released with the living society (05120886 and 5acc7cdf), with the
-#: purposeful routine the inputs record, with both versions of the decision contract a person's
+#: purposeful routine the inputs record, with every version of the decision contract a person's
 #: requests record, with the score, protocol and seeds a comparison of models records, and with
 #: the codes each kind of activity records, the legacy identities of the first three engines and
 #: the living town's routine; a new version adds a line here, and no line ever changes.
@@ -224,6 +224,12 @@ RELEASED_CATALOGS = {
     ),
     "society-decision-policy.v4.json": (
         "509bab7d614f6d6c8775714043954e3b9337e7ed58557ecd53c4b7c9bfe11e61"
+    ),
+    "society-decision-action.v5.json": (
+        "5d8155294460256138c2cd1531e741b09ea36e53b7b38aac27673784defad7fb"
+    ),
+    "society-decision-policy.v5.json": (
+        "67744ddc361badc5816f032f87880f05baf15ed25764d9e29fd3e4780c07fbf2"
     ),
     "society-legacy-identity.v1.json": (
         "5f8c5a040fe346e7fe61b22f20e3210507f4828d6fc1c93690cb909d09aee455"

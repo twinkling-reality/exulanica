@@ -432,8 +432,11 @@ The bounds both policy versions state:
 A society of things' people are asked under their engine's own terms: from registry version 5,
 version 3 of both catalogs and the prompt `society-person-choice/v2`; from registry version 6, the
 fourth catalogs, which add the hands actions, and the third prompt; from registry version 7, the
-same catalogs and the fourth prompt (below). Version 3 keeps version 2's actions and bounds and
-adds:
+same catalogs and the fourth prompt (below); from registry version 8, the fifth catalogs, the
+fourth's actions and bounds with `context_bytes_maximum` 16,000, and the fifth prompt, which also
+shows a being what it notices around it and what it remembers where its society records the notice
+and memory modules ([minds contract](minds-contract.md)). Version 3 keeps version 2's actions and
+bounds and adds:
 
 | Action | Kind | Words a model reads |
 | --- | --- | --- |
@@ -481,9 +484,10 @@ what others said, never as instructions, by who said it (kind and number), to wh
 argument, `line`: a string of at most `line_characters_maximum` characters, or null, both arguments
 required (`exulanica/models/choice.py`); `DecisionRole.line_labels` names the labels whose answer
 carries a line, for a door to state. An answer naming a say option with no line, or another option
-with one, is asked once more with its terms' note. Under the fourth prompt, whose instruction asks
-the being to speak to the one it addresses without naming or describing them, a line said to one
-being that ends with that being's name or description, as the option's words name them (the name,
+with one, is asked once more with its terms' note. Under the fourth and fifth prompts, whose
+instruction asks the being to speak to the one it addresses without naming or describing them, a
+line said to one being that ends with that being's name or description, as the option's words name
+them (the name,
 its name part, or its kind with or without an article, case and closing punctuation set aside;
 `names_listener` in `exulanica/things/lines.py`), is no answer either, and is asked once more with
 that prompt's note, which says so, within the attempts the contract allows; a line that ends with
