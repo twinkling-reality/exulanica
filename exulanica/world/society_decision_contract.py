@@ -52,6 +52,8 @@ from __future__ import annotations
 import json
 import math
 import random
+import re
+import string
 from collections.abc import Container, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
@@ -112,6 +114,7 @@ __all__ = [
     "decision_contract",
     "decision_messages",
     "input_memo",
+    "line_listener",
     "observed_context",
     "option_goal_policy",
     "person_role",
@@ -777,6 +780,25 @@ def named(display_name: str, label: str | None) -> str:
     if label.lower() in display_name.lower():
         return display_name
     return f"{display_name} ({_article(label)})"
+
+
+def line_listener(option: Mapping[str, Any], contract: DecisionContract) -> str | None:
+    """Who the line an option says is said to, as the option's own words name them under
+    ``contract`` (the name the page shows, or the kind and number of an earlier contract's words):
+    None for a line said to everyone near, and for a label those words did not make."""
+    words = contract.words.get("say_to")
+    if option.get("kind") != "say_to" or words is None:
+        return None
+    pattern = ""
+    for literal, field, _spec, _conversion in string.Formatter().parse(words):
+        pattern += re.escape(literal)
+        if field is not None:
+            pattern += f"(?P<{field}>.+)" if field in ("name", "who") else "[0-9]+"
+    found = re.fullmatch(pattern, str(option.get("label", "")))
+    if found is None:
+        return None
+    named = found.groupdict()
+    return named.get("name") or named.get("who")
 
 
 def page_name(person: Mapping[str, Any]) -> str:

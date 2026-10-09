@@ -68,7 +68,7 @@ from exulanica.world.decision_roles import (
     RoleOption,
     decision_roles,
 )
-from exulanica.world.role_decisions import check_role_result
+from exulanica.world.role_decisions import check_role_result, names_its_listener
 from exulanica.world.society import asked_again_after_a_race, society_state_sha256
 from exulanica.world.society_controls import LEASE_SECONDS, ControlClaim
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
@@ -689,6 +689,13 @@ def ask(
             if refused is not None:
                 status, reason, proposal = "rejected", refused, None
                 break
+            if names_its_listener(role, asked.request, option, line):
+                # A line said to one being that names or describes it, under terms holding lines
+                # to that rule, is not an answer to this choice: asked once more, within the
+                # attempts the contract allows, as an option not offered is.
+                status, reason, proposal = "rejected", "answer_not_offered", None
+                messages = [*messages, {"role": "user", "content": terms.not_offered}]
+                continue
             proposal["line"] = check_line(line, maximum=context["line_characters_maximum"])
         break
     calls = [

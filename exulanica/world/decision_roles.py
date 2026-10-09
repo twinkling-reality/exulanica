@@ -40,7 +40,7 @@ import importlib
 import re
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from functools import cache
+from functools import cache, partial
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Final, Protocol
@@ -60,6 +60,7 @@ from exulanica.grammar.errors import CatalogError
 from exulanica.grammar.records import KEY_PATTERN
 from exulanica.models.choice import ChoiceRequest
 from exulanica.models.manifest import AnsweringMechanism, ChosenRoleBinding, ModelSpec
+from exulanica.things.lines import LINE_RULES
 from exulanica.world.role_catalogs import role_action_schema, role_policy_schema
 from exulanica.world.society_controls import LEASE_SECONDS
 from exulanica.world.society_engines import ENGINES
@@ -390,6 +391,10 @@ class RoleTerms:
     choice_description: str
     #: What a model is told when its answer was not one of the options, before it is asked again.
     not_offered: str
+    #: The rules beside the line rule a model's lines are held to under these terms
+    #: (:data:`~exulanica.things.lines.LINE_RULES`), from registry version 7: an answer whose line
+    #: breaks one is not an answer to the choice, and is asked again.
+    line_rules: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -460,6 +465,14 @@ class DecisionRole:
     def every_terms(self) -> tuple[RoleTerms, ...]:
         """The role's own terms, then each engine's, in engine order."""
         return (self.own_terms, *(self.engine_terms[e] for e in sorted(self.engine_terms)))
+
+    def terms_with_prompt(self, prompt_version: object) -> RoleTerms | None:
+        """The terms of this registry whose prompt is ``prompt_version``, the one a request
+        records; None for a prompt no terms of it state now, one a request was asked under
+        before."""
+        return next(
+            (terms for terms in self.every_terms() if terms.prompt_version == prompt_version), None
+        )
 
     @property
     def reasons(self) -> frozenset[str]:
@@ -674,6 +687,9 @@ def _description(where: str, value: object) -> FieldValue:
 _VERSION: Final = integer_field(1, 10_000)
 #: The registry version from which an entry states each engine's own terms (``engine_terms``).
 ENGINE_TERMS_FROM: Final = 5
+#: The registry version from which an engine's terms may state the rules their lines are held to
+#: beside the line rule (``line_rules``).
+LINE_RULES_FROM: Final = 7
 _TERM_FIELDS: Final = frozenset(
     {
         "engine",
@@ -687,18 +703,28 @@ _TERM_FIELDS: Final = frozenset(
 )
 
 
-def _engine_terms(where: str, value: object) -> FieldValue:
+def _engine_terms(where: str, value: object, *, line_rules: bool = False) -> FieldValue:
     """The terms each engine states for its own requests: a list of objects, one an engine, each
     naming an engine the engine table states, the two catalog versions its new requests record,
-    and its prompt's version and three texts."""
+    and its prompt's version and three texts; from :data:`LINE_RULES_FROM` (``line_rules``), also
+    the rules its lines are held to, where it states any."""
     if not isinstance(value, list):
         raise CatalogError(f"{where} is a list of an engine's terms")
     known = {engine.engine for engine in ENGINES}
     found: list[dict[str, object]] = []
     for index, item in enumerate(value):
         at = f"{where}[{index}]"
-        if not isinstance(item, dict) or set(item) != _TERM_FIELDS:
+        stated = set(item) - {"line_rules"} if line_rules and isinstance(item, dict) else item
+        if not isinstance(item, dict) or set(stated) != _TERM_FIELDS:
             raise CatalogError(f"{at} states exactly {sorted(_TERM_FIELDS)}")
+        rules = item.get("line_rules", [])
+        if (
+            not isinstance(rules, list)
+            or ("line_rules" in item and not rules)
+            or len(set(rules)) != len(rules)
+            or not set(rules) <= LINE_RULES
+        ):
+            raise CatalogError(f"{at}.line_rules names some of {sorted(LINE_RULES)}, each once")
         if item["engine"] not in known:
             raise CatalogError(f"{at}.engine is not an engine the engine table states")
         found.append(
@@ -718,6 +744,7 @@ def _engine_terms(where: str, value: object) -> FieldValue:
                 "not_offered": _matching(_PROMPT_TEXT, "one line of printable instruction text")(
                     f"{at}.not_offered", item["not_offered"]
                 ),
+                "line_rules": tuple(sorted(rules)),
             }
         )
     engines = [item["engine"] for item in found]
@@ -751,7 +778,11 @@ def _registry_schema(version: int) -> CatalogSchema:
             ("instruction", _matching(_PROMPT_TEXT, "one line of printable instruction text")),
             ("choice_description", _description),
             ("not_offered", _matching(_PROMPT_TEXT, "one line of printable instruction text")),
-            *((("engine_terms", _engine_terms),) if version >= ENGINE_TERMS_FROM else ()),
+            *(
+                (("engine_terms", partial(_engine_terms, line_rules=version >= LINE_RULES_FROM)),)
+                if version >= ENGINE_TERMS_FROM
+                else ()
+            ),
             ("reason", text_field),
         ),
     )
@@ -852,6 +883,7 @@ def load_decision_roles(
                 instruction=str(terms["instruction"]),
                 choice_description=str(terms["choice_description"]),
                 not_offered=str(terms["not_offered"]),
+                line_rules=frozenset(terms["line_rules"]),
             )
         roles[entry.key] = DecisionRole(
             key=entry.key,

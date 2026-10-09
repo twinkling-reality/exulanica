@@ -34,6 +34,7 @@ from exulanica.world.society_decision_contract import (
     DecisionOption,
     at_choice_point,
     choice_options,
+    line_listener,
     observed_context,
     situation,
 )
@@ -64,6 +65,7 @@ __all__ = [
     "due",
     "due_from_outside",
     "events",
+    "line_listener",
     "messages",
     "option_from_record",
     "options",

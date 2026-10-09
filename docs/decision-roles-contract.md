@@ -44,7 +44,7 @@ nothing is asked or reserved and the routine decides.
 
 A decision role is a kind of thing in a world that changes and chooses at choice points of its own,
 whose choices a world's owner may hand to an open model. Each role is one entry of the registry
-catalog `assets/catalogs/roles/decision-roles.v5.json`, read at its newest version by
+catalog `assets/catalogs/roles/decision-roles.v<N>.json`, read at its newest version by
 `exulanica/world/decision_roles.py`. An entry states, with a licence and a reason like every catalog
 entry:
 
@@ -60,7 +60,7 @@ entry:
 | `subjects_bound` | The policy key bounding how many of its subjects models run at once |
 | `request_profile`, `receipt_profile`, `choice_profile`, `context_profile` | The profiles of its documents |
 | `prompt_version`, `instruction`, `choice_description`, `not_offered` | Its prompt: the one instruction, how the one choice is described, and what a model is told when its answer was not offered |
-| `engine_terms` | From registry version 5: for an engine that hosts the role and asks its own questions, that engine's terms, the two catalog versions its new requests record and its own prompt (version and three texts); empty where every engine is asked under the role's own |
+| `engine_terms` | From registry version 5: for an engine that hosts the role and asks its own questions, that engine's terms, the two catalog versions its new requests record and its own prompt (version and three texts); empty where every engine is asked under the role's own. From registry version 7 an engine's terms may also state `line_rules`, the rules beside the line rule a model's lines are held to under them (`names_no_listener`, below) |
 
 A request is asked under the terms of the engine whose state it was asked over: the engine's own
 where the entry states them, the role's otherwise (`DecisionRole.terms`). A request names its engine
@@ -429,8 +429,11 @@ The bounds both policy versions state:
 
 ### A society of things' people
 
-A society of things' people are asked under their engine's own terms: version 3 of both catalogs and
-the prompt `society-person-choice/v2`. Version 3 keeps version 2's actions and bounds and adds:
+A society of things' people are asked under their engine's own terms: from registry version 5,
+version 3 of both catalogs and the prompt `society-person-choice/v2`; from registry version 6, the
+fourth catalogs, which add the hands actions, and the third prompt; from registry version 7, the
+same catalogs and the fourth prompt (below). Version 3 keeps version 2's actions and bounds and
+adds:
 
 | Action | Kind | Words a model reads |
 | --- | --- | --- |
@@ -470,7 +473,7 @@ leaving; a being with none of those is not asked. Going on and waiting change no
 program's idle answer is going on where it is offered, waiting otherwise
 (`DecisionRole.idle_label`).
 
-**What the model reads.** The second prompt's instruction, then the situation, which also says when
+**What the model reads.** Its terms' instruction, then the situation, which also says when
 something is still under way, and the lines the being heard, oldest first, each quoted and named as
 what others said, never as instructions, by who said it (kind and number), to whom and when.
 
@@ -478,7 +481,15 @@ what others said, never as instructions, by who said it (kind and number), to wh
 argument, `line`: a string of at most `line_characters_maximum` characters, or null, both arguments
 required (`exulanica/models/choice.py`); `DecisionRole.line_labels` names the labels whose answer
 carries a line, for a door to state. An answer naming a say option with no line, or another option
-with one, is asked once more with the second prompt's note. A line that breaks the line rule is
+with one, is asked once more with its terms' note. Under the fourth prompt, whose instruction asks
+the being to speak to the one it addresses without naming or describing them, a line said to one
+being that ends with that being's name or description, as the option's words name them (the name,
+its name part, or its kind with or without an article, case and closing punctuation set aside;
+`names_listener` in `exulanica/things/lines.py`), is no answer either, and is asked once more with
+that prompt's note, which says so, within the attempts the contract allows; a line that ends with
+the listener's kind while speaking of itself is asked again too. A receipt is held to the rule its
+request's recorded prompt states (`names_its_listener`), so a request asked under an earlier prompt
+reads and replays as it did. A line that breaks the line rule is
 refused `line_out_of_bounds`, and one the workspace's rules would change, as they change a saved
 name, `line_refused_by_rules`; either way the receipt is rejected, nothing is said and the routine
 decides that turn. An accepted receipt's proposal is the label, the option and the line. A model's
@@ -674,7 +685,7 @@ stored request the loop does not rebuild stops it by name.
 
 | Part | Source | Tests |
 | --- | --- | --- |
-| Registry and adapters | `assets/catalogs/roles/decision-roles.v5.json`, `exulanica/world/decision_roles.py`, `exulanica/world/role_catalogs.py`, `exulanica/world/roles/` | `tests/test_decision_roles.py`, with the test role in `tests/decision_role_fixtures/` |
+| Registry and adapters | `assets/catalogs/roles/decision-roles.v<N>.json`, `exulanica/world/decision_roles.py`, `exulanica/world/role_catalogs.py`, `exulanica/world/roles/` | `tests/test_decision_roles.py`, with the test role in `tests/decision_role_fixtures/` |
 | Deciders and outside programs | `exulanica/world/deciders.py`, `exulanica/api/external_asking.py`, the host's outside path in `exulanica/api/decision_host.py`, migration 0146 | `tests/test_outside_deciders.py` (each answer and statement a door may give, late, failing or malformed, costing its own subject alone; a context carrying a saved name in any field), `tests/test_outside_deciders_postgres.py` (a request left open by a stopped host; a request carrying a saved name undone and not sent; a released grant's retry) |
 | Requests, receipts, the minute loop and replay | `exulanica/world/role_decisions.py` | `tests/test_decision_roles.py` |
 | The person's contract and minute | `exulanica/world/society_decision_contract.py`, `exulanica/world/society_model_decisions.py`, `assets/catalogs/society/society-decision-action.v2.json`, `assets/catalogs/society/society-decision-policy.v2.json`, `assets/catalogs/society/society-decision-action.v3.json`, `assets/catalogs/society/society-decision-policy.v3.json` | `tests/test_society_person_decisions.py`, `tests/test_society_model_actions.py`, `tests/test_person_role_goldens.py`, `tests/test_society_lines.py`, `tests/test_society_lines_postgres.py` |

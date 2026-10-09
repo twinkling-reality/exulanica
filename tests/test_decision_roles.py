@@ -703,6 +703,7 @@ PUBLISHED_REGISTRIES = {
     "decision-roles.v4.json": "a516686bf682a8be9eee0e5d61357fad1336a52b1dddef0a5085931954cad134",
     "decision-roles.v5.json": "97fcf977330c6043c1181c7d18302c1a09fa942193f368c2d2fba50713052f31",
     "decision-roles.v6.json": "032d55a2b260d8aeb5f17e73c771c649608ac9f62c8db86ac07a02d8c267ad57",
+    "decision-roles.v7.json": "0caac20c8cab7e07d28115b72fc70e2bc8eaa5427b17be66e769da3885b04ca7",
 }
 
 
@@ -722,7 +723,7 @@ def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
     assert things.versions == {"society-decision-action": 4, "society-decision-policy": 4}
     assert (own.prompt_version, things.prompt_version) == (
         "society-person-choice/v1",
-        "society-person-choice/v3",
+        "society-person-choice/v4",
     )
     contract = person.contract(things.versions)
     assert {"carry_on", "say_to", "say_all", "leave"} <= set(contract.words)

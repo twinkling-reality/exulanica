@@ -34,7 +34,7 @@ from typing import Any, Final, Protocol
 
 from exulanica.canonical import canonical_json
 from exulanica.models.manifest import AnsweringMechanism
-from exulanica.things.lines import LineRefused, check_line
+from exulanica.things.lines import LineRefused, check_line, names_listener
 from exulanica.world.deciders import (
     EXTERNAL_REASONS,
     DeciderRefused,
@@ -71,6 +71,7 @@ __all__ = [
     "check_role_result",
     "consumed_receipts",
     "context_bytes",
+    "names_its_listener",
     "play_minutes",
     "replay_minutes",
     "resume_minutes",
@@ -371,6 +372,26 @@ def check_role_request(role: DecisionRole, document: Mapping[str, Any]) -> None:
         raise ValueError(f"a {role.key} decision request names the model it asked, and how")
 
 
+def names_its_listener(
+    role: DecisionRole, request: Mapping[str, Any], option: Mapping[str, Any], line: str
+) -> bool:
+    """Whether a model's ``line`` for ``option`` breaks the rule its request's terms hold lines
+    to: under terms that state ``names_no_listener`` (found by the prompt version the request
+    records), a line said to one being ends with that being's name or description, as the option's
+    words name them (:func:`~exulanica.things.lines.names_listener`). An outside program's line,
+    and one asked under terms that state no such rule, an earlier prompt's among them, never does.
+    """
+    config = request["provider_config"]
+    if is_external(config):
+        return False
+    terms = role.terms_with_prompt(config.get("prompt_version"))
+    listener_of = getattr(role.adapter, "line_listener", None)
+    if terms is None or "names_no_listener" not in terms.line_rules or listener_of is None:
+        return False
+    listener = listener_of(option, role.contract(config["contract"]["catalog_versions"]))
+    return listener is not None and names_listener(line, listener)
+
+
 def check_role_result(
     role: DecisionRole, result: Mapping[str, Any], request: Mapping[str, Any]
 ) -> None:
@@ -401,6 +422,10 @@ def check_role_result(
                 raise ValueError(f"a {role.key} decision's line breaks the line rule") from exc
             if checked != proposal["line"]:
                 raise ValueError(f"a {role.key} decision states its line as the line rule reads it")
+            if names_its_listener(role, request, option, checked):
+                raise ValueError(
+                    f"a {role.key} decision's line names or describes the one it is said to"
+                )
     if (result["status"] == "accepted") != (proposal is not None):
         raise ValueError(f"exactly an accepted {role.key} decision carries a proposal")
     provider = result["provider"]
