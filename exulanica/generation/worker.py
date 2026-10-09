@@ -170,10 +170,15 @@ class PieceGenerationWorker:
         now: datetime,
     ) -> dict[str, Any]:
         # A request a deletion cancelled while queued: its entry is withdrawn first, so a session
-        # that has not claimed it never does, and only then is its settlement decided.
-        for piece_batch_id in batches.cancelled_batches(connection, workspace_id):
+        # that has not claimed it never does, and only then is its settlement decided. A deletion
+        # that commits between the listing and the decision is decided too, so its entry is
+        # withdrawn after: the pass after would no longer list it.
+        withdrawn = batches.cancelled_batches(connection, workspace_id)
+        for piece_batch_id in withdrawn:
             entries.write_withdrawn(self.bucket, entries.entry_id(piece_batch_id), now)
-        batches.decide_cancelled(connection, workspace_id)
+        for piece_batch_id in batches.decide_cancelled(connection, workspace_id):
+            if piece_batch_id not in withdrawn:
+                entries.write_withdrawn(self.bucket, entries.entry_id(piece_batch_id), now)
         ended = self._follow(connection, workspace_id, now)
         settled = self._settle_decided(connection, workspace_id, now)
         # Looks move whether or not a session is warm: applying a piece runs no GPU.
@@ -345,7 +350,14 @@ class PieceGenerationWorker:
             )
             return
         kept = []
-        held = stored_bytes(self.pieces_store)
+        # The store's bytes, counted only when a piece is not already there, then kept current.
+        counted: list[int] = []
+
+        def held() -> int:
+            if not counted:
+                counted.append(stored_bytes(self.pieces_store))
+            return counted[0]
+
         for output in found:
             try:
                 stored = store_piece(
@@ -366,7 +378,7 @@ class PieceGenerationWorker:
                 )
                 continue
             if stored.written:
-                held += len(output.piece)
+                counted[0] += len(output.piece)
             kept.append(
                 batches.KeptOutput(
                     output=output,

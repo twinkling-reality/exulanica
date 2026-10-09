@@ -520,6 +520,7 @@ class ObjectRequests:
         payload_sha256: str,
         *,
         signed: bool = True,
+        timeout: float | None = None,
     ) -> httpx.Request:
         canonical_uri = s3_canonical_uri(self._path(key))
         query_string = canonical_query(query)
@@ -543,7 +544,11 @@ class ObjectRequests:
             sent["authorization"] = signature.authorization
         if content is not None:
             sent["content-length"] = str(length)
-        return self._http().build_request(method, url, headers=sent, content=content)
+        if timeout is None:
+            return self._http().build_request(method, url, headers=sent, content=content)
+        return self._http().build_request(
+            method, url, headers=sent, content=content, timeout=httpx.Timeout(timeout)
+        )
 
     def _pause(self, attempt: int) -> None:
         delay = min(_BACKOFF_CAP_SECONDS, _BACKOFF_SECONDS * 2 ** (attempt - 1))
@@ -563,8 +568,12 @@ class ObjectRequests:
         tolerate: Iterable[int] = (),
         stream: bool = False,
         error_in_body: bool = False,
+        attempts: int = ATTEMPTS,
+        timeout: float | None = None,
     ) -> _Reply:
-        """Send one logical request, retrying transient failures within ``ATTEMPTS``.
+        """Send one logical request, retrying transient failures within ``attempts`` (``ATTEMPTS``
+        unless the caller bounds it, with ``timeout`` seconds for each connect, read and write in
+        place of the client's).
 
         ``tolerate`` names statuses the caller interprets itself (404 for a missing key, for
         instance); every other failure raises a coded :class:`ObjectStoreRefused` or
@@ -573,16 +582,18 @@ class ObjectRequests:
         """
         tolerated = frozenset(tolerate)
         subject = self._subject(key)
-        for attempt in range(1, ATTEMPTS + 1):
+        for attempt in range(1, attempts + 1):
             content = body() if callable(body) else body
-            request = self._request(method, key, query, headers, content, length, payload_sha256)
+            request = self._request(
+                method, key, query, headers, content, length, payload_sha256, timeout=timeout
+            )
             try:
                 response = self._http().send(request, stream=True)
             except httpx.TransportError as error:
-                if attempt == ATTEMPTS:
+                if attempt == attempts:
                     raise ObjectStoreUnavailable(
                         "object_store_unreachable",
-                        f"{operation} {subject}: {type(error).__name__} after {ATTEMPTS} attempts",
+                        f"{operation} {subject}: {type(error).__name__} after {attempts} attempts",
                     ) from None
                 self._pause(attempt)
                 continue
@@ -593,10 +604,10 @@ class ObjectRequests:
                 limit = _MAX_DOCUMENT_BYTES if 200 <= status < 300 else _MAX_ERROR_BYTES
                 content_bytes = _read_bounded(response, limit)
             except httpx.TransportError:
-                if attempt == ATTEMPTS:
+                if attempt == attempts:
                     raise ObjectStoreUnavailable(
                         "object_store_unreachable",
-                        f"{operation} {subject}: the response broke off after {ATTEMPTS} attempts",
+                        f"{operation} {subject}: the response broke off after {attempts} attempts",
                     ) from None
                 self._pause(attempt)
                 continue
@@ -609,7 +620,7 @@ class ObjectRequests:
             if status in tolerated:
                 return _Reply(status, code, response.headers, content_bytes)
             retryable = status in _RETRIED_STATUS or code in _RETRIED_CODES
-            if retryable and attempt < ATTEMPTS:
+            if retryable and attempt < attempts:
                 self._pause(attempt)
                 continue
             raise _refusal(operation, subject, status, code, retried=retryable)
@@ -651,13 +662,20 @@ class ObjectRequests:
         length: int,
         md5_base64: str,
         sha256_hex: str,
+        *,
+        attempts: int = ATTEMPTS,
+        timeout: float | None = None,
     ) -> None:
+        """Write ``key``; ``attempts`` and ``timeout`` bound a write a caller must not wait long
+        for, as :meth:`_exchange` states."""
         self._exchange(
             "PUT",
             "PUT",
             key,
             headers=[("content-md5", md5_base64)],
             body=body,
+            attempts=attempts,
+            timeout=timeout,
             length=length,
             payload_sha256=sha256_hex,
         )
@@ -1587,12 +1605,18 @@ class ObjectContentAddressedStore(ContentAddressedStore):
         return head.size
 
     def iter_blob_ids(self) -> Iterator[BlobId]:
+        for blob_id, _size in self.iter_blob_sizes():
+            yield blob_id
+
+    def iter_blob_sizes(self) -> Iterator[tuple[BlobId, int]]:
+        """Each object and its size as the listing states it: one request a thousand objects,
+        where :meth:`size` asks once an object."""
         self._guard.require()
         base = f"{self._namespace}/"
-        for key, _size in self._requests.iter_keys(f"{base}sha-256/"):
+        for key, size in self._requests.iter_keys(f"{base}sha-256/"):
             match = _KEY_SHAPE.match(key[len(base) :])
             if match and match[3][:2] == match[1] and match[3][2:4] == match[2]:
-                yield BlobId.from_hex(match[3])
+                yield BlobId.from_hex(match[3]), size
 
 
 class PurgingObjectContentAddressedStore(ObjectContentAddressedStore):

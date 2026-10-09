@@ -18,6 +18,7 @@ import datetime as dt
 import uuid
 from decimal import Decimal
 
+import psycopg
 import pytest
 from exulanica.generation import store
 from exulanica.generation.requests import (
@@ -156,6 +157,41 @@ def _batch_rows(purged) -> int:
         "select (select count(*) from piece_batch) + (select count(*) from piece_output) as n"
     )
     return row["n"]
+
+
+def test_no_output_is_written_for_a_deleted_workspace(purged) -> None:
+    """After a workspace's tombstone, an output naming a piece the index keeps, with that row's own
+    receipt and verdict (so every other check holds), is refused as the tombstone's."""
+    from exulanica.generation import batches
+
+    made = _open_request(purged)
+    connection, workspace_id = purged.repository.connection, purged.workspace_id
+    [request] = purged.rows(
+        "select request_sha256 from piece_request where piece_request_id = %s", made
+    )
+    kept = kept_output(request["request_sha256"])
+    with connection.cursor() as cursor:
+        batches._record_generated(cursor, kept)
+    connection.commit()
+    _workspace_tombstone_as_runtime(purged)
+    runtime = purged.database(role=_APP_ROLE, password=_APP_PASSWORD)
+    with (
+        runtime.session(workspace_id) as session,
+        pytest.raises(psycopg.errors.IntegrityConstraintViolation, match="piece_output"),
+    ):
+        session.execute(
+            "insert into piece_output (workspace_id, piece_request_id, variant, cache_key, "
+            "  receipt_canonical, receipt_sha256, piece_sha256, within, over_checks) "
+            "values (%s, %s, 0, %s, %s, %s, %s, true, '{}')",
+            (
+                workspace_id,
+                made,
+                kept.cache_key,
+                kept.output.receipt.decode("ascii"),
+                kept.output.receipt_sha256,
+                kept.output.piece_sha256,
+            ),
+        )
 
 
 def test_a_workspace_tombstone_erases_the_workspace_s_batches_and_outputs(purged) -> None:

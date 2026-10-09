@@ -239,8 +239,8 @@ def submit_arguments(
     In ``session`` mode ``job_sha256`` is the session record's digest and ``timeout_seconds`` its
     hard stop. Nothing the machine runs is taken from the bucket on trust: the container copies the
     staged ``job.sh`` to its own disk and runs it only when it is ``job_script_sha256`` (by default
-    the digest of this tree's :data:`JOB_SCRIPT`), and ``job.sh`` holds the code archive and the
-    session record to the digests this command names. Anyone who can write the bucket can
+    the digest of this tree's :data:`JOB_SCRIPT`), and ``job.sh`` holds the code archive, and the
+    session record (in ``job`` mode the job record), to the digests this command names. Anyone who can write the bucket can
     therefore make a start fail, never run other code. The container command is ``sh -c`` with the
     check as its script, which relies on the service splitting ``--args`` as a shell does; the
     sessions measured so far ran a single path there, so this form is verified only by the next

@@ -197,6 +197,20 @@ def test_a_session_record_is_registered_once(cli_database, files, capsys) -> Non
     assert code == 2 and "registered already" in refused["refused"]
     code, status = _run(capsys, "session", "status")
     assert code == 0 and len(status["open"]) == 1
+    # The register holds each digest once of itself, whatever writes it: the owner's own insert of
+    # the same record under a new id is refused by the index, not only by the command's check.
+    with (
+        psycopg.connect(_url(), autocommit=True) as connection,
+        pytest.raises(psycopg.errors.UniqueViolation, match="generation_session_digest"),
+    ):
+        connection.execute(
+            "insert into generation_session (session_canonical, session_sha256, route, "
+            "  code_sha256, components_sha256, container, compute_key, provider_job_id, "
+            "  opened_by, window_ends_at) "
+            "select session_canonical, session_sha256, route, code_sha256, components_sha256, "
+            "  container, compute_key, provider_job_id, opened_by, window_ends_at "
+            "from generation_session"
+        )
 
 
 def test_the_runtime_role_reads_the_register_and_writes_none_of_it(

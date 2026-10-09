@@ -29,6 +29,7 @@ from exulanica.store.object import ObjectRequests, ObjectStoreCredentials, Objec
 __all__ = [
     "KEY_FILE_VARIABLE",
     "MAX_OBJECT_BYTES",
+    "ONCE_TIMEOUT_SECONDS",
     "GenerationBucket",
     "GenerationBucketRefused",
     "SignedGenerationBucket",
@@ -40,6 +41,9 @@ KEY_FILE_VARIABLE: Final = "EXULANICA_GENERATION_BUCKET_KEY_FILE"
 #: The largest object the worker reads: a piece is about 154 KB, a receipt a few; a mesh it never
 #: reads is far larger, and a read of one is refused rather than held in memory.
 MAX_OBJECT_BYTES: Final = 8 << 20
+#: The bound on each connect, read and write of a write the worker makes under a workspace's lock:
+#: one attempt, so a stalled endpoint holds the lock seconds rather than minutes.
+ONCE_TIMEOUT_SECONDS: Final = 10.0
 _KEY_FIELDS: Final = frozenset(
     {"aws_access_key_id", "aws_secret_access_key", "endpoint", "region", "bucket"}
 )
@@ -53,6 +57,11 @@ class GenerationBucket(Protocol):
     """What the worker does with the bucket."""
 
     def put(self, key: str, data: bytes) -> None: ...
+
+    def put_once(self, key: str, data: bytes) -> None:
+        """One attempt, bounded by :data:`ONCE_TIMEOUT_SECONDS` for each connect, read and write:
+        a write made while a lock others wait on is held."""
+        ...
 
     def get(self, key: str) -> bytes | None: ...
 
@@ -71,6 +80,18 @@ class SignedGenerationBucket:
     def put(self, key: str, data: bytes) -> None:
         md5 = base64.b64encode(hashlib.md5(data, usedforsecurity=False).digest()).decode()
         self._requests.put(key, data, len(data), md5, hashlib.sha256(data).hexdigest())
+
+    def put_once(self, key: str, data: bytes) -> None:
+        md5 = base64.b64encode(hashlib.md5(data, usedforsecurity=False).digest()).decode()
+        self._requests.put(
+            key,
+            data,
+            len(data),
+            md5,
+            hashlib.sha256(data).hexdigest(),
+            attempts=1,
+            timeout=ONCE_TIMEOUT_SECONDS,
+        )
 
     def get(self, key: str) -> bytes | None:
         response = self._requests.get(key)

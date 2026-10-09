@@ -125,7 +125,9 @@ def write_ready(
     not_after: datetime,
 ) -> None:
     """Write an entry's ``ready.json``, last: from here the session ``session_sha256``, and no
-    other, may take it until ``not_after``."""
+    other, may take it until ``not_after``. Written once, bounded (the worker holds the
+    workspace's lock while it writes it): a write that fails may still have reached the bucket, and
+    the worker follows the batch either way."""
     ready = build_ready(
         entry,
         job_raw,
@@ -134,7 +136,7 @@ def write_ready(
         queued_at=queued_at,
         not_after=not_after,
     )
-    bucket.put(f"queue/{entry}/ready.json", ready)
+    bucket.put_once(f"queue/{entry}/ready.json", ready)
 
 
 def _get(bucket: GenerationBucket, key: str, code: str) -> bytes | None:

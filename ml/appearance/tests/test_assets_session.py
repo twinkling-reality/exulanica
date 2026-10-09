@@ -22,6 +22,7 @@ from exulanica_pieces.geometry.postprocess import POSTPROCESS_VERSION
 from exulanica_pieces.records import build_job, build_request
 
 from exulanica_appearance.assets import nebius
+from exulanica_appearance.assets import session as session_module
 from exulanica_appearance.assets.dryrun import STUB_PACK, StubBackend, dry_run
 from exulanica_appearance.assets.queue import (
     build_ready,
@@ -374,6 +375,29 @@ def test_a_withdrawn_entry_does_not_hold_back_the_entries_queued_after_it(
     result = _serve(repository, root)
     assert [entry["entry_id"] for entry in result["served"]] == [kept]
     assert not (root / "claimed" / f"{withdrawn}.json").exists()
+
+
+def test_a_withdrawal_written_after_the_listing_still_stops_the_claim(
+    repository: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The worker withdraws an entry the session has listed but not yet claimed: the claim's own
+    # re-check reads the withdrawal and the entry is never claimed or run.
+    root = tmp_path / "bucket"
+    job, requests = _job(repository, BENCH)
+    entry = _enqueue(root, job, requests).name
+    listed = session_module._ready
+
+    def listing_then_withdrawal(root_: Path, session_sha256: str):  # type: ignore[no-untyped-def]
+        found = listed(root_, session_sha256)
+        (root_ / "withdrawn").mkdir(exist_ok=True)
+        (root_ / "withdrawn" / f"{entry}.json").write_bytes(build_withdrawn(entry, START))
+        return found
+
+    monkeypatch.setattr(session_module, "_ready", listing_then_withdrawal)
+    backend = CountingBackend()
+    result = _serve(repository, root, backend)
+    assert (result["served"], backend.meshes) == ([], 0)
+    assert not (root / "claimed" / f"{entry}.json").exists()
 
 
 def test_an_entry_holding_a_request_its_job_does_not_name_is_refused(

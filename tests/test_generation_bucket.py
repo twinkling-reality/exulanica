@@ -12,21 +12,30 @@ checked against the charge lines both warm sessions' run records state.
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
+import httpx
 import pytest
 from exulanica.generation import entries
 from exulanica.generation.bucket import (
     MAX_OBJECT_BYTES,
+    ONCE_TIMEOUT_SECONDS,
     GenerationBucketRefused,
     SignedGenerationBucket,
     bucket_from_key_file,
 )
 from exulanica.generation.requests import GPU_PROVIDER, generation_catalogs
 from exulanica.generation.session import session_state
-from exulanica.store.object import ObjectRequests, ObjectStoreCredentials, ObjectStoreLocation
+from exulanica.store.object import (
+    ATTEMPTS,
+    ObjectRequests,
+    ObjectStoreCredentials,
+    ObjectStoreLocation,
+    ObjectStoreUnavailable,
+)
 from exulanica_pieces.budgets import read_budgets
 from exulanica_pieces.canonical import Refused, canonical_bytes, sha256_hex
 from exulanica_pieces.queue import (
@@ -124,8 +133,9 @@ def test_an_entry_is_what_the_session_s_own_reader_takes(bucket, tmp_path) -> No
 
 def test_ready_is_written_last(bucket) -> None:
     written: list[str] = []
-    put = bucket.put
+    put, put_once = bucket.put, bucket.put_once
     bucket.put = lambda key, data: (written.append(key), put(key, data))  # type: ignore[method-assign]
+    bucket.put_once = lambda key, data: (written.append(key), put_once(key, data))  # type: ignore[method-assign]
     job_raw, requests = _job()
     _write(bucket, job_raw, requests)
     assert written[-1] == f"queue/{ENTRY}/ready.json" and len(written) == len(requests) + 2
@@ -148,6 +158,46 @@ def _markers(job_sha256: str, session_sha256: str, *, entry: str = ENTRY, at: da
         },
     )
     return claim, done
+
+
+def test_ready_is_written_in_one_bounded_attempt_and_other_writes_retry() -> None:
+    """The worker writes ready.json while it holds the workspace's lock, so that one write is tried
+    once with a short timeout; every other write keeps the client's retries and timeout."""
+    seen: list[dict[str, float]] = []
+
+    def unreachable(request: httpx.Request) -> httpx.Response:
+        seen.append(dict(request.extensions["timeout"]))
+        raise httpx.ConnectError("the endpoint stalled", request=request)
+
+    location = ObjectStoreLocation(
+        endpoint="http://127.0.0.1:19476", bucket="exulanica-gen", region="uk-south2"
+    )
+    stalled = SignedGenerationBucket(
+        ObjectRequests(
+            location,
+            ObjectStoreCredentials("runtime-key", "runtime-secret"),
+            transport=httpx.MockTransport(unreachable),
+            now=lambda: NOW,
+            sleep=lambda _seconds: None,
+        )
+    )
+    job_raw, requests = _job()
+    with pytest.raises(ObjectStoreUnavailable, match="after 1 attempts"):
+        entries.write_ready(
+            stalled,
+            entries.entry_id(uuid.uuid4()),
+            job_raw,
+            requests,
+            session_sha256="a" * 64,
+            queued_at=NOW,
+            not_after=NOW + timedelta(hours=1),
+        )
+    assert [timeout["read"] for timeout in seen] == [ONCE_TIMEOUT_SECONDS]
+    assert seen[0]["connect"] == ONCE_TIMEOUT_SECONDS
+    seen.clear()
+    with pytest.raises(ObjectStoreUnavailable, match=f"after {ATTEMPTS} attempts"):
+        stalled.put("queue/x/job.json", b"{}")
+    assert len(seen) == ATTEMPTS and seen[0]["read"] > ONCE_TIMEOUT_SECONDS
 
 
 def test_markers_are_read_only_as_this_entry_s_of_its_job_and_session(bucket) -> None:

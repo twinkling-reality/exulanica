@@ -728,6 +728,29 @@ def test_a_queued_request_its_workspace_s_deletion_cancelled_is_settled_unknown(
     assert reservation["state"] == "unknown"
 
 
+def test_a_deletion_committed_between_the_listing_and_the_decision_is_withdrawn_too(
+    played, monkeypatch
+) -> None:
+    # The worker lists the cancelled batches, then decides every cancelled request under the lock.
+    # A deletion that commits between the two is decided, so its entry is withdrawn after: the
+    # pass after would no longer list it, and a session could still take it.
+    p = played()
+    entry = _queued(p)
+    listed = batches.cancelled_batches
+
+    def listing_before_the_deletion(connection, workspace_id):
+        found = listed(connection, workspace_id)
+        p.tombstone()
+        return found
+
+    monkeypatch.setattr(batches, "cancelled_batches", listing_before_the_deletion)
+    p.worker.run_once()
+    withdrawn = json.loads(p.bucket.get(f"withdrawn/{entry}.json"))
+    assert withdrawn["entry_id"] == entry
+    [settlement] = p.rows("select basis from piece_settlement")
+    assert settlement["basis"] == "unknown"
+
+
 def test_a_request_the_allowance_refuses_stays_waiting(played) -> None:
     p = played(granted="0.05")
     p.ask()

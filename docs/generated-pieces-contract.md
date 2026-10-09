@@ -139,8 +139,10 @@ or past its window, it is `off`. Each session record carries a fresh nonce, so t
 with the same settings have their own digests, heartbeats and markers; `session open` refuses a
 record without one, and the register holds each digest once.
 
-A session takes only the entries whose ready marker names it, never one past its not-after instant
-or withdrawn by the worker, and passes over a directory that is not an entry or whose ready marker
+A session takes only the entries whose ready marker names it, never one past its not-after instant,
+and none the worker withdrew as far as it can see: it reads the withdrawals when it lists the queue
+and again as it claims, so a withdrawal written or shown after that claim still lets the entry run
+(its requests are then settled `unknown`, so the money holds until reconciled). It passes over a directory that is not an entry or whose ready marker
 does not read, since nothing then shows the entry is its own. It writes its last heartbeat, which
 says it ended, only after every claim and done marker it will write, and the bucket mount writes
 each file whole before the next is begun; the worker relies on both when it releases an entry an
@@ -165,24 +167,27 @@ one pass every 15 seconds, each workspace in its own session under row-level sec
   once from the kept pieces, with no GPU run, no reservation and no charge.
 - **Queueing**, then: the oldest of the rest, at most 16 and only as many as the session can still
   finish (their job's stop, at the bounding item time, inside the session's own stop less two
-  minutes), are each admitted under the workspace's `nebius_ai_cloud_gpu` grant at their worst
-  case, in order; the first one admission refuses stays waiting with every request after it. The
-  admitted requests are recorded as a batch (table `piece_batch`: the job and its digest, the
-  session it went to, the instant after which no session takes it, and each request `queued` with
-  its reservation), then their reservations are dispatched, then the batch is written as one queue
-  entry in the bucket, named by the batch's own id: the job, with one item set for each request
-  digest however many requests hold it, each request, and the ready marker last, which names the
-  one session that may take the entry. A waiting request that no longer reads under the catalogs
-  this server deploys (its piece budgets file changed since it was asked) ends `failed`
-  (`request_unreadable`) before anything is admitted, since no session could make it. That end is
-  final: a request asked under a catalog version the worker no longer runs, for instance during a
-  deployment that updates the API before the worker, is asked again under the new one. Any failure
-  before the ready marker ends the batch `refused` (`not_sent`) and releases its reservations, since
-  no session could have taken it. The ready marker is written under the workspace's lock and only
+  minutes), are each admitted under the workspace's `nebius_ai_cloud_gpu` grant at their worst case,
+  in order; the first one admission refuses stays waiting with every request after it. The admitted
+  requests are recorded as a batch (table `piece_batch`: the job and its digest, the session it went
+  to, the instant after which no session takes it, and each request `queued` with its reservation),
+  then their reservations are dispatched, then the batch is written as one queue entry in the
+  bucket, named by the batch's own id: the job, with one item set for each request digest however
+  many requests hold it, each request, and the ready marker last, which names the one session that
+  may take the entry. A waiting request that no longer reads under the catalogs this server deploys
+  (its piece budgets file changed since it was asked) ends `failed` (`request_unreadable`) before
+  anything is admitted, since no session could make it. That end is final: a request asked under a
+  catalog version the worker no longer runs, for instance during a deployment that updates the API
+  before the worker, is asked again under the new one. Any failure before the ready marker ends the
+  batch `refused` (`not_sent`) and releases its reservations, since no session could have taken it.
+  The ready marker is written under the workspace's lock, in one attempt bounded to ten seconds a
+  connect, read or write so a stalled endpoint holds the lock seconds rather than minutes, and only
   while the batch is still queued, so a deletion is either before it, and nothing is offered, or
   after it, and the worker withdraws the entry (`withdrawn/<entry>.json`) before it decides the
-  cancelled requests' settlements. A session whose GPU the deployed compute catalog no longer
-  prices is given nothing, and a batch it ran settles `unknown`.
+  cancelled requests' settlements, and after, for a deletion that committed between its listing and
+  its decision. A cancelled request whose reservation lapsed while it was queued was never
+  dispatched, and is released like one only admitted. A session whose GPU the deployed compute
+  catalog no longer prices is given nothing, and a batch it ran settles `unknown`.
 - **Following**, every pass, for every batch still queued, each on its own, and each workspace on
   its own, so one fault never stops the rest. The worker reads only that entry's markers, and a
   marker naming another entry, job or session, or dated more than two minutes before the batch was

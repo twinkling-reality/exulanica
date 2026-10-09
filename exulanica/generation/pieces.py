@@ -36,7 +36,7 @@ command planned for a later package.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -164,7 +164,11 @@ class StoredPiece:
 
 
 def stored_bytes(store: Any) -> int:
-    """The namespace's bytes: read once per batch by its caller, not once per piece."""
+    """The namespace's bytes, from the listing's sizes where the store states them (an object
+    store), else one size per blob: read at most once per batch by its caller."""
+    sizes = getattr(store, "iter_blob_sizes", None)
+    if sizes is not None:
+        return sum(size for _blob, size in sizes())
     return sum(store.size(blob) for blob in store.iter_blob_ids())
 
 
@@ -179,13 +183,14 @@ def store_piece(
     library: StylePackLibrary,
     shipped: Mapping[tuple[str, int], ThingKind],
     bound: int,
-    held: int | None = None,
+    held: int | Callable[[], int] | None = None,
 ) -> StoredPiece:
     """Admit a piece at the boundary (:func:`admit_piece`) and keep it in the shared store, or
     refuse it (:class:`PieceRefused`). A piece already there is not written again; one that would
     take the namespace past ``bound`` is refused. ``held`` is the namespace's bytes as its caller
-    last counted them (:func:`stored_bytes`, then the bytes it wrote since), so a batch counts the
-    namespace once; without it the namespace is counted here."""
+    last counted them (:func:`stored_bytes`, then the bytes it wrote since), or a function that
+    counts them when first asked, so a batch counts the namespace at most once and not at all when
+    every piece is already there; without it the namespace is counted here."""
     admitted = admit_piece(
         request_raw=request_raw,
         receipt_raw=receipt_raw,
@@ -198,7 +203,8 @@ def store_piece(
     blob = BlobId.from_hex(admitted.piece_sha256)
     if store.exists(blob):
         return StoredPiece(admitted, written=False)
-    if (stored_bytes(store) if held is None else held) + len(admitted.piece) > bound:
+    current = stored_bytes(store) if held is None else held() if callable(held) else held
+    if current + len(admitted.piece) > bound:
         raise PieceRefused("pieces_store_full", "the generated pieces store is at its bound")
     store.put_bytes(admitted.piece)
     return StoredPiece(admitted, written=True)

@@ -1505,6 +1505,19 @@ def _assert_only_this_workspace(
         )
 
 
+def _refuse_kept_rows(manifest: SeedManifest, files: list[tuple[str, str]]) -> None:
+    """Refuse an archive whose manifest says it carries rows of :data:`_KEPT_TABLE`. An export
+    refuses a workspace holding generated outputs, so its file is empty; one written while an export
+    ran could travel, and neither a restore nor a reset loads the index of pieces whose bytes the
+    seed does not carry."""
+    kept = [name for name, table in files if table == _KEPT_TABLE]
+    if any(int(manifest.rows[name]["rows"]) > 0 for name in kept):
+        raise SeedRefused(
+            f"the archive carries rows for {_KEPT_TABLE}, the installation's index of generated "
+            "pieces, which a reset never empties and an export never fills"
+        )
+
+
 def restore_seed(
     connection: psycopg.Connection,
     store: ContentAddressedStore,
@@ -1528,6 +1541,7 @@ def restore_seed(
     ``workspace_baked_tile``, whose foreign key names it, because the load order is topological.
     """
     manifest = verify_seed(archive) if verify else read_manifest(archive)
+    _refuse_kept_rows(manifest, _row_files(manifest))
     if manifest.tiles and tiles is None:
         raise SeedRefused(
             f"the archive carries {len(manifest.tiles)} baked tile(s) and no tile store was "
@@ -1621,12 +1635,7 @@ def reset_to_seed(
         )
     _require_tile_bytes(tiles, manifest)
 
-    kept = [name for name, table in files if table == _KEPT_TABLE]
-    if any(int(manifest.rows[name]["rows"]) > 0 for name in kept):
-        raise SeedRefused(
-            f"the archive carries rows for {_KEPT_TABLE}, the installation's index of generated "
-            "pieces, which a reset never empties and an export never fills"
-        )
+    _refuse_kept_rows(manifest, files)
     merged = [(name, table) for name, table in files if table == _MERGED_TABLE]
     keep = [
         (name, table)

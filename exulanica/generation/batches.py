@@ -516,7 +516,8 @@ def decide_cancelled(
     unsent: frozenset[uuid.UUID] | set[uuid.UUID] = frozenset(),
 ) -> list[uuid.UUID]:
     """Decide each request a deletion cancelled while it was queued, by its reservation: one only
-    admitted, or in a batch the worker knows it never offered (``unsent``), never reached a session
+    admitted, one the ledger already released (it lapsed while queued, so it was never dispatched),
+    or one in a batch the worker knows it never offered (``unsent``), never reached a session
     (``not_sent``); one dispatched may have (``unknown``: its whole reservation stays charged until
     an administrator reconciles it), since its batch is erased with the workspace. Returns the
     batches decided."""
@@ -529,7 +530,10 @@ def decide_cancelled(
             (workspace_id,),
         ).fetchall()
         for row in rows:
-            admitted = row["reservation_state"] == "admitted" or row["piece_batch_id"] in unsent
+            admitted = (
+                row["reservation_state"] in ("admitted", "released")
+                or row["piece_batch_id"] in unsent
+            )
             cursor.execute(
                 "insert into piece_settlement (workspace_id, piece_request_id, reservation_id, "
                 "basis, usd) values (%s, %s, %s, %s, %s)",

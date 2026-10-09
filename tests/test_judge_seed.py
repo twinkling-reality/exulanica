@@ -589,6 +589,40 @@ def test_a_reset_returns_the_rows_and_leaves_the_store_alone(seeded, store, tmp_
         assert sorted(store.key_for(value) for value in target.iter_blob_ids()) == before
 
 
+def test_a_reset_keeps_the_index_of_generated_pieces_and_refuses_an_archive_carrying_it(
+    seeded, store, tmp_path
+):
+    """generated_piece is the installation's, never a workspace's: a reset neither empties nor
+    loads it, and an archive whose manifest says it carries rows for it is refused before anything
+    changes. The control resets the same archive untouched first."""
+    from exulanica.generation import batches
+    from exulanica.orchestration.judge_seed import _row_files
+
+    from generated_piece_support import kept_output
+
+    destination, manifest = _exported(seeded, store, tmp_path)
+    with migrated_schema() as (_psycopg, admin):
+        admin.row_factory = dict_row
+        restore_seed(
+            admin, LocalContentAddressedStore(tmp_path / "reset-store"), archive=destination
+        )
+        with admin.cursor() as cursor:
+            batches._record_generated(cursor, kept_output("e" * 64))
+        admin.commit()
+        reset_to_seed(admin, archive=destination)
+        assert admin.execute("select count(*) as n from generated_piece").fetchone()["n"] == 1
+
+        [name] = [name for name, table in _row_files(manifest) if table == "generated_piece"]
+        document = json.loads((destination / "manifest.json").read_bytes())
+        document["rows"][name]["rows"] = 1
+        payload = json.dumps(document).encode()
+        (destination / "manifest.json").write_bytes(payload)
+        (destination / "manifest.sha256").write_text(hashlib.sha256(payload).hexdigest() + "\n")
+        with pytest.raises(SeedRefused, match="generated_piece"):
+            reset_to_seed(admin, archive=destination, verify=False)
+        assert admin.execute("select count(*) as n from generated_piece").fetchone()["n"] == 1
+
+
 def _blob(digest: str):
     from exulanica.evidence.blob import BlobId
 

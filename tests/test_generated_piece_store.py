@@ -19,6 +19,7 @@ from exulanica.generation.pieces import (
     admit_piece,
     max_bytes,
     store_piece,
+    stored_bytes,
 )
 from exulanica.generation.requests import LookReference, generation_catalogs, plan_requests
 from exulanica.store.local import LocalContentAddressedStore
@@ -227,6 +228,36 @@ def test_the_bound_is_held_to_the_bytes_its_caller_counted(tmp_path) -> None:
         _store(store, request_raw, receipt_raw, piece, bound=len(piece), held=1)
     assert refused.value.code == "pieces_store_full"
     assert _store(store, request_raw, receipt_raw, piece, bound=len(piece), held=0).written
+
+
+def test_the_store_is_counted_only_when_a_piece_is_written_and_from_its_listing(
+    tmp_path,
+) -> None:
+    # A piece already kept is not written, so the namespace is not counted for it; one that is
+    # written counts it once, through the function its caller passes.
+    store = LocalContentAddressedStore(tmp_path / "generated-pieces")
+    request_raw, receipt_raw, piece = _piece(_well_request())
+    counts: list[int] = []
+
+    def held() -> int:
+        counts.append(stored_bytes(store))
+        return counts[-1]
+
+    assert _store(store, request_raw, receipt_raw, piece, bound=len(piece), held=held).written
+    assert counts == [0]
+    assert not _store(store, request_raw, receipt_raw, piece, bound=len(piece), held=held).written
+    assert counts == [0]
+
+    # An object store states each object's size in its listing: no object is asked for its own.
+    class Listed:
+        def iter_blob_sizes(self):
+            yield BlobId.from_hex("a" * 64), 3
+            yield BlobId.from_hex("b" * 64), 4
+
+        def size(self, _blob):
+            raise AssertionError("an object was asked its size although the listing stated it")
+
+    assert stored_bytes(Listed()) == 7
 
 
 def test_the_bound_is_the_deployments_or_two_gibibytes() -> None:
