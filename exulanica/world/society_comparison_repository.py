@@ -264,8 +264,9 @@ class SocietyComparisonRepository:
         refused = reading_refusal(catalogs, population, body, family=family)
         if refused is not None:
             raise ComparisonRefused(*refused)
-        # One input alone: its own stored bytes are read before the lock its authorization takes.
-        self.society._authorize(frozen)
+        # The input it freezes and the first, over which every run's genesis is built: each one's
+        # stored bytes are read before the lock the first authorization takes.
+        self.authorize_inputs([read[sequence] for sequence in sorted(read)])
         # Asked under the contract the society's engine asks its people under.
         contract = role.contract_for(row["engine_version"])
         group, others = self._people(version_id, row, body, role, held)

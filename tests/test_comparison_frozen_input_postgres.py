@@ -139,5 +139,11 @@ def test_an_input_that_lost_its_rights_is_answered_unavailable(started, monkeypa
     refused = start_tests._start(started, start_tests._body(input_seq=1))
     assert (refused.status_code, refused.json()["code"]) == (424, "unavailable_society_input")
     assert start_tests._counts(world) == before
-    # The newest input keeps its rights, and a start frozen at it is made.
+    # Every run's genesis is built over the first input, so a start frozen at the newest input,
+    # which keeps its rights, is refused too: none of its runs could play.
+    refused = start_tests._start(started, start_tests._body())
+    assert (refused.status_code, refused.json()["code"]) == (424, "unavailable_society_input")
+    assert start_tests._counts(world) == before
+    # The positive control: with the first input's rights back, the same start is made.
+    monkeypatch.setattr(SocietyRuntime, "authorize", granted)
     assert start_tests._start(started, start_tests._body()).status_code == 201

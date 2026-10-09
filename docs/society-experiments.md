@@ -652,9 +652,10 @@ freeze instead of its newest; the plan takes the same parameter and states the i
 its selection freezes (`plan.input_seq`), and the comparison's read serves the input it froze
 (`input`: its sequence and digest). An input the society does not hold is refused by name
 (`input_not_in_society`, 422), and one that lost its rights is answered 424
-`unavailable_society_input`, as a read of the society answers it. Every run starts at the
-society's genesis and consumes its inputs up to the frozen one, so two comparisons with the same
-models and seeds, one frozen before an edit and one at it, differ only by that edit
+`unavailable_society_input`, as a read of the society answers it; so is a start whose society's
+first input lost its rights, since every run's genesis is built over that input. Every run starts
+at the society's genesis and consumes its inputs up to the frozen one, so two comparisons with the
+same models and seeds, one frozen before an edit and one at it, differ only by that edit
 ([`tests/test_comparison_frozen_input_postgres.py`](../tests/test_comparison_frozen_input_postgres.py)).
 Neither is a branch of the live society at the edit's tick, which would need a replay to that tick
 and a new run start, and the live history is never written.
