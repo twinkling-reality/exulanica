@@ -54,6 +54,7 @@ from exulanica.world.crossings import (
     Crossing,
     CrossingRefused,
     check_crossing,
+    is_carry_out_list,
 )
 from exulanica.world.deciders import DECIDED_BY, decided_by_world
 from exulanica.world.errors import InvalidThingPlacement
@@ -211,9 +212,10 @@ _HANDS_ACTS: Final = {
 _DEPARTURE_REASONS: Final = {"sent_away": "sent_home", "grant_ended": "grant_ended"}
 _PERSON_FIELDS: Final = frozenset({"kind", "came_by", "placed_id", "placed_at_mm", "crossing"})
 #: What a visitor's crossing record states; ``decided_by`` beside them only where its arrival said,
-#: and ``may_carry_out`` (true) only where its arrival said so in a society running hands.
+#: ``may_carry_out`` (true) only where its arrival said so in a society running hands, and, beside
+#: that only, ``carries_out``, the kinds of the world's things its program can take.
 _CROSSING_FIELDS: Final = frozenset({"arrival_id", "bridge", "grant_id"})
-_CROSSING_MAY: Final = frozenset({"decided_by", "may_carry_out"})
+_CROSSING_MAY: Final = frozenset({"decided_by", "may_carry_out", "carries_out"})
 #: What each carried-out placement states, so the thing is never put back while it stands.
 _CARRIED_OUT_FIELDS: Final = frozenset({"placed_id", "kind", "placed_at_mm", "grant_id", "tick"})
 _THING_FIELDS: Final = frozenset(
@@ -512,13 +514,15 @@ class _Minute:
         brought, in its hands or wherever it stands here, but not what a being still here holds;
         a visitor whose arrival let it carry the world's things out, leaving by its own choice or
         called home by its player, also takes the placed things it holds, within its grant's bound
-        (:func:`_carries_out`); everything else it holds, and everything a being of the world
-        holds, is put down where it stood, and a thing put down whose bringer has left already
-        goes home to it (:func:`_gone_home`). In a society without hands, whatever it holds leaves
-        with it."""
+        (:func:`_carries_out`), and, where its arrival named the kinds its program can take
+        (``carries_out``), only things of those kinds; everything else it holds, and everything a
+        being of the world holds, is put down where it stood, and a thing put down whose bringer
+        has left already goes home to it (:func:`_gone_home`). In a society without hands,
+        whatever it holds leaves with it."""
         held = [thing for thing in self.state["things"] if thing["held_by"] == person["id"]]
         left: list[dict[str, Any]] = []
         returned: list[dict[str, Any]] = []
+        kept_back: list[dict[str, Any]] = []
         limited = False
         if _runs_hands(self.state):
             carried = [
@@ -531,6 +535,12 @@ class _Minute:
             if _carries_out(person, reason, extra):
                 grant = person["crossing"]["grant_id"]
                 placed = [thing for thing in held if thing["placed_id"] is not None]
+                listed = person["crossing"].get("carries_out")
+                if listed is not None:
+                    # Only the kinds its program can take leave; the rest are put down, and the
+                    # bound counts only what leaves.
+                    kept_back = [t for t in placed if t["kind"]["kind"] not in listed]
+                    placed = [t for t in placed if t["kind"]["kind"] in listed]
                 room = _carry_out_room(self.state, grant)
                 limited = len(placed) > room
                 for thing in placed[:room]:
@@ -590,6 +600,8 @@ class _Minute:
                 **({"left": [thing["id"] for thing in left]} if left else {}),
                 # The grant's bound held some of the world's things back: only where it did.
                 **({"carry_out_limited": True} if limited else {}),
+                # What it put down because its program cannot take that kind: only where any.
+                **({"not_let_out": [thing["id"] for thing in kept_back]} if kept_back else {}),
                 # What it put down that went home to a visitor that had left: only where any did.
                 **({"returned": [thing["id"] for thing in returned]} if returned else {}),
                 **(extra or {}),
@@ -878,6 +890,15 @@ def _arrive(minute: _Minute, crossing: Crossing, document: Mapping[str, Any]) ->
             **(
                 {"may_carry_out": True}
                 if document.get("may_carry_out") is True and _runs_hands(state)
+                else {}
+            ),
+            # Which kinds of the world's things its program can take, as its arrival said: kept
+            # beside may_carry_out only, and only where the arrival said.
+            **(
+                {"carries_out": list(document["carries_out"])}
+                if "carries_out" in document
+                and document.get("may_carry_out") is True
+                and _runs_hands(state)
                 else {}
             ),
         },
@@ -1711,9 +1732,16 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
                 and crossing.get("decided_by", "program") in DECIDED_BY
                 and crossing.get("may_carry_out", True) is True
                 and ("may_carry_out" not in crossing or _runs_hands(state))
+                and (
+                    "carries_out" not in crossing
+                    or (
+                        crossing.get("may_carry_out") is True
+                        and is_carry_out_list(crossing["carries_out"])
+                    )
+                )
             ),
             "a visitor's crossing names its arrival, bridge and grant, who decides for it, and "
-            "whether it may carry the world's things out",
+            "whether it may carry the world's things out, and which",
         )
     things = state["things"]
     hands = _runs_hands(state)

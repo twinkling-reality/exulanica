@@ -778,8 +778,9 @@ initializer that every creation and every replay passes through.
 
 Each relevant accepted authored edit appends a full immutable input snapshot in its transaction,
 even if several edits happen between simulation ticks. An edit is relevant when the input composed
-after it differs from the last one in anything but its sequence number and the authored edit
-cursor: an edit that changes nothing the society reads appends nothing (`_reads_the_same` in
+after it differs from the last one in anything but its sequence number, the authored edit cursor
+and the ability modules only a society's first input records: an edit that changes nothing the
+society reads appends nothing (`_reads_the_same` in
 `exulanica/api/society_runtime.py`), such as an object in another region of a made world, a
 photograph hidden, or an environment piece moved, which an input names only as a placement it does
 not read. The next committed step consumes every input
@@ -1738,12 +1739,17 @@ departure's `carried` with its `placed_id`. A carried-out placement is recorded 
 while the author's placement stands, so it is never in two places; an author who moves or changes
 the placement makes a new one, and the thing is placed again. The visitors of one grant carry out
 at most eight placed things in any sixty minutes; one past that is put down where its visitor
-stood, and the departure says so (`carry_out_limited`). Everything else a visitor holds (a placed
-thing it may not carry out, or a thing another visitor brought) it puts down where it stood. A
-being of the world that leaves (an author's edit removing a placed being) puts down everything it
-holds. A thing put down after the visitor that brought it has left goes home to it then, but it
-leaves the world undelivered: its bringer gave it away, the door tells a visitor's program only what
-that visitor's own departure carried, and no later word tells it of such a thing. So the
+stood, and the departure says so (`carry_out_limited`). Where its arrival also names the kinds of
+the world's things its program can take (`carries_out`, by kind key, beside `may_carry_out` only,
+kept on its crossing record), it carries out only placed things of those kinds; one of another kind
+is put down where it stood, named in the departure's `not_let_out`, and only what is carried out
+counts against the bound; an empty list carries nothing out, and an arrival that states no list
+carries out as above. Everything else a visitor holds (a placed thing it may not carry out, or a
+thing another visitor brought) it puts down where it stood. A being of the world that leaves (an
+author's edit removing a placed being) puts down everything it holds. A thing put down after the
+visitor that brought it has left goes home to it then, but it leaves the world undelivered: its
+bringer gave it away, the door tells a visitor's program only what that visitor's own departure
+carried, and no later word tells it of such a thing. So the
 things nobody placed are at most what the visitors here brought and what the beings here hold,
 and the state check refuses any other. The departure names what it took home (`carried`), what
 stayed (`left`) and what it put down that went home to a visitor gone before it (`returned`); a

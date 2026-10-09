@@ -195,6 +195,23 @@ def test_placed_beings_follow_the_latest_input_and_an_unavailable_one_changes_no
     assert events == ()
 
 
+def test_the_first_edit_that_changes_nothing_read_is_no_new_input():
+    """Only a society's first input records the modules it runs, so a later input of the same
+    things, after an edit that changed nothing the society reads, reads the same as the first and
+    the runtime appends none for it."""
+    from exulanica.api.society_runtime import _reads_the_same
+
+    first = compose((GATE, KNIGHT))
+    later = compose((GATE, KNIGHT), input_seq=2, edit_seq=EDITS + 1)
+    assert "modules" in first and "modules" not in later
+    assert _reads_the_same(first, later)
+    # The positive control: a later input that moves the knight is a new input.
+    moved = compose(
+        (GATE, thing("knight", "knight", 1, -2_000, 4_000)), input_seq=2, edit_seq=EDITS + 1
+    )
+    assert not _reads_the_same(first, moved)
+
+
 def test_a_visitor_arrives_at_the_gate_holding_what_it_carried_and_leaves_with_it():
     document = compose((GATE, WELL))
     state = _genesis(GATE, WELL)

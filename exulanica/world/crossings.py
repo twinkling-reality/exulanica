@@ -17,7 +17,9 @@ A crossing is one of two documents:
     and digest, its origin record (class ``crossed``: the program that sent it, under its grant),
     the digest of the translation manifest that states what came across, the things it carries
     by id and kind, its grant, the gate it arrives through, or none, and, optionally, who decides
-    for it there (``decided_by``: ``program``, what stating nothing means, or ``world``);
+    for it there (``decided_by``: ``program``, what stating nothing means, or ``world``), whether
+    it may carry the world's things out (``may_carry_out``, only as true) and, beside that only,
+    the kinds of the world's things its program can take (``carries_out``, by key);
 *   a departure, ``exulanica.thing-departure/v1``: who leaves, and why: ``sent_away`` by its
     program, or ``grant_ended``.
 
@@ -49,6 +51,7 @@ __all__ = [
     "ARRIVAL_PROFILE",
     "ARRIVAL_REFUSALS",
     "CALLED_BY",
+    "CARRIES_OUT_MAXIMUM",
     "CROSSINGS_PER_MINUTE",
     "DEPARTURE_PROFILE",
     "DEPARTURE_REASONS",
@@ -62,6 +65,7 @@ __all__ = [
     "check_arrival",
     "check_departure",
     "crossing_stream",
+    "is_carry_out_list",
     "register_crossing_stream",
     "society_of_version",
 ]
@@ -105,13 +109,16 @@ _ARRIVAL_FIELDS: Final = frozenset(
     }
 )
 #: What an arrival may state beside its fields: who decides for its visitor (absent, its program),
-#: and whether its grant lets the visitor carry the world's things out (present only as true).
-_ARRIVAL_MAY: Final = frozenset({"decided_by", "may_carry_out"})
+#: whether its grant lets the visitor carry the world's things out (present only as true) and,
+#: beside that only, the kinds of the world's things its program can take, by key.
+_ARRIVAL_MAY: Final = frozenset({"decided_by", "may_carry_out", "carries_out"})
 _DEPARTURE_FIELDS: Final = frozenset({"profile", "departure_id", "thing_id", "reason"})
 #: What a departure may state beside its fields: who called its visitor home.
 _DEPARTURE_MAY: Final = frozenset({"called_by"})
 #: The most things one visitor carries in.
 CARRIED_MAXIMUM: Final = 16
+#: The most kinds an arrival's ``carries_out`` names: a bridge's mapping lets a few kinds out.
+CARRIES_OUT_MAXIMUM: Final = 64
 _KEY: Final = re.compile(r"[a-z][a-z0-9_]{0,47}")
 _HEX64: Final = re.compile(r"[0-9a-f]{64}")
 _PLACED_ID: Final = re.compile(r"[a-z0-9]([a-z0-9:._-]{0,198}[a-z0-9])?")
@@ -225,6 +232,17 @@ def _kind(where: str, value: object) -> None:
         raise CrossingRefused(f"{where} names a kind by key, version and digest")
 
 
+def is_carry_out_list(value: object) -> bool:
+    """Whether ``value`` names the kinds a visitor may carry out: a sorted list of at most
+    :data:`CARRIES_OUT_MAXIMUM` distinct kind keys, possibly empty."""
+    return (
+        isinstance(value, list)
+        and len(value) <= CARRIES_OUT_MAXIMUM
+        and all(isinstance(key, str) and _KEY.fullmatch(key) is not None for key in value)
+        and value == sorted(set(value))
+    )
+
+
 def check_arrival(document: object) -> Mapping[str, Any]:
     """``document`` held to the arrival's shape, or :class:`CrossingRefused`. Whether its kind is
     shipped, and where it arrives, are the society's to say."""
@@ -234,6 +252,13 @@ def check_arrival(document: object) -> Mapping[str, Any]:
         raise CrossingRefused(f"an arrival's decided_by is one of {list(DECIDED_BY)}, or none")
     if document.get("may_carry_out", True) is not True:
         raise CrossingRefused("an arrival's may_carry_out is true, or absent")
+    if "carries_out" in document:
+        if document.get("may_carry_out") is not True:
+            raise CrossingRefused("an arrival states carries_out only beside may_carry_out")
+        if not is_carry_out_list(document["carries_out"]):
+            raise CrossingRefused(
+                f"carries_out is a sorted list of at most {CARRIES_OUT_MAXIMUM} distinct kind keys"
+            )
     if document["profile"] != ARRIVAL_PROFILE:
         raise CrossingRefused(f"an arrival is an {ARRIVAL_PROFILE} document")
     _uuid("arrival_id", document["arrival_id"])

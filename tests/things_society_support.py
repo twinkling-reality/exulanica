@@ -170,10 +170,12 @@ def arrival(
     grant_id: uuid.UUID = GRANT,
     decided_by: str | None = None,
     may_carry_out: bool = False,
+    carries_out: Sequence[str] | None = None,
 ) -> Crossing:
     """The ``index``th arrival a door hands over: a visitor, by default of the shipped visitor
-    kind, under the test grant, stating who decides for it only when ``decided_by`` is given and
-    that it may carry the world's things out only when ``may_carry_out`` is."""
+    kind, under the test grant, stating who decides for it only when ``decided_by`` is given, that
+    it may carry the world's things out only when ``may_carry_out`` is, and which kinds only when
+    ``carries_out`` is."""
     arrival_id = uuid.uuid5(grant_id, f"arrival:{index}")
     document = {
         "profile": ARRIVAL_PROFILE,
@@ -190,6 +192,8 @@ def arrival(
         document["decided_by"] = decided_by
     if may_carry_out:
         document["may_carry_out"] = True
+    if carries_out is not None:
+        document["carries_out"] = list(carries_out)
     return Crossing(arrival_id, document)
 
 

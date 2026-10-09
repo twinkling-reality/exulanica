@@ -289,18 +289,26 @@ def _site_read(
 #: What a saved world's input says of the edit it follows, not of what its society reads: its
 #: place in the sequence, the version's edit cursor, and the digest over both.
 _EDIT_CURSOR_FIELDS: Final = frozenset({"input_seq", "authored_state", "document_sha256"})
+#: What only a society's first input states (the ability modules its minutes run for its whole
+#: life), so a later input's not stating it is no difference.
+_FIRST_INPUT_ONLY: Final = frozenset({"modules"})
 
 
 def _reads_the_same(previous: Mapping[str, Any], current: Mapping[str, Any]) -> bool:
     """Whether two successive inputs differ only in which edit they follow.
 
     Such an edit changed nothing the society reads, so it appends no input: an object in another
-    region of the world, or a photograph hidden or moved. Every other field is what the society
-    reads, and any difference there is a new input.
+    region of the world, or a photograph hidden or moved. The modules only a first input states
+    are no difference either. Every other field is what the society reads, and any difference
+    there is a new input.
     """
 
     def read(document: Mapping[str, Any]) -> dict[str, Any]:
-        return {key: value for key, value in document.items() if key not in _EDIT_CURSOR_FIELDS}
+        return {
+            key: value
+            for key, value in document.items()
+            if key not in _EDIT_CURSOR_FIELDS and key not in _FIRST_INPUT_ONLY
+        }
 
     return read(previous) == read(current)
 

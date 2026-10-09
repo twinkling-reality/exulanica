@@ -5,8 +5,9 @@ up. Leaving by its own choice, or called home by its player, it takes the sword:
 it with its placement, the sword is gone from the society, and while the author's placement stands
 it is never put back, so it is never in two places. Sent away by the world's owner, its grant
 ended, or with no such right, it puts the sword down where it stood. One grant carries at most
-eight placed things out in any sixty minutes; one past that stays. An author who moves the
-placement makes a new one, and the sword is placed again.
+eight placed things out in any sixty minutes; one past that stays. Where its arrival names the
+kinds its program can take, it carries out only those, and puts the rest down. An author who moves
+the placement makes a new one, and the sword is placed again.
 """
 
 from __future__ import annotations
@@ -42,11 +43,13 @@ def _sword(state):
     return next((t for t in state["things"] if t["placed_id"] == "sword"), None)
 
 
-def _holding(document, *, may_carry_out=True):
+def _holding(document, *, may_carry_out=True, carries_out=None):
     """The visitor arrives, the sword is laid where it stands, and it picks the sword up."""
     state = initial_things_society(SOCIETY, SEED, document, population=POPULATION)
     state, _, _ = hands._minute(
-        state, document, crossings=[arrival(1, may_carry_out=may_carry_out)]
+        state,
+        document,
+        crossings=[arrival(1, may_carry_out=may_carry_out, carries_out=carries_out)],
     )
     visitor = _visitor(state)
     assert visitor["crossing"].get("may_carry_out", False) is may_carry_out
@@ -212,15 +215,64 @@ def test_an_author_who_moves_the_carried_out_placement_places_the_sword_again():
 
 
 @pytest.mark.parametrize(
+    ("listed", "carried"),
+    [(["sword"], True), (["lantern", "shield"], False), ([], False)],
+    ids=["its-kind-listed", "other-kinds-listed", "nothing-listed"],
+)
+def test_a_visitor_carries_out_only_the_kinds_its_program_can_take(listed, carried):
+    """Its arrival names the kinds of the world's things its program can take: called home by its
+    player, it carries the sword out only where the list names the sword's kind, and otherwise puts
+    it down where it stood, named as left and as not let out, carrying nothing out of the world."""
+    document = compose((GATE, KNIGHT, SWORD))
+    state = _holding(document, carries_out=listed)
+    assert _visitor(state)["crossing"]["carries_out"] == listed
+    sword = _sword(state)
+    state, events, _ = hands._minute(
+        state, document, crossings=[departure(_visitor(state)["id"], 1, called_by="player")]
+    )
+    departed = _departed(events)
+    gone = departed["thing"]
+    if carried:
+        assert [held.get("placed_id") for held in gone["carried"]] == ["sword"]
+        assert "not_let_out" not in gone and _sword(state) is None
+        assert [entry["placed_id"] for entry in state["carried_out"]] == ["sword"]
+    else:
+        assert gone["carried"] == [] and "carry_out_limited" not in gone
+        assert gone["left"] == gone["not_let_out"] == [sword["id"]]
+        stayed = _sword(state)
+        assert (stayed["held_by"], stayed["position_mm"]) == (None, departed["position_mm"])
+        assert "carried_out" not in state
+    validate_things_state(state)
+
+
+@pytest.mark.parametrize(
     ("change", "message"),
     [
         ({"may_carry_out": False}, "may_carry_out is true, or absent"),
         ({"may_carry_out": "yes"}, "may_carry_out is true, or absent"),
+        ({"may_carry_out": None, "carries_out": ["sword"]}, "carries_out only beside"),
+        ({"carries_out": ["sword", "lantern"]}, "sorted list"),
+        ({"carries_out": ["sword", "sword"]}, "sorted list"),
+        ({"carries_out": ["Sword"]}, "sorted list"),
+        ({"carries_out": "sword"}, "sorted list"),
+        ({"carries_out": [f"kind_{n:02d}" for n in range(65)]}, "at most 64"),
+    ],
+    ids=[
+        "false",
+        "not-a-boolean",
+        "kinds-without-the-right",
+        "unsorted",
+        "repeated",
+        "not-a-key",
+        "not-a-list",
+        "too-many",
     ],
 )
 def test_an_arrival_states_its_right_to_carry_out_only_as_true(change, message):
     crossing = arrival(1, may_carry_out=True)
     crossing.document.update(change)
+    if crossing.document.get("may_carry_out") is None:
+        del crossing.document["may_carry_out"]
     with pytest.raises(CrossingRefused, match=message):
         check_crossing(crossing)
 
@@ -242,6 +294,11 @@ def test_the_state_check_holds_the_new_fields_to_their_shapes():
     wrong = copy.deepcopy(state)
     _visitor(wrong)["crossing"]["may_carry_out"] = False
     with pytest.raises(ValueError, match="may carry the world's things out"):
+        validate_things_state(wrong)
+    wrong = copy.deepcopy(state)
+    _visitor(wrong)["crossing"].update(carries_out=["sword"])
+    del _visitor(wrong)["crossing"]["may_carry_out"]
+    with pytest.raises(ValueError, match="may carry the world's things out, and which"):
         validate_things_state(wrong)
     wrong = copy.deepcopy(state)
     wrong["carried_out"] = [{"placed_id": "sword"}]
