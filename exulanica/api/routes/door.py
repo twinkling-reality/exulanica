@@ -248,8 +248,8 @@ def _grant_view(
         # The program's own words about itself, as it last said hello: for a person reading a card.
         "declared": None if presence is None or presence.declared is None else presence.declared,
         # Whether a line of its program carried a name the account holder saved: every later line
-        # of the grant is refused, and the program learnt at most one name part for each thing
-        # asked in the minute of that refusal, at most 12 (the contract's Answers).
+        # of the grant is refused, and the program learnt only that one of its lines of that
+        # minute carried one (the contract's Answers).
         "lines_closed": lines_closed(connection, workspace_id, grant.grant_id),
     }
 

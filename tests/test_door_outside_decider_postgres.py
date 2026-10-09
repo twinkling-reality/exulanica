@@ -14,7 +14,9 @@ stopped. What is shown:
     version, the grant and the digest of the answer the bridge sent, and costs nothing;
 *   replay needs no bridge;
 *   revoking the grant hands the person back to the routine, and a quiet bridge's person is not
-    asked: its turn is recorded as ``decider_disconnected``;
+    asked: its turn is recorded as ``decider_disconnected``; a grant revoked while its people are
+    away hands them back all the same, so once they are here again the routine decides for them
+    with no request reserved, and the owner may choose for them;
 *   the world's models read gives the person's latest decision under the grant (``latest``): the
     bridge's answer, a turn a connected program let pass (``no_answer_in_time``, the routine
     deciding) until a later answer replaces it, or none yet under a new grant.
@@ -365,3 +367,77 @@ def test_a_program_that_never_answers_reads_as_missed_until_an_answer_replaces_i
     assert answering.sent and answered["decision_seq"] > missed["decision_seq"]
     assert (answered["status"], answered["reason"]) == ("accepted", "validated_choice")
     assert _latest_of(world, client, person) == _latest(answered)
+
+
+def _requests_for(world, people: list[str]) -> int:
+    """How many decision requests were reserved for ``people``."""
+    row = (
+        world["connection"]
+        .execute(
+            "select count(*) as requests from world_society_decision_request "
+            "where workspace_id = %s and subject_id = any(%s::uuid[])",
+            (world["workspace"], people),
+        )
+        .fetchone()
+    )
+    return int(row["requests"])
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_grant_revoked_while_its_people_are_away_hands_them_back_all_the_same(door):
+    world, client, services = door
+    snapshot = stays._inhabited(world, client)
+    people = sorted(person["id"] for person in snapshot["state"]["inhabitants"])[:2]
+    issued = client.post(
+        "/door/grants",
+        headers=OWNER,
+        params={"world_id": world["binding"].world_id},
+        json={
+            "idempotency_key": "outside-people-away",
+            "bridge": "test-bridge",
+            "things": people,
+            "version_id": str(world["binding"].version_id),
+        },
+    )
+    assert issued.status_code == 201, issued.text
+    grant_id = issued.json()["grant"]["grant_id"]
+    scope, _, society = routes(world)
+
+    def presence(current: dict[str, Any], wanted: str) -> dict[str, Any]:
+        changed = client.post(
+            society + "/presence",
+            headers=OWNER,
+            params=scope,
+            json={
+                "idempotency_key": str(uuid.uuid4()),
+                "presence": wanted,
+                "base_tick": current["current_tick"],
+                "base_state_sha256": current["state_sha256"],
+            },
+        )
+        assert changed.status_code == 200, changed.text
+        return changed.json()
+
+    # The owner sends everyone away, then revokes: nobody the grant names is here.
+    snapshot = presence(snapshot, "away")
+    revoked = client.post(f"/door/grants/{grant_id}/revoke", headers=OWNER)
+    assert (revoked.status_code, revoked.json()["grant"]["ended"]) == (200, "revoked")
+    for person in people:
+        assert _choice_of(world, client, person)["decider"] == {"kind": "routine"}
+    # Brought back, they are their routine's: the host asks for nobody here, and no request is
+    # reserved for them minute by minute.
+    snapshot = presence(snapshot, "here")
+    host = services.decision_host()
+    before = _requests_for(world, people)
+    for _ in range(6):
+        assert not host.before_minute(_claim(world, snapshot), time.monotonic() + LEASE_SECONDS)
+        snapshot = stays._step(world, client, snapshot)
+    assert _requests_for(world, people) == before
+    # And the owner's own choice for them is taken.
+    chosen = client.post(
+        society + "/models",
+        headers=OWNER,
+        params=scope,
+        json={"idempotency_key": str(uuid.uuid4()), "people": people, "model": None},
+    )
+    assert chosen.status_code in (200, 201), chosen.text

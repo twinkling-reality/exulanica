@@ -23,6 +23,7 @@ from __future__ import annotations
 import contextlib
 import datetime as dt
 import json
+import logging
 import uuid
 from typing import Any
 
@@ -626,7 +627,7 @@ def test_a_grant_the_sweep_cannot_settle_is_held_back_and_named_until_it_is_sett
 
 
 def test_the_sweep_looks_only_at_grants_that_ran_out_within_its_window(
-    door, crossings, monkeypatch, spine_schema
+    door, crossings, monkeypatch, spine_schema, caplog
 ):
     world, society = _world(door)
     finder = _finder(spine_schema)
@@ -635,9 +636,19 @@ def test_the_sweep_looks_only_at_grants_that_ran_out_within_its_window(
         _arrive(client, channel, str(uuid.uuid4()), carried=[])
         society = _step(client, world, society)
         _expire(world, grant_id)  # ended a second ago
-        with monkeypatch.context() as narrow:
+        with (
+            monkeypatch.context() as narrow,
+            caplog.at_level(logging.WARNING, sweep_module.__name__),
+        ):
             narrow.setattr(sweep_module, "SETTLE_WINDOW", dt.timedelta(milliseconds=500))
             assert sweep(finder, door["database"]) == _swept(0, 0)
+            # Held back as it leaves the window, it is named once, and no later pass looks at it.
+            left = sweep(finder, door["database"], deferred=[uuid.UUID(grant_id)])
+            assert left == _swept(0, 0)
+            assert sweep(finder, door["database"], deferred=left["stuck"]) == _swept(0, 0)
+        assert [r.getMessage() for r in caplog.records if r.name == sweep_module.__name__] == [
+            f"A door grant left the sweep's window unsettled: {grant_id}"
+        ]
         assert sweep(finder, door["database"]) == _swept(1, 1)
 
 

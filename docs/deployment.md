@@ -1657,9 +1657,10 @@ asks everyone to sign in again. Nor does it carry the rows of `door_secret` and
 so each world's owner opens their grants again ([door contract](door-contract.md)), and a credential
 the door prunes after its retention never leaves an older backup unrestorable. The database itself
 keeps every revoked door secret for good (migration 0157), and every sealed restore checkpoint
-carries them: they grow by at most 2,400 rows, about 0.6 MB, a day for a workspace issuing the most
-grants the door allows (50 in any 24 hours, 48 secrets each), and by a few dozen for an owner who
-opens a few grants a day.
+carries them, with the table's indexes: they grow by 2,400 rows a day on average for a workspace
+issuing the most grants the door allows (50 in any 24 hours, 48 secrets each), by at most 4,800 in
+any 24 hours (a grant may be given its secrets at any time in its own day), and by a few dozen for
+an owner who opens a few grants a day.
 
 `exulanica_backup` is provisioned by `exulanica-db` with `EXULANICA_BACKUP_ROLE_PASSWORD`: BYPASSRLS,
 SELECT on every table and sequence (and, by default privilege, on those the owner creates later)

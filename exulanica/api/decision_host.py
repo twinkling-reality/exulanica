@@ -446,6 +446,49 @@ def _line_out_of_bounds(asked: OutsideAsk, result: Mapping[str, Any]) -> bool:
         return True
 
 
+def _lines_refused_together(
+    outside: Sequence[tuple[list[OutsideAsk], list[tuple[uuid.UUID, dict[str, Any]]]]],
+    groups: list[list[tuple[uuid.UUID, dict[str, Any]]]],
+) -> list[list[tuple[uuid.UUID, dict[str, Any]]]]:
+    """The outside programs' results of one minute, with every line a grant's program answered in
+    it refused as carrying a saved name once one of them is. All of a minute's answers are in
+    before any is recorded, so the grant's lines close only after it: refused one by one, each
+    would tell the program which of its lines carried a name, up to one name part a thing; refused
+    together, they tell it only that one of them did."""
+    grant_of = {
+        uuid.UUID(asked.request["request_id"]): asked.request["provider_config"].get("grant_id")
+        for asks, _refused in outside
+        for asked in asks
+    }
+    closed = {
+        grant_of.get(request_id)
+        for group in groups
+        for request_id, result in group
+        if result.get("reason") == "line_refused_by_rules"
+    } - {None}
+
+    def says_a_line(result: Mapping[str, Any]) -> bool:
+        return result["status"] == "accepted" and (result["proposal"] or {}).get("line") is not None
+
+    return [
+        [
+            (
+                request_id,
+                {
+                    **result,
+                    "status": "rejected",
+                    "reason": "line_refused_by_rules",
+                    "proposal": None,
+                }
+                if grant_of.get(request_id) in closed and says_a_line(result)
+                else result,
+            )
+            for request_id, result in group
+        ]
+        for group in groups
+    ]
+
+
 def without_named_lines(
     names: Sequence[SavedName],
 ) -> Callable[[dict[str, Any]], dict[str, Any]]:
@@ -1412,6 +1455,7 @@ class DecisionHost:
                     )
             results = DecisionHost._models_asked(client, reserved)
             answered = iter(outside_futures)
+            outside_groups: list[list[tuple[uuid.UUID, dict[str, Any]]]] = []
             for asks, refused in outside:
                 group = list(refused)
                 for asked in asks:
@@ -1424,8 +1468,8 @@ class DecisionHost:
                         _LOG.error("An outside decision ask failed with %s", _error_class(exc))
                         result = _refused("decider_disconnected")
                     group.append((uuid.UUID(asked.request["request_id"]), result))
-                results.append(group)
-            return results
+                outside_groups.append(group)
+            return results + _lines_refused_together(outside, outside_groups)
         finally:
             if outside_pool is not None:
                 # A door that ignores its deadline is not waited for: its late answer is dropped.

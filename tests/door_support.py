@@ -14,6 +14,7 @@ from typing import Any, Final
 from exulanica.canonical import sha256_of_canonical
 from exulanica.door.bridges import BridgeDirectory, load_bridge_directory
 from exulanica.door.credentials import credential_sha256
+from exulanica.door.grants import visitors_society
 
 #: The test bridge's own deployment credential, as its server would hold it.
 BRIDGE_CREDENTIAL: Final = "test-bridge-credential-that-is-long-enough-0001"
@@ -202,3 +203,14 @@ def open_to_visitors(client: Any, world: dict[str, Any]) -> None:
     if held is None:
         _place(client, world, "well", "well", 2, -4_000, 2_000)
         _make_society(client, world)
+    elif (
+        visitors_society(
+            world["connection"], world["workspace"], binding.world_id, str(binding.version_id)
+        )
+        is None
+    ):
+        raise AssertionError(
+            "this version already holds a society that takes no visitors (one of people, "
+            "exulanica-society/v2): open it to visitors before its people are made, or use "
+            "another version"
+        )

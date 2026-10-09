@@ -199,21 +199,24 @@ def test_an_arrival_never_takes_the_id_a_departure_is_written_under(door, crossi
     }
 
 
-def test_a_visitors_grant_stored_before_grants_named_their_version_is_still_read(door):
-    world = door["world"]
-    client = door["client"]
+#: A visitors grant's scope as revisions were stored before grants named their version.
+_STORED_SCOPE: dict[str, Any] = {
+    "visitors_maximum": 1,
+    "kinds": ["player"],
+    "things": [],
+    "version_id": None,
+    "gate": None,
+    "may_carry_in": False,
+    "may_carry_out": False,
+    "may_speak": True,
+    "world_words": None,
+}
+
+
+def _stored_grant(world, scope: dict[str, Any]) -> uuid.UUID:
+    """A grant written straight into the tables, as a revision stored before a rule it would now
+    break: the rules a grant is read under still hold for it."""
     grant_id = uuid.uuid4()
-    scope = {
-        "visitors_maximum": 1,
-        "kinds": ["player"],
-        "things": [],
-        "version_id": None,
-        "gate": None,
-        "may_carry_in": False,
-        "may_carry_out": False,
-        "may_speak": True,
-        "world_words": None,
-    }
     connection, transaction = _scoped(world)
     try:
         connection.execute(
@@ -251,6 +254,14 @@ def test_a_visitors_grant_stored_before_grants_named_their_version_is_still_read
         )
     finally:
         transaction.__exit__(None, None, None)
+    return grant_id
+
+
+def test_a_visitors_grant_stored_before_grants_named_their_version_is_still_read(door):
+    world = door["world"]
+    client = door["client"]
+    scope = _STORED_SCOPE
+    grant_id = _stored_grant(world, scope)
     params = {"world_id": world["binding"].world_id}
     listed = client.get("/door/grants", headers=OWNER, params=params)
     assert listed.status_code == 200, listed.text
@@ -322,6 +333,23 @@ def test_a_visitors_grant_is_issued_only_for_a_version_holding_a_society_of_thin
         },
     )
     assert named.status_code == 201, named.text
+
+
+def test_an_arrival_under_a_stored_grant_into_a_society_of_people_is_refused(door):
+    """A grant stored before issuing read its version's society, naming a version whose society is
+    one of people (exulanica-society/v2): its arrivals are refused by the rule issuing now keeps."""
+    world = door["world"]
+    client = door["client"]
+    _person_request(door)  # the version's society is one of people
+    grant_id = _stored_grant(
+        world, {**_STORED_SCOPE, "version_id": str(world["binding"].version_id)}
+    )
+    opened = client.post(f"/door/grants/{grant_id}/channel-credentials", headers=OWNER)
+    assert opened.status_code == 201, opened.text
+    channel = {"Authorization": f"Bearer {opened.json()['credential']}"}
+    assert _hello(door, channel).status_code == 200
+    taken = _arrive(client, channel, str(uuid.uuid4()), carried=[])
+    assert (taken.status_code, taken.json()["code"]) == (409, "world_not_open_to_visitors")
 
 
 def test_a_grant_takes_a_bounded_number_of_arrivals_an_hour(door, crossings, monkeypatch):

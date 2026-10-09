@@ -651,10 +651,12 @@ class SocietyModelChoiceRepository:
         contract: DecisionContract,
     ) -> dict[str, Any] | None:
         """Hand every subject the grant ``grant_id`` still decides for back to their routine, as
-        one choice: called by the route that revokes the grant, in its transaction. Who the grant
-        decides for is read under the society's lock, so a choice committed meanwhile is never
-        overwritten; a retry of this key returns the choice it recorded. None when the grant
-        decides for nobody now, because a later choice already replaced it."""
+        one choice: called by the route that revokes the grant, in its transaction, and by a grant
+        that ran out. Who the grant decides for is read under the society's lock, so a choice
+        committed meanwhile is never overwritten; a retry of this key returns the choice it
+        recorded. None when the grant decides for nobody now, because a later choice already
+        replaced it. A subject that is not here (everyone sent away, or a placed thing its author
+        removed) is handed back all the same, so no grant that ended keeps anyone."""
 
         def held(rows: Sequence[Mapping[str, Any]]) -> list[str]:
             return [
@@ -673,6 +675,7 @@ class SocietyModelChoiceRepository:
             described=lambda: {"kind": "routine"},
             chosen_by=chosen_by,
             contract=contract,
+            handing_back=True,
         )
 
     def _record(
@@ -687,13 +690,18 @@ class SocietyModelChoiceRepository:
         chosen_by: uuid.UUID,
         contract: DecisionContract,
         granted_away: bool = False,
+        handing_back: bool = False,
     ) -> dict[str, Any] | None:
         """Record one choice of ``role`` naming ``asked``, checked as ``described()`` checks it,
         or return the one this idempotency key already recorded. ``subjects`` may be read from
         the society's choices under its lock instead: then a key already recorded is answered
         whoever it named, and None is returned, recording nothing, when they name nobody. With
         ``granted_away``, the owner's own choice, a subject a grant decides for now is refused
-        (``decided_from_outside``): only ending the grant hands it back."""
+        (``decided_from_outside``): only ending the grant hands it back. With ``handing_back``,
+        an ended grant's hand-back to the routine, a subject that is not here is accepted and
+        skips the checks that read it from the state; one that is here keeps every check."""
+        if handing_back and dict(asked or {}) != {"kind": "routine"}:
+            raise ValueError("only a hand-back to the routine names somebody who is not here")
         with self.connection.transaction():
             society = self._society(version_id, lock=True)
             rows = self._rows(society["society_id"])
@@ -726,9 +734,11 @@ class SocietyModelChoiceRepository:
                 raise ModelChoiceRefused("person_named_twice")
             record = described()
             present = set(role.adapter.subjects(society["state"]))
-            if not chosen or not set(chosen) <= present:
+            # Who is here: everyone, but in a hand-back, whose subjects may have been sent away.
+            here = [subject for subject in chosen if subject in present]
+            if not chosen or (len(here) != len(chosen) and not handing_back):
                 raise ModelChoiceRefused("person_not_in_this_world")
-            if any(decided_from_outside(society["state"], subject) for subject in chosen):
+            if any(decided_from_outside(society["state"], subject) for subject in here):
                 raise ModelChoiceRefused("decided_from_outside")
             if record["kind"] == "external" and any(
                 _came_from_outside(society["state"], subject) for subject in chosen
@@ -744,7 +754,13 @@ class SocietyModelChoiceRepository:
                 ):
                     raise ModelChoiceRefused("decided_from_outside")
             state = society["state"]
-            if not all(kind_allows(state, subject, record["kind"]) for subject in chosen):
+            if not all(kind_allows(state, subject, record["kind"]) for subject in here):
+                raise ModelChoiceRefused("decider_not_allowed")
+            if record["kind"] == "external" and not all(
+                kind_allows(state, subject, "routine") for subject in chosen
+            ):
+                # A grant ends, and whoever it decided for goes back to their routine then, so a
+                # thing whose kind takes no routine is never handed to an outside program.
                 raise ModelChoiceRefused("decider_not_allowed")
             if record["kind"] != "routine":
                 occupied: dict[tuple[str, str], bool] = {}

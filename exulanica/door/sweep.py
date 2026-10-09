@@ -12,7 +12,8 @@ So a visitor leaves within one maintenance pass of its grant's end, sooner when 
 grant first. Settling is idempotent. Only grants that ran out within
 :data:`~exulanica.door.grants.SETTLE_WINDOW` are looked at. A grant a pass could not settle, or
 whose settling left it as it was, is held back: every later pass takes it after every other grant,
-so it never holds the place of a newer one, and names it until it is settled or leaves the window.
+so it never holds the place of a newer one, and names it until it is settled or leaves the window;
+one that leaves the window unsettled is logged by its id once, as no pass looks at it again.
 
 Only this module of the door is reached from the maintenance pass (the import contract "Only the
 HTTP surface reaches the door" names the one edge), and it reaches only what settling needs.
@@ -20,6 +21,8 @@ HTTP surface reaches the door" names the one edge), and it reaches only what set
 
 from __future__ import annotations
 
+import datetime as dt
+import logging
 import uuid
 from collections.abc import Collection
 from typing import Any, Final
@@ -33,6 +36,11 @@ __all__ = ["SWEPT_PER_PASS", "sweep"]
 
 #: The most grants one maintenance pass settles; any more wait for the next pass, oldest first.
 SWEPT_PER_PASS: Final = 32
+#: How far past the window a held-back grant this pass no longer finds is looked for, to say that it
+#: left unsettled: the passes run every few seconds, so one that left did so moments ago.
+_LEFT_WITHIN: Final = dt.timedelta(days=1)
+
+_LOG = logging.getLogger(__name__)
 
 
 def sweep(
@@ -64,6 +72,20 @@ def sweep(
                 UNSETTLED.format(scope="g.grant_id = any(%(held)s::uuid[])"),
                 {"held": held_back, "limit": len(held_back), "window": SETTLE_WINDOW},
             ).fetchall()
+            found = {row["grant_id"] for row in ordered}
+            gone = [grant_id for grant_id in held_back if grant_id not in found]
+            # A held-back grant no longer found was settled meanwhile, or has just left the window
+            # unsettled: its visitor then stays, run by the routine, until its owner sends it away.
+            left = (
+                cursor.execute(
+                    UNSETTLED.format(scope="g.grant_id = any(%(held)s::uuid[])"),
+                    {"held": gone, "limit": len(gone), "window": SETTLE_WINDOW + _LEFT_WITHIN},
+                ).fetchall()
+                if gone
+                else []
+            )
+            for row in left:
+                _LOG.warning("A door grant left the sweep's window unsettled: %s", row["grant_id"])
     settled = departures = failed = 0
     stuck = [row["grant_id"] for row in ordered[limit:]]
     for row in ordered[:limit]:

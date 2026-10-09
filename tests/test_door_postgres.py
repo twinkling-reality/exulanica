@@ -54,7 +54,9 @@ from exulanica.door.bridges import load_bridge_directory
 from exulanica.door.channel import ChannelRepository
 from exulanica.door.credentials import credential_sha256
 from exulanica.door.grants import (
+    GRANTS_PER_DAY_MAXIMUM,
     SECRETS_WAITING_MAXIMUM,
+    GrantRefused,
     GrantRepository,
     Scope,
     grant_actor,
@@ -62,6 +64,7 @@ from exulanica.door.grants import (
 from exulanica.door.notices import Notices
 from exulanica.door.protocol import DEADLINE_MS_DEFAULT, Cursor
 from exulanica.door.runtime import DoorRuntime
+from exulanica.world import society_model_choice_repository as choice_module
 from exulanica.world.role_decisions import role_request, seal
 from exulanica.world.society_decision_contract import person_role
 from exulanica.world.society_model_choice_repository import (
@@ -507,7 +510,9 @@ def _person_request(door) -> tuple[dict[str, Any], str]:
     return found
 
 
-def _store_external(door, request: dict[str, Any], grant_id: uuid.UUID) -> dict[str, Any]:
+def _store_external(
+    door, request: dict[str, Any], grant_id: uuid.UUID, *, deadline_ms: int | None = None
+) -> dict[str, Any]:
     world = door["world"]
     asker = door["runtime"].asker()
     config, refusal = asker.configuration(
@@ -517,6 +522,8 @@ def _store_external(door, request: dict[str, Any], grant_id: uuid.UUID) -> dict[
         {"kind": "external", "bridge": "test-bridge", "grant_id": str(grant_id)},
     )
     assert refusal is None, refusal
+    if deadline_ms is not None:
+        config = {**config, "deadline_ms": deadline_ms}
     external = {key: value for key, value in request.items() if key != "document_sha256"}
     external["provider_config"] = {**config, "contract": request["provider_config"]["contract"]}
     external = seal(external)
@@ -736,6 +743,69 @@ def test_an_ask_no_receipt_will_close_holds_neither_later_outcomes_nor_the_end(d
     assert [frame["kind"] for frame in after["frames"]] == ["grant_ended"]
     told = Cursor.decode(after["cursor"])
     assert (told.ended, told.outcome) == (True, Cursor.decode(read["cursor"]).ask)
+
+
+def test_an_ask_within_its_deadline_holds_the_end_with_no_window_after_it(door, monkeypatch):
+    """The unanswered window is counted from an ask's deadline, never from when it was asked: with
+    no window at all, an ask whose deadline has not come may still be decided, so the end waits."""
+    request, person = _person_request(door)
+    grant_id = _grant_for(door, person)
+    channel = _credential(door, grant_id)
+    _hello(door, channel)
+    external = _store_external(door, request, grant_id, deadline_ms=60_000)
+    door["runtime"].asker()._write_ask(
+        door["world"]["workspace"], grant_id, uuid.UUID(external["request_id"])
+    )
+    door["client"].post(f"/door/grants/{grant_id}/revoke", headers=OWNER)
+    monkeypatch.setattr(channel_module, "UNANSWERED_WINDOW", datetime.timedelta(0))
+    read = _frames(door, channel).json()
+    assert [frame["kind"] for frame in read["frames"]] == ["grant", "asked"]
+    again = _frames(door, channel, read["cursor"]).json()
+    assert again["frames"] == [] and Cursor.decode(again["cursor"]).ended is False
+
+
+def test_an_ask_passed_over_lets_the_outcome_after_it_be_told_in_the_same_poll(door, monkeypatch):
+    """Of two asks under a standing grant, the first is never decided (its host stopped) and the
+    second is: once the first is past its deadline and window, the second's outcome is told."""
+    [(first, person), (second, other)] = _person_requests(door, 2)
+    grant_id = _grant_for(door, person, other)
+    channel = _credential(door, grant_id)
+    _hello(door, channel)
+    stopped = _store_external(door, first, grant_id, deadline_ms=8_000)
+    decided = _store_external(door, second, grant_id, deadline_ms=8_000)
+    asker = door["runtime"].asker()
+    for external in (stopped, decided):
+        asker._write_ask(door["world"]["workspace"], grant_id, uuid.UUID(external["request_id"]))
+    written = time.monotonic()
+    read = _frames(door, channel).json()
+    assert [frame["kind"] for frame in read["frames"]] == ["grant", "asked", "asked"]
+    _record_turn(door, decided)
+    monkeypatch.setattr(channel_module, "UNANSWERED_WINDOW", datetime.timedelta(0))
+    time.sleep(max(0.0, written + 8.5 - time.monotonic()))
+    after = _frames(door, channel, read["cursor"]).json()
+    assert [(frame["kind"], frame["request_id"]) for frame in after["frames"]] == [
+        ("outcome", decided["request_id"])
+    ]
+    assert Cursor.decode(after["cursor"]).outcome == Cursor.decode(read["cursor"]).ask
+
+
+def test_a_bridge_reading_after_an_ask_passed_is_never_sent_it(door, monkeypatch):
+    """A bridge that first reads once an ask is past its deadline and window is not sent an ask
+    nobody can answer: its cursor moves past the ask and its outcome together, with no frame."""
+    request, person = _person_request(door)
+    grant_id = _grant_for(door, person)
+    channel = _credential(door, grant_id)
+    _hello(door, channel)
+    external = _store_external(door, request, grant_id, deadline_ms=1)
+    door["runtime"].asker()._write_ask(
+        door["world"]["workspace"], grant_id, uuid.UUID(external["request_id"])
+    )
+    monkeypatch.setattr(channel_module, "UNANSWERED_WINDOW", datetime.timedelta(0))
+    time.sleep(0.5)
+    read = _frames(door, channel).json()
+    assert [frame["kind"] for frame in read["frames"]] == ["grant"]
+    told = Cursor.decode(read["cursor"])
+    assert (told.ask, told.outcome) == (1, 1)
 
 
 def test_configuration_names_a_quiet_bridge_a_thing_the_grant_no_longer_names_and_its_end(
@@ -1405,6 +1475,176 @@ def test_a_workspace_issues_at_most_fifty_grants_a_day(door):
     refused = _issue(door, key="daily-grant-0050")
     assert (refused.status_code, refused.json()["code"]) == (429, "too_many_grants")
     assert 0 < refused.json()["retry_after_s"] <= 86_400
+
+
+def _issue_visitors(door, connection, key: str):
+    """Issue a grant letting one visitor into the world's version, which holds a society of things,
+    through the repository, on ``connection``."""
+    world = door["world"]
+    return GrantRepository(connection, world["workspace"], world["session"].actor).issue(
+        world_id=_world_id(door),
+        bridge=door["runtime"].bridges.get("test-bridge"),
+        scope=Scope(
+            visitors_maximum=1, kinds=("player",), version_id=str(world["binding"].version_id)
+        ),
+        minutes=60,
+        idempotency_key=key,
+    )
+
+
+def test_two_issues_at_the_daily_bound_take_turns_and_the_second_is_refused(door):
+    """The workspace's issuing lock: an issue taking the last place of the day holds it until it
+    commits, so a second one waits for it, then counts it and is refused."""
+    world = door["world"]
+    door_support.open_to_visitors(door["client"], world)
+    with door["database"].session(world["workspace"]) as connection:
+        for index in range(GRANTS_PER_DAY_MAXIMUM - 1):
+            _issue_visitors(door, connection, f"racing-grant-{index:04d}")
+    second: dict[str, str] = {}
+
+    def issue_second() -> None:
+        with door["database"].session(world["workspace"]) as connection:
+            try:
+                _issue_visitors(door, connection, "racing-grant-second")
+                second["answer"] = "issued"
+            except GrantRefused as exc:
+                second["answer"] = exc.code
+
+    racing = threading.Thread(target=issue_second)
+    with door["database"].session(world["workspace"]) as first, first.transaction():
+        _issue_visitors(door, first, "racing-grant-first")  # the last place, until this commits
+        racing.start()
+        waited = False
+        with door["database"].session(world["workspace"]) as watcher:
+            deadline = time.monotonic() + 60
+            while racing.is_alive() and time.monotonic() < deadline and not waited:
+                waited = (
+                    watcher.execute(
+                        "select 1 from pg_locks where locktype = 'advisory' and not granted"
+                    ).fetchone()
+                    is not None
+                )
+                time.sleep(0.05)
+        assert waited, f"the second issue never waited for the first: {second}"
+    racing.join(timeout=60)
+    assert second == {"answer": "too_many_grants"}
+
+
+def test_an_issue_waiting_on_a_world_s_minute_holds_up_no_other_issue(door):
+    """A grant naming a knight binds it under its society's row, which a running minute holds; the
+    workspace's issuing lock is taken only after that, so another issue meanwhile, letting a visitor
+    into the same version, goes on."""
+    from test_society_things_postgres import _make_society, _place
+
+    world, client = door["world"], door["client"]
+    _place(client, world, "well", "well", 2, -4_000, 2_000)
+    _place(client, world, "knight", "knight", 1, 3_000, 3_000)
+    society = _make_society(client, world)
+    [knight] = [p for p in society["state"]["inhabitants"] if p.get("placed_id") == "knight"]
+    named: dict[str, Any] = {}
+
+    def issue_named() -> None:
+        with door["database"].session(world["workspace"]) as connection:
+            try:
+                grant, _ = GrantRepository(
+                    connection, world["workspace"], world["session"].actor
+                ).issue(
+                    world_id=_world_id(door),
+                    bridge=door["runtime"].bridges.get("test-bridge"),
+                    scope=Scope(
+                        things=(knight["id"],), version_id=str(world["binding"].version_id)
+                    ),
+                    minutes=60,
+                    idempotency_key="named-while-a-minute-runs",
+                )
+                named["grant"] = grant.grant_id
+            except Exception as exc:  # said in the assertion below
+                named["error"] = repr(exc)
+
+    waiting = threading.Thread(target=issue_named)
+    with door["database"].session(world["workspace"]) as minute, minute.transaction():
+        minute.execute(
+            "select 1 from world_society where workspace_id = %s and world_id = %s "
+            "and version_id = %s for update",
+            (world["workspace"], world["binding"].world_id, world["binding"].version_id),
+        )
+        waiting.start()
+        blocked = False
+        with door["database"].session(world["workspace"]) as watcher:
+            deadline = time.monotonic() + 60
+            while waiting.is_alive() and time.monotonic() < deadline and not blocked:
+                # A lock some other session waits for: the named issue's, on the minute's row.
+                blocked = (
+                    watcher.execute(
+                        "select 1 from pg_locks where not granted and pid <> pg_backend_pid()"
+                    ).fetchone()
+                    is not None
+                )
+                time.sleep(0.05)
+            seen = (
+                []
+                if blocked
+                else watcher.execute(
+                    "select l.pid, l.locktype, l.mode, l.granted, a.state, a.wait_event_type, "
+                    "a.wait_event, left(a.query, 60) as query from pg_locks l "
+                    "left join pg_stat_activity a on a.pid = l.pid where l.pid <> pg_backend_pid() "
+                    "and l.locktype not in ('virtualxid', 'relation')"
+                ).fetchall()
+            )
+        assert blocked, f"the named issue never waited on the minute: {named}; locks {seen}"
+        with door["database"].session(world["workspace"]) as connection:
+            connection.execute("set statement_timeout = '30s'")
+            _grant, created = _issue_visitors(door, connection, "issued-while-a-minute-runs")
+        assert created
+    waiting.join(timeout=60)
+    assert "grant" in named, named
+
+
+def test_a_thing_whose_kind_takes_no_routine_is_never_handed_to_a_program(door, monkeypatch):
+    """A grant hands whoever it decided for back to their routine when it ends, so binding refuses
+    a thing whose kind takes no routine. No kind an author may place is one today (a visitor is
+    refused at placing, and one that crossed in is refused as decided from outside), so the kind's
+    answer is made here to say so."""
+    world = door["world"]
+    _request, person = _person_request(door)
+    monkeypatch.setattr(
+        choice_module, "kind_allows", lambda state, subject, decider: decider != "routine"
+    )
+    with (
+        door["database"].session(world["workspace"]) as connection,
+        pytest.raises(GrantRefused) as refused,
+    ):
+        GrantRepository(connection, world["workspace"], world["session"].actor).issue(
+            world_id=_world_id(door),
+            bridge=door["runtime"].bridges.get("test-bridge"),
+            scope=Scope(things=(person,), version_id=str(world["binding"].version_id)),
+            minutes=60,
+            idempotency_key="a-kind-without-a-routine",
+        )
+    assert refused.value.code == "decider_not_allowed"
+
+
+def test_the_daily_bound_counts_the_grants_of_every_world_of_the_workspace(door):
+    """Another world of the workspace issued 49 grants today (written straight into the table the
+    bound counts: that world holds no version to let anything into); this world's 50th is issued
+    and its 51st refused."""
+    world = door["world"]
+    other = "door-daily-other-world"
+    with door["database"].session(world["workspace"]) as connection, connection.transaction():
+        connection.execute(
+            "insert into world_identity (workspace_id, world_id, kind, provenance, created_by) "
+            "values (%s, %s, 'authored-starter', '{}'::jsonb, %s)",
+            (world["workspace"], other, world["session"].actor),
+        )
+        for _ in range(GRANTS_PER_DAY_MAXIMUM - 1):
+            connection.execute(
+                "insert into door_grant (workspace_id, grant_id, world_id, bridge, issued_by) "
+                "values (%s, %s, %s, 'test-bridge', %s)",
+                (world["workspace"], uuid.uuid4(), other, world["session"].actor),
+            )
+    assert _issue(door, key="this-world-grant-0001").status_code == 201
+    refused = _issue(door, key="this-world-grant-0002")
+    assert (refused.status_code, refused.json()["code"]) == (429, "too_many_grants")
 
 
 def test_at_most_six_hellos_a_grant_a_minute(door):

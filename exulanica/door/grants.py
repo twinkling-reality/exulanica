@@ -685,7 +685,6 @@ class GrantRepository:
                 raise GrantRefused(
                     "world_not_open_to_visitors", "this world's version takes no visitors"
                 )
-            self._within_daily_grants()
             self._connection.execute(
                 "insert into door_grant (workspace_id, grant_id, world_id, bridge, issued_by) "
                 "values (%s, %s, %s, %s, %s)",
@@ -719,6 +718,9 @@ class GrantRepository:
             if traveller is not None:
                 assert manifest is not None
                 self._record_traveller(issued, traveller, manifest)
+            # Counted last, this grant among them: the workspace's issuing lock is then held only
+            # from the count to the commit, never while this issue waits on a world's minute.
+            self._within_daily_grants()
         return issued, True
 
     def _takes_no_visitors(self, world_id: str, scope: Scope) -> bool:
@@ -728,9 +730,10 @@ class GrantRepository:
         return society is None
 
     def _within_daily_grants(self) -> None:
-        """Refuse a new grant past the workspace's daily bound, under the workspace's issuing lock
-        (taken after the grant's, and only here), so two issued at once cannot both take the last
-        place; answered with when the oldest grant of the day leaves the count."""
+        """Refuse a new grant past the workspace's daily bound, across all its worlds, counted with
+        the new grant among them at the end of its issue, under the workspace's issuing lock (taken
+        last, and only here), so two issued at once cannot both take the last place; answered with
+        when the oldest grant of the day leaves the count."""
         self._connection.execute(
             "select pg_advisory_xact_lock(hashtextextended(%s, 149003))",
             (str(self._workspace_id),),
@@ -744,7 +747,7 @@ class GrantRepository:
             (self._workspace_id,),
         ).fetchone()
         assert row is not None
-        if row["issued"] >= GRANTS_PER_DAY_MAXIMUM:
+        if row["issued"] > GRANTS_PER_DAY_MAXIMUM:
             raise GrantRefused(
                 "too_many_grants",
                 f"a workspace issues at most {GRANTS_PER_DAY_MAXIMUM} grants a day",

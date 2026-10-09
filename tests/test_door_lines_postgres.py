@@ -14,8 +14,9 @@ for a knight placed beside the gate and the door for a visitor:
 *   a name the account holder saves afterwards is screened from every said frame read again: a
     line, a speaker's words and an addressee's words carrying it are sent as null;
 *   a grant's first line refused for carrying a saved name closes its lines: every later line is
-    refused while the grant acts on, and its owner reads that its lines are closed; a line holding
-    a placeholder-shaped token is refused;
+    refused while the grant acts on, and its owner reads that its lines are closed; every line the
+    grant's program answered in that minute is refused with it, so the program cannot tell which
+    carried the name; a line holding a placeholder-shaped token is refused;
 *   more lines than one poll holds are each told once, in order, read again from an old cursor; a
     poll with nothing to tell moves its line place past the minutes it read, and reads a grant's
     departures before its lines; one whose read moves nothing at all is held for its whole hold;
@@ -645,6 +646,57 @@ def test_a_grant_s_first_line_carrying_a_saved_name_closes_its_lines(door, cross
     assert any(status == 202 and "line" not in body for body, status, _answer in bridge.answers)
     view = client.get(f"/door/grants/{grant_id}", headers=OWNER).json()["grant"]
     assert view["lines_closed"] is True
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_grant_s_lines_of_the_minute_a_saved_name_is_refused_are_refused_together(
+    door, crossings
+):
+    """Two visitors of one grant probe in one minute, one line carrying a saved name and one
+    carrying none: both are refused alike, so the program cannot tell which carried it."""
+    world, society = _world_with_a_knight(door)
+    client = door["client"]
+    host, _manifest, _model_id = _host(door, _Knight())
+    _grant_id, channel = _grant(door, may_carry_in=False, may_carry_out=False, visitors_maximum=2)
+    start = _hello(door, channel).json()["cursor"]
+    naming = _arrive(client, channel, str(uuid.uuid4()), carried=[]).json()["thing_id"]
+    other = _arrive(client, channel, str(uuid.uuid4()), carried=[]).json()["thing_id"]
+    society = _step(client, world, society)
+    _save_name(world, "Marisol Vega")
+    clean_lines: dict[int, str] = {}
+    probe: dict[str, str] = {}
+
+    def choose(frame: dict[str, Any]) -> dict[str, Any]:
+        says, idle = frame["line_labels"], frame["idle_label"]
+        if not says or probe:
+            return {"label": idle}
+        if frame["subject_id"] == other:
+            clean_lines[frame["minute"]] = frame["request_id"]
+            return {"label": says[0], "line": "Hello there."}
+        assert frame["subject_id"] == naming
+        if frame["minute"] not in clean_lines:
+            return {"label": says[0], "line": "Good day."}
+        # The other visitor's clean line of this minute is stored already: this one names.
+        probe.update(named=frame["request_id"], clean=clean_lines[frame["minute"]])
+        return {"label": says[0], "line": "Is Marisol about?"}
+
+    def outcomes(bridge: _Bridge) -> dict[str, tuple[str, str]]:
+        return {
+            f["request_id"]: (f["status"], f["reason"])
+            for f in bridge.frames
+            if f["kind"] == "outcome" and f["request_id"] in probe.values()
+        }
+
+    with _Bridge(client, channel, start, choose) as bridge:
+        for _ in range(24):
+            society = _minute(door, host, world, society)
+            if probe and len(outcomes(bridge)) == 2:
+                break
+            time.sleep(1.5)
+        else:
+            raise AssertionError("no minute asked both visitors for a line in twenty-four minutes")
+    refused = ("rejected", "line_refused_by_rules")
+    assert outcomes(bridge) == {probe["named"]: refused, probe["clean"]: refused}
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)

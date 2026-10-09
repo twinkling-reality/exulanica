@@ -175,11 +175,22 @@ def presence_of(
     return None if row is None else Presence(**row)
 
 
-#: How long after an ask its request may still gain a receipt, beyond its own deadline: the minutes
-#: in which the host closes a request that a stopped process left unanswered (a playing world's
-#: minute is a minute). Past it no receipt will come, so the ask's outcome is passed over and
-#: nothing after it, the grant's end included, waits for it.
+#: How long past an ask's deadline the door waits for its receipt before passing it over. The host
+#: closes a request a stopped process left unanswered once its society has played
+#: UNANSWERED_WINDOW_TICKS more minutes, and a playing society's minute takes at most a minute of
+#: wall time (its base tick interval over its speed), so while the world plays no receipt comes
+#: after this. A world that is not playing (its deployment down, or paused by its owner) may still
+#: close the request when it plays again: that receipt is recorded and not told, since the
+#: bridge's cursor has moved past it. Passing over keeps a grant's later outcomes and its end from
+#: waiting on a world that may never play again.
 UNANSWERED_WINDOW: Final = dt.timedelta(minutes=UNANSWERED_WINDOW_TICKS)
+#: Whether an ask (``a``) whose request (``r``) has no receipt (``d``) is past its deadline and
+#: the unanswered window (``%(window)s``): nobody can answer it any more.
+_PASSED: Final = (
+    "(d.request_id is null and a.recorded_at < statement_timestamp() - %(window)s "
+    "  - make_interval(secs => coalesce("
+    "      (r.document->'provider_config'->>'deadline_ms')::numeric, 0) / 1000))"
+)
 #: This grant's arrivals the society took. A society's minute takes crossings in the order the door
 #: wrote them, so their ``crossing_seq`` is the order they were taken in, and a cursor holds the
 #: last one it was told of.
@@ -212,10 +223,11 @@ _REACHED: Final = (
 )
 #: The lines said after a place (``%(said)s``) that one of this grant's visitors said or heard, in
 #: the order the society recorded them. A visitor says and hears only while it is there, so only
-#: its own society's record is read, from its grant's first arrival, or the minute of the place if
-#: later, to the minute its last visitor departed once every one has (the said-event index serves
-#: the range), and the list is only ever appended to. A line nobody of this grant said or heard
-#: never reaches its channel.
+#: its own society's record is read, from its grant's first arrival, or the first minute that can
+#: hold a line after the place if later (the next one when the place ends its minute), to the
+#: minute its last visitor departed once every one has (the said-event index serves the range),
+#: and the list is only ever appended to. A line nobody of this grant said or heard never reaches
+#: its channel.
 _SAID: Final = (
     "from world_society_event e join ("
     "  select c.society_id, min(b.tick) as since, "
@@ -228,7 +240,7 @@ _SAID: Final = (
     "      and x.subject_id = c.thing_id and x.event_kind = 'thing_departed' limit 1) d on true "
     "  where c.workspace_id = %(w)s and c.grant_id = %(g)s and c.kind = 'arrival' "
     "    and b.disposition = 'arrived' group by c.society_id) s on s.society_id = e.society_id "
-    "where e.workspace_id = %(w)s and e.tick >= greatest(s.since, %(said)s / 1048576) "
+    "where e.workspace_id = %(w)s and e.tick >= greatest(s.since, (%(said)s + 1) / 1048576) "
     "  and (s.until is null or e.tick <= s.until) "
     "  and e.event_kind = 'said' and " + _SAID_PLACE + " > %(said)s and exists ("
     "  select 1 from door_crossing c join door_crossing_binding b "
@@ -583,11 +595,8 @@ class ChannelRepository:
         outcomes = self._connection.execute(
             "select a.ask_seq, a.request_id, d.document->>'status' as status, "
             "d.document->>'reason' as reason, "
-            # An ask no receipt can close any more: past its deadline and the unanswered window.
-            "(d.request_id is null and a.recorded_at < statement_timestamp() - %(window)s "
-            "  - make_interval(secs => coalesce("
-            "      (r.document->'provider_config'->>'deadline_ms')::numeric, 0) / 1000)) as passed "
-            "from door_ask a join world_society_decision_request r "
+            + _PASSED
+            + " as passed from door_ask a join world_society_decision_request r "
             "  on r.workspace_id = a.workspace_id and r.society_id = a.society_id "
             " and r.request_id = a.request_id "
             "left join world_society_decision d "
@@ -608,8 +617,9 @@ class ChannelRepository:
             if row["status"] is None:
                 if not row["passed"]:
                     break  # in ask order, an ask that may still be decided stops the outcomes
-                # No receipt will ever close it, so nothing can be told of it truthfully: it is
-                # passed over, and the outcomes after it, and the grant's end, wait for it no more.
+                # Nobody can answer it any more and, while its world plays, no receipt will close
+                # it, so nothing is told of it: it is passed over, and the outcomes after it, and
+                # the grant's end, wait for it no more (UNANSWERED_WINDOW).
                 position["outcome"] = row["ask_seq"]
                 continue
             frames.append(
@@ -624,8 +634,9 @@ class ChannelRepository:
         room = FRAMES_PER_POLL - len(frames)
         if room > 0:
             asks = self._connection.execute(
-                "select a.ask_seq, r.document as request, d.request_id as recorded "
-                "from door_ask a join world_society_decision_request r "
+                "select a.ask_seq, r.document as request, d.request_id as recorded, "
+                + _PASSED
+                + " as passed from door_ask a join world_society_decision_request r "
                 "  on r.workspace_id = a.workspace_id and r.society_id = a.society_id "
                 " and r.request_id = a.request_id "
                 "left join world_society_decision d "
@@ -633,7 +644,7 @@ class ChannelRepository:
                 " and d.request_id = a.request_id "
                 "where a.workspace_id = %(w)s and a.grant_id = %(g)s and a.ask_seq > %(ask)s "
                 "order by a.ask_seq limit %(limit)s",
-                {**self._ids, "ask": cursor.ask, "limit": room},
+                {**self._ids, "ask": cursor.ask, "limit": room, "window": UNANSWERED_WINDOW},
             ).fetchall()
             registry = decision_roles()
             asked_bytes = 0
@@ -642,6 +653,13 @@ class ChannelRepository:
                 if row["recorded"] is not None:
                     position["ask"] = row["ask_seq"]
                     continue  # answered already, or closed: its outcome follows, not the ask
+                if row["passed"]:
+                    # Nobody can answer it any more, so it is not sent; once every earlier outcome
+                    # is told, its own is passed over with it, as the outcomes would.
+                    if position["outcome"] == position["ask"]:
+                        position["outcome"] = row["ask_seq"]
+                    position["ask"] = row["ask_seq"]
+                    continue
                 request = row["request"]
                 role = registry.for_request(request["profile"])
                 if role is None:
