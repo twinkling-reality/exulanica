@@ -506,7 +506,7 @@ describe('where a person of a society of things on a town is going, in Selected'
     server.targets = [{
       target_id: premises, subject_id: 'city.premises:ee384d1d-95ae-5b8a-aebd-38f0682c38ba', node_id: 'entrance:e', affordance: 'visit',
       activity: 'visit', origin: 'premises', object_id: 'ee384d1d-95ae-5b8a-aebd-38f0682c38ba', version_id: 'version', enabled: true,
-      place_node_ids: ['entrance:e'],
+      place_node_ids: ['entrance:e'], place: { use_class: 'bakery', label: 'bakery', address_number: 12 },
     }, {
       // Listed, but not enabled: nobody can go there now.
       target_id: 'city.premises:shut:visit', subject_id: 'city.premises:shut', node_id: 'entrance:s', affordance: 'visit',
@@ -528,8 +528,9 @@ describe('where a person of a society of things on a town is going, in Selected'
       expect(listed).not.toContain(words('place_gone'));
       expect(gone).toContain(words('place_gone'));
       expect(nowOf('resident-2')).toContain(words('place_gone'));
-      // The same sentence, with the plain place where the gone one stood.
-      expect(listed.split('.')[0]).toBe(gone.split('.')[0]!.replace(words('place_gone'), words('place_listed')));
+      // The same sentence, with what its town calls the place where the gone one stood.
+      const named = words('place_named_at').replace('{label}', 'bakery').replace('{number}', '12');
+      expect(listed.split('.')[0]).toBe(gone.split('.')[0]!.replace(words('place_gone'), named));
       mounted.dispose();
     } finally {
       server.targets = [];

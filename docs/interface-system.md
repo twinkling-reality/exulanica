@@ -250,8 +250,9 @@ few lines it answers what this is (its name and summary), what it is doing now, 
 and where it came from; under it the inspector keeps the subject's own controls and its record,
 which then reads "How we know". Every word about the subject comes from what the server and
 Selected already hold; the card writes only its frame words ("Now", "Mind", "Came from"). Where the Now
-line names a place, it is the title of the person's own object, or "a place" where the input their
-society consumed lists as open one that no object names (a town's premises); only a place that input
+line names a place, it is the title of the person's own object, or, for one the input their society
+consumed lists as open that no object names (a town's premises), what its town calls it ("the bakery at
+number 12", from the input's place label and address number), else "a place"; only a place that input
 does not list as open is said to be gone.
 
 The mind is an open model by its served name and line, or "Their own routine" ("What they would do

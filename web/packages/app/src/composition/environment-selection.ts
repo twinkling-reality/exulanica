@@ -883,8 +883,9 @@ export function mountEnvironmentSelection(
           || societyModels?.mindOf(id)?.outside != null,
         // Anyone who came in from outside is said to come from where the door lists their bridge.
         (bridge) => bridges?.get(bridge)?.label ?? null,
-        // A place the input lists that none of the person's objects names (a town's premises) is still there.
-        new Set(society.places.targets.filter((target) => target.enabled).map((target) => target.targetId)))
+        // A place the input lists that none of the person's objects names (a town's premises) is still
+        // there, said by what its town calls it where the input says.
+        new Map(society.places.targets.filter((target) => target.enabled).map((target) => [target.targetId, target.place ?? null])))
       : null;
     inspector.show({
       subject: id,

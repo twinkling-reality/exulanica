@@ -14,7 +14,7 @@
 
 import { objectActivity } from '../society-activity-words.js';
 import type { AtlasBinding, OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
-import type { SocietyAffordance, SocietyPlaces, SocietySnapshot } from '../society-api.js';
+import type { SocietyAffordance, SocietyPlaceName, SocietyPlaces, SocietySnapshot } from '../society-api.js';
 import {
   PLAYBACK_SPEEDS,
   type SocietyPlaybackControl,
@@ -318,6 +318,14 @@ type Inhabitant = OwnedSocietyState['inhabitants'][number];
 
 export { REASON_WORDS, type InhabitantWords } from '../society-inhabitant-words.js';
 
+/** A listed place in words: its town's label, with its address number where the town gives one, else "a place". */
+function listedPlaceWords(name: SocietyPlaceName | null): string {
+  if (name?.label == null) return phrase('place_listed');
+  return name.addressNumber === null
+    ? phrase('place_named', { label: name.label })
+    : phrase('place_named_at', { label: name.label, number: name.addressNumber });
+}
+
 /**
  * Who a simulated person is and what they are doing, in words. Places are named by the titles of
  * the person's own objects (`placeRows`); a place the input still lists that no object names (a
@@ -336,17 +344,18 @@ export function inhabitantWords(
   /** The label the door lists for a bridge, for one who came in from outside (`inhabitantWordsFrom`). */
   bridgeLabel: BridgeLabel | null = null,
   /**
-   * The targets the input their society consumed lists as enabled. One that no object of the
-   * person's names (a town's premises) is still there, so it is said plainly ("a place"); only a
-   * target the input does not list as enabled is said to be gone.
+   * The targets the input their society consumed lists as enabled, each with what its town calls it
+   * (null where the input names none). One that no object of the person's names (a town's premises)
+   * is still there: said by its town's name ("the bakery at number 12"), else plainly ("a place");
+   * only a target the input does not list as enabled is said to be gone.
    */
-  listed: ReadonlySet<string> | null = null,
+  listed: ReadonlyMap<string, SocietyPlaceName | null> | null = null,
 ): InhabitantWords {
   const named = new Map<string, string>();
   for (const row of rows) if (row.status.kind === 'usable') named.set(row.status.targetId, row.label);
   return inhabitantWordsFrom(
     person,
-    (targetId) => named.get(targetId) ?? (listed?.has(targetId) === true ? phrase('place_listed') : null),
+    (targetId) => named.get(targetId) ?? (listed?.has(targetId) === true ? listedPlaceWords(listed.get(targetId) ?? null) : null),
     (id) => people.find((other) => other.id === id)?.display_name ?? null,
     profile,
     null,

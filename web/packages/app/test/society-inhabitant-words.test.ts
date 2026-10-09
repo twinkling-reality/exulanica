@@ -182,8 +182,15 @@ describe('a place the input lists that no object of the person names', () => {
   it('is a place where the input lists it, and gone only where it does not', () => {
     const gone = inhabitantWords(visitor, []).doing;
     expect(gone).toContain(phrase('place_gone'));
-    expect(inhabitantWords(visitor, [], [], null, false, null, new Set(['city.premises:other:visit'])).doing).toBe(gone);
-    const listed = inhabitantWords(visitor, [], [], null, false, null, new Set([target])).doing;
-    expect(listed).toBe(gone.replace(phrase('place_gone'), phrase('place_listed')));
+    expect(inhabitantWords(visitor, [], [], null, false, null, new Map([['city.premises:other:visit', null]])).doing).toBe(gone);
+    const said = (name: { useClass: string; label: string | null; addressNumber: number | null } | null) =>
+      inhabitantWords(visitor, [], [], null, false, null, new Map([[target, name]])).doing;
+    expect(said(null)).toBe(gone.replace(phrase('place_gone'), phrase('place_listed')));
+    // Named by its town where the input says: its label, with its address number where the town gives one.
+    expect(said({ useClass: 'bakery', label: 'bakery', addressNumber: null }))
+      .toBe(gone.replace(phrase('place_gone'), phrase('place_named').replace('{label}', 'bakery')));
+    expect(said({ useClass: 'bakery', label: 'bakery', addressNumber: 12 }))
+      .toBe(gone.replace(phrase('place_gone'), phrase('place_named_at').replace('{label}', 'bakery').replace('{number}', '12')));
+    expect(said({ useClass: 'bakery', label: null, addressNumber: 12 })).toBe(said(null));
   });
 });

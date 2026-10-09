@@ -338,6 +338,20 @@
       "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
     },
     {
+      "key": "phrase.place_named",
+      "kind": "phrase",
+      "code": "place_named",
+      "words": "the {label}",
+      "reason": "Authored: a place the input a person's society consumed lists as open and names from its town (its label, and its address number where the town gives one); never a street, which is presentation."
+    },
+    {
+      "key": "phrase.place_named_at",
+      "kind": "phrase",
+      "code": "place_named_at",
+      "words": "the {label} at number {number}",
+      "reason": "Authored: a place the input a person's society consumed lists as open and names from its town (its label, and its address number where the town gives one); never a street, which is presentation."
+    },
+    {
       "key": "phrase.place_listed",
       "kind": "phrase",
       "code": "place_listed",
