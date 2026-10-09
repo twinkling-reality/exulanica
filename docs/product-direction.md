@@ -169,10 +169,13 @@ derived from how long reading a run may take, by a line measured on the engine t
 runs ([what a comparison can read](society-experiments.md#running-a-comparison)). A generated
 town's society runs the living town's engine, whose line lets a model decide for everybody in each
 town measured, small towns of 38 and 52 people and market towns of 74 and 88
-([record](evaluation/2026-10-07-living-comparison-replay.json)). Over a day the town's runs are
+([record](evaluation/2026-10-09-living-comparison-replay.json)). Over a day the town's runs are
 read by a line of their own, which also lets a model decide for everybody in each town measured,
 and in a stress town of 128 at the town ground's bound
-([record](evaluation/2026-10-07-living-day-replay.json)). A town whose society was made before
+([record](evaluation/2026-10-09-living-day-replay.json)). A society of things is read by a line
+measured on its own replay, which lets a model decide for everybody in each measured run of up to
+66 beings and for 93 of 130
+([record](evaluation/2026-10-09-things-comparison-replay.json)). A town whose society was made before
 that engine keeps the earlier one, whose line allows at most 24 of 56 people or 11 of 86.
 Besides the small square's, two judged comparisons ran over a
 small town of 52 people for a group of 12: the first stopped incomplete, and the second found no
