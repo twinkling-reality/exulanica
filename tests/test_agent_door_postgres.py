@@ -25,7 +25,12 @@ are what answer. What is shown:
     its body's turns, and when its program stops and starts again with the same key the body stays
     and its turns come to the new program; the world's models read names it as decided from
     outside by what the agent declared, and when its owner sends it home the agent reads why and
-    acknowledges the departure once; the world replays with the agent gone.
+    acknowledges the departure once; the world replays with the agent gone;
+*   an agent leaving takes its body's way out: its turn offers an option of kind ``leave``, the
+    library answers it and tells the door the agent has gone, and the body leaves by its own
+    choice, which the agent reads;
+*   one agent's body says a line to everyone near it, held to the line the door names on the ask,
+    and another agent's body beside it hears it, while the speaker reads the line as its own.
 """
 
 from __future__ import annotations
@@ -524,3 +529,119 @@ def test_an_agents_own_body_comes_in_takes_its_turns_and_goes_home(door, crossin
         thread.join(5)
     # The world replays with the agent gone.
     assert _replayed(client, world)
+
+
+def test_an_agent_leaving_takes_its_bodys_way_out_and_the_body_goes(door, crossings):
+    world, client, _database, services = door
+    _place(client, world, "well", "well", 2, -4_000, 2_000)
+    _place(client, world, "gate", "gate", 1, 0, 6_000)
+    society = _make_society(client, world)
+    _grant_id, key = _key(world, client, gate="gate")
+    body = _connect(client, key)
+    ways_out: list[Any] = []
+    told: list[list[str]] = []
+
+    def mind() -> None:
+        # Keeps quiet until a turn offers its body a way out, then the agent leaves: that answers
+        # the open turn with the way out and tells the door the agent has gone.
+        for turn in body.turns():
+            out = [option for option in turn.options if option.kind == "leave"]
+            if out:
+                ways_out.append(out[0])
+                told.append(body.leave())
+                return
+            turn.act(_quiet(turn).action)
+
+    thread = threading.Thread(target=mind, daemon=True)
+    thread.start()
+    host = services.decision_host()
+    try:
+        assert body.enter().received
+        society = _minute(client, world, society)
+        [visitor] = [p for p in society["state"]["inhabitants"] if p["came_by"] == "crossed"]
+        for _ in range(8):
+            if not [p for p in society["state"]["inhabitants"] if p["came_by"] == "crossed"]:
+                break
+            assert host.before_minute(_claim(world, society), time.monotonic() + LEASE_SECONDS)
+            society = _minute(client, world, society)
+        assert [p for p in society["state"]["inhabitants"] if p["came_by"] == "crossed"] == []
+        assert told == [[visitor["id"]]] and ways_out[0].kind == "leave"
+        assert until(lambda: any(h.what == "left" for h in body.recent()))
+        [left] = [h for h in body.recent() if h.what == "left"]
+        # It left by the way out its turn offered, not by going quiet.
+        assert (left.thing, left.reason) == (visitor["id"], "chose_to_leave")
+        assert "you chose to leave" in left.words
+    finally:
+        body.close(wait_seconds=5)
+        thread.join(5)
+    assert _replayed(client, world)
+
+
+#: What one agent's body says to everyone near it, and the other agent's body hears.
+GREETING = "Good evening to everyone by the gate."
+
+
+def test_one_agents_body_says_a_line_and_another_agents_body_hears_it(door, crossings):
+    world, client, _database, services = door
+    _place(client, world, "well", "well", 2, -4_000, 2_000)
+    _place(client, world, "gate", "gate", 1, 0, 6_000)
+    society = _make_society(client, world)
+    _speaker_grant, speaker_key = _key(world, client, gate="gate")
+    _listener_grant, listener_key = _key(world, client, gate="gate")
+    speaker = _connect(client, speaker_key)
+    listener = _connect(client, listener_key, name="Lark", maker="Acme")
+    said: list[Any] = []
+
+    def speaking() -> None:
+        # Says the greeting to everyone near once a turn offers it, then keeps quiet.
+        for turn in speaker.turns():
+            to_all = [o for o in turn.options if o.kind == "say_all" and o.says_line]
+            if to_all and not said:
+                answer = turn.act(to_all[0].action, GREETING)
+                if answer.received:
+                    said.append((turn, to_all[0]))
+                    continue
+            turn.act(_quiet(turn).action)
+
+    def listening() -> None:
+        for turn in listener.turns():
+            turn.act(_quiet(turn).action)
+
+    threads = [threading.Thread(target=f, daemon=True) for f in (speaking, listening)]
+    for thread in threads:
+        thread.start()
+    host = services.decision_host()
+    try:
+        assert speaker.enter().received and listener.enter().received
+        society = _minute(client, world, society)
+        visitors = [p for p in society["state"]["inhabitants"] if p["came_by"] == "crossed"]
+        assert len(visitors) == 2
+        for _ in range(15):
+            if any(h.what == "heard" and h.line == GREETING for h in listener.recent()):
+                break
+            assert host.before_minute(_claim(world, society), time.monotonic() + LEASE_SECONDS)
+            society = _minute(client, world, society)
+            time.sleep(1.2)  # a poll held one second reads what the minute said
+        assert said, "the speaking body was never offered a line to everyone near it"
+        _turn, option = said[0]
+        # The door names the actions that carry a line on the asked frame, with their bound.
+        assert option.line_characters_maximum is not None and option.line_characters_maximum > 0
+        assert until(lambda: any(h.line == GREETING for h in listener.recent()))
+        [heard] = [h for h in listener.recent() if h.what == "heard" and h.line == GREETING]
+        # Said to everyone near: the listener reads who said it; the speaker reads its own line.
+        assert heard.words.endswith(f'({agents_bridge()["label"]}) said: "{GREETING}"')
+        assert heard.minute is not None
+        assert until(lambda: any(h.line == GREETING for h in speaker.recent()))
+        [own] = [h for h in speaker.recent() if h.what == "heard" and h.line == GREETING]
+        assert own.words == f'Your body said: "{GREETING}"'
+    finally:
+        for body in (speaker, listener):
+            body.close(wait_seconds=5)
+        for thread in threads:
+            thread.join(5)
+    assert _replayed(client, world)
+
+
+def _quiet(turn: Any) -> Any:
+    """The turn's first action that says nothing and keeps the body in the world."""
+    return next(o for o in turn.options if not o.says_line and o.kind != "leave")

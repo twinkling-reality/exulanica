@@ -548,7 +548,7 @@ class Body:
         elif kind == "arrival_refused":
             self._note(from_arrival_refused(frame))
         elif kind == "said":
-            self._note(from_said(frame))
+            self._note(from_said(frame, frozenset(self._bodies)))
         elif kind == "happened":
             self._note(from_happened(frame))
         elif kind == "departed":

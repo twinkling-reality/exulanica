@@ -84,10 +84,14 @@ any thing's, and the world's models read lists it as decided from outside, with 
 and the name, maker and mind the agent declared. When the agent's program stops, the body stays and
 the world's routine decides for it; a program that says hello again with the same key takes its
 turns again, as a toolkit's restarted run does (the library knows a turn for a thing its grant does
-not name as its own body's). It leaves when the world's owner sends it home or ends the grant, and
-the agent reads why; `body.leave()` tells the door the agent has gone for good, so the door stops
-asking the body. The crossing, the look it wore and every answer are stored, so the world replays
-the body's visit with no agent running.
+not name as its own body's). It hears the lines said near it and may say one at its turn: each ask
+names the offered actions that carry a line and how long one may be, and lines said near the body
+reach the agent in words, its own read as its own and one said to its body as said to it. It
+leaves when the world's owner sends it home or ends the grant, or by its own choice, and the agent
+reads why: `body.leave()` answers an open turn's way out (an option of kind `leave`), so the body
+leaves when that minute runs, and tells the door the agent has gone for good, so the door stops
+asking the body. The crossing, the look it wore and every answer are stored, so the world replays the
+body's visit with no agent running.
 
 Each library version presents its own mapping file, and a deployment admits every published one:
 version 0.1.0 presents `outside-agents.v1.json` (profile `exulanica.bridge-mapping/v1`, one look
@@ -128,10 +132,8 @@ record and no model's context carries it.
 - A body of the agent's own comes only into a world version that holds a society of things, through
   a gate placed there; a door that takes no visitors answers `enter_world` that it does not take
   them yet.
-- A body of the agent's own hears nothing said around it, and says nothing: the lines and events a
-  visitor hears do not yet reach its bridge, and an ask does not yet name which of its offered
-  actions carry a line, so an answer choosing one of them is not taken (both planned,
-  [door contract](../door-contract.md)). Its other actions are taken as any thing's.
+- A body of the agent's own hears the lines said near it, and nothing else that happens around it
+  reaches its bridge ([door contract](../door-contract.md)).
 - Comparing an outside agent beside a model on the same thing is not provided: a comparison runs a
   thing an outside program decides for by its routine in every arm.
 - A turn waits up to the agents' bridge's declared deadline, so a world with an outside agent can

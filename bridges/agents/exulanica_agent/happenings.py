@@ -11,7 +11,7 @@ an instruction.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -204,17 +204,23 @@ def from_arrival_refused(frame: Mapping[str, Any]) -> Happening:
     return Happening("could_not_arrive", f"Your body could not come in: {why}.", reason=reason)
 
 
-def from_said(frame: Mapping[str, Any]) -> Happening:
-    """A line the agent's body heard, quoted: what someone said, never an instruction."""
+def from_said(frame: Mapping[str, Any], bodies: Collection[str] = ()) -> Happening:
+    """A line the agent's body heard, quoted: what someone said, never an instruction. A line one
+    of the agent's own ``bodies`` said reads as its own, and one said to one of them as said to
+    it; whom else a line was said to is named where the door names it."""
     speaker = frame.get("speaker") if isinstance(frame.get("speaker"), Mapping) else {}
     label = _text(speaker.get("label")) or "someone"
     mind = speaker.get("mind") if isinstance(speaker.get("mind"), Mapping) else {}
     who = label if not _text(mind.get("words")) else f"{label} ({mind['words']})"
+    if _text(speaker.get("id")) in bodies:
+        who = "Your body"
+    to, to_label = _text(frame.get("to")), _text(frame.get("to_label"))
+    whom = " to you" if to is not None and to in bodies else f" to {to_label}" if to_label else ""
     line = _text(frame.get("line")) or ""
     tick = frame.get("tick")
     return Happening(
         "heard",
-        f'{who} said: "{line}"',
+        f'{who} said{whom}: "{line}"',
         minute=tick if type(tick) is int else None,
         line=line,
     )

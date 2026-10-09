@@ -116,7 +116,9 @@ done
 
 [`checks/nat_check.py`](checks/nat_check.py) runs it against a stand-in door, with a stand-in mind
 or, with `--live`, with Nemotron itself. [`checks/nat_run.py`](checks/nat_run.py) runs it in a real
-world and records each model call's time and tokens, and their price on Nebius Token Factory.
+world and records each model call's time and tokens, and their price on Nebius Token Factory. Its
+`--mind` names the model the agent thinks with, and `--name` and `--maker` what the agent declares
+it is called and who made it, which the world shows on its card; each defaults to the example's.
 
 ## What an agent can and cannot do
 
