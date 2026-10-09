@@ -22,13 +22,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final
 
+from exulanica_pieces.budgets import PieceBudgets, read_budgets
+
 from exulanica.db.session import Database
 from exulanica.errors import BlobNotFoundError
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.namespaces import WorkspaceStores
 from exulanica.world.style_pack_library import style_pack_library
-from exulanica.world.style_pack_pieces import StylePieceRefused, read_palette_piece
+from exulanica.world.style_pack_pieces import (
+    PieceOutOfBounds,
+    StylePieceRefused,
+    hold_pieces,
+    piece_roles,
+    read_palette_piece,
+)
 from exulanica.world.workspace_style_packs import (
     StylePackNotReady,
     StylePackVersionRecord,
@@ -49,6 +57,8 @@ __all__ = [
 
 #: A version's check, at most: past it the check stops as ``interrupted``.
 CHECK_SECONDS: Final = 120
+#: The repository's root, where the piece budgets are committed.
+_TREE: Final = Path(__file__).resolve().parents[2]
 #: A claim's lease outlasts the check's bound, so a live check is never claimed twice.
 CHECK_LEASE_SECONDS: Final = 180
 
@@ -128,16 +138,26 @@ def check_version(
     *,
     table: tuple[int, ...],
     library: LibraryPalettes,
+    budgets: PieceBudgets | None = None,
     seconds: float = CHECK_SECONDS,
     clock: Callable[[], float] = time.monotonic,
 ) -> tuple[str | None, str | None, dict[str, Any]]:
     """Check one version's pieces: ``(None, None, report)`` when it passes, else its failure class,
-    what it found, and the report."""
+    what it found, and the report.
+
+    A look made of generated pieces has each piece held to the pack-piece profile and its family's
+    budget first, as an upload's are at its admission (:func:`~exulanica.world.style_pack_pieces
+    .hold_pieces`): the machine that made a piece judged it, and this server judges it again."""
     started = clock()
     palette = _palette(repository, record, library)
     if palette is None:
         return "base_unavailable", "a pack this one is drawn on could not be read", {}
     report: dict[str, Any] = {"pieces": {}}
+    read: dict[str, bytes] = {}
+    if record.origin == "generated":
+        held = _hold_generated(repository, record, budgets or read_budgets(_TREE), read)
+        if held is not None:
+            return (*held, report)
     for file in repository.files(record.manifest_sha256):
         if file.media_type != "model/gltf-binary":
             continue
@@ -151,7 +171,7 @@ def check_version(
                 if file.source == "workspace"
                 else repository.store_for(file)
             )
-            data = store.get(BlobId.from_hex(file.content_sha256))
+            data = read.get(file.path) or store.get(BlobId.from_hex(file.content_sha256))
         except (BlobNotFoundError, StylePackNotReady):
             return "interrupted", f"{file.path}: its bytes are missing from their store", report
         try:
@@ -174,6 +194,45 @@ def check_version(
     return None, None, report
 
 
+class _Missing(Exception):
+    """A piece's bytes are not in its store."""
+
+
+def _hold_generated(
+    repository: WorkspaceStylePackRepository,
+    record: StylePackVersionRecord,
+    budgets: PieceBudgets,
+    read: dict[str, bytes],
+) -> tuple[str, str] | None:
+    """A generated version's pieces held to the profile and their families' budgets: None when every
+    piece holds, else the failure class and what failed. Each piece read is kept in ``read``."""
+    if record.manifest_canonical is None:
+        return "refused", "the version's manifest is erased"
+    files = {file.path: file for file in repository.files(record.manifest_sha256)}
+
+    def fetch(path: str) -> bytes:
+        file = files[path]
+        try:
+            data = repository.store_for(file).get(BlobId.from_hex(file.content_sha256))
+        except (BlobNotFoundError, StylePackNotReady):
+            raise _Missing(path) from None
+        read[path] = data
+        return data
+
+    try:
+        hold_pieces(
+            piece_roles(json.loads(record.manifest_canonical)),
+            lambda path: read.get(path) or fetch(path),
+            budgets.families,
+            budgets.lod1_share_permille,
+        )
+    except _Missing as missing:
+        return "interrupted", f"{missing}: its bytes are missing from their store"
+    except PieceOutOfBounds as refused:
+        return "refused", f"{refused.path}: {refused.code}: {refused}"
+    return None
+
+
 class StylePackCheckWorker:
     """Drains waiting style pack checks for a set of workspaces, one per workspace in turn."""
 
@@ -191,8 +250,10 @@ class StylePackCheckWorker:
         workspace_source: Callable[[], Iterable[uuid.UUID]] | None = None,
         seconds: float = CHECK_SECONDS,
         generated_pieces: ContentAddressedStore | None = None,
+        budgets: PieceBudgets | None = None,
     ) -> None:
         self._database = database
+        self._budgets = budgets if budgets is not None else read_budgets(_TREE)
         self._stores = stores
         self._generated_pieces = generated_pieces
         self._workspaces = workspaces
@@ -265,6 +326,7 @@ class StylePackCheckWorker:
             record,
             table=self._table,
             library=self._library,
+            budgets=self._budgets,
             seconds=self._seconds,
         )
         if failure is None:

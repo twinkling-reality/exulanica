@@ -23,6 +23,7 @@ import datetime as dt
 import hashlib
 import io
 import json
+import re
 import tarfile
 import tempfile
 import uuid
@@ -75,6 +76,7 @@ __all__ = [
     "PackFile",
     "StylePackAttemptsExceeded",
     "StylePackExists",
+    "StylePackGeneratedNotOffered",
     "StylePackIsABase",
     "StylePackNotCreator",
     "StylePackNotReady",
@@ -107,6 +109,8 @@ DEFAULT_INSTALLATION_BYTES: Final = 16 * 1024 * 1024 * 1024
 #: The pack ids of looks made of generated pieces: a generated version's alone (the schema holds
 #: it), so the upload admission refuses one.
 GENERATED_PREFIX: Final = "generated."
+#: A content digest as a generated look names it: 64 lower case hexadecimal digits.
+_CONTENT_SHA256: Final = re.compile(r"[0-9a-f]{64}")
 #: The declaration a generated version is recorded under: the worker's, naming whose request it
 #: was, never a person's words.
 GENERATED_DECLARATION_PROFILE: Final = "exulanica.workspace-style-pack-generated-declaration/v1"
@@ -177,6 +181,10 @@ class StylePackNotCreator(WorkspaceStylePackError):
 
 class StylePackPublishLicenceNotHeld(WorkspaceStylePackError):
     """A licensed version passes on only the licence it came under."""
+
+
+class StylePackGeneratedNotOffered(WorkspaceStylePackError):
+    """A look made of generated pieces is never offered to the shared library."""
 
 
 class StylePackNotReady(WorkspaceStylePackError):
@@ -368,6 +376,10 @@ def _refused(error: psycopg.Error) -> Exception:
         "style_pack_is_a_base"
     ):
         return StylePackIsABase(message.removeprefix("style_pack_is_a_base: "))
+    if isinstance(error, psycopg.errors.CheckViolation) and message.startswith(
+        "publish_generated_look"
+    ):
+        return StylePackGeneratedNotOffered(message.removeprefix("publish_generated_look: "))
     if isinstance(error, psycopg.errors.CheckViolation) and message.startswith(
         "publish_licence_not_held"
     ):
@@ -687,6 +699,11 @@ class WorkspaceStylePackRepository:
         wears it. The same manifest answers the version already held. Refused by name with
         :class:`GeneratedStylePackRefused`, or as :meth:`record` refuses an identity.
         """
+        if not isinstance(content_sha256, str) or not _CONTENT_SHA256.fullmatch(content_sha256):
+            raise GeneratedStylePackRefused(
+                "content_digest_unreadable",
+                "a generated look's content digest is 64 lower case hexadecimal digits",
+            )
         try:
             value = json.loads(manifest_canonical)
             canonical = canonical_json(value).encode("ascii")
@@ -802,6 +819,11 @@ class WorkspaceStylePackRepository:
     def generated_version(self, content_sha256: str) -> StylePackVersionRecord | None:
         """The newest unwithdrawn generated version made of ``content_sha256``, or None: a world
         applying the same pieces on the same base again wears it rather than another."""
+        if not isinstance(content_sha256, str) or not _CONTENT_SHA256.fullmatch(content_sha256):
+            raise GeneratedStylePackRefused(
+                "content_digest_unreadable",
+                "a generated look's content digest is 64 lower case hexadecimal digits",
+            )
         row = self.connection.execute(
             "select v.manifest_sha256 from workspace_style_pack_version v "
             "where v.workspace_id = %s and v.origin = 'generated' and v.erased_at is null "
@@ -991,7 +1013,8 @@ class WorkspaceStylePackRepository:
         licence they grant the project. Only a host command publishes, and only on such a request.
 
         Refused unless the session's actor created the version (:class:`StylePackNotCreator`), the
-        version may be worn, and a licensed version passes on only its own licence
+        version is not a look made of generated pieces (:class:`StylePackGeneratedNotOffered`), it
+        may be worn, and a licensed version passes on only its own licence
         (:class:`StylePackPublishLicenceNotHeld`).
         """
         self.version(manifest_sha256)

@@ -64,6 +64,7 @@ from exulanica.world.workspace_style_packs import (
     AuthorizedPackFile,
     StylePackAttemptsExceeded,
     StylePackExists,
+    StylePackGeneratedNotOffered,
     StylePackIsABase,
     StylePackNotCreator,
     StylePackNotReady,
@@ -183,6 +184,8 @@ def _refused(error: Exception) -> JSONResponse:
         return _problem(403, "style_pack_not_creator", str(error))
     if isinstance(error, StylePackPublishLicenceNotHeld):
         return _problem(422, "publish_licence_not_held", str(error))
+    if isinstance(error, StylePackGeneratedNotOffered):
+        return _problem(422, "publish_generated_look", str(error))
     if isinstance(error, StylePackIsABase):
         return _problem(409, "style_pack_is_a_base", str(error))
     if isinstance(error, UnknownStylePack):

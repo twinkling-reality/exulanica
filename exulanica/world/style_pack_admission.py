@@ -34,7 +34,11 @@ from typing import Annotated, Any, Final, Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
 
 from exulanica.world import style_packs
-from exulanica.world.style_pack_pieces import StylePieceRefused, check_piece_profile
+from exulanica.world.style_pack_pieces import (
+    PieceOutOfBounds,
+    hold_pieces,
+    piece_roles,
+)
 from exulanica.world.style_pack_preview import PreviewRefused, walk_preview
 from exulanica.world.workspace_style_packs import (
     GENERATED_PREFIX,
@@ -291,13 +295,7 @@ def admit(
             + (f"; missing {', '.join(missing)}" if missing else "")
             + (f"; not listed {', '.join(unknown)}" if unknown else ""),
         )
-    pieces: dict[str, tuple[str, Mapping[str, Any], bool]] = {}
-    for role, module in manifest["modules"].items():
-        family = role.split(".", 1)[0]
-        for variant in module["variants"]:
-            pieces[variant["file"]] = (family, variant, False)
-            if variant["lod1"] is not None:
-                pieces[variant["lod1"]] = (family, variant, True)
+    pieces = piece_roles(manifest)
     for path, file in listed.items():
         data = files[path]
         if len(data) != file["bytes"] or hashlib.sha256(data).hexdigest() != file["sha256"]:
@@ -306,33 +304,10 @@ def admit(
                 "a file is not the size and digest its manifest lists",
                 path=path,
             )
-        if path in pieces and len(data) > budgets[pieces[path][0]].glb_bytes:
-            raise StylePackAdmissionRefused(
-                "over_budget", "a piece is over its family's file size", path=path
-            )
-    measured: dict[str, int] = {}
-    for path, (family, variant, lod1) in sorted(pieces.items()):
-        try:
-            profile = check_piece_profile(files[path])
-        except StylePieceRefused as refused:
-            raise StylePackAdmissionRefused(
-                "style_pack_piece_refused", f"{refused.reason}: {refused}", path=path
-            ) from None
-        budget = budgets[family]
-        limit = budget.triangle_limit(variant["size_mm"][0])
-        if lod1:
-            first = measured.get(variant["file"])
-            if first is None:
-                first = check_piece_profile(files[variant["file"]]).triangles
-            limit = first * lod1_share_permille // 1000
-        if profile.triangles > limit or profile.materials > budget.materials:
-            raise StylePackAdmissionRefused(
-                "over_budget",
-                f"{profile.triangles} triangles and {profile.materials} materials, over "
-                f"{limit} and {budget.materials}",
-                path=path,
-            )
-        measured[path] = profile.triangles
+    try:
+        measured = hold_pieces(pieces, files.__getitem__, budgets, lod1_share_permille)
+    except PieceOutOfBounds as refused:
+        raise StylePackAdmissionRefused(refused.code, str(refused), path=refused.path) from None
     preview = manifest.get("preview")
     preview_sha256 = None
     preview_size = None

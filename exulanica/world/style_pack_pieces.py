@@ -18,7 +18,9 @@ steps, so nothing a piece carries is hidden and nothing expensive runs in a requ
    alpha 65535, each RGB a value of the colour table ``exulanica.srgb8-linear16/v1``), and each
    triangle one colour. The caller holds the colours to the pack's palette.
 
-Both refuse with :class:`StylePieceRefused`, by reason and message.
+Both refuse with :class:`StylePieceRefused`, by reason and message. :func:`hold_pieces` holds each
+piece a manifest lists to the profile and its family's budget, the one place both the upload's
+admission and the check of a look made of generated pieces ask it.
 """
 
 from __future__ import annotations
@@ -26,18 +28,24 @@ from __future__ import annotations
 import json
 import re
 import struct
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from exulanica.world.static_glb import StaticGlbRefused, inspect_static_glb
+
+if TYPE_CHECKING:
+    from exulanica_pieces.budgets import PieceBudget
 
 __all__ = [
     "NAME_MAX",
     "PalettePiece",
+    "PieceOutOfBounds",
     "PieceProfile",
     "StylePieceRefused",
     "check_piece_profile",
+    "hold_pieces",
+    "piece_roles",
     "read_palette_piece",
 ]
 
@@ -123,6 +131,72 @@ def check_piece_profile(payload: bytes) -> PieceProfile:
         triangles=int(inspected.counts["rendered_triangles"]),
         materials=int(inspected.counts["materials"]),
     )
+
+
+class PieceOutOfBounds(ValueError):
+    """A pack's piece refused by the pack-piece profile or its family's budget: the code the
+    upload's admission answers it with, what broke it, and the piece's path."""
+
+    def __init__(self, code: str, message: str, path: str) -> None:
+        self.code = code
+        self.path = path
+        super().__init__(message)
+
+
+def piece_roles(manifest: Mapping[str, Any]) -> dict[str, tuple[str, Mapping[str, Any], bool]]:
+    """Every piece the manifest's modules list, by path: its family (the role's first part), its
+    variant, and whether it is the variant's second level of detail."""
+    pieces: dict[str, tuple[str, Mapping[str, Any], bool]] = {}
+    for role, module in manifest["modules"].items():
+        family = role.split(".", 1)[0]
+        for variant in module["variants"]:
+            pieces[variant["file"]] = (family, variant, False)
+            if variant["lod1"] is not None:
+                pieces[variant["lod1"]] = (family, variant, True)
+    return pieces
+
+
+def _profile(data: bytes, path: str) -> PieceProfile:
+    try:
+        return check_piece_profile(data)
+    except StylePieceRefused as refused:
+        raise PieceOutOfBounds(
+            "style_pack_piece_refused", f"{refused.reason}: {refused}", path
+        ) from None
+
+
+def hold_pieces(
+    pieces: Mapping[str, tuple[str, Mapping[str, Any], bool]],
+    read: Callable[[str], bytes],
+    budgets: Mapping[str, PieceBudget],
+    lod1_share_permille: int,
+) -> dict[str, int]:
+    """Each piece held, in path order, to the canonical pack-piece profile and its family's budget:
+    its file size, its triangles (a tiled family's limit scales with the variant's width, and a
+    second level of detail keeps at most its share of the first's) and its materials. Returns each
+    piece's triangles by path, or raises :class:`PieceOutOfBounds` for the first that fails."""
+    measured: dict[str, int] = {}
+    for path, (family, variant, lod1) in sorted(pieces.items()):
+        data = read(path)
+        budget = budgets[family]
+        if len(data) > budget.glb_bytes:
+            raise PieceOutOfBounds("over_budget", "a piece is over its family's file size", path)
+        profile = _profile(data, path)
+        limit = budget.triangle_limit(variant["size_mm"][0])
+        if lod1:
+            first = measured.get(variant["file"])
+            if first is None:
+                first = _profile(read(variant["file"]), variant["file"]).triangles
+            limit = first * lod1_share_permille // 1000
+        if profile.triangles > limit or profile.materials > budget.materials:
+            raise PieceOutOfBounds(
+                "over_budget",
+                f"{profile.triangles} triangles and {profile.materials} materials, over "
+                f"{limit} and {budget.materials}",
+                path,
+            )
+        measured[path] = profile.triangles
+    return measured
 
 
 def _check_every_byte_read(document: Mapping[str, Any], bin_chunk: bytes) -> None:

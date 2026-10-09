@@ -462,18 +462,29 @@ A world's own look made of [generated pieces](generated-pieces-contract.md) is a
 workspace's own pack of origin `generated`: drawn on a library pack, with pieces the generation
 worker made at a person's request in place of some of its own (`exulanica/generation/looks.py`
 builds its manifest). One migration (`a_workspace_look_wears_generated_pieces`) adds it to section
-11's tables, and `WorkspaceStylePackRepository.record_generated` records one; no route uploads one.
+11's tables, a second (`a_held_piece_is_found_by_an_index`) indexes the held clause, keeps a generated
+version's base a library one and closes publication to it, and
+`WorkspaceStylePackRepository.record_generated` records one; no route uploads one.
 
 | Part | What it holds |
 | --- | --- |
-| The version | Origin `generated`; a pack id in `generated.`, which the schema keeps for these versions and the upload admission refuses; licensed `CC0-1.0` with no attribution; drawn on a version the library holds. Its declaration is the worker's (`exulanica.workspace-style-pack-generated-declaration/v1`): whose request it was and the licence, and no words of anybody's. Its receipt names what it is made of (its base chain and pieces, by which a world applying the same pieces again wears it rather than another) and the pieces' receipts |
+| The version | Origin `generated`; a pack id in `generated.`, which the schema keeps for these versions and the upload admission refuses; licensed `CC0-1.0` with no attribution; drawn on a version the library holds, which the schema requires of every generated version. Its declaration is the worker's (`exulanica.workspace-style-pack-generated-declaration/v1`): whose request it was and the licence, and no words of anybody's. Its receipt names what it is made of (its base chain and pieces, by which a world applying the same pieces again wears it rather than another) and the pieces' receipts |
 | Its files | Each a generated piece by digest, with source `generated_piece`: the bytes live in the one shared `generated-pieces` store, not in the workspace's namespace, and no inventory record names them |
 
 - **Held.** A generated piece is held while a passed output of the workspace (`piece_output`,
   `within`) names its digest. A version is recorded only once every piece is held, becomes ready
   only while each still is, and `workspace_style_pack_wearable` asks the same before it is worn or
-  served. Its check reads each piece from the shared store and holds it to the base's palette, as
-  an upload's is.
+  served. An output of another workspace never holds a piece here. The record's content digest is
+  64 lower case hexadecimal digits, or it is refused (`content_digest_unreadable`).
+- **Checked.** The machine that made a piece judged it, and this server judges it again. The check
+  reads each piece from the shared store and holds it, before the palette, to the pack-piece profile
+  and its family's budget (file size, triangles by the variant's width, materials), as the upload's
+  admission holds an upload's pieces with the same helper (`hold_pieces`); a piece outside them ends
+  the check `refused`, naming the piece and the code (`style_pack_piece_refused` or
+  `over_budget`). Then it holds every piece to the base's palette, as an upload's are.
+- **Never published.** A generated look is not offered to the shared library: its pieces are the
+  generation worker's, made at a person's request, not a creator's own work. A publish request for
+  one is refused 422 `publish_generated_look`.
 - **Bounds.** A person's bounds (16 live versions, 256 MiB) count their uploads only. A workspace
   holds at most 64 live generated versions (`workspace_style_pack_generated_limit`): every distinct
   set of pieces a world wears is one, and applying a set again reuses its version. Generated pieces
@@ -484,4 +495,6 @@ builds its manifest). One migration (`a_workspace_look_wears_generated_pieces`) 
   workspace's outputs, so the version is never worn or served again. Nothing is queued for its
   pieces and the tombstone's completion never waits on them: the shared bytes stay, holding nothing
   of the person, as [generated pieces](generated-pieces-contract.md#53-the-shared-store-of-generated-pieces)
-  says.
+  says. An erased version's file rows keep each piece's digest and source, as every erased
+  version's rows keep digests and sizes; they name nothing of anybody, so a sweep of the shared store
+  that keeps a piece while a row names it does not count them.

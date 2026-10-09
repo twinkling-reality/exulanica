@@ -10,8 +10,11 @@ names it. Against PostgreSQL, as the deployed runtime role writes:
     no longer worn or served once the output is gone;
 *   a workspace tombstone erases the version and its file rows as it erases every version, enqueues
     nothing for its pieces and completes without them, and the shared bytes stay;
-*   a person's upload bounds count uploads only: a workspace holding its sixteen still records a
-    generated look.
+*   a person's upload bounds count uploads only (a generated look first, then sixteen uploads),
+    and a workspace holds at most 64 generated looks;
+*   the check holds each piece to the pack-piece profile and its family's budget before the palette;
+*   a piece only another workspace's output names is not held here, and a generated look is never
+    offered to the shared library.
 
 The piece is a committed cozy piece standing in for a generated one: its colours are the base's
 palette, as a generated piece's are. The outputs are written as the owner with the foreign keys'
@@ -21,6 +24,7 @@ and verdict, not how the generation worker came to write it.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import uuid
@@ -31,13 +35,17 @@ from exulanica.deletion import queue
 from exulanica.evidence.blob import BlobId
 from exulanica.generation.looks import GeneratedVariant, build_derived_look
 from exulanica.world.style_pack_checks import StylePackCheckWorker, colour_table, library_palettes
+from exulanica.world.style_pack_pieces import check_piece_profile
 from exulanica.world.style_packs import canonical_json, load_context, read_manifest
 from exulanica.world.workspace_style_packs import (
     GeneratedStylePackRefused,
+    StylePackGeneratedNotOffered,
     StylePackQuotaExceeded,
+    StylePackVersionRecord,
     StylePackWithdrawn,
     WorkspaceStylePackRepository,
 )
+from exulanica_pieces.budgets import read_budgets
 
 from test_purge import purged as purged
 from test_workspace_style_packs_postgres import Packs, admitted
@@ -78,17 +86,19 @@ def _repository(packs: Packs) -> WorkspaceStylePackRepository:
     )
 
 
-def _output(packs: Packs, *, within: bool = True) -> None:
-    """A passed output of the workspace naming the piece, as the generation worker records one."""
+def _output(packs: Packs, *, within: bool = True, workspace: uuid.UUID | None = None) -> None:
+    """A passed output of the workspace (or of ``workspace``) naming the piece, as the generation
+    worker records one."""
     receipt = canonical_json({"piece_sha256": DIGEST})
-    with packs.purged.database().session(packs.workspace_id) as owner, owner.transaction():
+    workspace = workspace or packs.workspace_id
+    with packs.purged.database().session(workspace) as owner, owner.transaction():
         owner.execute("set local session_replication_role = replica")
         owner.execute(
             "insert into piece_output (workspace_id, piece_request_id, variant, cache_key, "
             "  receipt_canonical, receipt_sha256, piece_sha256, within, over_checks) "
             "values (%s, %s, 0, %s, %s, %s, %s, %s, %s)",
             (
-                packs.workspace_id,
+                workspace,
                 uuid.uuid4(),
                 "c" * 64,
                 receipt,
@@ -98,6 +108,23 @@ def _output(packs: Packs, *, within: bool = True) -> None:
                 [] if within else ["triangles"],
             ),
         )
+
+
+def _recorded(packs: Packs, version: int = 1) -> StylePackVersionRecord:
+    manifest, content = _look(version)
+    record, created = _repository(packs).record_generated(
+        manifest, content_sha256=content, asked_by=packs.actor, context=load_context(ROOT)
+    )
+    assert created
+    return record
+
+
+def _made_ready(packs: Packs, record: StylePackVersionRecord) -> None:
+    """Its check ended ready, as the worker ends a passing one, without reading the pieces."""
+    repository = _repository(packs)
+    claimed = repository.claim("test-worker", 60)
+    assert claimed is not None and claimed[0] == record.manifest_sha256, claimed
+    repository.finish_ready(record.manifest_sha256, claimed[1], {"pieces": "measured"})
 
 
 def _check(packs: Packs) -> None:
@@ -194,14 +221,69 @@ def test_a_workspace_tombstone_erases_a_generated_look_and_only_the_shared_bytes
 
 
 def test_a_person_s_upload_bounds_count_their_uploads_only(packs):
+    # A generated look first: were it counted, the sixteenth upload would be refused.
+    _output(packs)
+    _made_ready(packs, _recorded(packs))
     # Each made ready before the next, since at most four checks wait at once.
     for version in range(1, 17):
         packs.ready(admitted(version=version, pieces=1))
     with pytest.raises(StylePackQuotaExceeded, match="16 style pack versions"):
         packs.repository().record(admitted(version=17, pieces=1))
-    manifest, content = _look()
+
+
+def test_a_workspace_holds_at_most_64_generated_looks(packs):
     _output(packs)
-    record, created = _repository(packs).record_generated(
-        manifest, content_sha256=content, asked_by=packs.actor, context=load_context(ROOT)
+    for version in range(1, 65):
+        _made_ready(packs, _recorded(packs, version))
+    manifest, content = _look(65)
+    with pytest.raises(StylePackQuotaExceeded, match="64 generated style pack versions"):
+        _repository(packs).record_generated(
+            manifest, content_sha256=content, asked_by=packs.actor, context=load_context(ROOT)
+        )
+
+
+def test_a_generated_piece_over_its_family_s_budget_is_refused_by_the_check(packs):
+    packs.content.generated_pieces.put_bytes(PIECE)
+    _output(packs)
+    record = _recorded(packs)
+    # The plant family allowed one triangle fewer than the piece holds.
+    budgets = read_budgets(ROOT)
+    plant = dataclasses.replace(
+        budgets.families["plant"], triangles=check_piece_profile(PIECE).triangles - 1
     )
-    assert created and record.origin == "generated"
+    outcome = StylePackCheckWorker(
+        packs.runtime,
+        packs.stores,
+        frozenset({packs.workspace_id}),
+        table=colour_table(ROOT),
+        library=library_palettes,
+        generated_pieces=packs.content.generated_pieces,
+        budgets=dataclasses.replace(budgets, families={**budgets.families, "plant": plant}),
+    ).drain()
+    assert (outcome.refused, outcome.ready, outcome.errors) == (1, 0, []), outcome
+    checked = _repository(packs).version(record.manifest_sha256)
+    assert (checked.state, checked.failure_class) == ("failed", "refused")
+    assert "over_budget" in (checked.failure_message or "")
+    assert not _repository(packs).wearable(record.manifest_sha256)
+
+
+def test_a_piece_only_another_workspace_s_output_names_is_not_held_here(packs):
+    manifest, content = _look()
+    _output(packs, workspace=uuid.uuid4())
+    with pytest.raises(GeneratedStylePackRefused) as refused:
+        _repository(packs).record_generated(
+            manifest, content_sha256=content, asked_by=packs.actor, context=load_context(ROOT)
+        )
+    assert refused.value.code == "piece_not_held"
+
+
+def test_a_generated_look_is_never_offered_to_the_shared_library(packs):
+    _output(packs)
+    record = _recorded(packs)
+    _made_ready(packs, record)
+    repository = _repository(packs)
+    assert repository.wearable(record.manifest_sha256)
+    with pytest.raises(StylePackGeneratedNotOffered):
+        repository.request_publish(
+            record.manifest_sha256, licence_id="CC0-1.0", attribution=None, statement="ours"
+        )
