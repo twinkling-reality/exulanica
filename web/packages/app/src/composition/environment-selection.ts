@@ -1718,6 +1718,8 @@ export function mountEnvironmentSelection(
 
   function reflectPlayback(): void {
     const control = societyControl;
+    // The arrival line follows every change of the clock, however it came (a read, Play or Pause, a step).
+    if (savedWorld !== null && phase !== 'disposed') arrivalLine(savedWorld.worldId);
     // Who decides says the same calm line as People when open models are not asked now.
     societyModels?.setModelMinds(modelMinds(control));
     if (control === null) {
@@ -1817,8 +1819,6 @@ export function mountEnvironmentSelection(
     try {
       if (refreshSocietyState) await liveSociety?.refresh();
       societyControl = await controlClient.read(current.versionId);
-      // Every read, whichever way the world was opened: said once, once people live there.
-      if (savedWorld !== null) arrivalLine(savedWorld.worldId);
     } catch (error) {
       societyControl = null;
       playbackStatus.textContent = problemSentence(error, PEOPLE_PROBLEMS, CLOCK_UNREAD);

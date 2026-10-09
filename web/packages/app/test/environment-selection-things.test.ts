@@ -139,15 +139,15 @@ function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean } 
     read: vi.fn(async () => { if (!withSociety) throw missing(); return thingsSociety(); }),
     create: vi.fn(), connect: vi.fn(), advance: vi.fn(), events: vi.fn(async () => []),
   };
-  const control = () => parseSocietyControl({
+  const control = (mode: 'paused' | 'playing' = 'paused') => parseSocietyControl({
     profile: 'exulanica.society-control/v1', society_id: 'society', branch_id: 'version', persisted: false,
-    revision: 0, mode: 'paused', speed: 1, base_tick_interval_ms: 1000, tick_interval_ms: 1000,
+    revision: 0, mode, speed: 1, base_tick_interval_ms: 1000, tick_interval_ms: 1000,
     interval_semantics: 'minimum_wait_after_batch_completion', last_batch_execution: null,
     simulated_seconds_per_tick: 60, max_catchup_ticks: 3, next_due_at: null, reason: null,
     lease_expires_at: null, last_event_seq: 0, current_tick: 3, state_sha256: '3'.repeat(64),
     play_ineligible_reason: null, play_eligible: true,
   }, 'version');
-  const controlClient = { read: vi.fn(async () => { if (!withSociety) throw missing(); return control(); }), configure: vi.fn(), step: vi.fn() };
+  const controlClient = { read: vi.fn(async () => { if (!withSociety) throw missing(); return control(); }), configure: vi.fn(async () => control('playing')), step: vi.fn() };
   const placed = scene.nothingPlaced === true ? { ...version, things: [] } as unknown as AlternateVersion : version;
   const worldClient = { connect: vi.fn(async () => ({ assets: [], version: placed })), assets: vi.fn(() => []) };
   const modelsClient = { read: vi.fn(async () => { throw missing(); }), choose: vi.fn() };
@@ -332,5 +332,16 @@ describe('a saved world\'s placed things', () => {
       'The world is paused. Press Play to let it run. People are out in the town: open People to find them.');
     mounted.dispose();
     expect(holdStatus).toHaveBeenLastCalledWith(null);
+  });
+
+  it('takes the paused line away as soon as the world plays, by the Play write itself', async () => {
+    window.localStorage.clear();
+    const { mounted, holdStatus } = mount(true);
+    await mounted.begin();
+    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(holdStatus).toHaveBeenLastCalledWith('The world is paused. Press Play to let it run.');
+    await mounted.people.play();
+    expect(holdStatus).toHaveBeenLastCalledWith(null);
+    mounted.dispose();
   });
 });
