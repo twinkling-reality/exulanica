@@ -88,6 +88,16 @@ export function hostWords(refusal: string | null): string {
  */
 export const OVER_BOUND_WORDS = 'Their own routine for now: this world already runs as many minds as it may, so their model waits.';
 
+/** Whether a person plays them now, and whether that is the reader; undefined while nobody does. */
+export function playedOf(view: SocietyModels, subjectId: string): { readonly byYou: boolean } | undefined {
+  return view.choices.find((held) => held.subjectId === subjectId)?.played;
+}
+
+/** Who decides for a being a person plays, in words: the reader, or somebody else. */
+export function playedWords(played: { readonly byYou: boolean }): string {
+  return played.byYou ? 'Played by you. Its own mind rests until you give it back.' : 'Being played by another person.';
+}
+
 /** Who an outside program decides for, by subject: the read's entry, or undefined for anybody else. */
 export function outsideOf(view: SocietyModels, subjectId: string): OutsideDecider | undefined {
   return (view.outside ?? []).find((entry) => entry.subjectId === subjectId);
@@ -138,6 +148,7 @@ export function choiceWords(view: SocietyModels, subjectId: string, paused: stri
   const outside = outsideOf(view, subjectId);
   if (outside !== undefined) return outsideWords(outside);
   const choice = view.choices.find((held) => held.subjectId === subjectId);
+  if (choice?.played !== undefined) return playedWords(choice.played);
   if (choice?.from === 'choice_over_bound' || choice?.from === 'travellers_over_bound') return OVER_BOUND_WORDS;
   if (choice === undefined || choice.model === null) return 'Their own routine.';
   const { name } = choice.model;
@@ -416,7 +427,7 @@ export function buildSocietyModels(handlers: {
   };
   everyone.addEventListener('click', () => {
     for (const box of peopleList.querySelectorAll<HTMLInputElement>('input[type=checkbox]')) {
-      if (box.closest('[data-outside]') !== null) continue;
+      if (box.closest('[data-not-choosable]') !== null) continue;
       box.checked = true;
       checked.add(box.value);
     }
@@ -494,14 +505,17 @@ export function buildSocietyModels(handlers: {
     shown = view;
     const present = new Set(people.map((person) => person.id));
     for (const id of [...checked]) if (!present.has(id)) checked.delete(id);
-    // Somebody an outside program decides for is listed with who that is, and cannot be ticked.
+    // Somebody an outside program decides for, or a person plays, is listed with who that is, and
+    // cannot be ticked: no model can be chosen for them meanwhile.
     for (const entry of view.outside ?? []) checked.delete(entry.subjectId);
+    for (const choice of view.choices) if (choice.played !== undefined) checked.delete(choice.subjectId);
     replace(peopleList, people.map((person) => {
       const outsideOfPerson = outsideOf(view, person.id);
       const outside = outsideOfPerson !== undefined;
+      const played = playedOf(view, person.id) !== undefined;
       const box = el('input', { type: 'checkbox', value: person.id }) as HTMLInputElement;
       box.checked = checked.has(person.id);
-      box.disabled = busy || outside;
+      box.disabled = busy || outside || played;
       box.addEventListener('change', () => {
         if (box.checked) checked.add(person.id); else checked.delete(person.id);
         reflectChoose();
@@ -515,6 +529,8 @@ export function buildSocietyModels(handlers: {
       ]);
       label.dataset['subjectId'] = person.id;
       if (outside) label.dataset['outside'] = 'true';
+      if (played) label.dataset['played'] = 'true';
+      if (outside || played) label.dataset['notChoosable'] = 'true';
       return label;
     }));
     if (wanted !== null) { const asked = wanted; wanted = null; tick(asked); }
@@ -552,7 +568,7 @@ export function buildSocietyModels(handlers: {
     const boxes = [...peopleList.querySelectorAll<HTMLInputElement>('input[type=checkbox]')];
     checked.clear();
     for (const box of boxes) {
-      box.checked = subjectIds.includes(box.value) && box.closest('[data-outside]') === null;
+      box.checked = subjectIds.includes(box.value) && box.closest('[data-not-choosable]') === null;
       if (box.checked) checked.add(box.value);
     }
     reflectChoose();

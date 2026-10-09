@@ -234,6 +234,10 @@ Where the program's latest answer for them was not taken (the entry's `latest` r
 says why under who decides, in the words catalog's own reason ("Lately: the program that decides for
 them did not answer in time, so their own routine decided.", `outsideLatestWords`), and nothing
 while its latest answer was taken.
+While a person plays a being (its choice's decider is a person), its row says "Played by you. Its own
+mind rests until you give it back." or "Being played by another person.", names no model and cannot
+be ticked; the read says only whether the reader is the one playing (`played_by_you`), never who, and
+`playedSubjects()` in `composition/society-models-mount.ts` gives the marks and the card the same.
 `outsideWords`, `outsideShort` and `cameWords` in `ui/society-models.ts` are the one source of these
 words for the card and the marks, which read the entry through `PersonMind.outside`. A visitor the
 world decides for is named by the mind given travellers through its gate ("Nemotron 3 Nano 30B, the

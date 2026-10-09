@@ -23,6 +23,7 @@ import {
   choiceWords,
   decisionWordsFor,
   outsideOf,
+  playedOf,
   recordedWords,
   type ChoosablePerson,
 } from '../ui/society-models.js';
@@ -51,6 +52,8 @@ export interface PersonMind {
    * does. Words for it come from `outsideWords`, `outsideShort` and `cameWords` in ui/society-models.ts.
    */
   readonly outside?: OutsideDecider | null;
+  /** Set while a person plays them: whether it is the reader. Absent or null while nobody does. */
+  readonly played?: { readonly byYou: boolean } | null;
 }
 
 /**
@@ -58,7 +61,9 @@ export interface PersonMind {
  * not theirs (a refusal on the read or on their choice), when their own routine decides.
  */
 function runningModel(view: SocietyModels, subjectId: string, paused: boolean): NamedModelRef | null {
-  if (view.hostRefusal !== null || paused || outsideOf(view, subjectId) !== undefined) return null;
+  // A being a person plays rests its mind: no model is asked for it meanwhile.
+  if (view.hostRefusal !== null || paused || outsideOf(view, subjectId) !== undefined
+    || playedOf(view, subjectId) !== undefined) return null;
   const choice = view.choices.find((held) => held.subjectId === subjectId);
   return choice === undefined || choice.refusal !== null ? null : choice.model;
 }
@@ -97,6 +102,8 @@ export interface MountedSocietyModels {
   setModelMinds(minds: { readonly words: string; readonly why: string } | null): void;
   /** Everyone an outside program decides for now, by subject, from the last read. */
   outsideDeciders(): ReadonlyMap<string, OutsideDecider>;
+  /** Everyone a person plays now, and whether that person is the reader (`played_by_you`). */
+  playedSubjects(): ReadonlyMap<string, { readonly byYou: boolean }>;
   dispose(): void;
 }
 
@@ -277,10 +284,12 @@ export function mountSocietyModels(options: {
     mindOf(subjectId) {
       if (view === null || !view.takesModelChoices) return null;
       const outside = outsideOf(view, subjectId);
+      const played = playedOf(view, subjectId);
       return {
         running: runningModel(view, subjectId, minds !== null),
         words: choiceWords(view, subjectId, minds?.why ?? null),
         ...(outside === undefined ? {} : { outside }),
+        ...(played === undefined ? {} : { played }),
       };
     },
     runningModels() {
@@ -298,6 +307,12 @@ export function mountSocietyModels(options: {
       render();
       // The card and the marks read who runs each person again.
       options.onRead?.();
+    },
+    playedSubjects() {
+      const played = new Map<string, { readonly byYou: boolean }>();
+      if (view === null || !view.takesModelChoices) return played;
+      for (const choice of view.choices) if (choice.played !== undefined) played.set(choice.subjectId, choice.played);
+      return played;
     },
     outsideDeciders() {
       if (view === null || !view.takesModelChoices) return new Map();

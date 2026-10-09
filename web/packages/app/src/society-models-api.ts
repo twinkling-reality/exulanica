@@ -63,6 +63,11 @@ export interface PersonModelChoice {
   readonly refusal: string | null;
   /** Where the choice comes from, or null where the read does not say. */
   readonly from?: ChoiceSource | null;
+  /**
+   * Set while a person plays them (the choice's decider is a person): whether that person is the
+   * one reading. Absent otherwise, and from a server that predates playing.
+   */
+  readonly played?: { readonly byYou: boolean };
 }
 
 /** The mind a gate's travellers get when their arrival says the world decides for them. */
@@ -262,6 +267,9 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         choiceSeq: count(held['choice_seq']),
         refusal: maybe(held['refusal'], text),
         from: source(held['from']),
+        // A person playing them is said by whether it is the reader, never by account.
+        ...(held['decider'] !== undefined && held['decider'] !== null && object(held['decider'])['kind'] === 'person'
+          ? { played: { byYou: flag(held['played_by_you']) } } : {}),
       };
     }),
     latest: list(row['latest']).map((entry) => {

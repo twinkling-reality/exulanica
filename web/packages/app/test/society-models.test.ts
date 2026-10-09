@@ -656,3 +656,35 @@ describe('what became of an outside program\'s latest answer', () => {
     expect(lately('bea')).toBeNull();
   });
 });
+
+describe('a being a person plays', () => {
+  // 3p's models read (THINGS, 2026-10-09): the played being's choice reads decider person and
+  // played_by_you, never an account; ada played by the reader, bea by someone else.
+  const answer = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+  const played = (byYou: boolean, subject: string) => ({
+    subject_id: subject, model: null, choice_seq: 2, chosen_by: null, recorded_at: '2026-10-09T01:00:00Z',
+    refusal: null, decider: { kind: 'person' }, played_by_you: byYou,
+  });
+
+  it('says who plays them, rests their mind, and lets no model be chosen for them meanwhile', async () => {
+    const view = read({ choices: [played(true, 'ada'), played(false, 'bea'), { ...read().choices[0], subject_id: 'cy' }] });
+    const fetcher = vi.fn(async () => answer(view));
+    const client = new SocietyModelsClient({ baseUrl: 'https://example.test', token: 't', worldId: 'w', fetch: fetcher as typeof fetch });
+    const mounted = mountSocietyModels({ credentials: { baseUrl: 'https://example.test', token: 't' }, world: { worldId: 'w', versionId: 'version' }, client });
+    const people = [{ id: 'ada', name: 'Ada' }, { id: 'bea', name: 'Bea' }, { id: 'cy', name: 'Cy' }];
+    await mounted.refresh(1, people);
+    expect(mounted.mindOf('ada')).toEqual({ running: null, words: 'Played by you. Its own mind rests until you give it back.', played: { byYou: true } });
+    expect(mounted.mindOf('bea')?.words).toBe('Being played by another person.');
+    expect(mounted.mindOf('cy')?.played).toBeUndefined();
+    expect([...mounted.playedSubjects()]).toEqual([['ada', { byYou: true }], ['bea', { byYou: false }]]);
+    expect([...mounted.runningModels().keys()]).toEqual(['cy']);
+    // Their rows say so and cannot be ticked; Choose everyone passes them by.
+    const box = (id: string) => mounted.root.querySelector<HTMLInputElement>(`[data-subject-id="${id}"] input[type=checkbox]`)!;
+    expect([box('ada').disabled, box('bea').disabled, box('cy').disabled]).toEqual([true, true, false]);
+    mounted.root.querySelector<HTMLButtonElement>('button.society-models-everyone')!.click();
+    expect([box('ada').checked, box('bea').checked, box('cy').checked]).toEqual([false, false, true]);
+    // A read from a server that predates playing says nothing of it.
+    expect(parseSocietyModels(read()).choices[0]).not.toHaveProperty('played');
+    mounted.dispose();
+  });
+});
