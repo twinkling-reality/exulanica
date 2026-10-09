@@ -185,6 +185,27 @@ class Row:
         }
 
 
+#: Whether a browser capture or an image build also takes the machine-wide quiet slot. "off" runs it
+#: directly, as root's 16:43 rule asks of acceptance runs outside a declared quiet window (they are
+#: not timing measurements); a browser still takes the GPU slot. Anything else, or unset, takes both.
+QUIET_SLOT_VARIABLE = "ACCEPTANCE_QUIET_SLOT"
+
+
+def quiet_slot_wanted(environ: Mapping[str, str] | None = None) -> bool:
+    return (os.environ if environ is None else environ).get(QUIET_SLOT_VARIABLE, "on") != "off"
+
+
+def browser_command(rehearse: Any, worktree: Path, command: list[str]) -> list[str]:
+    """A browser capture's command line: under the GPU slot, and the quiet slot unless it is off."""
+    checkout = rehearse.main_checkout(worktree)
+    gpu, quiet = checkout / ".exulanica/bin/gpu-slot", checkout / ".exulanica/bin/quiet-slot"
+    if not quiet_slot_wanted():
+        return [str(gpu), *command] if gpu.exists() else list(command)
+    return rehearse.browser_slot_command(
+        gpu if gpu.exists() else None, quiet if quiet.exists() else None, command
+    )
+
+
 #: Keys whose string values are credentials wherever they appear in a body (A-136): the door's
 #: channel credentials, a secret, and a session's CSRF token. Not "token": the API names no bearer
 #: token in a body, and a capability descriptor's "token" names a digest's field, which is kept.
@@ -4086,6 +4107,15 @@ THINGS_ROWS = (
         "the API card wears another look, chosen by the owner, and the card says what changed. "
         "Run whether or not a line was taken.",
     ),
+    (
+        "N1.z",
+        "things.premises_words",
+        "things-premises",
+        "In the same session, a town whose premises all stand (candidate-36, A-138): of up to a "
+        "dozen nearby people's cards, at least one is read and no Now line uses the catalog's "
+        "words for a place that is gone (phrase.place_gone); how many name a premises in its "
+        "plain words (phrase.place_listed) is recorded. Run whether or not a line was taken.",
+    ),
 )
 #: The steps of the things session that show a line, and so are blocked when none was taken.
 THINGS_LINE_STEPS = frozenset({"things-lines"})
@@ -4579,13 +4609,7 @@ def browser(arguments: argparse.Namespace) -> int:
     }
     plan_file = session_dir / "plan.json"
     plan_file.write_text(json.dumps(plan, indent=2))
-    checkout = rehearse.main_checkout(worktree)
-    gpu, quiet = checkout / ".exulanica/bin/gpu-slot", checkout / ".exulanica/bin/quiet-slot"
-    command = rehearse.browser_slot_command(
-        gpu if gpu.exists() else None,
-        quiet if quiet.exists() else None,
-        ["node", str(JOURNEY_RUNNER), str(plan_file)],
-    )
+    command = browser_command(rehearse, worktree, ["node", str(JOURNEY_RUNNER), str(plan_file)])
     if staged and not (facts.get("said") or (things and facts.get("ready"))):
         # Nothing was said (or the agent is not there), so there is nothing to show: no page
         # session (A-108, A-116); a things session whose world is ready still shows its card.

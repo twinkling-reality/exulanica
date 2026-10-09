@@ -54,7 +54,7 @@ const MAIN_STEPS = ['worlds-first', 'journey-open', 'journey-stall', 'journey-pe
 const PEOPLE_STEPS = ['people-card', 'people-marks'];
 // The things session (A-108): the lines a being said and heard, on its card, in a scene the driver
 // prepared (its facts name the world, the speaker, the line and a hearer).
-const THINGS_STEPS = ['things-lines', 'things-card'];
+const THINGS_STEPS = ['things-lines', 'things-card', 'things-premises'];
 // The outside session (A-116): people an outside AI agent decides for, in Who decides and over their
 // heads, while the agent is connected (the driver's facts name the world, the people and the name).
 const OUTSIDE_STEPS = ['outside-deciders', 'outside-visitor-words'];
@@ -717,6 +717,27 @@ const STEP_HANDLERS = {
       !!outcome && now.chosen_by_owner === true && (now.look !== was.look || now.version !== was.version || now.sha256 !== was.sha256),
       { key, outcome, before: [was.look, was.version], after: [now.look, now.version, now.chosen_by_owner] });
     await ctx.screenshot('card-look', "the knight's card after its look was changed");
+  },
+  async 'things-premises'(ctx) {
+    // N1.z (candidate-36): in a town whose premises all stand, no person's Now line says they are
+    // at, or going to, a place that is gone (the catalog's phrase.place_gone); a premises is said
+    // plainly (phrase.place_listed). Read from each nearby person's card, up to a dozen.
+    const gone = catalogWords('phrase.place_gone');
+    const listed = catalogWords('phrase.place_listed');
+    const ids = await ctx.page.evaluate(`[...(${INSPECT})?.options ?? []].map(o => o.value).filter(Boolean)`);
+    const nows = [];
+    for (const id of ids.slice(0, 12)) {
+      await ctx.page.setValue(INSPECT, id).catch(() => null);
+      const now = await ctx.page.waitFor(`(() => { const c = document.querySelector('section.thing-card[data-subject="${id}"]');
+        return c && c.checkVisibility() ? (c.querySelector('.thing-card-now span')?.textContent ?? '') : null; })()`,
+      SETTLE_MS, "a person's Now line").catch(() => null);
+      nows.push({ subject: id, now });
+    }
+    const read = nows.filter((n) => n.now !== null);
+    ctx.observe('no-place-said-gone', read.length > 0 && read.every((n) => !n.now.includes(gone)),
+      { read: read.length, gone_lines: read.filter((n) => n.now.includes(gone)), gone, listed,
+        listed_lines: read.filter((n) => n.now.includes(listed)).length });
+    await ctx.screenshot('premises', "a town's people and where they are going");
   },
   async 'outside-deciders'(ctx) {
     // N1.w (A-116): Who decides marks the two people outside, disabled and left out of Choose

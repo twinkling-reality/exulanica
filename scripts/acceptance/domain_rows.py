@@ -63,6 +63,11 @@ leaves the stack running:
 - ``hands``: HN1 (a being picks a thing up in a society of things). A fresh database, and the stack
   started with ``--workspaces 2 --society-of-things --society-playback --scripted-model
   scripts/acceptance/plans/hands.json --spending process --no-derivative-worker``.
+- ``picture-rights``: LP1 (a picture's reading right stopped by its grantor, with the grantor's
+  other rights on the picture and never a later consent). The stack is started with ``--workspaces
+  2 --peer-token --reference-pictures --scripted-model scripts/acceptance/plans/spending.json
+  --spending durable --no-derivative-worker --depth-worker``: pictures are offered only where a
+  reference worker, a model client and durable spending run.
 - ``guest-turns``: V7 (every waiting guest takes a turn) and PR2 (a guest asking for pieces). The
   stack is started as ``guest-places``'s; ``guest-allowance`` also checks KD2 (drafting refused
   before anything is spent when a guest's allowance cannot cover one attempt).
@@ -3088,6 +3093,198 @@ def row_k2(stack: Stack, transcripts: Any, out: Path, log: Path) -> Row:
     return row.close()
 
 
+#: A picture's reading right (docs/personal-admission.md, docs/reference-notes-contract.md section 10).
+PICTURE_RIGHT_ROLE = "reference_vision"
+#: How long after a stop LP1 waits before a later consent, longer than the second its admissions
+#: are recorded before they are sent, so the consent is granted after the stop.
+PICTURE_GRANT_GAP_SECONDS = 2.5
+
+
+def picture_right(
+    c: Any, step: str, stack: Stack, photo: Mapping[str, Any], name: str
+) -> tuple[int, list[str]]:
+    """``c``'s person admits ``photo`` again with a picture's reading right, as the account holder
+    does, against the exact words the reference list states for that right."""
+    _, admission = c.call(step, "GET", "/personal-admission")
+    # A-141: the words a picture's reading right is granted against are the ones the reference
+    # list states under pictures.consent.uses, served where pictures are offered.
+    _, listed = c.call(step, "GET", "/worlds/references")
+    uses = (((listed or {}).get("pictures") or {}).get("consent") or {}).get("uses") or []
+    offer = next((u for u in uses if u.get("role") == PICTURE_RIGHT_ROLE), {})
+    now = dt.datetime.now(dt.UTC)
+    status, answer = c.call(
+        step,
+        "POST",
+        "/personal-admission",
+        body={
+            "members": [
+                {
+                    "capture_id": photo["capture_id"],
+                    "sha256": photo["blob_sha256"],
+                    "bytes": (stack.run_dir / name).stat().st_size,
+                    "review": "no-person",
+                }
+            ],
+            "purpose": "Q10 acceptance LP1: a picture's reading right over a synthetic fixture",
+            "authority": {
+                "account_authority_basis": "Synthetic fixture drawn by the acceptance driver; no person",
+                "authorized_at": (now - dt.timedelta(minutes=1)).isoformat(),
+                "valid_until": (now + dt.timedelta(hours=1)).isoformat(),
+            },
+            "recorded_at": (now - dt.timedelta(seconds=1)).isoformat(),
+            "operation": "review",
+            "reviewed_by_name": F.STAND_IN_REVIEWER,
+            "attestation": (admission or {}).get("attestation"),
+            "model_rights": [
+                {
+                    "role": PICTURE_RIGHT_ROLE,
+                    "valid_until": (now + dt.timedelta(minutes=50)).isoformat(),
+                    "notice": offer.get("notice"),
+                }
+            ],
+        },
+    )
+    rights = [
+        right
+        for receipt in (answer or {}).get("receipts") or []
+        for right in receipt.get("model_right_ids") or []
+    ]
+    return status, rights
+
+
+def right_states(c: Any, step: str, capture: str) -> dict[str, str]:
+    """Every right ``c``'s person granted over ``capture``, by id, with its state, as their own
+    admission read lists them."""
+    _, admission = c.call(step, "GET", "/personal-admission")
+    return {
+        str(right.get("right_id")): str(right.get("state"))
+        for source in (admission or {}).get("sources") or []
+        if source.get("capture_id") == capture
+        for right in source.get("model_rights") or []
+    }
+
+
+def row_lp1(stack: Stack, transcripts: Any, out: Path) -> Row:
+    row = Row(
+        "LP1",
+        "references.picture_right_stop",
+        "A picture's reading right is stopped by its grantor, with the grantor's other reading "
+        "rights on that picture, and never a consent given later (candidate-36): on one picture of "
+        f"workspace 1, A grants two {PICTURE_RIGHT_ROLE} rights and B (another person of the "
+        "workspace) one; B's stop of A's first right is 404 as for an id nobody granted; A's stop "
+        "of it answers ended and ends A's second, B's standing; A then grants a third, and A's "
+        "stop of the first again leaves the third current. An owner's own stop is left to LOOKUP's "
+        "HTTP tests: this stack has no owner session.",
+    )
+    a = F.client(stack, transcripts, "w1", "token")
+    b = F.client(stack, transcripts, "peer", "token-peer")
+    photo = uploaded(stack, out, "token", "lp1-picture.jpg", photograph(23, width=320))
+    derived(a, "LP1", photo["job"])
+    capture = photo["capture_id"]
+    _, listed = a.call("LP1", "GET", "/worlds/references")
+    consent = ((listed or {}).get("pictures") or {}).get("consent")
+    if not consent:
+        row.blocked_by.append(
+            "the reference list states no picture consent here (pictures not offered on this stack)"
+        )
+        row.observed = {"pictures": (listed or {}).get("pictures")}
+        return row.close()
+    status_1, first = picture_right(a, "LP1 A first", stack, photo, "lp1-picture.jpg")
+    status_2, second = picture_right(a, "LP1 A second", stack, photo, "lp1-picture.jpg")
+    status_b, theirs = picture_right(b, "LP1 B", stack, photo, "lp1-picture.jpg")
+    granted = [status_1, status_2, status_b]
+    row.expect(
+        granted == [202, 202, 202] and all(len(ids) >= 1 for ids in (first, second, theirs)),
+        f"the grants answered {granted} with {[len(first), len(second), len(theirs)]} rights",
+    )
+    if not (first and second and theirs):
+        row.observed = {"granted": granted}
+        return row.close()
+    path = f"/personal-admission/model-rights/{first[0]}/withdraw"
+    status_foreign, foreign = b.call("LP1 B stops A's", "POST", path)
+    a_before = right_states(a, "LP1 A before", capture)
+    status_stop, stopped = a.call("LP1 A stops", "POST", path)
+    a_after, b_after = (
+        right_states(a, "LP1 A after", capture),
+        right_states(b, "LP1 B after", capture),
+    )
+    # A right's grant time is its admission's recorded_at, which picture_right sets a second before
+    # it sends; a consent given since the stop must be recorded after it (A-141's second clause).
+    time.sleep(PICTURE_GRANT_GAP_SECONDS)
+    status_3, third = picture_right(a, "LP1 A third", stack, photo, "lp1-picture.jpg")
+    # The later consent read before the repeated stop, so the stop's own effect is what is judged.
+    a_between = right_states(a, "LP1 A between", capture)
+    status_again, _ = a.call("LP1 A stops again", "POST", path)
+    a_last = right_states(a, "LP1 A last", capture)
+    row.expect(
+        status_foreign == 404,
+        f"B's stop of A's right answered {status_foreign} {F.problem_code(foreign)}",
+    )
+    # One grant records a right for each model the role reaches, so each is judged as a set.
+    row.expect(
+        all(a_before.get(r) == "current" for r in (*first, *second)),
+        f"before the stop A's rights read {a_before}",
+    )
+    row.expect(
+        status_stop == 200 and (stopped or {}).get("state") == "ended",
+        f"A's stop answered {status_stop} {(stopped or {}).get('state')}",
+    )
+    row.expect(
+        all(a_after.get(r) == "ended" for r in (*first, *second)),
+        f"after A's stop A's rights read {a_after}",
+    )
+    row.expect(
+        all(b_after.get(r) == "current" for r in theirs),
+        f"after A's stop B's rights read {b_after}",
+    )
+    row.expect(
+        bool(third) and all(a_between.get(r) == "current" for r in third),
+        f"the later consent read before the repeated stop {a_between}",
+    )
+    row.expect(
+        status_3 == 202
+        and bool(third)
+        and status_again == 200
+        and all(a_last.get(r) == "current" for r in third),
+        f"the later consent answered {status_3}; the repeated stop {status_again}; A's rights {a_last}",
+    )
+    row.observed = {
+        "capture": capture,
+        "granted": granted,
+        "b_stops_a": [status_foreign, F.problem_code(foreign)],
+        "a_before": a_before,
+        "a_stop": [status_stop, (stopped or {}).get("state")],
+        "a_after": a_after,
+        "b_after": b_after,
+        "later": [status_3, status_again],
+        "third": third,
+        "a_between": a_between,
+        "a_last": a_last,
+    }
+    return row.close()
+
+
+def picture_rights(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if (
+        not stack.token_file("token-peer").exists()
+        or not stack.state.get("reference_pictures")
+        or (stack.state.get("scripted_model") or {}).get("spending") != "durable"
+    ):
+        raise SystemExit(
+            "picture-rights needs a stack started with --workspaces 2 --peer-token "
+            "--reference-pictures --scripted-model scripts/acceptance/plans/spending.json "
+            "--spending durable --no-derivative-worker --depth-worker (A-141)"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_lp1(stack, Transcripts(out / "transcripts"), out)]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
 def withdrawal(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -3631,12 +3828,8 @@ def row_e4(stack: Stack, transcripts: Any, out: Path) -> Row:
     }
     plan_file = session_dir / "plan.json"
     plan_file.write_text(json.dumps(plan, indent=2))
-    checkout = rehearse.main_checkout(stack.worktree)
-    gpu, quiet = checkout / ".exulanica/bin/gpu-slot", checkout / ".exulanica/bin/quiet-slot"
-    command = rehearse.browser_slot_command(
-        gpu if gpu.exists() else None,
-        quiet if quiet.exists() else None,
-        ["node", str(CATALOG_RUNNER), str(plan_file)],
+    command = F.browser_command(
+        rehearse, stack.worktree, ["node", str(CATALOG_RUNNER), str(plan_file)]
     )
     runner_log = (out / "runner.txt").open("w")
     runner = subprocess.Popen(
@@ -7242,6 +7435,8 @@ def guest_allowance(arguments: argparse.Namespace) -> int:
 KIND_DRAFT_PLAN = HERE / "plans" / "kind-draft.json"
 #: How long a draft may take to end here: the client's call bound and the checks' bound, three times.
 KIND_DRAFT_SECONDS = 600
+#: What a provider's error status ends a draft as, where the closed list names it (A-137).
+PROVIDER_FAILED_CODE = "kind_draft_model_failed"
 
 
 def kind_draft_ended(c: Any, step: str, draft_id: str) -> dict[str, Any]:
@@ -7400,9 +7595,13 @@ def row_kd1(stack: Stack, transcripts: Any) -> Row:
         f"the brief making no kind ended {refused}",
     )
     failed = ended["failed"]
+    # A-137 (KINDS v2.1): where the closed list names it, a provider's error status ends the draft
+    # kind_draft_model_failed, never said as the model's silence (kind_draft_unanswered).
+    provider_code = PROVIDER_FAILED_CODE if PROVIDER_FAILED_CODE in closed else None
     row.expect(
         failed["state"] == "refused"
         and (failed["refusal"] or {}).get("code") in closed
+        and (provider_code is None or (failed["refusal"] or {}).get("code") == provider_code)
         and failed["execution_calls"] >= 1,
         f"the provider failure ended {failed}",
     )
@@ -7428,6 +7627,7 @@ def row_kd1(stack: Stack, transcripts: Any) -> Row:
         },
         "world": [status_world, F.problem_code(world)],
         "ended": ended,
+        "provider_failed_code_expected": provider_code,
         "scripted_calls": len(scripted_log(stack)) - calls_before,
     }
     return row.close()
@@ -7812,6 +8012,11 @@ def pieces(arguments: argparse.Namespace) -> int:
 #: else gives it, else waits (A-122).
 HANDS_PLAN = HERE / "plans" / "hands.json"
 HANDS_MODULE = "exulanica-ability/hands/v1"
+#: The modules a new society records to show each being what is near and what it remembers (MM1).
+NOTICE_MODULE, REMEMBER_MODULE = "exulanica-ability/notice/v1", "exulanica-ability/remember/v1"
+#: hands.json's rules by index: the one matching the memory block, the one matching the noticing
+#: block (headings as the decision contract renders them), and the rest.
+MEMORY_RULE, NOTICING_RULE = 0, 1
 ABILITY_MODULES = Path("exulanica") / "abilities" / "ability-modules.v1.json"
 BODY_PLANS = Path("assets") / "catalogs" / "things" / "body-plans.v1.json"
 #: Real seconds HN1 waits for the knight to pick the sword up, then watches it held.
@@ -7994,14 +8199,19 @@ def row_tc1(stack: Stack, transcripts: Any, worktree: Path, hn1: Mapping[str, An
         else {}
     )
     runs = set(state.get("modules") or [])
+    # A-140: an ability is listed when a module the society runs serves it, by the module table's
+    # own lists (a newer module version, purposeful/v2, serves what the catalog names under v1);
+    # each is said in the abilities catalog's words and names a module the society runs.
+    serves = {
+        key
+        for m in json.loads((worktree / ABILITY_MODULES).read_text())["modules"]
+        if m["module"] in runs
+        for key in m["abilities"]
+    }
     expected_abilities = [
-        {
-            "key": a["key"],
-            "words": abilities[a["key"]]["words"],
-            "module": abilities[a["key"]]["module"],
-        }
+        {"key": a["key"], "words": abilities[a["key"]]["words"]}
         for a in kind_file.get("abilities") or []
-        if a["key"] in abilities and abilities[a["key"]]["module"] in runs
+        if a["key"] in abilities and a["key"] in serves
     ]
     plan = (kind_file.get("body") or {}).get("plan")
     expected_looks = sorted(
@@ -8020,7 +8230,9 @@ def row_tc1(stack: Stack, transcripts: Any, worktree: Path, hn1: Mapping[str, An
         f"the knight's card answered {status} {card.get('profile')} {kind.get('label')}",
     )
     row.expect(
-        card.get("abilities") == expected_abilities
+        [{"key": a.get("key"), "words": a.get("words")} for a in card.get("abilities") or []]
+        == expected_abilities
+        and all(a.get("module") in runs for a in card.get("abilities") or [])
         and "follow" not in [a["key"] for a in card.get("abilities") or []],
         f"the card's abilities are {[a.get('key') for a in card.get('abilities') or []]}, "
         f"expected {[a['key'] for a in expected_abilities]}",
@@ -8113,6 +8325,211 @@ def row_tc1(stack: Stack, transcripts: Any, worktree: Path, hn1: Mapping[str, An
     return row.close()
 
 
+def row_mm1(stack: Stack, worktree: Path, hn1: Mapping[str, Any]) -> Row:
+    modules = {
+        m["module"]: m for m in json.loads((worktree / ABILITY_MODULES).read_text())["modules"]
+    }
+    plan = json.loads(HANDS_PLAN.read_text())
+    row = Row(
+        "MM1",
+        "minds.notice_and_remember",
+        "A new world's beings notice and remember (candidate-36): HN1's society records "
+        f"{NOTICE_MODULE} and {REMEMBER_MODULE}, both built in ability-modules.v1.json; among the "
+        "scripted model's requests at least one carries the noticing block ('Around you now:') and "
+        "a later one the memory block ('You remember (from what happened here').",
+    )
+    log = scripted_log(stack)
+    rules = [c.get("rule") for c in log]
+    noticing = [i for i, r in enumerate(rules) if r in (MEMORY_RULE, NOTICING_RULE)]
+    memory = [i for i, r in enumerate(rules) if r == MEMORY_RULE]
+    recorded = set(hn1.get("modules") or [])
+    row.expect(
+        all(modules.get(m, {}).get("status") == "built" for m in (NOTICE_MODULE, REMEMBER_MODULE)),
+        "ability-modules.v1.json does not state both modules built",
+    )
+    row.expect(
+        {NOTICE_MODULE, REMEMBER_MODULE} <= recorded,
+        f"the society records {sorted(recorded)}",
+    )
+    row.expect(bool(noticing), f"no request carried the noticing block: rules {rules[:20]}")
+    row.expect(
+        bool(memory) and bool(noticing) and memory[-1] >= noticing[0],
+        f"no request carried the memory block after the noticing one: rules {rules[:20]}",
+    )
+    row.observed = {
+        "plan_sha256": hashlib.sha256(HANDS_PLAN.read_bytes()).hexdigest(),
+        "headings": [
+            plan["rules"][MEMORY_RULE]["match"]["contains"],
+            plan["rules"][NOTICING_RULE]["match"]["contains"],
+        ],
+        "calls": len(rules),
+        "with_noticing": len(noticing),
+        "with_memory": len(memory),
+        "first": {
+            "noticing": noticing[0] if noticing else None,
+            "memory": memory[0] if memory else None,
+        },
+        "modules": sorted(recorded),
+    }
+    return row.close()
+
+
+#: The most simulated minutes HR1 steps a society for an asked act to be done.
+ASKED_MINUTES = 15
+
+
+def hands_request(
+    c: Any,
+    step: str,
+    entry: Mapping[str, Any],
+    subject: str,
+    ability: str,
+    thing: str,
+    with_id: str | None = None,
+) -> tuple[int, Any]:
+    """A direct request asking ``subject`` for a hands act, from the society's current state."""
+    _, now = F.society(c, step, entry)
+    intent: dict[str, Any] = {"kind": "hands", "ability": ability, "thing_id": thing}
+    if with_id is not None:
+        intent["with_id"] = with_id
+    return c.call(
+        step,
+        "POST",
+        F.version_path(entry, "/society/actions"),
+        query=F.world_query(entry),
+        body={
+            "idempotency_key": str(uuid.uuid4()),
+            "base_tick": (now or {}).get("current_tick"),
+            "base_state_sha256": (now or {}).get("state_sha256"),
+            "subject_id": subject,
+            "intent": intent,
+        },
+    )
+
+
+def row_hr1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
+    plans = {p["key"]: p for p in json.loads((worktree / BODY_PLANS).read_text())["entries"]}
+    float_most = max(s["length_mm_maximum"] for s in plans["bodiless"]["sockets"])
+    row = Row(
+        "HR1",
+        "things.hands_request",
+        "A person asks a being to use its hands (candidate-36): on workspace 2's own build of the "
+        "newest locked scene, a society of things nobody's model runs, the owner asks the knight to "
+        f"pick the sword up and within {ASKED_MINUTES} minutes it does, the event recorded as asked "
+        "(asked_to_pick_up) after a user_action_requested event; asking the lantern spirit, whose "
+        f"socket holds at most {float_most} mm, to pick the sword up is refused act_not_offered; "
+        "a thing the society does not hold is refused thing_gone (each 409 invalid_society_action "
+        "naming its reason, A-140); give without the other being is 422; on a town society, which "
+        "takes no directed actions, a hands request is refused engine_takes_no_directed_actions.",
+    )
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    record_path = out / "evidence" / "hr1-scene-build.json"
+    built = build_scene(stack, worktree, record_path, token_file="token-2")
+    (out / "evidence" / "hr1-scene-build.txt").write_text(built.stdout + built.stderr)
+    if not record_path.exists():
+        row.expect(False, f"the build exited {built.returncode}")
+        return row.close()
+    record = json.loads(record_path.read_text())
+    entry = F.read_entry(w2, "HR1", record["entry_id"])
+    status, society = w2.call(
+        "HR1",
+        "POST",
+        F.version_path(entry, "/society"),
+        query=F.world_query(entry),
+        body={"region_id": record["arrival"]["region_id"], "profile": THINGS_ENGINE},
+    )
+    state = (society or {}).get("state") or {}
+    placed = {p.get("placed_id"): p.get("id") for p in state.get("inhabitants") or []}
+    knight, spirit = placed.get("knight"), placed.get("lantern-spirit")
+    sword = next(
+        (t.get("id") for t in state.get("things") or [] if t.get("placed_id") == "sword"), None
+    )
+    row.expect(
+        status in (200, 201) and knight and spirit and sword, f"the society answered {status}"
+    )
+    if not (knight and spirit and sword):
+        return row.close()
+    refusals = {}
+    # A-140: a direct request the state cannot honour is 409 invalid_society_action naming its
+    # reason in the detail, as every directed request's refusal is answered and the page reads it
+    # (society-directed-action.ts, REFUSAL_WORDS).
+    for label, args, wanted in (
+        ("spirit", (spirit, "pick_up", sword), (409, "act_not_offered")),
+        ("gone", (knight, "pick_up", str(uuid.uuid4())), (409, "thing_gone")),
+        ("give without", (knight, "give", sword), (422, None)),
+    ):
+        got, answer = hands_request(w2, f"HR1 {label}", entry, *args)
+        reason = (
+            (answer or {}).get("detail") if isinstance((answer or {}).get("detail"), str) else None
+        )
+        refusals[label] = [got, F.problem_code(answer), reason]
+        row.expect(
+            got == wanted[0]
+            and (
+                wanted[1] is None
+                or (F.problem_code(answer) == "invalid_society_action" and reason == wanted[1])
+            ),
+            f"{label}: answered {got} {F.problem_code(answer)} {reason}, not {wanted}",
+        )
+    status_ask, asked = hands_request(w2, "HR1 ask", entry, knight, "pick_up", sword)
+    row.expect(
+        status_ask in (200, 201, 202),
+        f"asking the knight answered {status_ask} {F.problem_code(asked)}",
+    )
+    picked: list[dict[str, Any]] = []
+    for _ in range(ASKED_MINUTES):
+        _, now = F.society(w2, "HR1 step", entry)
+        F.advance(w2, "HR1 step", entry, now or {})
+        events = society_events(w2, "HR1 events", entry)
+        picked = [
+            e
+            for e in events
+            if e.get("event_kind") == "picked_up" and e.get("subject_id") == knight
+        ]
+        if picked:
+            break
+    requested = [
+        e
+        for e in society_events(w2, "HR1 events", entry)
+        if e.get("event_kind") == "user_action_requested" and e.get("subject_id") == knight
+    ]
+    row.expect(
+        bool(picked)
+        and ((picked[0].get("document") or {}).get("thing") or {}).get("thing") == sword
+        and "asked_to_pick_up" in json.dumps(picked[0]),
+        f"the knight's asked pick-up: {picked[:1]}",
+    )
+    row.expect(bool(requested), "no user_action_requested event names the knight")
+    town = generated_town(w2, "HR1 town", "Q10 HR1 town")
+    _, town_society = F.society(w2, "HR1 town", town)
+    person = next(
+        (p.get("id") for p in ((town_society or {}).get("state") or {}).get("inhabitants") or []),
+        None,
+    )
+    status_town, town_answer = hands_request(
+        w2, "HR1 town", town, person, "pick_up", str(uuid.uuid4())
+    )
+    town_reason = (town_answer or {}).get("detail")
+    row.expect(
+        status_town == 409 and town_reason == "engine_takes_no_directed_actions",
+        f"a town's hands request answered {status_town} {F.problem_code(town_answer)} {town_reason}",
+    )
+    row.observed = {
+        "society": [status, (society or {}).get("profile")],
+        "refusals": refusals,
+        "asked": [status_ask, F.problem_code(asked)],
+        "picked_up": [
+            {k: e.get(k) for k in ("event_kind", "subject_id", "tick")}
+            | {"document": e.get("document")}
+            for e in picked[:1]
+        ],
+        "requested": len(requested),
+        "town": [status_town, F.problem_code(town_answer), town_reason],
+        "float_socket_mm": float_most,
+    }
+    return row.close()
+
+
 def hands(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -8130,7 +8547,13 @@ def hands(arguments: argparse.Namespace) -> int:
     started = dt.datetime.now(dt.UTC).isoformat()
     transcripts = Transcripts(out / "transcripts")
     hn1 = row_hn1(stack, transcripts, worktree, out)
-    rows = [hn1, row_tc1(stack, transcripts, worktree, hn1.observed)]
+    mm1 = row_mm1(stack, worktree, hn1.observed)
+    rows = [
+        hn1,
+        mm1,
+        row_tc1(stack, transcripts, worktree, hn1.observed),
+        row_hr1(stack, transcripts, worktree, out),
+    ]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
 
@@ -8456,6 +8879,7 @@ def build_parser() -> argparse.ArgumentParser:
         "pieces",
         "hands",
         "guest-turns",
+        "picture-rights",
     ):
         guested = commands.add_parser(name)
         guested.add_argument("--worktree", required=True)
@@ -8495,6 +8919,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "pieces": pieces,
         "hands": hands,
         "guest-turns": guest_turns,
+        "picture-rights": picture_rights,
         "declare-luanti": declare_luanti,
     }
     return commands[arguments.command](arguments)

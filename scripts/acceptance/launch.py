@@ -77,6 +77,9 @@ starts exactly what it always did:
   (``EXULANICA_DOOR_BRIDGES``, digests only, never a credential), so an adapter can be run against
   the slot's API. An entry's ``"workspaces": "synthetic"`` becomes the run's synthetic workspace
   ids, which the file cannot know before the run makes them; the API's own loader checks the rest.
+- ``--reference-pictures`` serves references to the first workspace with a person's own pictures
+  turned on, so ``GET /worlds/references`` states the consent a picture's reading right is granted
+  against.
 - ``--society-of-things`` offers the society of things on the slot's API
   (``EXULANICA_SOCIETY_OF_THINGS=on``), so a rehearsal can start a society over placed things. It
   is set for the API process alone, after the scrub of the shell's ``EXULANICA_`` variables, and
@@ -766,6 +769,7 @@ def api_environment(
     door_bridges: str | None = None,
     society_of_things: bool = False,
     accounts: Mapping[str, str] | None = None,
+    reference_pictures: Sequence[str] | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     environment = clean_environment(environ)
@@ -788,6 +792,11 @@ def api_environment(
         environment["EXULANICA_DOOR_BRIDGES"] = door_bridges
     if society_of_things:
         environment["EXULANICA_SOCIETY_OF_THINGS"] = "on"
+    if reference_pictures:
+        # The workspaces references are served to, with a person's own pictures turned on, so the
+        # list states the consent a picture's reading right is granted against.
+        environment["EXULANICA_REFERENCE_WORKSPACES"] = json.dumps(list(reference_pictures))
+        environment["EXULANICA_REFERENCE_PICTURES"] = "on"
     if accounts is not None:
         environment.update(accounts)
     return environment
@@ -1642,6 +1651,8 @@ def up(arguments: argparse.Namespace) -> None:
         state["door_bridges"] = door_bridges
     if arguments.society_of_things:
         state["society_of_things"] = True
+    if arguments.reference_pictures:
+        state["reference_pictures"] = [workspace_id]
 
     accounts = None
     if arguments.accounts_guest_code:
@@ -1696,6 +1707,7 @@ def up(arguments: argparse.Namespace) -> None:
         door_bridges=door_bridges,
         society_of_things=arguments.society_of_things,
         accounts=accounts,
+        reference_pictures=state.get("reference_pictures"),
     )
     environment.update(model_witness_environment(environment, run_dir))
     plan = None
@@ -2015,6 +2027,7 @@ def restart_api(arguments: argparse.Namespace) -> None:
         door_bridges=state.get("door_bridges"),
         society_of_things=bool(state.get("society_of_things")),
         accounts=(state.get("accounts") or {}).get("environment"),
+        reference_pictures=state.get("reference_pictures"),
     )
     environment.update(model_witness_environment(environment, run_dir))
     scripted = state.get("scripted_model")
@@ -2216,6 +2229,13 @@ def build_parser() -> argparse.ArgumentParser:
                 help="admit the outside programs a JSON array of bridge declarations names "
                 '(EXULANICA_DOOR_BRIDGES; an entry\'s "workspaces": "synthetic" becomes the '
                 "run's synthetic workspaces) (default: no bridge)",
+            )
+            command.add_argument(
+                "--reference-pictures",
+                action="store_true",
+                help="serve references to the first workspace with a person's own pictures on "
+                "(EXULANICA_REFERENCE_WORKSPACES, EXULANICA_REFERENCE_PICTURES=on), so the list "
+                "states the consent a picture's reading right is granted against (default: off)",
             )
             command.add_argument(
                 "--society-of-things",

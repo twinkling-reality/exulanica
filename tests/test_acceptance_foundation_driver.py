@@ -231,3 +231,29 @@ def test_a_transcript_holds_no_door_credential_or_invite_code(tmp_path):
     assert lines[1]["response_body"]["code"] == DRIVE.CREDENTIAL_PLACEHOLDER
     # A problem's code is not an invite's: it is kept.
     assert lines[2]["response_body"] == problem
+
+
+def test_a_browser_capture_skips_the_quiet_slot_only_when_it_is_off(tmp_path, monkeypatch):
+    # Root's 16:43 rule: acceptance runs outside a declared quiet window run directly; a browser
+    # still takes the GPU slot, and the default keeps both slots.
+    bin_dir = tmp_path / ".exulanica" / "bin"
+    bin_dir.mkdir(parents=True)
+    for name in ("gpu-slot", "quiet-slot"):
+        (bin_dir / name).write_text("#!/bin/sh\n")
+
+    class Rehearse:
+        @staticmethod
+        def main_checkout(worktree):
+            return tmp_path
+
+        @staticmethod
+        def browser_slot_command(gpu, quiet, command):
+            return [str(gpu), str(quiet), *command]
+
+    monkeypatch.setenv(DRIVE.QUIET_SLOT_VARIABLE, "off")
+    direct = DRIVE.browser_command(Rehearse, tmp_path, ["node", "run.mjs"])
+    monkeypatch.delenv(DRIVE.QUIET_SLOT_VARIABLE)
+    slotted = DRIVE.browser_command(Rehearse, tmp_path, ["node", "run.mjs"])
+
+    assert direct == [str(bin_dir / "gpu-slot"), "node", "run.mjs"]
+    assert slotted == [str(bin_dir / "gpu-slot"), str(bin_dir / "quiet-slot"), "node", "run.mjs"]

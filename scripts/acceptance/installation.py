@@ -486,11 +486,13 @@ def base_image_ids(installation: Installation) -> dict[str, str]:
 
 
 def build(installation: Installation, evidence: Path) -> dict[str, Any]:
-    """Build every image of the composition through quiet-slot; record what it downloaded."""
+    """Build every image of the composition, through quiet-slot unless ACCEPTANCE_QUIET_SLOT is
+    off (root's 16:43 rule); record what it downloaded."""
     quiet = main_checkout(installation.worktree) / ".exulanica" / "bin" / "quiet-slot"
+    slotted = quiet.exists() and os.environ.get("ACCEPTANCE_QUIET_SLOT", "on") != "off"
     before = base_image_ids(installation)
     command = installation.compose_command("--profile", "recovery", "build")
-    if quiet.exists():
+    if slotted:
         command = [str(quiet), *command]
     started = time.monotonic()
     done = subprocess.run(
@@ -508,7 +510,7 @@ def build(installation: Installation, evidence: Path) -> dict[str, Any]:
     downloads = [line[:300] for line in log.splitlines() if DOWNLOADED.search(line)]
     return {
         "exit": done.returncode,
-        "through_quiet_slot": quiet.exists(),
+        "through_quiet_slot": slotted,
         "seconds": round(time.monotonic() - started, 1),
         "download_lines": downloads,
         "metadata_lookups": sum("load metadata for" in line for line in log.splitlines()),

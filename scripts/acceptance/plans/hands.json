@@ -1,16 +1,43 @@
 {
  "profile": "q10-scripted-model-plan/v1",
- "note": "HN1 (candidate-34, A-122): every being a model runs picks the sword up when it is offered, else gives it, else waits, saying nothing.",
+ "note": "HN1 (A-122, A-125) and MM1 (candidate-36): every being a model runs picks the sword up when it is offered, else gives it, else talks with someone near (a meeting each remembers, MM1, A-140), else waits, saying nothing; the first two rules choose the same but match the memory block's and the noticing block's own headings, so the call log shows which requests carried them.",
  "bounds": {
   "ceiling_usd": "0.50",
   "max_calls": 400
  },
  "rules": [
   {
+   "match": {
+    "contains": "You remember (from what happened here"
+   },
    "choose": {
     "containing": [
      "pick up the sword",
      "give the sword to",
+     "talk with",
+     "wait"
+    ]
+   }
+  },
+  {
+   "match": {
+    "contains": "Around you now:"
+   },
+   "choose": {
+    "containing": [
+     "pick up the sword",
+     "give the sword to",
+     "talk with",
+     "wait"
+    ]
+   }
+  },
+  {
+   "choose": {
+    "containing": [
+     "pick up the sword",
+     "give the sword to",
+     "talk with",
      "wait"
     ]
    }

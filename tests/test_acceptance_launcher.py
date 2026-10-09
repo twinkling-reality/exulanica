@@ -1030,3 +1030,38 @@ def test_a_playback_run_with_accounts_needs_readiness_to_report_account_discover
         )
         == "society-playback-not-running"
     )
+
+
+def test_reference_pictures_serve_references_to_the_first_workspace_with_pictures_on():
+    # A-141: the list states the consent a picture's reading right is granted against only where
+    # references are served to the workspace and pictures are on (exulanica/references/settings.py).
+    exports = {
+        "EXULANICA_DATABASE_URL": "postgresql://exulanica_app@localhost:19200/exulanica",
+        "EXULANICA_READONLY_DATABASE_URL": "postgresql://exulanica_ro@localhost:19200/exulanica",
+        "EXULANICA_PURGE_DATABASE_URL": "postgresql://exulanica_purge@localhost:19200/exulanica",
+    }
+    workspace = "0f3c2b1a-0000-4000-8000-000000000001"
+
+    def environment(reference_pictures):
+        return LAUNCH.api_environment(
+            exports=exports,
+            grant={"token": {"permissions": []}},
+            data_dir=Path("run/data"),
+            model=False,
+            derivative_worker=False,
+            society_playback={},
+            reference_pictures=reference_pictures,
+            environ={},
+        )
+
+    served, off = environment([workspace]), environment(None)
+
+    assert json.loads(served["EXULANICA_REFERENCE_WORKSPACES"]) == [workspace]
+    assert served["EXULANICA_REFERENCE_PICTURES"] == "on"
+    assert "EXULANICA_REFERENCE_WORKSPACES" not in off
+    assert "EXULANICA_REFERENCE_PICTURES" not in off
+    assert (
+        LAUNCH.build_parser()
+        .parse_args(["up", "--worktree", ".", "--reference-pictures"])
+        .reference_pictures
+    )
