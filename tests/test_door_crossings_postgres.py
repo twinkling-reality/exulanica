@@ -14,6 +14,7 @@ Through the real routes, as a world's owner and as a bridge with a channel crede
 *   revoking the grant sends its visitors home, and the bridge reads every departure before it
     reads that the grant ended;
 *   a visitor whose player left is not asked again;
+*   a thing's card reads what came across with a visitor by its arrival in the world;
 *   the society replays from what it stored and bound, with no bridge running.
 """
 
@@ -25,7 +26,7 @@ from typing import Any
 
 import pytest
 from exulanica.canonical import sha256_of_canonical
-from exulanica.door.bridges import load_bridge_directory
+from exulanica.door.bridges import BridgeDirectory, load_bridge_directory
 from exulanica.door.crossings import DoorCrossings
 from exulanica.world.crossings import register_crossing_stream
 
@@ -237,6 +238,74 @@ def test_a_visitor_crosses_in_through_the_door_and_goes_home(door, crossings):
     assert (unknown.status_code, unknown.json()["code"]) == (404, "unknown_reference")
     # The society replays from what it stored and bound, with no bridge running.
     assert _replayed(client, world)
+
+
+def test_a_visitor_s_card_reads_what_came_across_by_its_arrival_in_its_world(door, crossings):
+    """The manifest the door kept for an arrival, read by the arrival's id in its world: the
+    stored document and its digest, and the bridge in the words the deployment declares for it.
+    An id that names no arrival into that world is answered as one nobody sent."""
+    world, _society = _world(door)
+    client = door["client"]
+    grant_id, channel = _grant(door)
+    assert _hello(door, channel).status_code == 200
+    arrival_id = str(uuid.uuid4())
+    sent = _arrive(client, channel, arrival_id)
+    assert sent.status_code == 201, sent.text
+    scope = {"world_id": world["binding"].world_id}
+    read = client.get(f"/door/crossings/{arrival_id}/manifest", headers=OWNER, params=scope)
+    assert read.status_code == 200, read.text
+    body = read.json()
+    connection = world["connection"]
+    stored = connection.execute(
+        "select m.manifest_sha256, m.document from door_crossing c join door_manifest m "
+        "  on m.workspace_id = c.workspace_id "
+        " and m.manifest_sha256 = c.document->>'translation_manifest_sha256' "
+        "where c.workspace_id = %s and c.crossing_id = %s",
+        (world["workspace"], uuid.UUID(arrival_id)),
+    ).fetchone()
+    connection.commit()
+    assert (body["manifest_sha256"], body["manifest"]) == (
+        stored["manifest_sha256"],
+        stored["document"],
+    )
+    assert sha256_of_canonical(body["manifest"]).hex() == body["manifest_sha256"]
+    assert body["from"] == {"bridge": "test-bridge", "label": "A test bridge", "ai": False}
+    # The card's words are the mapping's own: what the sword is, and why the name stayed behind.
+    fields = {field["path"]: field for field in body["manifest"]["fields"]}
+    assert fields["/test:sword"]["words"] == "A sword, which arrives as a sword"
+    assert (fields["/player name"]["disposition"], fields["/player name"]["reason"]) == (
+        "dropped",
+        "a person's name never crosses",
+    )
+
+    # Sent home, the visitor's departure is written under an id that names no arrival, and what
+    # came across with it does not change.
+    thing_id = sent.json()["thing_id"]
+    sent_away = client.post(
+        f"/door/grants/{grant_id}/send-away", headers=OWNER, json={"thing_id": thing_id}
+    )
+    assert sent_away.status_code == 202, sent_away.text
+    nothing = {"code": "unknown_reference", "detail": "nothing at this address is available"}
+    for asked, params in (
+        (str(uuid.uuid4()), scope),
+        (_departure_id(grant_id, thing_id, "sent_away"), scope),
+        (arrival_id, {"world_id": "another-world"}),
+    ):
+        refused = client.get(f"/door/crossings/{asked}/manifest", headers=OWNER, params=params)
+        assert (refused.status_code, refused.json()) == (404, nothing), asked
+    again = client.get(f"/door/crossings/{arrival_id}/manifest", headers=OWNER, params=scope)
+    assert (again.status_code, again.json()) == (200, body)
+
+    # A deployment that no longer declares the bridge still shows what came across, and states
+    # nothing it does not know about the bridge.
+    bare, _runtime = door["application"](BridgeDirectory())
+    with bare:
+        undeclared = bare.get(f"/door/crossings/{arrival_id}/manifest", headers=OWNER, params=scope)
+    assert undeclared.status_code == 200, undeclared.text
+    assert undeclared.json() == {
+        **body,
+        "from": {"bridge": "test-bridge", "label": None, "ai": None},
+    }
 
 
 def test_a_second_visitor_waits_for_room_and_an_unshipped_look_is_refused(door, crossings):

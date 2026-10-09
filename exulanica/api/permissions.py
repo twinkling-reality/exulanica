@@ -604,6 +604,7 @@ _OPERATIONS_WRITES: Final = _every(
 _WORLD_READS: Final = _every(
     _WORLD_READ,
     "GET /door/bridges",
+    "GET /door/crossings/{arrival_id}/manifest",
     "GET /door/grants",
     "GET /door/grants/{grant_id}",
     "GET /materials/library",

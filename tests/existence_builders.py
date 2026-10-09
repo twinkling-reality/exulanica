@@ -49,6 +49,7 @@ from exulanica.world.society_experiments import DEVELOPMENT_SEEDS
 from exulanica.world.society_repository import SocietyRepository
 
 import comparison_support
+import door_support
 import things_society_support as things_support
 from conftest import (
     DEFAULT_PAYLOAD,
@@ -946,6 +947,70 @@ def door_grant(owner) -> str:
         201,
     )
     return granted["grant"]["grant_id"]
+
+
+def door_arrival(owner) -> str:
+    """A visitor's arrival through the sweep's test bridge, by the id the bridge chose for it, into
+    a society of things of the owner's world (API): a grant letting one player in, opened with an
+    invite the bridge's server redeems (the bridge is listed, so its grants open no other way), the
+    bridge's hello with its mapping, and the arrival, whose translation manifest the door keeps."""
+    version_id = society_thing(owner)["/world/versions/{version_id}"]
+    issued = _ok(
+        in_world(
+            owner,
+            "POST",
+            "/door/grants",
+            json={
+                "idempotency_key": "existence-sweep-visitors",
+                "bridge": "test-bridge",
+                "visitors_maximum": 1,
+                "kinds": ["player"],
+                "version_id": str(version_id),
+            },
+        ),
+        201,
+    )
+    grant_id = issued["grant"]["grant_id"]
+    invited = _ok(owner.request("POST", f"/door/grants/{grant_id}/invites"), 201)
+    redeemed = _ok(
+        owner.request(
+            "POST",
+            "/door/invites/redeem",
+            headers={"Authorization": f"Bearer {door_support.BRIDGE_CREDENTIAL}"},
+            json={"code": invited["code"], "requester": "a" * 64},
+        ),
+        201,
+    )
+    channel = {"Authorization": f"Bearer {redeemed['credential']}"}
+    _ok(
+        owner.request(
+            "POST",
+            "/door/channel/hello",
+            headers=channel,
+            json={
+                "adapter_version": door_support.ADAPTER_VERSION,
+                "mapping": door_support.mapping(),
+                "reads": door_support.READS,
+            },
+        ),
+        200,
+    )
+    arrival_id = str(uuid.uuid4())
+    _ok(
+        owner.request(
+            "POST",
+            "/door/channel/arrivals",
+            headers=channel,
+            json={
+                "arrival_id": arrival_id,
+                "game_type": "player",
+                "look_key": "otherwise",
+                "carried": [],
+            },
+        ),
+        201,
+    )
+    return arrival_id
 
 
 def world_entry(owner) -> str:

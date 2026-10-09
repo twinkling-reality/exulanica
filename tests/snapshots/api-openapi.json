@@ -20747,6 +20747,77 @@
     }
    }
   },
+  "/door/crossings/{arrival_id}/manifest": {
+   "get": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Crossing Manifest",
+    "description": "What came across with one visitor and what stayed behind: the translation manifest its\narrival into this world named, as the door kept it, with its digest, and the bridge it came\nthrough in the words the deployment declares for it (null for a bridge it no longer\ndeclares). One answer for an id that names no arrival into this world.",
+    "operationId": "crossing_manifest_door_crossings__arrival_id__manifest_get",
+    "parameters": [
+     {
+      "name": "arrival_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Arrival Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Crossing Manifest Door Crossings  Arrival Id  Manifest Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/door/grants/{grant_id}/revoke": {
    "post": {
     "tags": [

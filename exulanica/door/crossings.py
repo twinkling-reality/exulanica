@@ -33,8 +33,10 @@ Replay reads the bound crossings back by minute, so a society with visitors repl
 running.
 
 A visitor is present from its arrival (bound as arrived, or not yet taken) until a departure of it
-is written or the society records it leaving by its own rules. Every query here runs on a
-connection scoped to the grant's workspace.
+is written or the society records it leaving by its own rules. A thing's card reads what came
+across with a visitor by its arrival in the world (:func:`manifest_of_arrival`). Every query here
+runs on a connection scoped to the workspace whose rows it reads or writes: the grant's, or the
+reader's.
 """
 
 from __future__ import annotations
@@ -76,9 +78,11 @@ from exulanica.world.thing_store import admitted_look_by_digest
 __all__ = [
     "ARRIVALS_PER_HOUR_MAXIMUM",
     "CARRIED_UNITS_MAXIMUM",
+    "ArrivalManifest",
     "DoorCrossings",
     "Visits",
     "departure_id",
+    "manifest_of_arrival",
 ]
 
 #: The most things one arrival carries in, every unit counted: the society's own bound.
@@ -160,6 +164,44 @@ def departure_id(grant_id: uuid.UUID, thing_id: uuid.UUID, reason: str) -> uuid.
     """The one departure the door writes for ``thing_id`` for ``reason``: writing it twice is
     writing it once."""
     return _id(grant_id, "departure", thing_id, reason)
+
+
+@dataclass(frozen=True, slots=True)
+class ArrivalManifest:
+    """What came across with one visitor: the translation manifest its arrival named, as the door
+    kept it by its digest, and the key of the bridge it came through."""
+
+    manifest_sha256: str
+    manifest: Mapping[str, Any]
+    bridge: str
+
+
+def manifest_of_arrival(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, arrival_id: uuid.UUID
+) -> ArrivalManifest | None:
+    """The manifest of the arrival ``arrival_id`` into one of ``world_id``'s societies, or None
+    where no arrival of that id came into that world: a departure's id, another world's arrival
+    and an id nobody sent are all None. A bridge chooses its arrival ids and each society holds
+    one id once, so an id sent into two versions' societies of a world names two arrivals: the
+    newest answers. Read through the world's societies, so each is looked up by its key."""
+    row = connection.execute(
+        "select c.document->>'translation_manifest_sha256' as manifest_sha256, "
+        "       c.document->'origin'->'by'->>'bridge' as bridge, m.document as manifest "
+        "from world_society s "
+        "join door_crossing c on c.workspace_id = s.workspace_id "
+        " and c.society_id = s.society_id and c.crossing_id = %(a)s and c.kind = 'arrival' "
+        "join door_manifest m on m.workspace_id = c.workspace_id "
+        " and m.manifest_sha256 = c.document->>'translation_manifest_sha256' "
+        "where s.workspace_id = %(w)s and s.world_id = %(world)s "
+        "order by c.recorded_at desc, c.society_id "
+        "limit 1",
+        {"w": workspace_id, "world": world_id, "a": arrival_id},
+    ).fetchone()
+    if row is None:
+        return None
+    return ArrivalManifest(
+        manifest_sha256=row["manifest_sha256"], manifest=row["manifest"], bridge=row["bridge"]
+    )
 
 
 class DoorCrossings:

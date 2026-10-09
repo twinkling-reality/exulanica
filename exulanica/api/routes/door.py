@@ -8,7 +8,8 @@ opens it either with an invite
 a server bridge redeems (``POST /door/grants/{grant_id}/invites``) or with a channel credential
 shown once (``.../channel-credentials``), for a program the owner runs or a server bridge declared
 for the owner's workspace alone. These owner routes need ``world.write`` and ``door.grant``; the
-reads need ``world.read``.
+reads need ``world.read``, among them what came across with a visitor, read by its arrival in the
+world (``GET /door/crossings/{arrival_id}/manifest``).
 
 A bridge redeems an invite with its deployment credential (``POST /door/invites/redeem``) and then
 acts on its grant's channel with the channel credential it received: it says hello with its
@@ -71,7 +72,7 @@ from exulanica.door.channel import (
     presence_of,
     presence_window,
 )
-from exulanica.door.crossings import CARRIED_UNITS_MAXIMUM, Visits
+from exulanica.door.crossings import CARRIED_UNITS_MAXIMUM, Visits, manifest_of_arrival
 from exulanica.door.grants import (
     GRANTS_LISTED_MAXIMUM,
     MINUTES_DEFAULT,
@@ -414,6 +415,34 @@ def one_grant(
     for unsettled in grants.unsettled([grant_id], limit=1):
         grants.settle(unsettled)
     return {"grant": _grant_view(grant, connection, session.workspace_id, _bridges_of(request))}
+
+
+@router.get("/crossings/{arrival_id}/manifest")
+def crossing_manifest(
+    request: Request,
+    arrival_id: uuid.UUID,
+    session: CurrentSession,
+    connection: ScopedConnection,
+    world_id: WorldId,
+) -> Any:
+    """What came across with one visitor and what stayed behind: the translation manifest its
+    arrival into this world named, as the door kept it, with its digest, and the bridge it came
+    through in the words the deployment declares for it (null for a bridge it no longer
+    declares). One answer for an id that names no arrival into this world."""
+    found = manifest_of_arrival(connection, session.workspace_id, world_id, arrival_id)
+    if found is None:
+        return _problem(404, "unknown_reference", "nothing at this address is available")
+    directory = _bridges_of(request)
+    bridge = None if directory is None else directory.get(found.bridge)
+    return {
+        "manifest_sha256": found.manifest_sha256,
+        "manifest": found.manifest,
+        "from": {
+            "bridge": found.bridge,
+            "label": None if bridge is None else bridge.label,
+            "ai": None if bridge is None else bridge.ai,
+        },
+    }
 
 
 @router.post("/grants/{grant_id}/revoke")
