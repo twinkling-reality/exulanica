@@ -51,6 +51,7 @@ __all__ = [
     "OPEN_STATES",
     "PieceAllowanceRefused",
     "PieceAskKeyReused",
+    "PieceLookLimit",
     "PieceNotTakenIn",
     "PieceQuotaExceeded",
     "PieceRequestNotCancellable",
@@ -63,6 +64,7 @@ __all__ = [
     "list_piece_requests",
     "open_worst_case",
     "read_piece_request",
+    "workspace_deleted",
 ]
 
 #: The states a request waits in; the rest are ends.
@@ -97,6 +99,11 @@ Weigh = Callable[[psycopg.Connection, Decimal, Decimal], None]
 
 class PieceQuotaExceeded(ExulanicaError):
     """The workspace has made as many requests in a day, or holds as many open, as it may."""
+
+
+class PieceLookLimit(ExulanicaError):
+    """The workspace holds as many live looks of generated pieces as it may, so no new pieces can
+    be taken into a look."""
 
 
 class PieceNotTakenIn(ExulanicaError):
@@ -325,7 +332,9 @@ def create_piece_requests(
     request digest is answered rather than made again. Only the requests left to make are weighed
     (``weigh``, beside what the workspace's open requests can still cost); when it refuses, nothing
     is written. Under a key the ask is recorded with every request it answered with. A workspace
-    over its limits is :class:`PieceQuotaExceeded`.
+    over its limits is :class:`PieceQuotaExceeded`; one holding as many live looks of generated
+    pieces as it may is :class:`PieceLookLimit` for an ask that would make a request, after a key's
+    earlier answer and the requests already open are answered.
     """
     if (request_id is None) != (ask_sha256 is None):
         raise ValueError("a key comes with the digest of the ask it names")
@@ -365,6 +374,11 @@ def create_piece_requests(
                 ).fetchone()
                 if open_row is not None:
                     waiting[index] = _record(open_row)
+            if len(waiting) < len(planned) and generated_looks_full(connection, workspace_id):
+                raise PieceLookLimit(
+                    "this workspace holds as many looks of generated pieces as it may; no new "
+                    "pieces can be taken into a look"
+                )
             to_make = sum(
                 (worst for index, worst in enumerate(worst_cases) if index not in waiting),
                 Decimal(0),
@@ -420,12 +434,20 @@ def create_piece_requests(
     return answered, made
 
 
+def workspace_deleted(connection: Any, workspace_id: uuid.UUID) -> bool:
+    """Whether the workspace has a workspace tombstone: nothing more is done in it."""
+    return (
+        connection.execute(
+            "select 1 from tombstone where workspace_id = %s and scope = 'workspace' limit 1",
+            (workspace_id,),
+        ).fetchone()
+        is not None
+    )
+
+
 def _refuse_if_tombstoned(cursor: Any, workspace_id: uuid.UUID) -> None:
     """Refuse every ask in a deleted workspace, a key replay as much as a new request."""
-    if cursor.execute(
-        "select 1 from tombstone where workspace_id = %s and scope = 'workspace' limit 1",
-        (workspace_id,),
-    ).fetchone():
+    if workspace_deleted(cursor, workspace_id):
         raise TombstonedError("tombstoned: the workspace has been deleted and takes no ask")
 
 

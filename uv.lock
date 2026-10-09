@@ -323,7 +323,7 @@ requires-dist = [
     { name = "pillow", specifier = ">=12.3.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "pycolmap", marker = "extra == 'pose'", specifier = "==4.2.0" },
-    { name = "pydantic", specifier = ">=2.9" },
+    { name = "pydantic", specifier = ">=2.13" },
     { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "scipy", marker = "extra == 'reconstruction'", specifier = ">=1.11" },
     { name = "torch", marker = "sys_platform == 'darwin' and extra == 'reconstruction'", specifier = ">=2.5", index = "https://download.pytorch.org/whl/cpu" },

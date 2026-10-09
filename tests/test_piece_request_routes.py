@@ -20,6 +20,7 @@ from exulanica.api.authorisation import load_token_directory
 from exulanica.api.routes import piece_requests as route
 from exulanica.api.services import Services
 from exulanica.db.roles import provision_runtime_role
+from exulanica.generation import store
 from exulanica.generation.requests import GPU_PROVIDER
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.things.kinds import shipped_thing_kinds
@@ -326,6 +327,20 @@ def test_a_key_replay_answers_before_the_allowance_is_weighed(api) -> None:
     assert [r["piece_request_id"] for r in again.json()["piece_requests"]] == [
         r["piece_request_id"] for r in first.json()["piece_requests"]
     ]
+
+
+def test_at_its_limit_of_generated_looks_an_ask_answers_409_and_a_replay_200(
+    api, monkeypatch
+) -> None:
+    client = api()
+    key = str(uuid.uuid4())
+    first = _ask(client, idempotency_key=key)
+    assert first.status_code == 202
+    monkeypatch.setattr(store, "generated_looks_full", lambda *_: True)
+    assert _ask(client, idempotency_key=key).status_code == 200
+    refused = _ask(client, kinds=(("sword", 3),))
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "look_limit"
 
 
 def test_an_ask_in_a_deleted_workspace_answers_410(api, repository) -> None:

@@ -47,6 +47,7 @@ from exulanica.store.configured import content_stores
 from exulanica.things.kinds import shipped_thing_kinds
 from exulanica.world.style_pack_library import style_pack_library
 from exulanica.world.style_packs import load_context
+from exulanica.world.workspace_preparations import retained_bytes_limit
 
 __all__ = ["WORKSPACES_ENV", "main"]
 
@@ -118,6 +119,7 @@ def build(args: argparse.Namespace, environ: Mapping[str, str]) -> PieceGenerati
             context=load_context(_TREE),
             stores=stores.workspace_style_packs,
             generated_pieces=stores.generated_pieces,
+            retained_bytes_limit=retained_bytes_limit(environ),
         ),
     )
 

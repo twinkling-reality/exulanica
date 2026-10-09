@@ -44,7 +44,8 @@ dependencies = [
   "pillow>=12.3.0",
   "pi-heif==1.4.0",  # decode-only HEIF wheel; bundled LGPL libraries in license matrix
   "psycopg[binary]>=3.2",
-  "pydantic>=2.9",
+  # 2.13 or later: Field(exclude_if=...) keeps library answers byte for byte (api/routes/world.py).
+  "pydantic>=2.13",
   # `POST /intake` is multipart, and Starlette parses multipart only when this is installed. It
   # is a hard dependency rather than an extra because the route is part of the surface: an
   # instance that could not accept an upload would serve a documented endpoint that raises.

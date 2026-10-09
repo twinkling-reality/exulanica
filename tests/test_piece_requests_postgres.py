@@ -127,6 +127,25 @@ def test_a_key_answers_with_its_ask_or_refuses_another_body(world) -> None:
         _ask(connection, workspace_id, request_id=key, ask_sha256="b" * 64)
 
 
+def test_at_its_limit_of_generated_looks_an_ask_is_refused_after_its_key_s_answer(
+    world, monkeypatch
+) -> None:
+    # A workspace holding as many live looks of generated pieces as it may takes no ask that would
+    # make a request, but a retry of an ask it took answers as before, and so does an ask whose
+    # request is already open.
+    connection, workspace_id = world.connection, world.workspace_id
+    key = uuid.uuid4()
+    first, made = _ask(connection, workspace_id, request_id=key, ask_sha256="a" * 64)
+    assert made
+    monkeypatch.setattr(store, "generated_looks_full", lambda *_: True)
+    again, made_again = _ask(connection, workspace_id, request_id=key, ask_sha256="a" * 64)
+    assert again == first and not made_again
+    open_again, made_open = _ask(connection, workspace_id)
+    assert open_again == first and not made_open
+    with pytest.raises(store.PieceLookLimit):
+        _ask(connection, workspace_id, kinds=(("gate", 1),))
+
+
 def test_an_open_request_for_the_same_world_and_digest_is_held_once(world) -> None:
     connection, workspace_id = world.connection, world.workspace_id
     first, _ = _ask(connection, workspace_id)

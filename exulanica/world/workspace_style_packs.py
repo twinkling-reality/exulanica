@@ -164,7 +164,13 @@ class StylePackIsABase(WorkspaceStylePackError):
 
 
 class StylePackQuotaExceeded(WorkspaceStylePackError):
-    """The workspace's or the installation's room for style packs is full."""
+    """The workspace's or the installation's room for style packs is full. ``bound`` names which
+    room: ``workspace_bytes`` and ``installation_bytes`` for retained bytes, ``versions`` for the
+    schema's count limits (the workspace's live versions, its checks waiting)."""
+
+    def __init__(self, message: str, bound: str = "versions") -> None:
+        super().__init__(message)
+        self.bound = bound
 
 
 class StylePackAttemptsExceeded(WorkspaceStylePackError):
@@ -581,7 +587,8 @@ class WorkspaceStylePackRepository:
                     f"the workspace's own content would hold {held + adding} bytes, over its "
                     f"retained-bytes limit of {self.retained_bytes_limit} bytes (admitted and "
                     "prepared assets and style packs, withdrawn ones included until the "
-                    "workspace is erased)"
+                    "workspace is erased)",
+                    "workspace_bytes",
                 )
             room = self.connection.execute(
                 "select style_pack_installation_bytes_admit(%s, %s) as admitted",
@@ -589,7 +596,8 @@ class WorkspaceStylePackRepository:
             ).fetchone()
             if room is None or not room["admitted"]:
                 raise StylePackQuotaExceeded(
-                    "this installation's style packs are at their retained-bytes limit"
+                    "this installation's style packs are at their retained-bytes limit",
+                    "installation_bytes",
                 )
             base = admitted.base
             self.connection.execute(

@@ -195,13 +195,6 @@ def ask_for_pieces(
         return _refusal(422, refused.code, refused.detail)
     compute = generation_catalogs().compute.for_provider(GPU_PROVIDER)
     worst_cases = [compute.worst_case_usd(plan.variants) for plan in planned]
-    if store.generated_looks_full(connection, session.workspace_id):
-        return _refusal(
-            409,
-            "look_limit",
-            "this workspace holds as many looks of generated pieces as it may; no new pieces can "
-            "be taken into a look",
-        )
     if _is_guest(request, services) and _session_state(connection)["state"] != "running":
         return _refusal(
             409,
@@ -231,6 +224,8 @@ def ask_for_pieces(
         return _refusal(404, "unknown_world", _UNKNOWN_DETAIL)
     except store.PieceQuotaExceeded as limit:
         return _refusal(429, "piece_quota_exceeded", str(limit))
+    except store.PieceLookLimit as full:
+        return _refusal(409, "look_limit", str(full))
     except store.PieceAskKeyReused:
         return _refusal(
             409, "idempotency_key_reused", "the key names an earlier ask with another body"

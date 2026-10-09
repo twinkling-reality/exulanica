@@ -47,7 +47,7 @@ from datetime import datetime, timedelta
 from typing import Any, Final
 
 from exulanica.generation import looks
-from exulanica.generation.store import generated_looks_full
+from exulanica.generation.store import generated_looks_full, workspace_deleted
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.namespaces import WorkspaceStores
 from exulanica.world.errors import (
@@ -72,6 +72,7 @@ from exulanica.world.style_packs import (
     StylePackRefused,
     read_manifest,
 )
+from exulanica.world.workspace_preparations import DEFAULT_RETAINED_BYTES
 from exulanica.world.workspace_style_packs import (
     GeneratedStylePackRefused,
     StylePackQuotaExceeded,
@@ -93,6 +94,8 @@ _REQUEST_COLUMNS: Final = (
     "p.piece_request_id, p.requested_by, p.world_id, p.look_role, p.pack_id, p.pack_version, "
     "p.pack_manifest_sha256, p.finished_at"
 )
+#: The quota bounds that are retained bytes, which end a step by name (``look_bytes_limit``).
+_BYTES_BOUNDS: Final = frozenset({"workspace_bytes", "installation_bytes"})
 #: The authors a derived look names: the shape model of every piece (route A, the THINGS mapping).
 _AUTHORS: Final = ("TRELLIS-image-large",)
 
@@ -138,9 +141,14 @@ class LookStepper:
     context: StylePackContext
     stores: WorkspaceStores
     generated_pieces: ContentAddressedStore | None
+    #: The workspace's retained-bytes limit, as the deployment configures it for the API.
+    retained_bytes_limit: int = DEFAULT_RETAINED_BYTES
 
     def run(self, connection: Any, workspace_id: uuid.UUID, now: datetime) -> list[str]:
-        """Step every world of the workspace that has one waiting; the worlds stepped."""
+        """Step every world of the workspace that has one waiting; the worlds stepped. Nothing is
+        written in a deleted workspace (one still named in a static workspace list)."""
+        if workspace_deleted(connection, workspace_id):
+            return []
         stepped = []
         made, asked = _waiting(connection, workspace_id)
         worlds = sorted({r.world_id for r in made} | {t.request.world_id for t in asked})
@@ -243,6 +251,7 @@ class LookStepper:
             uuid.UUID(int=0),
             stores=self.stores,
             generated_pieces=self.generated_pieces,
+            retained_bytes_limit=self.retained_bytes_limit,
         )
         plan = self._plan(connection, workspace_id, own, current, made, asked)
         oldest = min([r.since for r in made] + [t.since for t in asked])
@@ -334,11 +343,15 @@ class LookStepper:
             role = take.request.look_role
             pieces = _passed(connection, workspace_id, take.request.piece_request_id)
             worn_pieces = [p.piece_sha256 for p in plan.roles.get(role, [])]
-            if base is not None and worn_pieces and worn_pieces == [p.piece_sha256 for p in pieces]:
+            if not worn_pieces or worn_pieces != [p.piece_sha256 for p in pieces]:
+                plan.not_worn.append(take)
+            elif base is None:
+                # The world wears the pieces, but the library no longer holds the look they were
+                # taken into, so no look without them can be made: refused by name, never not worn.
+                plan.not_taken_back.append((take, "base_not_library"))
+            else:
                 del plan.roles[role]
                 plan.taken_back.append(take)
-            else:
-                plan.not_worn.append(take)
         return plan
 
     def _look(
@@ -386,10 +399,13 @@ class LookStepper:
             return None, refused.code
         except GeneratedStylePackRefused as refused:
             return None, refused.code
-        except StylePackQuotaExceeded:
-            # Either the workspace holds as many looks of generated pieces as it may, for good (new
-            # asks are then refused by name before anything is spent), or its four checks are all
-            # waiting, which passes.
+        except StylePackQuotaExceeded as full:
+            # The retained bytes the workspace or the installation may hold are a limit by name; of
+            # the count limits, either the workspace holds as many looks of generated pieces as it
+            # may, for good (new asks are then refused by name before anything is spent), or its
+            # four checks are all waiting, which passes.
+            if full.bound in _BYTES_BOUNDS:
+                return None, "look_bytes_limit"
             if generated_looks_full(own.connection, own.workspace_id):
                 return None, "look_limit"
             return None, "waiting"

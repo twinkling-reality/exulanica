@@ -21,6 +21,7 @@ import dataclasses
 import datetime as dt
 import hashlib
 import json
+import logging
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -527,6 +528,78 @@ def test_at_its_limit_of_generated_looks_a_world_s_step_ends_by_name(world) -> N
     assert world.step() == [world.world_id]
     assert [(s["kind"], s["reason"]) for s in world.steps(plant)] == [("not_applied", "look_limit")]
     assert world.styles.current().style_pack == COZY
+
+
+def test_over_its_retained_bytes_a_world_s_step_ends_by_name(world) -> None:
+    # The stepper holds the limit the deployment configures, not the default; a look the
+    # workspace has no bytes left for ends not applied, look_bytes_limit, on its first pass,
+    # rather than waiting a day as a check that waits would, and the world keeps its look.
+    plant = world.made("plant.default")
+    world.stepper.retained_bytes_limit = 1
+    assert world.step() == [world.world_id]
+    assert [(s["kind"], s["reason"]) for s in world.steps(plant)] == [
+        ("not_applied", "look_bytes_limit")
+    ]
+    assert world.styles.current().style_pack == COZY
+
+
+def test_a_take_back_after_the_library_lets_go_of_the_look_s_base_is_refused_by_name(world) -> None:
+    # The world wears its own look of the pieces, but the library no longer holds the look they
+    # were taken into: no look without them can be made, so the take-back ends not taken back,
+    # base_not_library, never taken back as not worn while the world still wears them.
+    plant = _applied(world)
+    worn = world.styles.current().style_pack
+    library = world.stepper.library
+    others = tuple(pack for pack in library.packs if pack.pack_id != COZY.pack_id)
+    world.stepper.library = dataclasses.replace(library, packs=others, default=others[0].pack_id)
+    store.ask_take_back(world.packs.connection, world.packs.workspace_id, plant, world.packs.actor)
+    assert world.step() == [world.world_id]
+    last = world.steps(plant)[-1]
+    assert (last["kind"], last["reason"]) == ("not_taken_back", "base_not_library")
+    assert world.styles.current().style_pack == worn
+
+
+def test_nothing_is_written_in_a_deleted_workspace(world, caplog) -> None:
+    # A worker still serving a workspace after its tombstone (one named in a static list) steps
+    # nothing there: no look is taken in, and no world falls back into the erased workspace,
+    # though its own look now reads as not wearable. Nothing is even tried, so nothing is refused
+    # and logged on every pass.
+    _applied(world)
+    with world.packs.purged.database().session(world.packs.workspace_id) as owner:
+        owner.execute(
+            "insert into tombstone (workspace_id, scope, requested_by, reason) "
+            "values (%s, 'workspace', %s, 'an operator deleted the workspace')",
+            (world.packs.workspace_id, uuid.uuid4()),
+        )
+
+    def versions() -> int:
+        return world.packs.connection.execute(
+            "select count(*) as n from world_style_version where workspace_id = %s",
+            (world.packs.workspace_id,),
+        ).fetchone()["n"]
+
+    before = versions()
+    world.made("vehicle.sedan")
+    with caplog.at_level(logging.WARNING, logger="exulanica.generation.apply"):
+        assert world.step() == []
+    assert versions() == before
+    assert not caplog.records
+
+
+def test_pieces_whose_look_s_check_was_interrupted_take_the_next_version(world) -> None:
+    # An interrupted check may be asked again: the same pieces are not left on the failed version
+    # (which would end them look_check_failed) but take the next one, which is checked and worn.
+    plant = world.made("plant.default")
+    assert world.step() == []
+    own = world.own()
+    manifest, token = own.claim("test-worker", 60)
+    own.finish_failed(manifest, token, "interrupted", "a test interruption", {})
+    assert world.step() == []
+    world.check()
+    assert world.step() == [world.world_id]
+    assert [step["kind"] for step in world.steps(plant)] == ["applied"]
+    worn = world.styles.current().style_pack
+    assert worn is not None and worn.version == 2 and worn.manifest_sha256 != manifest
 
 
 def test_a_take_back_waits_while_its_look_is_checked_and_ends_by_name_when_it_is_refused(
