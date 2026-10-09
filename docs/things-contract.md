@@ -484,13 +484,16 @@ kind suggesting a look the library does not hold at the kind's digest each stop 
 | `bench`, `cafe_table`, `seating_planter` | object | their catalog dimensions, blocking walking | | rest_at, a seat at every place | | their reviewed asset |
 | `market_stall` | object | its catalog dimensions, blocking walking | | visit | | its reviewed asset |
 | `planter_tree` | object | its catalog dimensions, blocking walking | | visit, perch, host | | its reviewed asset |
-| `lamp_post` | object | its catalog dimensions, blocking walking; version 2 870 mm deep (version 1 250 mm) | | perch | | its reviewed asset |
+| `lamp_post` | object | its catalog dimensions, blocking walking; version 2 870 mm deep (version 1 250 mm); version 3 also 4,500 mm high (versions 1 and 2 6,000 mm) | | perch | | its reviewed asset |
 
 The six pieces of furniture each ship a version 2 that differs from version 1 in its summary alone, plain
 words a card shows ("A wooden bench people sit on.", "A small cafe table people sit at.", "A street lamp on a
 post that lights the way.", "A market stall with goods laid out under an awning.", "A young tree growing in a
 planter.", "A planter with a seat built along its edge."), and, for the lamp post, a box deep enough for the
-generated lamps its look may be swapped for (870 mm); version 1 stays as it shipped.
+generated lamps its look may be swapped for (870 mm); version 1 stays as it shipped. The lamp post's version 3
+is version 2 at a town lamp's height, 4,500 mm, for the lamp posts generated for it (versions 1 and 2 are the
+catalog lamp's 6,000 mm); its reviewed look is drawn at that size, and its perch, on the lamp's arm, scales with
+it (956 mm out and 4,350 mm up, from 1,275 and 5,800). Versions 1 and 2 stay as they shipped.
 
 | Look | Look kind | Origin |
 | --- | --- | --- |

@@ -48,6 +48,11 @@
       "sha256": "76aa7991996910e79ec5682f2f41897335674cc066266f17a058d9c8d6f90850"
     },
     {
+      "kind": "lamp_post",
+      "version": 3,
+      "sha256": "8a4482b81eb6f87cc9e336edf724387b0ca183c52d24f3910697120d3049eb9b"
+    },
+    {
       "kind": "lantern",
       "version": 1,
       "sha256": "5cb77297b677cdf10b67eb20fd4e7845c3f1f9f0dbd1f26fd57066c4bcf973a9"
