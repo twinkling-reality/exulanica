@@ -117,3 +117,12 @@ def test_someone_heading_to_a_premises_keeps_going_when_the_first_named_input_ar
     assert now["target"]["target_id"] == heading["target"]["target_id"]
     assert "place" in now["target"]
     assert not [e for e in events if "target_changed" in json.dumps(e.document)]
+
+
+def test_every_label_a_town_can_say_is_a_lowercase_common_noun():
+    """The card says "the {label} at number {n}": a town's labels come from the routine catalog's
+    closed list of use classes, never from a record's own name, and each is lower case."""
+    from exulanica.world.society_living import current_routine
+
+    labels = {use.label for use in current_routine().use_classes.values()}
+    assert labels and all(label == label.lower() and label.strip() == label for label in labels)
