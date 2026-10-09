@@ -151,6 +151,10 @@ export function refusalWords(refusal: NonNullable<InhabitantsView['refusal']>): 
     return 'Nobody came in: there is nowhere in this world they could reach yet. Put something they can '
       + `rest on or visit near where you arrive, then ask again. ${say('inhabitants.whereToPlace')}`;
   }
+  if (refusal.code === 'society_engine_differs') {
+    // What the world holds changed the kind of people it takes while the person was deciding.
+    return 'Nobody came in: what this world holds changed while you were deciding. Bring them in again.';
+  }
   if (refusal.code === 'engine_not_for_this_ground') {
     // The page asked for inhabitants of another kind than this world's ground takes, as a page
     // older than the server's engine table would.

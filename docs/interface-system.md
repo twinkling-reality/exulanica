@@ -213,6 +213,15 @@ choice came to. Another surface opens the panel with its subjects chosen through
 the world's environment selection, as a person would choose them. What each model decided, and how
 the panel's models decide, follow below it.
 
+People come into a saved world only when its owner asks (Bring people in). The page creates its society
+with the engine the world's entry states at that moment (`society_engine` on `GET
+/world-entries/{entry_id}`, read again then, so a thing placed since the world opened counts): on a
+host offering societies of things, a world holding a placed thing gets a society of things, whose
+beings live on their routines and show "Their own routine" here until the owner picks a mind or a
+person plays one. Refused `society_engine_differs` (what the world holds changed meanwhile), the page
+reads the entry once more and asks again with its engine. A society already there keeps its engine: a
+world whose people came in before its things were placed keeps the people it has.
+
 When the playback control says open models are not asked for the people here now (its
 `model_minds_code`, `spending_cap_reached` when the allowance for this visit is used up), People says
 so in one calm status line under the play controls and Who decides says the same in place of its

@@ -98,6 +98,7 @@ import { LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings, THING_LOOK_CHOSEN_EV
 import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
 import { mountPlayThisOne, type MountedPlayThisOne, type PlayPick } from './play-this-one.js';
 import { SocietyPlayClient } from '../society-play-api.js';
+import { WorldEntryClient } from '../world-entry-api.js';
 import { markLabel, markOf, type MarkInput } from './thing-marks.js';
 import { LineWatch, thingLine } from './thing-lines.js';
 import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
@@ -156,6 +157,8 @@ export interface EnvironmentSelectionDependencies {
   readonly societyClient?: SocietyClient;
   readonly societyControlClient?: SocietyControlClient;
   readonly societyModelsClient?: SocietyModelsClient;
+  /** The open world's entry, read again when a person brings people in; with the credentials when left out. */
+  readonly worldEntryClient?: Pick<WorldEntryClient, 'entry'>;
   /** The looks chosen for a society of things' things; read with the credentials when left out. */
   readonly thingLooksClient?: { read(versionId: string, resolve?: ResolveWorkspaceLook): Promise<ReadonlyMap<string, ThingLookChoice>> };
   readonly societyDistrictClient?: SocietyDistrictClient;
@@ -2623,6 +2626,10 @@ export function mountEnvironmentSelection(
       // which the server derives and serves with the entry; an entry built without it is a saved
       // world's own. Opening the world never creates anything; the person asks.
       profile: entry.societyEngine ?? engineCreatedOver('saved_world'),
+      // Asked when the person brings people in: the entry states the engine from what the world
+      // holds then, so a thing placed since it opened makes a society of things where offered.
+      profileWhenAsked: async () => (await (deps.worldEntryClient ?? new WorldEntryClient(deps.credentials))
+        .entry(entry.entryId)).societyEngine ?? engineCreatedOver('saved_world'),
       createOnConnect: false, places: true,
       ...(deps.societyClient ? { client: deps.societyClient } : {}),
       onChange: reflectSavedWorldSociety,

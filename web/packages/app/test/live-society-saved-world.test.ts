@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@exulanica/graph-client';
 import { createLiveSociety, type LiveSocietyView } from '../src/composition/live-society.js';
-import { parseSociety, type SocietyEvent, type SocietySnapshot } from '../src/society-api.js';
+import { parseSociety, type SocietyEvent, type SocietyProfile, type SocietySnapshot } from '../src/society-api.js';
 
 /*
  * In a saved world a society exists only because the person asked for one. Opening the world
@@ -19,7 +19,7 @@ function snapshot(tick = 0, place = 'derived-place'): SocietySnapshot {
 }
 const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
 
-function setup() {
+function setup(profileWhenAsked?: () => Promise<SocietyProfile>) {
   const views: LiveSocietyView[] = [];
   const client = {
     connect: vi.fn(async () => snapshot()),
@@ -33,6 +33,7 @@ function setup() {
     worldId: 'world:authored:one', versionId: 'branch', placeId: null, regionId: 'region:starter',
     profile: 'exulanica-society/v2', createOnConnect: false, places: true,
     onChange: (view) => views.push(view), client,
+    ...(profileWhenAsked ? { profileWhenAsked } : {}),
   });
   return { client, views, live };
 }
@@ -99,5 +100,27 @@ describe('a saved world society is created only when the person asks', () => {
     expect(client.advance).toHaveBeenCalledTimes(1);
     expect(client.read).toHaveBeenLastCalledWith('branch', { places: true });
     expect(live.view.snapshot?.currentTick).toBe(1);
+  });
+
+  it('asks for the engine the world states when the person asks, and once more when the server says it differs', async () => {
+    // The entry, read when asked, says a placed thing makes a society of things here.
+    const asked = vi.fn(async (): Promise<SocietyProfile> => 'exulanica-society/v7');
+    const { live, client } = setup(asked);
+    await live.connect();
+    client.read.mockResolvedValue(snapshot());
+    await live.bringIn();
+    expect(client.create).toHaveBeenLastCalledWith('branch', null, 'region:starter', 'exulanica-society/v7');
+    // A thing placed between the read and the request: refused by name, read again, asked once more.
+    asked.mockResolvedValueOnce('exulanica-society/v2').mockResolvedValueOnce('exulanica-society/v7');
+    client.create.mockClear();
+    client.create.mockRejectedValueOnce(new ApiError(409, 'society_engine_differs', 'this world takes exulanica-society/v7'));
+    await live.bringIn();
+    expect(client.create.mock.calls.map((call) => (call as unknown[])[3])).toEqual(['exulanica-society/v2', 'exulanica-society/v7']);
+    expect(live.view.refusal).toBeNull();
+    // An entry that cannot be read asks for the engine the world opened with; the server guards it.
+    asked.mockRejectedValueOnce(new Error('offline'));
+    client.create.mockClear();
+    await live.bringIn();
+    expect(client.create).toHaveBeenLastCalledWith('branch', null, 'region:starter', 'exulanica-society/v2');
   });
 });

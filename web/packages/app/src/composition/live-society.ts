@@ -38,6 +38,13 @@ export interface LiveSocietyOptions {
    */
   readonly profile?: SocietyProfile;
   /**
+   * The engine a new society is created with, read when the person asks: a saved world's entry
+   * states it from what the world holds then (a placed thing makes a society of things where the
+   * host offers one), so a thing placed since the world opened counts. Where the read fails,
+   * `profile` is asked for, and the server refuses it by name if the world now takes another.
+   */
+  readonly profileWhenAsked?: () => Promise<SocietyProfile>;
+  /**
    * Whether connecting may create the society. A saved world never gets inhabitants by being
    * opened: connecting only reads it, and `bringIn` is the person's own request.
    */
@@ -190,12 +197,34 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
     bringIn: () => run(async () => {
       if (client.create === undefined) throw new Error('This society client cannot create a society.');
       publish({ refusal: null });
+      const create = client.create.bind(client);
+      const engine = async (): Promise<SocietyProfile> => {
+        try { return await options.profileWhenAsked?.() ?? profile; } catch { return profile; }
+      };
+      const asked = await engine();
+      let failure: unknown = null;
       try {
-        await client.create(options.versionId, options.placeId, options.regionId, profile);
+        await create(options.versionId, options.placeId, options.regionId, asked);
       } catch (error) {
+        failure = error;
+      }
+      // The world takes another engine than the one asked for (a thing placed meanwhile, or a page
+      // that read it before): asked once more with the one the world states now.
+      if (failure instanceof ApiError && failure.code === 'society_engine_differs' && options.profileWhenAsked) {
+        const now = await engine();
+        if (now !== asked) {
+          try {
+            await create(options.versionId, options.placeId, options.regionId, now);
+            failure = null;
+          } catch (again) {
+            failure = again;
+          }
+        }
+      }
+      if (failure !== null) {
         // A refusal is an answer about the world, such as nothing in it anybody can reach, and
         // it changed nothing on the server. It is kept for the surface to say in words.
-        if (!refused(error)) throw error;
+        if (!refused(failure)) throw failure;
         if (view.snapshot === null) absent();
         return;
       }
