@@ -110,13 +110,13 @@ const thingsSociety = (): SocietySnapshot => parseSociety({
   },
 });
 
-function mount(withSociety = false) {
+function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean } = {}) {
   const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
   const regionEntity = { name: 'authored-region:region:starter' };
   const crowd = {
     root: { parent: regionEntity },
     setSociety: vi.fn(() => 0), clearSociety: vi.fn(), revealInhabitant: vi.fn(), setFigures: vi.fn(), societyJumps: [],
-    visibleInhabitantIds: ['person-0'], inhabitantRepresentation: vi.fn(() => null),
+    visibleInhabitantIds: scene.nothingPlaced === true ? [] : ['person-0'], inhabitantRepresentation: vi.fn(() => null),
     inhabitantDetail: vi.fn(() => 'near'), coincidentInhabitants: vi.fn(() => ['person-0']),
     societyCounts: { population: 1, outdoors: 1, indoors: 0, near: 1, far: 0, drawn: 1 },
     drawnInhabitantCount: 1, inhabitantSeatAtPlace: vi.fn(() => false), setSeatingLayout: vi.fn(), seatingMisses: [],
@@ -148,7 +148,8 @@ function mount(withSociety = false) {
     play_ineligible_reason: null, play_eligible: true,
   }, 'version');
   const controlClient = { read: vi.fn(async () => { if (!withSociety) throw missing(); return control(); }), configure: vi.fn(), step: vi.fn() };
-  const worldClient = { connect: vi.fn(async () => ({ assets: [], version })), assets: vi.fn(() => []) };
+  const placed = scene.nothingPlaced === true ? { ...version, things: [] } as unknown as AlternateVersion : version;
+  const worldClient = { connect: vi.fn(async () => ({ assets: [], version: placed })), assets: vi.fn(() => []) };
   const modelsClient = { read: vi.fn(async () => { throw missing(); }), choose: vi.fn() };
   const canvas = document.createElement('canvas');
   const shell = document.createElement('div');
@@ -320,5 +321,16 @@ describe('a saved world\'s placed things', () => {
     for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
     expect(again.holdStatus).not.toHaveBeenCalledWith('The world is paused. Press Play to let it run.');
     again.mounted.dispose();
+  });
+
+  it('says where the people are when nothing is placed and nobody is in sight, beside the paused line', async () => {
+    window.localStorage.clear();
+    const { mounted, holdStatus } = mount(true, { nothingPlaced: true });
+    await mounted.begin();
+    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(holdStatus).toHaveBeenLastCalledWith(
+      'The world is paused. Press Play to let it run. People are out in the town: open People to find them.');
+    mounted.dispose();
+    expect(holdStatus).toHaveBeenLastCalledWith(null);
   });
 });

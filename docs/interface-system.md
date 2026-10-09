@@ -157,7 +157,9 @@ between them, the first view steps along the footway, then back from the kerb, t
 drawn ground with a clear sight of it (`composition/arrival-view.ts`), and keeps the arrival where none
 is near. A world with people in it that opens paused keeps "The world is paused. Press Play to let it
 run." in the status place until it plays or closes, and once a browser has seen the world play the line is
-not said for it again; the world never plays by itself.
+not said for it again; the world never plays by itself. Where nothing is placed in it and none of its
+people is in sight yet, the same line adds "People are out in the town: open People to find them." until
+somebody comes near.
 
 ### Your worlds and Create a world
 

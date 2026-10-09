@@ -311,6 +311,8 @@ export interface MountedEnvironmentSelection {
 
 /** Said once when a world with people in it opens paused (a guest's arrival town opens so). */
 export const PAUSED_ARRIVAL_HINT = 'The world is paused. Press Play to let it run.';
+/** Said with it where nothing is placed and nobody is in sight yet (the people are out in the town). */
+export const PEOPLE_OUT_OF_SIGHT = 'People are out in the town: open People to find them.';
 
 /** What the world clock shows: the saved playback control and whether a request is in flight. */
 export interface PeopleClock {
@@ -839,6 +841,8 @@ export function mountEnvironmentSelection(
     const state = society?.state ?? previewState;
     const visible = new Set(crowd()?.visibleInhabitantIds ?? []);
     inhabitantsList.hidden = !state || visible.size === 0;
+    // Somebody near: the arrival line no longer says the people are out of sight.
+    if (visible.size > 0 && !somebodyNear) { somebodyNear = true; if (savedWorld !== null) arrivalLine(savedWorld.worldId); }
     // In a saved world nobody lives in yet, the inhabitants section says so; this line would repeat it.
     workspace.setNearby(state ? visible.size : 0, savedWorld !== null && state === null);
     inhabitantsList.replaceChildren(el('option', {value: '', text: 'Inspect a nearby inhabitant'}));
@@ -856,24 +860,31 @@ export function mountEnvironmentSelection(
     reflectCrowd();
   }
 
-  /** Whether the paused hint is held up now. */
-  let pausedHintShown = false;
+  /** The arrival line held in the status place now, or null. */
+  let arrivalHeld: string | null = null;
+  /** Whether somebody has come near since the world opened: the people line is then not said again. */
+  let somebodyNear = false;
   /**
-   * A world whose people live there but that opens paused says how to let it run, and keeps saying it
-   * until the world plays: it never plays by itself (a guest's playing time is theirs to start). Once
-   * this browser has seen the world play, the hint is not said for it again.
+   * The arrival line: what a person first needs to know about a world they open, held until it is no
+   * longer true. A world with people in it that opens paused says how to let it run, until it plays (once
+   * this browser has seen it play, not again); a world with nothing placed whose people are all out of
+   * sight says where they are, until somebody comes near. It never plays the world by itself.
    */
-  function pausedArrivalHint(worldId: string): void {
+  function arrivalLine(worldId: string): void {
     const key = `exulanica.paused-hint.${worldId}`;
     const played = (): boolean => { try { return window.localStorage.getItem(key) !== null; } catch { return false; } };
     if (societyControl?.mode === 'playing') {
       try { window.localStorage.setItem(key, '1'); } catch { /* said again next time, which is still true */ }
-      if (pausedHintShown) { pausedHintShown = false; deps.holdStatus?.(null); }
-      return;
     }
-    if (pausedHintShown || society === null || societyControl?.mode !== 'paused' || !societyControl.playEligible || played()) return;
-    pausedHintShown = true;
-    if (deps.holdStatus) deps.holdStatus(PAUSED_ARRIVAL_HINT); else deps.showStatus(PAUSED_ARRIVAL_HINT);
+    const peopleHere = society !== null && society.state.inhabitants.length > 0;
+    const paused = peopleHere && societyControl?.mode === 'paused' && societyControl.playEligible && !played();
+    const nothingPlaced = (current?.things ?? []).every((thing) => thing.removed);
+    const outOfSight = peopleHere && nothingPlaced && !somebodyNear;
+    const line = [paused ? PAUSED_ARRIVAL_HINT : null, outOfSight ? PEOPLE_OUT_OF_SIGHT : null]
+      .filter((part) => part !== null).join(' ') || null;
+    if (line === arrivalHeld) return;
+    arrivalHeld = line;
+    if (deps.holdStatus) deps.holdStatus(line); else if (line !== null) deps.showStatus(line);
   }
 
   /**
@@ -1807,7 +1818,7 @@ export function mountEnvironmentSelection(
       if (refreshSocietyState) await liveSociety?.refresh();
       societyControl = await controlClient.read(current.versionId);
       // Every read, whichever way the world was opened: said once, once people live there.
-      if (savedWorld !== null) pausedArrivalHint(savedWorld.worldId);
+      if (savedWorld !== null) arrivalLine(savedWorld.worldId);
     } catch (error) {
       societyControl = null;
       playbackStatus.textContent = problemSentence(error, PEOPLE_PROBLEMS, CLOCK_UNREAD);
@@ -2987,7 +2998,7 @@ export function mountEnvironmentSelection(
       // the server gives it back after its quiet minutes.
       pointerHover.abort();
       // The paused hint belongs to this world; it goes with it.
-      if (pausedHintShown) { pausedHintShown = false; deps.holdStatus?.(null); }
+      if (arrivalHeld !== null) { arrivalHeld = null; deps.holdStatus?.(null); }
       playThisOne?.dispose();
       playThisOne = null;
       savedFlight?.stop();
