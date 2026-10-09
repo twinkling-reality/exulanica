@@ -377,17 +377,22 @@ def test_a_plan_that_places_then_asks_waits_for_the_minute_that_takes_the_thing_
     assert waiting["outcome"] == "plan"
     [held] = waiting["steps"]
     assert (held["state"], held["code"]) == ("pending", "society_input_queued")
-    # As the page does: a minute at a time, while the step says to wait (the lantern's input, or
-    # the knight in the middle of what its routine began), at most twenty. Once the lantern is
-    # taken in, the step is the route's to answer: prepared, or refused by the route's own name.
+    # As the page does: a minute at a time, while the step says to wait (the lantern's input, the
+    # knight in the middle of what its routine began, or every place at the well taken by the
+    # residents visiting it), at most twenty. Once the lantern is taken in, the step is the
+    # route's to answer: prepared, refused by the route's own name, or still waiting for the
+    # knight or a free place at the well, never for the lantern again.
+    waits = ("society_input_queued", "inhabitant_action_in_progress", "destination_full")
     for _minutes in range(20):
         _minute(client, world)
         [prepared] = _prepare(client, world, [second["action"]])["steps"]
         if prepared["state"] != "pending":
             break
-        assert prepared["code"] in ("society_input_queued", "inhabitant_action_in_progress")
+        assert prepared["code"] in waits, prepared
     assert prepared["code"] != "society_input_queued", prepared
     if prepared["state"] == "prepared":
         assert _send(client, prepared).status_code == 200
+    elif prepared["state"] == "pending":
+        assert prepared["code"] in waits, prepared
     else:
         assert prepared["state"] == "blocked" and prepared["code"] in ACTION_REFUSALS, prepared
