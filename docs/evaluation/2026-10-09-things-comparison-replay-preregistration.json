@@ -1,0 +1,127 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "design": {
+   "answers": {
+    "hands_first": [
+     "pick_up",
+     "give",
+     "take",
+     "put_down"
+    ],
+    "lines": [
+     "Good morning.",
+     "Is that your sword?",
+     "The well looks deep today.",
+     "Shall we walk to the gate together?",
+     "I have not seen you here before.",
+     "Rain may come later this afternoon.",
+     "Who built this square?",
+     "My armour needs polishing again."
+    ],
+    "order": "hands first where the request's digest is even, saying first where odd",
+    "otherwise": "the option the request's document digest chooses",
+    "saying": [
+     "say_to",
+     "say_all"
+    ]
+   },
+   "contract": {
+    "catalog_versions": {
+     "society-decision-action": 5,
+     "society-decision-policy": 5
+    },
+    "sha256": "2de3b7fd6381a1e9af34f4138aa858de3b857b4b23dfed60faf4c4afdfbd2161"
+   },
+   "engine": "exulanica-society/v7",
+   "gate": {
+    "idle_percent_before_least": "70.0",
+    "idle_percent_mean_least": "50.0",
+    "load_most_before_each_point": "8.0"
+   },
+   "holdables": {
+    "count": 16,
+    "kinds": [
+     [
+      "sword",
+      3
+     ],
+     [
+      "lantern",
+      1
+     ]
+    ],
+    "square_grid_mm": {
+     "x": [
+      -7000,
+      -5000,
+      -3000,
+      -1000,
+      1000,
+      3000,
+      5000,
+      7000
+     ],
+     "z": [
+      2000,
+      6000
+     ]
+    },
+    "town_apart_mm": 3000
+   },
+   "line": "least-margin bounding line over every point's 95th percentile read, with its population-times-decided term (scripts/measure_living_comparison_replay.py's fit)",
+   "seed": "7777777777777777777777777777777777777777777777777777777777777777",
+   "society_bound_not_measured": 512,
+   "square_populations": [
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "square_scene": [
+    "three-strangers",
+    4
+   ],
+   "stated_groups": [
+    4,
+    16
+   ],
+   "town": {
+    "preset": "small_town",
+    "world_id": "world:generated:things-replay-measured-small_town"
+   },
+   "town_populations_below_own": [
+    8,
+    16,
+    32
+   ],
+   "town_scene": [
+    "three-strangers-in-town",
+    1
+   ]
+  },
+  "kind": "exulanica.things-comparison-replay-preregistration/v1",
+  "reads": {
+   "assets/catalogs/scenes/three-strangers-in-town.v1.json": "8660d119128bb7fb4ae750c7bd2ea9e65494b8007165080e9ab15f4c7af9836c",
+   "assets/catalogs/scenes/three-strangers.v4.json": "66af9938c11262a13c277f90ed55c6dfbb1388a0d71b9d6ec9481462ec67293a",
+   "scripts/measure_comparison_replay.py": "37cc54f8b3d6a7c3aa3910ce7b213cd7edabd1949147a907eea5be8a32825b83",
+   "scripts/measure_living_comparison_replay.py": "68bdcd9cca97665c51846e828b34c3e95a350c646af19d4e25e640e9d3f0f0d7",
+   "tests/living_square_support.py": "239a0114ee571a3be54acea3cb2492930949745852c2de9394bebf1f420d3575",
+   "tests/living_town_support.py": "a99318f3b184e2b8e13ad5629f02660f3201b5cd28f70a8822cf256a1d93bd39",
+   "tests/things_society_support.py": "843c664f433eca780f8cc0d9318e4b5319bdd7c9b1fcd65340bba45c675c51ea"
+  },
+  "script": "scripts/measure_things_comparison_replay.py",
+  "script_sha256": "b975b8506c8ec98b4b6078a4fe5e2c418a462b431d944cf57ac3fdf208a2aeea",
+  "source": {
+   "changed_paths": [],
+   "drawing_code_sha256": "235b984ba01d739fa3426bb4e89e29a2a8a33d481d5216561c631698282efc84",
+   "head": "d8b1f107b1406f423da37d73248f6a1a61a9087e"
+  },
+  "stops": [
+   "A graph that does not compose with every thing usable, or a run whose replay differs from what it recorded, stops the measurement.",
+   "A gate refusal is retried only inside the declared window; a discarded record is not bound."
+  ]
+ },
+ "record_sha256": "7f8f4ce6d406d28d9098b4be2eb358b5fe34e079ac619efc23255e491381791f"
+}

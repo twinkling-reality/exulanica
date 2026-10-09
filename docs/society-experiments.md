@@ -474,28 +474,58 @@ does not refuse such a group.
 
 **A living town's line.** A living town (`exulanica-society/v5`), the engine a generated town's
 society runs, is read by a line measured on its own replay rather than the protocol's:
-[`assets/catalogs/society-comparison-cost/society-comparison-reading.v5.json`](../assets/catalogs/society-comparison-cost/society-comparison-reading.v5.json)
+[`assets/catalogs/society-comparison-cost/society-comparison-reading.v6.json`](../assets/catalogs/society-comparison-cost/society-comparison-reading.v6.json)
 names it for the state family the engine reads (`living`) and binds it by path and digest to its
-[measurement record](evaluation/2026-10-07-living-comparison-replay.json), which
+[measurement record](evaluation/2026-10-09-living-comparison-replay.json), which
 [`scripts/measure_living_comparison_replay.py`](../scripts/measure_living_comparison_replay.py)
 wrote under the quiet slot's idle gate. The record names the drawing code it measured by its digest.
 Measured: the 95th percentile read at 61 points, with scripted answers the engine applies, on
 generated small towns of 38 and 52 people, market towns of 74 and 88, and one stress town of 128 at
 the society ground's bound, outside the admitted specification and composed only to measure a run
 there; each at its own population and at stated smaller ones, with nobody or everybody decided for,
-and at stated groups. The machine was 71.66 percent idle over ten seconds before the run and 71.19
+and at stated groups. The machine was 88.3 percent idle over ten seconds before the run and 81.28
 percent after it, with the one-minute load under 8 before every point. Derived from those reads: the
-least-margin line on or above every point, 39 ms for any run, 10608 µs for each of the society's
-people, 4272 µs for each person a model decides for, and 78 µs more for each of those for each
+least-margin line on or above every point, 8 ms for any run, 9994 µs for each of the society's
+people, 1545 µs for each person a model decides for, and 45 µs more for each of those for each
 person of the society. By that line and the protocol's ten-second pair budget (half of it for each
 run), a model may decide for everybody in each measured town, up to the stress town's 128, whose
-everybody-decided run the line puts at 3221592 µs; and it would let a run hold 463 people where a
+everybody-decided run the line puts at 2222272 µs; and it would let a run hold 497 people where a
 model decides for one of them, more than the 128 a town's ground allows, so for a living town the
 ground is the bound that applies. The plan route and a start judge a living town's society by this
-line and a purposeful society by the protocol's, which stays at its third version and was measured
-on one. A society of any other family the reading catalog binds no line for, a society of things
-today, is refused by name (`no_reading_line`, 409) rather than read by a line measured on another
-engine's runs. It reads an hour's run; a day is read by a line of its own (a day, below).
+line, a society of things by its own (below), and a purposeful society by the protocol's, which
+stays at its third version and was measured on one. A society of any other family the reading
+catalog binds no line for is refused by name (`no_reading_line`, 409) rather than read by a line
+measured on another engine's runs. It reads an hour's run; a day is read by a line of its own (a
+day, below).
+
+**A society of things' line.** A society of things (`exulanica-society/v7`), whose minutes also
+run the things phase (lines said and heard, hands), is read by a line measured on its own replay:
+the same catalog names it for the state family `things` and binds it by path and digest to its
+[measurement record](evaluation/2026-10-09-things-comparison-replay.json), which
+[`scripts/measure_things_comparison_replay.py`](../scripts/measure_things_comparison_replay.py)
+wrote under the quiet slot's idle gate. The run was held to its
+[pre-registration](evaluation/2026-10-09-things-comparison-replay-preregistration.json), written
+on the same tree before any timed read, which bound the script, the files it reads, the tree, the
+drawing digest and every choice of the design, and the script refuses a run any of them differs
+from. Measured: the 95th percentile read at 34 points, with scripted answers the engine applies (a
+hands act or a said line wherever one is offered), on two grounds: the Three strangers scene on a
+bare starter, an authored-ground input of 114 nodes holding 26 things, and the town scene on a
+generated small town, a walking-surfaces input of 608 nodes holding 22 things and 34 residents,
+each with 16 placed holdable things among them; on the starter at 8, 16, 32, 64 and 128 stated
+people and on the town at 8, 16, 32 and its own 34, each with nobody, groups of 4 and 16 and
+everybody decided for. A point's population is every being its run holds, the stated people and
+the scene's two placed beings, as a comparison of a society of things is priced and bounded; the
+largest measured is 130. The machine was 81.32 percent idle over ten seconds before the run and
+86.89 percent after it, with the one-minute load between 3.86 and 4.54 before every point. Derived:
+the least-margin line on or above every point, 428 ms for any run, 4538 µs for each being, 29284
+µs for each being a model decides for, and 102 µs more for each of those for each being of the
+society. Four points set it: the starter's 130 with nobody and with everybody decided, whose dearest
+reads were 1.02 and 6.54 s, and the town's 36 with nobody and with 16 decided, 0.59 and 1.12 s. By
+that line and the protocol's pair budget, a model may decide for everybody in each measured run of
+up to 66 beings, whose everybody-decided run the line puts at 3104564 µs, and for at most 93 of
+130. Beyond the populations measured the line is inferred, not measured: it would let a run hold 979
+beings where a model decides for one of them, more than the engine's 512, so the engine's bound
+applies, and at 512 a model could decide for at most 27.
 
 **A day.** A start and a plan name the window every run plays (`window`): `hour`, the default, or
 `day`. A day is a living town's, whose engine keeps the time of day: from its genesis at 06:00 to
@@ -506,26 +536,26 @@ window, as an entry of its own for the state family and the window (`living-1440
 read by the hour and a town's hours differ through its day; a day of a family the catalog binds no
 such line for is refused by name (`window_not_offered`, 409), and the plan states each window with
 the line it is read by or the refusal it meets.
-[`assets/catalogs/society-comparison-cost/society-comparison-reading.v5.json`](../assets/catalogs/society-comparison-cost/society-comparison-reading.v5.json)
+[`assets/catalogs/society-comparison-cost/society-comparison-reading.v6.json`](../assets/catalogs/society-comparison-cost/society-comparison-reading.v6.json)
 binds the living town's line over a day by path and digest to its
-[measurement record](evaluation/2026-10-07-living-day-replay.json), which
+[measurement record](evaluation/2026-10-09-living-day-replay.json), which
 [`scripts/measure_living_day_replay.py`](../scripts/measure_living_day_replay.py) wrote under the
 quiet slot. Measured: 25 points on the hour line's graphs, small towns of 38 and 52 people, market
 towns of 74 and 88 and the stress town of 128, each at its own population with nobody, everybody and
 groups of 4, 8 and 16 decided for; each day played and sealed hour by hour with scripted answers the
 engine applies, then every hour read three times as the run route reads one and the day as the day
 route reads it, a point's read the dearest of them. Composing and playing were neither gated nor
-timed; the reads' gate passed at 83.33 percent idle, the reads' mean idle was 87.805 percent, and
-the one-minute load was under 8 before and after every point, so no point was read again (a point
-whose reads end with the load at 8 or over is read again, up to twice, and only its last reads
-kept). Derived: the least-margin line on or above every point, 10 ms for any run, 14559 µs for
-each of the society's people, 3294 µs for each person a model decides for, and 60 µs more for each of
-those for each person of the society, so what a decided person adds grows with the town. Four
-points set it: the town of 52 with 16 decided, the town of 88 with 16 and with everybody decided,
-and the stress town with everybody decided, whose dearest reads were 0.87, 1.43, 2.04 and
-3.27 s. By that line and the protocol's pair budget, a model may decide over a day for everybody
+timed; the reads' gate passed at 82.48 percent idle, the reads' mean idle was 77.605 percent, and
+the one-minute load was under 8 before every point. One point, the town of 88 with everybody
+decided, ended its first reads with the load at 10.12 and was read again from 7.9, its second reads
+kept (a point whose reads end with the load at 8 or over is read again, up to twice, and only its
+last reads kept). Derived: the least-margin line on or above every point, 0 ms for any run, 15505 µs for
+each of the society's people, nothing for a person a model decides for alone, and 72 µs for each of
+those for each person of the society, so what a decided person adds grows with the town. Two points
+set it: the town of 88 with 4 decided and the stress town with everybody decided, whose dearest
+reads were 1.39 and 3.16 s. By that line and the protocol's pair budget, a model may decide over a day for everybody
 in each measured town, up to the stress town's
-128, whose everybody-decided run the line puts at 3278224 µs; and it would let a run hold 341
+128, whose everybody-decided run the line puts at 3164288 µs; and it would let a run hold 320
 people where a model decides for one of them, so the ground's 128 is the bound on a day's
 population. The plan route and a start
 judge a day of a living town's society by this line. A day's run is played hour by hour, each hour

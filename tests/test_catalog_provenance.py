@@ -122,7 +122,7 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # versions and the two versions of the specification schema their presets are points in,
     # plus the signal role registry and its policy, observation and response catalogs, the world
     # clock's two profiles, the protocol and seeds a comparison of signal models reads, and the
-    # replay lines a comparison of a living town's people is read by, in five versions, the
+    # replay lines a comparison of a living town's people is read by, in six versions, the
     # world kinds' look families, engine roles, bounds and society defaults, the reference
     # sources, the aspects a reference note may be about, the words no outgoing reference
     # query may carry and the words no note from a person's picture may carry, the four
@@ -130,7 +130,7 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # in two versions, the second fitting every plan with bones), the body grammar a creature's
     # body recipe is read against, the generated piece recipes in two versions, and what generating
     # a piece costs and the style words a piece request carries for each pack.
-    assert len(found[ENTRY_SHAPE]) == 115
+    assert len(found[ENTRY_SHAPE]) == 116
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
     # mappings, the road derivation and the signal placement.
     assert len(found[CITED_SHAPE]) == 7

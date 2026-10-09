@@ -1,9 +1,10 @@
 """A comparison of a saved world's society of things, defined, run and read against PostgreSQL.
 
 Two knights and a sword are placed in a saved world whose society of things runs the hands module.
-Until a reading line is measured for a society of things, a comparison of one is refused by name
-(``no_reading_line``) where it is defined and where the application plans or starts one. With a
-line in the reading catalog (a test's), a development comparison of the knights is defined under
+Where the reading catalog binds no line for a society of things (a test's catalog leaves the
+shipped one out), a comparison of one is refused by name (``no_reading_line``) where it is defined
+and where the application plans or starts one. With a line in the reading catalog (a test's), a
+development comparison of the knights is defined under
 the sixth score and the terms the society of things asks its people under, run through the
 product's client against a scripted model, and read: the routine scores one, waiting zero, the
 model's runs record the acts its knights did, and a run is read by replaying what it stored with
@@ -110,8 +111,9 @@ def _group(knights: list[str]) -> dict[str, Any]:
 
 
 def _things_line(tmp_path: Path) -> Path:
-    """The shipped reading catalog with a test's line for a society of things beside its own."""
-    document = json.loads(reading.READING_CATALOG.read_text(encoding="utf-8"))
+    """The shipped reading catalog with a test's line for a society of things in place of its
+    own: the living town's hour figures."""
+    document = _without_things()
     living = next(entry for entry in document["entries"] if entry["key"] == "living")
     document["entries"].append({**living, "key": "things", "state_family": "things"})
     path = tmp_path / "society-comparison-reading.json"
@@ -119,9 +121,23 @@ def _things_line(tmp_path: Path) -> Path:
     return path
 
 
+def _without_things() -> dict[str, Any]:
+    """The shipped reading catalog's document less its line for a society of things."""
+    document = json.loads(reading.READING_CATALOG.read_text(encoding="utf-8"))
+    document["entries"] = [e for e in document["entries"] if e["state_family"] != "things"]
+    return document
+
+
+def _no_things_line(tmp_path: Path) -> Path:
+    path = tmp_path / "society-comparison-reading-without-things.json"
+    path.write_text(json.dumps(_without_things()), encoding="utf-8")
+    return path
+
+
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_a_society_of_things_is_not_compared_until_a_reading_line_is_measured(app):
+def test_a_society_of_things_is_not_compared_without_a_reading_line(app, monkeypatch, tmp_path):
     world, client = app
+    monkeypatch.setattr(reading, "READING_CATALOG", _no_things_line(tmp_path))
     knights = _knights(client, world)
     runner = _runner(world, client, _Handing())
     with pytest.raises(ComparisonRefused) as refused:

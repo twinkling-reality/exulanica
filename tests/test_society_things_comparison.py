@@ -13,8 +13,10 @@ of one is refused by name.
 
 from __future__ import annotations
 
+import json
 import uuid
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -22,6 +24,7 @@ from exulanica.api.decision_host import ask_bound_usd
 from exulanica.api.society_comparison_start import comparison_cost
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.manifest import load_manifest
+from exulanica.world import society_comparison_reading as reading
 from exulanica.world.society_catalogs import (
     COMPARISON_PROTOCOL_CATALOG,
     COMPARISON_VERSIONS,
@@ -315,11 +318,26 @@ def test_a_society_of_things_is_compared_under_the_sixth_score_and_its_own_bindi
     assert society_engine(THINGS_PROFILE).comparisons
 
 
-def test_a_things_comparison_waits_for_its_reading_line_while_the_others_keep_theirs():
+def _without_things_line(tmp_path: Path) -> Path:
+    """The shipped reading catalog less its line for a society of things."""
+    document = json.loads(reading.READING_CATALOG.read_text(encoding="utf-8"))
+    document["entries"] = [e for e in document["entries"] if e["state_family"] != "things"]
+    path = tmp_path / reading.READING_CATALOG.name
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
+def test_a_things_comparison_reads_its_own_line_and_waits_without_one(tmp_path, monkeypatch):
     catalogs = comparison_catalogs_for_engine(THINGS_PROFILE)
-    assert measured_line("things") is None
-    with pytest.raises(ComparisonRefused) as refused:
-        reading_bound(catalogs)
+    line = measured_line("things")
+    assert line is not None
+    assert reading_bound(catalogs).per_person_us == line["replay_per_person_us"]
+    assert reading_bound(catalogs).per_decided_us == line["replay_per_decided_person_us"]
+    with monkeypatch.context() as patch:
+        patch.setattr(reading, "READING_CATALOG", _without_things_line(tmp_path))
+        assert measured_line("things") is None
+        with pytest.raises(ComparisonRefused) as refused:
+            reading_bound(catalogs)
     assert refused.value.code == NO_READING_LINE
     # The purposeful family reads the protocol's own line; the living family its measured one.
     purposeful = comparison_catalogs_for_engine("exulanica-society/v2")
@@ -461,7 +479,10 @@ def test_a_society_of_things_has_no_typical_cost_and_is_priced_under_its_engine_
     )
 
 
-def test_a_family_with_no_line_is_refused_before_an_earlier_protocol_s_figures():
+def test_a_family_with_no_line_is_refused_before_an_earlier_protocol_s_figures(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(reading, "READING_CATALOG", _without_things_line(tmp_path))
     earlier = load_comparison_catalogs(
         versions={**COMPARISON_VERSIONS, COMPARISON_PROTOCOL_CATALOG: 2}
     )

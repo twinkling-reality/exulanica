@@ -1791,8 +1791,9 @@ since}`, with `asked` true for one asked for). A society states
 
 It runs no experiment, and its people are not sent away. A comparison of models runs an hour of it
 from its genesis, where nobody has crossed in, so it compares the world's own beings, scored by the
-sixth person score ([society experiments](society-experiments.md#score)); it is offered once a reading
-line has been measured for its runs, and refused by name until then (`no_reading_line`). A placed
+sixth person score ([society experiments](society-experiments.md#score)); its runs are read by a
+line measured on a society of things' own replay, which bounds how many of its beings a model may
+decide for ([a society of things' line](society-experiments.md#running-a-comparison)). A placed
 thing's footprint is its kind's whole box, so a kind whose box overhangs its base (a tree's
 canopy) blocks all of it.
 

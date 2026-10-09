@@ -246,3 +246,30 @@ def test_every_shipped_living_line_is_the_one_its_measurement_record_fitted():
         assert {key: record["line"][key] for key in reading.LINE_KEYS} == {
             key: entry[key] for key in reading.LINE_KEYS
         }
+
+
+def test_the_shipped_things_line_is_the_one_its_pre_registered_measurement_fitted():
+    """The catalog states a society of things' line over an hour, naming the record it was read
+    from. That record digests to the entry's digest, measured the things engine under the gate
+    without being discarded, fitted exactly these four figures, and was held to the
+    pre-registration beside it, which bound the same tree and drawing digest."""
+    root = reading.READING_CATALOG.parents[3]
+    document = json.loads(reading.READING_CATALOG.read_text(encoding="utf-8"))
+    (entry,) = [row for row in document["entries"] if row["state_family"] == "things"]
+    assert entry.get("window_ticks", 60) == 60
+    source = root / entry["source"]
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == entry["source_sha256"]
+    record = json.loads(source.read_text(encoding="utf-8"))["record"]
+    assert record["kind"] == "exulanica.things-comparison-replay-measurement/v1"
+    assert record["engine"] == "exulanica-society/v7"
+    assert record["window_ticks"] == 60
+    assert record["discard"] is False
+    assert {key: record["line"][key] for key in reading.LINE_KEYS} == {
+        key: entry[key] for key in reading.LINE_KEYS
+    }
+    registered = json.loads(
+        source.with_name(source.stem + "-preregistration.json").read_text(encoding="utf-8")
+    )
+    assert registered["record_sha256"] == record["preregistration_sha256"]
+    assert registered["record"]["source"] == record["source"]
+    assert registered["record"]["script_sha256"] == record["script_sha256"]

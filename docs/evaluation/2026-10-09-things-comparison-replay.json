@@ -1,0 +1,2352 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "derived": {
+   "decided_most": [
+    {
+     "decided_most": 10,
+     "estimate_everybody_us": 776420,
+     "population": 10
+    },
+    {
+     "decided_most": 18,
+     "estimate_everybody_us": 1069844,
+     "population": 18
+    },
+    {
+     "decided_most": 34,
+     "estimate_everybody_us": 1695860,
+     "population": 34
+    },
+    {
+     "decided_most": 36,
+     "estimate_everybody_us": 1777784,
+     "population": 36
+    },
+    {
+     "decided_most": 66,
+     "estimate_everybody_us": 3104564,
+     "population": 66
+    },
+    {
+     "decided_most": 93,
+     "estimate_everybody_us": 6548660,
+     "population": 130
+    },
+    {
+     "decided_most": 27,
+     "estimate_everybody_us": 44483552,
+     "population": 512
+    }
+   ],
+   "pair_replay_budget_ms": 10000,
+   "population_most": 979,
+   "run_budget_us": 5000000
+  },
+  "discard": false,
+  "engine": "exulanica-society/v7",
+  "gate": {
+   "idle_percent_after": "86.89",
+   "idle_percent_before": "81.32",
+   "idle_percent_before_least": "70.0",
+   "idle_percent_mean_least": "50.0",
+   "load_after": "10:34  up 3 days,  3:12, 2 users, load averages: 5.13 5.57 10.73",
+   "load_before": "10:30  up 3 days,  3:08, 2 users, load averages: 4.17 6.52 12.43",
+   "load_most_before_each_point": "8.0"
+  },
+  "graphs": [
+   {
+    "ground": "authored_starter",
+    "input_document_sha256": "baa20285043395e2bf708ff35acd5612a2b802b985659d421486c80229061cc5",
+    "key": "square",
+    "nodes": 114,
+    "populations": [
+     8,
+     16,
+     32,
+     64,
+     128
+    ],
+    "profile": "exulanica.society-input/authored-ground-v5",
+    "things": [
+     {
+      "kind": "bench",
+      "position_mm": [
+       -5600,
+       -2200
+      ],
+      "thing_id": "bench-west",
+      "version": 1
+     },
+     {
+      "kind": "gate",
+      "position_mm": [
+       0,
+       -8000
+      ],
+      "thing_id": "gate",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       -7000,
+       2000
+      ],
+      "thing_id": "held-0",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       -5000,
+       2000
+      ],
+      "thing_id": "held-1",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       -3000,
+       6000
+      ],
+      "thing_id": "held-10",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       -1000,
+       6000
+      ],
+      "thing_id": "held-11",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       1000,
+       6000
+      ],
+      "thing_id": "held-12",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       3000,
+       6000
+      ],
+      "thing_id": "held-13",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       5000,
+       6000
+      ],
+      "thing_id": "held-14",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       7000,
+       6000
+      ],
+      "thing_id": "held-15",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       -3000,
+       2000
+      ],
+      "thing_id": "held-2",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       -1000,
+       2000
+      ],
+      "thing_id": "held-3",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       1000,
+       2000
+      ],
+      "thing_id": "held-4",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       3000,
+       2000
+      ],
+      "thing_id": "held-5",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       5000,
+       2000
+      ],
+      "thing_id": "held-6",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       7000,
+       2000
+      ],
+      "thing_id": "held-7",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       -7000,
+       6000
+      ],
+      "thing_id": "held-8",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       -5000,
+       6000
+      ],
+      "thing_id": "held-9",
+      "version": 1
+     },
+     {
+      "kind": "knight",
+      "position_mm": [
+       2000,
+       -2000
+      ],
+      "thing_id": "knight",
+      "version": 2
+     },
+     {
+      "kind": "lamp_post",
+      "position_mm": [
+       2400,
+       -8300
+      ],
+      "thing_id": "lamp",
+      "version": 1
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       -800,
+       -300
+      ],
+      "thing_id": "lantern",
+      "version": 1
+     },
+     {
+      "kind": "lantern_spirit",
+      "position_mm": [
+       0,
+       -4000
+      ],
+      "thing_id": "lantern-spirit",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       1400,
+       -900
+      ],
+      "thing_id": "sword",
+      "version": 3
+     },
+     {
+      "kind": "planter_tree",
+      "position_mm": [
+       6800,
+       -5800
+      ],
+      "thing_id": "tree-east",
+      "version": 1
+     },
+     {
+      "kind": "planter_tree",
+      "position_mm": [
+       -6000,
+       -6000
+      ],
+      "thing_id": "tree-west",
+      "version": 1
+     },
+     {
+      "kind": "well",
+      "position_mm": [
+       -2200,
+       -2000
+      ],
+      "thing_id": "well",
+      "version": 2
+     }
+    ],
+    "unavailable_affordances": [
+     [
+      "tree-east",
+      "visit",
+      "authored_affordance_unreachable"
+     ],
+     [
+      "tree-west",
+      "visit",
+      "authored_affordance_unreachable"
+     ]
+    ],
+    "world_id": "world:authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0003"
+   },
+   {
+    "ground": "small_town",
+    "input_document_sha256": "df508641a542209c80538a137f56a8d77dcdd7b9675b335c1e0628b4dc391d3c",
+    "key": "town",
+    "nodes": 608,
+    "populations": [
+     8,
+     16,
+     32,
+     34
+    ],
+    "profile": "exulanica.society-input/walking-surfaces-v3",
+    "things": [
+     {
+      "kind": "gate",
+      "position_mm": [
+       127282,
+       -55325
+      ],
+      "thing_id": "gate",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       125882,
+       -72525
+      ],
+      "thing_id": "held-0",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       131204,
+       -72525
+      ],
+      "thing_id": "held-1",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       144509,
+       -72525
+      ],
+      "thing_id": "held-10",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       134766,
+       -54850
+      ],
+      "thing_id": "held-11",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       125665,
+       -52150
+      ],
+      "thing_id": "held-12",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       115483,
+       -54850
+      ],
+      "thing_id": "held-13",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       137856,
+       -54850
+      ],
+      "thing_id": "held-14",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       117433,
+       -52150
+      ],
+      "thing_id": "held-15",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       120263,
+       -72525
+      ],
+      "thing_id": "held-2",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       117407,
+       -74650
+      ],
+      "thing_id": "held-3",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       136344,
+       -72525
+      ],
+      "thing_id": "held-4",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       139187,
+       -74650
+      ],
+      "thing_id": "held-5",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       111311,
+       -72525
+      ],
+      "thing_id": "held-6",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       141180,
+       -71530
+      ],
+      "thing_id": "held-7",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       108839,
+       -74650
+      ],
+      "thing_id": "held-8",
+      "version": 3
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       107360,
+       -71530
+      ],
+      "thing_id": "held-9",
+      "version": 1
+     },
+     {
+      "kind": "knight",
+      "position_mm": [
+       122582,
+       -56525
+      ],
+      "thing_id": "knight",
+      "version": 2
+     },
+     {
+      "kind": "lantern",
+      "position_mm": [
+       120782,
+       -57125
+      ],
+      "thing_id": "lantern",
+      "version": 1
+     },
+     {
+      "kind": "lantern_spirit",
+      "position_mm": [
+       130882,
+       -56525
+      ],
+      "thing_id": "lantern-spirit",
+      "version": 1
+     },
+     {
+      "kind": "sword",
+      "position_mm": [
+       118282,
+       -56225
+      ],
+      "thing_id": "sword",
+      "version": 3
+     },
+     {
+      "kind": "well",
+      "position_mm": [
+       119582,
+       -56825
+      ],
+      "thing_id": "well",
+      "version": 2
+     }
+    ],
+    "unavailable_affordances": [],
+    "world_id": "world:generated:things-replay-measured-small_town"
+   }
+  ],
+  "kind": "exulanica.things-comparison-replay-measurement/v1",
+  "largest_population_measured": 130,
+  "limits": [
+   "Scripted answers the engine applies: the most receipts, lines and hands acts a run holds, not any model's behaviour.",
+   "One simulated hour per run; a day is not measured.",
+   "No point measures the society bound of 512; what the line implies beyond the largest population measured is inferred."
+  ],
+  "line": {
+   "margins": [
+    {
+     "decided": 0,
+     "graph": "square",
+     "margin_us": 352992,
+     "p95_us": 120388,
+     "population": 10
+    },
+    {
+     "decided": 4,
+     "graph": "square",
+     "margin_us": 397190,
+     "p95_us": 197406,
+     "population": 10
+    },
+    {
+     "decided": 10,
+     "graph": "square",
+     "margin_us": 371138,
+     "p95_us": 405282,
+     "population": 10
+    },
+    {
+     "decided": 0,
+     "graph": "square",
+     "margin_us": 333823,
+     "p95_us": 175861,
+     "population": 18
+    },
+    {
+     "decided": 4,
+     "graph": "square",
+     "margin_us": 374786,
+     "p95_us": 259378,
+     "population": 18
+    },
+    {
+     "decided": 16,
+     "graph": "square",
+     "margin_us": 393868,
+     "p95_us": 613736,
+     "population": 18
+    },
+    {
+     "decided": 18,
+     "graph": "square",
+     "margin_us": 381295,
+     "p95_us": 688549,
+     "population": 18
+    },
+    {
+     "decided": 0,
+     "graph": "square",
+     "margin_us": 264803,
+     "p95_us": 317489,
+     "population": 34
+    },
+    {
+     "decided": 4,
+     "graph": "square",
+     "margin_us": 300959,
+     "p95_us": 412341,
+     "population": 34
+    },
+    {
+     "decided": 16,
+     "graph": "square",
+     "margin_us": 343668,
+     "p95_us": 762656,
+     "population": 34
+    },
+    {
+     "decided": 34,
+     "graph": "square",
+     "margin_us": 389450,
+     "p95_us": 1306410,
+     "population": 34
+    },
+    {
+     "decided": 0,
+     "graph": "square",
+     "margin_us": 124869,
+     "p95_us": 602639,
+     "population": 66
+    },
+    {
+     "decided": 4,
+     "graph": "square",
+     "margin_us": 182355,
+     "p95_us": 689217,
+     "population": 66
+    },
+    {
+     "decided": 16,
+     "graph": "square",
+     "margin_us": 311164,
+     "p95_us": 992600,
+     "population": 66
+    },
+    {
+     "decided": 66,
+     "graph": "square",
+     "margin_us": 728773,
+     "p95_us": 2375791,
+     "population": 66
+    },
+    {
+     "decided": 0,
+     "graph": "square",
+     "margin_us": 625,
+     "p95_us": 1017315,
+     "population": 130
+    },
+    {
+     "decided": 4,
+     "graph": "square",
+     "margin_us": 15366,
+     "p95_us": 1172750,
+     "population": 130
+    },
+    {
+     "decided": 16,
+     "graph": "square",
+     "margin_us": 132494,
+     "p95_us": 1566150,
+     "population": 130
+    },
+    {
+     "decided": 130,
+     "graph": "square",
+     "margin_us": 5574,
+     "p95_us": 6543086,
+     "population": 130
+    },
+    {
+     "decided": 0,
+     "graph": "town",
+     "margin_us": 257224,
+     "p95_us": 216156,
+     "population": 10
+    },
+    {
+     "decided": 4,
+     "graph": "town",
+     "margin_us": 284837,
+     "p95_us": 309759,
+     "population": 10
+    },
+    {
+     "decided": 10,
+     "graph": "town",
+     "margin_us": 281543,
+     "p95_us": 494877,
+     "population": 10
+    },
+    {
+     "decided": 0,
+     "graph": "town",
+     "margin_us": 174997,
+     "p95_us": 334687,
+     "population": 18
+    },
+    {
+     "decided": 4,
+     "graph": "town",
+     "margin_us": 220469,
+     "p95_us": 413695,
+     "population": 18
+    },
+    {
+     "decided": 16,
+     "graph": "town",
+     "margin_us": 194546,
+     "p95_us": 813058,
+     "population": 18
+    },
+    {
+     "decided": 18,
+     "graph": "town",
+     "margin_us": 233611,
+     "p95_us": 836233,
+     "population": 18
+    },
+    {
+     "decided": 0,
+     "graph": "town",
+     "margin_us": 15161,
+     "p95_us": 567131,
+     "population": 34
+    },
+    {
+     "decided": 4,
+     "graph": "town",
+     "margin_us": 21433,
+     "p95_us": 691867,
+     "population": 34
+    },
+    {
+     "decided": 16,
+     "graph": "town",
+     "margin_us": 22845,
+     "p95_us": 1083479,
+     "population": 34
+    },
+    {
+     "decided": 34,
+     "graph": "town",
+     "margin_us": 263487,
+     "p95_us": 1432373,
+     "population": 34
+    },
+    {
+     "decided": 0,
+     "graph": "town",
+     "margin_us": 569,
+     "p95_us": 590799,
+     "population": 36
+    },
+    {
+     "decided": 4,
+     "graph": "town",
+     "margin_us": 31063,
+     "p95_us": 692129,
+     "population": 36
+    },
+    {
+     "decided": 16,
+     "graph": "town",
+     "margin_us": 740,
+     "p95_us": 1117924,
+     "population": 36
+    },
+    {
+     "decided": 36,
+     "graph": "town",
+     "margin_us": 236837,
+     "p95_us": 1540947,
+     "population": 36
+    }
+   ],
+   "replay_fixed_ms": 428,
+   "replay_per_decided_pair_us": 102,
+   "replay_per_decided_person_us": 29284,
+   "replay_per_person_us": 4538
+  },
+  "line_without_pairs": {
+   "margins": [
+    {
+     "decided": 0,
+     "graph": "square",
+     "margin_us": 98892,
+     "p95_us": 120388,
+     "population": 10
+    },
+    {
+     "decided": 4,
+     "graph": "square",
+     "margin_us": 162838,
+     "p95_us": 197406,
+     "population": 10
+    },
+    {
+     "decided": 10,
+     "graph": "square",
+     "margin_us": 166408,
+     "p95_us": 405282,
+     "population": 10
+    },
+    {
+     "decided": 0,
+     "graph": "square",
+     "margin_us": 159643,
+     "p95_us": 175861,
+     "population": 18
+    },
+    {
+     "decided": 4,
+     "graph": "square",
+     "margin_us": 217090,
+     "p95_us": 259378,
+     "population": 18
+    },
+    {
+     "decided": 16,
+     "graph": "square",
+     "margin_us": 285624,
+     "p95_us": 613736,
+     "population": 18
+    },
+    {
+     "decided": 18,
+     "graph": "square",
+     "margin_us": 281293,
+     "p95_us": 688549,
+     "population": 18
+    },
+    {
+     "decided": 0,
+     "graph": "square",
+     "margin_us": 250463,
+     "p95_us": 317489,
+     "population": 34
+    },
+    {
+     "decided": 4,
+     "graph": "square",
+     "margin_us": 296575,
+     "p95_us": 412341,
+     "population": 34
+    },
+    {
+     "decided": 16,
+     "graph": "square",
+     "margin_us": 369152,
+     "p95_us": 762656,
+     "population": 34
+    },
+    {
+     "decided": 34,
+     "graph": "square",
+     "margin_us": 459736,
+     "p95_us": 1306410,
+     "population": 34
+    },
+    {
+     "decided": 0,
+     "graph": "square",
+     "margin_us": 430209,
+     "p95_us": 602639,
+     "population": 66
+    },
+    {
+     "decided": 4,
+     "graph": "square",
+     "margin_us": 484595,
+     "p95_us": 689217,
+     "population": 66
+    },
+    {
+     "decided": 16,
+     "graph": "square",
+     "margin_us": 604104,
+     "p95_us": 992600,
+     "population": 66
+    },
+    {
+     "decided": 66,
+     "graph": "square",
+     "margin_us": 982963,
+     "p95_us": 2375791,
+     "population": 66
+    },
+    {
+     "decided": 0,
+     "graph": "square",
+     "margin_us": 945325,
+     "p95_us": 1017315,
+     "population": 130
+    },
+    {
+     "decided": 4,
+     "graph": "square",
+     "margin_us": 930854,
+     "p95_us": 1172750,
+     "population": 130
+    },
+    {
+     "decided": 16,
+     "graph": "square",
+     "margin_us": 960346,
+     "p95_us": 1566150,
+     "population": 130
+    },
+    {
+     "decided": 130,
+     "graph": "square",
+     "margin_us": 884,
+     "p95_us": 6543086,
+     "population": 130
+    },
+    {
+     "decided": 0,
+     "graph": "town",
+     "margin_us": 3124,
+     "p95_us": 216156,
+     "population": 10
+    },
+    {
+     "decided": 4,
+     "graph": "town",
+     "margin_us": 50485,
+     "p95_us": 309759,
+     "population": 10
+    },
+    {
+     "decided": 10,
+     "graph": "town",
+     "margin_us": 76813,
+     "p95_us": 494877,
+     "population": 10
+    },
+    {
+     "decided": 0,
+     "graph": "town",
+     "margin_us": 817,
+     "p95_us": 334687,
+     "population": 18
+    },
+    {
+     "decided": 4,
+     "graph": "town",
+     "margin_us": 62773,
+     "p95_us": 413695,
+     "population": 18
+    },
+    {
+     "decided": 16,
+     "graph": "town",
+     "margin_us": 86302,
+     "p95_us": 813058,
+     "population": 18
+    },
+    {
+     "decided": 18,
+     "graph": "town",
+     "margin_us": 133609,
+     "p95_us": 836233,
+     "population": 18
+    },
+    {
+     "decided": 0,
+     "graph": "town",
+     "margin_us": 821,
+     "p95_us": 567131,
+     "population": 34
+    },
+    {
+     "decided": 4,
+     "graph": "town",
+     "margin_us": 17049,
+     "p95_us": 691867,
+     "population": 34
+    },
+    {
+     "decided": 16,
+     "graph": "town",
+     "margin_us": 48329,
+     "p95_us": 1083479,
+     "population": 34
+    },
+    {
+     "decided": 34,
+     "graph": "town",
+     "margin_us": 333773,
+     "p95_us": 1432373,
+     "population": 34
+    },
+    {
+     "decided": 0,
+     "graph": "town",
+     "margin_us": 6209,
+     "p95_us": 590799,
+     "population": 36
+    },
+    {
+     "decided": 4,
+     "graph": "town",
+     "margin_us": 45843,
+     "p95_us": 692129,
+     "population": 36
+    },
+    {
+     "decided": 16,
+     "graph": "town",
+     "margin_us": 42940,
+     "p95_us": 1117924,
+     "population": 36
+    },
+    {
+     "decided": 36,
+     "graph": "town",
+     "margin_us": 324737,
+     "p95_us": 1540947,
+     "population": 36
+    }
+   ],
+   "replay_fixed_ms": 74,
+   "replay_per_decided_person_us": 35241,
+   "replay_per_person_us": 14528
+  },
+  "machine": {
+   "cpus": 18,
+   "python": "3.11.6",
+   "system": "macOS-26.7-arm64-arm-64bit"
+  },
+  "points": [
+   {
+    "acts": {},
+    "body_bytes": 235173,
+    "decided": 0,
+    "drawing_bytes": 235173,
+    "drawing_gzip_bytes": 9747,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.17",
+     "before": "4.17"
+    },
+    "play_cpu_us": 107166,
+    "play_wall_us": 107232,
+    "population": 10,
+    "read_cpu_us": {
+     "max": 120308,
+     "median": 104649,
+     "min": 104005,
+     "p95": 120308
+    },
+    "read_wall_us": {
+     "max": 120388,
+     "median": 104689,
+     "min": 104071,
+     "p95": 120388
+    },
+    "receipts": 0,
+    "stated_population": 8,
+    "stored_read_wall_us": {
+     "max": 25846,
+     "median": 9604,
+     "min": 9495,
+     "p95": 25846
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "acts": {},
+    "body_bytes": 260502,
+    "decided": 4,
+    "drawing_bytes": 260434,
+    "drawing_gzip_bytes": 10972,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.32",
+     "before": "4.17"
+    },
+    "play_cpu_us": 164309,
+    "play_wall_us": 165065,
+    "population": 10,
+    "read_cpu_us": {
+     "max": 197073,
+     "median": 178435,
+     "min": 174092,
+     "p95": 197073
+    },
+    "read_wall_us": {
+     "max": 197406,
+     "median": 178828,
+     "min": 174420,
+     "p95": 197406
+    },
+    "receipts": 58,
+    "stated_population": 8,
+    "stored_read_wall_us": {
+     "max": 27208,
+     "median": 10687,
+     "min": 10290,
+     "p95": 27208
+    },
+    "stored_request_receipt_bytes": 286830
+   },
+   {
+    "acts": {
+     "gave": 5,
+     "hands_missed": 1,
+     "picked_up": 12,
+     "put_down": 11,
+     "said": 25
+    },
+    "body_bytes": 339860,
+    "decided": 10,
+    "drawing_bytes": 339690,
+    "drawing_gzip_bytes": 14144,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.32",
+     "before": "4.32"
+    },
+    "play_cpu_us": 384836,
+    "play_wall_us": 385459,
+    "population": 10,
+    "read_cpu_us": {
+     "max": 404912,
+     "median": 401884,
+     "min": 386666,
+     "p95": 404912
+    },
+    "read_wall_us": {
+     "max": 405282,
+     "median": 402177,
+     "min": 387022,
+     "p95": 405282
+    },
+    "receipts": 168,
+    "stated_population": 8,
+    "stored_read_wall_us": {
+     "max": 12272,
+     "median": 11844,
+     "min": 11779,
+     "p95": 12272
+    },
+    "stored_request_receipt_bytes": 1015426
+   },
+   {
+    "acts": {},
+    "body_bytes": 421284,
+    "decided": 0,
+    "drawing_bytes": 421284,
+    "drawing_gzip_bytes": 16388,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.32",
+     "before": "4.32"
+    },
+    "play_cpu_us": 142716,
+    "play_wall_us": 142823,
+    "population": 18,
+    "read_cpu_us": {
+     "max": 175729,
+     "median": 174261,
+     "min": 159167,
+     "p95": 175729
+    },
+    "read_wall_us": {
+     "max": 175861,
+     "median": 174424,
+     "min": 159277,
+     "p95": 175861
+    },
+    "receipts": 0,
+    "stated_population": 16,
+    "stored_read_wall_us": {
+     "max": 31384,
+     "median": 16410,
+     "min": 16339,
+     "p95": 31384
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "acts": {},
+    "body_bytes": 447507,
+    "decided": 4,
+    "drawing_bytes": 447439,
+    "drawing_gzip_bytes": 17776,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.29",
+     "before": "4.32"
+    },
+    "play_cpu_us": 203745,
+    "play_wall_us": 203901,
+    "population": 18,
+    "read_cpu_us": {
+     "max": 259094,
+     "median": 257520,
+     "min": 242023,
+     "p95": 259094
+    },
+    "read_wall_us": {
+     "max": 259378,
+     "median": 257753,
+     "min": 242199,
+     "p95": 259378
+    },
+    "receipts": 61,
+    "stated_population": 16,
+    "stored_read_wall_us": {
+     "max": 17293,
+     "median": 17253,
+     "min": 16970,
+     "p95": 17293
+    },
+    "stored_request_receipt_bytes": 313749
+   },
+   {
+    "acts": {
+     "gave": 1,
+     "picked_up": 12,
+     "put_down": 10,
+     "said": 24
+    },
+    "body_bytes": 546644,
+    "decided": 16,
+    "drawing_bytes": 546372,
+    "drawing_gzip_bytes": 22040,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.29",
+     "before": "4.29"
+    },
+    "play_cpu_us": 548988,
+    "play_wall_us": 549539,
+    "population": 18,
+    "read_cpu_us": {
+     "max": 613403,
+     "median": 603994,
+     "min": 594580,
+     "p95": 613403
+    },
+    "read_wall_us": {
+     "max": 613736,
+     "median": 605097,
+     "min": 595375,
+     "p95": 613736
+    },
+    "receipts": 236,
+    "stated_population": 16,
+    "stored_read_wall_us": {
+     "max": 37770,
+     "median": 20825,
+     "min": 20122,
+     "p95": 37770
+    },
+    "stored_request_receipt_bytes": 1409050
+   },
+   {
+    "acts": {
+     "hands_missed": 1,
+     "picked_up": 14,
+     "put_down": 12,
+     "said": 33
+    },
+    "body_bytes": 585547,
+    "decided": 18,
+    "drawing_bytes": 585241,
+    "drawing_gzip_bytes": 24304,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.27",
+     "before": "4.29"
+    },
+    "play_cpu_us": 609414,
+    "play_wall_us": 609947,
+    "population": 18,
+    "read_cpu_us": {
+     "max": 687930,
+     "median": 680724,
+     "min": 664848,
+     "p95": 687930
+    },
+    "read_wall_us": {
+     "max": 688549,
+     "median": 681298,
+     "min": 665403,
+     "p95": 688549
+    },
+    "receipts": 296,
+    "stated_population": 16,
+    "stored_read_wall_us": {
+     "max": 20896,
+     "median": 20718,
+     "min": 20580,
+     "p95": 20896
+    },
+    "stored_request_receipt_bytes": 1768701
+   },
+   {
+    "acts": {},
+    "body_bytes": 819532,
+    "decided": 0,
+    "drawing_bytes": 819532,
+    "drawing_gzip_bytes": 31609,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.25",
+     "before": "4.27"
+    },
+    "play_cpu_us": 229505,
+    "play_wall_us": 229708,
+    "population": 34,
+    "read_cpu_us": {
+     "max": 317026,
+     "median": 297548,
+     "min": 294329,
+     "p95": 317026
+    },
+    "read_wall_us": {
+     "max": 317489,
+     "median": 297884,
+     "min": 294676,
+     "p95": 317489
+    },
+    "receipts": 0,
+    "stated_population": 32,
+    "stored_read_wall_us": {
+     "max": 48372,
+     "median": 31652,
+     "min": 31515,
+     "p95": 48372
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "acts": {},
+    "body_bytes": 825401,
+    "decided": 4,
+    "drawing_bytes": 825333,
+    "drawing_gzip_bytes": 32692,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.25",
+     "before": "4.25"
+    },
+    "play_cpu_us": 317444,
+    "play_wall_us": 317755,
+    "population": 34,
+    "read_cpu_us": {
+     "max": 412003,
+     "median": 402016,
+     "min": 386139,
+     "p95": 412003
+    },
+    "read_wall_us": {
+     "max": 412341,
+     "median": 402355,
+     "min": 386471,
+     "p95": 412341
+    },
+    "receipts": 60,
+    "stated_population": 32,
+    "stored_read_wall_us": {
+     "max": 49036,
+     "median": 32677,
+     "min": 32294,
+     "p95": 49036
+    },
+    "stored_request_receipt_bytes": 350138
+   },
+   {
+    "acts": {
+     "gave": 1,
+     "picked_up": 6,
+     "put_down": 4,
+     "said": 11
+    },
+    "body_bytes": 916215,
+    "decided": 16,
+    "drawing_bytes": 915943,
+    "drawing_gzip_bytes": 37168,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.31",
+     "before": "4.25"
+    },
+    "play_cpu_us": 679746,
+    "play_wall_us": 680385,
+    "population": 34,
+    "read_cpu_us": {
+     "max": 762040,
+     "median": 758514,
+     "min": 745677,
+     "p95": 762040
+    },
+    "read_wall_us": {
+     "max": 762656,
+     "median": 759195,
+     "min": 746596,
+     "p95": 762656
+    },
+    "receipts": 246,
+    "stated_population": 32,
+    "stored_read_wall_us": {
+     "max": 53250,
+     "median": 35002,
+     "min": 34639,
+     "p95": 53250
+    },
+    "stored_request_receipt_bytes": 1482886
+   },
+   {
+    "acts": {
+     "gave": 3,
+     "hands_missed": 1,
+     "picked_up": 11,
+     "put_down": 8,
+     "said": 30
+    },
+    "body_bytes": 1054300,
+    "decided": 34,
+    "drawing_bytes": 1053722,
+    "drawing_gzip_bytes": 45273,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.19",
+     "before": "4.31"
+    },
+    "play_cpu_us": 1162800,
+    "play_wall_us": 1163731,
+    "population": 34,
+    "read_cpu_us": {
+     "max": 1304243,
+     "median": 1279372,
+     "min": 1244133,
+     "p95": 1304243
+    },
+    "read_wall_us": {
+     "max": 1306410,
+     "median": 1280553,
+     "min": 1245319,
+     "p95": 1306410
+    },
+    "receipts": 512,
+    "stated_population": 32,
+    "stored_read_wall_us": {
+     "max": 57855,
+     "median": 39716,
+     "min": 38547,
+     "p95": 57855
+    },
+    "stored_request_receipt_bytes": 3177723
+   },
+   {
+    "acts": {},
+    "body_bytes": 1595341,
+    "decided": 0,
+    "drawing_bytes": 1595341,
+    "drawing_gzip_bytes": 67336,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.09",
+     "before": "4.19"
+    },
+    "play_cpu_us": 420273,
+    "play_wall_us": 420780,
+    "population": 66,
+    "read_cpu_us": {
+     "max": 601627,
+     "median": 570450,
+     "min": 563363,
+     "p95": 601627
+    },
+    "read_wall_us": {
+     "max": 602639,
+     "median": 570975,
+     "min": 563990,
+     "p95": 602639
+    },
+    "receipts": 0,
+    "stated_population": 64,
+    "stored_read_wall_us": {
+     "max": 79124,
+     "median": 63070,
+     "min": 61669,
+     "p95": 79124
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "acts": {},
+    "body_bytes": 1592676,
+    "decided": 4,
+    "drawing_bytes": 1592608,
+    "drawing_gzip_bytes": 69498,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.09",
+     "before": "4.09"
+    },
+    "play_cpu_us": 521987,
+    "play_wall_us": 522755,
+    "population": 66,
+    "read_cpu_us": {
+     "max": 688623,
+     "median": 657690,
+     "min": 648462,
+     "p95": 688623
+    },
+    "read_wall_us": {
+     "max": 689217,
+     "median": 658340,
+     "min": 648970,
+     "p95": 689217
+    },
+    "receipts": 48,
+    "stated_population": 64,
+    "stored_read_wall_us": {
+     "max": 80233,
+     "median": 63054,
+     "min": 62087,
+     "p95": 80233
+    },
+    "stored_request_receipt_bytes": 345802
+   },
+   {
+    "acts": {},
+    "body_bytes": 1651529,
+    "decided": 16,
+    "drawing_bytes": 1651257,
+    "drawing_gzip_bytes": 73443,
+    "graph": "square",
+    "load_1m": {
+     "after": "3.92",
+     "before": "4.09"
+    },
+    "play_cpu_us": 810274,
+    "play_wall_us": 810993,
+    "population": 66,
+    "read_cpu_us": {
+     "max": 991177,
+     "median": 984621,
+     "min": 955279,
+     "p95": 991177
+    },
+    "read_wall_us": {
+     "max": 992600,
+     "median": 985590,
+     "min": 956018,
+     "p95": 992600
+    },
+    "receipts": 238,
+    "stated_population": 64,
+    "stored_read_wall_us": {
+     "max": 84166,
+     "median": 65591,
+     "min": 64426,
+     "p95": 84166
+    },
+    "stored_request_receipt_bytes": 1507945
+   },
+   {
+    "acts": {
+     "gave": 2,
+     "picked_up": 17,
+     "put_down": 14,
+     "said": 22
+    },
+    "body_bytes": 1978587,
+    "decided": 66,
+    "drawing_bytes": 1977465,
+    "drawing_gzip_bytes": 92737,
+    "graph": "square",
+    "load_1m": {
+     "after": "3.99",
+     "before": "3.92"
+    },
+    "play_cpu_us": 2128041,
+    "play_wall_us": 2130023,
+    "population": 66,
+    "read_cpu_us": {
+     "max": 2373630,
+     "median": 2344638,
+     "min": 2319132,
+     "p95": 2373630
+    },
+    "read_wall_us": {
+     "max": 2375791,
+     "median": 2346845,
+     "min": 2321281,
+     "p95": 2375791
+    },
+    "receipts": 911,
+    "stated_population": 64,
+    "stored_read_wall_us": {
+     "max": 95802,
+     "median": 73808,
+     "min": 72643,
+     "p95": 95802
+    },
+    "stored_request_receipt_bytes": 5881494
+   },
+   {
+    "acts": {},
+    "body_bytes": 2614652,
+    "decided": 0,
+    "drawing_bytes": 2614652,
+    "drawing_gzip_bytes": 100866,
+    "graph": "square",
+    "load_1m": {
+     "after": "3.91",
+     "before": "3.99"
+    },
+    "play_cpu_us": 786101,
+    "play_wall_us": 786909,
+    "population": 130,
+    "read_cpu_us": {
+     "max": 1016144,
+     "median": 1000593,
+     "min": 992173,
+     "p95": 1016144
+    },
+    "read_wall_us": {
+     "max": 1017315,
+     "median": 1001623,
+     "min": 993491,
+     "p95": 1017315
+    },
+    "receipts": 0,
+    "stated_population": 128,
+    "stored_read_wall_us": {
+     "max": 121379,
+     "median": 119303,
+     "min": 102437,
+     "p95": 121379
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "acts": {},
+    "body_bytes": 2613094,
+    "decided": 4,
+    "drawing_bytes": 2613026,
+    "drawing_gzip_bytes": 102871,
+    "graph": "square",
+    "load_1m": {
+     "after": "3.92",
+     "before": "3.91"
+    },
+    "play_cpu_us": 928621,
+    "play_wall_us": 929346,
+    "population": 130,
+    "read_cpu_us": {
+     "max": 1171484,
+     "median": 1142651,
+     "min": 1110846,
+     "p95": 1171484
+    },
+    "read_wall_us": {
+     "max": 1172750,
+     "median": 1144046,
+     "min": 1111787,
+     "p95": 1172750
+    },
+    "receipts": 47,
+    "stated_population": 128,
+    "stored_read_wall_us": {
+     "max": 123261,
+     "median": 122541,
+     "min": 103172,
+     "p95": 123261
+    },
+    "stored_request_receipt_bytes": 240753
+   },
+   {
+    "acts": {},
+    "body_bytes": 2671219,
+    "decided": 16,
+    "drawing_bytes": 2670947,
+    "drawing_gzip_bytes": 106478,
+    "graph": "square",
+    "load_1m": {
+     "after": "3.86",
+     "before": "3.92"
+    },
+    "play_cpu_us": 1326654,
+    "play_wall_us": 1329006,
+    "population": 130,
+    "read_cpu_us": {
+     "max": 1564558,
+     "median": 1553922,
+     "min": 1540085,
+     "p95": 1564558
+    },
+    "read_wall_us": {
+     "max": 1566150,
+     "median": 1555456,
+     "min": 1541250,
+     "p95": 1566150
+    },
+    "receipts": 221,
+    "stated_population": 128,
+    "stored_read_wall_us": {
+     "max": 133523,
+     "median": 125199,
+     "min": 105429,
+     "p95": 133523
+    },
+    "stored_request_receipt_bytes": 1077293
+   },
+   {
+    "acts": {
+     "picked_up": 32,
+     "put_down": 30,
+     "said": 55
+    },
+    "body_bytes": 3348441,
+    "decided": 130,
+    "drawing_bytes": 3346231,
+    "drawing_gzip_bytes": 149490,
+    "graph": "square",
+    "load_1m": {
+     "after": "4.33",
+     "before": "3.86"
+    },
+    "play_cpu_us": 5923713,
+    "play_wall_us": 5929455,
+    "population": 130,
+    "read_cpu_us": {
+     "max": 6509199,
+     "median": 6405565,
+     "min": 6302518,
+     "p95": 6509199
+    },
+    "read_wall_us": {
+     "max": 6543086,
+     "median": 6415269,
+     "min": 6309821,
+     "p95": 6543086
+    },
+    "receipts": 1686,
+    "stated_population": 128,
+    "stored_read_wall_us": {
+     "max": 160139,
+     "median": 155663,
+     "min": 125100,
+     "p95": 160139
+    },
+    "stored_request_receipt_bytes": 8965978
+   },
+   {
+    "acts": {},
+    "body_bytes": 366184,
+    "decided": 0,
+    "drawing_bytes": 366184,
+    "drawing_gzip_bytes": 26557,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.14",
+     "before": "4.33"
+    },
+    "play_cpu_us": 173910,
+    "play_wall_us": 174026,
+    "population": 10,
+    "read_cpu_us": {
+     "max": 215943,
+     "median": 204345,
+     "min": 187055,
+     "p95": 215943
+    },
+    "read_wall_us": {
+     "max": 216156,
+     "median": 204510,
+     "min": 187270,
+     "p95": 216156
+    },
+    "receipts": 0,
+    "stated_population": 8,
+    "stored_read_wall_us": {
+     "max": 32215,
+     "median": 14786,
+     "min": 14694,
+     "p95": 32215
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "acts": {},
+    "body_bytes": 407332,
+    "decided": 4,
+    "drawing_bytes": 407264,
+    "drawing_gzip_bytes": 28465,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.14",
+     "before": "4.14"
+    },
+    "play_cpu_us": 252382,
+    "play_wall_us": 252611,
+    "population": 10,
+    "read_cpu_us": {
+     "max": 309357,
+     "median": 288912,
+     "min": 272233,
+     "p95": 309357
+    },
+    "read_wall_us": {
+     "max": 309759,
+     "median": 289207,
+     "min": 272446,
+     "p95": 309759
+    },
+    "receipts": 57,
+    "stated_population": 8,
+    "stored_read_wall_us": {
+     "max": 16187,
+     "median": 15715,
+     "min": 15598,
+     "p95": 16187
+    },
+    "stored_request_receipt_bytes": 410055
+   },
+   {
+    "acts": {
+     "picked_up": 13,
+     "put_down": 11,
+     "said": 26
+    },
+    "body_bytes": 450634,
+    "decided": 10,
+    "drawing_bytes": 450464,
+    "drawing_gzip_bytes": 29582,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.21",
+     "before": "4.14"
+    },
+    "play_cpu_us": 442600,
+    "play_wall_us": 443062,
+    "population": 10,
+    "read_cpu_us": {
+     "max": 494106,
+     "median": 475165,
+     "min": 474285,
+     "p95": 494106
+    },
+    "read_wall_us": {
+     "max": 494877,
+     "median": 475675,
+     "min": 474819,
+     "p95": 494877
+    },
+    "receipts": 158,
+    "stated_population": 8,
+    "stored_read_wall_us": {
+     "max": 16927,
+     "median": 16642,
+     "min": 16581,
+     "p95": 16927
+    },
+    "stored_request_receipt_bytes": 1119356
+   },
+   {
+    "acts": {},
+    "body_bytes": 611259,
+    "decided": 0,
+    "drawing_bytes": 611259,
+    "drawing_gzip_bytes": 38575,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.21",
+     "before": "4.21"
+    },
+    "play_cpu_us": 272841,
+    "play_wall_us": 273062,
+    "population": 18,
+    "read_cpu_us": {
+     "max": 334378,
+     "median": 319283,
+     "min": 310117,
+     "p95": 334378
+    },
+    "read_wall_us": {
+     "max": 334687,
+     "median": 321323,
+     "min": 310360,
+     "p95": 334687
+    },
+    "receipts": 0,
+    "stated_population": 16,
+    "stored_read_wall_us": {
+     "max": 39812,
+     "median": 24742,
+     "min": 24713,
+     "p95": 39812
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "acts": {},
+    "body_bytes": 638391,
+    "decided": 4,
+    "drawing_bytes": 638323,
+    "drawing_gzip_bytes": 39470,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.04",
+     "before": "4.21"
+    },
+    "play_cpu_us": 355916,
+    "play_wall_us": 356617,
+    "population": 18,
+    "read_cpu_us": {
+     "max": 413362,
+     "median": 398806,
+     "min": 391652,
+     "p95": 413362
+    },
+    "read_wall_us": {
+     "max": 413695,
+     "median": 399281,
+     "min": 391964,
+     "p95": 413695
+    },
+    "receipts": 58,
+    "stated_population": 16,
+    "stored_read_wall_us": {
+     "max": 44634,
+     "median": 26795,
+     "min": 26240,
+     "p95": 44634
+    },
+    "stored_request_receipt_bytes": 428809
+   },
+   {
+    "acts": {
+     "picked_up": 9,
+     "put_down": 8,
+     "said": 41
+    },
+    "body_bytes": 780729,
+    "decided": 16,
+    "drawing_bytes": 780457,
+    "drawing_gzip_bytes": 45309,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.11",
+     "before": "4.04"
+    },
+    "play_cpu_us": 728920,
+    "play_wall_us": 731130,
+    "population": 18,
+    "read_cpu_us": {
+     "max": 811524,
+     "median": 777037,
+     "min": 770330,
+     "p95": 811524
+    },
+    "read_wall_us": {
+     "max": 813058,
+     "median": 777759,
+     "min": 771423,
+     "p95": 813058
+    },
+    "receipts": 249,
+    "stated_population": 16,
+    "stored_read_wall_us": {
+     "max": 48007,
+     "median": 31011,
+     "min": 29580,
+     "p95": 48007
+    },
+    "stored_request_receipt_bytes": 1837114
+   },
+   {
+    "acts": {
+     "picked_up": 20,
+     "put_down": 20,
+     "said": 34
+    },
+    "body_bytes": 788991,
+    "decided": 18,
+    "drawing_bytes": 788685,
+    "drawing_gzip_bytes": 46292,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.34",
+     "before": "4.11"
+    },
+    "play_cpu_us": 728705,
+    "play_wall_us": 730290,
+    "population": 18,
+    "read_cpu_us": {
+     "max": 833155,
+     "median": 815474,
+     "min": 803431,
+     "p95": 833155
+    },
+    "read_wall_us": {
+     "max": 836233,
+     "median": 816317,
+     "min": 804541,
+     "p95": 836233
+    },
+    "receipts": 290,
+    "stated_population": 16,
+    "stored_read_wall_us": {
+     "max": 51813,
+     "median": 32492,
+     "min": 31237,
+     "p95": 51813
+    },
+    "stored_request_receipt_bytes": 2108487
+   },
+   {
+    "acts": {},
+    "body_bytes": 1123520,
+    "decided": 0,
+    "drawing_bytes": 1123520,
+    "drawing_gzip_bytes": 66088,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.34",
+     "before": "4.34"
+    },
+    "play_cpu_us": 444092,
+    "play_wall_us": 445234,
+    "population": 34,
+    "read_cpu_us": {
+     "max": 566504,
+     "median": 548280,
+     "min": 546350,
+     "p95": 566504
+    },
+    "read_wall_us": {
+     "max": 567131,
+     "median": 548727,
+     "min": 546903,
+     "p95": 567131
+    },
+    "receipts": 0,
+    "stated_population": 32,
+    "stored_read_wall_us": {
+     "max": 62183,
+     "median": 46175,
+     "min": 45591,
+     "p95": 62183
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "acts": {},
+    "body_bytes": 1140976,
+    "decided": 4,
+    "drawing_bytes": 1140908,
+    "drawing_gzip_bytes": 67302,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.32",
+     "before": "4.34"
+    },
+    "play_cpu_us": 548099,
+    "play_wall_us": 548676,
+    "population": 34,
+    "read_cpu_us": {
+     "max": 687156,
+     "median": 650812,
+     "min": 642102,
+     "p95": 687156
+    },
+    "read_wall_us": {
+     "max": 691867,
+     "median": 651544,
+     "min": 642670,
+     "p95": 691867
+    },
+    "receipts": 62,
+    "stated_population": 32,
+    "stored_read_wall_us": {
+     "max": 63685,
+     "median": 47308,
+     "min": 46418,
+     "p95": 63685
+    },
+    "stored_request_receipt_bytes": 406185
+   },
+   {
+    "acts": {
+     "gave": 2,
+     "picked_up": 4,
+     "put_down": 3,
+     "said": 58
+    },
+    "body_bytes": 1272417,
+    "decided": 16,
+    "drawing_bytes": 1272145,
+    "drawing_gzip_bytes": 72436,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.13",
+     "before": "4.32"
+    },
+    "play_cpu_us": 911857,
+    "play_wall_us": 912855,
+    "population": 34,
+    "read_cpu_us": {
+     "max": 1080519,
+     "median": 1048749,
+     "min": 1021213,
+     "p95": 1080519
+    },
+    "read_wall_us": {
+     "max": 1083479,
+     "median": 1049688,
+     "min": 1022246,
+     "p95": 1083479
+    },
+    "receipts": 260,
+    "stated_population": 32,
+    "stored_read_wall_us": {
+     "max": 70898,
+     "median": 69770,
+     "min": 49805,
+     "p95": 70898
+    },
+    "stored_request_receipt_bytes": 1734846
+   },
+   {
+    "acts": {
+     "picked_up": 4,
+     "put_down": 3,
+     "said": 53
+    },
+    "body_bytes": 1393569,
+    "decided": 34,
+    "drawing_bytes": 1392991,
+    "drawing_gzip_bytes": 76800,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.42",
+     "before": "4.13"
+    },
+    "play_cpu_us": 1234431,
+    "play_wall_us": 1235774,
+    "population": 34,
+    "read_cpu_us": {
+     "max": 1430569,
+     "median": 1387643,
+     "min": 1364089,
+     "p95": 1430569
+    },
+    "read_wall_us": {
+     "max": 1432373,
+     "median": 1388720,
+     "min": 1365302,
+     "p95": 1432373
+    },
+    "receipts": 489,
+    "stated_population": 32,
+    "stored_read_wall_us": {
+     "max": 74083,
+     "median": 52223,
+     "min": 52064,
+     "p95": 74083
+    },
+    "stored_request_receipt_bytes": 3173751
+   },
+   {
+    "acts": {},
+    "body_bytes": 1187056,
+    "decided": 0,
+    "drawing_bytes": 1187056,
+    "drawing_gzip_bytes": 69590,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.54",
+     "before": "4.42"
+    },
+    "play_cpu_us": 458990,
+    "play_wall_us": 459353,
+    "population": 36,
+    "read_cpu_us": {
+     "max": 590110,
+     "median": 586720,
+     "min": 567086,
+     "p95": 590110
+    },
+    "read_wall_us": {
+     "max": 590799,
+     "median": 587234,
+     "min": 567710,
+     "p95": 590799
+    },
+    "receipts": 0,
+    "stated_population": 34,
+    "stored_read_wall_us": {
+     "max": 64410,
+     "median": 47869,
+     "min": 47437,
+     "p95": 64410
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "acts": {},
+    "body_bytes": 1224731,
+    "decided": 4,
+    "drawing_bytes": 1224663,
+    "drawing_gzip_bytes": 71394,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.5",
+     "before": "4.54"
+    },
+    "play_cpu_us": 561101,
+    "play_wall_us": 561714,
+    "population": 36,
+    "read_cpu_us": {
+     "max": 691549,
+     "median": 681362,
+     "min": 659688,
+     "p95": 691549
+    },
+    "read_wall_us": {
+     "max": 692129,
+     "median": 681914,
+     "min": 660217,
+     "p95": 692129
+    },
+    "receipts": 63,
+    "stated_population": 34,
+    "stored_read_wall_us": {
+     "max": 65853,
+     "median": 50527,
+     "min": 48599,
+     "p95": 65853
+    },
+    "stored_request_receipt_bytes": 392055
+   },
+   {
+    "acts": {
+     "picked_up": 18,
+     "put_down": 18,
+     "said": 55
+    },
+    "body_bytes": 1378862,
+    "decided": 16,
+    "drawing_bytes": 1378590,
+    "drawing_gzip_bytes": 76428,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.46",
+     "before": "4.5"
+    },
+    "play_cpu_us": 929870,
+    "play_wall_us": 930758,
+    "population": 36,
+    "read_cpu_us": {
+     "max": 1116834,
+     "median": 1092633,
+     "min": 1070985,
+     "p95": 1116834
+    },
+    "read_wall_us": {
+     "max": 1117924,
+     "median": 1093862,
+     "min": 1071870,
+     "p95": 1117924
+    },
+    "receipts": 293,
+    "stated_population": 34,
+    "stored_read_wall_us": {
+     "max": 71947,
+     "median": 70448,
+     "min": 53486,
+     "p95": 71947
+    },
+    "stored_request_receipt_bytes": 1748613
+   },
+   {
+    "acts": {
+     "picked_up": 3,
+     "put_down": 3,
+     "said": 65
+    },
+    "body_bytes": 1513208,
+    "decided": 36,
+    "drawing_bytes": 1512596,
+    "drawing_gzip_bytes": 83933,
+    "graph": "town",
+    "load_1m": {
+     "after": "4.46",
+     "before": "4.46"
+    },
+    "play_cpu_us": 1363102,
+    "play_wall_us": 1366067,
+    "population": 36,
+    "read_cpu_us": {
+     "max": 1539599,
+     "median": 1493513,
+     "min": 1490256,
+     "p95": 1539599
+    },
+    "read_wall_us": {
+     "max": 1540947,
+     "median": 1495592,
+     "min": 1491948,
+     "p95": 1540947
+    },
+    "receipts": 544,
+    "stated_population": 34,
+    "stored_read_wall_us": {
+     "max": 78964,
+     "median": 75704,
+     "min": 56993,
+     "p95": 78964
+    },
+    "stored_request_receipt_bytes": 3321326
+   }
+  ],
+  "preregistration_sha256": "7f8f4ce6d406d28d9098b4be2eb358b5fe34e079ac619efc23255e491381791f",
+  "reads": {
+   "assets/catalogs/scenes/three-strangers-in-town.v1.json": "8660d119128bb7fb4ae750c7bd2ea9e65494b8007165080e9ab15f4c7af9836c",
+   "assets/catalogs/scenes/three-strangers.v4.json": "66af9938c11262a13c277f90ed55c6dfbb1388a0d71b9d6ec9481462ec67293a",
+   "scripts/measure_comparison_replay.py": "37cc54f8b3d6a7c3aa3910ce7b213cd7edabd1949147a907eea5be8a32825b83",
+   "scripts/measure_living_comparison_replay.py": "68bdcd9cca97665c51846e828b34c3e95a350c646af19d4e25e640e9d3f0f0d7",
+   "tests/living_square_support.py": "239a0114ee571a3be54acea3cb2492930949745852c2de9394bebf1f420d3575",
+   "tests/living_town_support.py": "a99318f3b184e2b8e13ad5629f02660f3201b5cd28f70a8822cf256a1d93bd39",
+   "tests/things_society_support.py": "843c664f433eca780f8cc0d9318e4b5319bdd7c9b1fcd65340bba45c675c51ea"
+  },
+  "repeats": 5,
+  "script": "scripts/measure_things_comparison_replay.py",
+  "script_sha256": "b975b8506c8ec98b4b6078a4fe5e2c418a462b431d944cf57ac3fdf208a2aeea",
+  "source": {
+   "changed_paths": [],
+   "drawing_code_sha256": "235b984ba01d739fa3426bb4e89e29a2a8a33d481d5216561c631698282efc84",
+   "head": "d8b1f107b1406f423da37d73248f6a1a61a9087e"
+  },
+  "window_ticks": 60
+ },
+ "record_sha256": "0897ab40f4cf2a8ca68756e9580c7e76cf49b11bf0c331e78c62e30a3e5c7dab"
+}
