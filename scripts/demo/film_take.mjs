@@ -16,7 +16,9 @@
 // Steps, each marked in marks.json (seconds from the recording's first frame): world-open, named,
 // asked, question, plan-shown, placed, reopened, people-in, framed, minds-chosen, playing, alive-end, then,
 // with --hold, hold-start and hold-end (the recording runs while something outside, such as a game's
-// crossing, happens; it ends when the file exists or after --hold-minutes), card, look-swapped,
+// crossing, happens; it ends when the file exists or after --hold-minutes; a request written to
+// <hold>.say meanwhile is typed to the Companion and confirmed: asked-plan, asked-done or asked-refused),
+// card, look-swapped,
 // how-we-know, look-back, mind-swapped, end. A step that fails is marked "failed: <step>" with the reason;
 // the recording keeps what happened and the take stops there.
 //
@@ -84,6 +86,10 @@ const button = (text) => `[...document.querySelectorAll('button')].filter(${visi
 const buttonStarting = (text) => `[...document.querySelectorAll('button')].filter(${visible}).find(b => (b.innerText || '').trim().startsWith(${JSON.stringify(text)}) || (b.getAttribute('aria-label') || '').startsWith(${JSON.stringify(text)}))`;
 const labelStarting = (text) => `[...document.querySelectorAll('label')].filter(${visible}).find(l => (l.innerText || '').trim().startsWith(${JSON.stringify(text)}))`;
 const anyWords = (text) => `[...document.querySelectorAll('body *')].some(e => e.children.length === 0 && (e.textContent || '').includes(${JSON.stringify(text)}) && e.getClientRects().length > 0)`;
+// Words shown by any visible element, its own words beside an icon included ("Not done" sits beside one).
+const shownWords = (text) => `[...document.querySelectorAll('body *')].some(e => e.getClientRects().length > 0 && (e.children.length === 0 ? (e.textContent || '') : [...e.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('')).includes(${JSON.stringify(text)}))`;
+// The plan panel's own Close, not another panel's or a notice's.
+const planClose = `[...document.querySelectorAll('button')].filter(${visible}).find(b => (b.innerText || '').trim() === 'Close' && (() => { for (let e = b.parentElement; e && e !== document.body; e = e.parentElement) if ((e.innerText || '').includes('Check this plan')) return true; return false; })())`;
 const titleInput = `[...document.querySelectorAll('input')].find(i => i.getAttribute('aria-label') === 'World title')`;
 const step = async (name, run) => {
   try { await run(); } catch (error) {
@@ -91,6 +97,38 @@ const step = async (name, run) => {
     throw error;
   }
 };
+
+// A person's request typed to the Companion: confirmed when it plans steps, kept as said otherwise.
+async function ask(words) {
+  // A plan still open from an earlier request would be read as this one's answer.
+  if (await page.evaluate(`!!(${planClose})`)) await page.click(planClose, 'Close the earlier plan');
+  if (!(await page.evaluate(`!!document.querySelector('input[placeholder="Ask about your sources"]') || !!document.querySelector('input[placeholder="Your reply"]')`))) {
+    await page.click(buttonStarting('Companion'), 'the Companion');
+  }
+  const input = `(document.querySelector('input[placeholder="Ask about your sources"]') || document.querySelector('input[placeholder="Your reply"]'))`;
+  await page.waitFor(`!!(${input})`, 15_000, 'the Companion input');
+  await page.click(input, 'the Companion input');
+  await page.typeInto(input, words);
+  await sleep(600);
+  await page.key('Enter', 'Enter', { text: '\r' });
+  // The Companion says it is working, then shows a plan to confirm or an answer ending in its
+  // provenance line ("... read that in ..."): a being's line on screen is never taken for the answer.
+  const working = shownWords('Looking through your library.');
+  await page.waitFor(`${working} || !!(${button('Confirm')})`, 10_000, 'the Companion working').catch(() => null);
+  await page.waitFor(`!${working} && (!!(${button('Confirm')}) || ${shownWords('read that in')} || ${shownWords('No model was asked')} || ${shownWords('A model was asked')})`, 60_000, 'the plan or an answer');
+  if (await page.evaluate(`!!(${button('Confirm')})`)) {
+    await mark('asked-plan', words);
+    await sleep(2_000);
+    await page.click(button('Confirm'), 'Confirm the request');
+    await page.waitFor(`${shownWords('Every step happened')} || ${shownWords('Partly done')} || ${shownWords('Not done')}`, 180_000, 'the request carried out');
+    await mark('asked-done', await page.evaluate(`${shownWords('Every step happened')} ? 'every step happened' : ${shownWords('Partly done')} ? 'partly done' : 'not done'`));
+  } else {
+    await mark('asked-refused', words);
+  }
+  await sleep(1_500);
+  if (await page.evaluate(`!!(${planClose})`)) await page.click(planClose, 'Close the plan');
+  await page.key('Escape', 'Escape');
+}
 
 let failed = null;
 try {
@@ -215,7 +253,22 @@ try {
   if (hold) {
     await mark('hold-start', hold);
     const deadline = Date.now() + holdMinutes * 60_000;
-    while (!existsSync(hold) && Date.now() < deadline) await sleep(2_000);
+    // While it holds, a request written to <hold>.say is the person's: typed to the Companion in this
+    // recorded page, its plan checked and confirmed, and marked with its words and what became of it.
+    const sayFile = `${hold}.say`;
+    while (!existsSync(hold) && Date.now() < deadline) {
+      if (existsSync(sayFile)) {
+        const words = readFileSync(sayFile, 'utf8').trim();
+        rmSync(sayFile, { force: true });
+        if (words) {
+          await ask(words).catch(async (error) => {
+            await mark('asked-failed', `${words}: ${String(error.message).slice(0, 200)}`);
+            if (await page.evaluate(`!!(${planClose})`).catch(() => false)) await page.click(planClose, 'Close the plan').catch(() => null);
+          });
+        }
+      }
+      await sleep(2_000);
+    }
     await mark('hold-end', existsSync(hold) ? 'the file exists' : 'the limit');
   }
   await step('card', async () => {
