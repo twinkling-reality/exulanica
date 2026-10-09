@@ -916,7 +916,8 @@ page, not the picture: a fixed pool of nodes placed each frame over the box a pe
 picked by, read by a screen reader in the card's words and
 picked by a click as by aiming. The model's short name and the person's kind show over the selected
 person, a speaking one and the three nearest marked people within 12 m drawn on screen; no pill is
-drawn beyond 60 m.
+drawn beyond 60 m. A pill that would cover a nearer person's stands just above it (2 px apart), so two
+people in line from the camera both read; the nearest stays over its person.
 
 Each line a being says is drawn over it as it is said, from the society's `said` events read with
 each minute: only lines said after the page first read the society, each once, oldest first, at most

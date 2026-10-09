@@ -15,8 +15,10 @@
  * and the marks stay readable by a screen reader and checkable in the page. The model's short name
  * shows beside the pill, with the being's label, for the selected being, a speaking one and the
  * three nearest marked beings within 12 m; farther ones show the pill alone, and none is drawn
- * beyond 60 m or off screen. A line's words are set only as text: lines are written by models and
- * players and are never markup. A pill is a button: clicking it picks its being as aiming does.
+ * beyond 60 m or off screen. A pill that would cover a nearer being's stands just above it, so two
+ * beings in line from the camera both read; the nearest stays over its being. A line's words are set
+ * only as text: lines are written by models and players and are never markup. A pill is a button:
+ * clicking it picks its being as aiming does.
  */
 
 import * as pc from 'playcanvas';
@@ -64,6 +66,8 @@ export const lineSeconds = (text: string): number => Math.min(9, 2 + 0.055 * [..
 const LINE_LIFT_PX = 34;
 /** A point this far off screen, in CSS pixels, is not drawn. */
 const SCREEN_MARGIN_PX = 40;
+/** The room between a pill and the nearer one it stands on, in CSS pixels. */
+export const MARK_STACK_GAP_PX = 2;
 
 interface MarkNode {
   readonly root: HTMLDivElement;
@@ -77,6 +81,9 @@ interface MarkNode {
   visible: boolean;
   /** The transform last written, so a mark that has not moved is not written again. */
   at: string;
+  /** Its size in CSS pixels, read once for what it says now (`words`), or null until read. */
+  size: { readonly width: number; readonly height: number } | null;
+  words: string;
 }
 
 interface LineNode {
@@ -187,7 +194,27 @@ export class ThingMarks {
       const node = this.marks[used]!;
       used += 1;
       this.fillMark(node, one.id, one.subject, named.has(one.id) || one.id === selected || speaking.has(one.id));
-      this.place(node, one.screen[0], one.screen[1]);
+      this.show(node);
+    }
+    // Nearest first, each pill over its being unless it would cover one already placed: then it
+    // stands just above that one. Sizes are read only for words not read before, all before any move.
+    const sizes = this.marks.slice(0, used).map((node) => (node.size ??= { width: node.root.offsetWidth, height: node.root.offsetHeight }));
+    const placed: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number }[] = [];
+    for (let i = 0; i < used; i += 1) {
+      const { width, height } = sizes[i]!;
+      const x = drawn[i]!.screen[0];
+      let y = drawn[i]!.screen[1];
+      for (let moved = true; moved;) {
+        moved = false;
+        for (const box of placed) {
+          if (x + width / 2 > box.left && x - width / 2 < box.right && y > box.top && y - height < box.bottom) {
+            y = box.top - MARK_STACK_GAP_PX;
+            moved = true;
+          }
+        }
+      }
+      placed.push({ left: x - width / 2, right: x + width / 2, top: y - height, bottom: y });
+      this.place(this.marks[i]!, x, y);
     }
     for (let i = used; i < this.marks.length; i += 1) {
       this.marks[i]!.subject = null;
@@ -229,11 +256,15 @@ export class ThingMarks {
     return [x, y];
   }
 
-  private place(node: { root: HTMLElement; visible: boolean; at: string }, x: number, y: number): void {
+  private show(node: { root: HTMLElement; visible: boolean }): void {
     if (!node.visible) {
       node.root.style.display = '';
       node.visible = true;
     }
+  }
+
+  private place(node: { root: HTMLElement; visible: boolean; at: string }, x: number, y: number): void {
+    this.show(node);
     // Centred over the point, standing on it.
     const at = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -100%)`;
     if (at !== node.at) {
@@ -266,6 +297,13 @@ export class ThingMarks {
     const label = withName ? subject.label : null;
     node.label.textContent = label ?? '';
     node.label.hidden = label === null;
+    // What it shows decides its size: read again only when that changes.
+    const words = [node.pill.className, node.pillWord.textContent, node.pillName.hidden ? '' : node.pillName.textContent,
+      node.pillFrom.hidden ? '' : node.pillFrom.textContent, label ?? ''].join('\u0000');
+    if (words !== node.words) {
+      node.words = words;
+      node.size = null;
+    }
   }
 
   private markNode(): MarkNode {
@@ -287,7 +325,7 @@ export class ThingMarks {
     const label = document.createElement('span');
     label.className = 'thing-mark-label';
     root.append(pill, label);
-    const node: MarkNode = { root, pill, pillWord, pillName, pillFrom, label, subject: null, visible: false, at: '' };
+    const node: MarkNode = { root, pill, pillWord, pillName, pillFrom, label, subject: null, visible: false, at: '', size: null, words: '' };
     pill.addEventListener('click', () => {
       if (node.subject !== null) this.onPick(node.subject);
     });

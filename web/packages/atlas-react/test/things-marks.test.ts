@@ -97,6 +97,33 @@ describe('marks over the beings a model or someone outside runs', () => {
     expect(overlay.counts).toEqual({ marks: 2, aiMarks: 1, lines: 0 });
   });
 
+  it('stands a pill that would cover a nearer one just above it, so two beings in line both read', () => {
+    const { camera, stage } = setup();
+    const overlay = new ThingMarks(stage, () => undefined);
+    // This page lays nothing out, so each mark states the size a browser would give it: 80 by 24.
+    for (const node of Array.from(stage.querySelectorAll<HTMLElement>('.thing-mark'))) {
+      Object.defineProperty(node, 'offsetWidth', { value: 80 });
+      Object.defineProperty(node, 'offsetHeight', { value: 24 });
+    }
+    overlay.setMarks(marked([['spirit', AI, 'lantern spirit'], ['traveller', AI, 'traveller'], ['knight', AI, 'knight']]));
+    // The traveller stands in the gate 4 m behind the spirit, in line from the camera; the knight is well aside.
+    const anchors = new Map([
+      ['spirit', new pc.Vec3(0, 1, -5)],
+      ['traveller', new pc.Vec3(0, 1.4, -9)],
+      ['knight', new pc.Vec3(4, 1, -9)],
+    ]);
+    overlay.update(camera, anchors, null, 0);
+    const at = (id: string) => /translate3d\(([-\d.]+)px, ([-\d.]+)px/.exec(shown(stage).find((one) => one.subject === id)!.transform)!.slice(1).map(Number);
+    const [sx, sy] = screenOf(5, 1);
+    const [tx, ty] = screenOf(9, 1.4);
+    // Over its own being the traveller's pill would cover the spirit's (both 80 wide at x 400, 13 px apart).
+    expect(Math.abs(ty - sy)).toBeLessThan(24);
+    expect(at('spirit')).toEqual([Number(sx.toFixed(1)), Number(sy.toFixed(1))]);
+    expect(at('traveller')).toEqual([Number(tx.toFixed(1)), Number((sy - 24 - 2).toFixed(1))]);
+    const [kx, ky] = screenOf(9, 1, 4);
+    expect(at('knight')).toEqual([Number(kx.toFixed(1)), Number(ky.toFixed(1))]);
+  });
+
   it('names the three nearest within 12 m, the selected one and a speaking one, and draws none beyond 60 m or behind the eye', () => {
     const { camera, stage } = setup();
     const overlay = new ThingMarks(stage, () => undefined);
