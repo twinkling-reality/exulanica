@@ -260,12 +260,20 @@ export async function prepareWorldLook(
     ? [stylePackContent(access, digest, `${packId} manifest`).then((bytes) => JSON.parse(new TextDecoder().decode(bytes)) as unknown), Promise.resolve(null)]
     : [ownLookManifest(access, digest, packId), stylePackContent(access, ownBase.manifestSha256, `${ownBase.packId} manifest`)
       .then((bytes) => JSON.parse(new TextDecoder().decode(bytes)) as unknown)]);
-  const [style, { attachTileInk }, { parseTextureSetManifest, readStylePackManifest, resolveStylePack }] = await Promise.all([
+  const [style, { attachTileInk }, { canonicalJson, parseTextureSetManifest, readStylePackManifest, resolveStylePack }] = await Promise.all([
     import('@exulanica/atlas-react/style-pack'),
     import('@exulanica/atlas-react/generated-tile'),
     import('@exulanica/atlas-core'),
   ]);
   const { fetchPackPieces, renderLookOfPreset } = style;
+  if (ownBase !== null) {
+    // The workspace states its own manifest as JSON; its canonical bytes are held to the digest the
+    // appearance names, as the library's manifest bytes are.
+    const bytes = new TextEncoder().encode(canonicalJson(manifest));
+    if (hex(await crypto.subtle.digest('SHA-256', bytes)) !== digest) {
+      throw new Error(`${packId}'s manifest is not the one its digest names`);
+    }
+  }
   const families = lookFamilies();
   const textureSets = new Set(parseTextureSetManifest(textureManifest).byId.keys());
   const read = readStylePackManifest(manifest as Parameters<typeof readStylePackManifest>[0], { families, textureSets });

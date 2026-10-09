@@ -844,6 +844,23 @@ class WorkspaceStylePackRepository:
         ).fetchone()
         return None if row is None else self.version(row["manifest_sha256"])
 
+    def generated_withdrawn_since(self, content_sha256: str, since: dt.datetime) -> bool:
+        """Whether a generated version made of ``content_sha256`` at or after ``since`` was
+        withdrawn: the owner withdrew the look made for the requests waiting on it."""
+        return (
+            self.connection.execute(
+                "select 1 from workspace_style_pack_version v "
+                "where v.workspace_id = %s and v.origin = 'generated' "
+                "  and v.receipt_document->>'content_sha256' = %s and v.created_at >= %s "
+                "  and exists (select 1 from workspace_style_pack_withdrawal w "
+                "               where w.workspace_id = v.workspace_id "
+                "                 and w.manifest_sha256 = v.manifest_sha256) "
+                "limit 1",
+                (self.workspace_id, content_sha256, since),
+            ).fetchone()
+            is not None
+        )
+
     # -- reads ---------------------------------------------------------------------------------
 
     def version(self, manifest_sha256: str) -> StylePackVersionRecord:

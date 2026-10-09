@@ -286,9 +286,14 @@ request not yet taken in, or a take-back asked and not yet done, one step
    already made of the same pieces on the same base when the workspace holds one, else a new one,
    whose check reads every piece again before any world wears it; after a check that was
    interrupted (which may be asked again) the same pieces take the next version. While a check
-   runs, or the workspace's four checks are all waiting, the step waits for a later pass. A check
+   runs, or the workspace's four checks are all waiting, the step waits for a later pass. Pieces
+   taken in wait at most a day, counted from when the oldest request waiting in that world finished
+   (not from the step's first wait, which nothing records), then end not applied
+   (`look_not_ready`); so after a worker outage a request older than a day ends on the first pass
+   that must wait. A take-back waits however long it takes. A check
    that ends failed ends it (`look_refused`, `look_check_failed`), as does a version withdrawn
-   before it was worn (`look_withdrawn`), a workspace at its limit of 64 live generated looks
+   before it was worn (`look_withdrawn`; the same pieces are not made again for the requests that
+   waited on it, though a later ask of them is), a workspace at its limit of 64 live generated looks
    (`look_limit`), a look over the workspace's or the installation's retained bytes
    (`look_bytes_limit`), a look that could not be recorded (`look_not_recorded`), a base the reader
    refuses (`base_unreadable`) or not in the library (`base_not_library`), and a refusal of the
@@ -297,7 +302,7 @@ request not yet taken in, or a take-back asked and not yet done, one step
    Apply a person's change takes: origin `user`, the asker as actor, the reference
    `generated-pieces:<request>`, and every saved entry resting on the replaced version moved to
    the new one in the same write, so the person's next change is not refused as stale. A write
-   refused as busy or stale is tried on the next pass, for at most a day (`look_write_busy`).
+   refused as busy or stale is tried on the next pass, for at most that day (`look_write_busy`).
    Whatever ends an Apply, its preview is closed (as stale after a saved entry moved, as discarded
    otherwise), so the page never offers it to the person as a change of their own.
 5. **The record.** One step per request (table `piece_look_step`, appended once, never changed):
@@ -311,15 +316,16 @@ request not yet taken in, or a take-back asked and not yet done, one step
 6. **A look that may no longer be worn.** A world whose current appearance names its own look after
    that look was withdrawn is drawn in the look's library base, and a change that names no pack
    keeps that base. On its next pass the step writes the base (or no pack, when the library no
-   longer holds it) as the world's next version and records `fell_back` (`look_withdrawn`) for the
-   request whose pieces the look held.
+   longer holds it) as the world's next version and records `fell_back` (`look_withdrawn`) for
+   each request of the world whose pieces the look held, taken in and not taken back.
 
 Taking back writes a new appearance version and deletes no piece, request or look; the world's
 appearance history rolls back as it always does. A request is applied or not once, asked back once,
 taken back or not once, and falls back once. An ask is refused `409` `look_limit` while the
 workspace holds 64 live generated looks (the limit the style pack contract states), before anything
 is spent, since its pieces could not be taken into a look; a retry of an ask under its idempotency
-key, or an ask whose requests are already open, answers as before. A request's pieces arrive with its
+key, or an ask whose requests are already open, answers as before. A take-back that meets the
+limit stays asked, since withdrawing a look frees a place, and is done on a pass after room is made. A request's pieces arrive with its
 batch's done marker (section 6 gives the time an item takes), each new look is checked in the next
 asset preparation pass, and the world wears it on the worker's next pass after that. While a look
 waits, the world is alive in what it wore.

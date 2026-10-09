@@ -28,19 +28,22 @@ from pathlib import Path
 
 import psycopg
 import pytest
-from exulanica.generation import store
+from exulanica.generation import apply, store
 from exulanica.generation.apply import REFERENCE_PREFIX, LookStepper
 from exulanica.generation.looks import GeneratedVariant, build_derived_look
 from exulanica.world import InvalidStyleData, ProposalOrigin, ProposalProvenance, StyleScope
 from exulanica.world.errors import StyleWriteBusy
 from exulanica.world.models import StylePackBinding
 from exulanica.world.repository import WorldStyleRepository
+from exulanica.world.saved_entries import SavedWorldEntryRepository
 from exulanica.world.style_pack_checks import StylePackCheckWorker, colour_table, library_palettes
 from exulanica.world.style_pack_library import style_pack_library
 from exulanica.world.style_packs import load_context, read_manifest
 from exulanica.world.workspace_style_packs import (
+    StylePackQuotaExceeded,
     WorkspaceStylePackRepository,
 )
+from exulanica.world.worlds import GENERATED, new_world_id
 from exulanica_pieces.canonical import canonical_bytes, sha256_hex
 from exulanica_pieces.records import POSTPROCESS_VERSION, cache_key
 
@@ -128,9 +131,10 @@ class World:
         base: StylePackBinding = COZY,
         within: bool = True,
         stand_in: tuple[str, tuple[int, int, int]] | None = None,
+        at: dt.datetime | None = None,
     ) -> uuid.UUID:
-        """A request for ``role`` on ``base`` that a session made, its one piece kept (``stand_in``,
-        a cozy file and its size, in place of the role's own)."""
+        """A request for ``role`` on ``base`` that a session made (at ``at``, else now), its one
+        piece kept (``stand_in``, a cozy file and its size, in place of the role's own)."""
         name, size = stand_in or PIECES[role]
         piece = (COZY_PIECES / name).read_bytes()
         self.packs.content.generated_pieces.put_bytes(piece)
@@ -152,7 +156,7 @@ class World:
             }
         )
         key = cache_key(request_sha256, COMPONENTS, POSTPROCESS_VERSION)
-        now = dt.datetime.now(dt.UTC)
+        now = at or dt.datetime.now(dt.UTC)
         with (
             self.packs.purged.database().session(self.packs.workspace_id) as owner,
             owner.transaction(),
@@ -602,6 +606,99 @@ def test_pieces_whose_look_s_check_was_interrupted_take_the_next_version(world) 
     assert worn is not None and worn.version == 2 and worn.manifest_sha256 != manifest
 
 
+def test_a_take_back_at_the_limit_of_generated_looks_stays_asked(world, monkeypatch) -> None:
+    # Withdrawing a look frees a slot, so a take-back refused at the workspace's limit of live
+    # generated looks is not ended: it stays asked, and is done on a pass after room is made.
+    plant = _applied(world)
+    _applied(world, "vehicle.sedan")
+    store.ask_take_back(world.packs.connection, world.packs.workspace_id, plant, world.packs.actor)
+
+    def full(*_args, **_kwargs):
+        raise StylePackQuotaExceeded("this workspace's style packs are at their limit")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(WorkspaceStylePackRepository, "record_generated", full)
+        patched.setattr(apply, "generated_looks_full", lambda *_: True)
+        world.step()
+        assert world.steps(plant)[-1]["kind"] == "take_back_asked"
+    assert world.step() == []
+    world.check()
+    assert world.step() == [world.world_id]
+    assert world.steps(plant)[-1]["kind"] == "taken_back"
+
+
+def test_a_withdrawn_look_falls_back_for_every_request_whose_pieces_it_held(world) -> None:
+    # Two requests' pieces in one look: both fall back with it, not only the one whose step named
+    # that look.
+    plant = _applied(world)
+    sedan = _applied(world, "vehicle.sedan")
+    world.own().withdraw(world.styles.current().style_pack.manifest_sha256)
+    assert world.step() == [world.world_id]
+    assert world.styles.current().style_pack == COZY
+    for request in (plant, sedan):
+        fell = world.steps(request)[-1]
+        assert (fell["kind"], fell["reason"]) == ("fell_back", "look_withdrawn")
+
+
+def test_a_look_a_take_back_wrote_falls_back_for_the_pieces_it_kept(world) -> None:
+    # The take-back wrote the look without the trees: when that look is withdrawn, the request
+    # whose pieces it holds falls back, and the request taken back does not.
+    plant = _applied(world)
+    sedan = _applied(world, "vehicle.sedan")
+    store.ask_take_back(world.packs.connection, world.packs.workspace_id, plant, world.packs.actor)
+    world.step()
+    world.check()
+    assert world.step() == [world.world_id]
+    assert world.steps(plant)[-1]["kind"] == "taken_back"
+    world.own().withdraw(world.styles.current().style_pack.manifest_sha256)
+    assert world.step() == [world.world_id]
+    assert world.steps(plant)[-1]["kind"] == "taken_back"
+    fell = world.steps(sedan)[-1]
+    assert (fell["kind"], fell["reason"]) == ("fell_back", "look_withdrawn")
+
+
+def test_a_look_withdrawn_while_its_requests_wait_is_not_made_again_for_them(world) -> None:
+    # The owner withdraws the look made for a request while its check waits: the request ends not
+    # applied, look_withdrawn, and no other version is made for it; a later ask of the same pieces
+    # is made again.
+    plant = world.made("plant.default")
+    assert world.step() == []
+    own = world.own()
+    [waiting] = [
+        row["manifest_sha256"]
+        for row in world.packs.connection.execute(
+            "select manifest_sha256 from workspace_style_pack_version "
+            "where workspace_id = %s and origin = 'generated'",
+            (world.packs.workspace_id,),
+        ).fetchall()
+    ]
+    assert own.withdraw(waiting)
+    assert world.step() == [world.world_id]
+    assert [(s["kind"], s["reason"]) for s in world.steps(plant)] == [
+        ("not_applied", "look_withdrawn")
+    ]
+    assert world.styles.current().style_pack == COZY
+    again = world.made("plant.default")
+    assert world.step() == []
+    world.check()
+    assert world.step() == [world.world_id]
+    assert world.steps(again)[-1]["kind"] == "applied"
+
+
+def test_a_take_back_waiting_long_never_ends_a_fresh_request_on_its_first_wait(world) -> None:
+    # A take-back may wait however long it takes; the day a request may wait is counted from the
+    # oldest request taken in, never from that take-back.
+    plant = _applied(world)
+    _applied(world, "vehicle.sedan")
+    store.ask_take_back(world.packs.connection, world.packs.workspace_id, plant, world.packs.actor)
+    assert world.step() == []
+    later = dt.datetime.now(dt.UTC) + dt.timedelta(days=2)
+    fresh = world.made("vehicle.sedan", at=later)
+    assert world.step(later + dt.timedelta(minutes=1)) == []
+    assert world.steps(fresh) == []
+    assert world.steps(plant)[-1]["kind"] == "take_back_asked"
+
+
 def test_a_take_back_waits_while_its_look_is_checked_and_ends_by_name_when_it_is_refused(
     world,
 ) -> None:
@@ -651,6 +748,96 @@ def test_an_apply_refused_as_busy_leaves_no_preview_open(world, monkeypatch) -> 
         (world.packs.workspace_id, world.world_id),
     ).fetchone()
     assert opened["n"] == 0
+
+
+def test_a_saved_entry_moves_to_the_version_the_look_step_writes(world) -> None:
+    # Every generated world has a saved entry: the step's write moves it with the appearance, so
+    # the person's next change is not refused as stale.
+    entries = SavedWorldEntryRepository(world.packs.connection, world.packs.workspace_id)
+    entry = entries.create_starter(title="A town", created_by=world.packs.actor)
+    town = World(world.packs, entry.world_id, world.stepper)
+    # A starter names no pack, so its pieces are asked in the library's default.
+    assert town.styles.current().style_pack is None
+    assert entry.style_version_id == town.styles.current().version_id
+    default = style_pack_library().default_pack
+    base = StylePackBinding(default.pack_id, default.version, default.manifest_sha256)
+    plant = town.made("plant.default", base=base)
+    town.step()
+    town.check()
+    assert town.step() == [town.world_id]
+    assert town.steps(plant)[-1]["kind"] == "applied"
+    current = town.styles.current()
+    assert current.style_pack.source == "workspace"
+    assert entries.entry(entry.entry_id).style_version_id == current.version_id
+
+
+def test_a_world_naming_no_pack_takes_pieces_into_the_library_default(world) -> None:
+    other = registered_world(
+        world.packs.connection,
+        world.packs.workspace_id,
+        new_world_id(GENERATED),
+        kind=GENERATED,
+        actor=world.packs.actor,
+    )
+    bare = World(world.packs, other, world.stepper)
+    bare.styles.register_topology(topology(world_id=other))
+    assert bare.styles.current().style_pack is None
+    default = style_pack_library().default_pack
+    base = StylePackBinding(default.pack_id, default.version, default.manifest_sha256)
+    plant = bare.made("plant.default", base=base)
+    bare.step()
+    bare.check()
+    assert bare.step() == [other]
+    assert bare.steps(plant)[-1]["kind"] == "applied"
+    worn = bare.styles.current().style_pack
+    assert worn is not None and worn.source == "workspace" and worn.base == base
+
+
+def test_a_busy_write_is_tried_again_and_given_up_after_a_day(world, monkeypatch) -> None:
+    plant = world.made("plant.default")
+    world.step()
+    world.check()
+
+    def busy(*_args, **_kwargs):
+        raise StyleWriteBusy("another change held a lock this write needs")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(WorldStyleRepository, "apply", busy)
+        assert world.step() == []
+        assert world.steps(plant) == []
+    assert world.step() == [world.world_id]
+    assert world.steps(plant)[-1]["kind"] == "applied"
+    later = world.made("vehicle.sedan")
+    world.step()
+    world.check()
+    monkeypatch.setattr(WorldStyleRepository, "apply", busy)
+    assert world.step(dt.datetime.now(dt.UTC) + dt.timedelta(days=2)) == [world.world_id]
+    assert [(s["kind"], s["reason"]) for s in world.steps(later)] == [
+        ("not_applied", "look_write_busy")
+    ]
+
+
+def test_a_proposal_and_preview_naming_an_own_look_state_its_base_and_whether_it_may_be_worn(
+    world,
+) -> None:
+    # A page drawing a proposal or a preview draws an own look by its base and wearable, as it
+    # does a version read: never wearable false and no base for a look that may be worn.
+    _applied(world)
+    styles = world.styles
+    current = styles.current()
+    own = current.style_pack
+    assert own is not None and own.source == "workspace"
+    preview = styles.preview(naming(current, own))
+    read = styles.proposal(preview.proposal.proposal_id).proposal.style_pack
+    [(opened, _record)] = styles.open_previews().readable
+    for named in (
+        preview.proposal.style_pack,
+        preview.candidate.style_pack,
+        read,
+        opened.proposal.style_pack,
+        opened.candidate.style_pack,
+    ):
+        assert named is not None and named.wearable is True and named.base == COZY
 
 
 def test_after_its_own_look_is_withdrawn_a_world_takes_regional_changes_and_falls_back(

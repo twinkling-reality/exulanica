@@ -370,6 +370,7 @@ class WorldStyleRepository:
             appearance_basis=row.get("appearance_basis"),
             **_stated_style_pack(row.get("style_pack")),
         )
+        proposal = replace(proposal, style_pack=self._resolved_pack(proposal.style_pack))
         return StyleProposalRecord(
             proposal=proposal,
             recipe_binding=row["recipe_binding"],
@@ -417,6 +418,7 @@ class WorldStyleRepository:
             try:
                 record = self.proposal(row["proposal_id"])
                 candidate = self._candidate_from_document(row["candidate"])
+                candidate = replace(candidate, style_pack=self._resolved_pack(candidate.style_pack))
             except _UNREADABLE_PREVIEW:
                 unreadable += 1
                 continue
@@ -534,7 +536,17 @@ class WorldStyleRepository:
         if rejected is not None:
             raise rejected
         assert result is not None
-        return result
+        # The proposal and its candidate state an own look as a version read states it: its base
+        # and whether it may be worn now.
+        return replace(
+            result,
+            proposal=replace(
+                result.proposal, style_pack=self._resolved_pack(result.proposal.style_pack)
+            ),
+            candidate=replace(
+                result.candidate, style_pack=self._resolved_pack(result.candidate.style_pack)
+            ),
+        )
 
     def apply(
         self,
@@ -1339,6 +1351,13 @@ class WorldStyleRepository:
                 f"{binding.manifest_sha256} is not a version of this workspace's own pack that "
                 "may be worn"
             )
+
+    def _resolved_pack(self, binding: StylePackBinding | None) -> StylePackBinding | None:
+        """``binding`` with its base and whether it may be worn now, when it names this
+        workspace's own pack and states neither yet; anything else as it is."""
+        if binding is None or binding.source != "workspace" or binding.wearable is not None:
+            return binding
+        return self._own_pack(binding, resolve=True)
 
     def _own_pack(self, binding: StylePackBinding, *, resolve: bool) -> StylePackBinding:
         """``binding``, a version of this workspace's own pack, with the library version it is drawn

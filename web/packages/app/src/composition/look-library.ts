@@ -35,6 +35,16 @@ export interface LookLibrary {
 /** Said in the Look sheet when a world names a look this host does not list, so it is drawn plainly. */
 export const UNSERVED_LOOK_WORDS = 'This world names a look this server does not offer, so it is drawn in its plain tiles. Choose a look to draw it in.';
 
+/**
+ * Said in the Look sheet for a world wearing its workspace's own look of new pieces: the look it is
+ * drawn on (`title`, null when this host no longer offers it) and whether the own look may be worn.
+ */
+export function ownLookWords(title: string | null, wearable: boolean): string {
+  if (title === null) return 'This world\'s own look of new pieces is drawn on a look this server no longer offers, so it is drawn in its plain tiles. Choose a look to draw it in.';
+  if (!wearable) return `This world's own look of new pieces can no longer be worn, so it is drawn in ${title}.`;
+  return `This world wears its own look, with new pieces made for it on ${title}. Choosing a look here replaces it.`;
+}
+
 const pictures = new Map<string, Promise<string | null>>();
 
 function picture(
@@ -73,6 +83,13 @@ export async function readLookLibrary(access: Credentials): Promise<LookLibrary>
     },
     async now(bound) {
       if (bound === null) return { packId: defaultId, how: {} };
+      if (bound.own !== undefined) {
+        const base = bound.own.base === null ? undefined : look.listedVersion(packs, bound.own.base.manifestSha256);
+        const title = base === undefined ? null : base.pack.title;
+        // One that may not be worn is drawn in its base, which the sheet then shows as chosen.
+        const shown = base !== undefined && !bound.own.wearable ? base.pack.pack_id : null;
+        return { packId: shown, how: { notice: ownLookWords(title, bound.own.wearable) } };
+      }
       const found = look.listedVersion(packs, bound.manifestSha256);
       if (found === undefined) return { packId: null, how: { notice: UNSERVED_LOOK_WORDS } };
       if (found.current) return { packId: found.pack.pack_id, how: {} };

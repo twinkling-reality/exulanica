@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
+import { canonicalJson } from '@exulanica/atlas-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Credentials } from '../src/config.js';
 import {
@@ -259,7 +260,7 @@ function ownLook(served: Served): { digest: string; view: unknown; piece: Uint8A
     modules: { 'plant.default': { variants: [{ file: path, lod1: null, size_mm: [3000, 3000, 5500], stretch_mm: [null, null, null] }] } },
     files: [{ path, sha256: sha256(piece), bytes: piece.length, media_type: 'model/gltf-binary' }],
   };
-  const digest = 'd'.repeat(64);
+  const digest = sha256(new TextEncoder().encode(canonicalJson(manifest)));
   return {
     digest,
     view: { manifest_sha256: digest, pack_id: 'generated.cozy-town', ready: true, manifest },
@@ -316,6 +317,16 @@ describe('a world\'s own look, prepared', () => {
     await expect(prepareWorldLook(ACCESS, 'generated.cozy-town', TEXTURES, [], own.digest, {
       packId: toon.pack_id, version: toon.version, manifestSha256: toon.manifest_sha256,
     })).rejects.toThrow('is not drawn on');
+  });
+
+  it('is refused when the manifest the workspace states is not the one its digest names', async () => {
+    const served = committedLibrary();
+    const own = ownLook(served);
+    const view = own.view as { manifest: { title: string } };
+    const altered = { ...view, manifest: { ...view.manifest, title: 'Another look' } };
+    vi.stubGlobal('fetch', hostWithOwn(served, { ...own, view: altered }, []));
+    await expect(prepareWorldLook(ACCESS, 'generated.cozy-town', TEXTURES, [], own.digest, own.base))
+      .rejects.toThrow('is not the one its digest names');
   });
 });
 

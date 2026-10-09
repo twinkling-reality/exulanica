@@ -13,7 +13,7 @@ vi.mock('../src/world-look.js', async (original) => ({
     return new Uint8Array([1, 2, 3]);
   },
 }));
-const { UNSERVED_LOOK_WORDS, readLookLibrary } = await import('../src/composition/look-library.js');
+const { UNSERVED_LOOK_WORDS, ownLookWords, readLookLibrary } = await import('../src/composition/look-library.js');
 
 const ACCESS: Credentials = { baseUrl: 'https://host.test/api', token: 'look-token' };
 const sha = (c: string): string => c.repeat(64);
@@ -68,5 +68,19 @@ describe('what a world is drawn in now', () => {
   it('is no pack, said in words, for a digest the host lists under none, whatever pack id it carries', async () => {
     const library = await readLookLibrary(ACCESS);
     expect(await library.now(bound('exulanica.cozy-town', 9, sha('e')))).toEqual({ packId: null, how: { notice: UNSERVED_LOOK_WORDS } });
+  });
+
+  it('is the world\'s own look said by the look it is drawn on, never as plain tiles while it may be worn', async () => {
+    const library = await readLookLibrary(ACCESS);
+    const base = { packId: COZY.pack_id, version: COZY.version, manifestSha256: COZY.manifest_sha256 };
+    const own = (wearable: boolean, on: typeof base | null = base) => ({
+      ...bound('generated.cozy-town', 1, sha('d')), own: { base: on, wearable },
+    });
+    const worn = await library.now(own(true));
+    expect(worn).toEqual({ packId: null, how: { notice: ownLookWords(COZY.title, true) } });
+    expect(worn.how.notice).toContain(COZY.title);
+    expect(worn.how.notice).not.toContain('plain tiles');
+    expect(await library.now(own(false))).toEqual({ packId: COZY.pack_id, how: { notice: ownLookWords(COZY.title, false) } });
+    expect(await library.now(own(true, null))).toEqual({ packId: null, how: { notice: ownLookWords(null, true) } });
   });
 });

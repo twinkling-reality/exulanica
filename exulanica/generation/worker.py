@@ -181,12 +181,13 @@ class PieceGenerationWorker:
                 entries.write_withdrawn(self.bucket, entries.entry_id(piece_batch_id), now)
         ended = self._follow(connection, workspace_id, now)
         settled = self._settle_decided(connection, workspace_id, now)
-        # Looks move whether or not a session is warm: applying a piece runs no GPU.
-        stepped = [] if self.looks is None else self.looks.run(connection, workspace_id, now)
         answered: list[str] = []
         queued = None
         if state == "warm" and session is not None and beat is not None:
             answered, queued = self._queue(connection, workspace_id, session, beat, now)
+        # Looks move whether or not a session is warm: applying a piece runs no GPU. They move
+        # after the queueing, so their lock waits never delay work for a warm, paid session.
+        stepped = [] if self.looks is None else self.looks.run(connection, workspace_id, now)
         return {
             key: value
             for key, value in (

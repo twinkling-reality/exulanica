@@ -96,6 +96,8 @@ _REQUEST_COLUMNS: Final = (
 )
 #: The quota bounds that are retained bytes, which end a step by name (``look_bytes_limit``).
 _BYTES_BOUNDS: Final = frozenset({"workspace_bytes", "installation_bytes"})
+#: Limits that end pieces taken in but leave a take-back asked: a withdrawn look frees its slot.
+_TAKE_BACK_WAITS: Final = frozenset({"look_limit"})
 #: The authors a derived look names: the shape model of every piece (route A, the THINGS mapping).
 _AUTHORS: Final = ("TRELLIS-image-large",)
 
@@ -184,8 +186,9 @@ class LookStepper:
     ) -> bool:
         """A world whose current appearance names its own look of generated pieces after that look
         may no longer be worn (withdrawn) names its library base in the next version (none when
-        the library no longer holds it), recorded as ``fell_back`` for the request whose pieces
-        that look held. A busy write is tried again on the next pass."""
+        the library no longer holds it), recorded as ``fell_back`` for each request of the world
+        whose pieces that look held (taken in, not taken back), or, when none is found, for the
+        request whose step named the look. A busy write is tried again on the next pass."""
         row = connection.execute(
             f"select {_REQUEST_COLUMNS} from piece_look_step s join piece_request p "
             "  on p.workspace_id = s.workspace_id and p.piece_request_id = s.piece_request_id "
@@ -202,7 +205,6 @@ class LookStepper:
         ).fetchone()
         if row is None:
             return False  # no step of a request named that look: nothing to record it against
-        request = _request(row)
         styles = WorldStyleRepository(
             connection, workspace_id, world_id=world_id, style_packs=self.library
         )
@@ -210,6 +212,10 @@ class LookStepper:
         worn = current.style_pack
         if worn is None or worn.manifest_sha256 != manifest_sha256 or worn.wearable:
             return False
+        holders = self._holders(connection, workspace_id, world_id, manifest_sha256) or [
+            _request(row)
+        ]
+        request = holders[0]
         target = (
             None
             if worn.base is None
@@ -222,13 +228,48 @@ class LookStepper:
         except (StyleWriteBusy, StaleStyleVersion, StaleSavedWorldEntry):
             return False
         with connection.transaction():
-            connection.execute(
-                "insert into piece_look_step (workspace_id, piece_request_id, world_id, kind, "
-                "  reason, style_version_id) "
-                "values (%s, %s, %s, 'fell_back', 'look_withdrawn', %s)",
-                (workspace_id, request.piece_request_id, world_id, written.version_id),
-            )
+            for holder in holders:
+                connection.execute(
+                    "insert into piece_look_step (workspace_id, piece_request_id, world_id, kind, "
+                    "  reason, style_version_id) "
+                    "values (%s, %s, %s, 'fell_back', 'look_withdrawn', %s)",
+                    (workspace_id, holder.piece_request_id, world_id, written.version_id),
+                )
         return True
+
+    def _holders(
+        self, connection: Any, workspace_id: uuid.UUID, world_id: str, manifest_sha256: str
+    ) -> list[_Request]:
+        """The world's requests taken in and not taken back or fallen back whose passed pieces
+        the look's modules list for their role, oldest first."""
+        own = WorkspaceStylePackRepository(
+            connection,
+            workspace_id,
+            uuid.UUID(int=0),
+            stores=self.stores,
+            generated_pieces=self.generated_pieces,
+            retained_bytes_limit=self.retained_bytes_limit,
+        )
+        held = _worn_roles(connection, workspace_id, own.version(manifest_sha256))
+        rows = connection.execute(
+            f"select {_REQUEST_COLUMNS} from piece_request p "
+            "where p.workspace_id = %s and p.world_id = %s "
+            "  and exists (select 1 from piece_look_step a where a.workspace_id = p.workspace_id "
+            "               and a.piece_request_id = p.piece_request_id and a.kind = 'applied') "
+            "  and not exists (select 1 from piece_look_step e "
+            "                   where e.workspace_id = p.workspace_id "
+            "                     and e.piece_request_id = p.piece_request_id "
+            "                     and e.kind in ('taken_back', 'fell_back')) "
+            "order by p.finished_at, p.piece_request_id",
+            (workspace_id, world_id),
+        ).fetchall()
+        holders = []
+        for request in map(_request, rows):
+            listed = [piece.piece_sha256 for piece in held.get(request.look_role, [])]
+            passed = _passed(connection, workspace_id, request.piece_request_id)
+            if listed and listed == [piece.piece_sha256 for piece in passed]:
+                holders.append(request)
+        return holders
 
     # -- one world -----------------------------------------------------------------------------
 
@@ -254,7 +295,8 @@ class LookStepper:
             retained_bytes_limit=self.retained_bytes_limit,
         )
         plan = self._plan(connection, workspace_id, own, current, made, asked)
-        oldest = min([r.since for r in made] + [t.since for t in asked])
+        # The day pieces taken in may wait: a take-back waits however long, so it never counts.
+        oldest = min((r.since for r in made), default=now)
         if plan.base is None or not (plan.applied or plan.taken_back):
             # Nothing to write: every waiting step ends as it stands.
             self._record(connection, workspace_id, plan, None, None)
@@ -270,7 +312,7 @@ class LookStepper:
         if failure is not None:
             plan.not_applied.extend((request, failure) for request in plan.applied)
             plan.applied = []
-            if failure not in _PASSING:
+            if failure not in _PASSING and failure not in _TAKE_BACK_WAITS:
                 plan.not_taken_back.extend((take, failure) for take in plan.taken_back)
             plan.taken_back = []
             self._record(connection, workspace_id, plan, None, None)
@@ -376,6 +418,11 @@ class LookStepper:
             if record is not None and _interrupted(record):
                 # An interrupted check may be asked again: the same pieces take the next version.
                 record = None
+            since = min([r.since for r in plan.applied] + [t.since for t in plan.taken_back])
+            if record is None and own.generated_withdrawn_since(content, since):
+                # The owner withdrew the look made for these requests while they waited on it; a
+                # later ask of the same pieces is made again.
+                return None, "look_withdrawn"
             if record is None:
                 pack_id = looks.derived_pack_id(base.pack_id)
                 built = looks.build_derived_look(
