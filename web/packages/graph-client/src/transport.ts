@@ -40,6 +40,8 @@ export class ApiError extends Error {
      * for a caller that knows the member, never a replacement for `code`.
      */
     readonly extensions: Readonly<Record<string, unknown>> = {},
+    /** The response's `Retry-After`, in whole seconds, where it sent one as a number; else null. */
+    readonly retryAfterSeconds: number | null = null,
   ) {
     super(`${code}: ${detail}`);
     this.name = 'ApiError';
@@ -184,5 +186,6 @@ export async function toApiError(response: Response): Promise<ApiError> {
   } catch {
     // Not JSON. The status and statusText above are what there is, and they are enough to act on.
   }
-  return new ApiError(response.status, code, detail, extensions);
+  const retryAfter = Number(response.headers?.get('retry-after') ?? Number.NaN);
+  return new ApiError(response.status, code, detail, extensions, Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter : null);
 }

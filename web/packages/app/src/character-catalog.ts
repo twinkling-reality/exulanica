@@ -9,7 +9,7 @@ import {
   type ServedCharacterCatalog,
 } from '@exulanica/atlas-react/playcanvas';
 import type { CharacterSubject } from '@exulanica/atlas-core';
-import { Transport, type TransportOptions } from '@exulanica/graph-client';
+import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 
 export interface CharacterLook {
   readonly generated?: boolean;
@@ -109,15 +109,60 @@ export const PREPARATION_PREFIX = 'preparation:';
 export function workspaceCharacterLoader(
   options: TransportOptions,
   prepared: (preparationId: string) => string | null = () => null,
+  pace: CharacterReadPace = {},
 ): CharacterByteLoader {
+  const most = pace.concurrent ?? CHARACTER_READS_AT_ONCE;
+  const tries = pace.tries ?? CHARACTER_READ_TRIES;
+  const wait = pace.wait ?? ((ms: number, signal?: AbortSignal) => new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => { clearTimeout(timer); resolve(); }, { once: true });
+  }));
+  // A town asks for every person's parts at once; the host admits a few reads a workspace at a time
+  // and refuses the rest with Retry-After, so reads queue here and a refusal is asked again.
+  let running = 0;
+  const queued: (() => void)[] = [];
+  const slot = async (): Promise<void> => {
+    if (running < most) { running += 1; return; }
+    await new Promise<void>((resolve) => queued.push(resolve));
+  };
+  const release = (): void => {
+    const next = queued.shift();
+    if (next !== undefined) next(); else running -= 1;
+  };
   return async (reference, signal) => {
     const path = reference.assetKey.startsWith(PREPARATION_PREFIX)
       ? prepared(reference.assetKey.slice(PREPARATION_PREFIX.length))
       : `/world/assets/${encodeURIComponent(reference.assetKey)}/bytes`;
     if (path === null) throw new Error('preparation_unavailable');
-    const response = await new Transport({ ...options, signal }).getBytes(path);
-    return response.arrayBuffer();
+    await slot();
+    try {
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          const response = await new Transport({ ...options, ...(signal === undefined ? {} : { signal }) }).getBytes(path);
+          return await response.arrayBuffer();
+        } catch (error) {
+          const busy = error instanceof ApiError && (error.status === 429 || error.status === 503);
+          if (!busy || attempt >= tries || signal?.aborted === true) throw error;
+          // Its Retry-After where it sent one, else a growing pause; never less than half a second.
+          await wait(Math.max(500, (error.retryAfterSeconds ?? attempt) * 1000), signal);
+        }
+      }
+    } finally {
+      release();
+    }
   };
+}
+
+/** How many character reads one page keeps in flight, beside the world's other reads. */
+export const CHARACTER_READS_AT_ONCE = 6;
+/** How many times a read the host was too busy for is asked, in all. */
+export const CHARACTER_READ_TRIES = 5;
+
+/** Overrides of the loader's pacing, for a test. */
+export interface CharacterReadPace {
+  readonly concurrent?: number;
+  readonly tries?: number;
+  readonly wait?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
 /** `GET /world/character-catalogs`, the host's list of the catalogs it serves. */

@@ -73,4 +73,50 @@ describe('signed-in character bytes', () => {
     await expect(nowhere(reference, signal)).rejects.toThrow('preparation_unavailable');
     expect(seen).toHaveLength(1);
   });
+
+  it('keep at most six reads in flight, so a town of people does not overrun the host', async () => {
+    const { workspaceCharacterLoader } = await import('../src/character-catalog.js');
+    let inFlight = 0;
+    let most = 0;
+    const opened: (() => void)[] = [];
+    const fetch = async () => {
+      inFlight += 1; most = Math.max(most, inFlight);
+      await new Promise<void>((resolve) => opened.push(resolve));
+      inFlight -= 1;
+      return new Response(new Uint8Array([1]));
+    };
+    const load = workspaceCharacterLoader({ baseUrl: 'https://world.example/api', token: '', fetch });
+    const reference = (n: number) => ({ assetKey: `part-${n}`, mediaType: 'model/gltf-binary', contentSha256: 'a'.repeat(64), byteSize: 1 });
+    const all = Array.from({ length: 20 }, (_, n) => load(reference(n), new AbortController().signal));
+    let settled = false;
+    const finished = Promise.all(all).then(() => { settled = true; });
+    // Let each read in flight finish, a turn at a time, until every one has.
+    while (!settled) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      opened.splice(0).forEach((open) => open());
+    }
+    await finished;
+    expect(most).toBe(6);
+  });
+
+  it('ask again a read the host was too busy for, after the Retry-After it sent', async () => {
+    const { workspaceCharacterLoader } = await import('../src/character-catalog.js');
+    const answers = [
+      new Response(JSON.stringify({ code: 'workspace_capacity_exhausted', detail: 'busy' }), { status: 429, headers: { 'Retry-After': '1' } }),
+      new Response(JSON.stringify({ code: 'capacity_exhausted', detail: 'busy' }), { status: 503, headers: { 'Retry-After': '2' } }),
+      new Response(new Uint8Array([1, 2, 3])),
+    ];
+    const fetch = async () => answers.shift()!;
+    const waited: number[] = [];
+    const load = workspaceCharacterLoader({ baseUrl: 'https://world.example/api', token: '', fetch }, undefined,
+      { wait: async (ms) => { waited.push(ms); } });
+    const bytes = await load({ assetKey: 'part', mediaType: 'model/gltf-binary', contentSha256: 'a'.repeat(64), byteSize: 3 }, new AbortController().signal);
+    expect(bytes.byteLength).toBe(3);
+    expect(waited).toEqual([1000, 2000]);
+    // Anything else, such as a missing asset, is not asked again.
+    const once = workspaceCharacterLoader({ baseUrl: 'https://world.example/api', token: '', fetch: async () => new Response('{}', { status: 404 }) },
+      undefined, { wait: async (ms) => { waited.push(ms); } });
+    await expect(once({ assetKey: 'gone', mediaType: 'model/gltf-binary', contentSha256: 'a'.repeat(64), byteSize: 1 }, new AbortController().signal)).rejects.toThrow();
+    expect(waited).toEqual([1000, 2000]);
+  });
 });
