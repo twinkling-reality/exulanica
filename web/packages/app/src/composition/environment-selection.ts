@@ -138,6 +138,8 @@ export interface EnvironmentSelectionDependencies {
   readonly onPanelOpen?: () => void;
   readonly onObjects?: () => void;
   readonly showStatus: (message: string, kind?: 'progress' | 'failure') => void;
+  /** Keep a line in the status place until it is taken back with null; `showStatus` when left out. */
+  readonly holdStatus?: (message: string | null) => void;
   /**
    * Tell the person, in one sentence, that somebody crossed in from outside, left again or was
    * turned away; `seeWho` opens the visitor's card while it is still here, and is null otherwise.
@@ -306,6 +308,9 @@ export interface MountedEnvironmentSelection {
   /** G: give back the being played from this page, else play the person selected in the world. */
   togglePlay(): void;
 }
+
+/** Said once when a world with people in it opens paused (a guest's arrival town opens so). */
+export const PAUSED_ARRIVAL_HINT = 'The world is paused. Press Play to let it run.';
 
 /** What the world clock shows: the saved playback control and whether a request is in flight. */
 export interface PeopleClock {
@@ -846,6 +851,26 @@ export function mountEnvironmentSelection(
     }
     if (selectedInhabitant && visible.has(selectedInhabitant)) inhabitantsList.value = selectedInhabitant;
     reflectCrowd();
+  }
+
+  /** Whether the paused hint is held up now. */
+  let pausedHintShown = false;
+  /**
+   * A world whose people live there but that opens paused says how to let it run, and keeps saying it
+   * until the world plays: it never plays by itself (a guest's playing time is theirs to start). Once
+   * this browser has seen the world play, the hint is not said for it again.
+   */
+  function pausedArrivalHint(worldId: string): void {
+    const key = `exulanica.paused-hint.${worldId}`;
+    const played = (): boolean => { try { return window.localStorage.getItem(key) !== null; } catch { return false; } };
+    if (societyControl?.mode === 'playing') {
+      try { window.localStorage.setItem(key, '1'); } catch { /* said again next time, which is still true */ }
+      if (pausedHintShown) { pausedHintShown = false; deps.holdStatus?.(null); }
+      return;
+    }
+    if (pausedHintShown || society === null || societyControl?.mode !== 'paused' || !societyControl.playEligible || played()) return;
+    pausedHintShown = true;
+    if (deps.holdStatus) deps.holdStatus(PAUSED_ARRIVAL_HINT); else deps.showStatus(PAUSED_ARRIVAL_HINT);
   }
 
   /** The words a Companion citation opened this person with, kept while they stay selected. */
@@ -1758,6 +1783,8 @@ export function mountEnvironmentSelection(
     try {
       if (refreshSocietyState) await liveSociety?.refresh();
       societyControl = await controlClient.read(current.versionId);
+      // Every read, whichever way the world was opened: said once, once people live there.
+      if (savedWorld !== null) pausedArrivalHint(savedWorld.worldId);
     } catch (error) {
       societyControl = null;
       playbackStatus.textContent = problemSentence(error, PEOPLE_PROBLEMS, CLOCK_UNREAD);
@@ -2934,6 +2961,8 @@ export function mountEnvironmentSelection(
       // The being played from this page stays the person's until they give it back or go quiet:
       // the server gives it back after its quiet minutes.
       pointerHover.abort();
+      // The paused hint belongs to this world; it goes with it.
+      if (pausedHintShown) { pausedHintShown = false; deps.holdStatus?.(null); }
       playThisOne?.dispose();
       playThisOne = null;
       savedFlight?.stop();

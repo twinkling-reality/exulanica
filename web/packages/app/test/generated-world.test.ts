@@ -118,7 +118,8 @@ describe('a saved generated world of several tiles', () => {
     // In the tile look, so what it reads is the tiles alone; a pack's reads are world-look.test.ts's.
     const loaded = await loadGeneratedWorld(access, entry(tiles), '?look=today');
     expect(isGeneratedWorld(loaded)).toBe(true);
-    expect(read).toEqual([west, east].map((id) =>
+    // Its tiles' bytes (the first view also reads the version's things and what is parked).
+    expect(read.filter((url) => url.includes('/tiles/'))).toEqual([west, east].map((id) =>
       `/world/versions/version/tiles/${id}/bytes?world_id=world%3Agenerated%3Awide`));
     // The runtime draws the first container as the tile and every other as a neighbour, whose
     // ground it composes into the walk (`GeneratedTileSources.neighbours`).

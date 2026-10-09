@@ -955,6 +955,7 @@ async function mountWorld(): Promise<void> {
     }),
     scene: built.scene,
     showStatus: (message, kind) => showTravelStatus(message, kind),
+    holdStatus: (message) => holdTravelStatus(message),
     ...(env.preview ? { admissionId: PREVIEW_NYC_OPEN_DATA_ADMISSION_ID } : {}),
     onSelect: (context) => { companionCityContext = context; },
     onAskAboutInhabitant: (question, asked) => companion.askAbout(
@@ -1012,6 +1013,7 @@ async function mountWorld(): Promise<void> {
   let travelStatusTimer: number | null = null;
   const showTravelStatus = (message: string, kind: 'progress' | 'failure' = 'progress'): void => {
     if (travelStatusTimer !== null) window.clearTimeout(travelStatusTimer);
+    delete travelStatus.dataset['held'];
     travelStatus.textContent = message;
     travelStatus.dataset['kind'] = kind;
     travelStatus.hidden = false;
@@ -1019,6 +1021,20 @@ async function mountWorld(): Promise<void> {
       travelStatus.hidden = true;
       travelStatusTimer = null;
     }, kind === 'failure' ? 5200 : 3200);
+  };
+  /** A line kept until it is taken back (null), or until another status replaces it. */
+  const holdTravelStatus = (message: string | null): void => {
+    if (message === null) {
+      if (travelStatusTimer === null && travelStatus.dataset['held'] === 'true') travelStatus.hidden = true;
+      delete travelStatus.dataset['held'];
+      return;
+    }
+    if (travelStatusTimer !== null) window.clearTimeout(travelStatusTimer);
+    travelStatusTimer = null;
+    travelStatus.textContent = message;
+    travelStatus.dataset['kind'] = 'progress';
+    travelStatus.dataset['held'] = 'true';
+    travelStatus.hidden = false;
   };
   const travelUsesReducedMotion = (): boolean =>
     state.preferences.transition === 'fade' ||

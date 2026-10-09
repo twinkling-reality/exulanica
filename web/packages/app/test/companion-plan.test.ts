@@ -287,6 +287,25 @@ describe('a confirmed plan', () => {
   });
 });
 
+describe('people brought in by a plan', () => {
+  it('prepares the step again with the engine the world takes now when the first send is refused for its engine', async () => {
+    const drafted = fixture('bring-people-plan') as { steps: { body: Record<string, unknown> }[] };
+    const now = { ...drafted, steps: [{ ...drafted.steps[0]!, body: { ...drafted.steps[0]!.body, profile: 'exulanica-society/v7' } }] };
+    const h = harness({
+      plan: async () => drafted,
+      prepare: async () => now,
+      send: async (_request, index) => {
+        if (index === 0) throw new ApiError(409, 'society_engine_differs', 'this world takes exulanica-society/v7');
+        return {};
+      },
+    });
+    await h.plans.route('bring people in');
+    await confirmAndWait(h);
+    expect(h.sent.map((request) => (request.body as { profile?: string }).profile)).toEqual(['exulanica-society/v2', 'exulanica-society/v7']);
+    expect(stepStates(h.sheet)).toEqual(['done']);
+  });
+});
+
 describe('a question asked before a plan', () => {
   // The plan the planner gives when it needs the person's own role for the bench first.
   const clarify = (): unknown => {

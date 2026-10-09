@@ -51,6 +51,7 @@ import {
   type GeneratedWorldReady,
 } from './generated-world-ready.js';
 import { committedTextureLibrary } from '../texture-library.js';
+import { arrivalView, parkedFootprint, type PlanFootprint } from './arrival-view.js';
 import { WORLD_LOOK_ATTRIBUTE, swappableDrawing } from './world-look-redraw.js';
 
 /** The media type a baked tile's container is served as. */
@@ -180,6 +181,40 @@ export function groundNear(
   return null;
 }
 
+/** How long the first view waits for the placed things and the parked vehicles before it stands without them. */
+const ARRIVAL_INPUTS_MS = 4000;
+
+/**
+ * The placed things' plan points and the vehicles parked at the traffic's current second, or null
+ * where either cannot be read in time: the arrival then stands as served.
+ */
+async function arrivalInputs(
+  access: Credentials, entry: SavedWorldEntry,
+): Promise<{ readonly targets: readonly (readonly [number, number])[]; readonly parked: readonly PlanFootprint[] } | null> {
+  const read = async () => {
+    const [{ Transport }, { parseVersion }, { WorldTrafficClient }] = await Promise.all([
+      import('@exulanica/graph-client'), import('../world-objects-api.js'), import('../traffic-api.js'),
+    ]);
+    const [version, traffic] = await Promise.all([
+      new Transport(access).getJson<unknown>(`/world/versions/${encodeURIComponent(entry.authoredVersionId)}`, { world_id: entry.worldId })
+        .then(parseVersion),
+      new WorldTrafficClient(access).window(entry.worldId, entry.authoredVersionId, null, 1),
+    ]);
+    const parkedMode = traffic.window.modes.indexOf('parked');
+    return {
+      targets: (version.things ?? []).filter((thing) => !thing.removed)
+        .map((thing) => [thing.transform.xMm, thing.transform.zMm] as const),
+      parked: traffic.window.vehicles
+        .filter((vehicle) => vehicle.mode[0] === parkedMode)
+        .flatMap((vehicle) => parkedFootprint(vehicle) ?? []),
+    };
+  };
+  return Promise.race([
+    read().catch(() => null),
+    new Promise<null>((resolve) => { setTimeout(() => resolve(null), ARRIVAL_INPUTS_MS); }),
+  ]);
+}
+
 /**
  * The world an entry declares, loaded and ready to mount, or why it is not drawn yet. Null for an
  * entry that declares no generated ground.
@@ -194,6 +229,9 @@ export async function loadGeneratedWorld(
   if (ground === null) return null;
   if (ground.tiles.some((tile) => tile.state === 'failed')) return { waiting: 'failed', ground };
   if (ground.tiles.some((tile) => tile.state !== 'baked')) return { waiting: 'baking', ground };
+  // What the first look should see past: the version's placed things and what is parked now; read
+  // beside the tiles, and never waited on for long (the served arrival stands without them).
+  const viewing = arrivalInputs(access, entry);
   const [route, { parseTextureSetManifest }, library] = await Promise.all([
     import('@exulanica/atlas-react/generated-tile'),
     import('@exulanica/atlas-core'),
@@ -254,11 +292,20 @@ export async function loadGeneratedWorld(
   const [east, height, south] = ground.arrivalMm;
   const [facingEast, facingSouth] = ground.arrivalFacingMm;
   const stand = groundNear(loaded.navigationWorld.surface, east, south, [facingEast, facingSouth]);
+  const surface = loaded.navigationWorld.surface;
+  // Facing the placed things, from the nearest spot whose sight of them nothing parked blocks.
+  const inputs = await viewing;
+  const view = inputs === null ? null : arrivalView({
+    eastMm: stand?.eastMm ?? east, southMm: stand?.southMm ?? south, facing: [facingEast, facingSouth],
+    targets: inputs.targets, parked: inputs.parked,
+    ground: (e, s) => surface.sample(e / 1000, s / 1000) !== null,
+  });
+  const standHeight = view?.moved === true ? surface.sample(view.eastMm / 1000, view.southMm / 1000)?.height ?? null : null;
   const start = {
-    x: (stand?.eastMm ?? east) / 1000,
-    y: (stand?.heightM ?? height / 1000) + loaded.navigationWorld.eyeHeight,
-    z: (stand?.southMm ?? south) / 1000,
-    yaw: Math.atan2(-facingEast, -facingSouth),
+    x: (view?.eastMm ?? stand?.eastMm ?? east) / 1000,
+    y: (standHeight ?? stand?.heightM ?? height / 1000) + loaded.navigationWorld.eyeHeight,
+    z: (view?.southMm ?? stand?.southMm ?? south) / 1000,
+    yaw: view?.yaw ?? Math.atan2(-facingEast, -facingSouth),
     pitch: 0,
   };
   return {

@@ -152,6 +152,8 @@ function mount(withSociety = false) {
   const modelsClient = { read: vi.fn(async () => { throw missing(); }), choose: vi.fn() };
   const canvas = document.createElement('canvas');
   const shell = document.createElement('div');
+  const showStatus = vi.fn();
+  const holdStatus = vi.fn();
   // The shell is in the page, as the application's is, so a pick raised on it reaches the document.
   document.body.replaceChildren(shell);
   const mounted = mountEnvironmentSelection({
@@ -163,14 +165,14 @@ function mount(withSociety = false) {
     } as unknown as SessionState,
     scene: { islands: [] } as unknown as AtlasScene,
     credentials: { baseUrl: 'https://example.test', token: 'token' },
-    showStatus: vi.fn(), admissionId: null,
+    showStatus, holdStatus, admissionId: null,
     worldClient: worldClient as never, societyClient: societyClient as never, societyControlClient: controlClient as never,
     societyModelsClient: modelsClient as never,
     // No look is chosen for any thing here.
     thingLooksClient: { read: vi.fn(async () => new Map()) },
   });
   document.body.append(mounted.root);
-  return { mounted, crowd, controls, canvas, shell, regionEntity, binding };
+  return { mounted, crowd, controls, canvas, shell, regionEntity, binding, showStatus, holdStatus };
 }
 
 describe('a saved world\'s placed things', () => {
@@ -300,5 +302,23 @@ describe('a saved world\'s placed things', () => {
     expect(playClient.answer).toHaveBeenLastCalledWith('version', 'person-0', 3, 'walk to a spot you choose', null, { xMm: 1200, zMm: -800 });
     expect(layer.destination).toEqual({ xMm: 1200, zMm: -800 });
     mounted.dispose();
+  });
+
+  it('keeps saying how to let a paused world with people run, until this browser has seen it play', async () => {
+    window.localStorage.clear();
+    const first = mount(true);
+    await first.mounted.begin();
+    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    // Held, not a passing toast: a judge looking at the town still finds it.
+    expect(first.holdStatus).toHaveBeenCalledWith('The world is paused. Press Play to let it run.');
+    expect(first.showStatus).not.toHaveBeenCalledWith('The world is paused. Press Play to let it run.');
+    first.mounted.dispose();
+    // Once this browser has seen the world play, it is not said for it again.
+    window.localStorage.setItem(`exulanica.paused-hint.${WORLD}`, '1');
+    const again = mount(true);
+    await again.mounted.begin();
+    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(again.holdStatus).not.toHaveBeenCalledWith('The world is paused. Press Play to let it run.');
+    again.mounted.dispose();
   });
 });

@@ -241,6 +241,10 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
         happened: 'Nobody came in: there is nowhere here they could reach yet.',
         next: 'Add something to rest on or visit near where you arrive, such as a bench or a small square, then try again.',
       },
+      society_engine_differs: {
+        happened: 'Nobody came in: what this world holds changed while I was getting them.',
+        next: 'Bring them in again.',
+      },
       engine_not_for_this_ground: {
         happened: 'Nobody came in: this page asked for another kind of people than this world takes.',
         next: 'Reload the page, then bring them in again.',

@@ -317,7 +317,21 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
         stopped = true;
         continue;
       }
-      const result = await performPlanned(host, { ...built.request, stepIndex: step.index });
+      let result = await performPlanned(host, { ...built.request, stepIndex: step.index });
+      // People brought in with an engine the world no longer takes (its things changed since the
+      // plan was drafted): the step is prepared once more against the world as it is, and sent so.
+      if (result.kind === 'refused' && result.code === 'society_engine_differs') {
+        try {
+          const again = await client.prepare(current(), [step.action]);
+          const fresh = again.outcome === 'plan' ? again.steps[0] ?? null : null;
+          const rebuilt = fresh === null ? null : plannedRequest(fresh, earlier);
+          if (rebuilt !== null && !('refused' in rebuilt)) {
+            result = await performPlanned(host, { ...rebuilt.request, stepIndex: step.index });
+          }
+        } catch {
+          // The first refusal stands, said in the action's words.
+        }
+      }
       const operation = actionSpec(built.request.actionId).operation ?? '';
       if (result.kind === 'ran') {
         answers[step.index] = stepAnswer(operation, { status: result.status, body: result.response });

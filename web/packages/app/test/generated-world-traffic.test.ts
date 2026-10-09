@@ -100,7 +100,8 @@ describe('a saved generated world\'s traffic', () => {
     } as never;
     const attachment = tile!.attach(host);
     await vi.waitFor(() => expect(shell.querySelector(`[${WORLD_TRAFFIC_NOTE_ATTRIBUTE}]`)).not.toBeNull(), { timeout: 10_000 });
-    expect(traffic).toEqual(['/world/versions/version/traffic?world_id=world%3Agenerated%3Atown&seconds=60']);
+    // The windows the layer reads (the arrival's one-second read of what is parked is the first view's).
+    expect(traffic.filter((url) => !url.endsWith('&seconds=1'))).toEqual(['/world/versions/version/traffic?world_id=world%3Agenerated%3Atown&seconds=60']);
     const note = shell.querySelector(`[${WORLD_TRAFFIC_NOTE_ATTRIBUTE}]`)!;
     expect(note.getAttribute(WORLD_TRAFFIC_NOTE_ATTRIBUTE)).toBe('roads_unavailable');
     expect(note.textContent).toBe(trafficRefusalWords('roads_unavailable'));

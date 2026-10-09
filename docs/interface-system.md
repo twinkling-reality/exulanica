@@ -151,6 +151,14 @@ refusal is said by its code: a wrong code, a day's guests all admitted (with whe
 `retry_after_seconds`), guests off, a server that could not admit one just now, or a page not served
 by the server itself. The developer's token entry stays last, under "or, for developers".
 
+A generated town opens where a person arrives, facing the middle of what was placed in it (a scene
+dressed for an arrival stands across the street); where a vehicle parked at the kerb would stand
+between them, the first view steps along the footway, then back from the kerb, to the nearest spot on
+drawn ground with a clear sight of it (`composition/arrival-view.ts`), and keeps the arrival where none
+is near. A world with people in it that opens paused keeps "The world is paused. Press Play to let it
+run." in the status place until it plays or closes, and once a browser has seen the world play the line is
+not said for it again; the world never plays by itself.
+
 ### Your worlds and Create a world
 
 Your worlds (`web/packages/app/src/composition/world-entry.ts`, `ui/your-worlds.css`) is the first
