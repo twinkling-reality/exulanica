@@ -2,18 +2,18 @@
 
     python3 bridges/luanti/tools/fake_door.py --port 19525 --log FILE [--minute-s 2]
 
-It is not the door. It serves the channel routes a bridge uses (hello, frames by long-poll,
-answers, arrivals, delivered, gone, home) with the frame shapes the door's protocol states for
-crossings, keeps everything in memory and plays a short script, a world minute every
-``--minute-s`` seconds: the grant lets one traveller in and things be carried both ways; an arrival
-is placed at the next minute; the world asks about the character every minute it is there (the gate
-leaves those asks to the world, so any answer is counted); on its first visit someone gives it a
-sword, and after three minutes it chooses to leave carrying what it holds; on a later visit it
-leaves after two minutes; a character its player calls home leaves at the next minute, as one its
-world's owner sends home. A departure repeats in every poll until it is reported delivered. With
-``--refuse-look`` an arrival in that look is refused ``look_not_shipped``, as a door refuses a look
-its library does not hold. Every body a bridge sends is appended to the log as one JSON line,
-headers never.
+It is not the door. It serves the channel routes a bridge uses (hello, frames by long-poll, answers,
+arrivals, delivered, gone, home) with the frame shapes the door's protocol states for crossings,
+keeps everything in memory and plays a short script, a world minute every ``--minute-s`` seconds:
+the grant lets one traveller in and things be carried both ways; an arrival is placed at the next
+minute; the world asks about the character every minute it is there (the gate leaves those asks to
+the world, so any answer is counted); on its first visit someone gives it a sword, saying so to it,
+and it answers (two said frames, as the door tells a grant the lines its visitors said or heard),
+and after three minutes it chooses to leave carrying what it holds; on a later visit it leaves after
+two minutes; a character its player calls home leaves at the next minute, as one its world's owner
+sends home. A departure repeats in every poll until it is reported delivered. With ``--refuse-look``
+an arrival in that look is refused ``look_not_shipped``, as a door refuses a look its library does
+not hold. Every body a bridge sends is appended to the log as one JSON line, headers never.
 
 Standard library only; listens on 127.0.0.1.
 """
@@ -32,6 +32,12 @@ from urllib.parse import parse_qs, urlparse
 NAMESPACE = uuid.UUID("6f1b9a52-4d1e-4c55-9e4b-0c8f0d2b7a11")
 SWORD = str(uuid.uuid5(NAMESPACE, "sword"))
 GRANT = str(uuid.uuid5(NAMESPACE, "grant"))
+GIVER = str(uuid.uuid5(NAMESPACE, "giver"))
+#: The lines said when the sword is given: the giver's to the character, the character's back.
+GIVING_LINE = "Take this sword for the road, traveller."
+THANKS_LINE = "Thank you. I will carry it home."
+#: Who decided a line, in the words the door uses for a model's mind.
+WORLD_MIND = {"ai": True, "words": "the world's model"}
 KINDS = {"default:torch": "lantern", "default:sword_steel": "sword"}
 GAME_ITEMS = {"lantern": "default:torch", "sword": "default:sword_steel"}
 #: Minutes a character stays on its first visit and on any later one.
@@ -84,6 +90,8 @@ class Visit:
             stayed = self.minute - visitor["arrived_at"]
             if visitor["first"] and stayed == 2:
                 visitor["held"].append({"thing_id": SWORD, "kind": "sword"})
+                self.say(GIVER, "the knight (person 1)", visitor["thing_id"], GIVING_LINE)
+                self.say(visitor["thing_id"], "the traveller (person 2)", None, THANKS_LINE)
             if stayed >= (FIRST_STAY if visitor["first"] else LATER_STAY):
                 self.depart("chose_to_leave")
                 return
@@ -117,6 +125,20 @@ class Visit:
                 "arrival_id": arrival["arrival_id"],
                 "thing_id": thing_id,
                 "carried": carried,
+            }
+        )
+
+    def say(self, speaker: str, label: str, to: str | None, line: str) -> None:
+        """A line said where the character is: who said it, whom to (None for everyone near) and
+        the line, as the door's said frame carries it."""
+        self.add(
+            {
+                "kind": "said",
+                "tick": self.minute,
+                "speaker": {"id": speaker, "label": label, "mind": dict(WORLD_MIND)},
+                "to": to,
+                "to_label": None if to is None else "the traveller (person 2)",
+                "line": line,
             }
         )
 

@@ -9,9 +9,13 @@
    "match": {},
    "choose": {
     "containing": [
-     "leave",
+     "say something to everyone near you",
      "wait"
     ]
+   },
+   "line": {
+    "text": "Hello. I came through the gate.",
+    "for": "say something"
    }
   }
  ]

@@ -26,7 +26,11 @@ local function verdict(name, ok, detail)
 		name, detail and (": " .. tostring(detail)) or ""))
 end
 
+local player, gate_origin
 local function write_result()
+	-- Everything the stand-in player was told, for check.py to hold against the lines said in the
+	-- world: none of those may reach the game's chat.
+	result.told = player and table.copy(player.heard) or {}
 	local folder = core.get_worldpath() .. "/exulanica_gate_check"
 	core.mkdir(folder)
 	local file = assert(io.open(folder .. "/result.json", "w"))
@@ -166,7 +170,6 @@ local function line_shown(stand)
 	return nil
 end
 
-local player, gate_origin
 local GAME_FORM = "the game's own inventory form"
 -- crossing: a player's character crosses into a world against the stand-in door
 -- (tools/fake_door.py), which plays the world's side: it asks about the character (left to the

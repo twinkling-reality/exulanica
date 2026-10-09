@@ -29,7 +29,9 @@ What it does, in order, refusing by name at the first thing that is not as expec
     gate once its player has left the game with the character away again.
 4.  Reads the check's result and the mod's recording of every exchange, then the world's own
     records: the gate answered no ask (the world decides for a character that crossed), each ask
-    about the character was decided by the world, and the society replays with no game running.
+    about the character was decided by the world, no line said where the character was (the
+    door's said frames) was told in the game, a mind the grant named decided for the character at
+    least once (from the world's events), and the society replays with no game running.
 5.  Writes the run's summary (no credential, no token) into the run folder and brings everything
     down (``--keep-stack`` leaves the stack up for a look in the browser).
 
@@ -112,11 +114,11 @@ class Refused(SystemExit):
         super().__init__(f"check refused: {code}: {detail}")
 
 
-def mapping_digest() -> str:
+def mapping_digest(name: str = MAPPING_FILE) -> str:
     sys.path.insert(0, str(CHECKOUT))
     from exulanica.canonical import sha256_of_canonical
 
-    mapping = json.loads((MOD / "mapping" / MAPPING_FILE).read_text())
+    mapping = json.loads((MOD / "mapping" / name).read_text())
     return sha256_of_canonical(mapping).hex()
 
 
@@ -315,6 +317,42 @@ def scripted_record(run_dir: Path, folder: Path) -> dict[str, Any]:
     return {"plan_sha256": scripted["plan_sha256"], "calls": len(calls)}
 
 
+#: The most pages of the world's events (256 events a page) read back for the characters' decisions.
+EVENT_PAGES_MAXIMUM = 200
+
+
+def character_decisions(api: Api, world: dict[str, Any], characters: set[str]) -> dict[str, Any]:
+    """Who decided for the characters that crossed, from the world's own events: every decision a
+    mind was asked for about one of them, counted by who was asked (``origin``) and what the
+    minute did with it (``disposition``), with the reasons a decision was not applied. Read newest
+    first, back to the last character's arrival."""
+    counts: dict[str, int] = {}
+    reasons: dict[str, int] = {}
+    unseen = set(characters)
+    before = None
+    for _ in range(EVENT_PAGES_MAXIMUM):
+        params = dict(world["scope"]) | ({"before": before} if before else {})
+        page = api("GET", world["society"] + "/events", params=params)
+        for event in page.get("events", []):
+            subject = str(event.get("subject_id"))
+            if subject not in characters:
+                continue
+            if event.get("event_kind") == "thing_arrived":
+                unseen.discard(subject)
+            if event.get("event_kind") != "decision_applied":
+                continue
+            document = event.get("document") or {}
+            key = f"{document.get('origin')} {document.get('disposition')}"
+            counts[key] = counts.get(key, 0) + 1
+            if document.get("disposition") != "applied":
+                reason = str(document.get("reason"))
+                reasons[reason] = reasons.get(reason, 0) + 1
+        before = page.get("next")
+        if not before or not unseen:
+            break
+    return {"counts": counts, "not_applied": reasons}
+
+
 def close_grant(api: Api, grant_id: str) -> bool:
     """End the grant this check issued, in a world it did not build: revoking twice changes
     nothing. False when the stack did not answer."""
@@ -335,6 +373,7 @@ def luanti_world(
     carry: str | None = None,
     lives_s: float = 20.0,
     calls_home: bool = False,
+    mapping: str = MAPPING_FILE,
 ) -> Path:
     """A fresh flat world and its server settings: a check world with the check mod (told how long
     the world's owner lets a character live in the world, ``lives_s``, and whether the door lets
@@ -361,7 +400,7 @@ def luanti_world(
         "fixed_map_seed = 2026",
         "static_spawnpoint = (0, 10, 0)",
         f"exulanica_gate.door_url = {door_url}",
-        f"exulanica_gate.mapping = {MAPPING_FILE}",
+        f"exulanica_gate.mapping = {mapping}",
         "exulanica_gate.record_exchanges = true",
     ]
     if player is None:
@@ -456,6 +495,27 @@ def read_marks(recorded: Path, start: int) -> tuple[list[dict[str, Any]], int]:
     return [mark for mark in marks if "mark" in mark], len(lines)
 
 
+def lines_kept_in_the_world(exchanges: list[dict[str, Any]], told: list[str]) -> dict[str, int]:
+    """How many lines said where the character was reached the gate (the door's said frames, read
+    from the mod's recording of every poll), and how many of those the player was told in the game:
+    the world's lines are seen in Exulanica, so the second must be 0."""
+    said = []
+    for entry in exchanges:
+        if not (
+            entry.get("exchange")
+            and str(entry.get("path", "")).startswith("/door/channel/frames")
+            and entry.get("status") == 200
+        ):
+            continue
+        for frame in json.loads(entry.get("response_text") or "{}").get("frames", []):
+            if frame.get("kind") == "said" and isinstance(frame.get("line"), str):
+                said.append(frame["line"])
+    return {
+        "said_frames": len(said),
+        "told_in_the_game": sum(1 for line in said if any(line in text for text in told)),
+    }
+
+
 #: How long a character lives in the world before its owner sends it home, at 1x, unless
 #: ``--lives-s`` says otherwise: two world minutes and a little more, so the world has asked about
 #: it and decided at least once.
@@ -538,6 +598,7 @@ def against_fake_door(arguments: argparse.Namespace, folder: Path) -> dict[str, 
             arguments.luanti_port,
             f"http://127.0.0.1:{arguments.fake_door_port}",
             "crossing",
+            mapping=arguments.mapping,
         )
         exit_code = run_luanti(
             folder, luanti, arguments.luanti_port, secrets.token_urlsafe(32), arguments.limit_s
@@ -550,6 +611,10 @@ def against_fake_door(arguments: argparse.Namespace, folder: Path) -> dict[str, 
     if result_file.exists():
         summary["check"] = json.loads(result_file.read_text())
     shutil.copy(luanti / "exulanica_gate" / "exchanges.jsonl", folder / "exchanges.jsonl")
+    exchanges = [json.loads(line) for line in (folder / "exchanges.jsonl").read_text().splitlines()]
+    summary["lines"] = lines_kept_in_the_world(
+        exchanges, summary.get("check", {}).get("told") or []
+    )
     sent = [json.loads(line) for line in log.read_text().splitlines()]
     arrivals = [entry["body"] for entry in sent if entry["route"] == "/door/channel/arrivals"]
     delivered = [entry["body"] for entry in sent if entry["route"].endswith("/delivered")]
@@ -576,6 +641,10 @@ def against_fake_door(arguments: argparse.Namespace, folder: Path) -> dict[str, 
             1 for entry in sent if entry["route"] == "/door/channel/home"
         )
         == 1,
+        # The stand-in door says two lines when the sword is given.
+        "the lines said where the character was reached the gate, and none was told in the game": (
+            summary["lines"]["said_frames"] >= 2 and summary["lines"]["told_in_the_game"] == 0
+        ),
     }
     return summary
 
@@ -622,7 +691,12 @@ def play_until_stopped(
     limit passes. The player's password for this throwaway server is written, readable by this
     user only, to ``<run folder>/player-password``, for the client to read once."""
     luanti = luanti_world(
-        folder, arguments.luanti_port, api.base, player=arguments.play, carry=arguments.carry
+        folder,
+        arguments.luanti_port,
+        api.base,
+        player=arguments.play,
+        carry=arguments.carry,
+        mapping=arguments.mapping,
     )
     password = folder / "player-password"
     password.write_text(secrets.token_urlsafe(18))
@@ -699,6 +773,12 @@ def main(argv: list[str] | None = None) -> int:
         "key, no cost): with --traveller-mind, the travellers' mind is asked of it",
     )
     parser.add_argument(
+        "--mapping",
+        default=MAPPING_FILE,
+        help="the published mapping version the server loads and the deployment pins, by its file "
+        f"name in mod/exulanica_gate/mapping (default: {MAPPING_FILE}, the game's newest)",
+    )
+    parser.add_argument(
         "--census",
         action="store_true",
         help="list the game's items (craft items and tools), for choosing by hand which may cross "
@@ -719,6 +799,8 @@ def main(argv: list[str] | None = None) -> int:
         help="with --api: the scene builder's record of the world to cross into",
     )
     arguments = parser.parse_args(argv)
+    if "/" in arguments.mapping or not (MOD / "mapping" / arguments.mapping).is_file():
+        parser.error(f"--mapping names no published mapping file: {arguments.mapping}")
     joined = arguments.api is not None
     if [arguments.token_file is not None, arguments.record is not None] != [joined, joined]:
         parser.error("--api, --token-file and --record go together")
@@ -766,7 +848,8 @@ def main(argv: list[str] | None = None) -> int:
         "profile": "exulanica-gate.check-run/v1",
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "adapter_version": adapter["adapter_version"],
-        "mapping_sha256": mapping_digest(),
+        "mapping_file": arguments.mapping,
+        "mapping_sha256": mapping_digest(arguments.mapping),
     }
     bridge_credential = None
     if joined:
@@ -801,17 +884,28 @@ def main(argv: list[str] | None = None) -> int:
             if arguments.scripted_model
             else []
         )
-        started = launch(
-            "up",
-            "--port-base",
-            str(arguments.port_base),
-            "--society-playback",
-            "--no-derivative-worker",
-            "--door-bridges",
-            str(declared),
-            "--society-of-things",
-            *scripted_api,
-        )
+        try:
+            started = launch(
+                "up",
+                "--port-base",
+                str(arguments.port_base),
+                "--society-playback",
+                "--no-derivative-worker",
+                "--door-bridges",
+                str(declared),
+                "--society-of-things",
+                *scripted_api,
+            )
+        except Refused:
+            # A start that failed part way (an API that never answered) may leave its database and
+            # state behind: bring them down before saying so.
+            subprocess.run(
+                [sys.executable, str(LAUNCH), "down", "--worktree", str(CHECKOUT)],
+                cwd=CHECKOUT,
+                capture_output=True,
+                check=False,
+            )
+            raise
         state = json.loads(started[: started.rindex("}") + 1])
     try:
         if joined:
@@ -874,6 +968,8 @@ def main(argv: list[str] | None = None) -> int:
                 "POST", f"/door/grants/{issued['grant']['grant_id']}/invites", expected=(201,)
             )["code"]
         summary["grant_id"] = issued["grant"]["grant_id"]
+        # The mind the grant gave travellers, a model the manifest offers, or None for the routine.
+        summary["traveller_mind"] = grant.get("traveller")
         if arguments.play:
             if arguments.invite:
                 # A person types the code their world shows them; this check shows none.
@@ -889,6 +985,7 @@ def main(argv: list[str] | None = None) -> int:
             "crossing_invite" if arguments.invite else "crossing_door",
             lives_s=arguments.lives_s,
             calls_home=offers["calls_home"],
+            mapping=arguments.mapping,
         )
         recorded = luanti / "exulanica_gate" / "exchanges.jsonl"
         server = start_luanti(
@@ -927,6 +1024,7 @@ def main(argv: list[str] | None = None) -> int:
         summary["home_calls"] = sum(
             1 for entry in exchanges if entry.get("path") == "/door/channel/home"
         )
+        summary["lines"] = lines_kept_in_the_world(exchanges, result.get("told") or [])
         # Each ask about the character the gate left to the world, as the world recorded it.
         world_side = []
         for mark in exchanges:
@@ -950,6 +1048,12 @@ def main(argv: list[str] | None = None) -> int:
                 }
             )
         summary["receipts"] = world_side
+        characters = {
+            str(mark["subject"])
+            for mark in exchanges
+            if mark.get("mark") == "arrived" and mark.get("subject")
+        }
+        summary["character_decisions"] = character_decisions(api, world, characters)
         replay = api("GET", world["society"] + "/replay", params=world["scope"])
         summary["replay_verified"] = replay.get("replay_verified")
         ended = api("GET", f"/door/grants/{summary['grant_id']}")["grant"]
@@ -972,6 +1076,11 @@ def main(argv: list[str] | None = None) -> int:
         entry["status"] == "accepted" and entry["provider_kind"] == "external"
         for entry in summary.get("receipts", [])
     )
+    lines = summary.get("lines", {})
+    # Where the grant named a mind for travellers, that mind decided for the character at least
+    # once: asking it is not enough, since a minute may refuse what it answered.
+    decided = summary.get("character_decisions", {}).get("counts", {})
+    mind_decided = not summary.get("traveller_mind") or decided.get("model applied", 0) > 0
     print(
         json.dumps(
             {
@@ -981,12 +1090,25 @@ def main(argv: list[str] | None = None) -> int:
                 "asks_left_to_the_world": len(summary.get("receipts", [])),
                 "the_world_decided": world_decided,
                 "came_home": summary.get("check", {}).get("came_home"),
+                "lines": lines,
+                "character_decisions": summary.get("character_decisions"),
+                "mind_decided": mind_decided,
                 "replay_verified": summary.get("replay_verified"),
             },
             indent=2,
         )
     )
-    return 0 if checks and not failed and world_decided and summary.get("replay_verified") else 1
+    kept = lines.get("told_in_the_game") == 0
+    return (
+        0
+        if checks
+        and not failed
+        and world_decided
+        and kept
+        and mind_decided
+        and summary.get("replay_verified")
+        else 1
+    )
 
 
 if __name__ == "__main__":

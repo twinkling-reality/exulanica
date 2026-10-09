@@ -6,14 +6,6 @@
  },
  "rules": [
   {
-   "match": {
-    "model": "deepseek-ai/DeepSeek-V4-Flash-0731"
-   },
-   "choose": {
-    "containing": "wait"
-   }
-  },
-  {
    "match": {},
    "choose": {
     "containing": "wait"

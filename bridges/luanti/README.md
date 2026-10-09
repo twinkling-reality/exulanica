@@ -23,9 +23,10 @@ the next, so a deployment that pinned one keeps working: version 1 (profile
 | --- | --- |
 | The channel: hello with the adapter's version, mapping and the game fields it reads; one held poll per grant; refusals read from bodies | Works against the door's channel routes |
 | A character crossing into a world: through the world's gate with one thing from the hand, the player told once when it arrives, its things delivered once when it comes home (also to a player who left the game meanwhile) | Works against the door's crossing routes; a scripted check plays it on a headless server against the demo's scene (below) |
-| The world deciding for the character | The gate answers no ask about it; until the door hands a crossed character to a mind the world's owner chose, the world's routine settles each ask |
+| The world deciding for the character | Works against the door: where a grant says the world decides for its visitors, no ask about the character reaches the gate, and the world's routine or the mind the world's owner names for travellers decides; the scripted check plays both (the mind with `--traveller-mind`, answered by a scripted model with `--scripted-model`, which calls no provider). Where a grant names the gate instead, its asks come and the gate leaves each to the world's routine |
+| Lines the character says and hears in the world | The door tells the gate each one; the mod shows none of them in the game (the world is seen in Exulanica), and the scripted check holds every line against what the player was told |
 | A character in the player's own look (the game's own player picture, built by `tools/build_look.py`) | The world shows it once its thing store holds the built look; until then the character arrives in the CC0 look |
-| Calling a character home from the game (`/comehome`; not `/home`, which Minetest Game's own `sethome` mod names a player's home point) | Works against the stand-in door, where the scripted check plays it; against the door once it publishes `POST /door/channel/home`, which the check then plays too. On a door without the route the player is told the world cannot call characters home yet |
+| Calling a character home from the game (`/comehome`; not `/home`, which Minetest Game's own `sethome` mod names a player's home point) | Works against the door's home route (`POST /door/channel/home`) and the stand-in door; the scripted check plays it on both. On a door without the route the player is told the world cannot call characters home yet |
 | A player's items crossing as themselves (a book, a diamond, a steel pickaxe: each its own look and kind, built by `tools/build_items.py` from the operator's copy) | Built and checked against the thing contract's readers; crossing waits for the door to read mapping profile v3, a workspace to admit item kinds, and the crossing's kind check to read them; until then items cross as mapping v2 says (a torch as a lantern, a sword) |
 | Invites (`/cross`, a code pasted into a masked form, for a server whose gate opens only by codes) | Works against the door's invite routes; the scripted check plays it with `--invite`: a code that opens nothing refused in words, the world's code opening the gate for that player, the same code refused the second time, then the crossing |
 
@@ -63,7 +64,10 @@ being on its routine, no model called) and grants the `luanti` bridge one travel
 scene's gate, carrying things both ways. For a scene that names its travellers (the gate they come
 through and the mind the world gives them), the grant opens that gate and, where the door's grants
 can say so, says the world decides for them; their paid mind is named only with `--traveller-mind`,
-under an allocation. The check then expects no ask about the character to reach the gate. With
+under an allocation, or with a scripted model answering for it (`--scripted-model PLAN`, plans in
+`run/plans/`: the travellers wait, say a line to everyone near, or leave where their kind can
+leave), which calls no provider and costs nothing. The check then expects no ask about the character
+to reach the gate. With
 `--invite` the Luanti server has no channel credential of its own: the check gives the world an
 invite and the stand-in player types it into `/cross` (the bridge's own credential and the code
 reach the server's environment alone, and nothing records either). A headless Luanti server's check
@@ -76,11 +80,14 @@ its `/openapi.json`), the stand-in player also sends its character once more and
 `/comehome`. Whatever the world gave the character must come home into the player's inventory with
 the torch, and the character arrives in the player's own look where the world can show it, else in
 the free look with the player told why. It then reads the world's own records: the gate posted no
-answer, each ask about the character was settled by the world, and the society replays with no game
-running. Each run's folder (ignored) holds the server's log, the mod's recording of every exchange
-and a summary with no credential in it. With `--against fake` the same crossing runs against the
-stand-in door instead, with no stack, where the character is given a sword and leaves on its own,
-and is called home with `/comehome` on a later visit.
+answer, each ask about the character was settled by the world, no line said where the character was
+reached the player's chat, a mind the grant named decided for the character at least once (counted
+from the world's events: asking it is not enough, since a minute may refuse its answer), and the
+society replays with no game running. Each run's folder (ignored) holds the server's log, the mod's recording of every exchange
+and a summary with no credential in it. `--mapping NAME` crosses with another published mapping
+version than the newest, to show a deployment pinned to it still works. With `--against fake` the same crossing runs against the
+stand-in door instead, with no stack, where the character is given a sword (with a line said to it,
+and one it says back) and leaves on its own, and is called home with `/comehome` on a later visit.
 
 `--api URL --token-file FILE --record FILE` joins a stack the check did not start, where a scene
 was built for a take: it starts and stops no stack and builds nothing. That stack is started with

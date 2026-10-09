@@ -18,8 +18,9 @@ adapter's own code:
     item list names each game item, kind and look once, none a key the library ships;
 *   at most one game item per kind travels out, so a departing thing's game item is never a guess;
 *   the mod decides nothing for a character that crossed: in a recorded run it posted only its
-    hello, its arrivals and its delivery reports, each valid against the door's own request models,
-    and every frame it received has the fields the door's frame builders write;
+    hello, its arrivals, its delivery reports and, when its player asked, a call home, each valid
+    against the door's own request models, and every frame it received (the lines its character
+    said or heard included) has the fields the door's frame builders write;
 *   nothing kept with the adapter looks like a channel credential or an invite code.
 
 Each guard is shown to refuse a mutant first.
@@ -38,7 +39,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from exulanica.api.routes.door import ArrivalBody, DeliveryBody, HelloBody
+from exulanica.api.routes.door import ArrivalBody, DeliveryBody, HelloBody, HomeBody
 from exulanica.canonical import sha256_of_canonical
 from exulanica.door.crossings import _look_reference
 from exulanica.door.mapping import MappingRefused, check_mapping, check_reads
@@ -50,6 +51,7 @@ from exulanica.door.protocol import (
     grant_ended_frame,
     grant_frame,
     outcome_frame,
+    said_frame,
 )
 from exulanica.things.lines import check_line
 from exulanica.things.looks import read_look
@@ -536,11 +538,13 @@ def test_fixtures_were_recorded_from_a_real_run():
 
 #: Everything the mod posts, with the door's request model for it (a departure's path names it).
 #: It never answers an ask or says its player is gone: the world decides for a character that
-#: crossed, and the character lives on when its player leaves the game.
+#: crossed, and the character lives on when its player leaves the game. It calls a character home
+#: only when its player asks (``/comehome``).
 REQUEST_MODELS = {
     "/door/channel/hello": HelloBody,
     "/door/channel/arrivals": ArrivalBody,
     "/door/channel/departures/*/delivered": DeliveryBody,
+    "/door/channel/home": HomeBody,
 }
 
 
@@ -588,6 +592,15 @@ FRAME_FIELDS = {
     "arrived": set(arrived_frame(arrival_id="a", thing_id="t", carried=[])),
     "arrival_refused": set(arrival_refused_frame(arrival_id="a", reason="r")),
     "departed": set(departed_frame(departure_id="d", thing_id="t", why="w", carried=[])),
+    "said": set(
+        said_frame(
+            tick=1,
+            speaker={"id": "s", "label": None, "mind": {"ai": None, "words": None}},
+            to=None,
+            to_label=None,
+            line=None,
+        )
+    ),
     "grant": set(grant_frame(grant_seq=1, scope={})),
     "grant_ended": set(grant_ended_frame(grant_id="g", grant_seq=1, reason="r")),
 }
