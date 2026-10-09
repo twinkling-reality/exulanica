@@ -14,6 +14,7 @@ import io
 import json
 import re
 import sys
+import urllib.error
 from pathlib import Path
 from typing import Any
 
@@ -252,6 +253,31 @@ def _run_check() -> Any:
     check = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(check)
     return check
+
+
+def test_a_game_with_no_match_yet_answers_its_interface():
+    """A game just started answers every route but /reset with 400 until a match starts: the check
+    takes that as the game listening (a run against a freshly started game found it refused), and
+    no answer, or another server's answer, as no game."""
+    check = _run_check()
+    rl = _module("rl")
+
+    def answering(status: int):
+        def opener(request, timeout):
+            body = io.BytesIO(b"Game not running. Please create a scenario first.")
+            raise urllib.error.HTTPError(request.full_url, status, "refused", {}, body)
+
+        return opener
+
+    def silent(request, timeout):
+        raise urllib.error.URLError(ConnectionRefusedError(61, "Connection refused"))
+
+    def game(opener) -> Any:
+        return rl.RLInterface("http://127.0.0.1:19508", opener=opener)
+
+    assert check.game_answers(game(answering(400)))
+    assert not check.game_answers(game(answering(404)))
+    assert not check.game_answers(game(silent))
 
 
 def _admitted(declarations: Path) -> dict[str, Any]:

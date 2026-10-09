@@ -88,7 +88,7 @@ from door_client import DoorClient  # noqa: E402
 from exulanica_zero_ad import ADAPTER_VERSION  # noqa: E402
 from exulanica_zero_ad.bridge import Bridge  # noqa: E402
 from exulanica_zero_ad.gate import Gate, game_type, place_marker, template  # noqa: E402
-from exulanica_zero_ad.rl import RLInterface  # noqa: E402
+from exulanica_zero_ad.rl import GameRefused, RLInterface  # noqa: E402
 
 MAPPING = ZERO_AD / "mapping" / "zero-ad-empires-ascendant.v1.json"
 READS = ZERO_AD / "mapping" / "reads.json"
@@ -162,6 +162,17 @@ def declare(out: Path, entry: dict[str, Any]) -> int:
     kept = [other for other in declared if other.get("bridge") != entry["bridge"]]
     out.write_text(json.dumps([*kept, entry], indent=2) + "\n")
     return len(kept) + 1
+
+
+def game_answers(game: RLInterface) -> bool:
+    """Whether the game answers its interface. Until a match starts, the game answers every route
+    but ``/reset`` with 400, which still says it is listening."""
+    try:
+        game.evaluate("1")
+    except GameRefused as refused:
+        cause = refused.__cause__
+        return isinstance(cause, urllib.error.HTTPError) and cause.code == 400
+    return True
 
 
 def luanti_helpers() -> Any:
@@ -454,7 +465,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
     game = RLInterface(arguments.game)
-    if game.evaluate("1") != 1:
+    if not game_answers(game):
         raise Refused("game", f"the game at {arguments.game} does not answer its interface")
     folder = (
         CHECKOUT
