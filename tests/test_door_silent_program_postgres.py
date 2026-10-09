@@ -12,6 +12,9 @@ What is shown:
     another thing of the same grant whose asks it answers is asked every minute all along;
 *   a program that says hello again is asked at its thing's next turn;
 *   a program that answers again is asked every minute again.
+
+Whether the program answers an ask is the test's own choice, and the world's wait follows that
+choice rather than the clock, so a loaded machine changes none of it.
 """
 
 from __future__ import annotations
@@ -35,6 +38,9 @@ pytestmark = pytest.mark.postgres
 #: The run of unanswered asks and the minutes between asks after it, small so the test is short.
 AFTER = 2
 EVERY = 3
+#: The program's answer window: the longest the decision contract lets a world wait
+#: (decision_deadline_ms), so an ask the program answers is never cut short by a loaded machine.
+DEADLINE_MS = 20_000
 
 
 def _asks(door, grant_id: str, subject: str) -> int:
@@ -59,9 +65,9 @@ def test_a_silent_program_is_asked_now_and_then_and_its_world_does_not_wait(
 ):
     monkeypatch.setattr(asker_module, "SILENT_AFTER_UNANSWERED", AFTER)
     monkeypatch.setattr(asker_module, "SILENT_ASK_EVERY_MINUTES", EVERY)
-    # A bridge whose asks wait a second and a half: room for the answered knight's answer under
-    # load, and each ask the program lets pass is short.
-    client, runtime = door["application"](_bridges(door["world"]["workspace"], deadline_ms=1500))
+    client, runtime = door["application"](
+        _bridges(door["world"]["workspace"], deadline_ms=DEADLINE_MS)
+    )
     door = {**door, "client": client, "runtime": runtime}
     # A society of things with two knights the grant hands to the program: it answers for one of
     # them all along and lets the other's asks pass.
@@ -92,10 +98,23 @@ def test_a_silent_program_is_asked_now_and_then_and_its_world_does_not_wait(
     services = client.app.state.services
     answering: list[bool] = [False]
 
+    def lets_pass(subject_id: str) -> bool:
+        return subject_id == knight and not answering[0]
+
     def choose(frame: dict[str, Any]) -> dict[str, Any] | None:
-        if answering[0] or frame["subject_id"] == squire:
-            return {"label": frame["idle_label"]}
-        return None
+        return None if lets_pass(frame["subject_id"]) else {"label": frame["idle_label"]}
+
+    # Whether the program answers an ask is this test's own choice, so the world's wait follows it
+    # rather than the clock: an ask the program lets pass ends as soon as it is written, as one
+    # whose window ran out does, and one it answers is waited for through the whole window.
+    asked = asker_module.DoorAsker.answer
+
+    def answer(self, workspace_id, world_id, request, ends_at):
+        if lets_pass(request["subject_id"]):
+            ends_at = self.monotonic()
+        return asked(self, workspace_id, world_id, request, ends_at)
+
+    monkeypatch.setattr(asker_module.DoorAsker, "answer", answer)
 
     def turns(count: int) -> list[tuple[str, int]]:
         """The knight's next ``count`` turns: each one's reason and the asks for it written by its
