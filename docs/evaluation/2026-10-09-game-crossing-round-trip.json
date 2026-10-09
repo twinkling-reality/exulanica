@@ -1,0 +1,538 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "crossing": {
+   "acts": {},
+   "answers_posted": 0,
+   "came_home": {
+    "delivered": null,
+    "why": "chose_to_leave"
+   },
+   "checks": [
+    {
+     "check": "the client joined as the player",
+     "ok": true
+    },
+    {
+     "check": "the player stood before the gate",
+     "ok": true
+    },
+    {
+     "check": "the player walked into the light and the gate put them through",
+     "ok": true
+    },
+    {
+     "check": "the character arrived in the world",
+     "ok": true
+    },
+    {
+     "check": "what came home is in the player's inventory",
+     "ok": false
+    }
+   ],
+   "client": "quit",
+   "completed_by_a_second_step": {
+    "at": "2026-10-09T15:11:47-0400",
+    "script_sha256": "1cb1db9c571840c70f8c40056ea7b82eb0db2ec96b00770599a3bd02bb7c0bb4",
+    "why": "check.py refused at its last verdict, which demanded that something come home; the character came home by its own choice carrying nothing, so check.py's reads after the crossing were made by this second step from the same sources"
+   },
+   "grant_closed": true,
+   "home_calls": 0,
+   "lines": {
+    "said_frames": 49,
+    "told_in_the_game": 0
+   },
+   "replay_verified": true,
+   "timings_ms": {
+    "arrival_request_ms": 98,
+    "departed_to_delivered_ms": 92,
+    "placed_to_departed_ms": 327672,
+    "walk_in_to_answer_ms": 99,
+    "walk_in_to_placed_ms": 6635
+   },
+   "told": [
+    "Your character is in Three strangers, carrying a lantern (your torch: this world has no torches; a lantern is the nearest thing that is held and gives light).",
+    "Your character came back from Three strangers."
+   ]
+  },
+  "decisions": {
+   "counts": {
+    "model applied": 21
+   },
+   "moments": [
+    {
+     "event": "thing_arrived",
+     "tick": 33
+    },
+    {
+     "event": "thing_departed",
+     "tick": 71
+    }
+   ],
+   "receipts": [
+    {
+     "chose": "say something to everyone near you",
+     "decision_sha256": "63bde8b83310ccc1ff0d9a314a2e5d604f87bbca491e6f7f48dcc2b82223ee54",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "82ca853b-fa1d-55fe-87e6-7bfa18c96851",
+     "tick": 34
+    },
+    {
+     "chose": "say something to everyone near you",
+     "decision_sha256": "42cdb42173f1cdf61e8363ffb7d751da4c159bf61497c18e47cee73b10d65591",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "d47416f3-b099-59b9-828f-37266243b825",
+     "tick": 37
+    },
+    {
+     "chose": "say something to the knight, 4 m away",
+     "decision_sha256": "6ba20754a178bf5e10bdf14b80c86dab78ad6db908b37d7679e119c9adbb820b",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "1581ba4c-4e17-5cd8-9bec-0248a487cefe",
+     "tick": 40
+    },
+    {
+     "chose": "say something to the lantern spirit, 2 m away",
+     "decision_sha256": "2ac348242408e4410346a1411489a1d167b241d9732e3fe323f9816328dc5238",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "f4384957-38d4-583f-a315-5acc131e7ae0",
+     "tick": 42
+    },
+    {
+     "chose": "say something to the lantern spirit, 2 m away",
+     "decision_sha256": "c9c8de2f14d557847bb14d65c6a668d3e278cccb858e0e147bd85e134bd0b548",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "0884057b-5e71-5c00-b4dc-ff4c8883d686",
+     "tick": 43
+    },
+    {
+     "chose": "say something to the lantern spirit, 2 m away",
+     "decision_sha256": "4e6f762bd6fb0fa962fe2734c70f693d069793721170d4ab7d0a8343dbff0601",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "4f229ae2-c6d6-597f-bf85-c8699e0928e9",
+     "tick": 44
+    },
+    {
+     "chose": "say something to the lantern spirit, 2 m away",
+     "decision_sha256": "efc4481d745a039c1cf95e6784b8da2fd6ccb82525788bb43cdf5054cae49393",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "1d465e5e-2f1c-500a-8796-d966cf32b62a",
+     "tick": 45
+    },
+    {
+     "chose": "say something to the lantern spirit, 2 m away",
+     "decision_sha256": "7d7a7a40e96c6673ff3648133d0a969e5e4b42fab0228096d98bf61de319e4cf",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "281d4fbd-3b46-5f97-b7fe-b6bbc9b3b655",
+     "tick": 46
+    },
+    {
+     "chose": "say something to the lantern spirit, 2 m away",
+     "decision_sha256": "602c12aab949c178eb541436b8ad780ce147ebf354e4b2c902b17d5c2f606d11",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "3b54b692-3e47-578d-906b-0b47157622d0",
+     "tick": 47
+    },
+    {
+     "chose": "say something to the lantern spirit, 2 m away",
+     "decision_sha256": "26bf9db6c9a78d85dcf9d21d4f7fa55dbb2c9df660d8324ad5b5c3fe9f668b44",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "b361941b-c538-5909-a7e3-91d62c29fb11",
+     "tick": 48
+    },
+    {
+     "chose": "say something to the lantern spirit, 2 m away",
+     "decision_sha256": "925afc2b917442abf6ae1a34413fbf1479682dfc76fad95920b1091cda341f39",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "82e4dbf6-c81a-54c5-8c1b-b300e7243577",
+     "tick": 49
+    },
+    {
+     "chose": "say something to everyone near you",
+     "decision_sha256": "d3fee5c28bd2d05d8d39da51dfa6d2afe75093050e30e11c95791f8d41450bfe",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "90779e70-bae6-5b59-abe8-5b7982d94a07",
+     "tick": 50
+    },
+    {
+     "chose": "give the lantern to the lantern spirit, 4 m away",
+     "decision_sha256": "2d09899237fa36046a14ee7f7601ae2f77acabaa1eda98856ddd838700ed040c",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "348c04a5-be52-5671-a199-1ef180d4f698",
+     "tick": 51
+    },
+    {
+     "chose": "say something to the lantern spirit, 2 m away",
+     "decision_sha256": "aa38170444fb498f873bfe4d055d9d8ecddc31f1589ed9c4bb2e32e4d0874b8a",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "09c33c11-0e61-55fb-ab83-fee9508a7d7e",
+     "tick": 53
+    },
+    {
+     "chose": "say something to the lantern spirit, 4 m away",
+     "decision_sha256": "5749d6c1362b6272744599459eb3edcecae0addb22590d4e8073c256f1b24145",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "b8cc2826-401d-55d0-8080-ac1c9043e2b2",
+     "tick": 59
+    },
+    {
+     "chose": "say something to the knight, 6 m away",
+     "decision_sha256": "23db5b6e6a052a865548aff5ba7d0555336ab10cb4e0cb498ab8533bcebd8b46",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "e0bcc6d1-f83d-5d1c-ab67-76e5314e8f15",
+     "tick": 61
+    },
+    {
+     "chose": "say something to the lantern spirit, 2 m away",
+     "decision_sha256": "0ab98131265289eea49b3cacfb9b10570f81a962eef962af0c20c1ef12ec31c2",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "8e497944-43ca-5602-b72b-0844283773e0",
+     "tick": 64
+    },
+    {
+     "chose": "carry on with what you are doing",
+     "decision_sha256": "b4e6eaa4cb8da257875f49ed978f390470318336021e005a64531be7b2e38ad4",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "097e53b5-cb31-5d2e-9404-bb72609f1c8f",
+     "tick": 65
+    },
+    {
+     "chose": "say something to everyone near you",
+     "decision_sha256": "420c8bfc1120a7fb74c3567df6e8b973797bf464fc9b608a43d27966e934e570",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "aa690ce0-bf7d-51e3-8868-f5f7c1fa4dd0",
+     "tick": 66
+    },
+    {
+     "chose": "say something to the lantern spirit, 2 m away",
+     "decision_sha256": "2d69dbb3723b5759fc8e83679a7a6614a4c63b7886cd6de7ce0451cf685420d2",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "ca382f59-02f3-5752-880e-651b7a29a758",
+     "tick": 70
+    },
+    {
+     "chose": "leave this world",
+     "decision_sha256": "20460daa0a40b72d253312320591f9cebf84c21914269e4781ec7279df26795f",
+     "disposition": "applied",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     },
+     "origin": "model",
+     "reason": "validated_choice",
+     "request_id": "92f22149-1282-50c8-bc74-1d9d8b3ef3f6",
+     "tick": 71
+    }
+   ]
+  },
+  "game": {
+   "adapter_version": "0.2.0",
+   "engine": "Luanti 5.17.0",
+   "game": "Minetest Game, ContentDB release 38214",
+   "mapping": {
+    "file": "luanti-minetest-game.v4.json",
+    "sha256": "d3950074d9c9d92f194a550df1bc6f5d90faf31c547c9b775d0999bb73a47ce2"
+   }
+  },
+  "kind": "exulanica.game-crossing-round-trip/v1",
+  "note": "One crossing from a game into a world and home again, played by the game's own client with nobody at the keyboard: a director test mod walked the player into the gate, the character lived in the world with the mind the world gave it until it came home, and the client's window was pictured at each moment. Figures are read from the run's summary, the gate's own recording (its clock) and the world's events; the pictures are named by digest and kept outside the repository, since the game's art in them is the game's own (CC BY-SA 3.0). The minds' model calls were the world's own, made by the world's process; their cost is in the world's receipts, not here.",
+  "pictures": {
+   "game_window": [
+    {
+     "bytes": 260144,
+     "file": "1-before-the-gate.png",
+     "moment": "before-the-gate",
+     "sha256": "f04632a62e8d44ac2fa4c657b6421178241b3fd19d39af4c74824b28ef74bb6e"
+    },
+    {
+     "bytes": 264452,
+     "file": "2-crossing.png",
+     "moment": "crossing",
+     "sha256": "e3970299e5f9e37dc0b5d66d9978bf4de67028e2baeb1f5c6863432661bed413"
+    },
+    {
+     "bytes": 280479,
+     "file": "3-away.png",
+     "moment": "away",
+     "sha256": "3714163ae3d7c65c18582ba13e820b356eff9a2109af8828d59f15e9d77576d4"
+    },
+    {
+     "bytes": 269024,
+     "file": "4-home.png",
+     "moment": "home",
+     "sha256": "7725a412074064aa65d7d93e173f452a3cc90d144cab5470da734f935382e9f7"
+    },
+    {
+     "bytes": 148108,
+     "file": "5-inventory.png",
+     "moment": "inventory",
+     "sha256": "e39c8766ab83db6cea20ee9e0b4bdd4e728b76ba71d9b1185d6f8024fb5ab6c8"
+    }
+   ],
+   "kept": "beside the run, outside the repository",
+   "side_by_side": [
+    {
+     "file": "1-crossing.jpg",
+     "from": {
+      "left": {
+       "file": "2-crossing.png",
+       "sha256": "e3970299e5f9e37dc0b5d66d9978bf4de67028e2baeb1f5c6863432661bed413"
+      },
+      "right": {
+       "file": "step-9-minute-38-traveller-arrived-own-look.jpg",
+       "sha256": "765bfdf54e8136d7fd36a95e151896f8239c39c3c61b77267850cf4894833749"
+      }
+     },
+     "sha256": "77324bb56fa8731a3ec9a35c57479512aeb457aa233185475837b2d4eb41a60c",
+     "words": {
+      "left": "In the game: walked into the gate; the character is crossing",
+      "right": "In the world, minute 38: it is here, in the player's own look"
+     }
+    },
+    {
+     "file": "2-away.jpg",
+     "from": {
+      "left": {
+       "file": "3-away.png",
+       "sha256": "3714163ae3d7c65c18582ba13e820b356eff9a2109af8828d59f15e9d77576d4"
+      },
+      "right": {
+       "file": "step-9-minute-61-fallback-refused-knight-traveller-line.jpg",
+       "sha256": "059ca30ef14ab11b2c323ae563f6c1f7ceba81d768f4ae0fe607d90e982d5418"
+      }
+     },
+     "sha256": "3d437235b4bbfa57efb9bf50a9307bfa124f4ab83102130e4866017cefe12b89",
+     "words": {
+      "left": "In the game: one line says where the character is",
+      "right": "In the world, minute 61: its own mind speaks to the knight"
+     }
+    },
+    {
+     "file": "3-home.jpg",
+     "from": {
+      "left": {
+       "file": "4-home.png",
+       "sha256": "7725a412074064aa65d7d93e173f452a3cc90d144cab5470da734f935382e9f7"
+      },
+      "right": {
+       "file": "step-9-minute-73-after-departure-card-still-open.jpg",
+       "sha256": "9dcedf85a3246b59d1e7813e66e3e0d94f30dfd38def6dfdbf10481da408ae40"
+      }
+     },
+     "sha256": "9acea91952b644e37dd3118558dd22bef03f66fb946ddbb33bdd74ceafe831fd",
+     "words": {
+      "left": "In the game: \"Your character came back from Three strangers.\"",
+      "right": "In the world, minute 73: it has gone home through the gate"
+     }
+    }
+   ],
+   "world": [
+    {
+     "bytes": 44257,
+     "file": "step-9-minute-38-traveller-arrived-own-look.jpg",
+     "moment": "arrival",
+     "sha256": "765bfdf54e8136d7fd36a95e151896f8239c39c3c61b77267850cf4894833749"
+    },
+    {
+     "bytes": 49811,
+     "file": "step-9-minute-61-fallback-refused-knight-traveller-line.jpg",
+     "moment": "away",
+     "sha256": "059ca30ef14ab11b2c323ae563f6c1f7ceba81d768f4ae0fe607d90e982d5418"
+    },
+    {
+     "bytes": 49112,
+     "file": "step-9-minute-69-traveller-card.jpg",
+     "moment": "card",
+     "sha256": "3d89c18bd7d2a31698d210971501e8a52904972dcc06f205295fd3077e2fecf4"
+    },
+    {
+     "bytes": 51270,
+     "file": "step-9-minute-73-after-departure-card-still-open.jpg",
+     "moment": "departure",
+     "sha256": "9dcedf85a3246b59d1e7813e66e3e0d94f30dfd38def6dfdbf10481da408ae40"
+    }
+   ]
+  },
+  "run": {
+   "decisions_sha256": "180da9e1be5d78c8793c7472c71bf46f3e178d09690d1a13c6347e5f5134e044",
+   "recording_sha256": "6af885b38c2086a1207b0b336188b647aba7c948fbd3bc6ae47904ab1e86e0b2",
+   "summary_sha256": "b35e043d6a3bbd11ae76f688a7f9222c9d61bb6ed99f3c778dee1a7e715278e1"
+  },
+  "script_sha256": "426f5300f753cb3f06f8f18043c69420fd591adc0bef0e68a214fc37b6a3dee7",
+  "tree": {
+   "diff_head_sha256": "a2d4590ab016fcbacab9022a05850017b68498a505c136ba257a4c44d4ee5a31",
+   "head": "99e2f18146a5a5cbf47210b3da1785c801b4fc0e",
+   "untracked_sha256": {
+    "bridges/luanti/check/exulanica_gate_director/init.lua": "99bcb563e2d6b9c5f8828a02a2ce44cc46d8632c9928a2dfcced2636020baed0",
+    "bridges/luanti/check/exulanica_gate_director/mod.conf": "c9487bb885161cfd42de3afda733982775b2c61f64055ef77259d123b694a98f",
+    "bridges/luanti/tools/crossing_record.py": "f5684a6699bca34498f9b421b1d1ffe44d1edd52c0f92a73c8788728d6c98e16",
+    "bridges/luanti/tools/side_by_side.py": "5965252d2a79dbc12674c76c97c69345074cd08888a9027962ef9dbb6db9e38a"
+   }
+  },
+  "window": {
+   "ended": "2026-10-09T15:10:31-0400",
+   "started": "2026-10-09T15:04:45-0400"
+  },
+  "world": {
+   "minds": [
+    {
+     "decider": {
+      "kind": "model",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "provider": "nebius_token_factory"
+     },
+     "thing_id": "knight"
+    },
+    {
+     "decider": {
+      "kind": "model",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "provider": "nebius_token_factory"
+     },
+     "thing_id": "lantern-spirit"
+    }
+   ],
+   "playback": {
+    "played_by_this_check": false,
+    "speed": 2
+   },
+   "played_by_this_check": false,
+   "scene": {
+    "file": "three-strangers.v5.json",
+    "sha256": "eb19d11820c4b013e5391f575d1b7b50ad97ba118512eb5a5d3371567b64875b",
+    "travellers": {
+     "gate": "gate",
+     "model": {
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory"
+     }
+    }
+   },
+   "traveller_mind": {
+    "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+    "provider": "nebius_token_factory"
+   }
+  }
+ },
+ "record_sha256": "a4dc1f566d52c6b495981aa0180dd14cba66a9a8caa1d19caff5c9e0811af876"
+}

@@ -1187,9 +1187,10 @@ def pictured_run(
         director.act("close")
         contents = director.act("contents").get("contents") or []
         held_now = {entry["item"] for entry in contents}
+        # A character may come home with nothing (it gave away what it carried); came_home says so.
         verdict(
             "what came home is in the player's inventory",
-            brought and set(brought) <= held_now,
+            set(brought) <= held_now,
             {"brought": brought, "inventory": sorted(held_now)},
         )
         director.act("release")

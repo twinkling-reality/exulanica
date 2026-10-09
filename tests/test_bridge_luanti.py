@@ -27,6 +27,8 @@ adapter's own code:
 *   the director that walks a real player for a pictured run is loaded only in the world made for
     that run, named for its one player; a run's timings are differences of the gate's own marks;
     a side-by-side picture names the two pictures it was made from by their digests;
+*   a crossing's evaluation record reproduces its digest, holds no float, and is refused where it
+    would carry any text no retained record may carry;
 *   nothing kept with the adapter looks like a channel credential or an invite code.
 
 Each guard is shown to refuse a mutant first.
@@ -35,6 +37,7 @@ Each guard is shown to refuse a mutant first.
 from __future__ import annotations
 
 import functools
+import hashlib
 import importlib.util
 import json
 import re
@@ -845,8 +848,6 @@ def test_a_crossings_timings_are_read_from_the_gates_own_clock():
 def test_a_side_by_side_picture_names_the_pictures_it_was_made_from(tmp_path):
     """A record names a side-by-side picture and its two sources by digest: the list the composer
     writes carries each, as hashed here from the files themselves."""
-    import hashlib
-
     from PIL import Image
 
     spec = importlib.util.spec_from_file_location(
@@ -884,6 +885,67 @@ def test_a_side_by_side_picture_names_the_pictures_it_was_made_from(tmp_path):
     }
     with Image.open(tmp_path / "out" / "1-crossing.jpg") as sheet:
         assert sheet.height > 720 and sheet.width > 1280 + 1152
+
+
+def _crossing_run(folder: Path, told: list[str]) -> dict[str, Path]:
+    """The smallest pictured run the record tool reads: its summary, recording and decisions."""
+    run = folder / "run"
+    run.mkdir(parents=True)
+    picture = {"moment": "home", "file": "4-home.png", "sha256": "0" * 64, "bytes": 1, "at": "x"}
+    summary = {
+        "started_at": "2026-10-09T15:00:00-0400",
+        "adapter_version": "0.2.0",
+        "mapping_file": "m.json",
+        "mapping_sha256": "1" * 64,
+        "scene": {"file": "s.json", "sha256": "2" * 64},
+        "timings": {"walk_in_to_placed_ms": 1300},
+        "owner_acts": {"held": {"kinds": ["sword"], "after_arrival_s": 7.8}},
+        "check": {
+            "checks": [{"check": "c", "ok": True}],
+            "pictures": [picture],
+            "told": told,
+            "came_home": {"why": "chose_to_leave"},
+        },
+    }
+    (run / "summary.json").write_text(json.dumps(summary))
+    (run / "exchanges.jsonl").write_text("")
+    (run / "decisions.json").write_text(json.dumps({"decisions": [], "moments": []}))
+    files = {"run": run}
+    for name, document in (
+        ("tree", {"head": "3" * 40}),
+        ("world", []),
+        ("sides", {"pictures": []}),
+    ):
+        files[name] = folder / f"{name}.json"
+        files[name].write_text(json.dumps(document))
+    return files
+
+
+def test_a_crossing_record_reproduces_its_digest_and_never_carries_a_machine_path(tmp_path):
+    """The record tool writes a digest-bound record whose digest the repository's own canonical
+    form reproduces, with no float in it, and refuses one that would carry any text no retained
+    record may carry (a machine path, a bearer token), read from the gate that refuses it."""
+    from exulanica.canonical import canonical_json
+    from exulanica.evaluation.visual_gate import _FORBIDDEN_TEXT
+
+    spec = importlib.util.spec_from_file_location(
+        "luanti_crossing_record", ADAPTER / "tools" / "crossing_record.py"
+    )
+    assert spec is not None and spec.loader is not None
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    files = _crossing_run(tmp_path / "plain", ["Your character came back."])
+    out = tmp_path / "record.json"
+    tool.write(files["run"], files["tree"], files["world"], files["sides"], out)
+    document = json.loads(out.read_text())
+    assert (
+        document["record_sha256"] == hashlib.sha256(canonical_json(document["record"])).hexdigest()
+    )
+    assert document["record"]["crossing"]["acts"]["held"]["after_arrival_ms"] == 7800
+    for index, phrase in enumerate(_FORBIDDEN_TEXT):
+        files = _crossing_run(tmp_path / f"leaked-{index}", [f"seen at {phrase}someone"])
+        with pytest.raises(SystemExit):
+            tool.write(files["run"], files["tree"], files["world"], files["sides"], out)
 
 
 #: A channel credential is 32 random bytes as URL-safe base64 (43 characters); an invite is 16

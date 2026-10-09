@@ -48,7 +48,7 @@ luanti-minetest-game.v4.json`), which are the words a world shows for where a vi
 | `check/exulanica_gate_check/` | A test mod that plays a player on a headless server |
 | `check/exulanica_gate_director/` | A test mod that walks one real, connected player through the gate for a pictured run |
 | `run/` | `install.sh` unpacks the engine and the game; `check.py` runs the scripted check on its own stack or one already running (`--api`), with a scripted model where asked (`--scripted-model`, plans in `run/plans/`), lists the game's items (`--census`), with `--play NAME` serves a world for a person, or with `--play NAME --pictures` plays one crossing with the game's own client and pictures its window; `serve.sh` and `play.sh` run the demo server and a window joined to it |
-| `tools/` | `build_look.py` builds a player's own look; `build_items.py` builds, from the hand-written `items.v1.json`, the look and thing kind each listed game item crosses as (see [the licence notes](LICENCE-NOTES.md)); `cross_once.py` makes one character cross into a running stack exactly as the mod would, with no game (for checking how a world shows it); `fake_door.py` is a stand-in door for checks; `fixtures.py` turns a recorded run into a fixture; `side_by_side.py` puts a game window's picture beside a world's picture of the same moment |
+| `tools/` | `build_look.py` builds a player's own look; `build_items.py` builds, from the hand-written `items.v1.json`, the look and thing kind each listed game item crosses as (see [the licence notes](LICENCE-NOTES.md)); `cross_once.py` makes one character cross into a running stack exactly as the mod would, with no game (for checking how a world shows it); `fake_door.py` is a stand-in door for checks; `fixtures.py` turns a recorded run into a fixture; `side_by_side.py` puts a game window's picture beside a world's picture of the same moment; `crossing_record.py` reads a pictured run's decisions from the world and writes its evaluation record |
 | `fixtures/` | Exchanges recorded from real runs, which the repository's tests read |
 | `LICENCE-NOTES.md` | What the adapter uses of Luanti and Minetest Game, and their licences |
 
@@ -138,7 +138,17 @@ before a run: a game window appears for a few minutes.
 
 `tools/side_by_side.py PLAN OUT` puts each of those pictures beside the world's own picture of the
 same moment, with words under each, and lists every picture it made with the digests of the two it
-was made from.
+was made from. `tools/crossing_record.py` reads, from the world a pictured run crossed into, every
+decision about its character with its receipt's digest (`decisions`), and writes the run's
+digest-bound evaluation record (`write`): the timings, the words the player read, what came home and
+why, the tree the run used and every picture by its SHA-256, the pictures themselves kept outside the
+repository.
+
+A pictured run joined with a world whose minds run on open models on Nebius Token Factory is
+recorded in [the round-trip record](../../docs/evaluation/2026-10-09-game-crossing-round-trip.json):
+the traveller lived in the world for 327,672 ms on 21 decisions of its own mind, none of which took
+up the world's sword, gave the lantern it carried in to the lantern spirit, and came home by its own
+choice carrying nothing.
 
 ## Security notes
 
