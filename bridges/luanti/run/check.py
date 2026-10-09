@@ -105,7 +105,7 @@ def newest_demo_scene() -> Path:
 
 
 #: The mapping file the server loads and the deployment pins: the game's newest.
-MAPPING_FILE = "luanti-minetest-game.v2.json"
+MAPPING_FILE = "luanti-minetest-game.v3.json"
 SOCIETY_OF_THINGS = "exulanica-society/v7"
 
 

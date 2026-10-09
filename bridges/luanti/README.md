@@ -14,8 +14,11 @@ The mod uses the engine's own API and nothing of any game, so one mod serves eve
 What a game's characters and items become in Exulanica is that game's mapping file
 (`mod/exulanica_gate/mapping/`), which is data. Each published version of a mapping stays beside
 the next, so a deployment that pinned one keeps working: version 1 (profile
-`exulanica.bridge-mapping/v1`) names a look by its digest, and version 2 (profile
-`exulanica.bridge-mapping/v2`, the mod's default) by the thing library's reference.
+`exulanica.bridge-mapping/v1`) names a look by its digest, version 2 (profile
+`exulanica.bridge-mapping/v2`) by the thing library's reference, and version 3 (the same profile,
+the mod's default) crosses the character as a traveller that goes home when its mind chooses
+(traveller version 2; version 2 of the mapping crosses it as traveller version 1, which cannot
+leave by itself).
 
 ## What works today, and what does not yet
 
@@ -27,7 +30,7 @@ the next, so a deployment that pinned one keeps working: version 1 (profile
 | Lines the character says and hears in the world | The door tells the gate each one; the mod shows none of them in the game (the world is seen in Exulanica), and the scripted check holds every line against what the player was told |
 | A character in the player's own look (the game's own player picture, built by `tools/build_look.py`) | The world shows it once its thing store holds the built look; until then the character arrives in the CC0 look |
 | Calling a character home from the game (`/comehome`; not `/home`, which Minetest Game's own `sethome` mod names a player's home point) | Works against the door's home route (`POST /door/channel/home`) and the stand-in door; the scripted check plays it on both. On a door without the route the player is told the world cannot call characters home yet |
-| A player's items crossing as themselves (a book, a diamond, a steel pickaxe: each its own look and kind, built by `tools/build_items.py` from the operator's copy) | Built and checked against the thing contract's readers; crossing waits for the door to read mapping profile v3, a workspace to admit item kinds, and the crossing's kind check to read them; until then items cross as mapping v2 says (a torch as a lantern, a sword) |
+| A player's items crossing as themselves (a book, a diamond, a steel pickaxe: each its own look and kind, built by `tools/build_items.py` from the operator's copy) | Built and checked against the thing contract's readers; crossing waits for the door to read the mapping profile `exulanica.bridge-mapping/v3` (a later mapping version names item kinds by digest), a workspace to admit item kinds, and the crossing's kind check to read them; until then items cross as the mapping says (a torch as a lantern, a sword) |
 | Invites (`/cross`, a code pasted into a masked form, for a server whose gate opens only by codes) | Works against the door's invite routes; the scripted check plays it with `--invite`: a code that opens nothing refused in words, the world's code opening the gate for that player, the same code refused the second time, then the crossing |
 
 ## Layout
@@ -65,8 +68,8 @@ scene's gate, carrying things both ways. For a scene that names its travellers (
 through and the mind the world gives them), the grant opens that gate and, where the door's grants
 can say so, says the world decides for them; their paid mind is named only with `--traveller-mind`,
 under an allocation, or with a scripted model answering for it (`--scripted-model PLAN`, plans in
-`run/plans/`: the travellers wait, say a line to everyone near, or leave where their kind can
-leave), which calls no provider and costs nothing. The check then expects no ask about the character
+`run/plans/`: the travellers wait, say a line to everyone near, leave, or pick up the world's sword
+and leave carrying it), which calls no provider and costs nothing. The check then expects no ask about the character
 to reach the gate. With
 `--invite` the Luanti server has no channel credential of its own: the check gives the world an
 invite and the stand-in player types it into `/cross` (the bridge's own credential and the code

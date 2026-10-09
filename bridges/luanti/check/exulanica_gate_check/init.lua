@@ -170,6 +170,15 @@ local function line_shown(stand)
 	return nil
 end
 
+-- The line on the player's screen at the moment of a mark: when an arrival is sent, and once the
+-- door has answered a call home. Read later, the line may already have moved on (a fast door places
+-- the character within a fraction of a second).
+mark_hook = function(mark)
+	if player and (mark.what == "arrival_sent" or mark.what == "called_home") then
+		mark.line = line_shown(player)
+	end
+end
+
 local GAME_FORM = "the game's own inventory form"
 -- crossing: a player's character crosses into a world against the stand-in door
 -- (tools/fake_door.py), which plays the world's side: it asks about the character (left to the
@@ -354,7 +363,7 @@ step("a player walks into the gate: one torch goes with their character, and the
 			return false
 		end
 		result.timings.walk_in_to_arrival_sent_ms = sent.at_ms - walked_at
-		local shown = line_shown(player) or ""
+		local shown = sent.line or ""
 		verdict("a player walks into the gate: one torch goes with their character, and they play on",
 			player.inventory:get_stack("main", 1):get_count() == 4 and player.physics.speed == 1
 				and player.physics.jump == 1 and player.inventory_form == GAME_FORM
@@ -494,12 +503,6 @@ end)
 if scenario == "crossing" or core.settings:get_bool("exulanica_gate_check.home_route", false) then
 	local calling
 	local home_call = "a player calls their character home with /comehome, and it comes home"
-	-- The line on the player's screen once the door has answered the call.
-	mark_hook = function(mark)
-		if mark.what == "called_home" then
-			mark.line = line_shown(player)
-		end
-	end
 	step(home_call, lives_s + 120, function()
 		local comehome = core.registered_chatcommands.comehome.func
 		if not calling then

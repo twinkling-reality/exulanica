@@ -88,7 +88,17 @@ def test_there_is_a_mapping_for_the_game_the_demo_runs():
     assert [path.name for path in MAPPINGS] == [
         "luanti-minetest-game.v1.json",
         "luanti-minetest-game.v2.json",
+        "luanti-minetest-game.v3.json",
     ]
+
+
+def test_the_newest_mapping_crosses_a_character_that_can_go_home_by_itself():
+    """A character lives in the world with a mind of that world, which must be able to bring it
+    home: the newest mapping crosses it as a kind with the leave ability, read from the catalog."""
+    newest = json.loads(MAPPINGS[-1].read_text())
+    for visitor in newest["visitors"]:
+        kind = _kind(visitor["kind"]["key"], visitor["kind"]["version"])
+        assert "leave" in {ability["key"] for ability in kind["abilities"]}, visitor["kind"]
 
 
 def _look_digest(named: str | dict[str, Any]) -> str:

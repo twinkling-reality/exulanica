@@ -43,7 +43,7 @@ end
 local settings = {
 	door_url = (setting("door_url", ""):gsub("/+$", "")),
 	world_words = setting("world_words", "The world beyond the gate"),
-	mapping = setting("mapping", "luanti-minetest-game.v2.json"),
+	mapping = setting("mapping", "luanti-minetest-game.v3.json"),
 	allowed_players = setting("allowed_players", ""),
 	frame_node = setting("frame_node", ""),
 	gate_at_spawn = core.settings:get_bool(modname .. ".gate_at_spawn", false),

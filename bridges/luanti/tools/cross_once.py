@@ -40,7 +40,7 @@ HERE = Path(__file__).resolve()
 BRIDGE = HERE.parents[1]
 CHECKOUT = HERE.parents[3]
 MOD = BRIDGE / "mod" / "exulanica_gate"
-MAPPING_FILE = "luanti-minetest-game.v2.json"
+MAPPING_FILE = "luanti-minetest-game.v3.json"
 BUILD_SCENE = CHECKOUT / "scripts" / "demo" / "build_scene.py"
 #: The scene a check builds unless ``--scene`` names another: the demo's, at the newest version the
 #: scene catalog's lock names.
@@ -88,7 +88,14 @@ def _digest(mapping: dict[str, Any]) -> str:
 
 
 def declare(out: Path) -> None:
+    """The declaration pins every published version of the mapping, the newest (the one this tool
+    crosses with) first, so a server or a check pinned to an older version is let in as well."""
     _, mapping = _mapping()
+    older = sorted(
+        (path for path in (MOD / "mapping").glob("*.json") if path.name != MAPPING_FILE),
+        reverse=True,
+    )
+    pinned = [_digest(mapping)] + [_digest(json.loads(path.read_text())) for path in older]
     entry = {
         "bridge": "luanti",
         "label": "Luanti",
@@ -96,7 +103,7 @@ def declare(out: Path) -> None:
         "run_by": "server",
         "ai": False,
         "credential_sha256": hashlib.sha256(secrets.token_bytes(32)).hexdigest(),
-        "mapping_sha256": [_digest(mapping)],
+        "mapping_sha256": pinned,
         "adapter_versions": [_adapter()["adapter_version"]],
         "listed": False,
         "workspaces": "synthetic",
