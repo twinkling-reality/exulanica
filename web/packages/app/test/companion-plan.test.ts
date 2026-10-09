@@ -450,6 +450,19 @@ describe('a plan of things', () => {
       .toBe('This world, or something the step names, is no longer there. Reload the page, then ask again.');
   });
 
+  it('says a hands step its being is not offered this minute as that, not as where the person points', async () => {
+    // A plan whose preview the being's options refused (act_not_offered), as SCENE's R1 met on 99e2f181.
+    const served = fixture('thing-direct-plan') as { steps: Record<string, unknown>[] };
+    const refused = { ...served, outcome: 'refused', steps: [{ ...served.steps[0], state: 'blocked', code: 'act_not_offered' }],
+      refusal: { code: 'preview_blocked', detail: 'the authority\'s preview refused the step; its code is the step\'s', step: 0,
+        operation: 'POST /world/versions/{version_id}/society/actions', capability: null, alternatives: [] } };
+    const h = harness({ plan: async () => refused });
+    expect(await h.plans.route('give the sword to the traveller')).toMatchObject({
+      refused: true,
+      sentences: ['They are not offered that right now.', 'It may be offered at a later minute, or ask someone else.'],
+    });
+  });
+
   it('says a step waits for a free place where every place is taken, and names an unnamed place plainly', async () => {
     const served = fixture('thing-direct-waiting') as { steps: Record<string, unknown>[] };
     const full = (place: string) => ({ ...served, steps: [{ ...served.steps[0], code: 'destination_full',

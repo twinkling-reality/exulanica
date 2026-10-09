@@ -141,6 +141,12 @@ const DIRECT_REFUSALS: Readonly<Record<string, RefusalWords>> = {
     happened: 'Every place there is taken.',
     next: 'Ask again when someone leaves.',
   },
+  // Their options this minute do not offer that act (out of reach, or their hands or the thing do
+  // not allow it now): nothing about where the person points.
+  act_not_offered: {
+    happened: 'They are not offered that right now.',
+    next: 'It may be offered at a later minute, or ask someone else.',
+  },
   inhabitant_action_in_progress: {
     happened: 'They are in the middle of something.',
     next: 'Ask again in a minute of the world’s time.',
