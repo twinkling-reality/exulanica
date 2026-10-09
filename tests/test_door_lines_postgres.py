@@ -47,6 +47,7 @@ from exulanica.world.society_controls import LEASE_SECONDS
 import test_society_authored_world_postgres as helpers
 import test_society_person_decisions_postgres as decisions
 from model_fakes import FakeTransport, chat_body
+from society_seed_support import choose_society_seed
 from test_door_crossings_postgres import _arrive, _grant, crossings
 from test_door_postgres import (
     OWNER,
@@ -70,6 +71,8 @@ KNIGHT_LINE = "Well met, traveller from afar."
 VISITOR_LINE = "Good day to you, sir."
 #: What a second visitor says after a first one has gone home.
 STAYING_LINE = "Is anyone about?"
+#: The society seed the said-frames test starts from (sha256 of "door-lines-said-frames-0").
+SAID_FRAMES_SEED = "98a2a4b551518b4988311a477926d116497ed1c2e0d6d1a4a6ac18628372bab0"
 
 
 def _catalog(name: str) -> Any:
@@ -256,8 +259,11 @@ def _read_all(door, channel, cursor) -> list[dict[str, Any]]:
 # On the endless ground: the bounded ground's villagers may stand nearer the knight than the visitor
 # does, and a being is offered a line to its three nearest hearers only, so whether these two speak
 # there depends on where the seed puts everyone; what the door sends does not depend on the ground.
+# From a chosen seed: the one a saved world derives from its world id changes each run, and under
+# some the knight's day takes it out of the visitor's hearing before both lines are said.
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_lines_reach_the_visitor_s_bridge_as_said_frames_screened_as_they_are_sent(door, crossings):
+    choose_society_seed(door["client"].app, SAID_FRAMES_SEED)
     world, society = _world_with_a_knight(door)
     client = door["client"]
     knight = _person(society, placed="knight")
