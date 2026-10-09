@@ -378,7 +378,7 @@ never from another workspace's.
 | Part | States |
 | --- | --- |
 | `visitors` | Each kind of game character that may cross, the thing kind it arrives as, the words it is known by, and the looks it may arrive in, each with its licence; none for a program that brings no visitor and only decides for a world's own things, such as an agent |
-| `items` | Each game item that may be carried, the thing kind it becomes, which ways it travels, and whether the correspondence is exact or approximated; at most one item of each kind travels out, so a thing leaving always becomes one known game item |
+| `items` | Each game item that may be carried, the thing kind it becomes, which ways it travels, and whether the correspondence is exact or approximated; at most one item of each kind travels out, so a thing leaving always becomes one known game item, and at most 64 kinds travel out, as many as an arrival names |
 | `actions` | Which of the game's actions become which abilities |
 | `never_crosses` | Every game field the adapter reads with no counterpart here; a player's name always among them |
 
@@ -483,13 +483,16 @@ decided: a visitor that chose to leave (`chose_to_leave`), and one its program l
 player left, for its kind's quiet minutes (`decider_lost`). `why` is the society's word for the
 departure: `sent_home` for the owner's send-away or a player's call home, `grant_ended`,
 `chose_to_leave` or `decider_lost`. A thing a visitor brought in goes home as the game item it came
-in as; a thing of the world it holds becomes the one item the mapping lets travel out for its kind
-(matched by the kind's key) only where the visitor may carry things out, else none. Whether it may
-is fixed at its arrival: an arrival under a grant that lets things be carried out (`may_carry_out`)
-states `may_carry_out: true`, and the society and the door read the visitor's right from it,
-whatever the grant says later. A thing of the world such a visitor carries out (below) leaves the
-world whatever its kind: where the mapping lets no item travel out for its kind, its frame names it
-with a null `game_item`, and no game receives it.
+in as; a thing of the world it holds becomes the one item the mapping its arrival named lets travel
+out for its kind (matched by the kind's key), whatever the bridge's hello says later, only where the
+visitor may carry things out, else none. Whether it may is fixed at its arrival: an arrival under a
+grant that lets things be carried out (`may_carry_out`) states `may_carry_out: true`, and the
+society and the door read the visitor's right from it, whatever the grant says later. Such an
+arrival also names the kinds its game can take (`carries_out`: the keys of the kinds its mapping
+lets travel out, sorted, at most 64, possibly none), and the visitor carries out only things of the
+world of those kinds (below), so each reaches its game. A visitor that arrived before arrivals named
+them carries out things of every kind, and one of a kind its mapping does not let out is named with
+a null `game_item` and reaches no game.
 A visitor leaves when its owner sends it home (`sent_away`), when its
 player calls it home through its bridge (`sent_away` with `called_by: "player"`), when its grant
 ends (revoking writes a `grant_ended` departure for each visitor in the revocation's transaction,
@@ -515,15 +518,16 @@ never changed, kept to its workspace, and inserted by the runtime only, and inde
 departures by the thing that left, which is how the door finds a visitor's. Not built yet: the other
 events a visitor witnesses, as frames (a thing given or taken). A visitor whose kind has hands may
 take hold of a thing of the world in a society running hands; one that may carry things out (above)
-and leaves by its own choice or is called home by its player carries out the placed things it holds,
-each named in its departure's `carried` with its `placed_id`, at most eight for one grant in any
-sixty minutes, and otherwise puts a thing of the world down where it stood (the [synthetic society
-contract](synthetic-society-contract.md) states the rule). It takes home what it brought, from its
-hands or from where it lies in the world, unless a being still here holds it. Such a thing leaves
-the world when that being puts it down, undelivered: its bringer gave it away, a departure's frame
-names only what went home with that visitor, and no later frame tells the bringer's program of it. A
-departure's `carried` lists what went home with the visitor. The adapters that send visitors live in
-the repository's `bridges/` folder, outside the product, each with its own licence notes.
+and leaves by its own choice or is called home by its player carries out the placed things it holds
+of the kinds its arrival names, each named in its departure's `carried` with its `placed_id`, at
+most eight for one grant in any sixty minutes, and otherwise puts a thing of the world down where it
+stood (the [synthetic society contract](synthetic-society-contract.md) states the rule). It takes
+home what it brought, from its hands or from where it lies in the world, unless a being still here
+holds it. Such a thing leaves the world when that being puts it down, undelivered: its bringer gave
+it away, a departure's frame names only what went home with that visitor, and no later frame tells
+the bringer's program of it. A departure's `carried` lists what went home with the visitor. The
+adapters that send visitors live in the repository's `bridges/` folder, outside the product, each
+with its own licence notes.
 
 ## Implementation and evidence
 
@@ -541,7 +545,7 @@ the repository's `bridges/` folder, outside the product, each with its own licen
 | The crossing rules: arrival ids apart from departure ids, revisions read as written, arrivals an hour, the look's licence, refusals by name, two grants in one society, the end's wait | `exulanica/door/crossings.py`, `grants.py`, `asker.py`, `exulanica/api/routes/door.py`, the crossings' migration | `tests/test_door_crossing_rules_postgres.py` |
 | Lines both ways: an ask's line labels and bound, an answer's line held to them and to the grant's word on speaking, said frames (who said each and who decided it, to whom) screened against saved names, the society's own departures | `exulanica/door/channel.py`, `protocol.py` | `tests/test_door_lines_postgres.py`, `tests/test_door.py` (the cursors) |
 | Visitors the world decides for: the arrival's word from the grant, the traveller mind and `model.invoke`, its release and lapse, settling a grant that ran out on the door's reads and through the maintenance sweep, a call home | `exulanica/door/grants.py`, `crossings.py`, `channel.py`, `sweep.py`, `exulanica/api/routes/door.py`, `exulanica/orchestration/installation/maintenance.py` | `tests/test_door_world_decides_postgres.py`, `tests/test_door.py` (the scope) |
-| What a visitor takes home: the right to carry things out fixed at its arrival, a player's call home, a thing of the world sent to its game as the item its kind's key names | `exulanica/door/crossings.py`, `channel.py` | `tests/test_door_carry_out_postgres.py` |
+| What a visitor takes home: the right to carry things out and the kinds its game can take, fixed at its arrival, a player's call home, a thing of the world sent to its game as the item its kind's key names in the mapping its arrival named | `exulanica/door/crossings.py`, `channel.py` | `tests/test_door_carry_out_postgres.py` |
 | A silent outside program: after a run of asks for a thing it let pass, asked for it again only now and then, each turn between refused at once | `exulanica/door/asker.py` | `tests/test_door_silent_program_postgres.py` |
 
 Decision record: [ADR-0031](adr/0031-an-outside-program-decides-only-through-the-door.md).

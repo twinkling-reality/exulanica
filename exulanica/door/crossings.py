@@ -52,6 +52,7 @@ from exulanica.canonical import sha256_of_canonical
 from exulanica.door.channel import ChannelRefused
 from exulanica.door.grants import Grant, visitors_society
 from exulanica.door.manifest import arrival_manifest
+from exulanica.door.mapping import travelling_out
 from exulanica.world.crossings import (
     ARRIVAL_PROFILE,
     DEPARTURE_PROFILE,
@@ -558,10 +559,15 @@ class Visits:
             # program's visitor's arrival keeps its bytes.
             **({"decided_by": "world"} if scope.visitors_decided_by == "world" else {}),
             # Whether the visitor may take things of the world home, fixed as the grant says it at
-            # arrival: the society reads it from the visitor, and the door maps what it carries out
-            # by it, whatever the grant says later. Stated only where it may, so every other
-            # arrival keeps its bytes.
-            **({"may_carry_out": True} if scope.may_carry_out else {}),
+            # arrival, and which kinds its game can take, by the mapping its hello named: the
+            # society reads both from the visitor and carries out only those kinds, and the door
+            # maps what it carries out by that mapping, whatever the grant or a later hello says.
+            # Stated only where it may, so every other arrival keeps its bytes.
+            **(
+                {"may_carry_out": True, "carries_out": sorted(travelling_out(mapping))}
+                if scope.may_carry_out
+                else {}
+            ),
         }
         check_arrival(document)
         with self.connection.transaction():

@@ -3,16 +3,18 @@
 Through the real routes, as a world's owner and as a bridge with a channel credential:
 
 *   an arrival states that its visitor may carry things of the world out only where its grant lets
-    things be carried out, and states nothing otherwise, so every other arrival keeps its bytes;
+    things be carried out, with the kinds its game can take by its hello's mapping, and states
+    nothing otherwise, so every other arrival keeps its bytes;
 *   a visitor its player calls home through its bridge leaves by a departure that says so
     (``called_by`` ``player``), one its owner sends away by one that does not, and whichever of the
     two comes first is the visitor's one departure, the other answered as written even when both
     passed the check for it at the same moment;
 *   end to end, a traveller crossing in under a world grant that lets things be carried out picks
     up the world's sword (its gate's mind, a scripted model, chooses so), its player calls it home,
-    it takes the sword, and its bridge reads the sword as the game's own item; one its owner sends
-    away first leaves the sword in the world, and its player's call home after that finds the one
-    departure.
+    it takes the sword, and its bridge reads the sword as the game's own item, by the mapping the
+    traveller's arrival named, even on a new credential that said no hello once the grant ended; one
+    its owner sends away first leaves the sword in the world, and its player's call home after that
+    finds the one departure.
 """
 
 from __future__ import annotations
@@ -56,7 +58,9 @@ def test_an_arrival_states_the_right_to_carry_out_only_where_its_grant_gives_it(
     may = _arrive(client, carrying, str(uuid.uuid4()), carried=[]).json()["thing_id"]
     may_not = _arrive(client, keeping, str(uuid.uuid4()), carried=[]).json()["thing_id"]
     assert _stored(world, may, "arrival")["may_carry_out"] is True
-    assert "may_carry_out" not in _stored(world, may_not, "arrival")
+    # The kinds the mapping its hello named lets travel out: the sword and the lantern.
+    assert _stored(world, may, "arrival")["carries_out"] == ["lantern", "sword"]
+    assert {"may_carry_out", "carries_out"}.isdisjoint(_stored(world, may_not, "arrival"))
 
 
 def test_a_visitor_its_player_calls_home_is_named_so_and_one_its_owner_sends_away_is_not(
@@ -141,7 +145,7 @@ def test_a_traveller_its_player_calls_home_takes_the_world_s_sword_to_its_game(
     _place(client, world, "sword", "sword", 2, 1_000, 4_000)
     society = _make_society(client, world)
     with _application(door, monkeypatch) as (bridge, traveller):
-        _grant_id, channel = _opened(
+        grant_id, channel = _opened(
             bridge, door, "sword-goes-home", traveller=traveller, may_carry_out=True
         )
         cursor = _hello_cursor(bridge, channel)
@@ -159,6 +163,12 @@ def test_a_traveller_its_player_calls_home_takes_the_world_s_sword_to_its_game(
         assert (home.status_code, home.json()["recorded"]) == (202, True)
         society = _step(client, world, society)
         assert _sword(society) is None
+        # The program comes back on a new credential once its grant has ended, and reads on with no
+        # hello: no hello's mapping counts now, and the sword is mapped by its arrival's.
+        made = bridge.post(f"/door/grants/{grant_id}/channel-credentials", headers=OWNER)
+        assert made.status_code == 201, made.text
+        assert bridge.post(f"/door/grants/{grant_id}/revoke", headers=OWNER).status_code == 200
+        channel = {"Authorization": f"Bearer {made.json()['credential']}"}
         departed = []
         for _ in range(10):
             frames, cursor = _read_from(bridge, channel, cursor)

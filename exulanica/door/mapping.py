@@ -18,7 +18,8 @@ ships none at that key and version. A pinned mapping of either profile stays val
 ``items``
     Each game item that may be carried across, the thing kind it becomes, which ways it travels,
     and whether the correspondence is exact or approximated. At most one item of each kind travels
-    out, so a thing leaving this world always becomes one known game item.
+    out, so a thing leaving this world always becomes one known game item, and at most as many
+    kinds travel out as a visitor's arrival can name (:func:`travelling_out`).
 ``actions``
     Which of the game's actions become which abilities here.
 ``never_crosses``
@@ -53,6 +54,7 @@ from exulanica.door.protocol import (
     WORDS_CHARACTERS_MAXIMUM,
     words_fault,
 )
+from exulanica.world.crossings import CARRIES_OUT_MAXIMUM
 
 __all__ = [
     "MAPPING_BYTES_MAXIMUM",
@@ -61,6 +63,7 @@ __all__ = [
     "check_plain",
     "check_reads",
     "mapped_fields",
+    "travelling_out",
 ]
 
 #: The largest mapping document, in canonical JSON bytes.
@@ -278,9 +281,12 @@ def check_mapping(document: Any) -> dict[str, Any]:
         _require(item["ways"] in _WAYS, f"{where} ways is in, out or both")
         _outcome(item, where)
     _unique([item["game_item"] for item in items], "the items")
-    _unique(
-        [item["kind"]["key"] for item in items if item["ways"] in ("out", "both")],
-        "the items travelling out, by kind,",
+    leaving = [item["kind"]["key"] for item in items if item["ways"] in ("out", "both")]
+    _unique(leaving, "the items travelling out, by kind,")
+    # A visitor's arrival names the kinds its game can take, and an arrival names at most these.
+    _require(
+        len(leaving) <= CARRIES_OUT_MAXIMUM,
+        f"at most {CARRIES_OUT_MAXIMUM} items travelling out",
     )
 
     actions = document["actions"]
@@ -320,6 +326,16 @@ def check_mapping(document: Any) -> dict[str, Any]:
         f"never_crosses lists {_ALWAYS_BEHIND!r} for a mapping with visitors",
     )
     return document
+
+
+def travelling_out(document: Mapping[str, Any]) -> dict[str, str]:
+    """The game item each thing kind travels out of this world as, by the kind's key, under a
+    checked mapping: its items whose ways are out or both."""
+    return {
+        item["kind"]["key"]: item["game_item"]
+        for item in document["items"]
+        if item["ways"] in ("out", "both")
+    }
 
 
 def mapped_fields(document: Mapping[str, Any]) -> frozenset[str]:

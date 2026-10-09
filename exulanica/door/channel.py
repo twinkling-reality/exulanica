@@ -62,6 +62,7 @@ from exulanica.door.mapping import (
     check_plain,
     check_reads,
     mapped_fields,
+    travelling_out,
 )
 from exulanica.door.protocol import (
     ASKED_BYTES_MAXIMUM,
@@ -909,11 +910,12 @@ class ChannelRepository:
         ``limit``, each with its place in its society's record, and the last minute that society
         had completed when they were read, in the same statement (None where none is known). A
         thing a visitor brought in goes home as the game item it came in as; a thing of the world
-        it holds becomes the one item the mapping lets travel out for its kind only where its
-        arrival recorded that it may carry things out, and otherwise none."""
+        it holds becomes the one item the mapping its arrival named lets travel out for its kind
+        only where that arrival recorded that it may carry things out, and otherwise none."""
         found = self._connection.execute(
             "with d as (select e.event_id, e.subject_id, e.document, c.game_items, "
             "coalesce((c.document->>'may_carry_out')::boolean, false) as may_carry_out, "
+            "c.document->'origin'->'by'->>'mapping_sha256' as mapping_sha256, "
             + _PLACE
             + " as place "
             + _DEPARTURES
@@ -926,8 +928,9 @@ class ChannelRepository:
         rows = [row for row in found if row["place"] is not None]
         if not rows:
             return [], reached
-        # The mapping is read only where a visitor may carry a thing of the world out.
-        outbound = self._outbound() if any(row["may_carry_out"] for row in rows) else {}
+        # A thing of the world goes out by the mapping the visitor's own arrival named, whatever the
+        # bridge's hello says now, read only where a visitor may carry one out.
+        outbound = self._outbound({row["mapping_sha256"] for row in rows if row["may_carry_out"]})
         frames = []
         for row in rows:
             details = row["document"]["thing"]
@@ -942,7 +945,7 @@ class ChannelRepository:
                         carried=carried_home(
                             details.get("carried", []),
                             came_as,
-                            outbound,
+                            outbound.get(row["mapping_sha256"], {}),
                             # The visitor's own right, fixed at its arrival, never the grant's now.
                             may_carry_out=row["may_carry_out"],
                         ),
@@ -970,23 +973,17 @@ class ChannelRepository:
         assert row is not None
         return int(row["before"])
 
-    def _outbound(self) -> dict[str, str]:
-        """The game item each thing kind travels out as, by the mapping of the bridge's hello."""
-        presence = presence_of(self._connection, self._session.workspace_id, self._session.grant_id)
-        if presence is None:
+    def _outbound(self, digests: set[str]) -> dict[str, dict[str, str]]:
+        """For each mapping of ``digests``, the game item each thing kind travels out as by it; a
+        mapping no longer stored maps nothing."""
+        if not digests:
             return {}
-        row = self._connection.execute(
-            "select document from door_mapping where workspace_id = %(w)s "
-            "and mapping_sha256 = %(m)s",
-            {**self._ids, "m": presence.mapping_sha256},
-        ).fetchone()
-        if row is None:
-            return {}
-        return {
-            item["kind"]["key"]: item["game_item"]
-            for item in row["document"]["items"]
-            if item["ways"] in ("out", "both")
-        }
+        rows = self._connection.execute(
+            "select mapping_sha256, document from door_mapping where workspace_id = %(w)s "
+            "and mapping_sha256 = any(%(m)s)",
+            {**self._ids, "m": sorted(digests)},
+        ).fetchall()
+        return {row["mapping_sha256"]: travelling_out(row["document"]) for row in rows}
 
     def arrive(self, body: Mapping[str, Any]) -> tuple[dict[str, Any], bool]:
         """Write one arrival of a visitor of this standing grant, or answer with the one its
@@ -1263,8 +1260,8 @@ def carried_home(
 ) -> list[dict[str, Any]]:
     """Each thing a departing visitor holds, with the game item it becomes: one it brought in
     goes home as the item it came in as; a thing of the world it holds becomes the one item the
-    mapping lets travel out for its kind (``outbound``, by the kind's key) only where the visitor
-    may carry things out (its arrival's ``may_carry_out``), and otherwise none."""
+    mapping its arrival named lets travel out for its kind (``outbound``, by the kind's key) only
+    where the visitor may carry things out (its arrival's ``may_carry_out``), and otherwise none."""
     return [
         {
             "thing_id": held["id"],

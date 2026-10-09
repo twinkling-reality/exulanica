@@ -306,6 +306,17 @@ def _a_second_sword_travelling_out(document):
     document["items"].append({**document["items"][0], "game_item": "test:old_sword"})
 
 
+def _more_kinds_travelling_out_than_an_arrival_names(document):
+    document["items"] += [
+        {
+            **document["items"][0],
+            "game_item": f"test:thing_{n}",
+            "kind": {"key": f"kind_{n}", "version": 1},
+        }
+        for n in range(63)
+    ]
+
+
 def _nested(depth):
     value: object = "bottom"
     for _ in range(depth):
@@ -320,6 +331,7 @@ def _nested(depth):
         (_approximate_silently, "reason_words exactly when it is approximated"),
         (_exact_with_a_reason, "reason_words exactly when it is approximated"),
         (_a_second_sword_travelling_out, "travelling out, by kind"),
+        (_more_kinds_travelling_out_than_an_arrival_names, "at most 64 items travelling out"),
         (lambda document: document.update(profile="other/v1"), "profile"),
         (lambda document: document.update(extra=1), "states exactly"),
         (lambda document: document["visitors"][0]["looks"][0].update(look="a.png"), "sha256"),
