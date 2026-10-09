@@ -34,6 +34,9 @@ export const PLAN_ACTIONS: Readonly<Record<string, string | null>> = Object.free
   direct_thing: 'people.direct',
   propose_appearance: null,
   apply_appearance: null,
+  // New generated pieces for a world's look (GEN's S1): not sent from a plan until the page shows its
+  // time and cost before Confirm.
+  request_pieces: null,
   other: null,
 });
 
