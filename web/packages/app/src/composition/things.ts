@@ -197,6 +197,8 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
     placedYawOf: (placedId) => placedYaw.get(placedId) ?? null,
   });
   let destroyed = false;
+  /** The being the viewer plays, as last handed to the layer. */
+  let played: string | null = null;
   return {
     async setPlaced(things) {
       if (destroyed) return;
@@ -228,7 +230,10 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
       return layer.misses;
     },
     setPlayed(subjectId) {
-      if (!destroyed) layer.setPlayed(subjectId);
+      // Every refresh of the marks says whom the viewer plays; the layer hears only a change.
+      if (destroyed || subjectId === played) return;
+      played = subjectId;
+      layer.setPlayed(subjectId);
     },
     setDestination(point) {
       if (!destroyed) layer.setDestination(point);

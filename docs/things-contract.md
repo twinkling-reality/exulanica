@@ -938,13 +938,13 @@ picked by a click as by aiming. The model's short name and the person's kind sho
 person, a speaking one and the three nearest marked people within 12 m drawn on screen; no pill is
 drawn beyond 60 m. A pill that would cover a nearer person's stands just above it (2 px apart), so two
 people in line from the camera both read; the nearest stays over its person. When a person plays a
-being (Play this one, which is not built yet: see below), it is marked by who decides now, before its
-mind: a `You` pill in the world-mark person colour for the one playing it and `Played` for anyone
-else, read as played by you or by another person (and, for a visitor the world decides for, from
-where, in the words read only); the one playing also sees a steady ring in the same colour at its feet
-as the crowd draws it, and another on the ground where its next walk goes, each on a dark edge in the
-person ink so it reads on pale ground. Who plays is read from the models read's person choice, which
-says only whether the viewer is the one playing, never who.
+being (Play this one; the app has no screen to start it yet: see below), it is marked by who decides
+now, before its mind: a `You` pill in the world-mark person colour for the one playing it and `Played`
+for anyone else, read as played by you or by another person (and, for a visitor the world decides for,
+from where, in the words read only); the one playing also sees a steady ring in the same colour at its
+feet as the crowd draws it, and another on the ground where its next walk goes, each on a dark edge in
+the person ink so it reads on pale ground. Who plays is read from the models read's person choice,
+which says only whether the viewer is the one playing, never who.
 
 Each line a being says is drawn over it as it is said, from the society's `said` events read with
 each minute: only lines said after the page first read the society, each once, oldest first, at most

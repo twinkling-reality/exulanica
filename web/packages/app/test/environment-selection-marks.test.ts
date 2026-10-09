@@ -22,12 +22,17 @@ import type { AppEnvironment, SessionState } from '../src/composition/session-st
 const KNIGHT = { kind: 'knight', version: 1, sha256: 'a'.repeat(64) };
 const QWEN = { provider: 'nebius', modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507', name: 'Qwen3 235B Instruct' };
 
-const { FakeLayer, FakeMarks, marksMade, bridgeReads } = vi.hoisted(() => {
+const { FakeLayer, FakeMarks, marksMade, layersMade, bridgeReads } = vi.hoisted(() => {
+  const layers: InstanceType<typeof Layer>[] = [];
   class Layer {
     placed: readonly PlacedThingRecord[] = [];
+    /** Each being the page has said the viewer plays, in order (null: nobody). */
+    readonly played: (string | null)[] = [];
     readonly maker = { library: { list: { kinds: [{ kind: 'knight', version: 1, sha256: 'a'.repeat(64), label: 'knight' }], looks: [] } } };
-    constructor(readonly options: ThingLayerOptions) {}
+    constructor(readonly options: ThingLayerOptions) { layers.push(this); }
     setSociety() {}
+    setPlayed(subjectId: string | null) { this.played.push(subjectId); }
+    setDestination() {}
     async setPlaced(things: readonly PlacedThingRecord[]) { this.placed = things; }
     pick() { return null; }
     setPicked() {}
@@ -43,7 +48,7 @@ const { FakeLayer, FakeMarks, marksMade, bridgeReads } = vi.hoisted(() => {
     set(subjects: ReadonlyMap<string, MarkedSubject>) { (this.sets as ReadonlyMap<string, MarkedSubject>[]).push(subjects); }
     destroy() { this.destroyed = true; }
   }
-  return { FakeLayer: Layer, FakeMarks: Marks, marksMade: made, bridgeReads: { count: 0 } };
+  return { FakeLayer: Layer, FakeMarks: Marks, marksMade: made, layersMade: layers, bridgeReads: { count: 0 } };
 });
 vi.mock('@exulanica/atlas-react/things', async (original) => ({
   ...(await original<typeof import('@exulanica/atlas-react/things')>()),
@@ -75,11 +80,15 @@ const person = (id: string, extra: Record<string, unknown>) => ({
   explanation: { summary: 'Waits (simulated).', event_ids: [] }, ...extra,
 });
 
+/** The minute the society is read at, and whether the knight is played (and by whom), as a test sets them. */
+let tick = 3;
+let knightPlayed: { readonly byYou: boolean } | null = null;
+
 /** A society of things: a knight a model runs, a person their routine runs, and two visitors. */
 const society = (): SocietySnapshot => parseSociety({
   society_id: 'society', version_id: 'version', branch_id: 'version', place_id: 'derived-place',
-  population_size: 4, current_tick: 3, state_sha256: '3'.repeat(64), input_seq: 1, input_sha256: 'b'.repeat(64),
-  state: { profile: 'exulanica-society/v7', society_id: 'society', branch_id: 'version', tick: 3, input_seq: 1,
+  population_size: 4, current_tick: tick, state_sha256: String(tick).repeat(64), input_seq: 1, input_sha256: 'b'.repeat(64),
+  state: { profile: 'exulanica-society/v7', society_id: 'society', branch_id: 'version', tick, input_seq: 1,
     input_sha256: 'b'.repeat(64),
     inhabitants: [
       person('knight-0', { kind: KNIGHT, came_by: 'placed', placed_id: 'knight-1' }),
@@ -95,11 +104,17 @@ const society = (): SocietySnapshot => parseSociety({
   },
 });
 
-/** The models read: Qwen asked for the knight; a model chosen for the routine person but not asked. */
+/**
+ * The models read: Qwen asked for the knight, or, while a person plays it, the person's choice saying
+ * whether the reader is that person (THINGS 3p, UI's models client); a model chosen for the routine
+ * person but not asked.
+ */
 const models = (): SocietyModels => ({
   societyId: 'society', takesModelChoices: true, hostRefusal: null, modelPeopleMaximum: 8, models: [],
   choices: [
-    { subjectId: 'knight-0', model: QWEN, choiceSeq: 1, refusal: null },
+    knightPlayed === null
+      ? { subjectId: 'knight-0', model: QWEN, choiceSeq: 1, refusal: null }
+      : { subjectId: 'knight-0', model: null, choiceSeq: 3, refusal: null, played: knightPlayed },
     { subjectId: 'routine-0', model: QWEN, choiceSeq: 2, refusal: 'model_not_asked_here' },
   ],
   latest: [], byModel: [], decisionsCounted: 0, decisionsMaximum: 0,
@@ -138,7 +153,7 @@ function mount() {
   }, 'version');
   const controlClient = { read: vi.fn(async () => control()), configure: vi.fn(), step: vi.fn() };
   const worldClient = { connect: vi.fn(async () => ({ assets: [], version })), assets: vi.fn(() => []) };
-  const modelsClient = { read: vi.fn(async () => { if (modelsAnswer === null) throw missing(); return modelsAnswer; }), choose: vi.fn() };
+  const modelsClient = { read: vi.fn(async () => { if (modelsAnswer === null) throw missing(); return models(); }), choose: vi.fn() };
   let modelsAnswer: SocietyModels | null = models();
   const canvas = document.createElement('canvas');
   const shell = document.createElement('div');
@@ -188,5 +203,37 @@ describe('marks over the people of a saved world\'s society', () => {
     mounted.dispose();
     expect(marks.destroyed).toBe(true);
     expect(canvas.dataset['thingMarks']).toBeUndefined();
+  });
+
+  it('marks the being the viewer plays You and rings it at the read that says so, and gives its mind\'s mark back after', async () => {
+    tick = 3;
+    knightPlayed = { byYou: true };
+    const { mounted } = mount();
+    await mounted.begin();
+    await settle();
+    const marks = marksMade.at(-1)!;
+    const layer = layersMade.at(-1)!;
+    // The words agreed with lane UI for Play this one; the ring is the played being's.
+    expect(marks.sets.at(-1)!.get('knight-0')).toEqual({
+      mark: { kind: 'person', mine: true, label: 'You', full: 'Played by you' }, label: 'knight', spoken: 'Played by you',
+    });
+    expect(layer.played.at(-1)).toBe('knight-0');
+    // Given back: the next minute's read names its model again, and the ring goes.
+    knightPlayed = null;
+    tick = 4;
+    [...document.querySelectorAll('button')].find((button) => button.textContent === 'Refresh persisted society')!.click();
+    await settle();
+    expect(marks.sets.at(-1)!.get('knight-0')!.mark).toEqual({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct' });
+    expect(layer.played.at(-1)).toBeNull();
+    // Another person playing it: Played, and no ring here.
+    knightPlayed = { byYou: false };
+    tick = 5;
+    [...document.querySelectorAll('button')].find((button) => button.textContent === 'Refresh persisted society')!.click();
+    await settle();
+    expect(marks.sets.at(-1)!.get('knight-0')!.mark).toEqual({ kind: 'person', mine: false, label: 'Played', full: 'Played by another person' });
+    expect(layer.played.at(-1)).toBeNull();
+    mounted.dispose();
+    knightPlayed = null;
+    tick = 3;
   });
 });

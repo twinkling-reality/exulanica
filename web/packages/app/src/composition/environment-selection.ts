@@ -2016,13 +2016,15 @@ export function mountEnvironmentSelection(
 
   /**
    * Mark who runs each person of the drawn state, decided by the one function the card shares
-   * (`markOf`): the model asked for them by the last models read, or the bridge a visitor crossed
-   * through. A visitor whose bridge is not yet known asks the door, at most once a minute.
+   * (`markOf`): who plays them, else the model asked for them by the last models read, or the bridge
+   * a visitor crossed through. A visitor whose bridge is not yet known asks the door, at most once a
+   * minute. The one the viewer plays wears its ring (Play this one).
    */
   function refreshMarks(state: OwnedSocietyState | null = renderedSnapshot?.state ?? null): void {
     if (marks === null) return;
     const people = state?.inhabitants ?? [];
     const running = societyModels?.runningModels() ?? new Map();
+    const played = societyModels?.playedSubjects() ?? new Map();
     const kinds = things?.layer.maker.library.list.kinds ?? [];
     const subjects = new Map<string, MarkedSubject>();
     let unknownBridge = false;
@@ -2033,7 +2035,7 @@ export function mountEnvironmentSelection(
       // An outside agent its own program runs is named in its own words once its grant is read.
       if (crossing !== null && crossing.decided_by !== 'world' && bridges?.get(crossing.bridge)?.ai === true
         && grants?.get(crossing.grant_id)?.declared == null) unnamedAgent = true;
-      const mark = markOf(markInputFor(person, running));
+      const mark = markOf(markInputFor(person, running, played));
       if (mark === null) continue;
       const kind = person.kind;
       const label = kind === undefined ? null
@@ -2041,6 +2043,7 @@ export function mountEnvironmentSelection(
       subjects.set(person.id, { mark, label, spoken: markLabel(mark) });
     }
     marks.set(subjects);
+    things?.setPlayed(people.find((person) => played.get(person.id)?.byYou === true)?.id ?? null);
     if (deps.env.canvas) deps.env.canvas.dataset['thingMarks'] = String(subjects.size);
     if (unknownBridge) readBridges();
     if (unnamedAgent) readGrants();
@@ -2050,11 +2053,13 @@ export function mountEnvironmentSelection(
   function markInputFor(
     person: OwnedSocietyState['inhabitants'][number],
     running: ReadonlyMap<string, NamedModelRef> = societyModels?.runningModels() ?? new Map(),
+    played: ReadonlyMap<string, { readonly byYou: boolean }> = societyModels?.playedSubjects() ?? new Map(),
   ): MarkInput {
     const crossing = person.came_by === 'crossed' ? person.crossing ?? null : null;
     const bridge = crossing === null ? null : bridges?.get(crossing.bridge) ?? null;
     const declared = crossing === null ? null : grants?.get(crossing.grant_id)?.declared ?? null;
-    return { running: running.get(person.id) ?? null, crossing, bridge, declared };
+    const playedNow = played.get(person.id);
+    return { running: running.get(person.id) ?? null, crossing, bridge, declared, ...(playedNow === undefined ? {} : { played: playedNow }) };
   }
 
   /**
