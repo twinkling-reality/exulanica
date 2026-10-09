@@ -60,7 +60,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Annotated, Any, Final, Literal
+from typing import Annotated, Any, Final, Literal, Protocol
 
 import psycopg
 from pydantic import BaseModel, ConfigDict, Field, create_model
@@ -115,12 +115,14 @@ __all__ = [
     "MAX_MINUTES",
     "MAX_PLAN_STEPS",
     "MAX_STEPS",
+    "PIECES",
     "PLAN_PROFILE",
     "SIMULATION_OPERATIONS",
     "THING_PLACE",
     "THING_UNDO",
     "ActionKind",
     "ClockReader",
+    "Pieces",
     "PlannedAction",
     "Previewer",
     "SimulationAction",
@@ -138,7 +140,7 @@ __all__ = [
 ]
 
 #: Bumped when a prompt below or a form's construction changes; recorded with every plan.
-ACTION_PROMPT_VERSION: Final = "action-plan-9"
+ACTION_PROMPT_VERSION: Final = "action-plan-10"
 PLAN_PROFILE: Final = "exulanica.companion-action-plan/v1"
 
 #: One try and one repair for the drafter, then a refusal; the classifier is asked once and a
@@ -194,6 +196,7 @@ class WorldEditOperation(StrEnum):
     PLACE_ARRANGEMENT = "place_arrangement"
     PLACE_THING = "place_thing"
     DIRECT_THING = "direct_thing"
+    REQUEST_PIECES = "request_pieces"
     OTHER = "other"
 
 
@@ -210,6 +213,7 @@ DRAFT_OPERATIONS: Final = (
     "send_to",
     "use",
     *action_things.HANDS_ACTS,
+    "request_pieces",
     "other",
 )
 #: A drafted direct step's operation and the act its typed action states.
@@ -296,6 +300,23 @@ BRING_PEOPLE: Final = f"POST {_VERSION}/society"
 CLOCK_READ: Final = f"GET {_VERSION}/clock"
 
 
+#: The route a request for new pieces of a world's look is sent to: world-scoped, so no version
+#: descriptor states it, and the plan states its own from the caller's grant (:func:`_with_pieces`).
+PIECES: Final = "POST /world/piece-requests"
+
+
+class Pieces(Protocol):
+    """New pieces for one world, as the actions route hands them to the planner, which names the
+    kinds (key, version and label each) and is answered with the request, its estimate and what the
+    sheet names, or the code that blocks it (``exulanica.generation.offer.WorldPieces``)."""
+
+    def available(self) -> bool: ...
+
+    def offer(
+        self, kinds: Sequence[tuple[str, int, str]], *, named: bool, idempotency_key: uuid.UUID
+    ) -> Any: ...
+
+
 @dataclass(frozen=True, slots=True)
 class _Row:
     commit: str
@@ -323,6 +344,11 @@ _MATRIX: Final[Mapping[WorldEditOperation, _Row]] = {
     # request, prepared again.
     WorldEditOperation.DIRECT_THING: _Row(
         DIRECT, None, "same_key_returns_the_recorded_request", "society_action_request", None
+    ),
+    # Sent again with its key it answers the requests its first answer held. Its route is
+    # world-scoped: the plan states its descriptor (:func:`_with_pieces`).
+    WorldEditOperation.REQUEST_PIECES: _Row(
+        PIECES, None, "same_key_returns_the_recorded_request", "piece_requests", None
     ),
 }
 
@@ -431,6 +457,9 @@ class _World:
     placed: tuple[_Choice, ...] = ()
     beings: tuple[_Choice, ...] = ()
     places: tuple[_Choice, ...] = ()
+    #: What new pieces of the world's look rest on, as the route hands it (:class:`Pieces`), or
+    #: None where it hands none and the step is not offered.
+    pieces: Pieces | None = None
 
     def descriptor(self, operation: str) -> Mapping[str, Any] | None:
         return self.descriptors.get(operation)
@@ -636,9 +665,10 @@ five things it is. You do not answer it and you do not act on it.
 
 - 'world_edit': they ask for something in the world to be added, put somewhere, moved, taken \
 away, arranged, or for the last change to be taken back, or for one of the beings living there to \
-go somewhere, use something, or pick something up, put it down, give it or take it. Benches, \
-lamps, trees, tables, stalls, wells, gates, swords, lanterns and small arrangements of them are \
-things in the world, and so are beings such as a knight, a traveller or a lantern spirit.
+go somewhere, use something, or pick something up, put it down, give it or take it, or for new \
+pieces to be made for how the things in it look. Benches, lamps, trees, tables, stalls, wells, \
+gates, swords, lanterns and small arrangements of them are things in the world, and so are beings \
+such as a knight, a traveller or a lantern spirit.
 - 'appearance': they ask for the world itself to look or feel different: its colour, how clear or \
 soft it is, how much detail it carries, how lively it looks, how fast it moves, what its surfaces \
 are made of. Not the things in it.
@@ -683,6 +713,10 @@ put down a thing it holds. 'give' asks a listed being to give a listed thing it 
 listed being. 'take' asks a listed being to take a listed thing from the being holding it. Name \
 the beings and the thing: which of them holds it is known, not taken from the order you name \
 them in. The kind of thing an earlier step of this request adds names that thing.
+- 'request_pieces' asks for new pieces to be made for how kinds of thing look in this world, not \
+for anything to be added. Its options name the listed things that can be added, or things in this \
+world, whose new look is wanted; none when the request asks for new pieces for the world's things \
+in general.
 - 'other' is a change these cannot express: turning or resizing something, changing its colour or \
 what it does, making something that is not listed. Never approximate it with a nearby change.
 - In a step's options, name everything the step names: what it adds or the being it asks, and \
@@ -896,8 +930,18 @@ class _Action:
     subject_id: str | None = None
     target_id: str | None = None
     with_id: str | None = None
+    #: For new pieces: the kinds asked by key, and whether the request named them (with none named,
+    #: the world's things are asked, and only those its look dresses with a default or nothing).
+    kinds: tuple[str, ...] = ()
+    named: bool = False
 
     def document(self) -> dict[str, Any]:
+        if self.operation is WorldEditOperation.REQUEST_PIECES:
+            return {
+                "operation": self.operation.value,
+                "kinds": list(self.kinds),
+                "named": self.named,
+            }
         if self.operation is WorldEditOperation.PLACE_THING:
             return {
                 "operation": self.operation.value,
@@ -997,6 +1041,23 @@ def _typed_from_draft(steps: Sequence[Mapping[str, Any]], world: _World) -> _Ver
             action, named = _hands_step(drafted, labels, world, added_things, holding)
             actions.append(action)
             slots += [(index, slot, found) for slot, found in named]
+            continue
+        if drafted == WorldEditOperation.REQUEST_PIECES.value:
+            asked = {kind.value for kind in _by_label(world.kinds, labels)}
+            placed = {choice.value for choice in _by_label(world.placed, labels)}
+            read = world.things
+            things = () if read is None else read.placed
+            asked |= {
+                str(item.kind)
+                for item in things
+                if f"thing:{item.thing_id}" in placed and item.kind
+            }
+            named = bool(asked)
+            if not named:
+                asked = {str(item.kind) for item in things if item.kind}
+            actions.append(
+                _Action(WorldEditOperation.REQUEST_PIECES, kinds=tuple(sorted(asked)), named=named)
+            )
             continue
         if drafted in _DRAFT_ACTS:
             named_kinds = {kind.value for kind in _by_label(world.kinds, labels)}
@@ -1100,6 +1161,18 @@ def _typed_from_draft(steps: Sequence[Mapping[str, Any]], world: _World) -> _Ver
             slots.append((index, "arrangement_key", candidates))
         else:
             actions.append(_Action(operation))
+    pieces = [
+        index
+        for index, action in enumerate(actions)
+        if action.operation is WorldEditOperation.REQUEST_PIECES
+    ]
+    if pieces and len(actions) > 1:
+        verdict.refusal = _refusal(
+            "action_not_offered",
+            "new pieces of the world's look are asked for on their own, apart from other changes",
+            step=pieces[0],
+        )
+        return verdict
     verdict.actions = actions
     for index, slot, candidates in slots:
         if len(candidates) > 1:
@@ -1345,7 +1418,8 @@ def _typed_from_request(actions: Sequence[Mapping[str, Any]], world: _World) -> 
     verdict = _Verdict()
     for index, raw in enumerate(actions):
         operation = WorldEditOperation(raw["operation"])
-        if operation is WorldEditOperation.OTHER:
+        if operation in (WorldEditOperation.OTHER, WorldEditOperation.REQUEST_PIECES):
+            # New pieces are planned from words alone, whole at once: never a later step.
             verdict.refusal = _refusal(
                 "action_not_offered", "the Companion does not prepare this change", step=index
             )
@@ -1723,6 +1797,8 @@ def _prepared_step(
     caller's grant whether one is opened at all.
     """
     row = _MATRIX[action.operation]
+    if action.operation is WorldEditOperation.REQUEST_PIECES:
+        return _prepared_pieces_step(index, action, world)
     if row.preview is None:
         return _prepared_things_step(index, action, context, world)
     descriptor = world.descriptor(row.commit) or {}
@@ -1814,6 +1890,63 @@ def _prepared_things_step(
         }
     )
     return step
+
+
+def _prepared_pieces_step(index: int, action: _Action, world: _World) -> dict[str, Any]:
+    """A request for new pieces of the world's look, with the estimate its route answers with, so
+    the sheet names the time and the cost before the person confirms. Blocked with the code that
+    says why when nothing can be asked (``exulanica.generation.offer.WorldPieces.offer``)."""
+    row = _MATRIX[action.operation]
+    kinds = {kind.key: kind for kind in (() if world.things is None else world.things.kinds)}
+    assert world.pieces is not None  # the step is offered only where the route hands it
+    prepared = world.pieces.offer(
+        [
+            (kinds[key].key, kinds[key].version, kinds[key].label)
+            for key in action.kinds
+            if key in kinds
+        ],
+        named=action.named,
+        idempotency_key=uuid.uuid5(
+            uuid.UUID(int=0), f"{world.world_id}|{world.state_sha256}|{index}|pieces"
+        ),
+    )
+    step = _step(
+        index, action, row, world, "prepared" if prepared.code is None else "blocked", prepared.code
+    )
+    step.update(
+        {
+            # World-scoped: the route takes the world in its body, and no path value.
+            "bind": {},
+            "query": {},
+            "body": prepared.body,
+            "titles": prepared.titles or None,
+            "estimate": prepared.estimate,
+        }
+    )
+    return step
+
+
+def _with_pieces(world: _World, grant: Grant, pieces: Pieces | None) -> _World:
+    """``world`` with what new pieces of its look rest on and the descriptor of the route that
+    asks for them, which no version descriptor states (its route is world-scoped): available while
+    the world wears a look pieces can be made in, permitted as the caller's grant says, spending.
+    Without ``pieces`` the step is not offered."""
+    if pieces is None:
+        return world
+    requires, permitted = grant(PIECES)
+    available = pieces.available()
+    descriptor = {
+        "operation": PIECES,
+        "state": "available" if available else "unavailable",
+        "code": None if available else "look_not_served",
+        "requires": list(requires),
+        "permitted": permitted,
+        "spends": True,
+        "effects": [],
+    }
+    return dataclasses.replace(
+        world, pieces=pieces, descriptors={**world.descriptors, PIECES: descriptor}
+    )
 
 
 def _titles(action: _Action, world: _World) -> dict[str, str]:
@@ -3099,6 +3232,7 @@ def plan_action(
     grant: Grant,
     clock: ClockReader,
     society: SocietyReader | None = None,
+    pieces: Pieces | None = None,
 ) -> PlannedAction:
     """One utterance to a plan, a clarification, a refusal, what this world offers, or a question.
 
@@ -3120,6 +3254,7 @@ def plan_action(
     )
     if world.state_sha256 != context.base_state_sha256:
         return PlannedAction(_stale(world))
+    world = _with_pieces(world, grant, pieces)
     log = CallLog()
     prompt_version = ACTION_PROMPT_VERSION
     try:

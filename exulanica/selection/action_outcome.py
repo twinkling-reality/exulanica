@@ -62,6 +62,7 @@ from exulanica.selection.action_plan import (
     CONTROL_STEP,
     DIRECT,
     MOVE,
+    PIECES,
     PLACE,
     REMOVE,
     STYLE_APPLY,
@@ -177,7 +178,54 @@ def _one_step(
         return _bring_people_step(connection, session, world_id, version_id, step)
     if operation == DIRECT:
         return _direct_step(connection, session, world_id, version_id, step)
+    if operation == PIECES:
+        return _pieces_step(connection, session, world_id, step)
     raise InvalidOutcomeStep(f"{operation!r} is not an operation a Companion plan names")
+
+
+def _pieces_step(
+    connection: psycopg.Connection, session: Session, world_id: str, step: Mapping[str, Any]
+) -> dict[str, Any]:
+    """An ask for new pieces: ``applied`` when every request its answer names is this world's,
+    asked by the caller for the kinds and look the step's body named, each receipt naming the
+    request and where it stands; ``not_applied`` when none is named or one is not so."""
+    with _client_shape(step):
+        body = step.get("body") or {}
+        kinds = {(str(kind["key"]), int(kind["version"])) for kind in body.get("kinds") or ()}
+        look = body.get("look") or {}
+        answer = _answer(step)
+        named = [uuid.UUID(str(value)) for value in (answer or {}).get("piece_request_ids") or ()]
+    if not named:
+        return _step(step, "not_applied")
+    rows = connection.execute(
+        "select piece_request_id, world_id, requested_by, kind_key, kind_version, pack_id, "
+        "pack_version, pack_manifest_sha256, state, request_sha256 from piece_request "
+        "where workspace_id = %s and piece_request_id = any(%s)",
+        (session.workspace_id, named),
+    ).fetchall()
+    found = {row["piece_request_id"]: row for row in rows}
+    receipts = []
+    for request_id in named:
+        row = found.get(request_id)
+        if (
+            row is None
+            or row["world_id"] != world_id
+            or row["requested_by"] != session.actor
+            or (row["kind_key"], int(row["kind_version"])) not in kinds
+            or (row["pack_id"], int(row["pack_version"]), row["pack_manifest_sha256"])
+            != (look.get("pack_id"), look.get("version"), look.get("manifest_sha256"))
+        ):
+            return _step(step, "not_applied")
+        receipts.append(
+            {
+                "operation": step.get("operation"),
+                "world_id": world_id,
+                "piece_request_id": str(request_id),
+                "request_sha256": row["request_sha256"],
+                "state": row["state"],
+            }
+        )
+    return _step(step, "applied", receipts=receipts)
 
 
 def _step(step: Mapping[str, Any], state: str, **found: Any) -> dict[str, Any]:

@@ -52,6 +52,7 @@ from exulanica.api.routes.world_arrangements import ViewerBody
 from exulanica.api.services import Services
 from exulanica.api.world_edit import SavedEntryAdvanceBody, TransformBody
 from exulanica.api.world_scope import WorldId
+from exulanica.generation.offer import world_pieces
 from exulanica.selection.action_outcome import InvalidOutcomeStep, action_outcome
 from exulanica.selection.action_plan import (
     ACTION_PROMPT_VERSION,
@@ -211,6 +212,7 @@ OutcomeOperation = Literal[
     "PUT /world/versions/{version_id}/society/control",
     "POST /world/versions/{version_id}/society/control/steps",
     "POST /world/versions/{version_id}/society",
+    "POST /world/piece-requests",
 ]
 
 
@@ -253,6 +255,8 @@ class OutcomeAnswerBody(BaseModel):
     society_id: uuid.UUID | None = None
     #: A direct request's own id, as the actions route's envelope names it under ``request``.
     request_id: uuid.UUID | None = None
+    #: The piece requests an ask for new pieces was answered with, by their ids, in its order.
+    piece_request_ids: list[uuid.UUID] | None = Field(default=None, max_length=16)
 
 
 class OutcomeStepBody(BaseModel):
@@ -355,6 +359,10 @@ class ActionStepView(BaseModel):
     #: ``place``, ``affordance`` and ``act``; or ``subject``, ``act``, ``thing`` and ``with``), for
     #: the page's words; absent otherwise.
     titles: dict[str, str] | None = None
+    #: For new pieces of the world's look, what they will take before the person confirms: the
+    #: route's own estimate (items, seconds warm and from a start, US dollars typically and at
+    #: most, the provider and where the figures come from); absent otherwise.
+    estimate: dict[str, JsonValue] | None = None
     replay: str
     receipt: str
     compensation: dict[str, str] | None
@@ -585,6 +593,7 @@ def plan_actions(
         grant=_grant(held),
         clock=_clock_reader(connection, session, world_id, body.version_id),
         society=_society_reader(request, scoped, session, world_id, body.version_id),
+        pieces=world_pieces(connection, session.workspace_id, world_id),
     )
     return _view(
         planned.document,

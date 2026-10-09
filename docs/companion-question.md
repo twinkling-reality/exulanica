@@ -789,10 +789,10 @@ conversation (`tests/test_companion_action_policy_boundary.py`). Scripted tests 
 two measurements of a live model reading held-out requests into these plans, before and after
 each step's options moved last under a 640-token ceiling, are in
 [evidence and limits](#evidence-and-limits). The later binds the prompt `action-plan-5`; the
-current prompt, `action-plan-9`, adds things and beings and a being's hands acts, asks each step's
+prompt `action-plan-9` adds things and beings and a being's hands acts, asks each step's
 options to name what a thing goes beside or where a being goes as well as what is added or asked
-(what stands in the world by its listed label; a visit to a place as using it), and is measured by
-neither.
+(what stands in the world by its listed label; a visit to a place as using it); the current prompt,
+`action-plan-10`, adds new pieces of the world's look. Neither is measured by those records.
 
 ### Things and beings
 
@@ -858,6 +858,26 @@ refused `act_not_offered`. A later step asking the same being waits as any askin
 "pick up the sword and give it to the traveller" the give is prepared once the knight is free
 again, and refused `act_not_offered` if the knight does not hold the sword by then. `titles` names
 the being, the act, the thing and the other being.
+
+### New pieces of the world's look
+
+A request for new pieces of the world's look is asked as `request_pieces`, the request
+`POST /world/piece-requests` takes ([generated-pieces-contract.md](generated-pieces-contract.md)):
+new pieces made by open models on a GPU, in the library look the world wears (its own look of
+generated pieces asks in that look's library base). The drafter names the kinds of thing, by a
+listed thing or a kind; with none named, the step asks for the world's things whose look the
+library dresses only with its family's default or the engine's box
+([style-pack-contract.md](style-pack-contract.md)). A being has no piece of its own and is passed
+over. Asking for pieces is a step on its own: a plan that mixes it with other changes is refused
+`action_not_offered`. The step always needs the person's yes (`confirmation: required`) and spends
+(`spends: true`, `model.invoke` and `world.write`); before that yes it carries the `estimate` the
+route answers with, so the sheet names the minutes (the first piece and all of them on a running
+piece maker, and a cold start) and the cost on Nebius AI Cloud (typical and at most, and the runs the
+figures come from). Nothing is asked of a GPU and nothing is spent until the person confirms. A
+step that cannot be asked carries the reason as its code: `look_not_served` for a world wearing no
+look pieces can be made in, `look_without_style_words` for a look without generation style words
+yet, and `no_piece_needed` when every thing asked for has pieces already. `titles` names the kinds asked. The step reads back as the
+piece requests its answer names.
 
 ### The browser's path
 

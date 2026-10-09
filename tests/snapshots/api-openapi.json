@@ -22338,6 +22338,20 @@
       ],
       "title": "Titles"
      },
+     "estimate": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Estimate"
+     },
      "replay": {
       "type": "string",
       "title": "Replay"
@@ -31719,6 +31733,22 @@
        }
       ],
       "title": "Request Id"
+     },
+     "piece_request_ids": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string",
+         "format": "uuid"
+        },
+        "type": "array",
+        "maxItems": 16
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Piece Request Ids"
      }
     },
     "additionalProperties": false,
@@ -31897,7 +31927,8 @@
        "POST /world/styles/previews/{preview_id}/apply",
        "PUT /world/versions/{version_id}/society/control",
        "POST /world/versions/{version_id}/society/control/steps",
-       "POST /world/versions/{version_id}/society"
+       "POST /world/versions/{version_id}/society",
+       "POST /world/piece-requests"
       ],
       "title": "Operation"
      },
