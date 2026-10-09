@@ -127,6 +127,10 @@ __all__ = [
 #: How a goal policy says a model chose it, so the planner records the model's own reason code
 #: (``chosen_by_their_model``), never the one a person's own request gives.
 CHOSEN_BY_MODEL: Final = "model"
+#: How a goal policy says the world's owner asked for it by a direct request where the policy
+#: alone cannot say so (a hands act's wait within reach, or its walk to stand within reach), so
+#: the planner records a request's reason code, never a model's.
+CHOSEN_BY_PERSON: Final = "person"
 #: The reasons only a person's decisions record, beside the generic path's own
 #: (:data:`~exulanica.world.decision_roles.GENERIC_REASONS`), all of them when the minute consumes a
 #: receipt.

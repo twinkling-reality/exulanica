@@ -84,7 +84,7 @@ the tick and state digest they were made against, and a stale base is refused.
 | `GET`, `PUT /world/versions/{version_id}/society/control` | Playback: play or pause at 1x, 2x or 4x speed |
 | `POST /world/versions/{version_id}/society/control/steps` | Advance a paused society by one step |
 | `POST /world/versions/{version_id}/society/presence` | One recorded minute in which everyone leaves, or the same people arrive again |
-| `POST /world/versions/{version_id}/society/actions` | Direct one person to go somewhere or use a place |
+| `POST /world/versions/{version_id}/society/actions` | Direct one person to go somewhere or use a place, or, in a society running hands, to pick a thing up, put it down, give it or take it |
 | `GET /world/versions/{version_id}/models` | Every registered decision role (a person, a junction signal): its subjects, offered models, choices and host refusal, with the same declared semantics on each role |
 | `POST /world/versions/{version_id}/models/{role_key}` | Choose a model for some subjects of one role, or none; needs `model.invoke` beside `world.write` |
 | `GET /world/versions/{version_id}/society/models` | The offered models, each person's choice and each model's decisions |

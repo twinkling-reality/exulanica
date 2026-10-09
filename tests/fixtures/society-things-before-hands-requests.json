@@ -1,0 +1,176 @@
+{
+ "input_sha256": "148310955854a057d3d55bf6fe42df544d8e447585b8ebaf2021aa3eaf74fe87",
+ "minutes": [
+  {
+   "events": [
+    "decision_applied",
+    "goal_selected",
+    "picked_up",
+    "route_progressed",
+    "user_action_requested"
+   ],
+   "events_sha256": "da1709a486bffeb0637617549cb55efc847ad5404d4560d3e8d2d3ca32c91583",
+   "receipts": [
+    {
+     "base_state_sha256": "47a47bd9fc6c30f1fafe2cd89578e53ea503b45b6f2ce8a189b20508f369a6a6",
+     "base_tick": 0,
+     "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+     "context_sha256": "6138f11b1dfb4900df4352938c36aff4f5223c8b8dea98e38839e248339181bb",
+     "decision_seq": 1,
+     "document_sha256": "3a95b696ecb514ce1fe227fb92a09197f40d8f698b4d49f3c554abe697285d66",
+     "input_seq": 1,
+     "input_sha256": "148310955854a057d3d55bf6fe42df544d8e447585b8ebaf2021aa3eaf74fe87",
+     "profile": "exulanica.society-decision/v2",
+     "proposal": {
+      "label": "pick up the sword, 5 m away",
+      "option": {
+       "action": "pick_up",
+       "activity": null,
+       "kind": "pick_up",
+       "label": "pick up the sword, 5 m away",
+       "target_id": "74493d30-86f2-5ed0-8de3-e568036d4dd5",
+       "walk_mm": 4000
+      }
+     },
+     "provider": {
+      "answers_asked": 1,
+      "calls": [],
+      "completion_tokens": 40,
+      "cost_known": true,
+      "cost_usd": "0.00002760",
+      "latency_ms": 900,
+      "mechanism": "tool_call",
+      "messages_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "model_id": "example/model",
+      "prompt_tokens": 300,
+      "prompt_version": "society-person-choice/v3",
+      "provider": "example_provider",
+      "served_model_id": "example/model"
+     },
+     "reason": "validated_choice",
+     "request_id": "d96d9f37-329d-5c5f-980f-1e579c47fb6f",
+     "request_sha256": "da32f542e3a5aa2cf471bebb31e5a4c39fcb93b343d82b46ecf47c472ec7fb93",
+     "status": "accepted",
+     "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+    }
+   ],
+   "requests": [
+    {
+     "base_state_sha256": "47a47bd9fc6c30f1fafe2cd89578e53ea503b45b6f2ce8a189b20508f369a6a6",
+     "base_tick": 0,
+     "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+     "document_sha256": "9e421e3fabc0622c948ddb285046e56862563a179cf5f6efa352840afc54cbbd",
+     "input_seq": 1,
+     "input_sha256": "148310955854a057d3d55bf6fe42df544d8e447585b8ebaf2021aa3eaf74fe87",
+     "intent": {
+      "kind": "go_to",
+      "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-1-planter_tree:visit"
+     },
+     "profile": "exulanica.society-action-request/v1",
+     "request_id": "00000000-0000-0000-0000-000000000005",
+     "requested_by": "00000000-0000-0000-0000-0000000000a5",
+     "subject_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+     "target": {
+      "activity": "visit_planter_tree",
+      "affordance": "visit",
+      "enabled": true,
+      "node_id": "ground:+00000000:-00002000",
+      "object_id": "small_square-1-1-planter_tree",
+      "origin": "authored",
+      "place_node_ids": [
+       "place:small_square-1-1-planter_tree:0",
+       "place:small_square-1-1-planter_tree:1",
+       "place:small_square-1-1-planter_tree:2",
+       "place:small_square-1-1-planter_tree:3"
+      ],
+      "subject_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-1-planter_tree",
+      "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-1-planter_tree:visit",
+      "version_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002"
+     }
+    }
+   ],
+   "state_sha256": "176180b29e48fbfae5bb153d76aba75af7c7312e51e6b11fdf52540a0e52beeb",
+   "tick": 1
+  },
+  {
+   "events": [
+    "decision_applied",
+    "put_down"
+   ],
+   "events_sha256": "0cfffb2867d3884d8d934c5b7469059ac6b3798cd1703245381fa28cc57dd31f",
+   "receipts": [
+    {
+     "base_state_sha256": "176180b29e48fbfae5bb153d76aba75af7c7312e51e6b11fdf52540a0e52beeb",
+     "base_tick": 1,
+     "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+     "context_sha256": "d6cb87bdc7226edb6ea0a82bfd2ba5ee53ae0c61b4e6cd952cb34f0825f669dd",
+     "decision_seq": 2,
+     "document_sha256": "223ab5abab2d4f52609f0a627a7844e7b2afc5a791898dd8e849d79224733243",
+     "input_seq": 1,
+     "input_sha256": "148310955854a057d3d55bf6fe42df544d8e447585b8ebaf2021aa3eaf74fe87",
+     "profile": "exulanica.society-decision/v2",
+     "proposal": {
+      "label": "put down the sword",
+      "option": {
+       "action": "put_down",
+       "activity": null,
+       "kind": "put_down",
+       "label": "put down the sword",
+       "target_id": "74493d30-86f2-5ed0-8de3-e568036d4dd5",
+       "walk_mm": 0
+      }
+     },
+     "provider": {
+      "answers_asked": 1,
+      "calls": [],
+      "completion_tokens": 40,
+      "cost_known": true,
+      "cost_usd": "0.00002760",
+      "latency_ms": 900,
+      "mechanism": "tool_call",
+      "messages_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "model_id": "example/model",
+      "prompt_tokens": 300,
+      "prompt_version": "society-person-choice/v3",
+      "provider": "example_provider",
+      "served_model_id": "example/model"
+     },
+     "reason": "validated_choice",
+     "request_id": "ea52610d-9fee-5baf-bf42-93aec2f7dcf8",
+     "request_sha256": "154db51e39d3c1ce77985304cee053b981dabac45c09ea6874064466c9eb0c80",
+     "status": "accepted",
+     "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+    }
+   ],
+   "requests": [],
+   "state_sha256": "e7b7ad2b9b4cb5b72116674673c279d4c799a7264a7d8528e30ad0b47c2c5785",
+   "tick": 2
+  },
+  {
+   "events": [
+    "action_completed"
+   ],
+   "events_sha256": "8eeb2e7c8d6205883b007adeaffdab0d6f8a7222e056f80f4dfce5e680bf8ec9",
+   "receipts": [],
+   "requests": [],
+   "state_sha256": "e266792d95e11cafb1a516d5a878c513b183c73089b9f8a4bf6b9ecffe69d2bb",
+   "tick": 3
+  },
+  {
+   "events": [
+    "action_completed",
+    "goal_selected",
+    "route_progressed"
+   ],
+   "events_sha256": "c8135ac3f495fad11d3b7d01eccc5d91475b6f2abc0696c02a4031db64d56d21",
+   "receipts": [],
+   "requests": [],
+   "state_sha256": "8c4b2699e624fb176b140995f00b816241d164310d13875c689b89e9d8fe80fb",
+   "tick": 4
+  }
+ ],
+ "population": 6,
+ "recorded_by": "main 60f7b84e, before hands requests",
+ "seed": "7777777777777777777777777777777777777777777777777777777777777777",
+ "society_id": "dae453f0-82b4-583c-b056-7150f5217e08"
+}

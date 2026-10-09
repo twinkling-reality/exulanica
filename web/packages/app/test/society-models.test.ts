@@ -117,7 +117,7 @@ describe('reading who decides', () => {
         + 'stopped before it heard the answer.');
     // A person's own request, or another decision, came first: neither is their routine.
     expect(latestDecisionWords({ ...view.latest[0]!, disposition: 'superseded', dispositionReason: 'person_asked_directly' }))
-      .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but you asked them to go somewhere yourself, and that came first.');
+      .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but you asked them yourself, and that came first.');
     expect(latestDecisionWords({ ...view.latest[0]!, disposition: 'superseded', dispositionReason: 'subject_already_decided' }))
       .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but something else already decided for them this minute, and that came first.');
     // Every decision not acted on is counted once, under why.

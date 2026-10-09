@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection
 from exulanica.api.world_scope import WorldId
@@ -32,13 +32,31 @@ class PerformIntent(GoToIntent):
     affordance: Annotated[str, Field(min_length=1, max_length=1000)]
 
 
+class HandsIntent(BaseModel):
+    """A hands act asked of a being in a society of things running the hands module: the thing,
+    and for giving or taking the other being, by the society's own ids."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["hands"]
+    ability: Literal["pick_up", "put_down", "give", "take"]
+    thing_id: Annotated[str, Field(min_length=1, max_length=1000)]
+    with_id: Annotated[str, Field(min_length=1, max_length=1000)] | None = None
+
+    @model_validator(mode="after")
+    def _another_being_exactly_to_give_or_take(self) -> HandsIntent:
+        """A give or a take names the other being; a pick-up or a put-down names none."""
+        if (self.with_id is not None) != (self.ability in ("give", "take")):
+            raise ValueError("with_id names the other being exactly for give and take")
+        return self
+
+
 class SocietyActionBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     idempotency_key: uuid.UUID
     base_tick: Annotated[StrictInt, Field(ge=0)]
     base_state_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
     subject_id: uuid.UUID
-    intent: GoToIntent | PerformIntent
+    intent: Annotated[GoToIntent | PerformIntent | HandsIntent, Field(discriminator="kind")]
 
 
 def repository(
@@ -83,7 +101,14 @@ def record_action(
     request: Request,
     world_id: WorldId,
 ) -> Any:
-    intent = ActionIntent(**body.intent.model_dump())
+    asked = body.intent
+    intent = (
+        ActionIntent(
+            kind="hands", target_id=asked.thing_id, ability=asked.ability, with_id=asked.with_id
+        )
+        if isinstance(asked, HandsIntent)
+        else ActionIntent(**asked.model_dump())
+    )
     return call(
         lambda: repository(connection, session, request, world_id).create(
             version_id,

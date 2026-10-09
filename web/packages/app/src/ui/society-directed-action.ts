@@ -54,10 +54,11 @@ export function societyDirectedActionGate(
 /** Plain-language summary of a recorded action envelope. Never claims personal evidence. */
 export function describeSocietyActionRecord(record: SocietyActionRecord): string {
   const intent = record.request.intent;
-  const target = String(record.request.target['target_id'] ?? intent.target_id);
-  const action = intent.kind === 'perform'
-    ? `perform ${intent.affordance} at ${target}`
-    : `go_to ${target}`;
+  const action = intent.kind === 'hands'
+    ? `${intent.ability} ${intent.thing_id}${intent.with_id === null ? '' : ` with ${intent.with_id}`}`
+    : intent.kind === 'perform'
+      ? `perform ${intent.affordance} at ${String(record.request.target?.['target_id'] ?? intent.target_id)}`
+      : `go_to ${String(record.request.target?.['target_id'] ?? intent.target_id)}`;
   if (record.status === 'pending') {
     return `Simulation action request recorded (${record.status}): ${action}. `
       + `Request ${record.request.requestId}. Digest ${record.request.documentSha256}. `
@@ -83,6 +84,10 @@ export const REFUSAL_WORDS: Readonly<Record<string, string>> = {
   inhabitant_already_there: 'They are already there, using it now.',
   target_unreachable: 'They cannot reach that place from where they are.',
   unknown_inhabitant: 'That inhabitant is not in this world any more.',
+  act_not_offered: 'They cannot do that: it is out of their reach, or their hands or the thing do not allow it.',
+  thing_gone: 'That is not here any more.',
+  out_of_reach: 'They could not get close enough to do it.',
+  belongs_to_visitor: 'That belongs to a visitor. Only they can give it away.',
 };
 
 export function describeSocietyActionFailure(error: unknown): string {

@@ -151,8 +151,17 @@ THING_REASONS: Final = frozenset(
         "chose_to_put_down",
         "chose_to_give",
         "chose_to_take",
+        # The world's owner asked a being for a hands act, done the same way.
+        "asked_to_pick_up",
+        "asked_to_put_down",
+        "asked_to_give",
+        "asked_to_take",
         "thing_gone",
         "out_of_reach",
+        # A hands act left undone for another: an asked act its decider's choice replaced, or a
+        # decider's act a request replaced.
+        "chose_otherwise",
+        "asked_otherwise",
     }
 )
 #: Every outcome the things phase records, stated once: the browser has words for exactly these.
@@ -1038,6 +1047,7 @@ def advance_things(
     events: Sequence[SocietyEvent],
     crossings: Sequence[Crossing] = (),
     decisions: Sequence[tuple[Mapping[str, Any], Any]] = (),
+    asked: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[dict[str, Any], tuple[SocietyEvent, ...], tuple[BoundCrossing, ...]]:
     """The things phase of a minute: ``state`` and ``events`` are the minute so far (the planner's,
     its directed requests' and its decisions'), ``previous`` the state it began from and
@@ -1045,7 +1055,9 @@ def advance_things(
     each with what the minute did with it: an applied line is said, an applied leaving is carried
     out, an applied hands act is done by the hands step once the being stands within reach (where
     the society runs the hands module), and a visitor whose program stays quiet for as many minutes
-    as its kind waits is sent home.
+    as its kind waits is sent home. ``asked`` are the hands acts the world's owner asked for and
+    the minute applied (``exulanica.society-action-request/v2``), done the same way, each marked as
+    asked.
     Answers the state, every event of the minute, and what became of each crossing, in the order
     they were handed over."""
     _require(state["profile"] == THINGS_PROFILE, "the things phase is a society of things'")
@@ -1075,6 +1087,7 @@ def advance_things(
             bound.append(_depart(minute, crossing, checked))
     _decided(minute, previous, decisions)
     if _runs_hands(result):
+        _asked(minute, asked)
         _hands(minute, previous)
     if _remembers(result):
         _remember(minute, decisions)
@@ -1186,7 +1199,11 @@ def _decided(
             continue
         option = receipt["proposal"]["option"]
         if option["kind"] in _HANDS_ACTS and _runs_hands(minute.state):
-            # What its hands do, done by the hands step in the minute it stands within reach.
+            # What its hands do, done by the hands step in the minute it stands within reach. An
+            # act the world's owner asked for that it replaces is recorded as left undone.
+            pending = person.get("hands")
+            if pending is not None and pending.get("asked"):
+                _missed(minute, person, "chose_otherwise")
             person["hands"] = {
                 "ability": option["kind"],
                 "thing": option["target_id"],
@@ -1269,6 +1286,50 @@ def _decided(
             minute.leave(person, "decider_lost")
 
 
+def _asked(minute: _Minute, asked: Sequence[Mapping[str, Any]]) -> None:
+    """Each hands act the world's owner asked for and the minute applied: the being's intent, as a
+    decider's applied act sets it, marked as asked, for the hands step to do once it stands within
+    reach. A request is applied only for a being nobody else decided for this minute."""
+    for request in asked:
+        person = next(
+            (p for p in minute.state["inhabitants"] if p["id"] == request["subject_id"]), None
+        )
+        if person is None:
+            continue
+        intent = request["intent"]
+        if person.get("hands") is not None:
+            # A pending act the request replaces is recorded as left undone.
+            _missed(minute, person, "asked_otherwise")
+        person["hands"] = {
+            "ability": intent["ability"],
+            "thing": intent["thing_id"],
+            "with": intent["with_id"],
+            "since": minute.state["tick"],
+            "asked": True,
+        }
+
+
+def _missed(minute: _Minute, person: dict[str, Any], reason: str) -> None:
+    """The being's pending hands act left undone, by name: ``hands_missed`` naming the act, and
+    for an act the world's owner asked for, ``asked`` (only then, so a decider's act is recorded
+    as it always was)."""
+    intent = person.pop("hands")
+    minute.emit(
+        "hands_missed",
+        person["id"],
+        reason,
+        "not_done",
+        person=person,
+        name=person["display_name"],
+        details={
+            "ability": intent["ability"],
+            "thing": intent["thing"],
+            "with": intent["with"],
+            **({"asked": True} if intent.get("asked") else {}),
+        },
+    )
+
+
 def _model_of(receipt: Mapping[str, Any]) -> dict[str, str] | None:
     """The model a receipt's request asked, by provider and identifier, where a model answered it;
     None for an outside program's answer."""
@@ -1338,7 +1399,7 @@ def _hands(minute: _Minute, previous: Mapping[str, Any]) -> None:
                 ),
                 None,
             )
-        reason = "chose_to_" + intent["ability"]
+        reason = ("asked_to_" if intent.get("asked") else "chose_to_") + intent["ability"]
         if found is None:
             things = {thing["id"] for thing in state["things"]}
             here = {other["id"] for other in state["inhabitants"]}
@@ -1347,20 +1408,7 @@ def _hands(minute: _Minute, previous: Mapping[str, Any]) -> None:
             )
             if not gone and state["tick"] - intent["since"] < walk_minutes_maximum():
                 continue
-            person.pop("hands")
-            minute.emit(
-                "hands_missed",
-                person["id"],
-                "thing_gone" if gone else "out_of_reach",
-                "not_done",
-                person=person,
-                name=person["display_name"],
-                details={
-                    "ability": intent["ability"],
-                    "thing": intent["thing"],
-                    "with": intent["with"],
-                },
-            )
+            _missed(minute, person, "thing_gone" if gone else "out_of_reach")
             continue
         parties = [person] + [
             other for other in state["inhabitants"] if other["id"] == found.other_id
@@ -1616,7 +1664,9 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
             or (
                 _runs_hands(state)
                 and isinstance(intent, dict)
-                and set(intent) == {"ability", "thing", "with", "since"}
+                # ``asked``, only ever true, marks an act the world's owner asked for.
+                and set(intent) - {"asked"} == {"ability", "thing", "with", "since"}
+                and intent.get("asked", True) is True
                 and intent["ability"] in _HANDS_ACTS
                 and isinstance(intent["thing"], str)
                 and (intent["with"] is None or isinstance(intent["with"], str))

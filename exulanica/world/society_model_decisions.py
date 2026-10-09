@@ -292,12 +292,20 @@ def hands_goal_policy(
     subject: str,
     option: DecisionOption,
     promised: set[str],
+    *,
+    asked: bool = False,
 ) -> dict[str, Any] | str:
     """The planner's goal policy for an applied hands act, or why it no longer holds: waiting
     where the being stands when what the act is for is within reach, else standing a while at the
     open node within reach of it, as a chosen stand does; ``thing_gone`` when the thing or the
-    other being is no longer here, ``out_of_reach`` when no open node within reach of it is left."""
-    from exulanica.world.society_decision_contract import CHOSEN_BY_MODEL, stand_activity
+    other being is no longer here, ``out_of_reach`` when no open node within reach of it is left.
+    ``asked`` marks an act the world's owner asked for by a direct request, whose wait or walk the
+    planner records with a request's reason, never the decider's."""
+    from exulanica.world.society_decision_contract import (
+        CHOSEN_BY_MODEL,
+        CHOSEN_BY_PERSON,
+        stand_activity,
+    )
     from exulanica.world.society_hands import acts_open, approach_node
 
     person = next((p for p in state["inhabitants"] if p["id"] == subject), None)
@@ -314,7 +322,11 @@ def hands_goal_policy(
         == (option.kind, option.target_id, option.addressee_id)
         for act in acts_open(state, person, document)
     ):
-        return {"allowed_target_ids": [], "wait": True}
+        return {
+            "allowed_target_ids": [],
+            "wait": True,
+            **({"chosen_by": CHOSEN_BY_PERSON} if asked else {}),
+        }
     target = option.addressee_id if option.kind in ("give", "take") else option.target_id
     assert target is not None
     node = approach_node(state, document, person, target)
@@ -325,5 +337,5 @@ def hands_goal_policy(
         "allowed_target_ids": [],
         "activity": stand.key,
         "place_node_id": node,
-        "chosen_by": CHOSEN_BY_MODEL,
+        "chosen_by": CHOSEN_BY_PERSON if asked else CHOSEN_BY_MODEL,
     }

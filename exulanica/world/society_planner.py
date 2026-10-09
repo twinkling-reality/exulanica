@@ -175,6 +175,7 @@ REASON_CODES: Final = AFFORDANCE_REASON_CODES | frozenset(
         "target_changed",
         "target_disabled_or_removed",
         "validated_model_wait",
+        "validated_user_wait",
         "waiting_for_partner",
         "authored_affordance_unreachable",
         "authored_object_moves",
@@ -1169,6 +1170,17 @@ def ends_on_request(routine: PurposefulRoutine, person: dict) -> bool:
     )
 
 
+def _asked_stand(policy: dict | None, stand: PurposefulActivity | None) -> bool:
+    """Whether a goal policy is a stand the world's owner asked for by a direct request: a hands
+    act's walk to stand within reach of what it is for (``hands_goal_policy`` with ``asked``)."""
+    return (
+        policy is not None
+        and stand is not None
+        and policy.get("chosen_by") == "person"
+        and policy.get("activity") == stand.key
+    )
+
+
 def _meets(person: dict, people: dict[str, dict]) -> bool:
     """Whether the person somebody means to talk with still means to talk with them.
 
@@ -1860,7 +1872,7 @@ def advance_purposeful_society(
             policy = (goal_policy or {}).get(person["id"])
             if (
                 policy is not None
-                and policy.get("preferred_target_id")
+                and (policy.get("preferred_target_id") or _asked_stand(policy, stand))
                 and ends_on_request(routine, person)
                 and _location_valid(person, nodes, edges)
             ):
@@ -1925,7 +1937,11 @@ def advance_purposeful_society(
             or (
                 policy
                 and person["action"]["status"] == "blocked"
-                and (policy.get("preferred_target_id") or policy.get("wait"))
+                and (
+                    policy.get("preferred_target_id")
+                    or policy.get("wait")
+                    or _asked_stand(policy, stand)
+                )
             )
             or pairing is not None
         ):
@@ -1934,7 +1950,15 @@ def advance_purposeful_society(
             person["route"] = None
         if person["goal"] is None:
             if policy and policy.get("wait"):
-                block(person, "validated_model_wait", doc)
+                # A wait the world's owner asked for, for a hands act within reach, records the
+                # request's own code, never a model's.
+                block(
+                    person,
+                    "validated_user_wait"
+                    if policy.get("chosen_by") == "person"
+                    else "validated_model_wait",
+                    doc,
+                )
                 continue
             loc = person["location"]
             start = loc["node_id"] if loc["edge"] is None else loc["edge"]["to_node_id"]
@@ -1993,13 +2017,25 @@ def advance_purposeful_society(
                 # A conversation a model chose that an edit this minute left no room for.
                 block(person, "route_invalidated", doc)
                 continue
-            elif chosen is not None and stand is not None and chosen.get("activity") == stand.key:
-                # A model's choice to stand a while, at the spot promised it before the minute.
-                if chosen["place_node_id"] not in paths or chosen["place_node_id"] in held:
+            elif (
+                chosen is not None and stand is not None and chosen.get("activity") == stand.key
+            ) or _asked_stand(policy, stand):
+                # A model's choice to stand a while, or a stand the world's owner asked for to
+                # reach a thing or another being (a hands act's walk), at the spot promised it
+                # before the minute; a request's walk records the request's own code.
+                stood = chosen if chosen is not None else policy
+                assert stood is not None and stand is not None
+                if stood["place_node_id"] not in paths or stood["place_node_id"] in held:
                     block(person, "route_invalidated", doc)
                     continue
-                goal = {"kind": stand.key, "target_id": None, "reason": "chosen_by_their_model"}
-                destination = chosen["place_node_id"]
+                goal = {
+                    "kind": stand.key,
+                    "target_id": None,
+                    "reason": "chosen_by_their_model"
+                    if chosen is not None
+                    else "remembered_target_selected",
+                }
+                destination = stood["place_node_id"]
             elif drawn and policy is None:
                 # A drawn routine: somebody tired sits if there is room, and anybody else picks,
                 # by the routine's weights, among what has room for them now; then which one,

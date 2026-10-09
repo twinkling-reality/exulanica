@@ -495,8 +495,17 @@ export interface SocietyActionIntent {
   readonly affordance?: SocietyActionAffordance;
 }
 
+/** A hands act a person asks of a being (`exulanica.society-action-request/v2`): never sent from
+ * this client, read where a world's history holds one. */
+export interface SocietyHandsIntent {
+  readonly kind: 'hands';
+  readonly ability: 'pick_up' | 'put_down' | 'give' | 'take';
+  readonly thing_id: string;
+  readonly with_id: string | null;
+}
+
 export interface SocietyActionRequest {
-  readonly profile: 'exulanica.society-action-request/v1';
+  readonly profile: 'exulanica.society-action-request/v1' | 'exulanica.society-action-request/v2';
   readonly requestId: string;
   readonly requestedBy: string;
   readonly subjectId: string;
@@ -509,10 +518,13 @@ export interface SocietyActionRequest {
     readonly kind: SocietyActionKind;
     readonly target_id: string;
     readonly affordance?: SocietyActionAffordance;
-  }>;
-  readonly target: Readonly<Record<string, unknown>>;
+  }> | SocietyHandsIntent;
+  /** The target a v1 request froze; null for a v2 request, which names a thing instead. */
+  readonly target: Readonly<Record<string, unknown>> | null;
   readonly documentSha256: string;
 }
+
+const HANDS_ABILITIES: readonly string[] = ['pick_up', 'put_down', 'give', 'take'];
 
 export interface SocietyActionRecord {
   readonly request: SocietyActionRequest;
@@ -527,6 +539,7 @@ export function parseSocietyActionRecord(value: unknown, versionId: string): Soc
   const row = record(value);
   const request = record(row['request']);
   const intent = record(request['intent']);
+  if (request['profile'] === 'exulanica.society-action-request/v2') return parseHandsRecord(row, request, intent, versionId);
   const target = record(request['target']);
   const kind = intent['kind'];
   const affordance = intent['affordance'];
@@ -543,16 +556,6 @@ export function parseSocietyActionRecord(value: unknown, versionId: string): Soc
     || !textValue(target['target_id'])
     || (row['status'] !== 'pending' && row['status'] !== 'consumed')) {
     throw new Error('Invalid society action response');
-  }
-  let consumption: SocietyActionRecord['consumption'] = null;
-  if (row['consumption'] !== null && row['consumption'] !== undefined) {
-    const held = record(row['consumption']);
-    if (!integer(held['tick']) || !textValue(held['disposition'])) {
-      throw new Error('Invalid society action consumption');
-    }
-    consumption = Object.freeze({ tick: held['tick'] as number, disposition: held['disposition'] as string });
-  } else if (row['status'] === 'consumed') {
-    throw new Error('Invalid society action consumption');
   }
   return Object.freeze({
     request: Object.freeze({
@@ -574,7 +577,62 @@ export function parseSocietyActionRecord(value: unknown, versionId: string): Soc
       documentSha256: request['document_sha256'] as string,
     }),
     status: row['status'] as SocietyActionStatus,
-    consumption,
+    consumption: actionConsumption(row),
+  });
+}
+
+/** How the minute that took a request recorded it, or null while none has. */
+function actionConsumption(row: Record<string, unknown>): SocietyActionRecord['consumption'] {
+  if (row['consumption'] !== null && row['consumption'] !== undefined) {
+    const held = record(row['consumption']);
+    if (!integer(held['tick']) || !textValue(held['disposition'])) {
+      throw new Error('Invalid society action consumption');
+    }
+    return Object.freeze({ tick: held['tick'] as number, disposition: held['disposition'] as string });
+  }
+  if (row['status'] === 'consumed') throw new Error('Invalid society action consumption');
+  return null;
+}
+
+/** A v2 record: a hands act asked of a being, naming its thing (and another being) and no target. */
+function parseHandsRecord(
+  row: Record<string, unknown>, request: Record<string, unknown>, intent: Record<string, unknown>, versionId: string,
+): SocietyActionRecord {
+  const ability = intent['ability'];
+  const withId = intent['with_id'];
+  const other = ability === 'give' || ability === 'take';
+  if (request['branch_id'] !== versionId || 'target' in request
+    || !textValue(request['request_id']) || !textValue(request['requested_by'])
+    || !textValue(request['subject_id']) || !integer(request['base_tick'])
+    || !digest(request['base_state_sha256']) || !integer(request['input_seq'], 1)
+    || !digest(request['input_sha256']) || !digest(request['document_sha256'])
+    || intent['kind'] !== 'hands' || !HANDS_ABILITIES.includes(String(ability))
+    || !textValue(intent['thing_id']) || (other ? !textValue(withId) : withId !== null)
+    || (row['status'] !== 'pending' && row['status'] !== 'consumed')) {
+    throw new Error('Invalid society action response');
+  }
+  return Object.freeze({
+    request: Object.freeze({
+      profile: 'exulanica.society-action-request/v2' as const,
+      requestId: request['request_id'] as string,
+      requestedBy: request['requested_by'] as string,
+      subjectId: request['subject_id'] as string,
+      branchId: request['branch_id'] as string,
+      baseTick: request['base_tick'] as number,
+      baseStateSha256: request['base_state_sha256'] as string,
+      inputSeq: request['input_seq'] as number,
+      inputSha256: request['input_sha256'] as string,
+      intent: Object.freeze({
+        kind: 'hands' as const,
+        ability: ability as SocietyHandsIntent['ability'],
+        thing_id: intent['thing_id'] as string,
+        with_id: other ? withId as string : null,
+      }),
+      target: null,
+      documentSha256: request['document_sha256'] as string,
+    }),
+    status: row['status'] as SocietyActionStatus,
+    consumption: actionConsumption(row),
   });
 }
 

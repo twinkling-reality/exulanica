@@ -105,11 +105,7 @@ class SocietyActionRepository:
         base_state_sha256: str,
         intent: ActionIntent,
     ) -> bool:
-        expected_intent = {
-            "kind": intent.kind,
-            "target_id": intent.target_id,
-            **({"affordance": intent.affordance} if intent.kind == "perform" else {}),
-        }
+        expected_intent = intent.document()
         return (
             document["requested_by"] == str(requested_by)
             and document["subject_id"] == str(subject_id)

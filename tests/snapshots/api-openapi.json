@@ -27357,6 +27357,53 @@
     "type": "object",
     "title": "HTTPValidationError"
    },
+   "HandsIntent": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "hands",
+      "title": "Kind"
+     },
+     "ability": {
+      "type": "string",
+      "enum": [
+       "pick_up",
+       "put_down",
+       "give",
+       "take"
+      ],
+      "title": "Ability"
+     },
+     "thing_id": {
+      "type": "string",
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Thing Id"
+     },
+     "with_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 1000,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "With Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "ability",
+     "thing_id"
+    ],
+    "title": "HandsIntent",
+    "description": "A hands act asked of a being in a society of things running the hands module: the thing,\nand for giving or taking the other being, by the society's own ids."
+   },
    "HelloBody": {
     "properties": {
      "adapter_version": {
@@ -37918,15 +37965,26 @@
       "title": "Subject Id"
      },
      "intent": {
-      "anyOf": [
+      "oneOf": [
        {
         "$ref": "#/components/schemas/GoToIntent"
        },
        {
         "$ref": "#/components/schemas/PerformIntent"
+       },
+       {
+        "$ref": "#/components/schemas/HandsIntent"
        }
       ],
-      "title": "Intent"
+      "title": "Intent",
+      "discriminator": {
+       "propertyName": "kind",
+       "mapping": {
+        "go_to": "#/components/schemas/GoToIntent",
+        "hands": "#/components/schemas/HandsIntent",
+        "perform": "#/components/schemas/PerformIntent"
+       }
+      }
      }
     },
     "additionalProperties": false,

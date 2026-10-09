@@ -1,4 +1,15 @@
-"""Typed user requests over canonical society targets, never browser-space movement."""
+"""Typed user requests over canonical society targets, never browser-space movement.
+
+A request is the world owner asking one of a society's people to do one thing at its next minute:
+to walk to a target its consumed input lists, or to do the target's activity there
+(``exulanica.society-action-request/v1``, ``go_to`` and ``perform``); or, in a society of things
+running the hands module, to pick a thing up, put it down, give it or take it
+(``exulanica.society-action-request/v2``, intent ``hands``). A v2 request is read beside v1 and
+names no input target: its act is checked against the hands acts the being is offered on the
+state the minute starts from, over the whole approach distance, and the minute walks the being to
+stand within reach as a decider's chosen act does. An applied request comes before the being's
+decider's answer for that minute, which is set aside (``person_asked_directly``).
+"""
 
 from __future__ import annotations
 
@@ -22,16 +33,42 @@ from exulanica.world.society_planner import (
 )
 
 ACTION_REQUEST_PROFILE: Final = "exulanica.society-action-request/v1"
+#: A request for a hands act, read beside v1: v1's fields without ``target``.
+HANDS_REQUEST_PROFILE: Final = "exulanica.society-action-request/v2"
 ACTION_EVENT_KIND: Final = "user_action_requested"
-ActionKind = Literal["go_to", "perform"]
+ActionKind = Literal["go_to", "perform", "hands"]
 ActionDispositionKind = Literal["applied", "stale", "unavailable", "rejected", "superseded"]
+#: The hands acts a person may ask a being for, as the hands module names them.
+HANDS_ABILITIES: Final = ("pick_up", "put_down", "give", "take")
+#: The acts that hand a thing to, or take it from, another being, who the request names.
+_WITH_ANOTHER: Final = frozenset({"give", "take"})
 
 
 @dataclass(frozen=True, slots=True)
 class ActionIntent:
+    """What a request asks: ``go_to`` or ``perform`` a target, or a ``hands`` act, whose
+    ``target_id`` is the thing and ``with_id`` the other being it is given to or taken from."""
+
     kind: ActionKind
     target_id: str
     affordance: str | None = None
+    ability: str | None = None
+    with_id: str | None = None
+
+    def document(self) -> dict[str, Any]:
+        """The intent as the request records it."""
+        if self.kind == "hands":
+            return {
+                "kind": "hands",
+                "ability": self.ability,
+                "thing_id": self.target_id,
+                "with_id": self.with_id,
+            }
+        return {
+            "kind": self.kind,
+            "target_id": self.target_id,
+            **({"affordance": self.affordance} if self.kind == "perform" else {}),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +93,13 @@ ACTION_REFUSALS: Final = frozenset(
         "inhabitant_already_there",
         "target_unreachable",
         "unknown_inhabitant",
+        # A hands act: not offered to the being now, its thing or other being gone, no open
+        # place within reach of it to walk to, or a thing a visitor here brought, which only that
+        # visitor may hand over.
+        "act_not_offered",
+        "thing_gone",
+        "out_of_reach",
+        "belongs_to_visitor",
     }
 )
 
@@ -99,7 +143,9 @@ def action_request_sha256(document: dict[str, Any]) -> str:
 
 
 def validate_action_request(document: dict[str, Any]) -> None:
-    """Validate the immutable request envelope without treating it as current authority."""
+    """Validate the immutable request envelope without treating it as current authority: a v1
+    request for a target, or a v2 request for a hands act, which names no target."""
+    hands = isinstance(document, dict) and document.get("profile") == HANDS_REQUEST_PROFILE
     fields = {
         "profile",
         "request_id",
@@ -111,13 +157,16 @@ def validate_action_request(document: dict[str, Any]) -> None:
         "input_seq",
         "input_sha256",
         "intent",
-        "target",
         "document_sha256",
+        *(() if hands else ("target",)),
     }
     _require(
         isinstance(document, dict) and set(document) == fields, "invalid action request fields"
     )
-    _require(document["profile"] == ACTION_REQUEST_PROFILE, "unsupported action request profile")
+    _require(
+        document["profile"] in (ACTION_REQUEST_PROFILE, HANDS_REQUEST_PROFILE),
+        "unsupported action request profile",
+    )
     for key in ("request_id", "requested_by", "subject_id", "branch_id"):
         _uuid(document[key], key)
     _require(type(document["base_tick"]) is int and document["base_tick"] >= 0, "invalid base tick")
@@ -130,30 +179,48 @@ def validate_action_request(document: dict[str, Any]) -> None:
     intent = document["intent"]
     _require(isinstance(intent, dict), "invalid action intent")
     kind = intent.get("kind")
-    if kind == "go_to":
-        _require(set(intent) == {"kind", "target_id"}, "invalid go-to intent fields")
-    elif kind == "perform":
+    if hands:
         _require(
-            set(intent) == {"kind", "target_id", "affordance"},
-            "invalid perform intent fields",
+            set(intent) == {"kind", "ability", "thing_id", "with_id"} and kind == "hands",
+            "invalid hands intent fields",
         )
+        _require(intent["ability"] in HANDS_ABILITIES, "unsupported hands act")
         _require(
-            isinstance(intent["affordance"], str) and 0 < len(intent["affordance"]) <= 1000,
-            "invalid requested affordance",
+            isinstance(intent["thing_id"], str) and 0 < len(intent["thing_id"]) <= 1000,
+            "invalid thing ID",
+        )
+        with_id = intent["with_id"]
+        _require(
+            (with_id is not None) == (intent["ability"] in _WITH_ANOTHER)
+            and (with_id is None or (isinstance(with_id, str) and 0 < len(with_id) <= 1000))
+            and with_id != document["subject_id"],
+            "a hands act names another being exactly when it gives or takes",
         )
     else:
-        raise ValueError("unsupported action intent")
-    _require(
-        isinstance(intent["target_id"], str) and 0 < len(intent["target_id"]) <= 1000,
-        "invalid target ID",
-    )
-    target = document["target"]
-    _require(isinstance(target, dict), "invalid frozen action target")
-    _require(target.get("target_id") == intent["target_id"], "action target binding mismatch")
-    _require(target.get("version_id") == document["branch_id"], "cross-branch action target")
-    _require(target.get("enabled") is True, "action target is not enabled")
-    if kind == "perform":
-        _require(target.get("affordance") == intent["affordance"], "action affordance changed")
+        if kind == "go_to":
+            _require(set(intent) == {"kind", "target_id"}, "invalid go-to intent fields")
+        elif kind == "perform":
+            _require(
+                set(intent) == {"kind", "target_id", "affordance"},
+                "invalid perform intent fields",
+            )
+            _require(
+                isinstance(intent["affordance"], str) and 0 < len(intent["affordance"]) <= 1000,
+                "invalid requested affordance",
+            )
+        else:
+            raise ValueError("unsupported action intent")
+        _require(
+            isinstance(intent["target_id"], str) and 0 < len(intent["target_id"]) <= 1000,
+            "invalid target ID",
+        )
+        target = document["target"]
+        _require(isinstance(target, dict), "invalid frozen action target")
+        _require(target.get("target_id") == intent["target_id"], "action target binding mismatch")
+        _require(target.get("version_id") == document["branch_id"], "cross-branch action target")
+        _require(target.get("enabled") is True, "action target is not enabled")
+        if kind == "perform":
+            _require(target.get("affordance") == intent["affordance"], "action affordance changed")
     _require(
         action_request_sha256(document) == document["document_sha256"],
         "action request digest mismatch",
@@ -234,6 +301,8 @@ def _request_reason(
         return "rejected", "decided_from_outside"
     if not may_be_directed(person, document):
         return "rejected", "inhabitant_action_in_progress"
+    if request["profile"] == HANDS_REQUEST_PROFILE:
+        return _hands_reason(state, document, person, request["intent"])
     if (
         ends_on_request(routine_of(document), person)
         and (person["target"] or {}).get("target_id") == request["intent"]["target_id"]
@@ -254,6 +323,66 @@ def _request_reason(
         # this person to; the request says so rather than leaving it standing in a queue.
         return "rejected", "destination_full"
     return "applied", "validated_user_target"
+
+
+def _hands_reason(
+    state: dict[str, Any],
+    document: dict[str, Any],
+    person: dict[str, Any],
+    intent: dict[str, Any],
+) -> tuple[ActionDispositionKind, str]:
+    """Whether a hands act may be asked of ``person`` on the state the minute starts from: the
+    society running the hands module, its thing and the other being here, no thing a visitor here
+    brought picked up or taken, and the act among those the being is offered over the whole
+    approach distance (walking first where it must). Read when the request is built and again by
+    the minute that consumes it."""
+    from exulanica.abilities.registry import HANDS
+    from exulanica.world.society_hands import acts_offered
+
+    if HANDS not in state.get("modules", ()):
+        return "rejected", "act_not_offered"
+    things = {thing["id"]: thing for thing in state.get("things", ())}
+    here = {other["id"] for other in state["inhabitants"]}
+    thing = things.get(intent["thing_id"])
+    if thing is None or (intent["with_id"] is not None and intent["with_id"] not in here):
+        return "rejected", "thing_gone"
+    if intent["ability"] in ("pick_up", "take") and thing.get("brought_by") in here:
+        # What a visitor brought goes home with it; only the visitor hands it over.
+        return "rejected", "belongs_to_visitor"
+    asked = (intent["ability"], intent["thing_id"], intent["with_id"])
+    if not any(
+        (offer.act.ability, offer.act.thing_id, offer.act.other_id) == asked
+        for offer in acts_offered(state, document, person)
+    ):
+        return "rejected", "act_not_offered"
+    return "applied", "validated_user_act"
+
+
+def _hands_option(intent: dict[str, Any]) -> Any:
+    """A hands request's act as the option the planner's hands goal policy reads."""
+    from exulanica.world.society_decision_contract import DecisionOption
+
+    return DecisionOption(
+        label="",
+        kind=str(intent["ability"]),
+        action="hands",
+        target_id=str(intent["thing_id"]),
+        activity=None,
+        walk_mm=None,
+        addressee_id=intent["with_id"],
+    )
+
+
+def applied_hands(
+    requests: list[dict[str, Any]], dispositions: tuple[ActionDisposition, ...]
+) -> tuple[dict[str, Any], ...]:
+    """The minute's applied hands requests, in request order, as its things phase takes them."""
+    applied = {str(value.request_id) for value in dispositions if value.disposition == "applied"}
+    return tuple(
+        request
+        for request in requests
+        if request["profile"] == HANDS_REQUEST_PROFILE and request["request_id"] in applied
+    )
 
 
 def _promised_place(
@@ -299,15 +428,7 @@ def build_action_request(
         and state.get("input_sha256") == document["document_sha256"],
         "advance queued inputs before requesting an action",
     )
-    if intent.kind == "perform" and intent.affordance not in routine_of(document).affordances:
-        raise UnknownAffordance(
-            f"the routine this society records offers no activity at an object named "
-            f"{intent.affordance!r}"
-        )
-    target = _target(document, intent.target_id)
-    _require(target is not None, "unknown canonical target")
-    request = {
-        "profile": ACTION_REQUEST_PROFILE,
+    common = {
         "request_id": str(request_id),
         "requested_by": str(requested_by),
         "subject_id": str(subject_id),
@@ -316,13 +437,23 @@ def build_action_request(
         "base_state_sha256": society_state_sha256(state),
         "input_seq": document["input_seq"],
         "input_sha256": document["document_sha256"],
-        "intent": {
-            "kind": intent.kind,
-            "target_id": intent.target_id,
-            **({"affordance": intent.affordance} if intent.kind == "perform" else {}),
-        },
-        "target": deepcopy(target),
+        "intent": intent.document(),
     }
+    if intent.kind == "hands":
+        request = {"profile": HANDS_REQUEST_PROFILE, **common}
+        request["document_sha256"] = action_request_sha256(request)
+        validate_action_request(request)
+        disposition, reason = _request_reason(state, document, request)
+        _require(disposition == "applied", reason)
+        return request
+    if intent.kind == "perform" and intent.affordance not in routine_of(document).affordances:
+        raise UnknownAffordance(
+            f"the routine this society records offers no activity at an object named "
+            f"{intent.affordance!r}"
+        )
+    target = _target(document, intent.target_id)
+    _require(target is not None, "unknown canonical target")
+    request = {"profile": ACTION_REQUEST_PROFILE, **common, "target": deepcopy(target)}
     request["document_sha256"] = action_request_sha256(request)
     validate_action_request(request)
     disposition, reason = _request_reason(state, document, request)
@@ -351,6 +482,27 @@ def action_goal_policies(
         subject = request["subject_id"]
         if disposition == "applied" and subject in policies:
             disposition, reason = "superseded", "subject_already_directed"
+        if request["profile"] == HANDS_REQUEST_PROFILE:
+            # The being waits where it stands within reach, or walks to the open node within reach
+            # of what the act is for, as a decider's chosen act walks it.
+            from exulanica.world.society_model_decisions import hands_goal_policy
+
+            if disposition == "applied":
+                policy = hands_goal_policy(
+                    state, document, subject, _hands_option(request["intent"]), promised, asked=True
+                )
+                if isinstance(policy, str):
+                    disposition, reason = "rejected", policy
+                else:
+                    policies[subject] = policy
+                    if "place_node_id" in policy:
+                        promised.add(policy["place_node_id"])
+            dispositions.append(
+                ActionDisposition(
+                    uuid.UUID(request["request_id"]), uuid.UUID(subject), disposition, reason
+                )
+            )
+            continue
         place = None
         if disposition == "applied" and document["profile"] in PLACE_INPUTS:
             place = _promised_place(state, people[subject], request["target"], promised, graph)
@@ -405,7 +557,12 @@ def append_action_events(
             "order": order,
             "input_seq": document["input_seq"],
             "input_sha256": document["document_sha256"],
-            "target": deepcopy(request["target"]),
+            "target": deepcopy(request.get("target")),
+            **(
+                {"act": {key: request["intent"][key] for key in ("ability", "thing_id", "with_id")}}
+                if request["profile"] == HANDS_REQUEST_PROFILE
+                else {}
+            ),
             "reason": disposition.reason,
             "outcome": "action_request_" + disposition.disposition,
             "goal": deepcopy(person["goal"]),

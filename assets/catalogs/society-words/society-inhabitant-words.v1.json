@@ -268,6 +268,13 @@
       "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
     },
     {
+      "key": "reason.validated_user_wait",
+      "kind": "reason",
+      "code": "validated_user_wait",
+      "words": "you asked them to do something where they stand",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
       "key": "reason.input_unavailable",
       "kind": "reason",
       "code": "input_unavailable",
@@ -1076,7 +1083,7 @@
       "key": "decision_reason.person_asked_directly",
       "kind": "decision_reason",
       "code": "person_asked_directly",
-      "words": "you asked them to go somewhere yourself",
+      "words": "you asked them yourself",
       "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
     },
     {
@@ -1549,6 +1556,34 @@
       "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
     },
     {
+      "key": "event_reason.asked_to_pick_up",
+      "kind": "event_reason",
+      "code": "asked_to_pick_up",
+      "words": "it was asked to pick it up",
+      "reason": "Authored: why a society of things recorded what a being's hands did when the world's owner asked for it, said after 'because'."
+    },
+    {
+      "key": "event_reason.asked_to_put_down",
+      "kind": "event_reason",
+      "code": "asked_to_put_down",
+      "words": "it was asked to put it down",
+      "reason": "Authored: why a society of things recorded what a being's hands did when the world's owner asked for it, said after 'because'."
+    },
+    {
+      "key": "event_reason.asked_to_give",
+      "kind": "event_reason",
+      "code": "asked_to_give",
+      "words": "it was asked to give it away",
+      "reason": "Authored: why a society of things recorded what a being's hands did when the world's owner asked for it, said after 'because'."
+    },
+    {
+      "key": "event_reason.asked_to_take",
+      "kind": "event_reason",
+      "code": "asked_to_take",
+      "words": "it was asked to take it",
+      "reason": "Authored: why a society of things recorded what a being's hands did when the world's owner asked for it, said after 'because'."
+    },
+    {
       "key": "event_reason.thing_gone",
       "kind": "event_reason",
       "code": "thing_gone",
@@ -1561,6 +1596,20 @@
       "code": "out_of_reach",
       "words": "it never came within reach",
       "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_otherwise",
+      "kind": "event_reason",
+      "code": "chose_otherwise",
+      "words": "it chose to do something else",
+      "reason": "Authored: why a society of things recorded a hands act the world's owner asked for as left undone: the being's decider chose another, said after 'because'."
+    },
+    {
+      "key": "event_reason.asked_otherwise",
+      "kind": "event_reason",
+      "code": "asked_otherwise",
+      "words": "you asked it to do something else",
+      "reason": "Authored: why a society of things recorded a pending hands act as left undone: the world's owner asked for another, said after 'because'."
     },
     {
       "key": "outcome.picked_up",

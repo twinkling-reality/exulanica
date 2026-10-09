@@ -33,6 +33,7 @@ from exulanica.world.society_action_repository import SocietyActionRepository
 from exulanica.world.society_actions import (
     action_goal_policies,
     append_action_events,
+    applied_hands,
     validate_action_request,
 )
 from exulanica.world.society_decisions import validate_decision_receipt
@@ -819,6 +820,7 @@ class SocietyRepository:
                         events,
                         pending,
                         decisions=consumed_receipts(receipts, decided),
+                        asked=applied_hands(list(requests), action_dispositions),
                     )
             else:
                 raise UnknownSocietyEngine(f"unsupported society engine {row['engine_version']!r}")
@@ -1314,6 +1316,7 @@ class SocietyRepository:
                             events,
                             [each.crossing for each in taken],
                             decisions=consumed_receipts(receipts, decided),
+                            asked=applied_hands(requests, action_dispositions),
                         )
                         if list(crossed) != [each.bound for each in taken]:
                             raise ValueError("society crossing replay mismatch")

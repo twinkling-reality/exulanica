@@ -819,7 +819,9 @@ The authenticated base route is
 
 - `POST` accepts exactly an idempotency key, base tick/state digest, synthetic subject ID and
   either `{kind: "go_to", target_id}` or
-  `{kind: "perform", target_id, affordance: "visit" | "rest"}`;
+  `{kind: "perform", target_id, affordance: "visit" | "rest"}`, or, in a society of things
+  running the hands module, `{kind: "hands", ability: "pick_up" | "put_down" | "give" | "take",
+  thing_id, with_id}` (see below);
 - `GET` returns newest-first authorized request envelopes; and
 - `GET /{request_id}` returns one request and its pending or consumed status.
 
@@ -834,6 +836,26 @@ request to the same rule about the person (`society_person_may_be_directed`, mig
 already is, part way through a stay there, is refused `inhabitant_already_there`, which the page
 says in words: ending the stay would only begin it again. Exact retries return the existing
 envelope; changed reuse or stale bases fail without another write.
+
+A hands request is recorded as `exulanica.society-action-request/v2`, read beside v1: v1's fields
+without `target`, its thing in the table's `target_id` (migration 0170). It is taken only by the
+rule a v1 request is taken by, and only for an act the being is offered on the state the minute
+starts from, over the hands module's whole approach distance ([things
+contract](things-contract.md)), checked when it is made and again by the minute that consumes it: a
+society that does not run the hands module refuses it `act_not_offered`, its thing or the being it
+names gone `thing_gone`, a pick-up or a take of a thing a visitor still here brought
+`belongs_to_visitor` (only that visitor hands it over), and anything else the module does not offer
+`act_not_offered`. At its minute it walks the being, or holds it where it stands within reach, by
+the goal policy a decider's chosen act takes, marked as the owner's: the walk to stand within reach
+records a request's reason (`remembered_target_selected`) and the wait `validated_user_wait`, never
+a model's; a stay the request ends or a blocked goal gives way to the walk, as it does to a request
+for a place. The things phase does the act once the being stands within reach, recorded with the
+reason `asked_to_<ability>`; an act that no longer holds is dropped `thing_gone` or `out_of_reach`.
+An asked act the being's decider replaces with a hands act of its own is recorded as left undone
+(`hands_missed`, `chose_otherwise`), and so is a pending act a request replaces (`asked_otherwise`);
+a `hands_missed` for an asked act states `asked`. Its `user_action_requested` event states `target`
+null and the act asked. As every direct request does, an applied one sets aside the being's
+decider's answer for that minute (`person_asked_directly`).
 
 Recording a request does not advance society time. The next normal deterministic step consumes
 ordered pending requests through the planner's goal-policy seam. `go_to` constrains the next goal
@@ -1474,14 +1496,14 @@ a generated town (`creates` does not name it, so a new world's society stays v2 
 world made from a world kind is lived in by the living society only, and refuses it. The route makes
 one only on a host that sets `EXULANICA_SOCIETY_OF_THINGS` on, and refuses it by name elsewhere
 (`society_engine_not_offered`). Its people walk, choose, stay and talk by the purposeful planner's
-rules, use their hands where a decider chooses (below) and follow nobody yet. Each of them names its
-kind by key, version and digest, and how it came: `populated` (the people its ground's population
-brings, the purposeful genesis's own people with the same names and draws, of the kind the ground's
-catalog entry names, `population_kind`), `placed` (a being the world's author placed in the version)
-or `crossed` (a visitor from an outside program). At genesis the author's beings are seated first,
-each at the open node nearest where it was placed, and only then does anybody of the population
-whose starting node one took step to the open node nearest it, so a composed scene holds from its
-first minute.
+rules, use their hands where a decider chooses or the world's owner asks (below) and follow nobody
+yet. Each of them names its kind by key, version and digest, and how it came: `populated` (the
+people its ground's population brings, the purposeful genesis's own people with the same names and
+draws, of the kind the ground's catalog entry names, `population_kind`), `placed` (a being the
+world's author placed in the version) or `crossed` (a visitor from an outside program). At genesis
+the author's beings are seated first, each at the open node nearest where it was placed, and only
+then does anybody of the population whose starting node one took step to the open node nearest it,
+so a composed scene holds from its first minute.
 
 **Its input carries the things its author placed.** It reads
 `exulanica.society-input/authored-ground-v5` (migration 0151): the fourth profile's projection, at
@@ -1589,14 +1611,15 @@ first, unchanged, and every event they record names v7; then the things phase:
   (`thing_departed`, `decider_lost`), taking what it carries home to the program that sent it. A
   program's answer refused for its line (`line_out_of_bounds`) is an answer, never a quiet minute;
 * where the society runs the hands module, what each being's hands do, in the order of the beings'
-  numbers. A hands act a decider chose (picking a thing up, putting it down, giving it to a being,
-  taking it from one) is done in the minute the being stands within the module's reach (1,500 mm)
+  numbers. A hands act a decider chose or the world's owner asked for by a direct request (picking
+  a thing up, putting it down, giving it to a being, taking it from one) is done in the minute the being stands within the module's reach (1,500 mm)
   of the thing, or within the hand-over distance of the other being: the reach, or the walking
   graph's longest step between two joined nodes where that is farther (2,000 mm on the lattice), so
   beings on neighbouring nodes can always hand over. A thing picked up or taken goes into the
   actor's free socket that fits it, one given into the other being's, and one put down rests where
   the actor stands. Each is recorded (`picked_up`, `put_down`, `gave`, `took`, reason
-  `chose_to_<ability>`) naming the thing, the other being and the socket. An act is dropped
+  `chose_to_<ability>`, or `asked_to_<ability>` for an act asked for) naming the thing, the other
+  being and the socket. An act is dropped
   (`hands_missed`) when the thing or the other being is gone (`thing_gone`) or the module's three
   minutes of walking pass first (`out_of_reach`). A hands act takes no line, and the routine never
   chooses one;
@@ -1712,7 +1735,8 @@ wrote it, its `model`, the line held to the line rule); in such a society a bein
 once it said a line (the last as many as it keeps of what it heard, each `{tick, to, to_name,
 to_kind, line}`), so its decider is shown what it already said. A visitor its program decides for states
 `quiet_minutes` only while that program has been quiet, and a being states `hands` only while a
-hands act its decider chose waits to be done (`{ability, thing, with, since}`). A society states
+hands act its decider chose or the world's owner asked for waits to be done (`{ability, thing, with,
+since}`, with `asked` true for one asked for). A society states
 `modules` only where its first input recorded them.
 
 It runs no experiment, and its people are not sent away. A comparison of models runs an hour of it

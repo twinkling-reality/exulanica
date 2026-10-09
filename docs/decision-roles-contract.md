@@ -180,7 +180,7 @@ A **decider** is what chooses a subject's next action. Its descriptor, `exulanic
 | --- | --- |
 | `{"kind": "routine"}` | the world's own rules |
 | `{"kind": "model", "provider", "model_id"}` | an open model the manifest declares |
-| `{"kind": "person"}` | the world's owner, through a direct request, which supersedes any bound decider's answer in its minute and is never a binding of its own |
+| `{"kind": "person"}` | the world's owner, through a direct request (a place to go to or use, or in a society running the hands module a hands act), which supersedes any bound decider's answer in its minute and is never a binding of its own |
 | `{"kind": "external", "bridge", "grant_id"}` | an outside program, by its bridge's key, under a grant the world's owner issued; which game, adapter version and mapping file it answers with are the grant's and each receipt's |
 
 A subject's decider is the latest choice naming it, and a society with no choice is run by its
@@ -622,7 +622,7 @@ decides for each, with no model, what it does (`model_goal_policies` in
 | --- | --- | --- |
 | Not accepted | its status: `rejected`, `unavailable` or `stale` | the receipt's own; the routine decides that turn |
 | Accepted, but asked over another state, input or branch, or for somebody no longer here | `stale` | `decision_context_changed` |
-| For a person whose own direct request this minute moves them | `superseded` | `person_asked_directly` |
+| For a person a direct request applied this minute decides for | `superseded` | `person_asked_directly` |
 | A second receipt for somebody already decided this minute | `superseded` | `subject_already_decided` |
 | A choice of a place, a wait or a stand that no longer holds when checked again | `rejected` | `action_in_progress`, `input_unavailable`, `target_disabled_or_removed`, `current_position_invalidated`, `known_target_unreachable`, `place_taken_this_minute` or `no_room_to_stand` |
 | A choice to talk that no longer holds | `rejected` | `partner_busy`, `partner_not_free` or `no_room_to_talk` |
