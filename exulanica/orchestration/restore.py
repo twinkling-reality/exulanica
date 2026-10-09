@@ -54,6 +54,7 @@ from exulanica.orchestration.installation.custody import (
     require_newest,
 )
 from exulanica.store.configured import purging_content_stores
+from exulanica.world.workspace_style_packs import carry_style_pack_withdrawal
 
 __all__ = ["WRITERS", "main"]
 
@@ -103,6 +104,7 @@ def _continue_place_name_chain(connection: psycopg.Connection[Any], row: Mapping
 WRITERS: Final[Mapping[str, Writer]] = {
     "retract": _retract,
     "place_name_chain": _continue_place_name_chain,
+    "style_pack_withdrawal": carry_style_pack_withdrawal,
 }
 
 

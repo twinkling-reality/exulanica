@@ -54,6 +54,7 @@ from exulanica.store.namespaces import (
     MATERIAL_NAMESPACE,
     WORKSPACE_ASSET_NAMESPACE,
     WORKSPACE_NAMESPACES,
+    WORKSPACE_STYLE_PACK_NAMESPACE,
 )
 
 if TYPE_CHECKING:
@@ -109,7 +110,8 @@ MAX_ATTEMPTS: Final = 8
 #: and says so rather than completing over bytes nobody destroyed. Workspace asset targets name an
 #: admitted or prepared object's hash in the workspace's own asset namespace (migration 0126), on
 #: the same terms. Look targets name a container's hash in the workspace's own looks namespace
-#: (migration 0172), on the same terms again.
+#: (migration 0172), on the same terms again. Workspace style pack targets name a file's hash in
+#: its own style pack namespace (migration 0173), on the same terms.
 DESTROYABLE_KINDS: Final = (
     "blob",
     "artifact",
@@ -117,6 +119,7 @@ DESTROYABLE_KINDS: Final = (
     "material_bake",
     "workspace_asset",
     "look",
+    "workspace_style_pack",
 )
 
 #: The namespace each stored kind's bytes live in (:mod:`exulanica.store.namespaces`); in a
@@ -130,6 +133,7 @@ STORED_KIND_NAMESPACES: Final[Mapping[str, str]] = MappingProxyType(
         "material_bake": MATERIAL_NAMESPACE,
         "workspace_asset": WORKSPACE_ASSET_NAMESPACE,
         "look": LOOK_NAMESPACE,
+        "workspace_style_pack": WORKSPACE_STYLE_PACK_NAMESPACE,
     }
 )
 
@@ -271,10 +275,12 @@ def claim_purge(
     """
     if not set(kinds) <= set(DESTROYABLE_KINDS):
         raise ValueError(f"cannot claim purge jobs of kinds {sorted(set(kinds))}")
-    if "look" in kinds and not _has_look_question(connection):
-        # A database one migration behind the code holds no look job and no look question, and a
-        # statement naming a function it lacks would fail every claim, not only a look's.
-        kinds = tuple(kind for kind in kinds if kind != "look")
+    # A database one migration behind the code holds neither the jobs nor the question of a kind a
+    # later migration brings, and a statement naming a function it lacks would fail every claim, not
+    # only that kind's: such a kind is left out until its migration runs.
+    missing = _questions_missing(connection, kinds)
+    if missing:
+        kinds = tuple(kind for kind in kinds if kind not in missing)
     # The bake arm is written only for a worker that may claim bakes. The function it calls
     # arrives in migration 0066, and a worker with no material namespaces also runs against a
     # schema from before it, as an upgrade does.
@@ -300,6 +306,14 @@ def claim_purge(
         if "look" in kinds
         else ""
     )
+    # And for a workspace's own style packs, whose function arrives in migration 0173.
+    style_packs = (
+        "     and (pj.target_kind <> 'workspace_style_pack' or "
+        "       workspace_style_pack_purge_is_authorized(pj.workspace_id, pj.tombstone_id, "
+        "                                                pj.target_ref)) "
+        if "workspace_style_pack" in kinds
+        else ""
+    )
     row = connection.execute(
         "update purge_job set state = 'running', attempts = attempts + 1, "
         "  attempted_at = now(), last_error = null "
@@ -313,6 +327,7 @@ def claim_purge(
         + bakes
         + assets
         + looks
+        + style_packs
         + "     and pj.attempts < %s "
         "     and (pj.state = 'queued' "
         "          or (pj.state in ('skipped', 'failed', 'running') "
@@ -346,12 +361,30 @@ def claim_purge(
     )
 
 
-def _has_look_question(connection: psycopg.Connection) -> bool:
-    """Whether the schema holds ``look_purge_is_authorized`` (migration 0172)."""
-    row = connection.execute(
-        "select to_regprocedure('look_purge_is_authorized(uuid,uuid,text)') is not null as present"
-    ).fetchone()
-    return bool(row and row["present"])
+#: The destroy question each kind's claim asks where a later migration brings it, by signature. A
+#: look's is ``look_purge_is_authorized`` (migration 0172).
+#: A workspace style pack's is ``workspace_style_pack_purge_is_authorized`` (migration 0173).
+_LATER_QUESTIONS: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "look": "look_purge_is_authorized(uuid,uuid,text)",
+        "workspace_style_pack": "workspace_style_pack_purge_is_authorized(uuid,uuid,text)",
+    }
+)
+
+
+def _questions_missing(connection: psycopg.Connection, kinds: tuple[str, ...]) -> frozenset[str]:
+    """The kinds among ``kinds`` whose question this schema does not hold yet."""
+    missing = set()
+    for kind in kinds:
+        signature = _LATER_QUESTIONS.get(kind)
+        if signature is None:
+            continue
+        row = connection.execute(
+            "select to_regprocedure(%s) is not null as present", (signature,)
+        ).fetchone()
+        if not (row and row["present"]):
+            missing.add(kind)
+    return frozenset(missing)
 
 
 def finish_purge(
@@ -425,6 +458,13 @@ def mark_purged(connection: psycopg.Connection, target: PurgeTarget) -> None:
     if target.target_kind == "look":
         connection.execute(
             "update look_object set purged_at = now() "
+            "where workspace_id = %s and content_sha256 = %s and purged_at is null",
+            (target.workspace_id, target.target_ref),
+        )
+        return
+    if target.target_kind == "workspace_style_pack":
+        connection.execute(
+            "update workspace_style_pack_blob set purged_at = now() "
             "where workspace_id = %s and content_sha256 = %s and purged_at is null",
             (target.workspace_id, target.target_ref),
         )

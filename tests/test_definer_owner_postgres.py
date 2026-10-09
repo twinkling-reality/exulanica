@@ -63,7 +63,8 @@ TABLE_PRIVILEGES = {
     "material_recipe": {"SELECT"},
     "material_recipe_source": {"SELECT"},
     "person_derivative_dependency": {"SELECT"},
-    # The erasure (0172) enqueues an erased creature's containers on its creature tombstone.
+    # The erasure (0172) enqueues an erased creature's containers on its creature tombstone, and
+    # a workspace tombstone its style pack files.
     "purge_job": {"INSERT"},
     "restore_control": {"SELECT"},
     "saved_world_source_attachment_operation": {"SELECT"},
@@ -89,6 +90,14 @@ TABLE_PRIVILEGES = {
     "world_project_share": {"SELECT", "UPDATE"},
     # reference_lookup_clear_queries reads a workspace's search records.
     "reference_lookup": {"SELECT"},
+    "installation_style_pack_day": {"SELECT", "INSERT", "UPDATE"},
+    "installation_style_pack_total": {"SELECT", "INSERT", "UPDATE"},
+    "workspace_style_pack_attempt_day": {"SELECT", "INSERT", "UPDATE"},
+    "workspace_style_pack_blob": {"SELECT"},
+    "workspace_style_pack_file": {"SELECT", "UPDATE"},
+    "workspace_style_pack_preparation": {"SELECT", "UPDATE"},
+    "workspace_style_pack_publish_request": {"SELECT", "UPDATE"},
+    "workspace_style_pack_version": {"SELECT", "UPDATE"},
 }
 
 #: Single columns the owner may reach beyond its table privileges: the search query that
@@ -132,6 +141,11 @@ DEFINERS = {
             "tg_world_project_item_erases_on_withdrawal()",
             "tg_world_project_withdraws_its_items()",
             "workspace_asset_purge_is_authorized(uuid,uuid,text)",
+            "style_pack_attempt(integer,integer)",
+            "style_pack_installation_bytes_admit(bigint,bigint)",
+            "tg_installation_style_pack_total()",
+            "tg_workspace_style_pack_purge_on_tombstone()",
+            "workspace_style_pack_purge_is_authorized(uuid,uuid,text)",
         ),
     }.items()
     for signature in signatures
@@ -188,9 +202,9 @@ def test_every_definer_belongs_to_the_login_less_owner_and_the_check_passes(admi
     definers = _definers(admin)
     # 0044, 0066, 0090, 0107, 0124, 0126, 0127, 0139, 0144, 0149 (door_prune, whose body 0157
     # replaced), 0155 and the search query retention migration (reference_lookup_clear_queries)
-    # define 23, and the migration that erases a drafted creature whole three more: these 26. A
-    # create or replace that drops SECURITY DEFINER leaves this set, so it fails
-    # here.
+    # define 23, the migration that erases a drafted creature whole three more, and the migration
+    # that keeps a workspace's own style packs five more: these 31. A create or replace that drops
+    # SECURITY DEFINER leaves this set, so it fails here.
     assert set(definers) == set(DEFINERS), definers
     assert {owner for owner in definers.values()} == {DEFINER_ROLE}, definers
     schema = admin.execute("select current_schema() s").fetchone()["s"]

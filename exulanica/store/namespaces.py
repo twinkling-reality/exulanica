@@ -42,12 +42,14 @@ __all__ = [
     "TILE_NAMESPACE",
     "WORKSPACE_ASSET_NAMESPACE",
     "WORKSPACE_NAMESPACES",
+    "WORKSPACE_STYLE_PACK_NAMESPACE",
     "LocalWorkspaceStores",
     "WorkspaceStores",
     "look_lock_key",
     "material_stores",
     "tile_store",
     "workspace_asset_lock_key",
+    "workspace_style_pack_write_key",
 ]
 
 #: Where the shared, content-addressed evidence store lives under the data directory.
@@ -66,6 +68,9 @@ WORKSPACE_ASSET_NAMESPACE: Final = "workspace-assets"
 #: sketch, a sculpted look and an imported traveller's look. One namespace per workspace, so a
 #: look is served only to the workspace that holds its row.
 LOOK_NAMESPACE: Final = "looks"
+#: Where each workspace's own style packs' files live (migration 0173): one namespace per workspace,
+#: apart from its assets, so each namespace's inventory accounts for exactly its own bytes.
+WORKSPACE_STYLE_PACK_NAMESPACE: Final = "workspace-style-packs"
 
 #: The namespaces holding one store for every workspace, in the order they are listed.
 SHARED_NAMESPACES: Final[tuple[str, ...]] = (BLOB_NAMESPACE, TILE_NAMESPACE)
@@ -74,6 +79,7 @@ WORKSPACE_NAMESPACES: Final[tuple[str, ...]] = (
     MATERIAL_NAMESPACE,
     WORKSPACE_ASSET_NAMESPACE,
     LOOK_NAMESPACE,
+    WORKSPACE_STYLE_PACK_NAMESPACE,
 )
 
 
@@ -146,6 +152,16 @@ def look_lock_key(workspace_id: uuid.UUID, digest: str) -> str:
     container until the rows naming it commit, and the purger takes it before destroying one.
     """
     return f"look:{workspace_id}:{digest}"
+
+
+def workspace_style_pack_write_key(workspace_id: uuid.UUID) -> str:
+    """The advisory lock key one workspace's style pack writes hold: an admission's rows and bytes,
+    a version becoming ready, and the purger's destruction of any of its style pack objects.
+
+    One key per workspace rather than one per object, so an admission of up to 513 objects holds
+    one lock. Always taken before the workspace's lifecycle lock and before the asset read lock.
+    """
+    return f"workspace-style-packs:{workspace_id}"
 
 
 def tile_store(data_dir: str | os.PathLike[str]) -> LocalContentAddressedStore:

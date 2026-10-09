@@ -41,9 +41,11 @@ import uuid
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import IO, Any, Final, TypeVar
 
 import psycopg
+from psycopg import sql
 from psycopg.types.json import Jsonb
 
 from exulanica.canonical import canonical_json
@@ -60,6 +62,7 @@ __all__ = [
     "DETERMINISTIC_FAILURES",
     "INPUT_KINDS",
     "MEDIA_TYPE",
+    "OWN_CONTENT_INVENTORIES",
     "RECEIPT_PROFILE",
     "RETAINED_BYTES_BOUNDS",
     "RETAINED_BYTES_SETTING",
@@ -83,6 +86,7 @@ __all__ = [
     "preparation_key",
     "queues_a_run",
     "refusals",
+    "retained_bytes_held",
     "retained_bytes_limit",
     "retained_bytes_refusal",
     "retrying",
@@ -175,33 +179,98 @@ def retained_bytes_limit(environ: Mapping[str, str] | None = None) -> int:
     return int(text)
 
 
+#: The inventories of a person's own content in a workspace, each in its own namespace: admitted
+#: assets and their prepared outputs (migration 0126), and style pack files (migration 0173). One
+#: retained-bytes limit holds them together.
+OWN_CONTENT_INVENTORIES: Final[Mapping[str, str]] = MappingProxyType(
+    {"assets": "workspace_asset_blob", "style_packs": "workspace_style_pack_blob"}
+)
+
+
+def retained_bytes_held(connection: psycopg.Connection, workspace_id: uuid.UUID) -> int:
+    """Every unpurged byte of the workspace's own content, across every inventory, and every
+    unerased style pack version's documents, withdrawn ones included. Asked under the
+    workspace's lifecycle lock by whoever records more."""
+    held = 0
+    for table in OWN_CONTENT_INVENTORIES.values():
+        exists = connection.execute(
+            "select to_regclass(%s) is not null as present", (table,)
+        ).fetchone()
+        if exists is None or not exists["present"]:
+            continue
+        row = connection.execute(
+            sql.SQL(
+                "select coalesce(sum(byte_size), 0) as held from {} "
+                "where workspace_id = %s and purged_at is null"
+            ).format(sql.Identifier(table)),
+            (workspace_id,),
+        ).fetchone()
+        held += 0 if row is None else int(row["held"])
+    return held + _style_pack_documents_held(connection, workspace_id)
+
+
+def _style_pack_documents_held(connection: psycopg.Connection, workspace_id: uuid.UUID) -> int:
+    """Every unerased style pack version's documents, which the database keeps until the
+    workspace is erased, withdrawn versions included."""
+    versions = connection.execute(
+        "select to_regclass('workspace_style_pack_version') is not null as present"
+    ).fetchone()
+    if versions is None or not versions["present"]:
+        return 0
+    row = connection.execute(
+        "select coalesce(sum(documents_byte_size), 0) as held "
+        "from workspace_style_pack_version where workspace_id = %s and erased_at is null",
+        (workspace_id,),
+    ).fetchone()
+    return 0 if row is None else int(row["held"])
+
+
 def retained_bytes_refusal(
     connection: psycopg.Connection,
     workspace_id: uuid.UUID,
     digest: str,
     byte_size: int,
     limit: int,
+    *,
+    inventory: str = "assets",
 ) -> str | None:
     """Why recording these bytes would cross the workspace's retained-bytes limit, or None.
 
-    Every unpurged object in the namespace counts, withdrawn admissions included. Bytes the
-    namespace already holds add nothing. Asked under the workspace's lifecycle lock, which every
-    record takes, so two records cannot both fit the last room.
+    Every unpurged object in every inventory of the workspace's own content counts, withdrawn ones
+    included, and every unerased style pack version's documents. Bytes the receiving inventory
+    (``inventory``, a key of :data:`OWN_CONTENT_INVENTORIES`) already holds add nothing; bytes
+    another inventory holds do, since each namespace keeps its own copy. Asked under the workspace's
+    lifecycle lock, which every record takes, so two records cannot both fit the last room.
     """
-    row = connection.execute(
-        "select coalesce(sum(byte_size) filter (where content_sha256 <> %s), 0) as held, "
-        "  bool_or(content_sha256 = %s) as present "
-        "from workspace_asset_blob where workspace_id = %s and purged_at is null",
-        (digest, digest, workspace_id),
-    ).fetchone()
-    if row is None or row["present"]:
-        return None
-    if int(row["held"]) + byte_size <= limit:
+    receiving = OWN_CONTENT_INVENTORIES[inventory]
+    held = 0
+    for table in OWN_CONTENT_INVENTORIES.values():
+        exists = connection.execute(
+            "select to_regclass(%s) is not null as present", (table,)
+        ).fetchone()
+        if exists is None or not exists["present"]:
+            continue
+        row = connection.execute(
+            sql.SQL(
+                "select coalesce(sum(byte_size) filter (where content_sha256 <> %s), 0) as held, "
+                "  coalesce(bool_or(content_sha256 = %s), false) as present "
+                "from {} where workspace_id = %s and purged_at is null"
+            ).format(sql.Identifier(table)),
+            (digest, digest, workspace_id),
+        ).fetchone()
+        if row is None:
+            continue
+        if table == receiving and row["present"]:
+            return None
+        held += int(row["held"]) + (byte_size if row["present"] else 0)
+    held += _style_pack_documents_held(connection, workspace_id)
+    if held + byte_size <= limit:
         return None
     return (
-        f"the workspace's assets would hold {int(row['held']) + byte_size} bytes, over its "
-        f"retained-bytes limit of {limit} bytes (admitted and prepared, withdrawn ones included "
-        "until the workspace is erased)"
+        f"the workspace's own content would hold {held + byte_size} bytes, over its "
+        f"retained-bytes limit of {limit} bytes (admitted and prepared assets, style pack files "
+        "and style pack versions' documents, withdrawn ones included until the workspace is "
+        "erased)"
     )
 
 

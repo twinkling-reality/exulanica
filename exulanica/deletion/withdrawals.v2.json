@@ -271,6 +271,18 @@
       "columns": ["revoked_at"],
       "withdrawn": {"column": "revoked_at", "is": "not null"},
       "workspace": "workspace_id"
+    },
+    {
+      "kind": "workspace_style_pack",
+      "table": "workspace_style_pack_withdrawal",
+      "shape": "event",
+      "note": "A creator withdrawing a version of their own style pack (migration 0173): no world wears it and its files are not served again. The row is the whole withdrawal. A restore writes it again when the restored database holds the version, so a version withdrawn after a backup does not come back. Replayed in withdrawn_at order, since a version is withdrawn only after the versions drawn on it, and by the product's writer, which first cancels as base_unavailable each version drawn on it that the restored database holds unfinished and unwithdrawn.",
+      "identity": ["workspace_id", "manifest_sha256"],
+      "withdrawn": {"column": "withdrawn_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "workspace_style_pack_version", "columns": ["workspace_id", "manifest_sha256"]},
+      "order": "withdrawn_at",
+      "writer": "style_pack_withdrawal"
     }
   ],
   "excluded": [
@@ -313,6 +325,10 @@
     {
       "table": "reference_request",
       "reason": "status 'withdrawn' is written by the triggers on a picture right's stop and on a tombstone (migration 0160), which replaying the right's withdrawal and the tombstone runs again, and by a job's finish under a stop, which a request restored as running meets when it reads its pictures again under the replayed stop."
+    },
+    {
+      "table": "workspace_style_pack_preparation",
+      "reason": "failure_class 'withdrawn' is written by the style pack withdrawal's own trigger, which replaying the withdrawal runs again."
     },
     {
       "table": "place_record_state_event",

@@ -185,6 +185,24 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
             "purge_job": frozenset(("INSERT",)),
         }
     ),
+    # A workspace's own style packs: the tombstone's erasure of their rows and its purge queue,
+    # the installation's byte total and the two upload attempt counters.
+    "0173": DefinerGrants(
+        tables={
+            name: frozenset(privileges)
+            for name, privileges in {
+                "installation_style_pack_day": ("SELECT", "INSERT", "UPDATE"),
+                "installation_style_pack_total": ("SELECT", "INSERT", "UPDATE"),
+                "purge_job": ("INSERT",),
+                "workspace_style_pack_attempt_day": ("SELECT", "INSERT", "UPDATE"),
+                "workspace_style_pack_blob": ("SELECT",),
+                "workspace_style_pack_file": ("SELECT", "UPDATE"),
+                "workspace_style_pack_preparation": ("SELECT", "UPDATE"),
+                "workspace_style_pack_publish_request": ("SELECT", "UPDATE"),
+                "workspace_style_pack_version": ("SELECT", "UPDATE"),
+            }.items()
+        },
+    ),
 }
 
 

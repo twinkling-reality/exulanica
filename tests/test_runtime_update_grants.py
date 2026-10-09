@@ -96,6 +96,11 @@ RUNTIME_UPDATES: dict[str, str] = {
         "lease; a request, a retry and a cancel move one under FOR NO KEY UPDATE; a withdrawal "
         "or a tombstone cancels one"
     ),
+    "workspace_style_pack_preparation": (
+        "a style pack's check is claimed, retaken after its lease, made ready or failed, and "
+        "asked again after an interruption (world/workspace_style_packs.py); a withdrawal or a "
+        "tombstone cancels one; migration 0173's guard refuses every other change"
+    ),
     "workspace_tile_quota": "tile use is counted against the quota (api/quotas.py)",
     "world_alternate_environment_instance": "an instance moves and is removed",
     "world_alternate_point_map_instance": (

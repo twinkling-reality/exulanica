@@ -90,6 +90,8 @@ __all__ = [
     "SPENDING_READ_FUNCTIONS",
     "SPENDING_RUNTIME_FUNCTIONS",
     "SPENDING_TABLES",
+    "STYLE_PACK_COUNTER_TABLES",
+    "STYLE_PACK_RUNTIME_FUNCTIONS",
     "RuntimeRoleUnsafe",
     "assert_runtime_role",
     "backup_role_gaps",
@@ -315,6 +317,32 @@ INSERT_ONLY_TABLES: Final = (
     # the purger writes; each refuses every update the runtime could make.
     "thing_erasure",
     "look_object",
+    # Migration 0173 appends a workspace's own style pack versions, their files, their withdrawals,
+    # their namespace inventory and their creators' publish requests; a workspace's erasure clears
+    # their uploader text in a definer run as exulanica_definer, and only the purger marks an
+    # object purged.
+    "workspace_style_pack_version",
+    "workspace_style_pack_file",
+    "workspace_style_pack_withdrawal",
+    "workspace_style_pack_blob",
+    "workspace_style_pack_publish_request",
+)
+
+#: Tables the runtime may read and never write (migration 0173): the style pack attempt counters
+#: and the installation's style pack byte total. Only the definer functions in
+#: :data:`STYLE_PACK_RUNTIME_FUNCTIONS`, the inventory's and the versions' trigger and a workspace
+#: tombstone's trigger write them, so no session can count itself below a bound or move the total.
+STYLE_PACK_COUNTER_TABLES: Final = (
+    "workspace_style_pack_attempt_day",
+    "installation_style_pack_day",
+    "installation_style_pack_total",
+)
+
+#: What the runtime may ask of those counters (migration 0173): one upload attempt counted for its
+#: workspace and the installation, and whether the installation may take more style pack bytes.
+STYLE_PACK_RUNTIME_FUNCTIONS: Final = (
+    ("style_pack_attempt", "integer,integer"),
+    ("style_pack_installation_bytes_admit", "bigint,bigint"),
 )
 
 #: Tables the runtime may change only in the named columns: provisioning takes the table's UPDATE
@@ -483,6 +511,7 @@ _PURGE_WORKSPACE_READS: Final = {
     # Whether a look the workspace still holds names a container a creature's erasure enqueued:
     # the same creature kept again holds the same file, and its job is skipped (worker.py).
     "look_version": ("workspace_id", "container_sha256"),
+    "workspace_style_pack_blob": ("workspace_id", "content_sha256", "purged_at"),
     "scene_training_artifact": ("workspace_id", "artifact_id", "right_id"),
     "scene_training_right": ("workspace_id", "right_id", "withdrawn_at"),
 }
@@ -490,15 +519,18 @@ _PURGE_WORKSPACE_WRITES: Final = {
     "material_bake": ("purged_at",),
     "workspace_asset_blob": ("purged_at",),
     "look_object": ("purged_at",),
+    "workspace_style_pack_blob": ("purged_at",),
 }
 #: The destroy questions this role may ask, each revoked from PUBLIC by the migration that added
 #: it: a bake's in 0066, a withdrawn training right's in 0082, a workspace asset object's in 0126,
 #: a looks object's in 0172.
+#: Also a workspace style pack file's in 0173.
 _PURGE_FUNCTIONS: Final = (
     ("material_bake_purge_is_authorized", "uuid,uuid,bytea"),
     ("scene_training_withdrawal_releases_artifact", "uuid,bytea"),
     ("workspace_asset_purge_is_authorized", "uuid,uuid,text"),
     ("look_purge_is_authorized", "uuid,uuid,text"),
+    ("workspace_style_pack_purge_is_authorized", "uuid,uuid,text"),
 )
 
 #: What the purger may write on the queue and on the tombstone. Exactly the columns the worker
@@ -610,6 +642,12 @@ def provision_runtime_role(
             connection.execute(
                 sql.SQL("revoke all on {} from {}").format(sql.Identifier(table), role_name)
             )
+        for table in sorted(_present_tables(connection, STYLE_PACK_COUNTER_TABLES)):
+            connection.execute(
+                sql.SQL("revoke insert, update, delete, truncate on {} from {}").format(
+                    sql.Identifier(table), role_name
+                )
+            )
         _grant_functions(connection, schema, role_name, SPENDING_READ_FUNCTIONS)
         if read_only:
             for table in sorted(_present_tables(connection, READ_ONLY_WITHHELD_TABLES)):
@@ -620,6 +658,7 @@ def provision_runtime_role(
             _grant_functions(connection, schema, role_name, SPENDING_RUNTIME_FUNCTIONS)
             _grant_functions(connection, schema, role_name, DOOR_RUNTIME_FUNCTIONS)
             _grant_functions(connection, schema, role_name, REFERENCE_RUNTIME_FUNCTIONS)
+            _grant_functions(connection, schema, role_name, STYLE_PACK_RUNTIME_FUNCTIONS)
             connection.execute(
                 sql.SQL("grant usage, select on all sequences in schema {} to {}").format(
                     schema, role_name

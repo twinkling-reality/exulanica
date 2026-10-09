@@ -185,6 +185,10 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     "spending_event": "per-deployment spending ledger",
     "spending_guest_policy": "per-deployment figures a guest workspace is granted",
     "spending_guest_policy_day": "per-deployment count of a guest policy's grants in a day",
+    # Migration 0173: the installation's style pack upload attempts in a day and its retained style
+    # pack bytes, each a count of this deployment's own and nothing of a workspace's content.
+    "installation_style_pack_day": "per-deployment count of a day's style pack upload attempts",
+    "installation_style_pack_total": "per-deployment total of retained style pack bytes",
     # The host publishes its character catalogs; a destination publishes its own, and a saved look
     # it cannot resolve there reads as unavailable rather than borrowing the source's catalog.
     "character_catalog_publication": "host-admin character catalog publication, per deployment",
@@ -901,6 +905,31 @@ def _refuse_held_things(connection: psycopg.Connection, workspace_id: uuid.UUID)
         )
 
 
+def _refuse_private_workspace_style_packs(
+    connection: psycopg.Connection, workspace_id: uuid.UUID
+) -> None:
+    """A workspace holding any style pack version of its own cannot be seeded, files or none.
+
+    A workspace's style pack is worn in its own worlds and nowhere else (migration 0173), and its
+    files live in that workspace's own namespace, outside the content store a seed copies from, so
+    its rows alone would restore as packs whose files are missing. Refused as an asset is.
+    """
+    present = connection.execute(
+        "select to_regclass('workspace_style_pack_version') is not null as present"
+    )
+    if not present.fetchone()["present"]:
+        return
+    held = connection.execute(
+        "select count(*) as n from workspace_style_pack_version where workspace_id = %s",
+        (workspace_id,),
+    ).fetchone()
+    if held["n"]:
+        raise SeedRefused(
+            f"workspace {workspace_id} holds {held['n']} style pack version(s), which are worn "
+            "only in that workspace's worlds and never leave it; a seed cannot carry them"
+        )
+
+
 def export_seed(
     connection: psycopg.Connection,
     store: ContentAddressedStore,
@@ -936,6 +965,7 @@ def export_seed(
     _refuse_private_bakes(connection, workspace_id)
     _refuse_private_workspace_assets(connection, workspace_id)
     _refuse_held_things(connection, workspace_id)
+    _refuse_private_workspace_style_packs(connection, workspace_id)
 
     buckets = classify_tables(connection)
     exported = list(buckets["workspace"]) + list(buckets["reached"])

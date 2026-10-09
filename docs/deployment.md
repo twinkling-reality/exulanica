@@ -185,6 +185,8 @@ With `EXULANICA_STORE_KIND` unset or `local`, the store is directories under `EX
   or a traveller's admitted look (`exulanica/world/thing_store.py`); never shared between
   workspaces, served only through a look the workspace holds, and destroyed by `exulanica-purge`
   when the workspace is erased, or when the creature whose looks name it is erased.
+- `workspace-style-packs/<workspace>/`: the files of each workspace's own style packs (migration
+  0173); never shared between workspaces, and erased only with the workspace.
 
 `<workspace>` is the workspace id as 32 lower-case hex digits. These names are stable: each is a
 directory here, a segment of every object key in 4.2 and the name a backup set records, so renaming

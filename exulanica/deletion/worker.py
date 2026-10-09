@@ -34,6 +34,9 @@ namespace when the workspace is erased, and a creature's when the creature is, a
 ``look_purge_is_authorized``; a container a look still held names (the same creature kept again)
 is skipped and comes back, as a blob another capture holds does. A worker built without
 ``look_stores`` claims none of them.
+**A workspace's own style packs' files** (migration 0173) go the same way from theirs, asked of
+``workspace_style_pack_purge_is_authorized``, under the workspace's style pack write key, and a
+worker built without ``workspace_style_pack_stores`` claims none of them.
 
 **A withdrawn training right is destroyed here too, and it is the one erasure whose subject stays
 alive.** Migration 0082 writes a ``scene_training`` tombstone when an account holder withdraws the
@@ -85,7 +88,12 @@ from exulanica.db.session import Database
 from exulanica.deletion import queue
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore, PurgeAuthorization, privileged_purger
-from exulanica.store.namespaces import WorkspaceStores, look_lock_key, workspace_asset_lock_key
+from exulanica.store.namespaces import (
+    WorkspaceStores,
+    look_lock_key,
+    workspace_asset_lock_key,
+    workspace_style_pack_write_key,
+)
 
 if TYPE_CHECKING:
     from exulanica.store.configured import ContentStores
@@ -141,18 +149,21 @@ class PurgeWorker:
         material_stores: WorkspaceStores | None = None,
         workspace_asset_stores: WorkspaceStores | None = None,
         look_stores: WorkspaceStores | None = None,
+        workspace_style_pack_stores: WorkspaceStores | None = None,
     ) -> None:
         self._database = database
         self._store = store
         self._material_stores = material_stores
         self._workspace_asset_stores = workspace_asset_stores
         self._look_stores = look_stores
+        self._workspace_style_pack_stores = workspace_style_pack_stores
         self._kinds = tuple(
             kind
             for kind in queue.DESTROYABLE_KINDS
             if (kind != "material_bake" or material_stores is not None)
             and (kind != "workspace_asset" or workspace_asset_stores is not None)
             and (kind != "look" or look_stores is not None)
+            and (kind != "workspace_style_pack" or workspace_style_pack_stores is not None)
         )
         self._workspaces = workspaces
         self._name = name
@@ -193,6 +204,7 @@ class PurgeWorker:
             material_stores=stores.materials,
             workspace_asset_stores=stores.workspace_assets,
             look_stores=stores.looks,
+            workspace_style_pack_stores=stores.workspace_style_packs,
         )
 
     # -- driving it ---------------------------------------------------------------------
@@ -323,6 +335,9 @@ class PurgeWorker:
             return
         if target.target_kind == "look":
             self._destroy_look(connection, target, outcome)
+            return
+        if target.target_kind == "workspace_style_pack":
+            self._destroy_workspace_style_pack(connection, target, outcome)
             return
         blob_id = BlobId.from_hex(target.target_ref)
         # The lock and the question share one transaction, so nothing can start holding these
@@ -511,6 +526,53 @@ class PurgeWorker:
             if store.exists(blob_id):
                 raise RuntimeError(
                     f"the looks namespace still holds {target.target_ref[:12]} after the purge"
+                )
+            if destroyed:
+                outcome.destroyed += 1
+            else:
+                outcome.already_absent += 1
+            queue.mark_purged(connection, target)
+            queue.finish_purge(
+                connection, target.workspace_id, purge_id=target.purge_id, state="done"
+            )
+
+    def _destroy_workspace_style_pack(
+        self, connection: psycopg.Connection, target: queue.PurgeTarget, outcome: PurgeOutcome
+    ) -> None:
+        """A style pack file, from its workspace's style pack namespace, as an asset object goes.
+
+        The lock is the workspace's style pack write key, which an admission holds from recording
+        its objects until their bytes are written, so an object recorded just before its tombstone
+        is destroyed after it is written, never before.
+        """
+        stores = self._workspace_style_pack_stores
+        if stores is None:  # claim_purge was not given the kind; a job here is a programming error
+            raise RuntimeError("a style pack job reached a worker with no style pack namespaces")
+        blob_id = BlobId.from_hex(target.target_ref)
+        store = stores.for_workspace(target.workspace_id)
+        with connection.transaction():
+            connection.execute(
+                "select purge_lock_object(%s)",
+                (workspace_style_pack_write_key(target.workspace_id),),
+            )
+            row = connection.execute(
+                "select workspace_style_pack_purge_is_authorized(%s, %s, %s) as allowed",
+                (target.workspace_id, target.tombstone_id, target.target_ref),
+            ).fetchone()
+            if row is None or not row["allowed"]:
+                raise ValueError("the tombstone does not authorize this style pack purge")
+            purger = privileged_purger(
+                store,
+                PurgeAuthorization(
+                    tombstone_id=str(target.tombstone_id),
+                    actor=str(target.requested_by),
+                    reason=target.reason or "a tombstone asked for these bytes to be destroyed",
+                ),
+            )
+            destroyed = purger.purge(blob_id)
+            if store.exists(blob_id):
+                raise RuntimeError(
+                    f"the style pack namespace still holds {target.target_ref[:12]} after the purge"
                 )
             if destroyed:
                 outcome.destroyed += 1

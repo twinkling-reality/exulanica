@@ -67,6 +67,7 @@ from test_restore_replay_search_entries import commands as commands
 from test_scene_training_right import GPU, TRAINING_PURPOSE
 from test_search_entries_on_stop import ACCOUNT, _as_runtime, _authorize, _stop
 from test_search_entries_on_stop import indexed as indexed
+from test_workspace_style_packs_postgres import Packs, admitted
 
 pytestmark = pytest.mark.postgres
 
@@ -947,3 +948,120 @@ def test_a_place_name_withdrawal_the_backups_chain_has_passed_is_refused_by_name
     assert _place_name_state(named, "structured_extraction") != "withdrawn"
     with pytest.raises(RestoreRefused, match="pending"):
         verify_restore(purged.database(), marker)
+
+
+def test_a_style_pack_withdrawn_after_the_backup_stays_withdrawn(purged, commands, tmp_path):
+    packs = Packs(purged, tmp_path)
+    pack = admitted()
+    try:
+        packs.ready(pack)
+    finally:
+        packs.close()
+
+    def repository(connection):
+        return Packs.repository_on(connection, packs)
+
+    def current() -> bool:
+        with purged.database().session(purged.workspace_id) as connection:
+            row = connection.execute(
+                "select workspace_style_pack_wearable(%s, %s) as wearable",
+                (purged.workspace_id, pack.manifest_sha256),
+            ).fetchone()
+        return bool(row["wearable"])
+
+    def withdraw() -> None:
+        with packs.runtime.session(purged.workspace_id) as connection:
+            assert repository(connection).withdraw(pack.manifest_sha256)
+
+    assert not _through_a_restore(purged, tmp_path, withdraw=withdraw, current=current)
+
+
+def _wearable(purged, manifest_sha256: str) -> bool:
+    with purged.database().session(purged.workspace_id) as connection:
+        row = connection.execute(
+            "select workspace_style_pack_wearable(%s, %s) as wearable",
+            (purged.workspace_id, manifest_sha256),
+        ).fetchone()
+    return bool(row["wearable"])
+
+
+def _base_and_dependent(*, base_sorts_first: bool):
+    """A base pack and a pack drawn on it, chosen so their digests sort as asked: the restore
+    replays a kind's rows in an order of its own, and both orders must carry."""
+    from test_workspace_style_packs_postgres import admitted, base_of
+
+    for salt in range(64):
+        base = admitted("maker.barn", salt=str(salt))
+        dependent = admitted("maker.barn-night", salt=str(salt), base=base_of(base))
+        if (base.manifest_sha256 < dependent.manifest_sha256) == base_sorts_first:
+            return base, dependent
+    raise AssertionError("no salt gave the digest order asked for")
+
+
+@pytest.mark.parametrize("base_sorts_first", [True, False], ids=["base first", "dependent first"])
+def test_a_base_and_the_pack_drawn_on_it_withdrawn_after_the_backup_stay_withdrawn(
+    purged, commands, tmp_path, base_sorts_first
+):
+    base, dependent = _base_and_dependent(base_sorts_first=base_sorts_first)
+    packs = Packs(purged, tmp_path)
+    try:
+        packs.ready(base)
+        packs.ready(dependent)
+    finally:
+        packs.close()
+
+    def withdraw() -> None:
+        # The dependent first, as the guard requires of the product too.
+        with packs.runtime.session(purged.workspace_id) as connection:
+            repository = Packs.repository_on(connection, packs)
+            assert repository.withdraw(dependent.manifest_sha256)
+            assert repository.withdraw(base.manifest_sha256)
+
+    def current() -> bool:
+        return _wearable(purged, base.manifest_sha256) or _wearable(
+            purged, dependent.manifest_sha256
+        )
+
+    assert not _through_a_restore(purged, tmp_path, withdraw=withdraw, current=current)
+    withdrawn = purged.rows(
+        "select manifest_sha256 from workspace_style_pack_withdrawal order by manifest_sha256"
+    )
+    assert [row["manifest_sha256"] for row in withdrawn] == sorted(
+        [base.manifest_sha256, dependent.manifest_sha256]
+    )
+
+
+def test_a_base_withdrawn_after_its_dependent_was_refused_stays_withdrawn(
+    purged, commands, tmp_path
+):
+    base, dependent = _base_and_dependent(base_sorts_first=True)
+    packs = Packs(purged, tmp_path)
+    try:
+        packs.ready(base)
+        packs.repository().record(dependent)  # still waiting for its check at the backup
+    finally:
+        packs.close()
+
+    def withdraw() -> None:
+        with packs.runtime.session(purged.workspace_id) as connection:
+            repository = Packs.repository_on(connection, packs)
+            claimed = repository.claim("test-worker", 60)
+            assert claimed is not None and claimed[0] == dependent.manifest_sha256
+            repository.finish_failed(claimed[0], claimed[1], "refused", "a stray colour", {})
+            # A refused dependent does not hold its base, so the base may be withdrawn.
+            assert repository.withdraw(base.manifest_sha256)
+
+    assert not _through_a_restore(
+        purged,
+        tmp_path,
+        withdraw=withdraw,
+        current=lambda: _wearable(purged, base.manifest_sha256),
+    )
+    # The restored database held the dependent as waiting; the replay cancelled it, as its check
+    # would have ended had it run after the base was withdrawn.
+    [state] = purged.rows(
+        "select state, failure_class from workspace_style_pack_preparation "
+        "where manifest_sha256 = %s",
+        dependent.manifest_sha256,
+    )
+    assert (state["state"], state["failure_class"]) == ("cancelled", "base_unavailable")

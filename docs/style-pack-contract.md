@@ -10,8 +10,9 @@ the light and finish a preset becomes is the [render look](generated-tile-runtim
 Status: the manifest, both readers, the resolver, the fit rules, the piece budgets, the browser's
 reading of a palette piece, drawing a generated town in a pack (section 7), three authored packs
 (section 8), the committed library the host serves (section 9) and a world's appearance naming its
-pack (section 10) are built. A control for choosing a pack, a person's own packs (storing,
-uploading and downloading them) and drafting a pack with a model are planned and not built.
+pack (section 10) are built, as is the store of a creator's own packs in their workspace (section
+11). Uploading, checking, serving and downloading one, wearing it in a world, publishing one to the
+library, the page's upload control, and drafting a pack with a model are planned and not built.
 
 ## 1. In plain words
 
@@ -323,3 +324,60 @@ the timeout leaves the library default with no error. The fallback serves under 
 when the primary is withdrawn; its slowest calls in the measurement were longer than the primary's
 and are cut by it. Twenty descriptions over three packs do not establish how well the step reads
 other words or a larger library. The page does not show the offer yet.
+
+## 11. A workspace's own packs
+
+A creator's own pack is kept in their workspace and never becomes a library pack. One migration
+(`a_workspace_keeps_its_own_style_packs`) holds it; `exulanica/world/workspace_style_packs.py`
+records and reads it. No route admits one yet: the upload, the check that reads its pieces, the
+routes that serve and archive it, and wearing it in a world are planned and not built, so nothing
+reaches these tables except through the repository.
+
+| Part | What it holds |
+| --- | --- |
+| A version | Its canonical manifest and the creator's declaration, each with its digest; its pack id (never in the project's `exulanica.` namespace) and version; the declared rights (own work, under `LicenseRef-Exulanica-Own-Work`; or licensed work under `CC0-1.0`, or `CC-BY-4.0` with the attribution it came under); the base it is drawn on, a library version or one of the workspace's own; its files' count and bytes; its preview's digest; and the admission's receipt. Unique by manifest digest, and among live versions by pack id and version (`workspace_style_pack_version_identity`, a partial unique index over versions not erased). An erased version's pack id is derived from its digest under the reserved prefix `erased.`, which no live version's pack id or base, library or workspace, may take |
+| Its files | Every file the manifest lists, by path, digest, size and media type, in its order. The bytes live in the workspace's own `workspace-style-packs` namespace |
+| Its check | One per version: requested, running under a lease, then ready, failed or cancelled. A failure is `interrupted` (its time bound or its worker stopped it, and it may be asked again), `refused` (its pieces broke a rule, which the same bytes always will) or `base_unavailable`; cancelled is `withdrawn` or `deleted` |
+| Its withdrawal | The creator ending the version, once and for good |
+| A publish request | The creator asking for a ready version to join the shared library, with the licence they grant the project (`CC0-1.0`, or `CC-BY-4.0` with its attribution) and their statement. Only the version's creator may ask, only while it may be worn, and a licensed version passes on only the licence and attribution it came under. Only a host command publishes, and only on such a request |
+
+A world may wear a version, and its files may be served, only while `workspace_style_pack_wearable`
+says so: the version is the asking workspace's, its check is ready, neither it nor any of the
+workspace's versions in its base chain (at most eight deep: no version is drawn on a chain already
+that deep) is withdrawn, the workspace is not
+erased, and every file is still held. A version is recorded drawn only on a workspace base that may
+be worn then, and becomes ready only if its base chain may still be worn, so a base withdrawn while
+the check ran leaves the version failed as `base_unavailable` rather than serving the withdrawn
+base's files. A version another live version of the workspace is drawn on is not withdrawn: the
+refusal (`style_pack_is_a_base`) names the versions drawn on it.
+
+Bounds, each enforced by the schema or by the repository under the workspace's lifecycle lock:
+
+| Bound | Value |
+| --- | --- |
+| Live versions in a workspace (not withdrawn, not finally failed) | 16 |
+| Their bytes: files, and each version's manifest, declaration and receipt | 256 MiB |
+| A declaration, a receipt, a check's report | 64 KiB each |
+| Checks waiting or running in a workspace, a check asked again included | 4 |
+| A workspace's own content: assets, style pack files and every unerased version's documents together | `EXULANICA_WORKSPACE_ASSET_RETAINED_BYTES` ([workspace assets](workspace-asset-admission.md)), each namespace's bytes counted, withdrawn ones included until the workspace is erased; an asset's admission and preparation count the style pack documents as a style pack's recording counts the assets |
+| Upload attempts a UTC day | 32 a workspace and 512 the installation, counted by `style_pack_attempt`; an attempt the installation refuses still counts for its workspace, and a limit below one admits no attempt and counts none |
+| Every workspace's retained style pack bytes, files and documents | the installation's ceiling, checked by `style_pack_installation_bytes_admit` against a total the inventory's and the versions' trigger keeps and a workspace tombstone's trigger lowers by the documents it erases, under that total's row lock, so two uploads cannot both take the last room |
+
+The counters and the total are written only by those security-definer functions, the inventory's and
+the versions' trigger and a workspace tombstone's trigger, each run as `exulanica_definer`; the
+runtime role may read them and write none of them. A workspace's versions, files,
+withdrawals and inventory are insert-only for the runtime role, and each table is under row-level
+security by workspace.
+
+Withdrawal hides and does not erase: a withdrawn version stops being worn or served and its pending
+check is cancelled, and its bytes stay until the workspace is erased. A workspace tombstone cancels
+every check still to finish; clears everything the creator chose or wrote (both documents, the
+attribution, every file path, every check's message and report, every publish request's
+attribution and statement), replaces each pack id with one derived from its version's digest and the
+receipt with a fixed marker, keeping digests and sizes; and queues every file in the namespace for
+the purge (kind `workspace_style_pack`, authorized by `workspace_style_pack_purge_is_authorized`).
+The tombstone is complete only once each is destroyed. A restore writes a withdrawal again from its
+checkpoint, as every withdrawal in `exulanica/deletion/withdrawals.v2.json`, in the order the
+withdrawals were made, and first cancels as `base_unavailable` each unfinished version the restored
+database holds that is drawn on the one withdrawn, as its check would have ended. A judge seed
+refuses a workspace holding any style pack version, files or none, since they never leave it.

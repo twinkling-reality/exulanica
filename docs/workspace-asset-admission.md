@@ -65,7 +65,7 @@ with its unit in its name:
 | Texture side and total texels | 4,096 px and 16,777,216 |
 | Scene depth | 32 |
 | Placeable largest extent | 10 mm to 50,000 mm |
-| Retained bytes per workspace | 2 GiB unless configured (`EXULANICA_WORKSPACE_ASSET_RETAINED_BYTES`, 64 MiB to 1 TiB) |
+| Retained bytes per workspace | 2 GiB unless configured (`EXULANICA_WORKSPACE_ASSET_RETAINED_BYTES`, 64 MiB to 1 TiB), shared with the workspace's own style pack files ([style pack contract](style-pack-contract.md#11-a-workspaces-own-packs)) |
 
 A container that passes is admitted. Being admitted does not make it placeable: its preparation
 must also succeed and its prepared object must meet the placeable-object profile

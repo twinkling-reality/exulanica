@@ -324,9 +324,11 @@ def read_withdrawals(connection: psycopg.Connection[Any]) -> list[Carried]:
         order = kind.identity
         if kind.chained and kind.ends is not None and kind.order is not None:
             order = (*kind.ends.columns, kind.order, *kind.identity)
-        elif kind.shape == "column" and kind.order is not None:
+        elif kind.order is not None and not kind.chained:
             # Earliest first: a replayed withdrawal whose cascade reaches rows must find the rows
-            # an earlier withdrawal ended already ended, with that withdrawal's own values.
+            # an earlier withdrawal ended already ended, with that withdrawal's own values; and an
+            # event a guard orders against others (a style pack's base after the packs drawn on
+            # it) must be written in the order it was made.
             order = (kind.order, *kind.identity)
         rows = connection.execute(
             sql.SQL("select {} as row from {} t where {} order by {}").format(
