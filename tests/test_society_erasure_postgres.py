@@ -21,6 +21,7 @@ What is shown:
 
 from __future__ import annotations
 
+import gzip
 import re
 import time
 import uuid
@@ -29,13 +30,16 @@ import psycopg
 import pytest
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
 from exulanica.db.session import set_workspace
+from exulanica.migrations import migrations
 from exulanica.selection.validation import Session
 from exulanica.world.companion_memory import CompanionMemoryRepository, SimulationCitation
 from exulanica.world.repository import WorldStyleRepository
 from exulanica.world.society_controls import LEASE_SECONDS
+from exulanica.world.society_erasure import erase_society
 from exulanica.world.starter import AUTHORED_STARTER_REGION_ID
 from psycopg import sql
 
+import pg_harness
 import test_outside_deciders_postgres as outside
 import test_society_authored_world_postgres as authored
 import test_society_play_postgres as play
@@ -64,19 +68,36 @@ NAMING_NO_SOCIETY = frozenset(
 )
 
 
+def _readable(value: bytes) -> bytes:
+    """A bytea value as its words are: gunzipped where it is stored compressed (a comparison's
+    drawings and hours)."""
+    value = bytes(value)
+    return gzip.decompress(value) if value[:2] == b"\x1f\x8b" else value
+
+
 def _tables_holding(connection, needle: str) -> set[str]:
-    """Every table one of whose text or jsonb columns holds ``needle``, the catalog's columns."""
+    """Every table one of whose text, jsonb or bytea columns holds ``needle``, the catalog's
+    columns; a bytea value is read through gzip where it is stored compressed."""
     columns = connection.execute(
-        "select c.table_name, c.column_name from information_schema.columns c "
+        "select c.table_name, c.column_name, c.data_type from information_schema.columns c "
         "join information_schema.tables t on t.table_schema = c.table_schema "
         "and t.table_name = c.table_name and t.table_type = 'BASE TABLE' "
         "where c.table_schema = current_schema() "
-        "and c.data_type in ('text', 'jsonb', 'json', 'character varying')"
+        "and c.data_type in ('text', 'jsonb', 'json', 'character varying', 'bytea')"
     ).fetchall()
     assert len(columns) > 500, "the positive control: the catalog names the schema's columns"
     found = set()
     for row in columns:
         table, column = row["table_name"], row["column_name"]
+        if row["data_type"] == "bytea":
+            values = connection.execute(
+                sql.SQL("select {} as v from {} where {} is not null").format(
+                    sql.Identifier(column), sql.Identifier(table), sql.Identifier(column)
+                )
+            ).fetchall()
+            if any(needle.encode() in _readable(value["v"]) for value in values):
+                found.add(table)
+            continue
         held = connection.execute(
             sql.SQL("select 1 from {} where {}::text like %s limit 1").format(
                 sql.Identifier(table), sql.Identifier(column)
@@ -255,6 +276,9 @@ def test_a_workspace_tombstone_erases_every_society_of_its_workspace(app):
             (world["workspace"], world["session"].actor),
         )
     assert not any(_society_rows(world["connection"], society_id).values())
+    # Every table the erasure deletes from, not only those naming a society: this workspace holds
+    # no comparison of another kind and no clock of another version, so none keeps a row.
+    assert not any(_workspace_rows(world["connection"], world["workspace"]).values())
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
@@ -538,3 +562,156 @@ def test_an_erasure_keeps_every_row_of_another_version_s_society_and_another_wor
         )
     connection.rollback()
     assert _workspace_rows(connection, workspace) == kept_workspace
+
+
+#: The erasure's migration, found by its title, so renumbering it at landing changes nothing here.
+ERASURE_TITLE = "_a_society_is_erased_whole.sql"
+#: pg_trigger.tgtype's bits (PostgreSQL's trigger.h): a row trigger, before, and delete.
+ROW, BEFORE, DELETE = 1, 2, 8
+
+
+def _triggers(admin) -> dict[tuple[str, str], tuple[int, str]]:
+    return {
+        (row[0], row[1]): (row[2], row[3])
+        for row in admin.execute(
+            "select c.relname, t.tgname, t.tgtype, t.tgfoid::regproc::text from pg_trigger t "
+            "join pg_class c on c.oid = t.tgrelid "
+            "where c.relnamespace = current_schema()::regnamespace and not t.tgisinternal"
+        ).fetchall()
+    }
+
+
+def test_every_guard_the_erasure_rebuilt_keeps_every_event_but_delete(monkeypatch):
+    """The erasure rebuilds 35 append-only guards without delete, from a list written by hand. Read
+    from pg_trigger on a schema of this test's own, before the migration and after it: every
+    trigger of a table the erasure deletes from keeps its function, its timing and every event it
+    had but delete (updates, and inserts where it bound them); 35 of them lost delete; and every
+    such table takes the new delete guard, before each row."""
+    everything = list(migrations())
+    [erasure] = [m for m in everything if m.path.name.endswith(ERASURE_TITLE)]
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            pg_harness,
+            "migrations",
+            lambda: iter(m for m in everything if m.version < erasure.version),
+        )
+        with pg_harness.migrated_schema() as (_psycopg, admin):
+            before = _triggers(admin)
+            admin.execute(erasure.sql)
+            admin.commit()
+            after = _triggers(admin)
+    guard = "tg_society_record_erased_whole"
+    guarded = {table for table, name in after if name == guard}
+    assert len(guarded) == 36, sorted(guarded)
+    for table in guarded:
+        assert after[(table, guard)] == (ROW | BEFORE | DELETE, guard), table
+    rebuilt = set()
+    for (table, name), (events, function) in before.items():
+        if table not in guarded:
+            continue
+        assert (table, name) in after, (table, name)
+        kept, kept_function = after[(table, name)]
+        assert kept_function == function, (table, name)
+        assert kept & ~DELETE == events & ~DELETE, (table, name, events, kept)
+        if events & DELETE and not kept & DELETE:
+            rebuilt.add((table, name))
+    assert len(rebuilt) == 35, sorted(rebuilt)
+
+
+#: The parents the erasure locks before its first delete, in its order: every parent a writer that
+#: takes no workspace lock adds to (a played being's answer and a play, a door's asker and its
+#: answers and crossings, the experiment writers, a comparison's host).
+PARENTS = [
+    "world_society",
+    "world_society_decision_request",
+    "door_ask",
+    "society_experiment_definition",
+    "society_comparison_start",
+    "society_comparison_run",
+]
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_the_erasure_locks_every_parent_before_its_first_delete(app):
+    """Read from the erasure's own body: every parent is locked, in one order, before the first
+    delete. And a writer holding a decision request as a decision it adds holds it (a key share)
+    makes the erasure wait at that lock, not at a delete after it has begun deleting."""
+    world, client = app
+    services = _services(client)
+    _played_line(world, client, services)
+    connection = world["connection"]
+    body = connection.execute(
+        "select pg_get_functiondef('society_erase_rows(uuid,uuid)'::regprocedure) as body"
+    ).fetchone()["body"]
+    connection.commit()
+    first = body.index("delete from")
+    locked = re.findall(r"perform 1 from (\w+) \w+\s+where[^;]*for update", body)
+    assert locked == PARENTS
+    assert all(body.index(f"perform 1 from {table} ") < first for table in PARENTS)
+
+    society_id = _society_id(world)
+    # The fixture's connection commits each statement; the key share is held in a block of its own.
+    with connection.transaction():
+        held = connection.execute(
+            "select request_id from world_society_decision_request "
+            "where workspace_id = %s and society_id = %s for key share",
+            (world["workspace"], society_id),
+        ).fetchall()
+        assert held, "the positive control: the played minute asked a decision"
+        with services.database.session(world["workspace"]) as runtime:
+            runtime.execute("set lock_timeout = '500ms'")
+            try:
+                with pytest.raises(psycopg.errors.LockNotAvailable) as waited:
+                    erase_society(
+                        runtime,
+                        world["workspace"],
+                        world["binding"].world_id,
+                        world["binding"].version_id,
+                        erased_by=world["session"].actor,
+                    )
+            finally:
+                runtime.execute("reset lock_timeout")
+    context = waited.value.diag.context or ""
+    assert "society_erase_rows" in context and "at PERFORM" in context, context
+    assert any(_society_rows(connection, society_id).values()), "nothing was erased"
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_held_erasure_names_a_society_its_workspace_holds_at_its_own_version(app):
+    """Beside its own society tombstone, as only the product writes it, an erasure names a society
+    its workspace holds, at that society's world version: one naming a society the workspace does
+    not hold, or another version, is refused by name, with nothing deleted."""
+    world, client = app
+    services = _services(client)
+    play._knight_society(world, client)
+    society_id = _society_id(world)
+    before = _society_rows(world["connection"], society_id)
+    assert any(before.values()), "the positive control: the society is there"
+
+    def erase(society, version) -> None:
+        with services.database.session(world["workspace"]) as runtime:
+            tombstone = runtime.execute(
+                "insert into tombstone (workspace_id, scope, requested_by, reason) "
+                "values (%s, 'society', %s, 'an erasure of nothing held') returning tombstone_id",
+                (world["workspace"], world["session"].actor),
+            ).fetchone()["tombstone_id"]
+            runtime.execute(
+                "insert into society_erasure (workspace_id, world_id, version_id, society_id, "
+                "tombstone_id, erased_by) values (%s, %s, %s, %s, %s, %s)",
+                (
+                    world["workspace"],
+                    world["binding"].world_id,
+                    version,
+                    society,
+                    tombstone,
+                    world["session"].actor,
+                ),
+            )
+
+    for society, version in (
+        (uuid.uuid4(), world["binding"].version_id),
+        (society_id, uuid.uuid4()),
+    ):
+        with pytest.raises(psycopg.errors.CheckViolation, match="a society its workspace holds"):
+            erase(society, version)
+    assert _society_rows(world["connection"], society_id) == before

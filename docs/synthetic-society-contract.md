@@ -1052,7 +1052,9 @@ but `exulanica_definer`. A restore carries the erasure before it replays any tom
 The erasure leaves a door grant, its revisions and its program's declaration, mapping and
 manifest, and the deliveries and gone notices keyed by the grant: the owner's configuration and the
 things carried out, with no society text. It leaves event ids in a world project item's
-references, and every copy already sent to a hosted model provider or an outside program.
+references; the looks a minute recorded for visitors' arrivals (a world version's rows naming a
+thing id, a crossing id and a look digest, no text, as a visitor's departure leaves them); and every
+copy already sent to a hosted model provider or an outside program.
 
 ### Versions that survive upgrades
 

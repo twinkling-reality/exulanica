@@ -279,6 +279,14 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
             },
         },
     ),
+    # society_erase_rows (0183) also locks a society's decision requests and its experiments'
+    # definitions before it deletes: UPDATE on workspace_id, which no body writes, for FOR UPDATE.
+    "0183": DefinerGrants(
+        columns={
+            name: {"workspace_id": frozenset(("UPDATE",))}
+            for name in ("society_experiment_definition", "world_society_decision_request")
+        },
+    ),
 }
 
 
