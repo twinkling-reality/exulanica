@@ -129,6 +129,18 @@ export function visitorNotice(event: SocietyEvent, words: VisitorNoticeWords, br
   return null;
 }
 
+/**
+ * What a being's open card says it is doing once it has left the world: the latest departure of it
+ * among the events read, by the words catalog's reason ("Left this world because it chose to go back
+ * where it came from."), or null where the events hold none (it is gone some other way, or unread).
+ */
+export function departedNowWords(events: readonly SocietyEvent[], subjectId: string): string | null {
+  const departure = [...events].reverse().find((event) => event.event_kind === 'thing_departed' && event.subject_id === subjectId);
+  if (departure === undefined) return null;
+  const reason = record(departure.document)['reason'];
+  return typeof reason === 'string' && reason !== '' ? `Left this world because ${reasonWords(reason)}.` : 'Left this world.';
+}
+
 /** An event new to the page, and the bridge its subject crossed through, where known. */
 export interface FreshEvent {
   readonly event: SocietyEvent;

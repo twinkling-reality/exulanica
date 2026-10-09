@@ -20,8 +20,11 @@ import type { PlayOption, PlayPoint, PlayTurn, SocietyPlayClient } from '../soci
 import { buildPlayBand, PLAY_WORDS, type PlayBand } from '../ui/play-this-one.js';
 import { choiceRefusalWords } from '../ui/society-models.js';
 
-/** Kinds that act on nothing a person can click in the world: the band's own buttons. */
-const LOOSE_KINDS: ReadonlySet<string> = new Set(['wait', 'stand', 'carry_on', 'say_all', 'leave']);
+/**
+ * Kinds that are the band's own buttons: those that act on nothing a person can click in the world,
+ * and stopping following someone, who may have walked out of view (its words name them).
+ */
+const LOOSE_KINDS: ReadonlySet<string> = new Set(['wait', 'stand', 'carry_on', 'say_all', 'leave', 'stop_following']);
 
 /** Why an answer was not taken, by the answer route's codes. */
 export const ANSWER_REFUSAL_WORDS: Readonly<Record<string, string>> = Object.freeze({

@@ -301,6 +301,10 @@ answer the minute already holds is said to be taken and is never sent again, and
 limit says in how many seconds the next minute takes answers. A page opened again while the person still
 plays takes the band up again; the server gives a being back after its quiet minutes, and the band then
 says so. The inspector's words for a played being say its person chose what it does, never a model.
+Following another being is offered by a click on it where the minute offers it; stopping following is the
+band's own button ("stop following knight 2"), since the one followed may have walked out of view. A being
+that has left the world keeps its open card, whose Now line then says it left and why, in the words
+catalog's reasons, with no mind or control offered for it.
 While the band shows, toasts start below it rather than over it.
 
 ### The thing card

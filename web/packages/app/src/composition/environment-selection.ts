@@ -104,7 +104,7 @@ import { LineWatch, thingLine } from './thing-lines.js';
 import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
 import { DoorGrantsClient, type DoorGrant } from '../door-grants-api.js';
 import { ThingLooksClient, type ResolveWorkspaceLook, type ThingLookChoice } from '../thing-looks-api.js';
-import { kindDocumentLabel, kindKey, noticeKinds, visitorNotice, VisitorNoticeWatch, type FreshEvent, type KindReference } from './visitor-notices.js';
+import { departedNowWords, kindDocumentLabel, kindKey, noticeKinds, visitorNotice, VisitorNoticeWatch, type FreshEvent, type KindReference } from './visitor-notices.js';
 import { VisitorGates } from './visitor-gates.js';
 import { heardBy, saidBy, type BeingLine } from './being-lines.js';
 import '../ui/thing-marks.css';
@@ -403,10 +403,13 @@ export function mountEnvironmentSelection(
     inspector.root.hidden = false;
   };
   /** Once the inspector holds this person, another surface's view may take the top of Selected. */
+  /** The being last shown in Selected, so its card can still say who it was once it has left. */
+  let lastBeing: { readonly id: string; readonly being: SelectedBeing } | null = null;
   const offerInhabitantView = (id: string): void => {
     const note = inspector.note();
     if (inhabitantView === null || note === null) return;
     const being = beingOf(id);
+    if (being !== null) lastBeing = { id, being };
     const shown = inhabitantView.show(id, { note, mind: societyModels?.mindOf(id) ?? null, ...(being === null ? {} : { being }) });
     inhabitantView.root.hidden = !shown;
     if (!shown) inhabitantView.hide();
@@ -871,6 +874,26 @@ export function mountEnvironmentSelection(
     if (pausedHintShown || society === null || societyControl?.mode !== 'paused' || !societyControl.playEligible || played()) return;
     pausedHintShown = true;
     if (deps.holdStatus) deps.holdStatus(PAUSED_ARRIVAL_HINT); else deps.showStatus(PAUSED_ARRIVAL_HINT);
+  }
+
+  /**
+   * Say in Selected that the being shown has left the world, by its departure's reason, in place
+   * of its last Now; no mind or control is offered for it. False where no departure of it was read.
+   */
+  function showDeparted(id: string): boolean {
+    const left = departedNowWords(liveSociety?.view.eventsAvailable ? liveSociety.view.events : [], id);
+    const last = inspector.note();
+    if (left === null || last === null || last.subject !== id) return false;
+    if (last.activity === left) return true;
+    inspector.show({ ...last, activity: left });
+    const note = inspector.note();
+    if (inhabitantView === null || note === null) return true;
+    const being = lastBeing?.id === id ? lastBeing.being : null;
+    const shown = inhabitantView.show(id, { note, mind: null, ...(being === null ? {} : { being }) });
+    inhabitantView.root.hidden = !shown;
+    if (!shown) inhabitantView.hide();
+    inspector.setUnderView(shown);
+    return true;
   }
 
   /** The words a Companion citation opened this person with, kept while they stay selected. */
@@ -1975,7 +1998,8 @@ export function mountEnvironmentSelection(
       canvas.dataset.societyRendered = String(atlas.ownedDistrict.drawnInhabitantCount);
       canvas.dataset.societyTick = String(society.currentTick);
       if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) {
-        inspectInhabitant(selectedInhabitant, false);
+        // The one whose card is open may have left since: its card then says so.
+        if (!inspectInhabitant(selectedInhabitant, false)) showDeparted(selectedInhabitant);
       }
     }
     directedAction?.reflect();
@@ -2030,7 +2054,8 @@ export function mountEnvironmentSelection(
       canvas.dataset.societyRendered = String(runtime.drawnInhabitantCount);
       canvas.dataset.societyTick = String(society.currentTick);
       if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) {
-        inspectInhabitant(selectedInhabitant, false);
+        // The one whose card is open may have left since: its card then says so.
+        if (!inspectInhabitant(selectedInhabitant, false)) showDeparted(selectedInhabitant);
       }
     }
     for (const control of savedWorldActions.values()) control.reflect();

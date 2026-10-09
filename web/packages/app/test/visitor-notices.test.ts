@@ -7,7 +7,7 @@
 // kinds' own (assets/catalogs/things).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { visitorNotice, VisitorNoticeWatch, type VisitorNoticeWords } from '../src/composition/visitor-notices.js';
+import { departedNowWords, visitorNotice, VisitorNoticeWatch, type VisitorNoticeWords } from '../src/composition/visitor-notices.js';
 import type { SocietyEvent } from '../src/society-api.js';
 import type { DoorBridge } from '../src/door-bridges-api.js';
 
@@ -58,6 +58,14 @@ describe('a visitor notice', () => {
     });
     expect(visitorNotice(left('grant_ended'), words, 'blockgame')?.message)
       .toBe(`The knight from Block Game left, taking a sword, because ${because('grant_ended')}.`);
+  });
+
+  it('gives a departed visitor\'s open card its leaving, by the latest departure, in place of its last Now', () => {
+    const left = event('thing_departed', 'visitor-1', 6, 'sent_home', { kind: ref(KNIGHT), came_by: 'crossed', placed_id: null, carried: [] });
+    const events = [arrived('visitor-1', 4), left, arrived('visitor-2', 7)];
+    expect(departedNowWords(events, 'visitor-1')).toBe(`Left this world because ${because('sent_home')}.`);
+    // Somebody still here, or whose leaving was never read, keeps what the card said.
+    expect(departedNowWords(events, 'visitor-2')).toBeNull();
   });
 
   it('words every refusal and departure the contract names from the catalog, and says nothing of an author\'s placements', () => {

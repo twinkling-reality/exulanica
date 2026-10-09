@@ -222,4 +222,20 @@ describe('playing one being from the world', () => {
     expect(document.body.style.getPropertyValue('--play-band-bottom')).toBe('');
     expect(band.hidden).toBe(true);
   });
+
+  it('offers following someone by a click on them, and stopping as a band button wherever they went', async () => {
+    const following = turnBody(3, { options: [
+      option('wait a moment', 'wait', null, null),
+      option('follow the traveller, 1 m away', 'follow', null, 'traveller'),
+      option('stop following knight 2', 'stop_following', null, 'knight-2'),
+    ] });
+    const { play, client, band } = harness([following]);
+    await play.play('knight');
+    expect([...band.querySelectorAll('.play-band-loose .play-band-option')].map((b) => b.textContent))
+      .toEqual(['wait a moment', 'stop following knight 2']);
+    expect(optionsFor(parsePlayTurn(following), { subjectId: 'knight-2', thingId: null })).toEqual([]);
+    play.onPick({ subjectId: 'traveller', thingId: null });
+    await settle();
+    expect(client.answer).toHaveBeenLastCalledWith('version', 'knight', 3, 'follow the traveller, 1 m away', null, null);
+  });
 });
