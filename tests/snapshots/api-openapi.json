@@ -40292,7 +40292,11 @@
         "type": "string",
         "enum": [
          "go_to",
-         "use"
+         "use",
+         "pick_up",
+         "put_down",
+         "give",
+         "take"
         ]
        },
        {
@@ -40324,6 +40328,18 @@
        }
       ],
       "title": "Target Id"
+     },
+     "with_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "With Id"
      }
     },
     "additionalProperties": false,

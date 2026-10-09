@@ -654,7 +654,7 @@ saved-entry lock and refusal as the same operation sent directly, because it is 
 | Move time on 1 to 10 simulated minutes | none, as above | `POST .../society/control/steps` once a minute, chained; a playing world is paused first and played again last |
 | Bring people into a world with none | none | `POST .../society` |
 | Add a thing by its kind, beside something named or where the person points | none; the route's own checks run in process | `POST .../things` |
-| Ask one of the world's beings to go to a place or use it | none; the step is prepared again just before it is sent | `POST .../society/actions` |
+| Ask one of the world's beings to go to a place or use it, or to pick up, put down, give or take a thing | none; the step is prepared again just before it is sent | `POST .../society/actions` |
 
 A plan names each step's route key, path values, body, the permissions its route declares, the
 version pins (`base_state_sha256` and `edit_seq`), the authority's preview document and its digest,
@@ -668,7 +668,8 @@ origin role of anything added is the person's stated choice. What is missing is 
 anything is prepared (`asset_ambiguous`, `object_ambiguous`, `object_required`,
 `arrangement_ambiguous`, `origin_role_required`, `placement_required`, `viewer_required`,
 `kind_ambiguous`, `anchor_ambiguous`, `being_required`, `being_ambiguous`, `place_required`,
-`place_ambiguous`); the answer goes to `POST /selection/actions/prepare` (`world.read`, no model),
+`place_ambiguous`, `thing_ambiguous`); the answer goes to `POST /selection/actions/prepare`
+(`world.read`, no model),
 which validates typed actions as any direct body is validated.
 
 A step the operations cannot express (`other`) refuses the whole plan. A drafted plan takes back at
@@ -787,7 +788,8 @@ conversation (`tests/test_companion_action_policy_boundary.py`). Scripted tests 
 two measurements of a live model reading held-out requests into these plans, before and after
 each step's options moved last under a 640-token ceiling, are in
 [evidence and limits](#evidence-and-limits). The later binds the prompt `action-plan-5`; the
-current prompt, `action-plan-6`, adds things and beings and is measured by neither.
+current prompt, `action-plan-7`, adds things and beings and a being's hands acts, and is measured by
+neither.
 
 ### Things and beings
 
@@ -825,6 +827,24 @@ from outside is offered to the drafter by its kind and number alone, so nothing 
 declared reaches a hosted request. A placing step reads back as its own `add_thing` edit; an
 asking step reads back as the request its answer names, `pending` until a minute takes it, then
 `applied`, or `not_applied` with the minute's reason.
+
+In a society of things running the hands module, a being may also be asked to pick a thing up, put
+it down, give it to another being or take it from one: a `direct_thing` step whose act is the
+ability, naming the thing by its placed id and, to give or take, the other being, sent as the hands
+intent `{kind: "hands", ability, thing_id, with_id}` with the society's id for the thing
+([synthetic-society-contract.md](synthetic-society-contract.md)). The drafter names the beings and
+the thing; which being holds the thing is read from the society, or from what the plan's earlier
+steps have them do, never from the order the drafter named them in: the holder gives, is taken
+from, and puts down, and a put-down naming no thing is of what the being holds. A kind of thing an
+earlier step of the same request adds names that thing, by the id it was minted, so "give the knight
+a lantern" is a lantern placed beside the knight and then the knight asked to pick that lantern up;
+the second step waits for the minute that takes the lantern in. Two things the words could mean, or
+none, are asked about as `thing_ambiguous`. A refusal is the route's own name (`act_not_offered`,
+`thing_gone`, `belongs_to_visitor`); no shipped kind lets a thing be taken from it, so a take is
+refused `act_not_offered`. A later step asking the same being waits as any asking step waits, so in
+"pick up the sword and give it to the traveller" the give is prepared once the knight is free
+again, and refused `act_not_offered` if the knight does not hold the sword by then. `titles` names
+the being, the act, the thing and the other being.
 
 ### The browser's path
 

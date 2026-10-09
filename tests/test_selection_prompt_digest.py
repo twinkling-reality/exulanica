@@ -42,6 +42,9 @@ PINNED = {
     # `action-plan-6`: things added by their kind and beings asked to go to or use a place; the
     # classifier counts asking a being as a world edit; up to eight steps of four options each.
     "action-plan-6": "332b30f3cad261a8376b043c0589f33c3c155a5a98f485e4195202db454417c6",
+    # `action-plan-7`: a being asked to pick a thing up, put it down, give it or take it; the
+    # classifier counts those as world edits too.
+    "action-plan-7": "3af61e470e542d4984c38a2b03ce48bd505a0c2ed4152a0215e01d0a628cc849",
     # The appearance drafter for a design choice drawn from no evidence; its own family, so the
     # evidence drafter's texts and `proposal-4` are untouched.
     "proposal-authored-1": "7b840134c24bc8152ab423f0665362b1d37bdd3cfb9b96cf208cfc6a46308d9a",

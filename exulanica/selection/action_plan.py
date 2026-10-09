@@ -45,9 +45,10 @@ Rules this module holds by construction rather than by asking the model:
     and the plan shows both steps.
 *   **Things are added by their kind, and beings asked by the route that takes direct requests.**
     A world edit may add a thing (``place_thing``) or ask one of the world's beings to go to a
-    place or use it (``direct_thing``); :mod:`exulanica.selection.action_things` reads, lays out and
-    prepares both, from routes that already exist. Neither route has a preview, so their own checks
-    run in process before a step is offered.
+    place or use it, or to pick a thing up, put it down, give it or take it (``direct_thing``);
+    :mod:`exulanica.selection.action_things` reads, lays out and prepares both, from routes that
+    already exist. Neither route has a preview, so their own checks run in process before a step is
+    offered.
 """
 
 from __future__ import annotations
@@ -136,7 +137,7 @@ __all__ = [
 ]
 
 #: Bumped when a prompt below or a form's construction changes; recorded with every plan.
-ACTION_PROMPT_VERSION: Final = "action-plan-6"
+ACTION_PROMPT_VERSION: Final = "action-plan-7"
 PLAN_PROFILE: Final = "exulanica.companion-action-plan/v1"
 
 #: One try and one repair for the drafter, then a refusal; the classifier is asked once and a
@@ -196,8 +197,8 @@ class WorldEditOperation(StrEnum):
 
 
 #: The operations the world-edit drafter's form offers, in the drafter's words: the matrix's own,
-#: but a direct step is named by what it asks (``send_to`` a place, or ``use`` it), each read back
-#: as one ``direct_thing`` with its act.
+#: but a direct step is named by what it asks (``send_to`` a place, ``use`` it, or one of the hands
+#: acts by its own name), each read back as one ``direct_thing`` with its act.
 DRAFT_OPERATIONS: Final = (
     "place_object",
     "move_object",
@@ -207,10 +208,13 @@ DRAFT_OPERATIONS: Final = (
     "place_thing",
     "send_to",
     "use",
+    *action_things.HANDS_ACTS,
     "other",
 )
 #: A drafted direct step's operation and the act its typed action states.
 _DRAFT_ACTS: Final = {"send_to": "go_to", "use": "use"}
+#: The hands acts, drafted and typed by their own names.
+_HANDS: Final = frozenset(action_things.HANDS_ACTS)
 
 
 class SimulationAction(StrEnum):
@@ -261,6 +265,8 @@ CLARIFICATIONS: Final = frozenset(
         "being_ambiguous",
         "place_required",
         "place_ambiguous",
+        # The thing a being is asked to pick up, put down, give or take.
+        "thing_ambiguous",
     }
 )
 
@@ -629,9 +635,9 @@ five things it is. You do not answer it and you do not act on it.
 
 - 'world_edit': they ask for something in the world to be added, put somewhere, moved, taken \
 away, arranged, or for the last change to be taken back, or for one of the beings living there to \
-go somewhere or use something. Benches, lamps, trees, tables, stalls, wells, gates, swords, \
-lanterns and small arrangements of them are things in the world, and so are beings such as a \
-knight, a traveller or a lantern spirit.
+go somewhere, use something, or pick something up, put it down, give it or take it. Benches, \
+lamps, trees, tables, stalls, wells, gates, swords, lanterns and small arrangements of them are \
+things in the world, and so are beings such as a knight, a traveller or a lantern spirit.
 - 'appearance': they ask for the world itself to look or feel different: its colour, how clear or \
 soft it is, how much detail it carries, how lively it looks, how fast it moves, what its surfaces \
 are made of. Not the things in it.
@@ -667,6 +673,11 @@ goes beside, name that too: a listed thing, object or being, or the kind of thin
 of this request adds.
 - 'send_to' asks one listed being to walk to one listed place. 'use' asks one listed being to use \
 one listed place, as the place says.
+- 'pick_up' asks one listed being to pick up one listed thing. 'put_down' asks one listed being to \
+put down a thing it holds. 'give' asks a listed being to give a listed thing it holds to another \
+listed being. 'take' asks a listed being to take a listed thing from the being holding it. Name \
+the beings and the thing: which of them holds it is known, not taken from the order you name \
+them in. The kind of thing an earlier step of this request adds names that thing.
 - 'other' is a change these cannot express: turning or resizing something, changing its colour or \
 what it does, making something that is not listed. Never approximate it with a nearby change.
 - In a step's options, name every option the words could mean for each thing the step names: one \
@@ -856,7 +867,8 @@ class _Action:
 
     A thing to add names its kind, the id minted for it when the plan was made and what it goes
     beside (``near``: ``thing:``, ``object:`` or ``being:`` and an id, or None for the pointed
-    spot). A being asked to act names the act, the being and the place."""
+    spot). A being asked to act names the act, the being and the place; asked for a hands act, the
+    thing (``thing_id``, its placed id) and, to give or take, the other being (``with_id``)."""
 
     operation: WorldEditOperation
     asset_key: str | None = None
@@ -870,6 +882,7 @@ class _Action:
     act: str | None = None
     subject_id: str | None = None
     target_id: str | None = None
+    with_id: str | None = None
 
     def document(self) -> dict[str, Any]:
         if self.operation is WorldEditOperation.PLACE_THING:
@@ -879,6 +892,14 @@ class _Action:
                 "kind_version": self.kind_version,
                 "thing_id": self.thing_id,
                 "near": self.near,
+            }
+        if self.operation is WorldEditOperation.DIRECT_THING and self.act in _HANDS:
+            return {
+                "operation": self.operation.value,
+                "act": self.act,
+                "subject_id": self.subject_id,
+                "thing_id": self.thing_id,
+                "with_id": self.with_id,
             }
         if self.operation is WorldEditOperation.DIRECT_THING:
             return {
@@ -951,9 +972,16 @@ def _typed_from_draft(steps: Sequence[Mapping[str, Any]], world: _World) -> _Ver
     #: Each kind of thing and kind of object an earlier step adds, for a later step to name.
     added_things: dict[str, str] = {}
     added_objects: set[str] = set()
+    #: Who holds each thing once the earlier steps' hands acts are done, by its placed id.
+    holding: dict[str, str | None] = {}
     for index, step in enumerate(steps):
         drafted = str(step["operation"])
         labels = step.get("options") or ()
+        if drafted in _HANDS:
+            action, named = _hands_step(drafted, labels, world, added_things, holding)
+            actions.append(action)
+            slots += [(index, slot, found) for slot, found in named]
+            continue
         if drafted in _DRAFT_ACTS:
             beings = _by_label(world.beings, labels)
             places = _by_label(world.places, labels)
@@ -1060,6 +1088,7 @@ _AMBIGUOUS: Final = {
     "near": "anchor_ambiguous",
     "subject_id": "being_ambiguous",
     "target_id": "place_ambiguous",
+    "thing_id": "thing_ambiguous",
 }
 
 
@@ -1115,6 +1144,88 @@ def _thing_to_add(
         near=anchors[0].value if anchors else None,
     )
     return action, [("kind", list(to_add)), ("near", list(anchors))]
+
+
+def _things_held(world: _World) -> tuple[_Choice, ...]:
+    """The listed things a hands step may name, each valued by its placed id."""
+    return tuple(
+        dataclasses.replace(choice, value=choice.value.removeprefix("thing:"))
+        for choice in world.placed
+    )
+
+
+def _holder(world: _World, holding: Mapping[str, str | None], placed_id: str) -> str | None:
+    """Who holds a thing once this plan's earlier hands acts are done, else who holds it now."""
+    if placed_id in holding:
+        return holding[placed_id]
+    society = None if world.things is None else world.things.society
+    if society is None:
+        return None
+    return action_things.holder(society, action_things.society_thing_id(world.world_id, placed_id))
+
+
+def _hands_step(
+    act: str,
+    labels: Sequence[str],
+    world: _World,
+    added_things: Mapping[str, str],
+    holding: dict[str, str | None],
+) -> tuple[_Action, list[tuple[str, list[_Choice]]]]:
+    """A hands step: the being asked, the thing and, to give or take, the other being.
+
+    The thing is a listed thing, or for a listed kind the thing of that kind an earlier step of
+    this request adds (by the id it was minted), else the listed things of that kind. A put-down
+    naming no thing is of what the being holds. Which being holds the thing is read from the
+    society, or from what the earlier steps have them do, never from the order the labels came in:
+    the holder gives, is taken from, and puts down. What the step does is then held for the steps
+    after it."""
+    beings = _by_label(world.beings, labels)
+    things = _by_label(_things_held(world), labels)
+    read = world.things
+    kinds = {} if read is None else {item.thing_id: item.kind for item in read.placed}
+    for kind in _by_label(world.kinds, labels):
+        if kind.value in added_things:
+            things.append(dataclasses.replace(kind, value=added_things[kind.value]))
+        else:
+            things += [
+                c
+                for c in _things_held(world)
+                if kinds.get(c.value) == kind.value and c not in things
+            ]
+    if not things and act == "put_down" and len(beings) == 1:
+        things = [
+            c for c in _things_held(world) if _holder(world, holding, c.value) == beings[0].value
+        ]
+    thing = things[0].value if things else None
+    held_by = None if thing is None else _holder(world, holding, thing)
+    named = [being.value for being in beings]
+    subject: str | None
+    other: str | None = None
+    if act not in ("give", "take"):
+        subject = named[0] if named else held_by if act == "put_down" else None
+    elif len(named) == 2:
+        # The holder gives, and is the one taken from, whichever order the two came in; where
+        # neither holds it, the order is all there is.
+        first, second = named
+        if held_by == (second if act == "give" else first):
+            first, second = second, first
+        subject, other = first, second
+    elif len(named) == 1 and held_by is not None and held_by != named[0]:
+        subject, other = (held_by, named[0]) if act == "give" else (named[0], held_by)
+    else:
+        subject = named[0] if named else held_by if act == "give" else None
+        other = held_by if act == "take" and subject != held_by else None
+    if thing is not None and subject is not None:
+        holding[thing] = None if act == "put_down" else other if act == "give" else subject
+    action = _Action(
+        WorldEditOperation.DIRECT_THING,
+        act=act,
+        subject_id=subject,
+        thing_id=thing,
+        with_id=other,
+    )
+    deciding = beings if act not in ("give", "take") or len(beings) > 2 else []
+    return action, [("subject_id", deciding), ("thing_id", things)]
 
 
 def _clarification(
@@ -1202,21 +1313,27 @@ def _typed_from_request(actions: Sequence[Mapping[str, Any]], world: _World) -> 
                 return verdict
             verdict.actions.append(typed)
         elif operation is WorldEditOperation.DIRECT_THING:
-            # A being or a place this society does not hold is left to the route's own builder,
-            # which answers it the way it answers a direct request (``unknown_inhabitant``,
-            # ``canonical_target_changed``), when the step is prepared.
+            # A being, a place or a thing this society does not hold is left to the route's own
+            # builder, which answers it the way it answers a direct request
+            # (``unknown_inhabitant``, ``canonical_target_changed``, ``thing_gone``), when the step
+            # is prepared.
             act = raw.get("act")
-            if act not in action_things.DIRECT_ACTS:
+            if act not in action_things.DIRECT_ACTS and act not in _HANDS:
                 verdict.refusal = _refusal(
-                    "action_not_offered", "a being is asked to go to a place or use it", step=index
+                    "action_not_offered",
+                    "a being is asked to go to a place, use it, or do something with its hands",
+                    step=index,
                 )
                 return verdict
+            hands = act in _HANDS
             verdict.actions.append(
                 _Action(
                     operation,
                     act=str(act),
                     subject_id=_text_or_none(raw.get("subject_id")),
-                    target_id=_text_or_none(raw.get("target_id")),
+                    target_id=None if hands else _text_or_none(raw.get("target_id")),
+                    thing_id=_text_or_none(raw.get("thing_id")) if hands else None,
+                    with_id=_text_or_none(raw.get("with_id")) if hands else None,
                 )
             )
         else:
@@ -1291,6 +1408,20 @@ def _requirements(
                 return _clarification(
                     "being_required", index, "subject_id", actions, candidates=world.beings
                 )
+            if action.act in _HANDS:
+                if action.thing_id is None:
+                    return _clarification(
+                        "thing_ambiguous",
+                        index,
+                        "thing_id",
+                        actions,
+                        candidates=_things_held(world),
+                    )
+                if action.act in ("give", "take") and action.with_id is None:
+                    return _clarification(
+                        "being_required", index, "with_id", actions, candidates=world.beings
+                    )
+                continue
             if action.target_id is None:
                 return _clarification(
                     "place_required", index, "target_id", actions, candidates=world.places
@@ -1576,7 +1707,13 @@ def _prepared_things_step(
                 requested_by=world.actor or uuid.UUID(int=0),
                 subject_id=str(action.subject_id),
                 act=str(action.act),
-                target_id=str(action.target_id),
+                target_id=action.target_id,
+                thing_id=(
+                    None
+                    if action.thing_id is None
+                    else action_things.society_thing_id(world.world_id, action.thing_id)
+                ),
+                with_id=action.with_id,
             )
         pins = (
             None
@@ -1606,7 +1743,8 @@ def _prepared_things_step(
 
 def _titles(action: _Action, world: _World) -> dict[str, str]:
     """What a thing step names, as the reads label it: the kind and what it goes beside, or the
-    being and the place. The labels the drafter and a clarification show, for the page's words."""
+    being and the place, or the being, the thing and the other being. The labels the drafter and a
+    clarification show, for the page's words."""
     read = world.things
     titles: dict[str, str | None] = {}
     if action.operation is WorldEditOperation.PLACE_THING:
@@ -1632,12 +1770,29 @@ def _titles(action: _Action, world: _World) -> dict[str, str]:
                 titles["near"] = None if being is None else being.display_name
     elif action.operation is WorldEditOperation.DIRECT_THING and read is not None:
         being = None if action.subject_id is None else read.being(action.subject_id)
-        place = None if action.target_id is None else read.place(action.target_id)
         titles["subject"] = None if being is None else being.display_name
-        titles["place"] = None if place is None else place.title
-        titles["affordance"] = None if place is None else place.affordance
         titles["act"] = action.act
+        if action.act in _HANDS:
+            other = None if action.with_id is None else read.being(action.with_id)
+            titles["thing"] = (
+                None if action.thing_id is None else _thing_title(action.thing_id, read)
+            )
+            titles["with"] = None if other is None else other.display_name
+        else:
+            place = None if action.target_id is None else read.place(action.target_id)
+            titles["place"] = None if place is None else place.title
+            titles["affordance"] = None if place is None else place.affordance
     return {key: value for key, value in titles.items() if value is not None}
+
+
+def _thing_title(placed_id: str, read: action_things.ThingsRead) -> str | None:
+    """A placed thing's kind label, or the kind's for one an earlier step of the plan adds."""
+    found = next((item for item in read.placed if item.thing_id == placed_id), None)
+    if found is not None:
+        return found.label
+    minted = placed_id.split(":")
+    kind = read.kind(minted[1]) if len(minted) == 3 and minted[0] == "companion" else None
+    return None if kind is None else kind.label
 
 
 def _anchor(

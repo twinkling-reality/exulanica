@@ -11,14 +11,15 @@ validation, transaction and refusal:
     here before the step is offered (:func:`placement_refusal`), and the route stays the authority
     when the step is sent.
 *   ``direct_thing`` is ``POST /world/versions/{version_id}/society/actions`` (``record_action``):
-    one of the world's own beings asked to walk to a place its society lists, or to use it. The
-    request is built by the function the route builds it with
-    (:func:`~exulanica.world.society_actions.build_action_request`), on the society's state and the
-    input a request would be made against now, so a step is offered only where the route would
-    take it. Its pins are that minute's, so a client prepares it again just before sending it;
-    while the society holds an input it has not taken in, the being is in the middle of something,
-    or it was already asked something at this minute, preparing says so by code
-    (:data:`WAIT_CODES`) and the client waits for the next minute.
+    one of the world's own beings asked to walk to a place its society lists, or to use it; or, in
+    a society of things running the hands module, to pick a thing up, put it down, give it to
+    another being or take it from one (:data:`HANDS_ACTS`). The request is built by the function
+    the route builds it with (:func:`~exulanica.world.society_actions.build_action_request`), on
+    the society's state and the input a request would be made against now, so a step is offered
+    only where the route would take it. Its pins are that minute's, so a client prepares it again
+    just before sending it; while the society holds an input it has not taken in, the being is in
+    the middle of something, or it was already asked something at this minute, preparing says so
+    by code (:data:`WAIT_CODES`) and the client waits for the next minute.
 
 What the drafter is shown about these comes from reads, by opaque label: the kinds of thing an
 author may place (by kind key), the version's placed objects (``thing-N``), the society's beings
@@ -57,7 +58,7 @@ from exulanica.world.placed_things import (
     shipped_kind,
     validate_placed_thing,
 )
-from exulanica.world.society_actions import ActionIntent, build_action_request
+from exulanica.world.society_actions import HANDS_ABILITIES, ActionIntent, build_action_request
 from exulanica.world.society_things import THING_NAMESPACE
 from exulanica.world.thing_library import shipped_looks
 
@@ -65,6 +66,7 @@ __all__ = [
     "BEING_HALF_MM",
     "DIRECT",
     "DIRECT_ACTS",
+    "HANDS_ACTS",
     "MAX_THING_CHOICES",
     "THING_PLACE",
     "WAIT_CODES",
@@ -77,6 +79,7 @@ __all__ = [
     "ThingsRead",
     "direct_body",
     "facing_yaw",
+    "holder",
     "lay_out",
     "minted_thing_id",
     "offered_kinds",
@@ -93,6 +96,9 @@ DIRECT: Final = f"POST {_VERSION}/society/actions"
 #: What a direct step asks of a being, and the intent the route takes for it: walk to a place, or
 #: use it (``perform`` its activity there).
 DIRECT_ACTS: Final = {"go_to": "go_to", "use": "perform"}
+#: What a hands step asks of a being, by the abilities the hands module names; the request's intent
+#: is ``hands`` with that ability, the thing and, to give or take, the other being.
+HANDS_ACTS: Final = HANDS_ABILITIES
 #: The codes that say a direct step is waiting for the society's next minute, not refused: an input
 #: it has not taken in yet (after a thing was placed), or a being in the middle of something or
 #: already asked something at this minute (a later step asking the same being).
@@ -161,6 +167,8 @@ class PlacedRead:
     region_id: str
     transform: Transform
     footprint: Footprint
+    #: Its kind's key, for a step naming a kind of thing to find the things of that kind.
+    kind: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -385,6 +393,7 @@ def read_things(
                 region_id=thing.region_id,
                 transform=thing.transform,
                 footprint=footprint,
+                kind=kind.kind,
             )
         )
     titles: dict[tuple[str, str], str] = {}
@@ -678,25 +687,32 @@ def direct_body(
     requested_by: uuid.UUID,
     subject_id: str,
     act: str,
-    target_id: str,
+    target_id: str | None = None,
+    thing_id: str | None = None,
+    with_id: str | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     """The body ``POST .../society/actions`` takes for this request now, or the code it would be
     refused with: built by the route's own function on the state and input it reads, so a step is
-    offered only where the route would take it. A code in :data:`WAIT_CODES` says to wait for the
-    next minute rather than that the request is refused."""
+    offered only where the route would take it. A walk or a use names the place (``target_id``); a
+    hands act the society's thing (``thing_id``) and, to give or take, the other being
+    (``with_id``). A code in :data:`WAIT_CODES` says to wait for the next minute rather than that
+    the request is refused."""
     if society.input_queued:
         return None, "society_input_queued"
     if subject_id in society.asked:
         return None, "inhabitant_action_in_progress"
-    place = next((p for p in society.places if p.target_id == target_id), None)
-    if place is None:
-        return None, "canonical_target_changed"
-    kind = DIRECT_ACTS[act]
-    intent = ActionIntent(
-        kind="perform" if kind == "perform" else "go_to",
-        target_id=target_id,
-        affordance=place.affordance if kind == "perform" else None,
-    )
+    if act in HANDS_ACTS:
+        intent = ActionIntent(kind="hands", target_id=str(thing_id), ability=act, with_id=with_id)
+    else:
+        place = next((p for p in society.places if p.target_id == target_id), None)
+        if place is None:
+            return None, "canonical_target_changed"
+        perform = DIRECT_ACTS[act] == "perform"
+        intent = ActionIntent(
+            kind="perform" if perform else "go_to",
+            target_id=place.target_id,
+            affordance=place.affordance if perform else None,
+        )
     key = uuid.uuid5(
         _DIRECT_KEYS,
         canonical_json(
@@ -705,11 +721,7 @@ def direct_body(
                 "subject_id": subject_id,
                 "base_tick": society.tick,
                 "base_state_sha256": society.state_sha256,
-                "intent": {
-                    "kind": intent.kind,
-                    "target_id": target_id,
-                    "affordance": intent.affordance,
-                },
+                "intent": intent.document(),
             }
         ).decode(),
     )
@@ -730,13 +742,16 @@ def direct_body(
         "base_tick": society.tick,
         "base_state_sha256": society.state_sha256,
         "subject_id": subject_id,
-        "intent": (
-            {"kind": "perform", "target_id": target_id, "affordance": place.affordance}
-            if intent.kind == "perform"
-            else {"kind": "go_to", "target_id": target_id}
-        ),
+        "intent": intent.document(),
     }
     return body, None
+
+
+def holder(society: SocietyRead, thing_id: str) -> str | None:
+    """The being holding one of the society's things now, by their society ids; None for a thing
+    on the ground or one the society does not hold."""
+    thing = next((t for t in society.state.get("things", ()) if t["id"] == thing_id), None)
+    return None if thing is None else thing.get("held_by")
 
 
 def valid_minted_id(thing_id: object, kind: str) -> bool:

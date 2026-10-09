@@ -266,6 +266,7 @@ def test_every_code_a_plan_can_carry_is_declared():
         "being_ambiguous",
         "place_required",
         "place_ambiguous",
+        "thing_ambiguous",
     } == plan.CLARIFICATIONS
     assert "no_change" in plan.ACTION_REFUSALS
     json.dumps(sorted(plan.ACTION_REFUSALS))

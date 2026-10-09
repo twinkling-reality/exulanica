@@ -151,10 +151,12 @@ class TypedActionBody(BaseModel):
     kind_version: int | None = Field(default=None, ge=1, le=10_000)
     thing_id: str | None = Field(default=None, max_length=200, pattern=PLACED_THING_ID_PATTERN)
     near: str | None = Field(default=None, min_length=1, max_length=300)
-    #: A being asked to act: what it is asked, the being and the place, by the society's ids.
-    act: Literal["go_to", "use"] | None = None
+    #: A being asked to act: what it is asked, the being and the place, by the society's ids; for
+    #: a hands act, the thing by its placed id (``thing_id``) and, to give or take, the other being.
+    act: Literal["go_to", "use", "pick_up", "put_down", "give", "take"] | None = None
     subject_id: str | None = Field(default=None, max_length=200)
     target_id: str | None = Field(default=None, max_length=1000)
+    with_id: str | None = Field(default=None, max_length=200)
 
 
 class TypedSimulationBody(BaseModel):
@@ -346,8 +348,9 @@ class ActionStepView(BaseModel):
     #: ``chained``: the first step's confirmation covers this one; each is still its own commit,
     #: and a refusal stops the chain where it is.
     confirmation: Literal["required", "chained"]
-    #: For a thing step, what it names as the reads label it (``kind`` and ``near``, or
-    #: ``subject``, ``place``, ``affordance`` and ``act``), for the page's words; absent otherwise.
+    #: For a thing step, what it names as the reads label it (``kind`` and ``near``; ``subject``,
+    #: ``place``, ``affordance`` and ``act``; or ``subject``, ``act``, ``thing`` and ``with``), for
+    #: the page's words; absent otherwise.
     titles: dict[str, str] | None = None
     replay: str
     receipt: str
