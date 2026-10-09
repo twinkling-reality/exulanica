@@ -46,8 +46,9 @@ luanti-minetest-game.v4.json`), which are the words a world shows for where a vi
 | `mod/exulanica_gate/adapter.json` | The adapter's version and the game fields it reads (with every item its mapping lists) |
 | `mod/exulanica_gate/mapping/` | The mapping files for each Luanti game, every published version kept |
 | `check/exulanica_gate_check/` | A test mod that plays a player on a headless server |
-| `run/` | `install.sh` unpacks the engine and the game; `check.py` runs the scripted check on its own stack or one already running (`--api`), with a scripted model where asked (`--scripted-model`, plans in `run/plans/`), lists the game's items (`--census`), or with `--play NAME` serves a world for a person; `serve.sh` and `play.sh` run the demo server and a window joined to it |
-| `tools/` | `build_look.py` builds a player's own look; `build_items.py` builds, from the hand-written `items.v1.json`, the look and thing kind each listed game item crosses as (see [the licence notes](LICENCE-NOTES.md)); `cross_once.py` makes one character cross into a running stack exactly as the mod would, with no game (for checking how a world shows it); `fake_door.py` is a stand-in door for checks; `fixtures.py` turns a recorded run into a fixture |
+| `check/exulanica_gate_director/` | A test mod that walks one real, connected player through the gate for a pictured run |
+| `run/` | `install.sh` unpacks the engine and the game; `check.py` runs the scripted check on its own stack or one already running (`--api`), with a scripted model where asked (`--scripted-model`, plans in `run/plans/`), lists the game's items (`--census`), with `--play NAME` serves a world for a person, or with `--play NAME --pictures` plays one crossing with the game's own client and pictures its window; `serve.sh` and `play.sh` run the demo server and a window joined to it |
+| `tools/` | `build_look.py` builds a player's own look; `build_items.py` builds, from the hand-written `items.v1.json`, the look and thing kind each listed game item crosses as (see [the licence notes](LICENCE-NOTES.md)); `cross_once.py` makes one character cross into a running stack exactly as the mod would, with no game (for checking how a world shows it); `fake_door.py` is a stand-in door for checks; `fixtures.py` turns a recorded run into a fixture; `side_by_side.py` puts a game window's picture beside a world's picture of the same moment |
 | `fixtures/` | Exchanges recorded from real runs, which the repository's tests read |
 | `LICENCE-NOTES.md` | What the adapter uses of Luanti and Minetest Game, and their licences |
 
@@ -108,8 +109,36 @@ check crosses into the world that record names: the scene is read from the catal
 digest (or from `--scene` for a scene the catalog does not ship), the society the builder started is
 read back (or one is started where the record names none), a paused society is played at
 `--minutes-speed` and a playing one keeps its speed. The world owner's token is read once from the
-file and stays in the check's process; the grant the check issued is closed when it ends. With
-`--play NAME` a person plays the crossing instead of the check mod.
+file and stays in the check's process; the grant the check issued is closed when it ends. The gate
+calls the world by its saved world's title, which its owner may have renamed. With `--play NAME` a
+person plays the crossing instead of the check mod.
+
+## Pictures of a crossing
+
+`check.py --play NAME --pictures` (on its own stack or joined with `--api`) plays one crossing with
+the game's own client and nobody at the keyboard, on macOS. The client is started with `open -g`,
+so it takes the focus from nobody, and joins the Luanti server as `NAME`. The director test mod
+(`check/exulanica_gate_director`, loaded only in the world this option makes) holds the player's own
+movement, so keys pressed in the window move nobody, and walks the player into the gate holding
+torches (`--carry` to change); the gate notices the player's feet in its light as it would anyone's.
+The character lives in the world until it comes home by its own choice; where it has kept a thing of
+the world for `--leave-wait-s` seconds (240 by default) without leaving, or has held nothing for
+`--call-home-limit-s` seconds after arriving, the director calls it home with `/comehome`, as its
+player would. Then the player takes what the world gave into the hand and opens the inventory.
+
+Only the client's window is captured, with `screencapture -l` and cut to what the game draws, at
+five moments: before the gate, crossing, away, home and the inventory. The server's own status line
+and the join announcement are not sent to that player, so the pictures show the crossing's words
+alone. The client quits when the run ends. The pictures stay in the ignored run folder: the game's
+art in them is its own (CC BY-SA 3.0 for Minetest Game) and is never committed. The summary lists
+each picture with its SHA-256, what the player was told, how the character came home, and each
+step's time read from the gate's own recording (`timings`: the walk-in to the world's answer and to
+the character's placing, its life in the world, and the delivery report). Tell anyone at the Mac
+before a run: a game window appears for a few minutes.
+
+`tools/side_by_side.py PLAN OUT` puts each of those pictures beside the world's own picture of the
+same moment, with words under each, and lists every picture it made with the digests of the two it
+was made from.
 
 ## Security notes
 

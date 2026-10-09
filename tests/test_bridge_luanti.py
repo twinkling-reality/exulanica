@@ -24,6 +24,9 @@ adapter's own code:
     hello, its arrivals, its delivery reports and, when its player asked, a call home, each valid
     against the door's own request models, and every frame it received (the lines its character
     said or heard included) has the fields the door's frame builders write;
+*   the director that walks a real player for a pictured run is loaded only in the world made for
+    that run, named for its one player; a run's timings are differences of the gate's own marks;
+    a side-by-side picture names the two pictures it was made from by their digests;
 *   nothing kept with the adapter looks like a channel credential or an invite code.
 
 Each guard is shown to refuse a mutant first.
@@ -782,6 +785,105 @@ def test_every_frame_the_mod_read_has_the_fields_the_door_writes():
             ]
             kinds.add(frame["kind"])
     assert {"grant", "arrived", "departed", "grant_ended"} <= kinds
+
+
+@functools.cache
+def _check() -> Any:
+    """``bridges/luanti/run/check.py``, the scripted check and the pictured run."""
+    spec = importlib.util.spec_from_file_location("luanti_check", ADAPTER / "run" / "check.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_only_a_pictured_world_loads_the_director_for_its_one_player(tmp_path):
+    """The director moves a real player; it is loaded in the world a pictured run makes and named
+    that run's player, and in no world a person plays in or a check plays."""
+    check = _check()
+
+    def made(name: str, **options: Any) -> tuple[str, str]:
+        folder = tmp_path / name
+        world = check.luanti_world(folder, 19529, "http://127.0.0.1:1", **options)
+        return (world / "world.mt").read_text(), (folder / "server.conf").read_text()
+
+    mods, settings = made("pictured", player="walker", director=True)
+    assert "load_mod_exulanica_gate_director = true" in mods.splitlines()
+    assert "exulanica_gate_director.player = walker" in settings.splitlines()
+    for name, options in (("played", {"player": "walker"}), ("checked", {"director": True})):
+        mods, settings = made(name, **options)
+        assert "director" not in mods + settings, name
+
+
+def test_a_crossings_timings_are_read_from_the_gates_own_clock():
+    """Each step's time is the difference of two of the gate's own marks (its recording's t_ms),
+    the first crossing's, and a step the run never reached is left out."""
+    recorded = [
+        {"mark": "arrival_sent", "request": "a1", "t_ms": 1000},
+        {"exchange": True, "path": "/door/channel/arrivals", "status": 201, "ms": 88, "t_ms": 1090},
+        {"mark": "arrived", "request": "a1", "t_ms": 2400},
+        {"mark": "departed", "request": "d1", "t_ms": 62400},
+        {"mark": "delivered", "request": "d1", "t_ms": 62500},
+        {"mark": "arrival_sent", "request": "a2", "t_ms": 70000},
+        {"mark": "arrived", "request": "a2", "t_ms": 99000},
+    ]
+    assert _check().crossing_timings(recorded) == {
+        "walk_in_to_answer_ms": 90,
+        "walk_in_to_placed_ms": 1400,
+        "placed_to_departed_ms": 60000,
+        "departed_to_delivered_ms": 100,
+        "arrival_request_ms": 88,
+    }
+    assert _check().crossing_timings(recorded[:3]) == {
+        "walk_in_to_answer_ms": 90,
+        "walk_in_to_placed_ms": 1400,
+        "arrival_request_ms": 88,
+    }
+
+
+def test_a_side_by_side_picture_names_the_pictures_it_was_made_from(tmp_path):
+    """A record names a side-by-side picture and its two sources by digest: the list the composer
+    writes carries each, as hashed here from the files themselves."""
+    import hashlib
+
+    from PIL import Image
+
+    spec = importlib.util.spec_from_file_location(
+        "luanti_side_by_side", ADAPTER / "tools" / "side_by_side.py"
+    )
+    assert spec is not None and spec.loader is not None
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    Image.new("RGB", (1280, 720), (40, 120, 40)).save(tmp_path / "game.png")
+    Image.new("RGB", (800, 500), (200, 200, 220)).save(tmp_path / "world.png")
+    plan = tmp_path / "plan.json"
+    plan.write_text(
+        json.dumps(
+            {
+                "pairs": [
+                    {
+                        "name": "1-crossing",
+                        "left": {"file": "game.png", "words": "In the game"},
+                        "right": {"file": "world.png", "words": "In the world"},
+                    }
+                ]
+            }
+        )
+    )
+    assert tool.main([str(plan), str(tmp_path / "out")]) == 0
+    [made] = json.loads((tmp_path / "out" / "side-by-side.json").read_text())["pictures"]
+
+    def digest(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    assert made["sha256"] == digest(tmp_path / "out" / "1-crossing.jpg")
+    assert made["from"] == {
+        "left": {"file": "game.png", "sha256": digest(tmp_path / "game.png")},
+        "right": {"file": "world.png", "sha256": digest(tmp_path / "world.png")},
+    }
+    with Image.open(tmp_path / "out" / "1-crossing.jpg") as sheet:
+        assert sheet.height > 720 and sheet.width > 1280 + 1152
 
 
 #: A channel credential is 32 random bytes as URL-safe base64 (43 characters); an invite is 16

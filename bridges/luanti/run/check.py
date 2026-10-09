@@ -2,11 +2,11 @@
 
     <checkout>/.venv/bin/python bridges/luanti/run/check.py [--port-base 19520]
         [--luanti-port 19529] [--minutes-speed 1] [--lives-s 20] [--keep-stack] [--scene FILE]
-        [--against stack|fake] [--play NAME [--carry ITEMS]] [--invite] [--traveller-mind]
-        [--scripted-model PLAN]
+        [--against stack|fake] [--play NAME [--carry ITEMS] [--pictures]] [--invite]
+        [--traveller-mind] [--scripted-model PLAN]
     <checkout>/.venv/bin/python bridges/luanti/run/check.py --api URL --token-file FILE
         --record FILE [--scene FILE] [--luanti-port 19529] [--minutes-speed 1] [--lives-s 20]
-        [--play NAME [--carry ITEMS]] [--traveller-mind]
+        [--play NAME [--carry ITEMS] [--pictures]] [--traveller-mind]
 
 What it does, in order, refusing by name at the first thing that is not as expected:
 
@@ -36,10 +36,12 @@ What it does, in order, refusing by name at the first thing that is not as expec
     down (``--keep-stack`` leaves the stack up for a look in the browser).
 
 ``--against fake`` runs the same crossing against ``tools/fake_door.py`` instead, with no stack;
-``--play NAME`` serves the world for a person to play in. ``--scripted-model PLAN`` serves the
-stack's API with ``scripts/acceptance/scripted_model.py`` answering every model request from PLAN
-(``run/plans/``: the travellers' mind waits, or leaves), with no provider, key or cost; the run
-keeps what it was asked and chose.
+``--play NAME`` serves the world for a person to play in, and with ``--pictures`` the game's own
+client plays one crossing there with nobody at the keyboard, walked by the director test mod, its
+window alone captured at each moment (the README's "Pictures of a crossing").
+``--scripted-model PLAN`` serves the stack's API with ``scripts/acceptance/scripted_model.py``
+answering every model request from PLAN (``run/plans/``: the travellers' mind waits, or leaves),
+with no provider, key or cost; the run keeps what it was asked and chose.
 
 ``--api URL --token-file FILE --record FILE`` joins a stack this check did not start, where a scene
 was built for a take: it starts and stops no stack and builds nothing. That stack was started with
@@ -60,6 +62,7 @@ import json
 import os
 import secrets
 import shutil
+import signal as signal_module
 import subprocess
 import sys
 import time
@@ -231,6 +234,11 @@ def crossing_world(api: Api, placed: dict[str, Any], scene: Path) -> dict[str, A
         raise Refused(
             "scene", f"travellers come through {travellers['gate']}, which was not placed"
         )
+    words = json.loads(scene.read_text())["title"]
+    if placed.get("entry_id"):
+        # The words the world shows for itself: its saved world's title, which its owner may have
+        # renamed; the scene's title is only what a builder first called it.
+        words = api("GET", f"/world-entries/{placed['entry_id']}").get("title") or words
     world = {
         "version": placed["version_id"],
         "scope": {"world_id": placed["world_id"]},
@@ -238,7 +246,7 @@ def crossing_world(api: Api, placed: dict[str, Any], scene: Path) -> dict[str, A
         "society": f"/world/versions/{placed['version_id']}/society",
         "gate": travellers.get("gate") or gates[0],
         "travellers": travellers,
-        "words": json.loads(scene.read_text())["title"],
+        "words": words,
     }
     named = placed.get("society")
     if named:
@@ -386,17 +394,21 @@ def luanti_world(
     calls_home: bool = False,
     mapping: str = MAPPING_FILE,
     call_home_on_signal: bool = False,
+    director: bool = False,
 ) -> Path:
     """A fresh flat world and its server settings: a check world with the check mod (told how long
     the world's owner lets a character live in the world, ``lives_s``, and whether the door lets
     a gate call its visitors home, ``calls_home``), or, given a ``player``, a world for a person to
     play in, with the gate at the spawn and only that name let in, starting with ``carry`` (the
-    game's own item words) in the hand when given."""
+    game's own item words) in the hand when given. With ``director`` the player's world also loads
+    the director (``check/exulanica_gate_director``), which walks that player for a pictured run."""
     world = folder / "world"
     world.mkdir(parents=True)
     mods = "load_mod_exulanica_gate = true\n"
     if player is None:
         mods += "load_mod_exulanica_gate_check = true\n"
+    elif director:
+        mods += "load_mod_exulanica_gate_director = true\n"
     (world / "world.mt").write_text(
         "gameid = minetest_game\nbackend = sqlite3\nplayer_backend = sqlite3\n"
         "auth_backend = sqlite3\nmod_storage_backend = sqlite3\n" + mods
@@ -435,6 +447,8 @@ def luanti_world(
         ]
         if carry:
             settings += ["give_initial_stuff = true", f"initial_stuff = {carry}"]
+        if director:
+            settings += [f"exulanica_gate_director.player = {player}"]
     (folder / "server.conf").write_text("\n".join([*settings, ""]))
     return world
 
@@ -528,6 +542,44 @@ def lines_kept_in_the_world(exchanges: list[dict[str, Any]], told: list[str]) ->
         "said_frames": len(said),
         "told_in_the_game": sum(1 for line in said if any(line in text for text in told)),
     }
+
+
+def crossing_timings(exchanges: list[dict[str, Any]]) -> dict[str, Any]:
+    """How long the first crossing's steps took, by the gate mod's own clock (its recording's
+    ``t_ms``): from the walk-in (the arrival sent) to the world's answer and to the character's
+    placing (the arrived frame read), the character's life in the world (to the departed frame),
+    and the delivery report's answer; and how long the door took to answer the arrival itself.
+    A step the run never reached is left out."""
+    marks: dict[str, int] = {}
+    for entry in exchanges:
+        if "mark" in entry and entry["mark"] not in marks:
+            marks[entry["mark"]] = int(entry["t_ms"])
+    posted = next(
+        (
+            entry
+            for entry in exchanges
+            if entry.get("exchange") and entry.get("path") == "/door/channel/arrivals"
+        ),
+        None,
+    )
+    steps = (
+        ("walk_in_to_answer_ms", "arrival_sent", None),
+        ("walk_in_to_placed_ms", "arrival_sent", "arrived"),
+        ("placed_to_departed_ms", "arrived", "departed"),
+        ("departed_to_delivered_ms", "departed", "delivered"),
+    )
+    timings: dict[str, Any] = {}
+    for name, start, end in steps:
+        if start not in marks:
+            continue
+        if end is None:
+            if posted is not None:
+                timings[name] = int(posted["t_ms"]) - marks[start]
+        elif end in marks:
+            timings[name] = marks[end] - marks[start]
+    if posted is not None and posted.get("ms") is not None:
+        timings["arrival_request_ms"] = int(posted["ms"])
+    return timings
 
 
 #: How long after the called-home crossing's arrival the check calls home anyway, with
@@ -763,6 +815,395 @@ def play_until_stopped(
     return summary
 
 
+# A pictured run -----------------------------------------------------------------------------------
+
+#: What the pictured run's player starts holding unless ``--carry`` says otherwise: the game's
+#: torches, one of which crosses as the mapping's lantern.
+PICTURES_CARRY = "default:torch 5"
+#: The size the client draws the game at, in the window's points: width and height.
+SCREEN = (1280, 720)
+#: The client's settings for a pictured run: a window of a fixed size that keeps drawing while
+#: another window has the focus, no sound, and nothing remembered from the run.
+CLIENT_SETTINGS = (
+    f"screen_w = {SCREEN[0]}",
+    f"screen_h = {SCREEN[1]}",
+    "fullscreen = false",
+    "autosave_screensize = false",
+    "pause_on_lost_focus = false",
+    "fps_max_unfocused = 30",
+    "mute_sound = true",
+    "show_debug = false",
+)
+#: Lists the windows of one process (its id the first argument) as JSON: id, layer and size. Only
+#: that process's windows leave the script.
+WINDOWS_OF = """
+ObjC.import('CoreGraphics');
+function run(argv) {
+  const pid = Number(argv[0]);
+  const listed = ObjC.castRefToObject(
+    $.CGWindowListCopyWindowInfo($.kCGWindowListOptionAll, $.kCGNullWindowID));
+  const found = [];
+  for (let index = 0; index < listed.count; index++) {
+    const window = listed.objectAtIndex(index);
+    if (ObjC.unwrap(window.objectForKey('kCGWindowOwnerPID')) !== pid) continue;
+    const bounds = ObjC.deepUnwrap(window.objectForKey('kCGWindowBounds'));
+    found.push({id: ObjC.unwrap(window.objectForKey('kCGWindowNumber')),
+      layer: ObjC.unwrap(window.objectForKey('kCGWindowLayer')),
+      width: bounds.Width, height: bounds.Height});
+  }
+  return JSON.stringify(found);
+}
+"""
+
+
+class Director:
+    """The director mod's two files in its world folder: the commands this run writes (the whole
+    list, replaced at once, so the mod never reads half a line) and the answers the mod appends,
+    with when its player joined and left."""
+
+    def __init__(self, world: Path) -> None:
+        self.folder = world / "exulanica_gate_director"
+        self.folder.mkdir(parents=True, exist_ok=True)
+        self.commands: list[str] = []
+
+    def answers(self) -> list[dict[str, Any]]:
+        done = self.folder / "done.jsonl"
+        if not done.exists():
+            return []
+        # Text after the last newline is a line still being written.
+        return [json.loads(line) for line in done.read_text().split("\n")[:-1]]
+
+    def wait_event(self, event: str, limit_s: float) -> dict[str, Any]:
+        ends = time.monotonic() + limit_s
+        while time.monotonic() < ends:
+            for answer in self.answers():
+                if answer.get("event") == event:
+                    return answer
+            time.sleep(0.25)
+        raise Refused("director", f"its player never {event} in {limit_s:.0f} s")
+
+    def act(self, act: str, limit_s: float = 15, **fields: Any) -> dict[str, Any]:
+        """Ask for one act and wait for its answer."""
+        number = len(self.commands) + 1
+        self.commands.append(json.dumps({"n": number, "act": act, **fields}))
+        written = self.folder / "commands.jsonl.new"
+        written.write_text("\n".join(self.commands) + "\n")
+        written.replace(self.folder / "commands.jsonl")
+        ends = time.monotonic() + limit_s
+        while time.monotonic() < ends:
+            for answer in self.answers():
+                if answer.get("n") == number:
+                    return answer
+            time.sleep(0.1)
+        raise Refused("director", f"no answer to {act} in {limit_s:.0f} s")
+
+    def told(self) -> list[str]:
+        told = self.folder / "told.jsonl"
+        if not told.exists():
+            return []
+        return [json.loads(line)["told"] for line in told.read_text().split("\n")[:-1]]
+
+
+class Client:
+    """The game's own client for a pictured run: started with ``open -g``, so it takes the focus
+    from nobody at this Mac; found again by the settings file in its run folder, which no other
+    process names; quit when the run ends."""
+
+    def __init__(self, folder: Path, port: int, name: str, password: Path) -> None:
+        self.settings = folder / "client.conf"
+        self.settings.write_text("\n".join([*CLIENT_SETTINGS, ""]))
+        app = INSTALL / "app" / "luanti.app"
+        self.binary = str(app / "Contents" / "MacOS" / "luanti")
+        subprocess.run(
+            [
+                "open",
+                "-g",
+                "-n",
+                "-a",
+                str(app),
+                "--env",
+                f"LUANTI_USER_PATH={INSTALL / 'user'}",
+                "--args",
+                "--go",
+                "--address",
+                "127.0.0.1",
+                "--port",
+                str(port),
+                "--name",
+                name,
+                "--password-file",
+                str(password),
+                "--config",
+                str(self.settings),
+                "--logfile",
+                str(folder / "client.log"),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        self.pid = self._find(limit_s=30)
+
+    def _ours(self, pid: int | None = None) -> list[int]:
+        listed = subprocess.run(
+            ["ps", "-axo", "pid=,command="], capture_output=True, text=True, check=True
+        ).stdout
+        found = []
+        for line in listed.splitlines():
+            number, _, command = line.strip().partition(" ")
+            if command.startswith(self.binary) and str(self.settings) in command:
+                found.append(int(number))
+        return [number for number in found if pid is None or number == pid]
+
+    def _find(self, limit_s: float) -> int:
+        ends = time.monotonic() + limit_s
+        while time.monotonic() < ends:
+            found = self._ours()
+            if found:
+                return found[0]
+            time.sleep(0.5)
+        raise Refused("client", f"the client did not start in {limit_s:.0f} s")
+
+    def window(self, limit_s: float) -> int:
+        """The client's game window: its largest window on the normal layer."""
+        ends = time.monotonic() + limit_s
+        while time.monotonic() < ends:
+            listed = subprocess.run(
+                ["osascript", "-l", "JavaScript", "-e", WINDOWS_OF, str(self.pid)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            windows = json.loads(listed.stdout or "[]") if listed.returncode == 0 else []
+            drawn = [
+                window
+                for window in windows
+                if window["layer"] == 0 and window["width"] >= 640 and window["height"] >= 360
+            ]
+            if drawn:
+                return max(drawn, key=lambda window: window["width"] * window["height"])["id"]
+            time.sleep(1)
+        raise Refused("client", f"the client showed no game window in {limit_s:.0f} s")
+
+    def capture(self, window: int, path: Path) -> None:
+        """That one window's picture, without its shadow and without a sound, cut to what the game
+        draws: the title bar above it is the system's, and names the client."""
+        from PIL import Image
+
+        whole = path.with_name(path.stem + ".window.png")
+        subprocess.run(["screencapture", "-x", "-o", f"-l{window}", str(whole)], check=True)
+        if not whole.exists() or whole.stat().st_size == 0:
+            raise Refused("picture", f"screencapture wrote no picture to {whole.name}")
+        with Image.open(whole) as image:
+            drawn = round(image.width * SCREEN[1] / SCREEN[0])
+            image.crop((0, image.height - drawn, image.width, image.height)).save(path)
+        whole.unlink()
+
+    def quit(self) -> str:
+        """Ask the client to quit, and make sure it has: it is this run's own process, found by its
+        settings file."""
+        if not self._ours(self.pid):
+            return "gone before the end"
+        os.kill(self.pid, signal_module.SIGTERM)
+        ends = time.monotonic() + 20
+        while time.monotonic() < ends:
+            if not self._ours(self.pid):
+                return "quit"
+            time.sleep(0.5)
+        os.kill(self.pid, signal_module.SIGKILL)
+        return "killed after 20 s"
+
+
+class Recording:
+    """The gate mod's recording of a run, read on as it grows."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.start = 0
+        self.marks: list[dict[str, Any]] = []
+
+    def first(self, name: str) -> dict[str, Any] | None:
+        marks, self.start = read_marks(self.path, self.start)
+        self.marks += marks
+        return next((mark for mark in self.marks if mark["mark"] == name), None)
+
+    def wait(self, name: str, limit_s: float) -> dict[str, Any] | None:
+        ends = time.monotonic() + limit_s
+        while time.monotonic() < ends:
+            found = self.first(name)
+            if found:
+                return found
+            time.sleep(0.5)
+        return None
+
+
+def wait_for_home(
+    recording: Recording,
+    director: Director,
+    holding: Any,
+    character: str,
+    arrived_at: float,
+    arguments: argparse.Namespace,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Wait for the character to come home, the player calling it home with ``/comehome`` when it
+    has kept a thing of the world for ``--leave-wait-s`` without leaving, or has held nothing for
+    ``--call-home-limit-s`` after it arrived. Returns the departure the gate recorded and what the
+    run did meanwhile."""
+    acts: dict[str, Any] = {}
+    held_since = None
+    read_at = 0.0
+    ends = time.monotonic() + arguments.limit_s
+    while True:
+        departed = recording.first("departed")
+        now = time.monotonic()
+        if departed:
+            return departed, acts
+        if now > ends:
+            raise Refused("pictures", f"the character was not home {arguments.limit_s} s on")
+        if "called_home" not in acts and now - read_at >= 2:
+            read_at = now
+            held = holding(character)
+            if held and held_since is None:
+                held_since = now
+                acts["held"] = {"kinds": held, "after_arrival_s": round(now - arrived_at, 1)}
+            waited = held_since is not None and now - held_since >= arguments.leave_wait_s
+            empty = held_since is None and now - arrived_at >= arguments.call_home_limit_s
+            if waited or empty:
+                called = director.act("command", name="comehome")
+                acts["called_home"] = {
+                    "after_arrival_s": round(now - arrived_at, 1),
+                    "holding": held,
+                    "answered": called.get("detail"),
+                }
+        time.sleep(0.5)
+
+
+def pictured_run(
+    arguments: argparse.Namespace,
+    folder: Path,
+    api: Api,
+    world: dict[str, Any],
+    credential: str,
+    holding: Any,
+    summary: dict[str, Any],
+) -> Path:
+    """One crossing played by the game's own client with nobody at the keyboard: the director
+    walks the player into the gate holding torches, the character lives in the world until it
+    comes home (by its own choice, or called home as ``wait_for_home`` says), and the player takes
+    what came home into the hand and opens the inventory. The client's window alone is captured at
+    each moment into ``<run folder>/pictures``. The run's result, in the check mod's result's
+    shape, is the summary's ``check`` from the start, so a run refused part way says how far it
+    got. Returns the world."""
+    carry = arguments.carry or PICTURES_CARRY
+    luanti = luanti_world(
+        folder,
+        arguments.luanti_port,
+        api.base,
+        player=arguments.play,
+        carry=carry,
+        mapping=arguments.mapping,
+        director=True,
+    )
+    recording = Recording(luanti / "exulanica_gate" / "exchanges.jsonl")
+    password = folder / "player-password"
+    password.write_text(secrets.token_urlsafe(18))
+    password.chmod(0o600)
+    director = Director(luanti)
+    pictures = folder / "pictures"
+    pictures.mkdir()
+    checks: list[dict[str, Any]] = []
+    taken: list[dict[str, Any]] = []
+    result: dict[str, Any] = {
+        "profile": "exulanica-gate.pictured-run/v1",
+        "checks": checks,
+        "pictures": taken,
+    }
+    summary["check"] = result
+    started = time.monotonic()
+
+    def verdict(name: str, ok: Any, detail: Any = None) -> None:
+        checks.append({"check": name, "ok": bool(ok), "detail": detail})
+        if not ok:
+            raise Refused("pictures", f"{name}: {detail}")
+
+    server = start_luanti(folder, luanti, arguments.luanti_port, credential)
+    client = None
+    try:
+        client = Client(folder, arguments.luanti_port, arguments.play, password)
+        director.wait_event("joined", 90)
+        verdict("the client joined as the player", True)
+        window = client.window(limit_s=30)
+
+        def take(moment: str) -> None:
+            path = pictures / f"{len(taken) + 1}-{moment}.png"
+            client.capture(window, path)
+            taken.append(
+                {
+                    "moment": moment,
+                    "file": path.name,
+                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                    "bytes": path.stat().st_size,
+                    "at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                    "run_s": round(time.monotonic() - started, 1),
+                }
+            )
+
+        director.act("hold")
+        stood = director.act("stand", distance=3.5, pitch_deg=4)
+        verdict("the player stood before the gate", stood["ok"], stood.get("detail"))
+        # The client draws the blocks around its new place.
+        time.sleep(4)
+        take("before-the-gate")
+        walked = director.act("walk_in", limit_s=25, speed=4)
+        verdict(
+            "the player walked into the light and the gate put them through",
+            walked["ok"],
+            walked.get("detail"),
+        )
+        director.act("look_back", distance=3.5, pitch_deg=4)
+        time.sleep(1)
+        take("crossing")
+        arrived = recording.wait("arrived", limit_s=180)
+        verdict("the character arrived in the world", arrived, "no arrived frame in 180 s")
+        arrived_at = time.monotonic()
+        time.sleep(1.5)
+        take("away")
+        departed, acts = wait_for_home(
+            recording, director, holding, str(arrived["subject"]), arrived_at, arguments
+        )
+        result["owner_acts"] = acts
+        result["came_home"] = {"delivered": departed.get("delivered"), "why": departed.get("why")}
+        time.sleep(1.5)
+        brought = [str(item) for item in departed.get("delivered") or []]
+        # What the world gave: whatever came home that the player did not start with.
+        started_with = {stuff.split()[0] for stuff in carry.split(",") if stuff.strip()}
+        given = [item for item in brought if item not in started_with]
+        if given:
+            director.act("wield", item=given[0])
+            time.sleep(1)
+        take("home")
+        director.act("inventory")
+        time.sleep(1.5)
+        take("inventory")
+        director.act("close")
+        contents = director.act("contents").get("contents") or []
+        held_now = {entry["item"] for entry in contents}
+        verdict(
+            "what came home is in the player's inventory",
+            brought and set(brought) <= held_now,
+            {"brought": brought, "inventory": sorted(held_now)},
+        )
+        director.act("release")
+    finally:
+        if client is not None:
+            result["client"] = client.quit()
+        server.terminate()
+        server.wait(timeout=30)
+        result["luanti_exit"] = server.returncode
+        password.unlink(missing_ok=True)
+        result["told"] = director.told()
+    return luanti
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--port-base", type=int, default=19520)
@@ -777,6 +1218,20 @@ def main(argv: list[str] | None = None) -> int:
         "--carry",
         metavar="ITEMS",
         help="with --play: what the person starts holding, as the game names its items",
+    )
+    parser.add_argument(
+        "--pictures",
+        action="store_true",
+        help="with --play NAME: the game's client joins as NAME, started in the background, and "
+        "a director walks it through the gate and back with nobody at the keyboard; only that "
+        "window is captured, at each moment, into the run folder's pictures (macOS)",
+    )
+    parser.add_argument(
+        "--leave-wait-s",
+        type=float,
+        default=240.0,
+        help="with --pictures: how long the character may keep a thing of the world without "
+        "leaving before its player calls it home",
     )
     parser.add_argument(
         "--scene",
@@ -866,6 +1321,8 @@ def main(argv: list[str] | None = None) -> int:
             "--api joins a running stack: no --against fake, --keep-stack, --invite or "
             "--scripted-model"
         )
+    if arguments.pictures and (not arguments.play or arguments.invite):
+        parser.error("--pictures plays a --play NAME world opened by the server's credential")
     if arguments.census:
         return take_census(arguments)
     if not joined:
@@ -1020,7 +1477,7 @@ def main(argv: list[str] | None = None) -> int:
         summary["grant_id"] = issued["grant"]["grant_id"]
         # The mind the grant gave travellers, a model the manifest offers, or None for the routine.
         summary["traveller_mind"] = grant.get("traveller")
-        if arguments.play:
+        if arguments.play and not arguments.pictures:
             if arguments.invite:
                 # A person types the code their world shows them; this check shows none.
                 raise Refused(
@@ -1028,60 +1485,77 @@ def main(argv: list[str] | None = None) -> int:
                 )
             play_until_stopped(arguments, folder, api, world, credential, summary)
             return 0
-        luanti = luanti_world(
-            folder,
-            arguments.luanti_port,
-            api.base,
-            "crossing_invite" if arguments.invite else "crossing_door",
-            lives_s=arguments.lives_s,
-            calls_home=offers["calls_home"],
-            mapping=arguments.mapping,
-            call_home_on_signal=arguments.call_home_when_holding,
-        )
-        if arguments.call_home_when_holding and not offers["calls_home"]:
-            raise Refused("call-home", "this door publishes no home route to call a character by")
-        recorded = luanti / "exulanica_gate" / "exchanges.jsonl"
-        server = start_luanti(
-            folder,
-            luanti,
-            arguments.luanti_port,
-            credential,
-            bridge_credential=bridge_credential if arguments.invite else None,
-            invite=invite,
-        )
-        del credential, invite, bridge_credential
-        # The gate closes a few seconds after the last crossing the check mod plays, the one whose
-        # player leaves the game; an invite's check plays none such.
-        closes_after = 0 if arguments.invite else (3 if offers["calls_home"] else 2)
-        # The file the check mod waits for before its player calls the character home.
-        signal = None
-        if arguments.call_home_when_holding:
-            signal = luanti / "exulanica_gate_check" / "call_home"
 
         def holding(character: str) -> list[str]:
             return world_things_held(api, world, character)
 
-        summary["owner_acts"] = act_as_owner(
-            api,
-            summary["grant_id"],
-            recorded,
-            server,
-            arguments.limit_s,
-            arguments.lives_s,
-            closes_after,
-            holding=holding,
-            signal=signal,
-            signal_limit_s=arguments.call_home_limit_s,
-        )
-        exit_code = server.returncode
-        summary["luanti_exit"] = exit_code
-        result_file = luanti / "exulanica_gate_check" / "result.json"
-        if not result_file.exists():
-            raise Refused("no-result", f"the check mod wrote no result; see {folder}/server.log")
-        result = json.loads(result_file.read_text())
-        summary["check"] = result
+        if arguments.pictures:
+            if not offers["calls_home"]:
+                raise Refused(
+                    "call-home", "this door publishes no home route to call a character by"
+                )
+            luanti = pictured_run(arguments, folder, api, world, credential, holding, summary)
+            del credential, invite, bridge_credential
+            result = summary["check"]
+            summary["owner_acts"] = result.get("owner_acts", {})
+            summary["luanti_exit"] = result.get("luanti_exit")
+            recorded = luanti / "exulanica_gate" / "exchanges.jsonl"
+        else:
+            luanti = luanti_world(
+                folder,
+                arguments.luanti_port,
+                api.base,
+                "crossing_invite" if arguments.invite else "crossing_door",
+                lives_s=arguments.lives_s,
+                calls_home=offers["calls_home"],
+                mapping=arguments.mapping,
+                call_home_on_signal=arguments.call_home_when_holding,
+            )
+            if arguments.call_home_when_holding and not offers["calls_home"]:
+                raise Refused(
+                    "call-home", "this door publishes no home route to call a character by"
+                )
+            recorded = luanti / "exulanica_gate" / "exchanges.jsonl"
+            server = start_luanti(
+                folder,
+                luanti,
+                arguments.luanti_port,
+                credential,
+                bridge_credential=bridge_credential if arguments.invite else None,
+                invite=invite,
+            )
+            del credential, invite, bridge_credential
+            # The gate closes a few seconds after the last crossing the check mod plays, the one
+            # whose player leaves the game; an invite's check plays none such.
+            closes_after = 0 if arguments.invite else (3 if offers["calls_home"] else 2)
+            # The file the check mod waits for before its player calls the character home.
+            signal = None
+            if arguments.call_home_when_holding:
+                signal = luanti / "exulanica_gate_check" / "call_home"
+            summary["owner_acts"] = act_as_owner(
+                api,
+                summary["grant_id"],
+                recorded,
+                server,
+                arguments.limit_s,
+                arguments.lives_s,
+                closes_after,
+                holding=holding,
+                signal=signal,
+                signal_limit_s=arguments.call_home_limit_s,
+            )
+            exit_code = server.returncode
+            summary["luanti_exit"] = exit_code
+            result_file = luanti / "exulanica_gate_check" / "result.json"
+            if not result_file.exists():
+                raise Refused(
+                    "no-result", f"the check mod wrote no result; see {folder}/server.log"
+                )
+            result = json.loads(result_file.read_text())
+            summary["check"] = result
         shutil.copy(recorded, folder / "exchanges.jsonl")
         exchanges = [json.loads(line) for line in recorded.read_text().splitlines()]
+        summary["timings"] = crossing_timings(exchanges)
         summary["answers_posted"] = sum(
             1 for entry in exchanges if entry.get("path") == "/door/channel/answers"
         )
