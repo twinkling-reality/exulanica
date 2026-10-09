@@ -331,8 +331,13 @@ given in `exulanica/api/services.py`):
    (`grant_revoked`), a bridge the deployment no longer declares or offers here, a workspace that is
    closed, or a program that has said no hello under the grant's live credential with a version and
    mapping the deployment admits, or has not polled within its hold and ten quiet seconds
-   (`decider_disconnected`). With a refusal the host records an unavailable receipt at once and the
-   world's routine decides that turn.
+   (`decider_disconnected`). A connected program that let its last three asks for a thing pass
+   unanswered is silent for it: it is asked for the thing again once ten of the world's minutes have
+   passed since its last ask, or as soon as it says hello again, and each turn between is refused at
+   once (`decider_disconnected`), so a silent program never makes its world wait out an answer
+   window every minute (`SILENT_AFTER_UNANSWERED` and `SILENT_ASK_EVERY_MINUTES` in
+   `exulanica/door/asker.py`). With a refusal the host records an unavailable receipt at once and
+   the world's routine decides that turn.
 2. **Asking** writes the ask to the grant's outbox (`door_ask`), which wakes the bridge's held poll,
    and waits until the minute's deadline for the bridge's answer in the inbox (`door_answer`),
    holding no connection between reads. The default deadline is 3,000 ms: a frame reaches a held
@@ -527,5 +532,6 @@ the repository's `bridges/` folder, outside the product, each with its own licen
 | Lines both ways: an ask's line labels and bound, an answer's line held to them and to the grant's word on speaking, said frames (who said each and who decided it, to whom) screened against saved names, the society's own departures | `exulanica/door/channel.py`, `protocol.py` | `tests/test_door_lines_postgres.py`, `tests/test_door.py` (the cursors) |
 | Visitors the world decides for: the arrival's word from the grant, the traveller mind and `model.invoke`, its release and lapse, settling a grant that ran out on the door's reads and through the maintenance sweep, a call home | `exulanica/door/grants.py`, `crossings.py`, `channel.py`, `sweep.py`, `exulanica/api/routes/door.py`, `exulanica/orchestration/installation/maintenance.py` | `tests/test_door_world_decides_postgres.py`, `tests/test_door.py` (the scope) |
 | What a visitor takes home: the right to carry things out fixed at its arrival, a player's call home, a thing of the world sent to its game as the item its kind's key names | `exulanica/door/crossings.py`, `channel.py` | `tests/test_door_carry_out_postgres.py` |
+| A silent outside program: after a run of asks for a thing it let pass, asked for it again only now and then, each turn between refused at once | `exulanica/door/asker.py` | `tests/test_door_silent_program_postgres.py` |
 
 Decision record: [ADR-0031](adr/0031-an-outside-program-decides-only-through-the-door.md).

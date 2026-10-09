@@ -14,6 +14,12 @@ application gives it (``exulanica/api/external_asking.py``), and this is the one
     credential said hello since it was issued, with a version and mapping the deployment still
     admits, and polled within the presence window (:func:`exulanica.door.channel.presence_of`). A
     visitor of a grant that ended is sent home: the door writes its departure for the next minute.
+    A connected program that let its last :data:`SILENT_AFTER_UNANSWERED` asks for a thing pass
+    unanswered is silent for it: it is asked for the thing again once
+    :data:`SILENT_ASK_EVERY_MINUTES` of the world's minutes have passed since its last ask, or as
+    soon as it says hello again, and each turn between is refused at once as
+    ``decider_disconnected``, so a silent program never makes its world wait out an answer window
+    every minute.
 *   :meth:`DoorAsker.answer` writes the ask to the grant's outbox, where the bridge's held poll
     reads it, and waits until ``ends_at`` for the bridge's answer in the inbox. The answer it finds
     becomes the result the host records as the receipt: the offered option the bridge named, and
@@ -45,12 +51,34 @@ from exulanica.door.notices import Notices
 from exulanica.door.protocol import DEADLINE_MS_DEFAULT
 from exulanica.world.decision_roles import decision_roles
 
-__all__ = ["DoorAsker"]
+__all__ = ["SILENT_AFTER_UNANSWERED", "SILENT_ASK_EVERY_MINUTES", "DoorAsker"]
 
 #: How often a waiting ask reads the inbox when no notice wakes it: an answer stored by another
 #: process is seen within this.
 _READ_EVERY_SECONDS: Final = 0.25
 _ENDED: Final = {"revoked": "grant_revoked", "expired": "grant_expired"}
+#: How many asks in a row for one thing a connected program leaves unanswered before it counts as
+#: silent for that thing.
+SILENT_AFTER_UNANSWERED: Final = 3
+#: How many of the world's minutes pass between asks for a thing its program is silent for: each
+#: one costs the world an answer window, the turns between none.
+SILENT_ASK_EVERY_MINUTES: Final = 10
+#: The newest asks of a grant for one thing, newest first: whether each was answered, the world
+#: minute it was asked for, when it was written, and the minute its society has reached since. The
+#: grant's asks are read newest first by their key and the read stops at the thing's third, so it
+#: passes only the asks for the grant's other things made since.
+_RECENT_ASKS: Final = (
+    "select r.base_tick, k.recorded_at, s.current_tick, exists ("
+    "  select 1 from door_answer a"
+    "  where a.workspace_id = k.workspace_id and a.request_id = k.request_id) as answered "
+    "from door_ask k join world_society_decision_request r "
+    "  on r.workspace_id = k.workspace_id and r.society_id = k.society_id "
+    " and r.request_id = k.request_id "
+    "join world_society s on s.workspace_id = k.workspace_id and s.society_id = k.society_id "
+    "  and s.world_id = %(world)s "
+    "where k.workspace_id = %(w)s and k.grant_id = %(g)s and r.subject_id = %(s)s "
+    "order by k.ask_seq desc limit %(n)s"
+)
 
 
 def _uuid_or_none(text: str) -> uuid.UUID | None:
@@ -58,6 +86,38 @@ def _uuid_or_none(text: str) -> uuid.UUID | None:
         return uuid.UUID(text)
     except ValueError:
         return None
+
+
+def _silent(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    grant_id: uuid.UUID,
+    subject_id: str,
+    hello_at: Any,
+) -> bool:
+    """Whether the grant's program is silent for ``subject_id`` this minute: it left its last
+    :data:`SILENT_AFTER_UNANSWERED` asks for it unanswered, said no hello since the newest of them,
+    and was asked for it fewer than :data:`SILENT_ASK_EVERY_MINUTES` of the world's minutes ago."""
+    subject = _uuid_or_none(subject_id)
+    if subject is None:
+        return False
+    recent = connection.execute(
+        _RECENT_ASKS,
+        {
+            "w": workspace_id,
+            "world": world_id,
+            "g": grant_id,
+            "s": subject,
+            "n": SILENT_AFTER_UNANSWERED,
+        },
+    ).fetchall()
+    if len(recent) < SILENT_AFTER_UNANSWERED or any(row["answered"] for row in recent):
+        return False
+    newest = recent[0]
+    if hello_at > newest["recorded_at"]:
+        return False  # it said hello again since: asked at once
+    return newest["current_tick"] - newest["base_tick"] < SILENT_ASK_EVERY_MINUTES
 
 
 def _unavailable(reason: str) -> dict[str, Any]:
@@ -104,6 +164,9 @@ class DoorAsker:
             # takes it, and its program decides for it until then.
             visiting = visitor is not None and visits.in_world(visitor)
             gone = visiting and visits.gone(visitor)
+            silent = presence is not None and _silent(
+                connection, workspace_id, world_id, grant_id, subject_id, presence.hello_at
+            )
         bridge = self.bridges.get(grant.bridge)
         config = {
             "kind": "external",
@@ -140,6 +203,9 @@ class DoorAsker:
             or not presence.connected(now, presence_window(bridge))
         ):
             # The bridge is quiet, or said the person behind this visitor left its game.
+            return config, "decider_disconnected"
+        if silent:
+            # Connected, but it let its last asks for this thing pass: not waited for this minute.
             return config, "decider_disconnected"
         return config, None
 
