@@ -639,6 +639,13 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /worlds/references": {
         "json": {"purpose": "kind", "description": "a harbour town", "web": True}
     },
+    # A reference id nobody made: the draft is answered as with no notes, never 403 or 404.
+    "POST /worlds/specification/drafts": {
+        "json": {
+            "description": "a quiet town",
+            "reference_id": "00000000-0000-4000-8000-000000000000",
+        }
+    },
 }
 
 

@@ -26065,6 +26065,18 @@
       "maxLength": 1000,
       "minLength": 1,
       "title": "Description"
+     },
+     "reference_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reference Id"
      }
     },
     "additionalProperties": false,
@@ -35084,6 +35096,86 @@
     ],
     "title": "ReferenceBody"
    },
+   "ReferencesView": {
+    "properties": {
+     "state": {
+      "type": "string",
+      "enum": [
+       "used",
+       "not_used"
+      ],
+      "title": "State"
+     },
+     "reference_id": {
+      "type": "string",
+      "title": "Reference Id"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "reference_unknown",
+         "reference_not_finished",
+         "reference_purpose_differs",
+         "reference_has_no_notes",
+         "reference_withdrawn"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail"
+     },
+     "notes": {
+      "type": "integer",
+      "title": "Notes"
+     },
+     "bundle_sha256": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bundle Sha256"
+     },
+     "basis": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Basis"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "state",
+     "reference_id",
+     "code",
+     "detail",
+     "notes",
+     "bundle_sha256",
+     "basis"
+    ],
+    "title": "ReferencesView",
+    "description": "Whether a reference request's notes were handed to the drafter.\n\n``used``: the drafter saw ``notes`` web notes from the request ``reference_id``, whose bundle\n``bundle_sha256`` names them (their text stays with the request), with ``basis`` the notes'\nbases. ``not_used``: the draft was drafted from the words alone, and ``code`` and ``detail``\nsay why; an id that is not a finished request of the caller's own is ``reference_unknown``\nwhoever made it, so the answer tells nobody whether another's id exists."
+   },
    "RefusalView": {
     "properties": {
      "code": {
@@ -41224,6 +41316,16 @@
       "anyOf": [
        {
         "$ref": "#/components/schemas/LookOfferView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "references": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ReferencesView"
        },
        {
         "type": "null"

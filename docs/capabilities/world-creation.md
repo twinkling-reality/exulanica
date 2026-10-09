@@ -78,8 +78,12 @@ share is and names no value, so a description's street mix and kinds of building
 specification's values. The draft also offers the library look the words ask for, if any, chosen
 by a short call of its own after the draft that never changes it, with the person's own words that
 chose it; the person keeps or changes it, and the page does not show it yet
-([the look offer](../style-pack-contract.md#101-a-look-offered-from-a-description)). Every town made through `POST /worlds/generated` wears a look from the
-moment it is made: the pack the request names, or the host's default. It keeps that look when the
+([the look offer](../style-pack-contract.md#101-a-look-offered-from-a-description)). A draft may
+also be handed a finished reference request's web notes, short descriptions of what such a place
+looks like, to fill the values the words leave open; the notes are quoted as material, never
+instructions, and the person's words win ([reference notes, section 9](../reference-notes-contract.md#9-notes-for-a-drafter)).
+The page does not ask for notes yet. Every town made through `POST /worlds/generated` wears a look
+from the moment it is made: the pack the request names, or the host's default. It keeps that look when the
 pack gains a version, since the host serves every version it has published, and moving to the newer
 one is a choice of its own ([style packs](../style-pack-contract.md#10-a-worlds-pack)).
 

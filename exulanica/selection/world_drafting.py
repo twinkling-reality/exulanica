@@ -25,8 +25,16 @@ of that specification's values. What comes back is a proposal and nothing more:
     (``exulanica/consent/place-name-uses.v1.json``), so no place's name is left for the boundary
     to release. The request still passes the one policy boundary every hosted request passes.
 
-The words the model is asked with are data (``world-drafting.v2.json`` beside this module): each
-draft records the prompt's version and the file's SHA-256. Pure apart from the model client: no
+*   **Reference notes are quoted data, never instructions.** A draft may be handed a finished
+    reference request's notes (:mod:`exulanica.references.for_drafting`), short descriptions drafted
+    from web search results. They follow the description in the person's message as one quoted,
+    bounded block under a heading that says they describe and never instruct; saved names in them
+    are replaced as in the description; the form is the same; and a copied phrase is still checked
+    against the description alone, so nothing in the notes can be shown as the person's words.
+
+The words the model is asked with are data (``world-drafting.v2.json`` beside this module, and
+``world-drafting.v3.json`` for a draft handed notes, so every draft records which words saw notes):
+each draft records the prompt's version and the file's SHA-256. Pure apart from the model client: no
 connection is read here except by :func:`sendable`, and nothing is written.
 """
 
@@ -61,6 +69,7 @@ __all__ = [
     "DRAFTER_ROLE",
     "DRAFT_ATTEMPTS",
     "ENUMERATED_VALUES_MAXIMUM",
+    "NOTES_PROMPT_PATH",
     "PROMPT_PATH",
     "Adjustable",
     "CutPlaceholder",
@@ -78,6 +87,7 @@ __all__ = [
     "draft_schema",
     "draft_world_specification",
     "drafting_prompt",
+    "notes_prompt",
     "render_form",
     "sendable",
     "specification_view",
@@ -90,6 +100,9 @@ DRAFTER_ROLE: Final = Role.SPECIFICATION_DRAFTER
 #: The words the drafter asks with: version 2, which says what a share is and names no value;
 #: version 1 stays beside it, byte for byte, as the words the judged comparison asked with.
 PROMPT_PATH: Final = Path(__file__).with_name("world-drafting.v2.json")
+#: The words a draft handed reference notes asks with: version 2's, saying what the notes are and
+#: that the person's words win. A draft without notes asks with version 2, byte for byte.
+NOTES_PROMPT_PATH: Final = Path(__file__).with_name("world-drafting.v3.json")
 _PROMPT_PROFILE: Final = "exulanica.world-drafting-prompt/v1"
 #: The served specification document's profile, the one shape this module reads.
 SPECIFICATION_PROFILE: Final = "exulanica.world-specification/v1"
@@ -175,6 +188,11 @@ def drafting_prompt(path: Path = PROMPT_PATH) -> DraftingPrompt:
         phrase_characters_maximum=int(document["phrase_characters_maximum"]),
         description_characters_maximum=int(document["description_characters_maximum"]),
     )
+
+
+def notes_prompt(notes: str | None) -> DraftingPrompt:
+    """The words a draft asks with: version 3 when it is handed reference notes, else version 2."""
+    return drafting_prompt(NOTES_PROMPT_PATH) if notes else drafting_prompt()
 
 
 # -- the specification, as the server serves it -------------------------------------------------
@@ -438,9 +456,10 @@ def _figure(value: object, unit: str) -> str:
     )
 
 
-def render_form(view: SpecificationView, description: str) -> str:
+def render_form(view: SpecificationView, description: str, notes: str | None = None) -> str:
     """The user message: the presets, every value with what it allows and why, the fixed values,
-    and the description as it is sent. A value in millimetres is also written in metres."""
+    and the description as it is sent, then the reference notes' quoted block when there is one. A
+    value in millimetres is also written in metres."""
     units = {entry.key: entry.unit for entry in view.adjustable}
     lines = ["Presets, each a starting point with the value it sets for each key:"]
     for preset in view.presets:
@@ -476,6 +495,9 @@ def render_form(view: SpecificationView, description: str) -> str:
         lines.append(f"- {fixed.key}: {fixed.label}, {fixed.value}. Why: {fixed.reason}")
     lines.append("")
     lines.append(f'The description:\n"""{description}"""')
+    if notes:
+        lines.append("")
+        lines.append(notes)
     return "\n".join(lines)
 
 
@@ -612,12 +634,15 @@ def draft_world_specification(
     placeholders: Mapping[uuid.UUID, str] | None = None,
     log: CallLog | None = None,
     max_tokens: int | None = None,
+    notes: str | None = None,
 ) -> DraftOutcome:
     """Ask the drafter to fill the form for ``description``, with one repair and no fallback.
 
     ``description`` is the text as it is sent, every saved name already replaced
     (:func:`sendable`), and ``placeholders`` the record of those replacements, handed to the
-    boundary with the request. ``log`` hears every attempt when ``client`` is the request's own
+    boundary with the request. ``notes`` is a reference notes block as it is sent, its saved names
+    replaced too, placed after the description; a copied phrase is checked against the description
+    alone. ``log`` hears every attempt when ``client`` is the request's own
     copy (``ModelClient.with_attempts``). A form the client refuses (outside the schema, or
     truncated) and a form naming a phrase the description does not hold are each told why once;
     a second refusal is :attr:`DraftRefusalCode.NOT_DRAFTED`.
@@ -631,7 +656,7 @@ def draft_world_specification(
     schema = draft_schema(view, prompt)
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": prompt.instructions},
-        {"role": "user", "content": render_form(view, description)},
+        {"role": "user", "content": render_form(view, description, notes)},
     ]
     log = CallLog() if log is None else log
     for attempt in range(1, DRAFT_ATTEMPTS + 1):
@@ -760,25 +785,40 @@ def propose_world_specification(
     description: str,
     workspace_id: uuid.UUID,
     view: SpecificationView,
+    *,
+    notes: str | None = None,
 ) -> tuple[DraftOutcome, SentDescription]:
     """Draft a specification for ``description`` with the workspace's saved names replaced first.
 
     The request sends through its own copy of the client, so its record lists every attempt it
     paid for; an error that ends it carries that record to the problem body. The phrases a draft
     could not place are returned by where they are in the description sent;
-    :meth:`SentDescription.typed_words` reads each in the words the person typed.
+    :meth:`SentDescription.typed_words` reads each in the words the person typed. ``notes``, a
+    reference notes block, is sent after the description with the same saved names replaced, each
+    under the placeholder the description gave it, and the draft asks with :func:`notes_prompt`.
     """
     log = CallLog()
-    prompt = drafting_prompt()
+    prompt = notes_prompt(notes)
     try:
         sent = sendable(connection, workspace_id, description)
+        placeholders: Mapping[uuid.UUID, str] = sent.placeholders
+        notes_sent = None
+        if notes:
+            redacted = redact_names(
+                notes,
+                saved_names(connection, workspace_id),
+                sent.placeholders,
+                reserved=[match.group(0) for match in PLACEHOLDER.finditer(sent.text)],
+            )
+            notes_sent, placeholders = redacted.text, redacted.placeholders
         outcome = draft_world_specification(
             client.with_attempts(log.attempt),
             sent.text,
             view,
             prompt=prompt,
-            placeholders=sent.placeholders,
+            placeholders=placeholders,
             log=log,
+            notes=notes_sent,
         )
     except Exception as failed:
         log.on_failure(prompt.prompt_version).note(failed)

@@ -11,6 +11,13 @@ proposal document, the same for the page and for an agent calling the API:
     (:mod:`exulanica.world.specification_samples`): its people, vehicles, streets and premises;
 *   the parts of the words no value can say, each the person's own words;
 *   or a refusal by name when nothing the words ask for is a world this server makes;
+*   with ``reference_id``, a finished reference request of the caller's own made for this draft
+    (``purpose`` ``world_draft``), ``references``: whether its web notes were handed to the drafter,
+    how many, and what names them (the request, its bundle's digest, the notes' basis), or why not.
+    The notes go after the words as one quoted block that says it describes and never instructs
+    (:mod:`exulanica.selection.world_drafting`). Any id that is not such a request, another
+    workspace's or another person's included, is answered exactly as an id nobody made, and the
+    draft is drafted from the words alone;
 *   the specification, prompt and model it was drafted with, and what the drafting cost;
 *   for a draft that is not refused, ``look_offer``: which of the library's looks the words ask
     for, if any, chosen by a short step of its own after the draft
@@ -26,6 +33,7 @@ values they confirm, the one gate every world passes. The route needs ``world.re
 from __future__ import annotations
 
 import dataclasses
+import uuid
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Request
@@ -38,11 +46,13 @@ from exulanica.errors import PrivacyAdmissionError
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import BudgetExceededError, ModelError
 from exulanica.models.manifest import load_manifest
+from exulanica.references.for_drafting import NOTES_REFUSALS, NotesRefused, notes_for_draft
 from exulanica.selection.calls import CallLog
 from exulanica.selection.look_choosing import LookOption, choose_look, chooser_prompt
 from exulanica.selection.world_drafting import (
     SentDescription,
     drafting_prompt,
+    notes_prompt,
     propose_world_specification,
     specification_view,
 )
@@ -62,6 +72,9 @@ class DraftBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     description: Annotated[str, Field(min_length=1, max_length=_DESCRIPTION_CHARACTERS)]
+    #: A finished reference request of the caller's own made for this draft, whose web notes the
+    #: drafter is handed beside the words; absent, the draft is drafted from the words alone.
+    reference_id: uuid.UUID | None = None
 
     @field_validator("description")
     @classmethod
@@ -170,6 +183,31 @@ class LookOfferView(BaseModel):
     execution: ExecutionView
 
 
+#: Why a reference request's notes were not handed to the drafter.
+NotesReason = Literal[tuple(NOTES_REFUSALS)]  # type: ignore[valid-type]
+
+
+class ReferencesView(BaseModel):
+    """Whether a reference request's notes were handed to the drafter.
+
+    ``used``: the drafter saw ``notes`` web notes from the request ``reference_id``, whose bundle
+    ``bundle_sha256`` names them (their text stays with the request), with ``basis`` the notes'
+    bases. ``not_used``: the draft was drafted from the words alone, and ``code`` and ``detail``
+    say why; an id that is not a finished request of the caller's own is ``reference_unknown``
+    whoever made it, so the answer tells nobody whether another's id exists.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    state: Literal["used", "not_used"]
+    reference_id: str
+    code: NotesReason | None
+    detail: str | None
+    notes: int
+    bundle_sha256: str | None
+    basis: list[str]
+
+
 class WorldDraftView(BaseModel):
     """What a description drafted: a proposal to confirm, or a refusal, and how it was made."""
 
@@ -192,6 +230,8 @@ class WorldDraftView(BaseModel):
     execution: ExecutionView
     #: Present for a draft that is not refused, while the library holds a look; absent otherwise.
     look_offer: LookOfferView | None = None
+    #: Present when the request named a ``reference_id``; absent otherwise.
+    references: ReferencesView | None = None
 
 
 def _unavailable(failed: Exception) -> LookReason:
@@ -247,6 +287,38 @@ def _look_offer(client: ModelClient, sent: SentDescription) -> LookOfferView | N
     )
 
 
+def _notes(
+    connection: ReadOnlyConnection, session: CurrentSession, reference_id: uuid.UUID | None
+) -> tuple[str | None, ReferencesView | None]:
+    """The notes block a draft is handed and what the answer says of it: none and nothing without
+    an id; otherwise the caller's own finished ``world_draft`` request's web notes, or why not."""
+    if reference_id is None:
+        return None, None
+    try:
+        found = notes_for_draft(
+            connection, session.workspace_id, session.actor, reference_id, purpose="world_draft"
+        )
+    except NotesRefused as refused:
+        return None, ReferencesView(
+            state="not_used",
+            reference_id=str(reference_id),
+            code=refused.code,
+            detail=refused.detail,
+            notes=0,
+            bundle_sha256=None,
+            basis=[],
+        )
+    return found.rendered.text, ReferencesView(
+        state="used",
+        reference_id=str(reference_id),
+        code=None,
+        detail=None,
+        notes=found.rendered.used,
+        bundle_sha256=str(found.provenance["bundle_sha256"]),
+        basis=list(found.rendered.bases),
+    )
+
+
 def _sample(sample: TownSample) -> SampleView:
     return SampleView(
         status=sample.status,
@@ -286,9 +358,10 @@ def draft_world(
         )
     )
     view = specification_view(specification_source.served_document())
-    prompt = drafting_prompt()
+    notes, references = _notes(connection, session, body.reference_id)
+    prompt = notes_prompt(notes)
     outcome, sent = propose_world_specification(
-        connection, client, body.description, session.workspace_id, view
+        connection, client, body.description, session.workspace_id, view, notes=notes
     )
     draft = outcome.draft
     proposal = None
@@ -329,4 +402,5 @@ def draft_world(
         else load_manifest().model_name(outcome.model_id),
         execution=_execution(outcome.calls, (), prompt_version=prompt.prompt_version),
         look_offer=None if draft is None else _look_offer(client, sent),
+        references=references,
     )

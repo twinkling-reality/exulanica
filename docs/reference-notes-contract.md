@@ -11,7 +11,7 @@ contract; the hosted-request boundary itself belongs to the
 | --- | --- |
 | Web notes from one source (Tavily), off by default and offered to listed workspaces only | Implemented |
 | A drafter's notes from a finished request: the quoted block, its bound and its provenance | Implemented |
-| A drafter's prompt carrying the notes | Not built: each drafter adds them in a prompt version of its own |
+| A drafter's prompt carrying the notes | Implemented for the describe-a-town drafter (`POST /worlds/specification/drafts` with `reference_id`, prompt version 3); not built for the kind, look and piece drafters, each of which adds them in a prompt version of its own |
 | Notes read from a person's own pictures: the reading call, its role, the checks on its notes, the job's picture step and the routes | Implemented, off by default (`EXULANICA_REFERENCE_PICTURES`) and never offered on a `public` installation; it stays off until Nebius Token Factory Sales confirms in writing that its terms allow it |
 | Facts admitted from record sources (Wikidata, GeoNames, Overture places) | Not built |
 
@@ -236,6 +236,18 @@ The provenance names the notes without their text: the request id, the bundle's 
 notes the block holds and their bases (`web_description`, `own_picture`). The text stays in the
 request, with its workspace; what a drafter writes from it is that drafter's own drafted text, held
 to its own checks.
+
+The describe-a-town drafter is the first to take notes. `POST /worlds/specification/drafts` takes an
+optional `reference_id`, a request made with purpose `world_draft`; it hands the drafter the web
+notes alone, after the person's words in the same message, and asks with version 3 of its words
+(`exulanica/selection/world-drafting.v3.json`), which says what the notes are and that the person's
+words win. Saved names in the notes are replaced under the labels the words gave them. The form is
+the same as without notes, and a phrase the drafter reports as not on the form must be copied from
+the person's words, never from a note. The answer's `references` says whether the notes were used,
+how many, and the request, bundle digest and bases that name them, or the code above when they were
+not; any id that is not the caller's own finished request is answered `reference_unknown`, whoever
+made it, and the draft is drafted from the words alone. A draft naming no reference asks with
+version 2, byte for byte, and its `references` is null.
 
 ## 10. Notes from a person's own pictures
 
