@@ -287,6 +287,40 @@ describe('ink lines', () => {
     const short = inkSegments(positions, corners, { ...INK_OPTIONS, maxLengthM: 0.999 });
     expect(short).toHaveLength(0);
   });
+
+  it('gives every point of a line the normal it is lifted along', () => {
+    const squares = [
+      [[0, 0, 0], [1, 0, 1], [1, 0, 0]], [[0, 0, 0], [0, 0, 1], [1, 0, 1]],
+      [[1, 0, 0], [2, 0, 1], [2, 0, 0]], [[1, 0, 0], [1, 0, 1], [2, 0, 1]],
+    ] as [number, number, number][][];
+    const { positions, corners } = soup(squares);
+    const normals: number[] = [];
+    const segments = inkSegments(positions, corners, INK_OPTIONS, normals);
+    expect(normals).toHaveLength(segments.length);
+    for (let at = 0; at < normals.length; at += 3) {
+      expect(normals[at]).toBeCloseTo(0, 9);
+      expect(normals[at + 1]).toBeCloseTo(1, 9);
+      expect(normals[at + 2]).toBeCloseTo(0, 9);
+    }
+  });
+
+  it('draws its lines with the normal the unlit material\'s shader declares', () => {
+    const { app } = scene();
+    const material = new pc.StandardMaterial();
+    const box = new pc.Entity('generated-tile:box');
+    box.addComponent('render', { meshInstances: [new pc.MeshInstance(pc.Mesh.fromGeometry(app.graphicsDevice, new pc.BoxGeometry()), material)] });
+    app.root.addChild(box);
+    const ink = attachTileInk(app.graphicsDevice, app.root, [0, 0, 0]);
+    expect(ink.segments).toBe(12);
+    const drawn = (box.findByName('generated-tile:ink') as pc.Entity).render!.meshInstances[0]!.mesh;
+    const positions: number[] = [];
+    const normals: number[] = [];
+    drawn.getPositions(positions);
+    drawn.getNormals(normals);
+    expect(normals).toHaveLength(positions.length);
+    ink.dispose();
+    app.destroy();
+  });
 });
 
 function scene(width = 320, height = 200): { app: pc.AppBase; camera: pc.Entity; environmentRoot: pc.Entity } {

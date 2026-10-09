@@ -15,6 +15,10 @@ import type { Rgb } from './look.js';
  *
  * WHERE. Each segment is lifted off its faces along their mean normal, so it wins the depth test
  * against the surfaces it outlines. Lines are one device pixel wide.
+ *
+ * NORMALS. A line's vertices carry that same direction as their normal. The ink is unlit, but the
+ * standard material's shader still declares the normal attribute, and a mesh without one is drawn
+ * with the driver's warning that the attribute is missing.
  */
 
 export interface InkOptions {
@@ -27,11 +31,17 @@ export const INK_OPTIONS: InkOptions = Object.freeze({ creaseDeg: 20, liftM: 0.0
 
 /**
  * Inked segments of the triangles `corners` names (three vertex indices each) over `positions`
- * (x, y, z per vertex, metres): pairs of points in the same frame, flattened.
+ * (x, y, z per vertex, metres): pairs of points in the same frame, flattened. With `normals`, each
+ * point's unit normal is appended to it in the same order: the direction its segment is lifted.
  */
-export function inkSegments(positions: ArrayLike<number>, corners: ArrayLike<number>, options: InkOptions = INK_OPTIONS): number[] {
+export function inkSegments(
+  positions: ArrayLike<number>,
+  corners: ArrayLike<number>,
+  options: InkOptions = INK_OPTIONS,
+  normals?: number[],
+): number[] {
   const crease = Math.cos((options.creaseDeg * Math.PI) / 180);
-  const normals: number[] = [];
+  const faceNormals: number[] = [];
   const edges = new Map<string, { a: number; b: number; faces: number[] }>();
   const key = (v: number): string =>
     `${Math.round(positions[v * 3]! * 10_000)},${Math.round(positions[v * 3 + 1]! * 10_000)},${Math.round(positions[v * 3 + 2]! * 10_000)}`;
@@ -50,8 +60,8 @@ export function inkSegments(positions: ArrayLike<number>, corners: ArrayLike<num
     const nz = ux * vy - uy * vx;
     const length = Math.hypot(nx, ny, nz);
     if (length === 0) continue;
-    const face = normals.length / 3;
-    normals.push(nx / length, ny / length, nz / length);
+    const face = faceNormals.length / 3;
+    faceNormals.push(nx / length, ny / length, nz / length);
     for (const [p, q] of [[a, b], [b, c], [c, a]] as const) {
       const kp = key(p);
       const kq = key(q);
@@ -70,8 +80,9 @@ export function inkSegments(positions: ArrayLike<number>, corners: ArrayLike<num
     let inked = faces.length === 1;
     for (let i = 0; i < faces.length && !inked; i += 1) {
       for (let j = i + 1; j < faces.length && !inked; j += 1) {
-        const dot = normals[faces[i]! * 3]! * normals[faces[j]! * 3]! + normals[faces[i]! * 3 + 1]! * normals[faces[j]! * 3 + 1]!
-          + normals[faces[i]! * 3 + 2]! * normals[faces[j]! * 3 + 2]!;
+        const dot = faceNormals[faces[i]! * 3]! * faceNormals[faces[j]! * 3]!
+          + faceNormals[faces[i]! * 3 + 1]! * faceNormals[faces[j]! * 3 + 1]!
+          + faceNormals[faces[i]! * 3 + 2]! * faceNormals[faces[j]! * 3 + 2]!;
         if (dot < crease) inked = true;
       }
     }
@@ -79,9 +90,13 @@ export function inkSegments(positions: ArrayLike<number>, corners: ArrayLike<num
     let mx = 0;
     let my = 0;
     let mz = 0;
-    for (const face of faces) { mx += normals[face * 3]!; my += normals[face * 3 + 1]!; mz += normals[face * 3 + 2]!; }
-    const lift = options.liftM / (Math.hypot(mx, my, mz) || 1);
-    for (const v of [a, b]) out.push(positions[v * 3]! + mx * lift, positions[v * 3 + 1]! + my * lift, positions[v * 3 + 2]! + mz * lift);
+    for (const face of faces) { mx += faceNormals[face * 3]!; my += faceNormals[face * 3 + 1]!; mz += faceNormals[face * 3 + 2]!; }
+    const unit = 1 / (Math.hypot(mx, my, mz) || 1);
+    const lift = options.liftM * unit;
+    for (const v of [a, b]) {
+      out.push(positions[v * 3]! + mx * lift, positions[v * 3 + 1]! + my * lift, positions[v * 3 + 2]! + mz * lift);
+      normals?.push(mx * unit, my * unit, mz * unit);
+    }
   }
   return out;
 }
@@ -128,10 +143,12 @@ export function attachTileInk(
       instance.mesh.getPositions(positions);
       const indices: number[] = [];
       instance.mesh.getIndices(indices);
-      const lines = inkSegments(positions, indices, options);
+      const normals: number[] = [];
+      const lines = inkSegments(positions, indices, options, normals);
       if (lines.length === 0) continue;
       const mesh = new pc.Mesh(device);
       mesh.setPositions(lines);
+      mesh.setNormals(normals);
       mesh.update(pc.PRIMITIVE_LINES);
       const entity = new pc.Entity('generated-tile:ink');
       entity.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, material)], castShadows: false, receiveShadows: false });
