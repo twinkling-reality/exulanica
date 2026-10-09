@@ -51,6 +51,26 @@ A grant that lets visitors in names the world version they arrive in, which must
 things (:func:`visitors_society`): issuing refuses one that does not, as every arrival under a grant
 stored without one is refused.
 
+A grant that lets visitors in states who decides for them once they have arrived
+(``visitors_decided_by``): their program (``program``, what a grant stating nothing means), asked
+through the door, or the world (``world``): the owner's own choice for a visitor, else the gate's
+traveller mind, else the routine, and the door never asks its program. Each arrival the door writes
+under the grant carries the grant's word as its ``decided_by``, read from the grant's current
+revision, never from the bridge. Issuing a world grant may name the traveller mind, a model the
+manifest offers the people's role: it is recorded through the choice record
+(``record_traveller_choice``) in the grant's own transaction, ending at the grant's end, and the
+issue route then also requires ``model.invoke``, since a recorded model choice authorises the
+spending it causes. Revoking releases it (``release_traveller_choice``), under a key of its own.
+
+A grant that runs out unrevoked is settled (:meth:`GrantRepository.settle`): each visitor of it
+still present is sent home (``grant_ended``), and its traveller mind is handed back, once, chosen by
+the grant's own actor; its named things go back to their routine the first time the decision host
+meets one (:meth:`GrantRepository.lapse`). A visitor its program decides for is also sent
+home when the decision host next asks for it; one the world decides for is never asked through the
+door, so the door settles a grant whenever it reads one that ran out (a poll of its channel, an
+arrival or a delivery report on it, its owner's read of it), and the installation's maintenance pass
+settles the rest (:mod:`exulanica.door.sweep`).
+
 The repository runs on a connection scoped to the owner's workspace and is the one writer of the
 grant tables. Its idempotency: an issue names an ``idempotency_key``, from which the grant's id is
 derived, so a repeated issue answers with the grant it made, its lists in any order, and a key
@@ -63,7 +83,7 @@ import datetime as dt
 import logging
 import re
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -81,13 +101,17 @@ from exulanica.door.credentials import (
 from exulanica.door.protocol import words_fault
 from exulanica.door.retention import prune
 from exulanica.errors import ExulanicaError
+from exulanica.models.manifest import Manifest
 from exulanica.world.crossings import society_of_version
+from exulanica.world.deciders import DECIDED_BY, model_of
 from exulanica.world.placed_things import PLACED_THING_ID_PATTERN
+from exulanica.world.society import UnknownSociety
 from exulanica.world.society_decision_contract import decision_contract, person_role
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_model_choice_repository import (
     ModelChoiceRefused,
     SocietyModelChoiceRepository,
+    decider_of,
 )
 
 __all__ = [
@@ -99,7 +123,10 @@ __all__ = [
     "READING_GRACE",
     "SECRETS_ISSUED_MAXIMUM",
     "SECRETS_WAITING_MAXIMUM",
+    "SETTLED_ON_READ_MAXIMUM",
+    "SETTLE_WINDOW",
     "THINGS_MAXIMUM",
+    "UNSETTLED",
     "VISITORS_MAXIMUM",
     "WORLD_WORDS_MAXIMUM",
     "Grant",
@@ -134,10 +161,67 @@ SECRETS_ISSUED_MAXIMUM: Final = 48
 GRANTS_PER_DAY_MAXIMUM: Final = 50
 #: The most characters in the words an owner gives a grant's bridge to show for the world.
 WORLD_WORDS_MAXIMUM: Final = 80
+#: The most grants that ran out an owner's read of a world's grants settles; the maintenance pass
+#: settles the rest.
+SETTLED_ON_READ_MAXIMUM: Final = 4
+#: How long after its end a grant that ran out is still looked at to be settled. Settling takes a
+#: pass or a read; one still unsettled this long after its end is reported by the sweep while it is
+#: looked at, never read again after, so no read grows with every grant ever issued.
+SETTLE_WINDOW: Final = dt.timedelta(days=7)
+#: The keys the traveller mind of a grant is recorded, released by its revocation and released when
+#: it runs out under, each derived from the grant's id; none is the named things' key.
+_TRAVELLER: Final = "traveller"
+_TRAVELLER_RELEASE: Final = "traveller-release"
+_TRAVELLER_LAPSE: Final = "traveller-lapse"
 #: Grants' ids, derived from the workspace and the issue's idempotency key.
 _GRANT_NAMESPACE: Final = uuid.UUID("6b0c9d2e-3f4a-5b6c-8d7e-9f0a1b2c3d4e")
 #: The actor a bridge's writes under a grant are recorded as: one per grant, never an account.
 _ACTOR_NAMESPACE: Final = uuid.UUID("2a7e5c19-8b3d-5f40-9c61-d4e8f0a2b6c3")
+#: The grants that ran out unrevoked within :data:`SETTLE_WINDOW` and still have something to
+#: settle: a visitor present (arrived, or waiting for a minute to take its arrival, with no
+#: departure written and none recorded) or a traveller mind whose latest group choice still names a
+#: model. Oldest end first, with each one's end. Only grants issued recently enough to have ended in
+#: the window are read (a grant ends at most :data:`MINUTES_MAXIMUM` after its issue), by the index
+#: on when grants were issued, and a mind by the index on a group choice's grant. ``{scope}`` is the
+#: caller's filter on the grants read (``g``: its workspace and grants, or none for every
+#: workspace's), and ``%(window)s`` the window.
+UNSETTLED: Final = (
+    "with recent as ("
+    "  select g.workspace_id, g.grant_id from door_grant g "
+    "  where {scope} and g.issued_at > statement_timestamp() - %(window)s "
+    f"- interval '{MINUTES_MAXIMUM} minutes'), "
+    "latest as ("
+    "  select distinct on (r.workspace_id, r.grant_id) r.workspace_id, r.grant_id, "
+    "    (r.document->>'expires_at')::timestamptz as expires_at "
+    "  from door_grant_revision r join recent g "
+    "    on g.workspace_id = r.workspace_id and g.grant_id = r.grant_id "
+    "  order by r.workspace_id, r.grant_id, r.grant_seq desc) "
+    "select l.workspace_id, l.grant_id, l.expires_at from latest l "
+    "where l.expires_at <= statement_timestamp() "
+    "  and l.expires_at > statement_timestamp() - %(window)s "
+    "  and not exists (select 1 from door_grant_revocation v "
+    "    where v.workspace_id = l.workspace_id and v.grant_id = l.grant_id) "
+    "  and (exists (select 1 from door_crossing c left join door_crossing_binding b "
+    "      on b.workspace_id = c.workspace_id and b.society_id = c.society_id "
+    "     and b.crossing_id = c.crossing_id "
+    "    where c.workspace_id = l.workspace_id and c.grant_id = l.grant_id "
+    "      and c.kind = 'arrival' and (b.disposition is null or b.disposition = 'arrived') "
+    "      and not exists (select 1 from door_crossing d "
+    "        where d.workspace_id = c.workspace_id and d.grant_id = c.grant_id "
+    "          and d.kind = 'departure' and d.thing_id = c.thing_id) "
+    "      and not exists (select 1 from world_society_event e "
+    "        where e.workspace_id = c.workspace_id and e.society_id = c.society_id "
+    "          and e.subject_id = c.thing_id and e.event_kind = 'thing_departed')) "
+    "    or exists (select 1 from world_society_model_choice m "
+    "    where m.workspace_id = l.workspace_id and m.document ? 'group' "
+    "      and m.document->'group'->>'grant_id' = l.grant_id::text "
+    "      and m.document->'decider'->>'kind' = 'model' "
+    "      and not exists (select 1 from world_society_model_choice n "
+    "        where n.workspace_id = m.workspace_id and n.document ? 'group' "
+    "          and n.document->'group'->>'grant_id' = m.document->'group'->>'grant_id' "
+    "          and n.society_id = m.society_id and n.choice_seq > m.choice_seq))) "
+    "order by l.expires_at, l.grant_id limit %(limit)s"
+)
 _KEY: Final = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
 _GAME_TYPE: Final = re.compile(r"^[A-Za-z0-9_:.-]{1,80}$")
 #: A placed thing's id, as a version's things are placed with.
@@ -176,6 +260,11 @@ def visitors_society(
     return society
 
 
+def _to_the_second(value: dt.datetime) -> dt.datetime:
+    """A grant's end as the traveller mind's end is recorded: to the second, never after it."""
+    return value.astimezone(dt.UTC).replace(microsecond=0)
+
+
 @dataclass(frozen=True, slots=True)
 class Scope:
     """What a grant lets its bridge do in its world."""
@@ -189,6 +278,10 @@ class Scope:
     may_carry_out: bool = False
     may_speak: bool = True
     world_words: str | None = None
+    #: Who decides for the grant's visitors once they have arrived: the program behind the bridge
+    #: (``program``, what a grant stating nothing means) or the world (``world``: the owner's
+    #: choice for the visitor, else the traveller mind the grant names, else the routine).
+    visitors_decided_by: str = "program"
 
     def __post_init__(self) -> None:
         if type(self.visitors_maximum) is not int or not 0 <= self.visitors_maximum <= (
@@ -230,13 +323,17 @@ class Scope:
             fault = words_fault(self.world_words, maximum=WORLD_WORDS_MAXIMUM)
             if fault is not None:
                 raise GrantRefused("invalid_scope", f"a grant's world words: {fault}")
+        if self.visitors_decided_by not in DECIDED_BY:
+            raise GrantRefused(
+                "invalid_scope", "a grant's visitors are decided by their program or the world"
+            )
 
     def check_issue(self) -> None:
         """The rules a grant is issued under beyond those every stored revision keeps, so a
         revision written before one of them existed is still read as it was written: a grant for
         visitors names the version they arrive in, and a gate is named only for visitors to come
-        through. A visitors grant stored without a version takes no arrival
-        (``world_not_open_to_visitors``)."""
+        through, and the world decides only for visitors a grant lets in. A visitors grant stored
+        without a version takes no arrival (``world_not_open_to_visitors``)."""
         if (bool(self.things) or self.visitors_maximum > 0) != (self.version_id is not None):
             raise GrantRefused(
                 "invalid_scope",
@@ -244,6 +341,10 @@ class Scope:
             )
         if self.gate is not None and self.visitors_maximum == 0:
             raise GrantRefused("invalid_scope", "a gate is named only for visitors to come through")
+        if self.visitors_decided_by == "world" and self.visitors_maximum == 0:
+            raise GrantRefused(
+                "invalid_scope", "the world decides only for visitors a grant lets in"
+            )
 
     def document(self) -> dict[str, Any]:
         return {
@@ -256,6 +357,9 @@ class Scope:
             "may_carry_out": self.may_carry_out,
             "may_speak": self.may_speak,
             "world_words": self.world_words,
+            # Stated only where the world decides: a program grant's revision keeps the bytes and
+            # the digest it had before the field existed.
+            **({"visitors_decided_by": "world"} if self.visitors_decided_by == "world" else {}),
         }
 
     @classmethod
@@ -270,6 +374,7 @@ class Scope:
             may_carry_out=document["may_carry_out"],
             may_speak=document["may_speak"],
             world_words=document["world_words"],
+            visitors_decided_by=document.get("visitors_decided_by", "program"),
         )
 
 
@@ -427,11 +532,14 @@ class GrantRepository:
         except ModelChoiceRefused as exc:
             raise GrantRefused(exc.code, exc.detail) from exc
 
-    def _release(self, grant: Grant, why: str = "release") -> dict[str, Any] | None:
+    def _release(
+        self, grant: Grant, why: str = "release", actor: uuid.UUID | None = None
+    ) -> dict[str, Any] | None:
         """Hand the grant's named things back to their routine in the version they were bound in,
         as one choice keyed by the grant and ``why`` (a revocation's ``release``, a run-out
-        grant's ``lapse``, each by its own chooser): the choice recorded, which a repeat answers
-        again, or None when the grant decides for nobody now, as after the other one."""
+        grant's ``lapse``, each by its own chooser, ``actor`` or this repository's): the choice
+        recorded, which a repeat answers again, or None when the grant decides for nobody now, as
+        after the other one."""
         assert grant.scope.version_id is not None
         try:
             return self._choices(grant.world_id).release_external_choice(
@@ -439,7 +547,7 @@ class GrantRepository:
                 person_role(),
                 request_id=uuid.uuid5(grant.grant_id, why),
                 grant_id=grant.grant_id,
-                chosen_by=self._actor,
+                chosen_by=self._actor if actor is None else actor,
                 contract=decision_contract(),
             )
         except ModelChoiceRefused as exc:
@@ -449,6 +557,73 @@ class GrantRepository:
             _LOG.warning("A grant's things were not handed back: %s", exc.code)
             return None
 
+    def _traveller_issued(self, grant: Grant) -> dict[str, str] | None:
+        """The model the grant's issue named as its traveller mind, as the choice record holds it
+        under the grant's own key, or None where its issue named none."""
+        if grant.scope.version_id is None:
+            return None
+        # By the version's society, so the choice table's key on its request id is used.
+        row = self._connection.execute(
+            "select m.document from world_society_model_choice m join world_society s "
+            "  on s.workspace_id = m.workspace_id and s.society_id = m.society_id "
+            "where s.workspace_id = %s and s.world_id = %s and s.version_id = %s "
+            "  and m.request_id = %s",
+            (
+                self._workspace_id,
+                grant.world_id,
+                grant.scope.version_id,
+                uuid.uuid5(grant.grant_id, _TRAVELLER),
+            ),
+        ).fetchone()
+        return None if row is None else model_of(decider_of(row["document"]))
+
+    def _record_traveller(
+        self, grant: Grant, traveller: Mapping[str, str], manifest: Manifest
+    ) -> None:
+        """Record the grant's traveller mind through the choice record, ending at the grant's end,
+        in the caller's transaction, or refuse by the choice record's name; a repeat of the issue
+        answers with the choice its key recorded."""
+        assert grant.scope.version_id is not None
+        try:
+            self._choices(grant.world_id).record_traveller_choice(
+                uuid.UUID(grant.scope.version_id),
+                person_role(),
+                request_id=uuid.uuid5(grant.grant_id, _TRAVELLER),
+                grant_id=grant.grant_id,
+                model=dict(traveller),
+                chosen_by=self._actor,
+                manifest=manifest,
+                contract=decision_contract(),
+                ends_at=_to_the_second(grant.expires_at),
+            )
+        except ModelChoiceRefused as exc:
+            raise GrantRefused(exc.code, exc.detail) from exc
+        except UnknownSociety as exc:
+            raise GrantRefused(
+                "world_not_open_to_visitors", "this world's version takes no visitors"
+            ) from exc
+
+    def _release_travellers(self, grant: Grant, why: str, actor: uuid.UUID) -> None:
+        """Hand the visitors arriving under a world grant back to the routine, as one group choice
+        keyed by the grant and ``why`` (a revocation's or a run-out grant's, each a key of its own,
+        neither the named things' key), chosen by ``actor``. Nothing is recorded where the grant
+        named no traveller mind; a refusal is said by name in the log and ends nothing early."""
+        if grant.scope.visitors_decided_by != "world" or grant.scope.version_id is None:
+            return
+        try:
+            self._choices(grant.world_id).release_traveller_choice(
+                uuid.UUID(grant.scope.version_id),
+                person_role(),
+                request_id=uuid.uuid5(grant.grant_id, why),
+                grant_id=grant.grant_id,
+                chosen_by=actor,
+                contract=decision_contract(),
+            )
+        except ModelChoiceRefused as exc:
+            _LOG.warning("A grant's traveller mind was not handed back: %s", exc.code)
+        except UnknownSociety:
+            _LOG.warning("A grant's traveller mind was not handed back: no society")
+
     def issue(
         self,
         *,
@@ -457,20 +632,29 @@ class GrantRepository:
         scope: Scope,
         minutes: int,
         idempotency_key: str,
+        traveller: Mapping[str, str] | None = None,
+        manifest: Manifest | None = None,
     ) -> tuple[Grant, bool]:
         """Issue a grant, or answer with the one this key already issued; True when it is new.
 
         The world must be one this workspace registered and the bridge one the deployment offers
         it; a grant for visitors names a version holding a society of things. The same issue sent
-        again answers with the grant it made: the world, the bridge and the scope's document, whose
-        lists are sorted, are what is compared, so kinds and things in another order are the same
-        grant. A key reused for a different grant is refused.
+        again answers with the grant it made: the world, the bridge, the scope's document, whose
+        lists are sorted, and the traveller mind it recorded are what is compared, so kinds and
+        things in another order are the same grant. A key reused for a different grant is refused.
+        A grant whose visitors the world decides for may name their ``traveller`` mind, a model the
+        ``manifest`` offers the people's role, recorded in the grant's own transaction.
         """
         if not isinstance(idempotency_key, str) or not _KEY.match(idempotency_key):
             raise GrantRefused("invalid_idempotency_key", "8 to 128 letters, digits or ._:-")
         if type(minutes) is not int or not 1 <= minutes <= MINUTES_MAXIMUM:
             raise GrantRefused("invalid_scope", f"a grant lasts 1 to {MINUTES_MAXIMUM} minutes")
         scope.check_issue()
+        if traveller is not None and scope.visitors_decided_by != "world":
+            raise GrantRefused(
+                "invalid_scope", "a traveller mind is named only for visitors the world decides for"
+            )
+        assert traveller is None or manifest is not None
         if not bridge.offered_to(self._workspace_id):
             raise GrantRefused("bridge_not_offered", "this deployment offers no such bridge here")
         grant_id = uuid.uuid5(_GRANT_NAMESPACE, f"{self._workspace_id}:{idempotency_key}")
@@ -482,10 +666,14 @@ class GrantRepository:
                     world_id,
                     bridge.key,
                     scope.document(),
+                ) or (None if traveller is None else dict(traveller)) != self._traveller_issued(
+                    existing
                 ):
                     raise GrantRefused(
                         "idempotency_key_reused", "this key already issued a different grant"
                     )
+                # A repeat records nothing: the mind its issue recorded stands as it was, released
+                # or lapsed, so a repeat never revives a gate's mind past its grant's end.
                 return existing, False
             registered = self._connection.execute(
                 "select 1 from world_identity where workspace_id = %s and world_id = %s",
@@ -527,7 +715,10 @@ class GrantRepository:
             if scope.things:
                 self._bind(world_id, grant_id, bridge.key, scope)
             issued = self.current(grant_id)
-        assert issued is not None
+            assert issued is not None
+            if traveller is not None:
+                assert manifest is not None
+                self._record_traveller(issued, traveller, manifest)
         return issued, True
 
     def _takes_no_visitors(self, world_id: str, scope: Scope) -> bool:
@@ -581,6 +772,7 @@ class GrantRepository:
             self._send_home(grant, self._actor)
             if grant.scope.things:
                 self._release(grant)
+            self._release_travellers(grant, _TRAVELLER_RELEASE, self._actor)
             revoked = self.current(grant_id)
         assert revoked is not None
         return revoked
@@ -600,6 +792,43 @@ class GrantRepository:
         except ChannelRefused as exc:
             _LOG.warning("A grant's visitors were not sent home: %s", exc.code)
             return 0
+
+    def settle(self, grant_id: uuid.UUID) -> int:
+        """Settle a grant that ran out unrevoked, in a transaction of its own under the grant's
+        lock and in revocation's order, chosen by the grant's own actor: a departure for each of
+        its visitors still present, then its traveller mind handed back. How many departures were
+        written. Whether anything is left is read first, with no lock taken, so a grant settled
+        already, one that stands and one that was revoked change nothing and wait on no minute.
+        Its named things are handed back by the decision host's asker the first time it meets one
+        (:meth:`lapse`), as before a grant could be settled."""
+        if not self.unsettled([grant_id], limit=1):
+            return 0
+        with self._connection.transaction():
+            self.lock(grant_id)
+            grant = self.current(grant_id)
+            if grant is None or grant.ended(self.now()) != "expired":
+                return 0
+            actor = grant_actor(grant_id)
+            written = self._send_home(grant, actor)
+            self._release_travellers(grant, _TRAVELLER_LAPSE, actor)
+            return written
+
+    def unsettled(self, grant_ids: Sequence[uuid.UUID], *, limit: int) -> list[uuid.UUID]:
+        """Of ``grant_ids``, those this workspace holds that ran out unrevoked and still have a
+        visitor present or a traveller mind naming a model, oldest end first, at most
+        ``limit``."""
+        if not grant_ids:
+            return []
+        rows = self._connection.execute(
+            UNSETTLED.format(scope="g.workspace_id = %(w)s and g.grant_id = any(%(g)s)"),
+            {
+                "w": self._workspace_id,
+                "g": list(grant_ids),
+                "limit": limit,
+                "window": SETTLE_WINDOW,
+            },
+        ).fetchall()
+        return [row["grant_id"] for row in rows]
 
     def lapse(self, grant_id: uuid.UUID) -> bool:
         """Hand a grant's named things back to their routine once the grant has run out, as

@@ -1801,6 +1801,7 @@ it. Recovery time is measured, not promised.
 | `EXULANICA_CODE_REVISION`, `EXULANICA_IMAGE_BACKEND`, `EXULANICA_IMAGE_CLIENT` | API | The identity facts report: a 40-character revision and `sha256:` image digests |
 | `EXULANICA_MAINTENANCE_STATUS_PATH` | API, maintenance | The maintenance status file |
 | `EXULANICA_BACKUP_DATABASE_URL` | maintenance | The `exulanica_backup` connection |
+| `EXULANICA_DATABASE_URL` | maintenance (and every runtime process) | In maintenance, the runtime role `exulanica_app`, for the door's sweep alone: before the pass's backups it settles door grants that ran out in the last seven days with nobody reading them, each in its own workspace, at most 32 a pass, and names in the status file (`door_sweep.stuck`) any it could not settle; without it the sweep is reported not configured and only the door's own reads settle such grants |
 | `EXULANICA_BACKUP_DIRECTORY`, `EXULANICA_BACKUP_STORE_DIRECTORY`, `EXULANICA_CUSTODY_DIRECTORY` | maintenance, restore | Backup sets, the stored-byte copy, and withdrawal exports |
 | `EXULANICA_RESTORE_MAINTENANCE_URL`, `EXULANICA_RESTORE_DATABASE_URL` | restore | A superuser, as the backup's owner, on the empty target server, and the database the restore creates there |
 | `EXULANICA_SOURCE_DATABASE_URL` | restore | The source database, which a planned restore seals and `return-to-source` without `--set-aside` replays into; as its owner or a superuser, since a return writes the database comment |

@@ -19,6 +19,10 @@ that fails is a code in ``failures``, never a silent success, and the next pass 
     the backup role, which the API's runtime role cannot do.
 *   **The backup role itself**: a table it cannot read or could write, or a large object, is
     ``backup_role_incomplete``, reported each pass rather than found by the next backup.
+*   **The door's sweep**: grants that ran out with a visitor still present or a traveller mind
+    still current, found as the backup role and settled as the runtime role, a bounded number a
+    pass (:mod:`exulanica.door.sweep`), so a visitor leaves within one pass of its grant's end.
+    Not run, and said so, where no runtime role is configured.
 """
 
 from __future__ import annotations
@@ -44,6 +48,7 @@ from exulanica.deletion.queue import STORED_KINDS, stored_target_store
 from exulanica.deletion.restore import export_withdrawals
 from exulanica.deletion.withdrawals import CATALOG
 from exulanica.deletion.worker import PurgeWorker
+from exulanica.door.sweep import sweep
 from exulanica.evidence.blob import BlobId
 from exulanica.orchestration.installation.backup_set import (
     BackupSetRefused,
@@ -166,12 +171,17 @@ class Maintenance:
     restore_state_path: Path | None
     backup_domains: tuple[Path, ...]
     backup_role: str = "exulanica_backup"
+    #: The runtime role's connection, which the door's sweep settles grants as; none skips it.
+    runtime_url: str | None = None
     purge_limit: int = 500
     keep_exports: int = DEFAULT_KEEP
     now: Callable[[], dt.datetime] = field(default=lambda: dt.datetime.now(dt.UTC))
     _signal: tuple[int, int] | None = field(default=None, init=False)
     _last_export: dt.datetime | None = field(default=None, init=False)
     _last_verified: dt.datetime | None = field(default=None, init=False)
+    #: The door grants the last pass's sweep could not settle, or left as they were: the next
+    #: pass takes them last.
+    _sweep_stuck: tuple[uuid.UUID, ...] = field(default=(), init=False)
 
     @property
     def _database(self) -> Database:
@@ -416,6 +426,9 @@ class Maintenance:
         steps: tuple[tuple[str, Callable[[dict[str, Any]], None]], ...] = (
             ("backup_role_check_failed", self._check_role),
             ("definer_role_check_failed", self._check_definer),
+            # The sweep is short and runs before the backups, so a visitor leaves within a pass
+            # of its grant's end whether or not a backup is due.
+            ("door_sweep_failed", self._door_sweep),
             ("withdrawal_export_failed", self._export),
             ("purge_failed", self._purge),
             ("backup_copy_purge_failed", self._purge_backup_copies),
@@ -442,6 +455,24 @@ class Maintenance:
         self.status_path.parent.mkdir(parents=True, exist_ok=True)
         write_private(self.status_path, json.dumps(status, sort_keys=True, default=str) + "\n")
         return status
+
+    def _door_sweep(self, status: dict[str, Any]) -> None:
+        """Settle the door grants that ran out with nobody reading them: found as the backup role,
+        settled as the runtime role. A grant a pass could not settle, or left as it was, is held
+        back: later passes take it after every other, and while any is held back the status names
+        them (``stuck``) and says ``door_sweep_incomplete``."""
+        if self.runtime_url is None:
+            status["door_sweep"] = {"configured": False}
+            return
+        swept = sweep(self._database, Database(self.runtime_url), deferred=self._sweep_stuck)
+        self._sweep_stuck = tuple(swept["stuck"])
+        status["door_sweep"] = {
+            "configured": True,
+            **swept,
+            "stuck": [str(grant_id) for grant_id in swept["stuck"]],
+        }
+        if swept["failed"] or swept["stuck"]:
+            status["failures"].append("door_sweep_incomplete")
 
     def _unlisted(self, status: dict[str, Any]) -> None:
         """How many keys restores listed as written after their backups, read from the listings

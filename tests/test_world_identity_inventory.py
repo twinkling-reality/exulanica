@@ -127,6 +127,11 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
         "the bound on how many grants a workspace issues in a day is the workspace's, counted "
         "across its worlds, since the door secrets it bounds are kept per workspace"
     ),
+    "exulanica/door/grants.py::<module> [door_grant, world_society_model_choice]": (
+        "the door grants that ran out in the settle window are found across a workspace's worlds "
+        "(every workspace's for the maintenance sweep); a traveller mind is matched by its grant's "
+        "id, which names one world, and each grant is then settled in that world"
+    ),
 }
 
 #: Routes whose ``world_id`` parameter a caller may omit.

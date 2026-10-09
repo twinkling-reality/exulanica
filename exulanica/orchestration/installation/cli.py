@@ -18,7 +18,8 @@ Every location is a setting, never a guess (deployment.md section 9 lists them):
 ``EXULANICA_BACKUP_DATABASE_URL`` is the read-only backup role; ``EXULANICA_CUSTODY_DIRECTORY``,
 ``EXULANICA_BACKUP_DIRECTORY`` and ``EXULANICA_BACKUP_STORE_DIRECTORY`` are where exports, backup
 sets and the stored-byte copy go, each outside the data directory; ``EXULANICA_PURGE_DATABASE_URL``
-is the purge role. A restore reads the target from ``EXULANICA_RESTORE_MAINTENANCE_URL`` (a
+is the purge role; ``EXULANICA_DATABASE_URL``, where set, the runtime role the door's sweep settles
+grants as. A restore reads the target from ``EXULANICA_RESTORE_MAINTENANCE_URL`` (a
 superuser on the empty target server), ``EXULANICA_RESTORE_DATABASE_URL`` (the database it
 creates, as its owner), ``EXULANICA_PURGE_DATABASE_URL`` and ``EXULANICA_DATA_DIR``, and the
 source from ``EXULANICA_SOURCE_DATABASE_URL`` (which a planned restore seals and a return without
@@ -117,6 +118,7 @@ def _maintenance() -> Maintenance:
     return Maintenance(
         backup_url=_setting("BACKUP_DATABASE_URL"),
         purge_url=env_get("PURGE_DATABASE_URL"),
+        runtime_url=env_get("DATABASE_URL"),
         custody=Path(_setting("CUSTODY_DIRECTORY")),
         backup_directory=Path(_setting("BACKUP_DIRECTORY")),
         status_path=Path(_setting("MAINTENANCE_STATUS_PATH")),

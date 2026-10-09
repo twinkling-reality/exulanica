@@ -36,7 +36,9 @@ Two members are not a surface of their own. ``model.invoke`` sits beside a read 
 that may call a model, because those routes spend money and reach the network, and beside a write
 on the society route that commits a world to a model: the choice of the model that decides for a
 person (``POST .../society/models``). That recorded choice is the authorization for the spend it
-causes. The host's playback asks the chosen model for a listed workspace whoever plays the world,
+causes, so the door's grant route asks for it too when a grant names the mind a gate's travellers
+get (``POST /door/grants`` with a ``traveller``), checked by the route because the body decides it.
+The host's playback asks the chosen model for a listed workspace whoever plays the world,
 so a token holding ``world.write`` without ``model.invoke`` may start spending by playing a world
 whose owner chose a model (``PUT .../society/control``), always within the decision contract's
 bounds per world and hour and the share of the process's budget it keeps for other work.
@@ -831,6 +833,9 @@ _GRANT_CHANNEL: Final[Mapping[str, Channel]] = MappingProxyType(
         ),
         "POST /door/channel/hello": Channel(
             "grant", "presents an adapter and its mapping for the grant its credential opens"
+        ),
+        "POST /door/channel/home": Channel(
+            "grant", "calls a visitor of the grant its credential opens home"
         ),
     }
 )

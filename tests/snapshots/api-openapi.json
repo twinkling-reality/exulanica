@@ -19972,7 +19972,7 @@
      "door"
     ],
     "summary": "World Grants",
-    "description": "Every grant issued in one world, newest first, each as it stands now.",
+    "description": "Every grant issued in one world, newest first, each as it stands now. Reading them settles\nthe first of those that ran out with something left to settle.",
     "operationId": "world_grants_door_grants_get",
     "parameters": [
      {
@@ -20643,6 +20643,48 @@
        "application/json": {
         "schema": {
          "title": "Response Gone Door Channel Gone Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/channel/home": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Home",
+    "description": "Call one of the grant's visitors home at the world's next minute, as its player asked.",
+    "operationId": "home_door_channel_home_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/HomeBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Home Door Channel Home Post"
         }
        }
       }
@@ -27974,6 +28016,21 @@
     ],
     "title": "HistoryRow"
    },
+   "HomeBody": {
+    "properties": {
+     "thing_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Thing Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "thing_id"
+    ],
+    "title": "HomeBody"
+   },
    "HostPlayback": {
     "properties": {
      "running": {
@@ -28964,6 +29021,25 @@
        }
       ],
       "title": "World Words"
+     },
+     "visitors_decided_by": {
+      "type": "string",
+      "enum": [
+       "program",
+       "world"
+      ],
+      "title": "Visitors Decided By",
+      "default": "program"
+     },
+     "traveller": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ChosenModel"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "minutes": {
       "type": "integer",

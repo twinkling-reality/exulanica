@@ -367,6 +367,9 @@ services:
     environment:
       EXULANICA_BACKUP_DATABASE_URL: postgresql://exulanica_backup:${EXULANICA_BACKUP_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
       EXULANICA_PURGE_DATABASE_URL: postgresql://exulanica_purge:${EXULANICA_PURGE_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      # The runtime role, for the door's sweep alone: it settles grants that ran out with nobody
+      # reading them, each in its own workspace (exulanica/door/sweep.py).
+      EXULANICA_DATABASE_URL: postgresql://exulanica_app:${EXULANICA_APP_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
       EXULANICA_INSTALLATION_PROFILE: /app/deploy/profiles/${EXULANICA_PROFILE:-single-host-server-only}.json
       EXULANICA_DATA_DIR: /var/lib/exulanica
       EXULANICA_BACKUP_DIRECTORY: /var/lib/exulanica-backup/sets

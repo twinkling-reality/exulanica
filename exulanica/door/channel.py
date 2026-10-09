@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import logging
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -103,6 +104,8 @@ __all__ = [
     "presence_window",
     "sendable",
 ]
+
+_LOG = logging.getLogger(__name__)
 
 
 def presence_window(bridge: Bridge) -> dt.timedelta:
@@ -346,6 +349,18 @@ class ChannelRepository:
         if row is None:
             raise ChannelRefused("unauthenticated", 401, "no door credential opens anything here")
 
+    def _settle(self, grant: Grant) -> None:
+        """Settle ``grant`` if it ran out (:meth:`GrantRepository.settle`), in a transaction of its
+        own: the door's own reads of a grant are where one nobody else reads is settled first. One
+        that waits past this connection's statement timeout on a society's minute is left to the
+        next read or the maintenance pass."""
+        if grant.ended(self._grants.now()) != "expired":
+            return
+        try:
+            self._grants.settle(grant.grant_id)
+        except psycopg.errors.QueryCanceled:
+            _LOG.info("A grant that ran out was left to its next settling")
+
     def _presence(self, bridge: Bridge, doing: str) -> Presence:
         """This channel's own hello, while the deployment admits what it named, or a refusal that
         asks the bridge to say hello first. A credential ended since its request was accepted is
@@ -449,6 +464,8 @@ class ChannelRepository:
         ended = grant.ended(self._grants.now())
         if ended is not None and cursor.ended:
             raise ChannelRefused("grant_ended", 410, "this grant was revoked or has ended")
+        if ended == "expired":
+            self._settle(grant)
         if ended is None:
             # Once the grant has ended a bridge only reads what was sent, its end included, so a
             # hello the deployment no longer admits does not keep it from reading the end.
@@ -923,6 +940,7 @@ class ChannelRepository:
         reads is one of them)."""
         from exulanica.door.crossings import Visits
 
+        self._settle(self.grant())
         with self._connection.transaction():
             self._live()
             grant = self._standing()
@@ -945,6 +963,7 @@ class ChannelRepository:
         """Record the bridge's report that its game delivered, or could not deliver, what one of
         this grant's departed visitors carried home; True when it is new. A report may follow the
         grant's end, and a second report of one departure changes nothing."""
+        self._settle(self.grant())
         with self._connection.transaction():
             row = self._connection.execute(
                 "select e.subject_id, e.document from world_society_event e join door_crossing c "
@@ -986,9 +1005,35 @@ class ChannelRepository:
             ).fetchone()
         return written is not None
 
+    def home(self, thing_id: uuid.UUID) -> dict[str, Any]:
+        """Call one of this grant's visitors home at the world's next minute, as its owner's
+        send-away does: the same departure (``sent_away``), so whichever of the two comes first
+        writes it and the other finds it written. Refused once the grant has ended, and for a thing
+        that is not one of its visitors here."""
+        from exulanica.door.crossings import Visits, departure_id
+
+        self._settle(self.grant())
+        with self._connection.transaction():
+            self._live()
+            grant = self._standing()
+            visits = Visits(
+                self._connection, self._session.workspace_id, grant, self._session.actor
+            )
+            leaving = str(departure_id(grant.grant_id, thing_id, "sent_away"))
+            if visits.departure_written(thing_id, "sent_away"):
+                return {"departure_id": leaving, "recorded": False}
+            if thing_id not in visits.present():
+                raise ChannelRefused(
+                    "unknown_reference", 404, "nothing at this address is open to this channel"
+                )
+            visits.depart(thing_id, "sent_away")
+        return {"departure_id": leaving, "recorded": True}
+
     def gone(self, thing_id: uuid.UUID) -> bool:
         """Record that the person behind one of this grant's visitors left the game: the visitor
-        is not asked again. True when it is new."""
+        is not asked again, and its kind's quiet minutes send it home. True when it is new. A
+        visitor the world decides for is never asked, so it has no quiet minutes to count: it is
+        refused, and its bridge calls it home instead (:meth:`home`)."""
         from exulanica.door.crossings import Visits
 
         with self._connection.transaction():
@@ -1000,6 +1045,17 @@ class ChannelRepository:
             if thing_id not in visits.present():
                 raise ChannelRefused(
                     "unknown_reference", 404, "nothing at this address is open to this channel"
+                )
+            world_decides = self._connection.execute(
+                "select 1 from door_crossing where workspace_id = %(w)s and grant_id = %(g)s "
+                "and kind = 'arrival' and thing_id = %(t)s and document->>'decided_by' = 'world'",
+                {**self._ids, "t": thing_id},
+            ).fetchone()
+            if world_decides is not None:
+                raise ChannelRefused(
+                    "decided_by_world",
+                    409,
+                    "the world decides for this visitor: call it home with POST /door/channel/home",
                 )
             written = self._connection.execute(
                 "insert into door_visitor_gone (workspace_id, grant_id, thing_id) "

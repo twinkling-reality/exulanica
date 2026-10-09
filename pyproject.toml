@@ -866,6 +866,11 @@ type = "forbidden"
 source_modules = ["exulanica.orchestration", "exulanica.world_package"]
 forbidden_modules = ["exulanica.door"]
 allow_indirect_imports = true
+# One edge, and only this one: the installation's maintenance pass settles door grants that ran
+# out with nobody reading them, since a visitor the world decides for is never asked through the
+# door and would otherwise stay after its grant's end. The sweep module reaches only what settling
+# needs; nothing else of orchestration reaches the door.
+ignore_imports = ["exulanica.orchestration.installation.maintenance -> exulanica.door.sweep"]
 
 [[tool.importlinter.contracts]]
 # The door reads worlds and the decision records and keeps its own tables; it never reaches a

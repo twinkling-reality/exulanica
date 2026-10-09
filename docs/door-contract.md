@@ -65,15 +65,56 @@ migration 0149). Its scope states how many visitors the bridge may bring in (0 t
 kinds, which of the world's own things it decides for (none by default, at most 8), whether things
 may be carried in or out, whether its visitors may speak, the words the bridge may show its players
 for the world (`world_words`, at most 80 characters, chosen by the owner; the door never reads the
-world's own title), and when it ends: 120 minutes unless the owner says otherwise, at most 1,440. A
-grant names at least one visitor or one thing.
+world's own title), who decides for its visitors once they arrive (`visitors_decided_by`, below), and
+when it ends: 120 minutes unless the owner says otherwise, at most 1,440. A grant names at least one
+visitor or one thing.
+
+**Who decides for a visitor.** A grant's visitors are decided for by their program unless the grant
+says the world does (`visitors_decided_by`: `program`, what a grant stating nothing means, or
+`world`, only for a grant that lets visitors in, and stated in its revision only then, so a program
+grant keeps the bytes and digest it always had). Every arrival the door writes under a world grant
+says so (`decided_by: world`), taken from the grant's current revision under its lock, never from
+the bridge: an arrival's body has no such field. The world then decides for such a visitor as for any
+of its beings: its owner's own choice for it, else the gate's traveller mind, else the routine
+([decision roles](decision-roles-contract.md)); the door never asks its program, and the society
+never counts it as decided from outside, so it is not among `outside` in the models read and its
+owner may choose a model for it. A world grant takes only visitors of a kind the routine, a model or
+a person may decide for (else 422 `kind_not_world_decided`). Issuing a world grant may name the
+traveller mind (`traveller`, `{provider, model_id}`, a model the manifest offers the people's role):
+it is recorded through the choice record in the grant's own transaction, as a choice naming the
+group of arrivals under the grant that ends at the grant's end (to the second), refused by the
+choice record's own names (`model_not_declared`, `model_not_offered`, `model_not_askable` 422;
+`engine_takes_no_model_choice`, `choice_key_reused` 409; a version with no society of things 409
+`world_not_open_to_visitors`). Naming one also requires `model.invoke`, because a recorded model
+choice authorises the spending it causes (403 `not_authorised` without it, with nothing issued). An
+issue repeated under its key answers with the same grant only if it names the same mind, or none
+when the first named none. Revoking a world grant hands its travellers back to the routine under a
+key of its own; a grant that runs out does the same when it is settled.
+
+**A grant that runs out.** A visitor its program decides for is sent home when the decision host
+next asks for it after its grant's end; a visitor the world decides for is never asked through the
+door, so the door settles a grant that ran out: a `grant_ended` departure for each visitor still
+present, then its traveller mind handed back, once and chosen by the grant's own actor (its named
+things go back to their routine the first time the decision host meets one). It does so whenever it
+reads such a grant (a poll of its channel, an arrival, a delivery report or a call home on it, its
+owner's read of it or of the world's grants, at most 4 at a read), first reading whether anything is
+left, so a settled grant waits on no minute; and the installation's maintenance pass settles the
+rest before its backups, at most 32 grants a pass, oldest end first ([deployment
+guide](deployment.md), section 9). A pass runs every 15 seconds unless the installation says
+otherwise, and takes longer when a backup is due, so a visitor leaves within one pass of its grant's
+end, sooner when the door reads the grant first, and the society records it leaving at its next
+minute. Only grants that ran out in the last seven days are looked at; a grant a pass could not
+settle, or whose settling left it as it was, is held back: every later pass takes it after every
+other grant and names it in its status (`stuck`, with the failure `door_sweep_incomplete`) until it
+is settled or the seven days pass. Whatever the sweep does, a
+traveller mind stops costing the workspace its model calls at its `ends_at`, the grant's end.
 
 | Route | Requires | Does |
 | --- | --- | --- |
 | `GET /door/bridges` | `world.read` | The bridges this deployment offers the workspace, in words, with who runs each and whether it is an AI |
-| `POST /door/grants?world_id=` | `world.write`, `door.grant` | Issue a grant: 201 with it, or 200 with the grant an earlier issue under the same `idempotency_key` made, for the same world, bridge and scope (its kinds and things in any order); a key reused for another grant is 409 `idempotency_key_reused`; with `channel_credential` true, also its channel credential, shown once, so an issue answered 200 carries none and the first stays live; a grant for visitors only in a version holding a society of things (409 `world_not_open_to_visitors`, see Crossings) |
-| `GET /door/grants?world_id=` | `world.read` | Every grant in a world, newest first, each with its bridge's label, who runs it, whether it is an AI, whether it is connected, what its program declared itself to be and whether its lines are closed (`lines_closed`: a line its program sent carried a name the account holder saved, so every later line is refused, and the program learnt at most 12 parts of saved names through the grant; see Answers) |
-| `GET /door/grants/{grant_id}` | `world.read` | One grant as it stands, in the same view |
+| `POST /door/grants?world_id=` | `world.write`, `door.grant` (and `model.invoke` to name a `traveller`) | Issue a grant: 201 with it, or 200 with the grant an earlier issue under the same `idempotency_key` made, for the same world, bridge, scope (its kinds and things in any order) and `traveller`; a key reused for another grant is 409 `idempotency_key_reused`; with `channel_credential` true, also its channel credential, shown once, so an issue answered 200 carries none and the first stays live; a grant for visitors only in a version holding a society of things (409 `world_not_open_to_visitors`, see Crossings) |
+| `GET /door/grants?world_id=` | `world.read` | Every grant in a world, newest first, each with its bridge's label, who runs it, whether it is an AI, whether it is connected, what its program declared itself to be and whether its lines are closed (`lines_closed`: a line its program sent carried a name the account holder saved, so every later line is refused, and the program learnt at most 12 parts of saved names through the grant; see Answers); settles grants that ran out |
+| `GET /door/grants/{grant_id}` | `world.read` | One grant as it stands, in the same view; settles it if it ran out |
 | `POST /door/grants/{grant_id}/revoke` | `world.write`, `door.grant` | End it now; revoking twice changes nothing |
 | `POST /door/grants/{grant_id}/credentials/revoke` | `world.write`, `door.grant` | End every live invite and channel credential of the grant now, without ending the grant, as after a credential leaked |
 | `POST /door/grants/{grant_id}/invites` | `world.write`, `door.grant` | An invite, shown once: for a server bridge only |
@@ -349,8 +390,9 @@ kind library by the crossings that use it.
   door credential reaches only the channel routes its declaration names.
 - An id the caller does not hold is answered as a nonexistent one, on owner and channel routes alike.
 - Bodies are bounded before they are read or parsed (`exulanica/api/routes/door.py`, `BODY_LIMITS`):
-  a hello 65,536 bytes, an answer 4,096, an arrival and a delivery report 8,192 each, a redemption
-  and a player's leaving 1,024 each and an owner's grant routes 4,096 (413 `body_too_large`). A hello's mapping is at most 49,152 canonical bytes and 64 fields read; at most
+  a hello 65,536 bytes, an answer 4,096, an arrival and a delivery report 8,192 each, a redemption,
+  a player's leaving and a call home 1,024 each and an owner's grant routes 4,096 (413
+  `body_too_large`). A hello's mapping is at most 49,152 canonical bytes and 64 fields read; at most
   32 frames a poll.
 - Nothing from a program is executed: a mapping is closed data, every answer is one of the labels its
   request offered, checked again by the engine in its minute, and a line meets the line rule before
@@ -381,8 +423,9 @@ channel; the owner may send one home:
 | --- | --- | --- |
 | `POST /door/channel/arrivals` | channel | `{arrival_id, game_type, look_key, carried: [{game_item, count}]}`: one visitor of a type the grant admits, in a look its mapping offers, carrying game items its mapping lets travel in, under an `arrival_id` of the bridge's own that is a random version 4 UUID; 201 `{arrival_id, thing_id}`, or 200 with the same answer for the same arrival sent again |
 | `POST /door/channel/departures/{departure_id}/delivered` | channel | `{delivered: [{thing_id, game_item}], not_delivered: [{thing_id, reason}]}`, naming each thing a departed visitor carried home once: 202 `{recorded}`, true the first time; a report may follow the grant's end |
-| `POST /door/channel/gone` | channel | `{thing_id}`: the person behind a visitor left the game, so it is not asked again, and the society sends it home once its kind's quiet minutes pass (`decider_lost`); 202 `{recorded}` |
-| `POST /door/grants/{grant_id}/send-away` | `world.write`, `door.grant` | `{thing_id}`: a visitor of the grant goes home at the next minute; 202 |
+| `POST /door/channel/gone` | channel | `{thing_id}`: the person behind a visitor left the game, so it is not asked again, and the society sends it home once its kind's quiet minutes pass (`decider_lost`); 202 `{recorded}`. A visitor the world decides for has no quiet minutes: 409 `decided_by_world`, and its bridge calls it home with `POST /door/channel/home` |
+| `POST /door/channel/home` | channel | `{thing_id}`: the bridge calls one of its visitors home at the next minute, as a player asks for: the same departure as the owner's send-away, so whichever comes first writes it; 202 `{departure_id, recorded}`, `recorded` true the first time; 404 for a thing that is not one of the grant's visitors here, 410 `grant_ended` after the grant's end |
+| `POST /door/grants/{grant_id}/send-away` | `world.write`, `door.grant` | `{thing_id}`: a visitor of the grant goes home at the next minute, once, whether its owner or its bridge asked first; 202 |
 
 An arrival is refused before anything is written: an arrival id that is not a random version 4
 UUID (422), a grant that brings no visitors (403 `no_visitors_allowed`), a type it does not admit
@@ -479,5 +522,6 @@ own licence notes.
 | Crossings: arrivals, looks, manifests, departures, deliveries, the end's order, replay | `exulanica/door/crossings.py`, `manifest.py`, `channel.py`, `exulanica/api/routes/door.py`, migration 0163 | `tests/test_door_crossings_postgres.py` |
 | The crossing rules: arrival ids apart from departure ids, revisions read as written, arrivals an hour, the look's licence, refusals by name, two grants in one society, the end's wait | `exulanica/door/crossings.py`, `grants.py`, `asker.py`, `exulanica/api/routes/door.py`, the crossings' migration | `tests/test_door_crossing_rules_postgres.py` |
 | Lines both ways: an ask's line labels and bound, an answer's line held to them and to the grant's word on speaking, said frames (who said each and who decided it, to whom) screened against saved names, the society's own departures | `exulanica/door/channel.py`, `protocol.py` | `tests/test_door_lines_postgres.py`, `tests/test_door.py` (the cursors) |
+| Visitors the world decides for: the arrival's word from the grant, the traveller mind and `model.invoke`, its release and lapse, settling a grant that ran out on the door's reads and through the maintenance sweep, a call home | `exulanica/door/grants.py`, `crossings.py`, `channel.py`, `sweep.py`, `exulanica/api/routes/door.py`, `exulanica/orchestration/installation/maintenance.py` | `tests/test_door_world_decides_postgres.py`, `tests/test_door.py` (the scope) |
 
 Decision record: [ADR-0031](adr/0031-an-outside-program-decides-only-through-the-door.md).

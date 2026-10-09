@@ -39,7 +39,7 @@ import dataclasses
 import time
 import uuid
 from collections.abc import Callable
-from typing import Annotated, Any, Final, TypeVar
+from typing import Annotated, Any, Final, Literal, TypeVar
 
 import anyio
 import anyio.to_thread
@@ -53,10 +53,12 @@ from exulanica.api.dependencies import (
     CurrentBridge,
     CurrentChannel,
     CurrentSession,
+    HeldPermissions,
     ScopedConnection,
     get_services,
 )
-from exulanica.api.routes.society_models import CHOICE_CONFLICTS
+from exulanica.api.permissions import Permission, PermissionRefused, record_refusal
+from exulanica.api.routes.society_models import CHOICE_CONFLICTS, ChosenModel
 from exulanica.api.world_scope import WorldId
 from exulanica.door.bridges import BridgeDirectory
 from exulanica.door.channel import (
@@ -70,6 +72,7 @@ from exulanica.door.crossings import CARRIED_UNITS_MAXIMUM, Visits
 from exulanica.door.grants import (
     MINUTES_DEFAULT,
     MINUTES_MAXIMUM,
+    SETTLED_ON_READ_MAXIMUM,
     THINGS_MAXIMUM,
     VISITORS_MAXIMUM,
     WORLD_WORDS_MAXIMUM,
@@ -100,6 +103,7 @@ from exulanica.door.secrets import (
     TooManyRedemptions,
     redeem_invite,
 )
+from exulanica.models.manifest import load_manifest
 
 router = APIRouter(prefix="/door", tags=["door"])
 
@@ -122,6 +126,7 @@ BODY_LIMITS: Final = (
     ("POST", "/door/channel/arrivals", ARRIVAL_BODY_BYTES),
     ("POST", "/door/channel/departures/{departure_id}/delivered", DELIVERY_BODY_BYTES),
     ("POST", "/door/channel/gone", REDEEM_BODY_BYTES),
+    ("POST", "/door/channel/home", REDEEM_BODY_BYTES),
     ("POST", "/door/grants/{grant_id}/send-away", OWNER_BODY_BYTES),
 )
 #: How a grant refusal answers, by its code. A refusal of the choice record that binds a grant's
@@ -209,6 +214,11 @@ class IssueBody(BaseModel):
     may_speak: bool = True
     #: The words the bridge may show players for the world, chosen here; never the world's title.
     world_words: str | None = Field(default=None, max_length=WORLD_WORDS_MAXIMUM)
+    #: Who decides for the grant's visitors once they arrive: their program, or the world.
+    visitors_decided_by: Literal["program", "world"] = "program"
+    #: The mind the world gives its visitors when it decides for them, a model the manifest offers
+    #: the people's role; naming one also requires ``model.invoke``.
+    traveller: ChosenModel | None = None
     minutes: int = Field(default=MINUTES_DEFAULT, ge=1, le=MINUTES_MAXIMUM)
     channel_credential: bool = False
 
@@ -273,10 +283,21 @@ def issue_grant(
     request: Request,
     body: IssueBody,
     session: CurrentSession,
+    held: HeldPermissions,
     connection: ScopedConnection,
     world_id: WorldId,
 ) -> Any:
     """Issue a grant in one world for one bridge, or answer with the one this key issued."""
+    if body.traveller is not None and Permission.MODEL_INVOKE not in held:
+        # A recorded model choice authorises the spending it causes, so naming the mind a gate's
+        # travellers get needs what choosing any model does.
+        refused = PermissionRefused(
+            method="POST", path="/door/grants", missing=frozenset({Permission.MODEL_INVOKE})
+        )
+        record_refusal(
+            connection, workspace_id=session.workspace_id, actor=session.actor, refused=refused
+        )
+        raise refused
     door = _door(request)
     if door is None:
         return _unavailable()
@@ -302,6 +323,7 @@ def issue_grant(
             may_carry_out=body.may_carry_out,
             may_speak=body.may_speak,
             world_words=body.world_words,
+            visitors_decided_by=body.visitors_decided_by,
         )
         grants = GrantRepository(connection, session.workspace_id, session.actor)
         grant, issued = grants.issue(
@@ -310,6 +332,8 @@ def issue_grant(
             scope=scope,
             minutes=body.minutes,
             idempotency_key=body.idempotency_key,
+            traveller=None if body.traveller is None else body.traveller.model_dump(),
+            manifest=None if body.traveller is None else load_manifest(),
         )
         credential = (
             grants.direct_channel(grant.grant_id, door.bridges)
@@ -330,8 +354,12 @@ def issue_grant(
 def world_grants(
     request: Request, session: CurrentSession, connection: ScopedConnection, world_id: WorldId
 ) -> Any:
-    """Every grant issued in one world, newest first, each as it stands now."""
+    """Every grant issued in one world, newest first, each as it stands now. Reading them settles
+    the first of those that ran out with something left to settle."""
     grants = GrantRepository(connection, session.workspace_id, session.actor)
+    listed = [grant.grant_id for grant in grants.in_world(world_id)]
+    for grant_id in grants.unsettled(listed, limit=SETTLED_ON_READ_MAXIMUM):
+        grants.settle(grant_id)
     directory = _bridges_of(request)
     return {
         "grants": [
@@ -345,9 +373,13 @@ def world_grants(
 def one_grant(
     request: Request, grant_id: uuid.UUID, session: CurrentSession, connection: ScopedConnection
 ) -> Any:
-    grant = GrantRepository(connection, session.workspace_id, session.actor).current(grant_id)
+    grants = GrantRepository(connection, session.workspace_id, session.actor)
+    grant = grants.current(grant_id)
     if grant is None:
         return _problem(404, "unknown_reference", "nothing at this address is available")
+    # Reading a grant that ran out settles it, if anything is left to settle.
+    for unsettled in grants.unsettled([grant_id], limit=1):
+        grants.settle(unsettled)
     return {"grant": _grant_view(grant, connection, session.workspace_id, _bridges_of(request))}
 
 
@@ -456,6 +488,9 @@ def send_away(
         return _problem(404, "unknown_reference", "nothing at this address is available")
     visits = Visits(connection, session.workspace_id, grant, session.actor)
     try:
+        if visits.departure_written(thing_id, "sent_away"):
+            # Sent home already, by its owner or by its own bridge: the same departure.
+            return JSONResponse(status_code=202, content={"sent_away": str(thing_id)})
         if thing_id not in visits.present():
             # The owner's own grant: saying it has no such visitor tells them nothing new.
             return _problem(404, "unknown_reference", "this grant has no visitor of that id here")
@@ -549,6 +584,13 @@ class DeliveryBody(BaseModel):
 class GoneBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    thing_id: uuid.UUID
+
+
+class HomeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    #: The visitor, by the thing id its arrival gave it in the world.
     thing_id: uuid.UUID
 
 
@@ -692,6 +734,16 @@ def gone(request: Request, body: GoneBody, channel: CurrentChannel) -> Any:
     except ChannelRefused as exc:
         return _channel_problem(exc)
     return JSONResponse(status_code=202, content={"recorded": created})
+
+
+@router.post("/channel/home")
+def home(request: Request, body: HomeBody, channel: CurrentChannel) -> Any:
+    """Call one of the grant's visitors home at the world's next minute, as its player asked."""
+    try:
+        called = _on_channel(request, channel, lambda repository: repository.home(body.thing_id))
+    except ChannelRefused as exc:
+        return _channel_problem(exc)
+    return JSONResponse(status_code=202, content=called)
 
 
 async def _in_thread(work: Callable[[], _T]) -> _T:

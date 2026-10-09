@@ -60,7 +60,7 @@ from exulanica.world.crossings import (
     check_departure,
 )
 from exulanica.world.errors import InvalidThingPlacement
-from exulanica.world.placed_things import named_kind
+from exulanica.world.placed_things import named_kind, shipped_kind
 from exulanica.world.thing_library import shipped_looks
 from exulanica.world.thing_looks import (
     ThingLookRefused,
@@ -78,6 +78,8 @@ __all__ = [
 
 #: The most things one arrival carries in, every unit counted: the society's own bound.
 CARRIED_UNITS_MAXIMUM: Final = 16
+#: The deciders the world gives a visitor it decides for.
+WORLD_DECIDERS: Final = ("routine", "model", "person")
 #: The most arrivals one grant writes in any hour, refused ones included: an arrival the minute
 #: refuses frees its place at once, so without this a bridge could write one every minute for good.
 ARRIVALS_PER_HOUR_MAXIMUM: Final = 60
@@ -111,6 +113,13 @@ def _shipped_kind(named: Mapping[str, Any]) -> Any:
         return named_kind(named["key"], named["version"])
     except InvalidThingPlacement as exc:
         raise ChannelRefused("kind_not_shipped", 422, str(exc)) from exc
+
+
+def _world_may_decide(kind: Any) -> bool:
+    """Whether a decider the world gives (the routine, a model or a person) may decide for a thing
+    of ``kind``, as its shipped kind's allowed deciders say."""
+    deciders = shipped_kind(kind).document["deciders"]
+    return deciders is not None and bool(set(deciders["allowed"]) & set(WORLD_DECIDERS))
 
 
 def departure_id(grant_id: uuid.UUID, thing_id: uuid.UUID, reason: str) -> uuid.UUID:
@@ -410,6 +419,10 @@ class Visits:
         if look is None:
             raise ChannelRefused("look_not_offered", 422, "that look is not one the mapping offers")
         visitor_kind = _shipped_kind(visitor["kind"])
+        if scope.visitors_decided_by == "world" and not _world_may_decide(visitor_kind):
+            raise ChannelRefused(
+                "kind_not_world_decided", 422, "the world decides for no visitor of that kind"
+            )
         kind_reference = {
             "kind": visitor_kind.kind,
             "version": visitor_kind.version,
@@ -503,6 +516,10 @@ class Visits:
             "carried": held,
             "grant_id": str(self.grant.grant_id),
             "gate": scope.gate,
+            # Who decides for the visitor is the grant's word, as its revision under the grant's
+            # lock states it, never the bridge's; stated only where the world decides, so a
+            # program's visitor's arrival keeps its bytes.
+            **({"decided_by": "world"} if scope.visitors_decided_by == "world" else {}),
         }
         check_arrival(document)
         with self.connection.transaction():
@@ -510,6 +527,15 @@ class Visits:
                 society["society_id"], "arrival", document, units_list, worn.document()
             )
         return document, created
+
+    def departure_written(self, thing_id: uuid.UUID, reason: str) -> bool:
+        """Whether the door wrote the departure of ``thing_id`` for ``reason`` under this grant."""
+        row = self.connection.execute(
+            "select 1 from door_crossing where workspace_id = %(w)s and grant_id = %(g)s "
+            "and kind = 'departure' and crossing_id = %(d)s",
+            {**self._ids, "d": departure_id(self.grant.grant_id, thing_id, reason)},
+        ).fetchone()
+        return row is not None
 
     def depart(self, thing_id: uuid.UUID, reason: str) -> bool:
         """Write the departure of one of this grant's visitors for ``reason``; True when new."""

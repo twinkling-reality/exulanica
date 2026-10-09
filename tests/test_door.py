@@ -31,7 +31,7 @@ from exulanica.door.credentials import (
     normalise_invite_code,
 )
 from exulanica.door.crossings import Visits
-from exulanica.door.grants import Grant, Scope
+from exulanica.door.grants import Grant, GrantRefused, Scope
 from exulanica.door.mapping import MappingRefused, check_mapping, check_reads
 from exulanica.door.notices import ANSWERS_REMEMBERED, HeldPolls, Hellos, Notices
 from exulanica.door.protocol import Cursor, InvalidCursor, declared_fault, words_fault
@@ -514,6 +514,25 @@ def test_a_process_remembers_a_bounded_number_of_answers():
     for _ in range(ANSWERS_REMEMBERED):
         notices.answered(uuid.uuid4())
     assert not notices.wait_for_answer(first, 0)
+
+
+def test_a_grant_s_visitors_are_decided_by_their_program_unless_it_says_the_world():
+    version = str(uuid.uuid4())
+    program = Scope(visitors_maximum=1, kinds=("player",), version_id=version)
+    world = Scope(
+        visitors_maximum=1, kinds=("player",), version_id=version, visitors_decided_by="world"
+    )
+    # A program grant's revision keeps the bytes it had before the field existed; a world grant
+    # states it; a revision stating nothing reads as its program's.
+    assert "visitors_decided_by" not in program.document()
+    assert world.document()["visitors_decided_by"] == "world"
+    assert Scope.from_document(program.document()) == program
+    assert Scope.from_document(world.document()) == world
+    with pytest.raises(GrantRefused, match="invalid_scope"):
+        Scope(visitors_maximum=1, kinds=("player",), version_id=version, visitors_decided_by="x")
+    things = Scope(things=(str(uuid.uuid4()),), version_id=version, visitors_decided_by="world")
+    with pytest.raises(GrantRefused, match="only for visitors a grant lets in"):
+        things.check_issue()
 
 
 def test_an_arrival_is_named_by_a_random_id_whoever_calls_the_door():

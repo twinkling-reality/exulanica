@@ -199,9 +199,10 @@ def test_runtime_containers_use_the_rls_role_and_only_migrations_use_the_owner()
     directives = _directives(COMPOSE)
     runtime_urls = [line for line in directives.splitlines() if "EXULANICA_DATABASE_URL:" in line]
     # The owner twice (migrate, catalogs), then the API, the derivative, scene, preparation,
-    # generated-tile and playback workers as the RLS role. The tile worker publishes through a
-    # second URL, the tile role's, which is not the owner (migration 0138).
-    assert len(runtime_urls) == 8, runtime_urls
+    # generated-tile and playback workers and maintenance (for the door's sweep alone) as the RLS
+    # role. The tile worker publishes through a second URL, the tile role's, which is not the owner
+    # (migration 0138).
+    assert len(runtime_urls) == 9, runtime_urls
     assert all("postgresql://${POSTGRES_USER:-exulanica}:" in url for url in runtime_urls[:2])
     assert all("postgresql://exulanica_app:" in line for line in runtime_urls[2:]), runtime_urls
     assert "EXULANICA_APP_ROLE_PASSWORD:?" in COMPOSE
