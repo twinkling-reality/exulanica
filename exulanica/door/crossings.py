@@ -6,15 +6,17 @@ optionally, the gate they come through (``Scope.gate``, a placed thing's id). It
 arrival under an id of its own, a random version 4 UUID (a departure's id is one the door derives,
 version 5, so the two never meet), with what the person in its game is (the game's own type, from
 the grant's admitted kinds and its mapping), the look they arrive in (a key the mapping offers for
-that type, naming a look the thing library ships, held at intake to the library and the kind's
-body plan by :func:`exulanica.world.thing_looks.check_crossing_look`) and what they carry in (game
+that type, naming a look the thing library ships or, by the same key, version and digest in a
+``bridge-mapping/v2`` mapping, one the arriving workspace keeps, held at intake to the library or
+that workspace's own store, never another's, and to the kind's body plan by
+:func:`exulanica.world.thing_looks.check_crossing_look`) and what they carry in (game
 items the mapping lets travel in, one thing each). A grant takes at most
 :data:`ARRIVALS_PER_HOUR_MAXIMUM` arrivals in any hour, refused ones included. The door writes the
 arrival as the society of things reads it (:func:`exulanica.world.crossings.check_arrival`): the
 visitor's id and each carried thing's, derived from the grant and the bridge's arrival id so a
 resent arrival is the same one; the kind each becomes, by the shipped library's digest; the
 visitor's origin (class ``crossed``: the program that sent it, under its grant), whose licence and
-distribution are the shipped look's own, never the mapping's words about it; and the digest of the
+distribution are the worn look's own, never the mapping's words about it; and the digest of the
 translation manifest that says what came across (:mod:`exulanica.door.manifest`), kept in the
 workspace by its digest. Departures are written for a visitor the world's owner sends home
 (``sent_away``) and for every visitor of a grant that ends (``grant_ended``). A bridge whose player
@@ -63,10 +65,12 @@ from exulanica.world.errors import InvalidThingPlacement
 from exulanica.world.placed_things import named_kind, shipped_kind
 from exulanica.world.thing_library import shipped_looks
 from exulanica.world.thing_looks import (
+    LookReference,
     ThingLookRefused,
     check_crossing_look,
     record_crossing_look,
 )
+from exulanica.world.thing_store import admitted_look_by_digest
 
 __all__ = [
     "ARRIVALS_PER_HOUR_MAXIMUM",
@@ -104,6 +108,35 @@ def _look_reference(named: str | Mapping[str, Any]) -> Mapping[str, Any]:
     if shipped is None:
         return {"look": "unknown", "version": 1, "sha256": digest}
     return {"look": shipped.look, "version": shipped.version, "sha256": shipped.sha256}
+
+
+def _worn_look(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    kind: Mapping[str, Any],
+    named: str | Mapping[str, Any],
+) -> tuple[LookReference, Mapping[str, Any]]:
+    """The look a visitor arrives in under a mapping's look, held to its kind's body plan, and the
+    origin that look states; or :class:`ThingLookRefused` by name.
+
+    A look the thing library ships is that look. A ``bridge-mapping/v2`` look at a key and version
+    the library ships none at is the arriving workspace's own look with that digest, read on the
+    grant's connection, when the workspace keeps one and has not withdrawn it and its key and
+    version are the mapping's: it is then named by its digest alone, as a world names a workspace's
+    look. The read is this workspace's, so a look another workspace keeps is refused exactly as one
+    nobody keeps (``look_not_shipped``)."""
+    reference = _look_reference(named)
+    key = (reference["look"], reference["version"])
+    kept = None
+    if not isinstance(named, str) and key not in shipped_looks():
+        kept = admitted_look_by_digest(connection, workspace_id, str(reference["sha256"]))
+        if kept is not None and (kept.look, kept.version) == key:
+            reference = {"source": "workspace", "sha256": kept.sha256}
+    worn = check_crossing_look(kind, reference, connection=connection, workspace_id=workspace_id)
+    if worn.source == "workspace":
+        assert kept is not None
+        return worn, kept.document["origin"]
+    return worn, shipped_looks()[(worn.look, worn.version)].document["origin"]
 
 
 def _shipped_kind(named: Mapping[str, Any]) -> Any:
@@ -194,9 +227,9 @@ class DoorCrossings:
             (workspace_id, society_id, crossing_id),
         ).fetchone()
         assert row is not None and row["look"] is not None
-        # Checked at intake against the same shipped library, so only a release that changed the
-        # library between the arrival and its minute refuses it here: the visitor still arrives,
-        # in its kind's own look, and a minute is never stopped by a look.
+        # Checked at intake, so only a release that changed the library, or the workspace
+        # withdrawing its own look, between the arrival and its minute refuses it here: the visitor
+        # still arrives, in its kind's own look, and a minute is never stopped by a look.
         with contextlib.suppress(ThingLookRefused):
             record_crossing_look(
                 connection,
@@ -432,7 +465,9 @@ class Visits:
             "sha256": visitor_kind.sha256,
         }
         try:
-            worn = check_crossing_look(kind_reference, _look_reference(look["look"]))
+            worn, worn_origin = _worn_look(
+                self.connection, self.workspace_id, kind_reference, look["look"]
+            )
         except ThingLookRefused as exc:
             raise ChannelRefused(exc.code, 422, exc.detail) from exc
         units = sum(int(entry["count"]) for entry in carried)
@@ -487,9 +522,8 @@ class Visits:
             "values (%s, %s, %s) on conflict do nothing",
             (self.workspace_id, manifest_sha256, Jsonb(manifest)),
         )
-        # The visitor wears the shipped look, so it carries the look's own licence and may be shown
-        # where the look may; a mapping's words about the look's licence are not read for it.
-        worn_origin = shipped_looks()[(worn.look, worn.version)].document["origin"]
+        # The visitor wears the look, so it carries the look's own licence and may be shown where
+        # the look may; a mapping's words about the look's licence are not read for it.
         document = {
             "profile": ARRIVAL_PROFILE,
             "arrival_id": str(arrival_id),

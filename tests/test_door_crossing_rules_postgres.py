@@ -13,6 +13,10 @@
     when to try again; a resent arrival is not counted again.
 *   A visitor carries its shipped look's own licence and may be shown where the look may, whatever
     a mapping says of the look.
+*   A second-profile mapping may name a look a workspace keeps: a visitor arrives in it, with its
+    licence, once its own workspace keeps it at the key and version the mapping names, and the
+    minute records it by its digest; while only another workspace keeps it, or its workspace keeps
+    that digest under another key, the arrival is refused by name and nothing is written.
 *   Arrivals the grant or mapping does not admit are refused by name before anything is written:
     things carried in under a grant that lets none in, too many things, an item that does not cross,
     a kind the library does not ship, a grant for no visitors, and an arrival id reused for another
@@ -35,7 +39,10 @@ import pytest
 from exulanica.canonical import sha256_of_canonical
 from exulanica.door import crossings as door_crossings
 from exulanica.door.bridges import load_bridge_directory
+from exulanica.store.local import LocalContentAddressedStore
+from exulanica.things.authored import container_of
 from exulanica.world.thing_library import shipped_looks
+from exulanica.world.thing_store import ThingStore
 from psycopg.types.json import Jsonb
 
 import door_support
@@ -52,7 +59,9 @@ from test_door_crossings_postgres import (
 from test_door_crossings_postgres import crossings as crossings
 from test_door_postgres import OWNER, _credential, _grant_for, _hello, _person_request
 from test_door_postgres import door as door
+from test_society_saved_world_api import routes
 from test_society_things_postgres import _step
+from test_thing_store_admission import _imported
 
 saved_world = helpers.saved_world
 pytestmark = pytest.mark.postgres
@@ -403,6 +412,80 @@ def test_a_visitor_carries_its_look_s_own_licence_whatever_its_mapping_says(door
     origin = crossing["document"]["origin"]
     assert origin["licence"] == look["licence"]
     assert origin["distribution"] == look["distribution"]
+
+
+def test_a_visitor_arrives_in_a_look_its_own_workspace_keeps_never_another_s(
+    door, crossings, tmp_path
+):
+    world, society = _world(door)
+    imported = _imported()
+
+    def admit(workspace_id: uuid.UUID, root: Any) -> Any:
+        """The workspace admits the imported traveller's look, as a deployment's intake does."""
+        with door["database"].session(workspace_id) as connection:
+            store = ThingStore(connection, workspace_id, LocalContentAddressedStore(root))
+            kept = store.admit_look(
+                copy.deepcopy(imported),
+                container_of("blocky-traveller"),
+                created_by=world["session"].actor,
+                admit=lambda _look: None,
+            )
+        return kept.look
+
+    theirs = admit(uuid.uuid4(), tmp_path / "theirs")
+    named = {"look": theirs.look, "version": theirs.version, "sha256": theirs.sha256}
+    assert (theirs.look, theirs.version) not in shipped_looks()
+    mapping = door_support.mapping_v2()
+    [offered] = mapping["visitors"][0]["looks"]
+    licence = {"spdx": imported["origin"]["licence"]["spdx"], "share_alike": True}
+    mapping["visitors"][0]["looks"] = [
+        {**offered, "look": named, "licence": licence},
+        {**offered, "look_key": "renamed", "look": {**named, "look": "renamed-look"}},
+    ]
+    entries = json.loads(
+        door_support.bridges_setting(listed=False, workspaces=[str(world["workspace"])])
+    )
+    entries[0]["mapping_sha256"] = [door_support.mapping_sha256(mapping)]
+    admitted = load_bridge_directory({"EXULANICA_DOOR_BRIDGES": json.dumps(entries)})
+    other_client, _runtime = door["application"](admitted)
+    arrival = str(uuid.uuid4())
+    with other_client:
+        _grant_id, channel = _grant(door, key="visitors-own-look")
+        said = other_client.post(
+            "/door/channel/hello",
+            headers=channel,
+            json={
+                "adapter_version": door_support.ADAPTER_VERSION,
+                "mapping": mapping,
+                "reads": door_support.READS,
+            },
+        )
+        assert said.status_code == 200, said.text
+        # Only another workspace keeps it: refused as a look nobody keeps.
+        elsewhere = _arrive(other_client, channel, str(uuid.uuid4()))
+        assert (elsewhere.status_code, elsewhere.json()["code"]) == (422, "look_not_shipped")
+        mine = admit(world["workspace"], tmp_path / "mine")
+        assert mine.sha256 == theirs.sha256
+        # Kept here, but named under another key: refused by name too.
+        renamed = _arrive(other_client, channel, str(uuid.uuid4()), look_key="renamed")
+        assert (renamed.status_code, renamed.json()["code"]) == (422, "look_not_shipped")
+        sent = _arrive(other_client, channel, arrival)
+        assert sent.status_code == 201, sent.text
+    # The refused arrivals wrote nothing; the visitor carries the kept look's own licence.
+    [crossing] = _crossings(world)
+    assert crossing["crossing_id"] == uuid.UUID(arrival)
+    origin = crossing["document"]["origin"]
+    assert origin["licence"] == imported["origin"]["licence"]
+    assert origin["distribution"] == imported["origin"]["distribution"]
+    society = _step(door["client"], world, society)
+    [visitor] = _visitors(society)
+    scope, root, _ = routes(world)
+    read = door["client"].get(f"{root}/thing-looks", headers=OWNER, params=scope)
+    assert read.status_code == 200, read.text
+    assert [
+        (entry["thing_id"], entry["look"], entry["chosen_by"])
+        for entry in read.json().get("workspace_looks", [])
+    ] == [(visitor["id"], {"sha256": mine.sha256, "source": "workspace"}, "crossing")]
 
 
 def test_arrivals_a_grant_or_mapping_does_not_admit_are_refused_by_name(door, crossings):

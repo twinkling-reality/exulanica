@@ -4,13 +4,15 @@ A mapping file is data, one per game and content set, kept with its adapter outs
 pinned by digest in the deployment's bridge directory. Two profiles are read side by side, the same
 but for how a visitor's look is named: ``exulanica.bridge-mapping/v1`` names it by its digest
 (``sha256:<digest>``), which the door resolves against the thing library when a visitor arrives, and
-``exulanica.bridge-mapping/v2`` by the library's own reference, its key, version and digest. A
-pinned mapping of either profile stays valid. It states:
+``exulanica.bridge-mapping/v2`` by the library's own reference, its key, version and digest, which
+also names a look a workspace keeps, read from the arriving workspace's own store when the library
+ships none at that key and version. A pinned mapping of either profile stays valid. It states:
 
 ``visitors``
     Each kind of game character that may cross, the thing kind it arrives as here, the words it is
-    known by, and the looks it may arrive in, each a look the thing library ships, with its
-    licence. A look is chosen by a key the adapter reports; no picture crosses at run time. None
+    known by, and the looks it may arrive in, each a look the thing library ships or, in the
+    second profile, one a workspace keeps, with its licence. A look is chosen by a key the adapter
+    reports; no picture crosses at run time. None
     for a program that brings no visitor and only decides for a world's own things, such as an
     agent.
 ``items``
@@ -137,7 +139,7 @@ def _kind(value: Any, where: str) -> None:
 
 
 def _look(value: Any, where: str) -> None:
-    """A look the thing library ships, named as it names one: its key, version and digest."""
+    """A look named as the thing library names one: its key, version and digest."""
     _object(value, ("look", "version", "sha256"), where)
     _require(isinstance(value["look"], str) and bool(_LOOK_KEY.match(value["look"])), where)
     _require(type(value["version"]) is int and 1 <= value["version"] <= 10_000, where)

@@ -262,8 +262,8 @@ The look a thing wears in a version is a choice recorded beside it
 ([`thing_looks.py`](../exulanica/world/thing_looks.py), migration 0156): a shipped look by key,
 version and digest, one the library holds, whose body plan is the thing's kind's (refused otherwise
 as `look_not_shipped`, `look_unfit` or `thing_kind_not_shipped`). `check_crossing_look` checks the
-look a crossing brings, reading only the shipped catalogs, so a door refuses an arrival before it
-writes anything; `record_crossing_look` records it, for a door to call in the transaction of the
+look a crossing brings, against the shipped catalogs or, asked on a workspace's connection, the
+looks that workspace keeps, so a door refuses an arrival before it writes anything; `record_crossing_look` records it, for a door to call in the transaction of the
 minute that binds the arrival as arrived, once per crossing however often it is handed over. Choices
 are appended and never changed, each naming the crossing or the actor that made it, and the newest
 per thing that still names a look to wear is worn: a choice naming a shipped look the library no

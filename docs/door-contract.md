@@ -370,8 +370,10 @@ digest in the deployment's bridge directory. Two profiles are read side by side,
 how a visitor's look is named: `exulanica.bridge-mapping/v1` names it by its digest
 (`sha256:<digest>`), which the door resolves against the thing library's shipped looks when a
 visitor arrives, and `exulanica.bridge-mapping/v2` by the library's own reference, `{look, version,
-sha256}`. A mapping pinned in either profile stays valid; a look the library holds only in a
-workspace's store can be named only in the second.
+sha256}`. A mapping pinned in either profile stays valid; a look a workspace keeps can be named
+only in the second: where the library ships no look at that key and version, the door reads it from
+the arriving workspace's own store by its digest, its key and version held to the mapping's, and
+never from another workspace's.
 
 | Part | States |
 | --- | --- |
@@ -439,9 +441,10 @@ channel; the owner may send one home:
 An arrival is refused before anything is written: an arrival id that is not a random version 4
 UUID (422), a grant that brings no visitors (403 `no_visitors_allowed`), a type it does not admit
 (422 `kind_not_admitted`), a kind the mapping names that the thing library does not ship (422
-`kind_not_shipped`), a look the mapping does not offer (422 `look_not_offered`) or the thing library
-does not ship for the visitor's kind (422 `look_not_shipped`, `look_unfit` or
-`thing_kind_not_shipped`, `exulanica/world/thing_looks.py`), carrying without `may_carry_in` (403
+`kind_not_shipped`), a look the mapping does not offer (422 `look_not_offered`), or one that neither
+the thing library ships nor the arriving workspace keeps as the mapping names it, or that does not
+fit the visitor's kind (422 `look_not_shipped`, `look_unfit` or `thing_kind_not_shipped`,
+`exulanica/world/thing_looks.py`), carrying without `may_carry_in` (403
 `carrying_not_allowed`), more than 16 things (422 `too_much_carried`), an item that does not travel
 in (422 `item_not_mapped`), more than 60 arrivals of the grant in the last hour, refused ones
 included (429 `too_many_arrivals`, with `retry_after_s`), as many visitors as the grant lets in
@@ -459,7 +462,7 @@ after a hello with another adapter version or mapping is another arrival's docum
 `crossing_id_reused`. The door writes an `exulanica.thing-arrival/v1` document ([things
 contract](things-contract.md)): the visitor's kind by the library's digest, its origin (class
 `crossed`: the bridge, its adapter version and mapping, the grant, with the licence and
-distribution of the shipped look it wears, never a mapping's words about that look), and the digest
+distribution of the look it wears, never a mapping's words about that look), and the digest
 of its translation manifest (`exulanica.translation-manifest/v2`), which says for each game field
 the mapping accounts for whether it came across exact, approximated or not at all, in the mapping's
 own words, and is kept in the workspace by that digest (`door_manifest`).

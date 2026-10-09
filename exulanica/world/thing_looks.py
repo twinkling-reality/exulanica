@@ -7,8 +7,9 @@ a shipped look by key, version and digest, one the thing library serves
 always fetch and draw it. Choices are appended (migration 0156) and the latest per thing is the one
 worn; a thing with none wears its kind's first look.
 
-*   :func:`check_crossing_look` holds a look to the shipped library and to the thing's kind,
-    reading nothing but the shipped catalogs, so a door refuses an arrival before it writes;
+*   :func:`check_crossing_look` holds a look to the shipped library, or to the looks a workspace
+    keeps when asked on that workspace's connection, and to the thing's kind, so a door refuses an
+    arrival before it writes;
 *   :func:`record_crossing_look` writes the look a visitor's crossing brought, on the minute's own
     connection, for an arrival the minute bound as arrived; one arrival records one look however
     often it is handed over;
