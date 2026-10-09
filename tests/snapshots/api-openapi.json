@@ -6036,6 +6036,434 @@
     }
    }
   },
+  "/workspace-style-packs": {
+   "post": {
+    "tags": [
+     "workspace-style-packs"
+    ],
+    "summary": "Admit Workspace Style Pack",
+    "operationId": "admit_workspace_style_pack_workspace_style_packs_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "declaration",
+         "manifest"
+        ],
+        "properties": {
+         "declaration": {
+          "type": "string",
+          "maxLength": 65536
+         },
+         "manifest": {
+          "type": "string",
+          "maxLength": 262144
+         }
+        },
+        "additionalProperties": {
+         "type": "string",
+         "contentMediaType": "application/octet-stream"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "workspace-style-packs"
+    ],
+    "summary": "This workspace's own style pack versions and their checks.",
+    "operationId": "list_workspace_style_packs_workspace_style_packs_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/workspace-style-packs/{manifest_sha256}": {
+   "get": {
+    "tags": [
+     "workspace-style-packs"
+    ],
+    "summary": "One version of a workspace style pack, and its check.",
+    "operationId": "read_workspace_style_pack_workspace_style_packs__manifest_sha256__get",
+    "parameters": [
+     {
+      "name": "manifest_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Manifest Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/workspace-style-packs/{manifest_sha256}/files/{content_sha256}": {
+   "get": {
+    "tags": [
+     "workspace-style-packs"
+    ],
+    "summary": "One file of a ready workspace style pack version, after the final read check.",
+    "operationId": "read_workspace_style_pack_file_workspace_style_packs__manifest_sha256__files__content_sha256__get",
+    "parameters": [
+     {
+      "name": "manifest_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Manifest Sha256"
+      }
+     },
+     {
+      "name": "content_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Content Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       },
+       "model/gltf-binary": {},
+       "image/png": {}
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/workspace-style-packs/{manifest_sha256}/withdraw": {
+   "post": {
+    "tags": [
+     "workspace-style-packs"
+    ],
+    "summary": "Withdraw a version of a workspace style pack for good.",
+    "operationId": "withdraw_workspace_style_pack_workspace_style_packs__manifest_sha256__withdraw_post",
+    "parameters": [
+     {
+      "name": "manifest_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Manifest Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/workspace-style-packs/{manifest_sha256}/archive": {
+   "get": {
+    "tags": [
+     "workspace-style-packs"
+    ],
+    "summary": "A ready workspace style pack version as one uncompressed tar archive.",
+    "operationId": "read_workspace_style_pack_archive_workspace_style_packs__manifest_sha256__archive_get",
+    "parameters": [
+     {
+      "name": "manifest_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Manifest Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       },
+       "application/x-tar": {}
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/workspace-style-packs/{manifest_sha256}/publish-request": {
+   "post": {
+    "tags": [
+     "workspace-style-packs"
+    ],
+    "summary": "Ask for a ready version of your own style pack to join the shared library.",
+    "operationId": "request_workspace_style_pack_publication_workspace_style_packs__manifest_sha256__publish_request_post",
+    "parameters": [
+     {
+      "name": "manifest_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Manifest Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PublishRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/tiles": {
    "get": {
     "tags": [
@@ -33930,6 +34358,45 @@
      "origin_reference"
     ],
     "title": "ProvenanceView"
+   },
+   "PublishRequest": {
+    "properties": {
+     "licence_id": {
+      "type": "string",
+      "enum": [
+       "CC0-1.0",
+       "CC-BY-4.0"
+      ],
+      "title": "Licence Id"
+     },
+     "attribution": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 400,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Attribution"
+     },
+     "statement": {
+      "type": "string",
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Statement"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "licence_id",
+     "statement"
+    ],
+    "title": "PublishRequest",
+    "description": "What a creator grants the project for a version to join the shared library."
    },
    "PublishedSet": {
     "properties": {

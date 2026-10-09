@@ -22,6 +22,7 @@ import sys
 import threading
 import uuid
 from collections.abc import Callable, Mapping
+from pathlib import Path
 from typing import Any, Final
 
 from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV, paced_account_source
@@ -31,11 +32,13 @@ from exulanica.db.session import Database
 from exulanica.env import env_get, env_name
 from exulanica.store.configured import content_stores
 from exulanica.world.asset_preparation import PREPARERS, AssetPreparationWorker, Preparer
+from exulanica.world.style_pack_checks import StylePackCheckWorker, colour_table, library_palettes
 from exulanica.world.workspace_preparations import retained_bytes_limit
 
 __all__ = ["WORKSPACES_ENV", "main"]
 
 WORKSPACES_ENV: Final = env_name("WORKSPACE_IDS")
+_TREE: Final = Path(__file__).resolve().parents[2]
 
 
 def _emit(stream: Any, event: str, **fields: Any) -> None:
@@ -74,15 +77,29 @@ def _build(
             f"no workspace was configured. Set {WORKSPACES_ENV}, pass --workspace, or set "
             f"{ACCOUNT_DATABASE_URL_ENV}; a worker that silently prepares nothing is not healthy."
         )
+    name = args.name or f"{platform.node() or 'unknown'}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
+    stores = content_stores(environ)
+    # The style pack checks run in this process, after each preparation pass: the same runtime
+    # role, workspaces and stores, and no service of their own.
+    checks = StylePackCheckWorker(
+        database,
+        stores.workspace_style_packs,
+        workspaces,
+        table=colour_table(_TREE),
+        library=library_palettes,
+        name=f"{name}:style-pack-checks",
+        workspace_source=source,
+    )
     return AssetPreparationWorker(
         database,
-        content_stores(environ).workspace_assets,
+        stores.workspace_assets,
         workspaces,
         preparers=preparers,
-        name=args.name or f"{platform.node() or 'unknown'}:{os.getpid()}:{uuid.uuid4().hex[:8]}",
+        name=name,
         poll_seconds=args.poll_seconds,
         workspace_source=source,
         retained_bytes_limit=retained_bytes_limit(environ),
+        also=(checks.drain,),
     )
 
 
@@ -128,6 +145,7 @@ def main(
     if args.once:
         try:
             outcome = worker.drain()
+            worker.drain_also()
         except Exception as error:
             _emit(output, "pass_failed", failure_class=type(error).__name__, message=str(error))
             return 1

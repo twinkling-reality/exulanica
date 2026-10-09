@@ -737,6 +737,39 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+# A creator's own style pack is uploader content: its pack id, title, description, tags, authors,
+# attribution, source reference, statement, swatch, preset and role keys, file paths and preview are
+# text and pictures a person wrote or chose, and no hosted model request carries any of them
+# (docs/style-pack-contract.md section 11). Every module that holds a registered hosted call site
+# (tests/test_hosted_boundary.py HOSTED_CALL_PATHS) is held away from the modules that keep, admit,
+# check or serve a workspace's style packs, indirect imports counted, so a prompt cannot reach that
+# text without this contract changing first.
+name = "No hosted model call site reaches a workspace's own style packs"
+type = "forbidden"
+source_modules = [
+    "exulanica.api.decision_host",
+    "exulanica.epistemics.caption_embeddings",
+    "exulanica.ingest.vision",
+    "exulanica.references.drafting",
+    "exulanica.references.pictures",
+    "exulanica.selection.action_plan",
+    "exulanica.selection.creature_drafting",
+    "exulanica.selection.embeddings",
+    "exulanica.selection.environment_proposal",
+    "exulanica.selection.planner",
+    "exulanica.selection.proposal",
+    "exulanica.selection.question",
+    "exulanica.selection.society_question",
+    "exulanica.selection.world_drafting",
+]
+forbidden_modules = [
+    "exulanica.api.routes.workspace_style_packs",
+    "exulanica.world.style_pack_admission",
+    "exulanica.world.style_pack_checks",
+    "exulanica.world.workspace_style_packs",
+]
+
+[[tool.importlinter.contracts]]
 # A thing kind, a look or an origin record is data read by a pure reader: it cannot open the
 # database or the store, name an evidence address, reach the pipeline, a person, the selector,
 # reconstruction or the capture verdict, import the world that reads it, call a model or load the

@@ -93,6 +93,9 @@ COPY assets/catalogs /app/assets/catalogs
 # (exulanica/world/style_pack_library.py). About 2.2 MiB.
 # `tests/test_image_ships_startup_reads.py` holds this line to what loading the library reads.
 COPY assets/style-packs /app/assets/style-packs
+# The colour table a style pack's pieces encode their swatches in, which the asset preparation
+# process's style pack check reads when it starts (exulanica/world/style_pack_checks.py). 1.6 KiB.
+COPY assets/colour /app/assets/colour
 # The character catalogs the image publishes (`exulanica-character-catalog publish --apply`, which
 # every serving database runs after `exulanica-db`, as the `catalogs` jobs do): the people and the
 # parametric family, with every container and licence they name. About 22 MB. The development

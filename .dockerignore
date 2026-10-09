@@ -26,6 +26,8 @@
 !assets/catalogs
 # The committed style pack library the API serves, read and checked when it starts. About 520 KiB.
 !assets/style-packs
+# The colour table the asset preparation process's style pack check reads at startup.
+!assets/colour
 # The character catalogs the image publishes, with their containers and licences. About 22 MB.
 !assets/characters/catalog.json
 !assets/characters/looks.json

@@ -71,6 +71,7 @@ from exulanica.world.material_recipes import MaterialRuntime
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.workspace_assets import WorkspaceAssetRuntime
 from exulanica.world.workspace_preparations import WorkspacePreparationRepository
+from exulanica.world.workspace_style_packs import WorkspaceStylePackRuntime
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
@@ -305,6 +306,9 @@ def existence(tmp_path, photo_dir, repository, spine_schema):
         ),
         workspace_assets=WorkspaceAssetRuntime(
             stores=LocalWorkspaceStores(tmp_path / "workspace-assets")
+        ),
+        workspace_style_packs=WorkspaceStylePackRuntime.over(
+            LocalWorkspaceStores(tmp_path / "workspace-style-packs"), uploads=True
         ),
         door=DoorRuntime(database=database, bridges=door_support.bridges()),
         content_stores=local_content_stores(tmp_path / "data"),

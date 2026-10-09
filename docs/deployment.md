@@ -342,6 +342,7 @@ Where a table says "no default", the process refuses to start without the settin
 | `EXULANICA_GOOGLE_CLIENT_ID`, `EXULANICA_GOOGLE_CLIENT_SECRET`, `EXULANICA_GOOGLE_CALLBACK_URI`, `EXULANICA_GOOGLE_RETURN_URIS`, `EXULANICA_ACCOUNT_BROWSER_ORIGINS`, `EXULANICA_ACCOUNT_DATABASE_URL` | Google sign-in and browser accounts (5.1.4) | Optional, all six or none: a partial set stops startup |
 | `EXULANICA_SOCIETY_CONTROL_WORKSPACES`, `EXULANICA_SOCIETY_TICK_INTERVAL_MS`, `EXULANICA_SOCIETY_CONTROL_WORKER` | Society playback (5.1.5) | Playback is off by default |
 | `EXULANICA_API_THREADS`, `EXULANICA_API_REQUESTS`, `EXULANICA_API_UPLOADS`, `EXULANICA_API_STREAMS`, `EXULANICA_API_WORKSPACE_REQUESTS`, `EXULANICA_API_WORKSPACE_UPLOADS`, `EXULANICA_API_WORKSPACE_STREAMS`, `EXULANICA_API_DECODES`, `EXULANICA_INTAKE_QUEUED_JOBS` | How much work this process accepts at once (5.4) | 40, 24, 2, 128, 12, 1, 8, 2 and 4. A value that is not a whole number, is outside its bounds, gives a workspace more than its class, or leaves fewer than four threads beside the admitted requests stops startup with the setting named |
+| `EXULANICA_WORKSPACE_STYLE_PACK_UPLOADS` | Whether `POST /workspace-style-packs` takes a creator's style pack ([style pack contract](style-pack-contract.md#11-a-workspaces-own-packs)) | `off`: the route answers 503 `style_pack_uploads_off`. `on` turns uploads on; any other value stops startup. Keep it off wherever sign-in is open to everyone until the creator grant is built |
 
 #### 5.1.1 The database roles
 
@@ -370,6 +371,10 @@ A route may declare a lower bound beside itself (`BODY_LIMITS`), which the same 
 the same two ways. `POST /workspace-assets` holds one asset and one declaration at their bounds with
 the framing around them, and reads its own body only after its caller is authenticated and its
 workspace's upload share is claimed ([workspace asset admission](workspace-asset-admission.md#admission)).
+`POST /workspace-style-packs` likewise holds one pack's files, manifest and declaration at their
+bounds with the framing around them (68,485,120 bytes), and reads its own body only after its caller
+is authenticated, its workspace's upload share claimed and the attempt counted
+([style pack contract](style-pack-contract.md#11-a-workspaces-own-packs)).
 
 In front of the API, each composition's client proxy carries a body cap of its own, set by the
 installation profile it serves:
@@ -854,9 +859,13 @@ is opened:
 | --- | --- | --- | --- | --- |
 | exempt | `GET /healthz`, `GET /readyz` | none | none | none |
 | streams | `GET /formation/{batch_id}` | `EXULANICA_API_STREAMS` (128) | `EXULANICA_API_WORKSPACE_STREAMS` (8) | 5 s |
-| uploads | `POST /intake`, `POST /workspace-assets` | `EXULANICA_API_UPLOADS` (2) | `EXULANICA_API_WORKSPACE_UPLOADS` (1) | 10 s |
+| uploads | `POST /intake`, `POST /workspace-assets`, `POST /workspace-style-packs` | `EXULANICA_API_UPLOADS` (2) | `EXULANICA_API_WORKSPACE_UPLOADS` (1) | 10 s |
 | requests | every other route | `EXULANICA_API_REQUESTS` (24) | `EXULANICA_API_WORKSPACE_REQUESTS` (12) | 1 s |
 
+- `GET /workspace-style-packs/{manifest_sha256}/archive` also bounds itself, in the route: at most 2
+  archives a process and 1 a workspace at a time, each holding up to one pack's 64 MiB on the
+  request's temporary disk until its response ends, so archives take at most 128 MiB of temporary
+  disk a process.
 - A class at its limit answers **503 `capacity_exhausted`**, and a workspace at its share **429
   `workspace_capacity_exhausted`**. Both carry `capacity` (the class), `retry_after_seconds` and a
   `Retry-After` header. Nothing of the route ran before either answer, so the same request can

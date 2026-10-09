@@ -138,6 +138,7 @@ from exulanica.world.society_controls import (
 from exulanica.world.texture_assets import load_material_catalog
 from exulanica.world.workspace_assets import WorkspaceAssetRuntime
 from exulanica.world.workspace_preparations import RETAINED_BYTES_SETTING, retained_bytes_limit
+from exulanica.world.workspace_style_packs import WorkspaceStylePackRuntime
 
 if TYPE_CHECKING:
     from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
@@ -347,6 +348,9 @@ class Services:
     #: Each workspace's own admitted assets and prepared outputs (migration 0126). None in a
     #: hand-built Services, which makes the workspace asset routes answer 503.
     workspace_assets: WorkspaceAssetRuntime | None = None
+    #: Each workspace's own style packs (migration 0173). None in a hand-built Services, which
+    #: makes the workspace style pack routes answer 503.
+    workspace_style_packs: WorkspaceStylePackRuntime | None = None
     #: The one store baked tiles live in, shared by every workspace because a baked tile is a
     #: pure function of public inputs (migration 0072). None in a hand-built Services, which
     #: makes the tile routes answer 503 rather than reach a store nobody configured.
@@ -1150,6 +1154,15 @@ class Services:
         )
 
 
+def _style_pack_uploads(environ: Mapping[str, str]) -> bool:
+    """Whether ``EXULANICA_WORKSPACE_STYLE_PACK_UPLOADS`` turns style pack uploads on: ``on``, or
+    off when absent; any other value is refused at startup rather than read as either."""
+    raw = (env_get("WORKSPACE_STYLE_PACK_UPLOADS", environ) or "off").strip()
+    if raw not in ("on", "off"):
+        raise ValueError("EXULANICA_WORKSPACE_STYLE_PACK_UPLOADS is on or off")
+    return raw == "on"
+
+
 def build_services(
     environ: Mapping[str, str] | None = None,
     *,
@@ -1223,6 +1236,11 @@ def build_services(
         materials=_material_runtime(stores, environ),
         workspace_assets=WorkspaceAssetRuntime(
             stores=stores.workspace_assets, retained_bytes_limit=retained_bytes_limit(environ)
+        ),
+        workspace_style_packs=WorkspaceStylePackRuntime.over(
+            stores.workspace_style_packs,
+            retained_bytes_limit=retained_bytes_limit(environ),
+            uploads=_style_pack_uploads(environ),
         ),
         character_appearance=_character_appearance_runtime(store, environ, stores.workspace_assets),
         tiles=stores.tiles,

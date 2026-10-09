@@ -10,9 +10,10 @@ the light and finish a preset becomes is the [render look](generated-tile-runtim
 Status: the manifest, both readers, the resolver, the fit rules, the piece budgets, the browser's
 reading of a palette piece, drawing a generated town in a pack (section 7), three authored packs
 (section 8), the committed library the host serves (section 9) and a world's appearance naming its
-pack (section 10) are built, as is the store of a creator's own packs in their workspace (section
-11). Uploading, checking, serving and downloading one, wearing it in a world, publishing one to the
-library, the page's upload control, and drafting a pack with a model are planned and not built.
+pack (section 10) are built, as are a creator's own packs in their workspace: kept, uploaded,
+checked, served, downloaded as an archive, offered for publication and withdrawn (section 11).
+Wearing a workspace pack in a world, publishing one to the library, the page's upload control, and
+drafting a pack with a model are planned and not built.
 
 ## 1. In plain words
 
@@ -329,9 +330,8 @@ other words or a larger library. The page does not show the offer yet.
 
 A creator's own pack is kept in their workspace and never becomes a library pack. One migration
 (`a_workspace_keeps_its_own_style_packs`) holds it; `exulanica/world/workspace_style_packs.py`
-records and reads it. No route admits one yet: the upload, the check that reads its pieces, the
-routes that serve and archive it, and wearing it in a world are planned and not built, so nothing
-reaches these tables except through the repository.
+records and reads it; section 11.1 is how one arrives and is served. Wearing one in a world and the
+command that publishes one are planned and not built.
 
 | Part | What it holds |
 | --- | --- |
@@ -381,3 +381,76 @@ checkpoint, as every withdrawal in `exulanica/deletion/withdrawals.v2.json`, in 
 withdrawals were made, and first cancels as `base_unavailable` each unfinished version the restored
 database holds that is drawn on the one withdrawn, as its check would have ended. A judge seed
 refuses a workspace holding any style pack version, files or none, since they never leave it.
+
+### 11.1 Uploading, checking and serving
+
+`POST /workspace-style-packs` is one `multipart/form-data` body: a `declaration` field
+(`exulanica.workspace-style-pack-admission/v1`: the manifest's digest and size, the rights, own work
+or licensed under `CC0-1.0` or `CC-BY-4.0` with its attribution, the source the creator names and
+the statement they affirm), a `manifest` field holding the manifest's canonical bytes, and one file
+part per path the manifest lists, named by that path. It is off unless the installation sets
+`EXULANICA_WORKSPACE_STYLE_PACK_UPLOADS` to `on`, answering 503 `style_pack_uploads_off`
+otherwise, so no installation where sign-in is open takes a creator's pack before the creator grant
+exists. It needs `admission.write`, joins the uploads
+admission class, and its body is bounded at 68,485,120 bytes. The route declares no form parameter,
+so the caller is authenticated, holds the permission and their workspace's upload share, and has
+the attempt counted before a byte of the body is read; and it holds no database connection while
+the body arrives. Anything but `multipart/form-data` is 415; a body the multipart parser refuses (a
+part over 256 KiB that is not a file, more than 512 files or more than two fields, a part with
+more than 8 headers or a header line over 4,224 bytes) is 422 `invalid_style_pack_body`, as is a
+manifest sent as a file or a part named twice.
+
+`exulanica/world/style_pack_admission.py` then decides, in order, with nothing written before the
+first refusal:
+
+| Step | Refused as |
+| --- | --- |
+| The declaration | 422 `invalid_declaration`, `licence_not_admitted` or `attribution_required` |
+| The manifest's bytes: at most 256 KiB, the declared digest and size, UTF-8 JSON with no duplicate key, no `NaN` or `Infinity`, at most 32 deep, and exactly its canonical bytes | 422 `content_digest_mismatch` or `invalid_style_data` |
+| The manifest, through the reader (section 6), then origin `uploaded`, an id outside `exulanica.` and not beginning `erased.` (the ids an erasure gives), the declaration's licence and attribution, and a base that is a library version or one of the workspace's own versions that may be worn | 422 `invalid_style_data` with its `path`, `licence_mismatch`, or `style_pack_base_unavailable` |
+| The parts: exactly the manifest's files, each at its listed size and digest, a piece within its family's file size before it is opened | 422 `invalid_style_pack_body`, `content_digest_mismatch` or `over_budget` |
+| Each piece's profile (`exulanica/world/style_pack_pieces.py`): an `exulanica.static-glb/v1` container with one buffer, the binary chunk that buffer and at most three zero bytes, every buffer view packed tightly, used and read byte for byte by its accessors, no `extras`, no images, textures or samplers, names and `asset.generator` at most 64 plain characters, `asset` holding nothing else; and its family's triangles (a second level of detail a quarter of the first's) and materials, from accessor counts | 422 `style_pack_piece_refused` or `over_budget`, with the piece's `path` |
+| The preview, walked to its end without decoding (`exulanica/world/style_pack_preview.py`) | 422 `style_pack_preview_refused` |
+
+The preview walk allows only what a plain still picture needs. A JPEG is SOI, one JFIF APP0 of 16
+bytes (no thumbnail), DQT, DHT, DRI, one SOF0, SOF1 or SOF2, its scans, and EOI with nothing after
+it: no Exif, XMP, ICC profile or comment. A PNG is IHDR, then only PLTE, tRNS, gAMA, cHRM, sRGB and
+IDAT, then IEND with nothing after it. A WebP is one `VP8 ` or `VP8L` image, or `VP8X` with only the
+alpha flag and its `ALPH` and `VP8 `. One frame, 1 to 2,048 pixels a side. The committed library's
+previews carry an ICC profile, so a library pack is not accepted back as an upload until its preview
+is re-encoded.
+
+An admitted version answers 201 (200 when the same declaration over the same manifest already made
+it), 409 `style_pack_exists` for another declaration over the same manifest, 409
+`style_pack_version_exists` (naming the `held` digest) for another manifest at a held pack id and
+version, 410 for a withdrawn one, and 429 `style_pack_quota_exceeded` at a bound (`bound` names
+`workspace` or `installation` for the attempts). Its check then runs off-request, in the asset
+preparation process after each of its passes (`exulanica/world/style_pack_checks.py`): every
+triangle of every piece read for its colour, as the browser reads a piece, and held to the pack's
+palette or a palette in its base chain; at most 120 s a version, past which it is `interrupted`, and
+three attempts, after which it is `interrupted` too. A version that passes is ready.
+
+| Route | Answer |
+| --- | --- |
+| `GET /workspace-style-packs` | `exulanica.workspace-style-pack-list/v1`: every version, with its state and its check's failure |
+| `GET /workspace-style-packs/{manifest_sha256}` | `exulanica.workspace-style-pack/v1`: one version, and its manifest once ready |
+| `GET /workspace-style-packs/{manifest_sha256}/files/{content_sha256}` | A file of a ready version or of a workspace version in its base chain: copied and verified into a file of the request's own, then the final read check asks `workspace_style_pack_wearable`, then the bytes are sent with no connection held; 409 `style_pack_not_ready` before the check passes, 410 once withdrawn |
+| `GET /workspace-style-packs/{manifest_sha256}/archive` | A ready version as one uncompressed POSIX tar archive (`application/x-tar`): `manifest.json` (the canonical manifest and one newline) and every file at its manifest path, each copied and verified, then the final read check, then sent; every header field but the name and size fixed, a path past 100 bytes in a pax header. At most 2 archives a process and 1 a workspace at a time (503 `capacity_exhausted` or 429 `workspace_capacity_exhausted`, `capacity` `archives`) |
+| `POST /workspace-style-packs/{manifest_sha256}/withdraw` | The version, and `withdrew`; 409 `style_pack_is_a_base` while a live version is drawn on it |
+| `POST /workspace-style-packs/{manifest_sha256}/publish-request` | `{licence_id, attribution, statement}`: 201 with the request; 403 `style_pack_not_creator`, 409 `style_pack_not_ready`, 422 `publish_licence_not_held` |
+| `GET /world/style-packs` | The library's packs, each with `source` `library`, and `workspace_packs`: this workspace's ready versions, each with `source` `workspace` |
+
+Writes need `admission.write` and reads `world.read`. Another workspace's version or file answers
+exactly as an invented digest does (404 `unknown_reference`). Every answer of these routes, refusals
+included, carries `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none';
+sandbox`, `Content-Disposition: attachment`, `Cache-Control: private, no-store` and
+`Cross-Origin-Resource-Policy: same-origin`, so a creator's bytes are never sniffed, framed, cached
+or read by another origin.
+
+No hosted model request carries a workspace pack's text or picture: its pack id, title,
+description, tags, authors, attribution, source reference, statement, swatch, preset and role keys,
+file paths and preview are a creator's words and choices. An import contract in `pyproject.toml`
+holds every module with a registered hosted call site away from the modules that keep, admit, check
+or serve a workspace's packs, indirect imports counted, and `tests/test_hosted_boundary.py` runs
+every registered call path over a workspace holding a ready pack with a sentinel in each of those
+strings and in its preview, and finds none in any request.

@@ -884,6 +884,41 @@ def workspace_asset(owner) -> str:
     ]
 
 
+def workspace_style_pack_request() -> dict[str, Any]:
+    """The multipart request that uploads a creator's own pack: the committed cozy pack, relabelled
+    as theirs, with every file it lists as a part named by its path."""
+    from style_pack_upload_support import upload
+
+    made = upload()
+    return {
+        "data": {
+            "declaration": made.declaration_bytes().decode(),
+            "manifest": made.manifest_bytes.decode(),
+        },
+        "files": [(path, (path.rsplit("/", 1)[-1], data)) for path, data in made.files.items()],
+    }
+
+
+def _uploaded_style_pack(owner) -> dict[str, Any]:
+    """The owner's upload of the creator's pack: 201 the first time, 200 when it is held."""
+    response = owner.request("POST", "/workspace-style-packs", **workspace_style_pack_request())
+    assert response.status_code in (200, 201), response.text
+    return response.json()
+
+
+def workspace_style_pack(owner) -> str:
+    """A creator's own style pack version, admitted and not yet checked (API)."""
+    return _uploaded_style_pack(owner)["manifest_sha256"]
+
+
+def workspace_style_pack_file(owner) -> str:
+    """A file the owner's style pack version lists, by its digest (API)."""
+    from style_pack_upload_support import upload
+
+    _uploaded_style_pack(owner)
+    return upload().manifest["files"][0]["sha256"]
+
+
 def door_grant(owner) -> str:
     """A grant handing one person of a purposeful society to the sweep's test bridge (API).
 

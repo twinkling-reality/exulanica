@@ -331,6 +331,7 @@ class AssetPreparationWorker:
         limit_per_pass: int = 16,
         workspace_source: Callable[[], Iterable[uuid.UUID]] | None = None,
         retained_bytes_limit: int = DEFAULT_RETAINED_BYTES,
+        also: tuple[Callable[[], object], ...] = (),
     ) -> None:
         if not preparers:
             raise ValueError("a preparation worker runs at least one preparer")
@@ -357,6 +358,8 @@ class AssetPreparationWorker:
         self._poll_seconds = poll_seconds
         self._limit = limit_per_pass
         self._retained_bytes_limit = retained_bytes_limit
+        #: Further passes this process runs after each of its own, such as the style pack checks.
+        self._also = also
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_error: str | None = None
@@ -407,6 +410,11 @@ class AssetPreparationWorker:
                     active.remove(workspace_id)
         return outcome
 
+    def drain_also(self) -> None:
+        """Run the further passes once, as the daemon runs them after each of its own."""
+        for drain in self._also:
+            drain()
+
     def start(self) -> None:
         if self._thread is not None:
             return
@@ -424,6 +432,8 @@ class AssetPreparationWorker:
         while not self._stop.is_set():
             try:
                 self.drain()
+                for drain in self._also:
+                    drain()
                 self._last_error = None
             except Exception as error:  # a pass that throws must not end the loop in silence
                 self._last_error = f"{type(error).__name__}: {error}"

@@ -982,3 +982,100 @@ def test_the_vision_request_is_refused_at_the_boundary_when_the_stages_check_is_
     outcome = ingest_observed(pipeline, world.repository, photograph)
     assert transport.requests == []
     assert outcome.error is not None and "no personal model right" in outcome.error
+
+
+# -- a creator's own style pack never leaves ----------------------------------------------------
+
+#: One distinct sentinel in each text a creator chooses for their style pack, and in its preview's
+#: bytes. None of them may appear in any hosted request, whatever the run reads.
+_PACK_SENTINELS: dict[str, str] = {
+    "pack_id": "sentinelpackid.cozy-barn",
+    "title": "SENTINEL-TITLE",
+    "description": "SENTINEL-DESCRIPTION",
+    "tag": "sentineltag",
+    "author": "SENTINEL-AUTHOR",
+    "attribution": "SENTINEL-ATTRIBUTION",
+    "source": "SENTINEL-SOURCE",
+    "statement": "SENTINEL-STATEMENT",
+    "swatch": "sentinel_swatch",
+    "preset": "sentinel_preset",
+    "surface leaf": "sentinel_surface_leaf",
+    "module leaf": "sentinel_module_leaf",
+    "path": "sentinel-dir/sentinel-piece.glb",
+    "preview": "SENTINEL-PREVIEW-BYTES",
+}
+
+
+def _record_sentinel_pack(world: World) -> None:
+    """A workspace style pack whose every creator-chosen string is a sentinel, ready to be worn."""
+    import hashlib
+
+    from exulanica.store.namespaces import LocalWorkspaceStores
+    from exulanica.world.workspace_style_packs import (
+        AdmittedStylePack,
+        PackFile,
+        WorkspaceStylePackRepository,
+    )
+
+    s = _PACK_SENTINELS
+    piece, preview = b"piece " + s["path"].encode(), s["preview"].encode()
+    manifest = {
+        "pack_id": s["pack_id"],
+        "title": s["title"],
+        "description": s["description"],
+        "tags": [s["tag"]],
+        "authors": [s["author"]],
+        "licence": {"id": "CC-BY-4.0", "attribution": s["attribution"]},
+        "palette": {"swatches": [{"key": s["swatch"]}]},
+        "light": {"default_preset": s["preset"], "presets": {s["preset"]: {}}},
+        "surfaces": {f"wall.{s['surface leaf']}": {"swatch": s["swatch"]}},
+        "modules": {f"window.{s['module leaf']}": {"variants": [{"file": s["path"]}]}},
+        "files": [s["path"], "preview.png"],
+    }
+    declaration = {"rights": {"source_reference": s["source"], "statement": s["statement"]}}
+    files = (
+        PackFile(s["path"], hashlib.sha256(piece).hexdigest(), len(piece), "model/gltf-binary"),
+        PackFile("preview.png", hashlib.sha256(preview).hexdigest(), len(preview), "image/png"),
+    )
+    repository = WorkspaceStylePackRepository(
+        world.connection,
+        world.repository.workspace_id,
+        uuid.uuid4(),
+        stores=LocalWorkspaceStores(world.tmp_path / "workspace-style-packs"),
+    )
+    repository.record(
+        AdmittedStylePack(
+            manifest_canonical=json.dumps(manifest, sort_keys=True).encode(),
+            pack_id=s["pack_id"],
+            version=1,
+            declaration_canonical=json.dumps(declaration, sort_keys=True).encode(),
+            rights_basis="licensed",
+            licence_id="CC-BY-4.0",
+            base=None,
+            files=files,
+            contents={
+                file.content_sha256: data
+                for file, data in zip(files, (piece, preview), strict=True)
+            },
+            preview_sha256=files[1].content_sha256,
+            receipt={},
+            attribution=s["attribution"],
+        )
+    )
+    claimed = repository.claim("sentinel-check", 60)
+    assert claimed is not None
+    repository.finish_ready(claimed[0], claimed[1], {})
+    assert repository.wearable(claimed[0]), "the positive control: the pack is the workspace's"
+    world.connection.commit()
+
+
+@pytest.mark.parametrize("path", sorted(HOSTED_CALL_PATHS))
+def test_no_style_pack_text_or_picture_leaves_on_any_hosted_path(world, admissions, path):
+    _record_sentinel_pack(world)
+    run, _ = SCENARIOS[path]
+    transport = run(world)
+    assert transport.requests, f"the {path} run sent nothing, so it shows nothing"
+    for request in transport.requests:
+        sent = json.dumps(request["payload"], ensure_ascii=False)
+        found = [name for name, sentinel in _PACK_SENTINELS.items() if sentinel in sent]
+        assert not found, f"{path}: a creator's style pack text reached a hosted model: {found}"

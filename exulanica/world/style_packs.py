@@ -46,6 +46,7 @@ __all__ = [
     "StylePackContext",
     "StylePackRefused",
     "canonical_json",
+    "is_plain_text",
     "load_context",
     "manifest_sha256",
     "read_manifest",
@@ -245,6 +246,16 @@ def _text(maximum: int, *, allow_empty: bool = False) -> Reader:
         return str(value)
 
     return read
+
+
+def is_plain_text(value: str, maximum: int) -> bool:
+    """Whether ``value`` meets the readers' text rule: trimmed, not empty, at most ``maximum``
+    UTF-16 units, and no lone surrogate, control or bidirectional control character."""
+    try:
+        _text(maximum)(value, "")
+    except StylePackRefused:
+        return False
+    return True
 
 
 def _nullable(read: Reader) -> Reader:

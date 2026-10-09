@@ -45,6 +45,11 @@ and world generation are routes of their own contracts, listed with every other 
 | `GET /world/assets` | The reviewed asset registry, with whether each asset's bytes are present |
 | `GET /workspace-assets` | The workspace's own admitted assets, what may be admitted, and the operations on each with their state ([workspace asset admission](../workspace-asset-admission.md)) |
 | `POST /workspace-assets` | Admit one static GLB the person declares the rights to; it is prepared before it may be placed |
+| `GET /workspace-style-packs` | The workspace's own style pack versions and their checks ([style pack contract](../style-pack-contract.md#11-a-workspaces-own-packs)) |
+| `POST /workspace-style-packs` | Upload a creator's own style pack: a declaration, its manifest and every file it lists; its pieces are checked before it may be worn |
+| `GET /workspace-style-packs/{manifest_sha256}` | One version, its check, and its manifest once ready |
+| `GET /workspace-style-packs/{manifest_sha256}/files/{content_sha256}` | One file of a ready version, after the final read check |
+| `POST /workspace-style-packs/{manifest_sha256}/withdraw` | Withdraw a version for good |
 | `GET /world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
 | `GET /world/behaviours` | The reviewed behaviours an object may be given, with each parameter's bounds |
 | `GET /world-entries` | The workspace's saved worlds, each naming the version and state it reopens at |

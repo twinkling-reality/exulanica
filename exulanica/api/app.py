@@ -125,6 +125,7 @@ from exulanica.api.routes import (
     things,
     tiles,
     workspace_assets,
+    workspace_style_packs,
     world,
     world_arrangements,
     world_assets,
@@ -440,7 +441,12 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     # whose body is a small document states its own tighter limit beside the route.
     app.add_middleware(
         BodyLimit,
-        routes=(*world_kinds.BODY_LIMITS, *door.BODY_LIMITS, *workspace_assets.BODY_LIMITS),
+        routes=(
+            *world_kinds.BODY_LIMITS,
+            *door.BODY_LIMITS,
+            *workspace_assets.BODY_LIMITS,
+            *workspace_style_packs.BODY_LIMITS,
+        ),
     )
 
     app.include_router(health.router)
@@ -462,6 +468,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(character_appearance.router)
     app.include_router(materials.router)
     app.include_router(workspace_assets.router)
+    app.include_router(workspace_style_packs.router)
     app.include_router(tiles.router)
     app.include_router(companion.router)
     app.include_router(environment_sources.router)

@@ -80,3 +80,21 @@ def test_every_file_the_thing_library_reads_ships_in_the_api_image():
     assert any(path.startswith("assets/catalogs/things/looks/") for path in read), read
     missing = [path for path in read if not (image.allowlisted(path) and image.shipped(path))]
     assert missing == []
+
+
+def test_every_file_the_style_pack_check_and_upload_read_ships_in_the_api_image():
+    # The asset preparation process builds its style pack check when it starts (the colour table),
+    # and the API its upload runtime (the look families, texture sets and piece budgets); both run
+    # from this image.
+    image = IMAGES["api"]
+    read = startup_reads(
+        "from exulanica.world.style_pack_checks import colour_table\n"
+        "from exulanica.world.workspace_style_packs import WorkspaceStylePackRuntime\n"
+        "from exulanica.store.namespaces import LocalWorkspaceStores\n"
+        "colour_table(root)\n"
+        "WorkspaceStylePackRuntime.over(LocalWorkspaceStores(root / 'never-made'))"
+    )
+    # A positive control: the check reads the colour table, so the reading saw it.
+    assert "assets/colour/srgb8-linear16.v1.json" in read, read
+    missing = [path for path in read if not (image.allowlisted(path) and image.shipped(path))]
+    assert missing == []

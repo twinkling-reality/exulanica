@@ -4,7 +4,10 @@ Read-only and the same for every workspace: the packs this host carries in its t
 (:mod:`exulanica.world.style_pack_library`), read and held to their digests once, when it starts.
 
 *   ``GET /world/style-packs`` lists every pack: its id, version and manifest digest, its title,
-    description and tags, its origin, its licence with the attribution it requires, and its authors.
+    description and tags, its origin, its licence with the attribution it requires, and its authors,
+    each with ``source`` ``library``; then, under ``workspace_packs``, this workspace's own versions
+    that may be worn now, each with ``source`` ``workspace``
+    (:mod:`exulanica.api.routes.workspace_style_packs`), whose bytes are served by their own routes.
 *   ``GET /world/style-packs/{content_sha256}`` serves one pack's manifest (its canonical bytes,
     as ``application/json``) or one file a manifest lists (as the media type the manifest states),
     named by the SHA-256 of exactly those bytes, so the address is the proof of what was read and
@@ -18,10 +21,11 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Path
+from fastapi import APIRouter, Path, Request
 from fastapi.responses import JSONResponse, Response
 
-from exulanica.api.dependencies import CurrentSession
+from exulanica.api.dependencies import CurrentSession, ScopedSessions, get_services
+from exulanica.api.routes.workspace_style_packs import workspace_listing
 from exulanica.world.committed_content import DIGEST
 from exulanica.world.style_pack_library import style_pack_library
 
@@ -34,8 +38,16 @@ _LIST_HEADERS = {"Cache-Control": "private, no-store", "X-Content-Type-Options":
     "/style-packs",
     summary="The committed style packs this host serves: each pack's identity, licence and origin.",
 )
-def style_packs(_session: CurrentSession) -> Any:
-    return JSONResponse(content=style_pack_library().listing(), headers=_LIST_HEADERS)
+def style_packs(request: Request, sessions: ScopedSessions, session: CurrentSession) -> Any:
+    listing = style_pack_library().listing()
+    listing["packs"] = [{**pack, "source": "library"} for pack in listing["packs"]]
+    listing["workspace_packs"] = []
+    # An instance started without workspace style pack namespaces lists the library alone and
+    # opens no connection for it.
+    if getattr(get_services(request), "workspace_style_packs", None) is not None:
+        with sessions() as connection:
+            listing["workspace_packs"] = workspace_listing(request, connection, session)
+    return JSONResponse(content=listing, headers=_LIST_HEADERS)
 
 
 @router.get(

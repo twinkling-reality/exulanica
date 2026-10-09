@@ -369,6 +369,8 @@ class WorkspaceStylePackRuntime:
     installation_bytes_limit: int = DEFAULT_INSTALLATION_BYTES
     workspace_day_attempts: int = DEFAULT_WORKSPACE_DAY_ATTEMPTS
     installation_day_attempts: int = DEFAULT_INSTALLATION_DAY_ATTEMPTS
+    #: Whether this installation takes uploads at all (``EXULANICA_WORKSPACE_STYLE_PACK_UPLOADS``).
+    uploads: bool = False
 
     @classmethod
     def over(

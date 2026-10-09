@@ -116,6 +116,7 @@ CAPACITY_ROUTES: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
         ("GET", "/formation/{batch_id}"): STREAMS,
         ("POST", "/intake"): UPLOADS,
         ("POST", "/workspace-assets"): UPLOADS,
+        ("POST", "/workspace-style-packs"): UPLOADS,
     }
 )
 

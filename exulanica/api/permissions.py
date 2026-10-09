@@ -530,6 +530,9 @@ _ADMISSION_WRITES: Final = _every(
     "POST /workspace-assets/{asset_id}/preparation",
     "POST /workspace-assets/{asset_id}/preparation/cancel",
     "POST /workspace-assets/{asset_id}/withdraw",
+    "POST /workspace-style-packs",
+    "POST /workspace-style-packs/{manifest_sha256}/publish-request",
+    "POST /workspace-style-packs/{manifest_sha256}/withdraw",
 )
 
 #: Derivative and reconstruction job status, and what the workspace may still spend on hosted
@@ -577,6 +580,10 @@ _WORLD_READS: Final = _every(
     "GET /workspace-assets",
     "GET /workspace-assets/{asset_id}",
     "GET /workspace-assets/{asset_id}/prepared/bytes",
+    "GET /workspace-style-packs",
+    "GET /workspace-style-packs/{manifest_sha256}",
+    "GET /workspace-style-packs/{manifest_sha256}/archive",
+    "GET /workspace-style-packs/{manifest_sha256}/files/{content_sha256}",
     "GET /world-entries",
     "GET /world-entries/candidates",
     "GET /world-entries/{entry_id}",

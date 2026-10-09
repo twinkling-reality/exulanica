@@ -130,6 +130,7 @@ _PHOTO_POINT_MAP: Final = {
 }
 _REVIEWED_ASSET: Final = {"kind": "reviewed_asset", "asset_key": "cc0.marker-cube"}
 _WORKSPACE_ASSET: Final = build.workspace_asset_request()
+_WORKSPACE_STYLE_PACK: Final = build.workspace_style_pack_request()
 
 #: A realistic request for each route whose default would stop at validation, sorted by path and
 #: then method. What a route does with a body it accepts belongs to that route's own tests; these
@@ -223,6 +224,12 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     # Multipart, as the route takes it: a declaration of exactly these bytes as the caller's own
     # work. What admission does with a container is tests/test_workspace_assets_postgres.py.
     "POST /workspace-assets": _WORKSPACE_ASSET,
+    # Multipart, as the route reads it: a creator's own pack, every listed file a part named by its
+    # path. What admission does with a pack is tests/test_workspace_style_packs_api_postgres.py.
+    "POST /workspace-style-packs": _WORKSPACE_STYLE_PACK,
+    "POST /workspace-style-packs/{manifest_sha256}/publish-request": {
+        "json": {"licence_id": "CC0-1.0", "statement": "my own work, given to the library"}
+    },
     # Enough of a specification to reach the permission floor, which is all this sweep asks of it.
     # What the route does with a body it accepts is tests/test_world_generation_route.py.
     "PUT /world-entries/{entry_id}": {
@@ -831,6 +838,12 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
         "is the same bytes for everyone, and what a workspace spends is its own delivery ledger",
     ),
     "/workspace-assets/{asset_id}": Owned(build.workspace_asset),
+    "/workspace-style-packs/{manifest_sha256}": Owned(
+        build.workspace_style_pack, build.invented_digest
+    ),
+    "/workspace-style-packs/{manifest_sha256}/files/{content_sha256}": Owned(
+        build.workspace_style_pack_file, build.invented_digest
+    ),
     "/world-entries/{entry_id}": Owned(build.world_entry),
     "/world-entries/{entry_id}/arrival/scene-geometry/{artifact_id}": Owned(build.trained_scene),
     "/world-read/places/{place_id}": Owned(build.world_read_place),
