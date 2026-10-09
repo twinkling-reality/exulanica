@@ -1423,7 +1423,9 @@ async function mountWorld(): Promise<void> {
   const planClient = state.activeWorldEntry === null
     ? null
     : new CompanionActionsClient({ ...currentCredentials, worldId: state.activeWorldEntry.worldId });
-  const PLANNED_EDITS = new Set(['objects.place', 'objects.move', 'objects.remove', 'objects.undo', 'arrangements.place']);
+  // Plan steps that write a new version of the world: the page follows each to the version it made,
+  // so the next step is prepared against it. A placed thing's answer is a version, as an object's is.
+  const PLANNED_EDITS = new Set(['objects.place', 'objects.move', 'objects.remove', 'objects.undo', 'arrangements.place', 'things.place']);
   const sendPlanned = async (
     request: PlannedRequest,
   ): Promise<{ readonly status: number; readonly body: unknown }> => {
@@ -1602,6 +1604,7 @@ async function mountWorld(): Promise<void> {
         objectId: typeof step.action['object_id'] === 'string' ? step.action['object_id'] : null,
       }),
       waitMs: COMPANION_DRAFT_WAIT_MS,
+      paused: () => environmentSelection.people.clock().mode === 'paused',
       onSaid: (utterance, said) => companion.panel.showAnswer(plannedAnswer(utterance, said)),
     });
   }

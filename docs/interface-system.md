@@ -419,6 +419,18 @@ step's result: done, not done (in the action's words) or not reached, with "Part
 that stopped, and Play when a stopped chain left the world paused
 ([world actions](companion-question.md#the-browsers-path)).
 
+Two entries exist only as plan steps (placement `companion`): Add a thing (`things.place`) and Ask
+someone (`people.direct`). Their rows say the step in words from the names the server's reads gave
+it (`step.titles`, `thingDetail` in `ui/companion-plan.ts`): "Lantern, beside Knight", "Knight, go
+to the well", "Knight, give the sword to Traveller"; an activity's words are the activity catalog's,
+and a step the server could not name fully shows no detail rather than half a sentence. A step asking
+a being is prepared again just before it is sent, because the world moves on every minute; while it
+must wait for the next minute (the server's wait codes, `WAIT_CODES` in
+`composition/companion-plan.ts`) its row shows Waiting and "At the world's next minute", or, while
+the world is paused, that the world is paused and how to move it on, for at most 90 seconds, after
+which the step is not sent and says so. A question the plan needs first is asked by code and, where
+it differs, by slot ("Who is the other person?" for a give or take's other being).
+
 Every interactive control a driver needs carries a `data-action` name (`people.bring-in`,
 `clock.advance`, `objects.place`, `objects.undo`, `object.remove`, `panel.people`, `confirm.accept`
 and so on). The names do not change when words do; drivers select with `ACTION(id, scope)` from

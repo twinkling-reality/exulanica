@@ -62,6 +62,9 @@ const OBJECT_PLACE = 'POST /world/versions/{version_id}/compositions/apply';
 const OBJECT_MOVE = 'POST /world/versions/{version_id}/objects/{object_id}/move';
 const OBJECT_REMOVE = 'POST /world/versions/{version_id}/objects/{object_id}/remove';
 const ARRANGEMENT_PLACE = 'POST /world/versions/{version_id}/arrangements/apply';
+/** A thing added by its kind, and one of a world's beings asked to go to or use a place. */
+const THING_PLACE = 'POST /world/versions/{version_id}/things';
+const DIRECT = 'POST /world/versions/{version_id}/society/actions';
 /** Making a town, read from the workspace's creation descriptors (`GET /worlds/capabilities`). */
 const MAKE_GENERATED = 'POST /worlds/generated';
 
@@ -85,6 +88,85 @@ const CLOCK_STALE: RefusalWords = {
   happened: 'The world moved on while you were deciding, so its clock did not change.',
   next: 'Look at People for what the world is doing now, then try again.',
 };
+const PEOPLE_UNREAD: RefusalWords = {
+  happened: 'The people of this world cannot be read right now.',
+  next: 'Try again in a moment.',
+};
+/** What adding a thing can meet: the route's own refusals, and those its checks give a plan. */
+const THING_REFUSALS: Readonly<Record<string, RefusalWords>> = {
+  stale_object_base: STALE_WORLD,
+  invalidated_source_version: SOURCE_GONE,
+  unavailable_society_input: PEOPLE_UNREAD,
+  invalid_thing_placement: {
+    happened: 'That thing cannot be put there.',
+    next: 'Point somewhere else in this world, then ask again.',
+  },
+  thing_limit_reached: {
+    happened: 'This world holds as many placed things as it can.',
+    next: 'Take one back first, then ask again.',
+  },
+  invalid_object_state: {
+    happened: 'Something here already has the name it was given.',
+    next: 'Ask again and I will plan it afresh.',
+  },
+  no_free_place_near: {
+    happened: 'There is no free room for it there.',
+    next: 'Make some space, or ask to put it somewhere else.',
+  },
+  anchor_not_here: {
+    happened: 'What it was to go beside is not here any more.',
+    next: 'Ask again, naming something that is here.',
+  },
+};
+/**
+ * What asking one of a world's beings can meet: the actions route's names
+ * (`ACTION_REFUSALS` in exulanica/world/society_actions.py) and the two that only mean waiting
+ * for the world's next minute.
+ */
+const DIRECT_REFUSALS: Readonly<Record<string, RefusalWords>> = {
+  unavailable_society_input: PEOPLE_UNREAD,
+  action_context_changed: {
+    happened: 'The world changed since you asked.',
+    next: 'Look again, then ask again.',
+  },
+  canonical_target_changed: {
+    happened: 'That place changed since it was chosen.',
+    next: 'Ask again and I will plan against what is there now.',
+  },
+  decided_from_outside: {
+    happened: 'That one came from another program, which decides what it does.',
+    next: 'It cannot be asked from here.',
+  },
+  destination_full: {
+    happened: 'Every place there is taken.',
+    next: 'Ask again when someone leaves.',
+  },
+  inhabitant_action_in_progress: {
+    happened: 'They are in the middle of something.',
+    next: 'Ask again in a minute of the world’s time.',
+  },
+  inhabitant_already_there: {
+    happened: 'They are already there, using it now.',
+    next: 'Nothing needed to change.',
+  },
+  target_unreachable: {
+    happened: 'They cannot reach that place from where they are.',
+    next: 'Ask them to go somewhere nearer.',
+  },
+  unknown_inhabitant: {
+    happened: 'They are not in this world any more.',
+    next: 'Ask someone who is here.',
+  },
+  society_input_queued: {
+    happened: 'The world has not taken in the last change yet.',
+    next: 'Ask again in a minute of the world’s time.',
+  },
+  engine_takes_no_directed_actions: {
+    happened: 'People in this kind of world choose for themselves.',
+    next: 'They cannot be asked to go somewhere.',
+  },
+};
+
 /** What every clock action can meet, whether a rail button or a Companion plan step sent it. */
 const CLOCK_REFUSALS: Readonly<Record<string, RefusalWords>> = {
   society_unavailable: NOBODY_HERE,
@@ -130,6 +212,16 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     id: 'arrangements.place', label: 'Place an arrangement', hint: 'Place a published group of objects in one change',
     icon: 'place', group: 'build', placement: ['companion'], operation: ARRANGEMENT_PLACE,
     refusals: { stale_object_base: STALE_WORLD, invalidated_source_version: SOURCE_GONE },
+  },
+  {
+    id: 'things.place', label: 'Add a thing', hint: 'Add a thing by its kind, beside something or where you are pointing',
+    icon: 'object', group: 'build', placement: ['companion'], operation: THING_PLACE,
+    refusals: THING_REFUSALS,
+  },
+  {
+    id: 'people.direct', label: 'Ask someone', hint: 'Ask one of the beings here to go to a place or use it',
+    icon: 'people', group: 'people', placement: ['companion'], operation: DIRECT,
+    refusals: DIRECT_REFUSALS,
   },
   {
     id: 'people.open', label: 'People', hint: 'See who lives here and what they are doing',

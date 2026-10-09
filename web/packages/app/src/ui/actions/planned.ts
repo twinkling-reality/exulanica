@@ -30,6 +30,8 @@ export const PLAN_ACTIONS: Readonly<Record<string, string | null>> = Object.free
   set_speed: 'clock.speed',
   advance: 'clock.advance',
   bring_people: 'people.bring-in',
+  place_thing: 'things.place',
+  direct_thing: 'people.direct',
   propose_appearance: null,
   apply_appearance: null,
   other: null,
@@ -115,6 +117,8 @@ const ANSWER_FIELDS: Readonly<Record<string, { readonly at: string | null; reado
   'POST /world/versions/{version_id}/society/control/steps': { at: 'receipt', fields: ['event_seq', 'document_sha256'] },
   'PUT /world/versions/{version_id}/society/control': { at: null, fields: ['revision', 'last_event_seq'] },
   'POST /world/versions/{version_id}/society': { at: null, fields: ['society_id'] },
+  'POST /world/versions/{version_id}/things': { at: null, fields: ['edit_seq', 'state_sha256'] },
+  'POST /world/versions/{version_id}/society/actions': { at: 'request', fields: ['request_id', 'document_sha256'] },
 };
 
 /**

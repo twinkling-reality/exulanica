@@ -32,6 +32,8 @@ export interface StepAnswer {
   readonly revision?: number;
   readonly last_event_seq?: number;
   readonly society_id?: string;
+  /** A direct request's own id, from the actions route's envelope (`request.request_id`). */
+  readonly request_id?: string;
 }
 
 export type PlanOutcome = 'plan' | 'clarify' | 'refused' | 'capabilities' | 'question';
@@ -60,6 +62,11 @@ export interface PlanStep {
   readonly permitted: boolean;
   readonly spends: boolean;
   readonly confirmation: 'required' | 'chained';
+  /**
+   * For a thing step, what it names as the server's reads label it: `kind` and `near` for a thing
+   * added, `subject`, `place`, `affordance` and `act` for a being asked. Empty for any other step.
+   */
+  readonly titles: Readonly<Record<string, string>>;
   /** The step as the server sent it, for the outcome read and the technical record. */
   readonly raw: Readonly<Record<string, unknown>>;
 }
@@ -175,6 +182,9 @@ function parseStep(value: unknown): PlanStep {
     permitted: row['permitted'] === true,
     spends: row['spends'] === true,
     confirmation: row['confirmation'] === 'chained' ? 'chained' : 'required',
+    titles: Object.freeze(Object.fromEntries(Object.entries(
+      row['titles'] !== null && typeof row['titles'] === 'object' ? row['titles'] as Record<string, unknown> : {},
+    ).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))),
     raw: Object.freeze({ ...row }),
   });
 }

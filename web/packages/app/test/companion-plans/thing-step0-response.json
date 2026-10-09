@@ -1,0 +1,140 @@
+{
+  "body": {
+    "created_at": "2026-10-08T20:40:49.446664+00:00",
+    "created_by": "c2b0ef23-698b-49f7-9d97-9c89b3470a2f",
+    "edit_seq": 3,
+    "edits": [
+      {
+        "actor": "c2b0ef23-698b-49f7-9d97-9c89b3470a2f",
+        "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "edit_id": "c5bed52d-d6a5-401a-8c0c-238df17298e9",
+        "edit_seq": 1,
+        "element_id": null,
+        "environment_instance_id": null,
+        "kind": "add_thing",
+        "object_id": null,
+        "point_map_instance_id": null,
+        "recorded_at": "2026-10-08T20:40:49.971090+00:00",
+        "result_state_sha256": "2a3b8a75217eabc1e583e8c859ac7ee1df0715665bbd26629aa1ec0582078eda",
+        "thing_id": "well",
+        "undone_edit_id": null
+      },
+      {
+        "actor": "c2b0ef23-698b-49f7-9d97-9c89b3470a2f",
+        "base_state_sha256": "2a3b8a75217eabc1e583e8c859ac7ee1df0715665bbd26629aa1ec0582078eda",
+        "edit_id": "2d03a58b-ba04-42fb-a9ae-7c71582fa046",
+        "edit_seq": 2,
+        "element_id": null,
+        "environment_instance_id": null,
+        "kind": "add_thing",
+        "object_id": null,
+        "point_map_instance_id": null,
+        "recorded_at": "2026-10-08T20:40:50.026858+00:00",
+        "result_state_sha256": "88b6b3d7cf23a3dec62bc1dbe9be94dfef8c1df03bab2b885225d051195c1c72",
+        "thing_id": "knight",
+        "undone_edit_id": null
+      },
+      {
+        "actor": "c2b0ef23-698b-49f7-9d97-9c89b3470a2f",
+        "base_state_sha256": "88b6b3d7cf23a3dec62bc1dbe9be94dfef8c1df03bab2b885225d051195c1c72",
+        "edit_id": "93be97af-12ba-4387-b259-229052a9700b",
+        "edit_seq": 3,
+        "element_id": null,
+        "environment_instance_id": null,
+        "kind": "add_thing",
+        "object_id": null,
+        "point_map_instance_id": null,
+        "recorded_at": "2026-10-08T20:40:51.748103+00:00",
+        "result_state_sha256": "262c4a8b4b0736e359111548280093e43334f3b345919fff11a3ae4fa4f7d7e1",
+        "thing_id": "companion:lantern:24c28ad80317",
+        "undone_edit_id": null
+      }
+    ],
+    "element_overrides": [],
+    "environment_instances": [],
+    "objects": [],
+    "origin": "authored",
+    "parent_version_id": null,
+    "point_map_instances": [],
+    "schema_version": 5,
+    "source_invalidated": false,
+    "source_snapshot_id": "13098c7c-5c57-43f5-93f8-df8cbedf09b4",
+    "state_sha256": "262c4a8b4b0736e359111548280093e43334f3b345919fff11a3ae4fa4f7d7e1",
+    "style_version_id": "01a11d3f-4a35-72c9-a27e-6bb36cfd34b8",
+    "things": [
+      {
+        "kind": {
+          "kind": "lantern",
+          "sha256": "5cb77297b677cdf10b67eb20fd4e7845c3f1f9f0dbd1f26fd57066c4bcf973a9",
+          "version": 1
+        },
+        "origin": {
+          "kind": "authored",
+          "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "thing_id": "companion:lantern:24c28ad80317",
+        "transform": {
+          "coordinate_space": "region_local",
+          "coordinate_unit": "millimetre",
+          "scale_milli": 1000,
+          "x_mm": 1396,
+          "y_mm": 0,
+          "yaw_microradians": 5497788,
+          "z_mm": 2604
+        }
+      },
+      {
+        "kind": {
+          "kind": "knight",
+          "sha256": "6a15023d6c9dcc809a181cb7f77ec6bd2ca48747c3155e5fa83d66bd5d0b682c",
+          "version": 2
+        },
+        "origin": {
+          "kind": "authored",
+          "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "thing_id": "knight",
+        "transform": {
+          "coordinate_space": "region_local",
+          "coordinate_unit": "millimetre",
+          "scale_milli": 1000,
+          "x_mm": 3000,
+          "y_mm": 0,
+          "yaw_microradians": 0,
+          "z_mm": 3000
+        }
+      },
+      {
+        "kind": {
+          "kind": "well",
+          "sha256": "498acbe7f30319219238468e561951e59676d581d4714f9ee11e8a5079337ca9",
+          "version": 2
+        },
+        "origin": {
+          "kind": "authored",
+          "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "thing_id": "well",
+        "transform": {
+          "coordinate_space": "region_local",
+          "coordinate_unit": "millimetre",
+          "scale_milli": 1000,
+          "x_mm": -4000,
+          "y_mm": 0,
+          "yaw_microradians": 0,
+          "z_mm": 2000
+        }
+      }
+    ],
+    "title": "A world of my own",
+    "version_id": "56d52abb-c2e5-4eac-ab19-70029b383f9e",
+    "world_id": "world:authored:dd70410c-b209-445e-9f5f-439fa05b5854"
+  },
+  "status": 201
+}

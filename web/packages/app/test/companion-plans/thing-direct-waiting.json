@@ -1,0 +1,66 @@
+{
+  "atomic": false,
+  "capabilities": null,
+  "clarification": null,
+  "clock": null,
+  "execution": {
+    "calls": [],
+    "prompt_version": "action-plan-6",
+    "rejections": []
+  },
+  "kind": "world_edit",
+  "names": {},
+  "outcome": "plan",
+  "plan_sha256": "c35f66cd7ef6269e48727c8280c9927635def6790372b355015dc5a4c3f4a34c",
+  "profile": "exulanica.companion-action-plan/v1",
+  "proposal_speech": null,
+  "refusal": null,
+  "spends": false,
+  "spends_by": [],
+  "steps": [
+    {
+      "action": {
+        "act": "go_to",
+        "operation": "direct_thing",
+        "subject_id": "f7a07bb3-cf53-5cbb-ab84-1b7548680430",
+        "target_id": "thing:well:visit"
+      },
+      "bind": {
+        "version_id": "56d52abb-c2e5-4eac-ab19-70029b383f9e"
+      },
+      "bind_from": null,
+      "body": null,
+      "body_from": null,
+      "code": "society_input_queued",
+      "compensation": null,
+      "confirmation": "required",
+      "effects": [],
+      "index": 0,
+      "operation": "POST /world/versions/{version_id}/society/actions",
+      "permitted": true,
+      "pins": {
+        "society_state_sha256": "5390ad087dd74cd5d8d9f04b1fe9e42dd464d04966fcca141d5085dd402ef2b8",
+        "tick": 0
+      },
+      "preview": null,
+      "query": {
+        "world_id": "world:authored:dd70410c-b209-445e-9f5f-439fa05b5854"
+      },
+      "receipt": "society_action_request",
+      "replay": "same_key_returns_the_recorded_request",
+      "requires": [
+        "world.write"
+      ],
+      "spends": false,
+      "state": "pending",
+      "titles": {
+        "act": "go_to",
+        "affordance": "visit",
+        "place": "well",
+        "subject": "Knight"
+      }
+    }
+  ],
+  "version_id": "56d52abb-c2e5-4eac-ab19-70029b383f9e",
+  "world_id": "world:authored:dd70410c-b209-445e-9f5f-439fa05b5854"
+}

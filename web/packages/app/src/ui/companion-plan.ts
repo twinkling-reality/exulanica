@@ -14,7 +14,8 @@ import { plannedEntry } from './actions/planned.js';
 import type { RefusalWords } from './actions/registry.js';
 import { button, panel, stateChip, technicalRecord, type InterfaceState } from './system/components.js';
 import { icon, type IconName } from './system/icon.js';
-import { PLAN_CLARIFY_WORDS, PLAN_WORDS } from './words/companion-plan.js';
+import { PLAN_CLARIFY_SLOT_WORDS, PLAN_CLARIFY_WORDS, PLAN_HANDS_WORDS, PLAN_WORDS } from './words/companion-plan.js';
+import { filled, isObjectActivity, objectActivity } from '../society-activity-words.js';
 
 /** A step's words before anything is sent: what it is and whether it can be sent now. */
 export interface PlanStepView {
@@ -28,7 +29,8 @@ export interface PlanStepView {
 }
 
 export type StepProgress =
-  | { readonly kind: 'waiting' }
+  /** `when` says what it waits for, under the row: the world's next minute. */
+  | { readonly kind: 'waiting'; readonly when?: string }
   | { readonly kind: 'running' }
   | { readonly kind: 'done' }
   | { readonly kind: 'not-done'; readonly words: RefusalWords; readonly code: string | null }
@@ -66,8 +68,42 @@ const PROGRESS_LOOK: Readonly<Record<StepProgress['kind'], { state: InterfaceSta
   'not-reached': { state: 'cancelled', words: PLAN_WORDS.notReached },
 };
 
+/**
+ * A thing step's particulars in words, from the labels the server's reads gave it: "Knight, beside
+ * the well", "Knight, go to the well", "Traveller, rest at the bench". An activity's words are the
+ * catalog's (`society-activity-words.ts`), never restated.
+ */
+export function thingDetail(step: PlanStep): string | null {
+  const titles = step.titles;
+  const capital = (words: string): string => words.charAt(0).toUpperCase() + words.slice(1);
+  if (step.action.operation === 'place_thing' && titles['kind'] !== undefined) {
+    const near = titles['near'];
+    if (near === undefined) return capital(titles['kind']);
+    const being = String(step.action['near'] ?? '').startsWith('being:');
+    return `${capital(titles['kind'])}, beside ${being ? near : `the ${near}`}`;
+  }
+  // A being asked to use their hands: the thing by its kind's label, the other being by name.
+  const hands = step.action.operation === 'direct_thing' ? PLAN_HANDS_WORDS[titles['act'] ?? ''] : undefined;
+  if (hands !== undefined && titles['subject'] !== undefined && titles['thing'] !== undefined
+    && (!hands.includes('{with}') || titles['with'] !== undefined)) {
+    return hands.replace('{subject}', titles['subject']).replace('{thing}', titles['thing'])
+      .replace('{with}', titles['with'] ?? '');
+  }
+  if (step.action.operation === 'direct_thing' && titles['subject'] !== undefined && titles['place'] !== undefined) {
+    const place = `the ${titles['place']}`;
+    if (titles['act'] === 'go_to') return `${titles['subject']}, go to ${place}`;
+    const activity = titles['affordance'];
+    const words = activity !== undefined && isObjectActivity(activity)
+      ? filled(objectActivity(activity).verbAtPlace, { place }) : `use ${place}`;
+    return `${titles['subject']}, ${words}`;
+  }
+  return null;
+}
+
 /** A step's own particulars in words: the minute of a chain, a speed. Objects are the caller's. */
 export function stepDetail(step: PlanStep): string | null {
+  const thing = thingDetail(step);
+  if (thing !== null) return thing;
   const action = step.action;
   if (action.operation === 'advance' && typeof action['minute'] === 'number' && typeof action['minutes'] === 'number') {
     return `Minute ${action['minute']} of ${action['minutes']}`;
@@ -159,7 +195,8 @@ export function buildPlanSheet(options: PlanSheetOptions): PlanSheet {
       cancel.dataset['action'] = 'plan.cancel';
       surface.body.replaceChildren(
         el('p', { class: 'companion-plan-utterance', text: `“${utterance}”` }),
-        el('p', { class: 'companion-plan-intro', text: PLAN_CLARIFY_WORDS[clarification.code] ?? PLAN_CLARIFY_WORDS['asset_ambiguous']! }),
+        el('p', { class: 'companion-plan-intro', text: PLAN_CLARIFY_SLOT_WORDS[`${clarification.code}:${clarification.slot ?? ''}`]
+          ?? PLAN_CLARIFY_WORDS[clarification.code] ?? PLAN_CLARIFY_WORDS['asset_ambiguous']! }),
         ...(clarification.candidates.length === 0 ? [] : [choices]),
         record(plan, { clarification: clarification.code }),
       );
@@ -181,6 +218,12 @@ export function buildPlanSheet(options: PlanSheetOptions): PlanSheet {
       found.row.dataset['progress'] = progress.kind;
       found.status.replaceChildren(stateChip(look.state, look.words));
       found.row.querySelector('.companion-plan-step-held')?.remove();
+      found.row.querySelector('.companion-plan-step-when')?.remove();
+      if (progress.kind === 'waiting' && progress.when !== undefined) {
+        found.row.querySelector('.companion-plan-step-words')?.append(
+          el('span', { class: 'companion-plan-step-when', text: progress.when }),
+        );
+      }
       if (progress.kind === 'not-done') {
         found.row.querySelector('.companion-plan-step-words')?.append(
           el('span', { class: 'companion-plan-step-held', text: `${progress.words.happened} ${progress.words.next}` }),

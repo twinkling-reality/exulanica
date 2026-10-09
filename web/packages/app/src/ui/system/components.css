@@ -406,7 +406,8 @@
 .companion-plan-step-words { display: grid; gap: 2px; }
 .companion-plan-step-label { color: var(--color-text); font-weight: var(--weight-medium); }
 .companion-plan-step-detail,
-.companion-plan-step-held { color: var(--color-text-muted); font-size: var(--text-sm); line-height: var(--text-sm-line); }
+.companion-plan-step-held,
+.companion-plan-step-when { color: var(--color-text-muted); font-size: var(--text-sm); line-height: var(--text-sm-line); }
 .companion-plan-spends { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); color: var(--color-text-muted); }
 .companion-plan-summary { margin: 0 0 var(--space-2); color: var(--color-text); }
 .companion-plan-summary:empty { display: none; }

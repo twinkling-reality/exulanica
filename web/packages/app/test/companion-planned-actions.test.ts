@@ -179,3 +179,41 @@ describe('a sent step’s own answer, as the outcome read takes it', () => {
       .toEqual({ status: 200, code: null });
   });
 });
+
+describe('a thing step, sent as its registry action', () => {
+  // Real answers: "put a lantern by the knight and send him to the well", and "send the knight to
+  // the well", planned in a saved world with a society of things (tests/test_companion_things_postgres.py).
+  it('adds a thing through the add_thing route with the plan’s body', () => {
+    const step = plan('thing-plan').steps[0]!;
+    const built = plannedRequest(step, []);
+    if (!('request' in built)) throw new Error(JSON.stringify(built.refused));
+    expect(built.request.actionId).toBe('things.place');
+    expect(built.request.path).toBe(`/world/versions/${step.bind['version_id']}/things`);
+    expect(built.request.body).toEqual(step.body);
+    expect(String(step.body!['thing_id'])).toMatch(/^companion:lantern:[0-9a-f]{12}$/);
+  });
+
+  it('asks a being through the actions route with the plan’s body and this minute’s pins', () => {
+    const step = plan('thing-direct-plan').steps[0]!;
+    const built = plannedRequest(step, []);
+    if (!('request' in built)) throw new Error(JSON.stringify(built.refused));
+    expect(built.request.actionId).toBe('people.direct');
+    expect(built.request.path).toBe(`/world/versions/${step.bind['version_id']}/society/actions`);
+    expect(built.request.body).toEqual(step.body);
+    expect(step.raw['pins']).toEqual({
+      tick: step.body!['base_tick'], society_state_sha256: step.body!['base_state_sha256'],
+    });
+  });
+
+  it('answers with the edit a placing made, and the request an asking recorded', () => {
+    const placed = (fixture('thing-step0-response') as { status: number; body: Record<string, unknown> });
+    expect(stepAnswer('POST /world/versions/{version_id}/things', placed)).toEqual({
+      status: 201, code: null, edit_seq: placed.body['edit_seq'], state_sha256: placed.body['state_sha256'],
+    });
+    const asked = (fixture('thing-direct-response') as { status: number; body: { request: Record<string, unknown> } });
+    expect(stepAnswer('POST /world/versions/{version_id}/society/actions', asked)).toEqual({
+      status: 200, code: null,
+      request_id: asked.body.request['request_id'], document_sha256: asked.body.request['document_sha256'],
+    });
+  });
+});

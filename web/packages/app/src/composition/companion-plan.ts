@@ -32,11 +32,21 @@ import type {
   StepAnswer,
 } from '../companion-actions-api.js';
 import { availability, actionSpec, refusalWords, type RefusalWords } from '../ui/actions/registry.js';
-import { PLAN_ACTIONS, plannedRequest, stepAnswer } from '../ui/actions/planned.js';
+import { PLAN_ACTIONS, plannedEntry, plannedRequest, stepAnswer } from '../ui/actions/planned.js';
 import { performPlanned, type ActionHost } from '../ui/actions/surfaces.js';
 import { plannedStepView, type PlanSheet, type PlanStepView } from '../ui/companion-plan.js';
 import { OBJECT_ROLE_LABELS, isObjectRole } from '../world-objects-api.js';
-import { PLAN_WORDS, planRefusalWords } from '../ui/words/companion-plan.js';
+import { PLAN_WAITED, PLAN_WORDS, planRefusalWords } from '../ui/words/companion-plan.js';
+
+/**
+ * The codes a step asking one of the world's beings is prepared with while it must wait for the
+ * world's next minute (`WAIT_CODES` in exulanica/selection/action_things.py): an input the world
+ * has not taken in, or the being in the middle of something.
+ */
+export const WAIT_CODES: ReadonlySet<string> = new Set(['society_input_queued', 'inhabitant_action_in_progress']);
+/** How often such a step is prepared again while it waits, and for how long at most. */
+export const WAIT_POLL_MS = 2_000;
+export const WAIT_LIMIT_MS = 90_000;
 
 /** Where a sentence goes after the plan route has read it. */
 export type PlanRouting =
@@ -69,6 +79,13 @@ export interface CompanionPlansDeps {
   readonly particular: (step: PlanStep) => string | null;
   /** How long a plan may take: the appearance route's own wait, since it drafts the same way. */
   readonly waitMs: number;
+  /**
+   * How a step asking one of the world's beings waits for the world's next minute before it is
+   * prepared again: a pause of `ms`. Left out, the page's own timer.
+   */
+  readonly pause?: (ms: number) => Promise<void>;
+  /** Whether the world's clock is paused now, so a waiting step says how to move it on. */
+  readonly paused?: () => boolean;
   /**
    * What the Companion says once a question it asked about a plan is answered on the sheet: the
    * plan now shown, or why there is none. Without it the Companion would still be asking.
@@ -130,9 +147,17 @@ export function appearanceWireFromPlan(plan: ActionPlan): WireProposal | null {
 function refusedWords(plan: ActionPlan): RefusalWords {
   const refusal = plan.refusal;
   if (refusal === null) return planRefusalWords('not_drafted');
+  // A step its route's preview refused names why in its own code (the well is full this minute):
+  // said in that action's words where it has them, else the plan's.
+  const own = refusal.code === 'preview_blocked'
+    ? plan.steps.find((step) => step.index === refusal.step)?.code ?? null : null;
   if (refusal.operation !== null) {
     const id = Object.values(PLAN_ACTIONS).find((candidate) => candidate !== null && actionSpec(candidate).operation === refusal.operation);
-    if (id !== undefined && id !== null && actionSpec(id).refusals?.[refusal.code] !== undefined) return refusalWords(actionSpec(id), refusal.code);
+    if (id !== undefined && id !== null) {
+      for (const code of [own, refusal.code]) {
+        if (code !== null && actionSpec(id).refusals?.[code] !== undefined) return refusalWords(actionSpec(id), code);
+      }
+    }
   }
   return planRefusalWords(refusal.code);
 }
@@ -159,6 +184,7 @@ function capabilitySentences(plan: ActionPlan): string[] {
 export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
   let shown: { readonly plan: ActionPlan; readonly utterance: string; readonly page: ActionPageContext } | null = null;
   let running = false;
+  const pause = deps.pause ?? ((ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); }));
 
   const held = (actionId: string): PlanStepView['held'] => {
     const found = availability(actionSpec(actionId), deps.host()?.capabilities() ?? null);
@@ -168,7 +194,12 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
   function stepView(step: PlanStep): PlanStepView {
     const view = plannedStepView(step, (spec) => spec.label, held, deps.particular);
     if (view.held !== null) return view;
-    if (step.state === 'blocked') return { ...view, held: { state: 'unavailable', words: planRefusalWords('preview_blocked') } };
+    if (step.state === 'blocked') {
+      // The step's own words where its entry has them (a thing step's checks are the route's).
+      const entry = plannedEntry(step);
+      const own = 'spec' in entry && step.code !== null ? entry.spec.refusals?.[step.code] : undefined;
+      return { ...view, held: { state: 'unavailable', words: own ?? planRefusalWords('preview_blocked') } };
+    }
     if (step.state === 'not_permitted') return { ...view, held: { state: 'not-permitted', words: planRefusalWords('action_not_permitted') } };
     return view;
   }
@@ -213,17 +244,35 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
       if (stopped) { deps.sheet.setStep(step.index, { kind: 'not-reached' }); continue; }
       deps.sheet.setStep(step.index, { kind: 'running' });
       let sending: PlanStep | null = step;
-      // A later world edit is prepared against the state the one before it left.
-      if (plan.kind === 'world_edit' && step.index > 0) {
-        const fresh = deps.page() ?? page;
+      // A later world edit is prepared against the state the one before it left, and a step asking
+      // one of the world's beings always just before it is sent: the world moves on every minute.
+      const asking = step.action.operation === 'direct_thing';
+      if ((plan.kind === 'world_edit' && step.index > 0) || asking) {
         try {
-          const again = await client.prepare(fresh, [step.action]);
+          let again = await client.prepare(deps.page() ?? page, [step.action]);
+          let waited = 0;
+          // While it must wait for the world's next minute, it is prepared again now and then.
+          while (asking && again.outcome === 'plan' && again.steps[0]?.state === 'pending'
+            && WAIT_CODES.has(again.steps[0].code ?? '') && waited < WAIT_LIMIT_MS) {
+            deps.sheet.setStep(step.index, {
+              kind: 'waiting', when: deps.paused?.() === true ? PLAN_WORDS.pausedMinute : PLAN_WORDS.nextMinute,
+            });
+            await pause(WAIT_POLL_MS);
+            waited += WAIT_POLL_MS;
+            again = await client.prepare(deps.page() ?? page, [step.action]);
+          }
           sending = again.outcome === 'plan' ? again.steps[0] ?? null : null;
+          if (sending !== null && sending.state === 'pending') {
+            deps.sheet.setStep(step.index, { kind: 'not-done', words: PLAN_WAITED, code: sending.code });
+            stopped = true;
+            continue;
+          }
           if (sending === null) {
             deps.sheet.setStep(step.index, { kind: 'not-done', words: refusedWords(again), code: again.refusal?.code ?? null });
             stopped = true;
             continue;
           }
+          deps.sheet.setStep(step.index, { kind: 'running' });
         } catch {
           deps.sheet.setStep(step.index, { kind: 'not-done', words: planRefusalWords('stale_version'), code: null });
           stopped = true;

@@ -1,0 +1,38 @@
+{
+  "body": {
+    "consumption": null,
+    "request": {
+      "base_state_sha256": "5390ad087dd74cd5d8d9f04b1fe9e42dd464d04966fcca141d5085dd402ef2b8",
+      "base_tick": 0,
+      "branch_id": "56d52abb-c2e5-4eac-ab19-70029b383f9e",
+      "document_sha256": "d6671e693a7338c642afd3fc080208aadb3a7cf9c79e963f29b88ad3ec036c6b",
+      "input_seq": 1,
+      "input_sha256": "186bd63972947dee10510d331d3827c71cb27432c2302ae1b8a7cef84115e7b7",
+      "intent": {
+        "kind": "go_to",
+        "target_id": "thing:well:visit"
+      },
+      "profile": "exulanica.society-action-request/v1",
+      "request_id": "55ae90a5-e048-5802-b7fd-8910ae3860c8",
+      "requested_by": "c2b0ef23-698b-49f7-9d97-9c89b3470a2f",
+      "subject_id": "f7a07bb3-cf53-5cbb-ab84-1b7548680430",
+      "target": {
+        "activity": "visit",
+        "affordance": "visit",
+        "enabled": true,
+        "node_id": "ground:-00004000:+00000000",
+        "object_id": "well",
+        "origin": "thing",
+        "place_node_ids": [
+          "place:thing/well:0",
+          "place:thing/well:1"
+        ],
+        "subject_id": "thing:well",
+        "target_id": "thing:well:visit",
+        "version_id": "56d52abb-c2e5-4eac-ab19-70029b383f9e"
+      }
+    },
+    "status": "pending"
+  },
+  "status": 200
+}

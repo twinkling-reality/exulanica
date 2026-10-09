@@ -28,7 +28,17 @@ export const PLAN_WORDS = Object.freeze({
   notSentRoute: 'This step was not sent: it names another change than the one it says.',
   unsentLabel: 'A step I cannot send',
   clarifyTitle: 'One question first',
+  /** A step asking one of the world's beings, waiting for the minute that can take it. */
+  nextMinute: 'At the world’s next minute',
+  /** The same step while the world is paused: it waits for the person to move the world on. */
+  pausedMinute: 'At the world’s next minute: the world is paused, so play it or move it on a minute.',
 });
+
+/** A step that waited for the world's next minute and saw none come. */
+export const PLAN_WAITED: RefusalWords = {
+  happened: 'The world did not move on, so this step was not sent.',
+  next: 'Play the world, or move it on a minute, then ask again.',
+};
 
 /** The general pair, for a refusal code this table has no words for. */
 export const PLAN_REFUSED: RefusalWords = {
@@ -86,6 +96,29 @@ export const PLAN_CLARIFY_WORDS: Readonly<Record<string, string>> = Object.freez
   speed_required: 'How fast should the world play?',
   minutes_required: 'How many minutes should the world move on, from 1 to 10?',
   region_required: 'Which place should the people come into?',
+  kind_ambiguous: 'Which kind of thing did you mean?',
+  anchor_ambiguous: 'Which one should it go beside?',
+  being_required: 'Who should do it?',
+  being_ambiguous: 'Who did you mean?',
+  place_required: 'Where should they go?',
+  place_ambiguous: 'Which place did you mean?',
+  thing_ambiguous: 'Which thing did you mean?',
+});
+
+/**
+ * A question asked of one slot rather than of the code's usual one: `being_required` on a give or
+ * take's other being (`with_id`) asks who receives or lets go, not who acts.
+ */
+export const PLAN_CLARIFY_SLOT_WORDS: Readonly<Record<string, string>> = Object.freeze({
+  'being_required:with_id': 'Who is the other person? Click them in the world, then ask again.',
+});
+
+/** A step asking a being to use their hands, by act: `{subject}`, `{thing}`, `{with}` filled in. */
+export const PLAN_HANDS_WORDS: Readonly<Record<string, string>> = Object.freeze({
+  pick_up: '{subject}, pick up the {thing}',
+  put_down: '{subject}, put down the {thing}',
+  give: '{subject}, give the {thing} to {with}',
+  take: '{subject}, take the {thing} from {with}',
 });
 
 export function planRefusalWords(code: string): RefusalWords {

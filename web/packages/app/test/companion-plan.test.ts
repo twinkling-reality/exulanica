@@ -16,7 +16,7 @@ import { appearanceWireFromPlan, mountCompanionPlans, type CompanionPlansDeps } 
 import type { PlannedRequest } from '../src/ui/actions/planned.js';
 import { ACTIONS } from '../src/ui/actions/registry.js';
 import type { ActionHost } from '../src/ui/actions/surfaces.js';
-import { buildPlanSheet } from '../src/ui/companion-plan.js';
+import { buildPlanSheet, thingDetail } from '../src/ui/companion-plan.js';
 import { toastStack } from '../src/ui/system/components.js';
 
 /*
@@ -51,13 +51,17 @@ interface Harness {
   readonly afterTime: ReturnType<typeof vi.fn>;
   readonly onSaid: ReturnType<typeof vi.fn>;
   readonly client: { plan: ReturnType<typeof vi.fn>; prepare: ReturnType<typeof vi.fn>; outcome: ReturnType<typeof vi.fn> };
+  /** What a waiting step's row said under it at each pause. */
+  readonly whens: (string | null)[];
 }
 
 function harness(options: {
   readonly plan?: () => Promise<unknown>;
+  readonly prepare?: () => Promise<unknown>;
   readonly send?: (request: PlannedRequest, index: number) => Promise<unknown>;
   readonly outcome?: unknown;
   readonly capabilities?: OperationDescriptors | null;
+  readonly paused?: () => boolean;
 }): Harness {
   const sent: PlannedRequest[] = [];
   const host: ActionHost = {
@@ -72,7 +76,8 @@ function harness(options: {
   };
   const client = {
     plan: vi.fn(async () => parseActionPlan(await (options.plan ?? (async () => fixture('world-edit-plan')))())),
-    prepare: vi.fn(async () => plan('world-edit-plan')),
+    prepare: vi.fn(async () => (options.prepare === undefined
+      ? plan('world-edit-plan') : parseActionPlan(await options.prepare()))),
     outcome: vi.fn(async () => parseActionOutcome(options.outcome ?? fixture('world-edit-outcome'))),
   };
   let plans!: ReturnType<typeof mountCompanionPlans>;
@@ -94,9 +99,13 @@ function harness(options: {
     particular: (step) => (step.action['asset_key'] === 'cc0.bench' ? 'Bench' : null),
     waitMs: 1000,
     onSaid,
+    // A step that waits for the world's next minute waits no time here.
+    pause: async () => { whens.push(sheet.root.querySelector('.companion-plan-step-when')?.textContent ?? null); },
+    ...(options.paused === undefined ? {} : { paused: options.paused }),
   };
+  const whens: (string | null)[] = [];
   plans = mountCompanionPlans(deps);
-  return { plans, sheet, sent, afterTime, onSaid, client };
+  return { plans, sheet, sent, afterTime, onSaid, client, whens };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -312,5 +321,105 @@ describe('a question asked before a plan', () => {
     const read = (fixture('world-edit-plan') as { execution: { calls: unknown[] } }).execution.calls;
     expect(said.calls.length).toBe(read.length);
     expect(read.length).toBeGreaterThan(0);
+  });
+});
+
+describe('a plan of things', () => {
+  // Real answers from tests/test_companion_things_postgres.py's world: a lantern placed beside
+  // the knight, then the knight sent to the well, and the prepare answer that says to wait.
+  it('says each step in the words the server’s reads gave it', async () => {
+    const h = harness({ plan: async () => fixture('thing-plan') });
+    await h.plans.route('put a lantern by the knight and send him to the well');
+    const rows = [...h.sheet.root.querySelectorAll('.companion-plan-step')].map((row) => [
+      row.querySelector('.companion-plan-step-label')?.textContent,
+      row.querySelector('.companion-plan-step-detail')?.textContent,
+    ]);
+    expect(rows).toEqual([['Add a thing', 'Lantern, beside Knight'], ['Ask someone', 'Knight, go to the well']]);
+    expect(h.sheet.root.querySelector('.companion-plan-spends')?.textContent).toBe('Carrying this out asks no model.');
+  });
+
+  it('prepares a step asking a being again before it is sent, waiting while it must', async () => {
+    const answers = [fixture('thing-direct-waiting'), fixture('thing-direct-waiting'), fixture('thing-direct-plan')];
+    const h = harness({
+      plan: async () => fixture('thing-direct-plan'),
+      prepare: async () => answers.shift(),
+      outcome: { profile: 'exulanica.companion-action-outcome/v1', state: 'pending', steps: [], alternatives: [] },
+    });
+    await h.plans.route('send the knight to the well');
+    await confirmAndWait(h);
+    expect(h.client.prepare).toHaveBeenCalledTimes(3);
+    expect(h.sent.map((request) => request.actionId)).toEqual(['people.direct']);
+    expect(stepStates(h.sheet)).toEqual(['done']);
+    // While it waited, its row said for what; once sent, that line is gone.
+    expect(h.whens).toEqual(['At the world’s next minute', 'At the world’s next minute']);
+    expect(h.sheet.root.querySelector('.companion-plan-step-when')).toBeNull();
+  });
+
+  it('says how to move a paused world on while a step waits for its next minute', async () => {
+    const answers = [fixture('thing-direct-waiting'), fixture('thing-direct-plan')];
+    const h = harness({
+      plan: async () => fixture('thing-direct-plan'),
+      prepare: async () => answers.shift(),
+      outcome: { profile: 'exulanica.companion-action-outcome/v1', state: 'pending', steps: [], alternatives: [] },
+      paused: () => true,
+    });
+    await h.plans.route('send the knight to the well');
+    await confirmAndWait(h);
+    expect(h.whens).toEqual(['At the world’s next minute: the world is paused, so play it or move it on a minute.']);
+  });
+
+  it('says a step asking a being to use their hands in words, and who the other person is when asked', () => {
+    // CX-2's step shape (AGENTS, 2026-10-08): act and the served titles; no target or place.
+    const step = (act: string, titles: Record<string, string>) => {
+      const served = structuredClone(fixture('thing-direct-plan')) as { steps: Record<string, unknown>[] };
+      served.steps[0] = { ...served.steps[0], action: { operation: 'direct_thing', act, subject_id: 's', thing_id: 'sword' }, titles };
+      return parseActionPlan(served).steps[0]!;
+    };
+    expect([
+      thingDetail(step('pick_up', { subject: 'Knight', act: 'pick_up', thing: 'lantern' })),
+      thingDetail(step('put_down', { subject: 'Knight', act: 'put_down', thing: 'lantern' })),
+      thingDetail(step('give', { subject: 'Knight', act: 'give', thing: 'sword', with: 'Traveller' })),
+      thingDetail(step('take', { subject: 'Knight', act: 'take', thing: 'sword', with: 'Traveller' })),
+      // A give whose other person the server could not name says nothing rather than half a sentence.
+      thingDetail(step('give', { subject: 'Knight', act: 'give', thing: 'sword' })),
+    ]).toEqual([
+      'Knight, pick up the lantern', 'Knight, put down the lantern',
+      'Knight, give the sword to Traveller', 'Knight, take the sword from Traveller', null,
+    ]);
+    const sheet = buildPlanSheet({ onConfirm: vi.fn(), onCancel: vi.fn(), onChoose: vi.fn(), onPlay: vi.fn() });
+    const served = fixture('thing-direct-plan') as Record<string, unknown>;
+    const asking = parseActionPlan({ ...served, outcome: 'clarify', steps: [], clarification: {
+      code: 'being_required', step: 0, slot: 'with_id', candidates: [], actions: [] } });
+    sheet.showClarification(asking, 'give the sword', (_value, title) => title);
+    expect(sheet.root.querySelector('.companion-plan-intro')?.textContent)
+      .toBe('Who is the other person? Click them in the world, then ask again.');
+  });
+
+  it('says why a step asking a being was refused when prepared again, in its own action\'s words', async () => {
+    // The answer a prepare gave on slot 6 (10-09) when the well was full that minute.
+    const served = fixture('thing-direct-plan') as { steps: Record<string, unknown>[] };
+    const full = { ...served, outcome: 'refused', steps: [{ ...served.steps[0], state: 'blocked', code: 'destination_full' }],
+      refusal: { code: 'preview_blocked', detail: 'the authority\'s preview refused the step; its code is the step\'s', step: 0,
+        operation: 'POST /world/versions/{version_id}/society/actions', capability: null, alternatives: [] } };
+    const h = harness({ plan: async () => fixture('thing-direct-plan'), prepare: async () => full });
+    await h.plans.route('send the knight to the well');
+    confirmButton(h.sheet).click();
+    for (let i = 0; i < 50 && h.sheet.root.querySelector('[data-action="plan.close"]') === null; i += 1) await settle();
+    expect(h.sent).toEqual([]);
+    expect(h.sheet.root.querySelector('.companion-plan-step-held')?.textContent).toBe('Every place there is taken. Ask again when someone leaves.');
+  });
+
+  it('sends nothing, and says why, when the world never moves on', async () => {
+    const h = harness({
+      plan: async () => fixture('thing-direct-plan'),
+      prepare: async () => fixture('thing-direct-waiting'),
+    });
+    await h.plans.route('send the knight to the well');
+    confirmButton(h.sheet).click();
+    for (let i = 0; i < 200 && h.sheet.root.querySelector('[data-action="plan.close"]') === null; i += 1) await settle();
+    expect(h.sent).toEqual([]);
+    expect(stepStates(h.sheet)).toEqual(['not-done']);
+    expect(h.sheet.root.querySelector('.companion-plan-step-held')?.textContent)
+      .toBe('The world did not move on, so this step was not sent. Play the world, or move it on a minute, then ask again.');
   });
 });
