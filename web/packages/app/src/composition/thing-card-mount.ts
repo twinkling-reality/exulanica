@@ -147,7 +147,17 @@ export function personCard(
       refused: model.refusal === null ? null : 'Not asked on this server.',
     })),
   ];
-  const mind: CardMind = {
+  // While a person plays them, the person decides and their own mind rests: Who decides' words for
+  // it, and nothing to change here until they are given back.
+  const played = about.mind?.played ?? null;
+  const mind: CardMind = played !== null && about.mind !== null ? {
+    name: played.byYou ? 'You' : 'Another person',
+    line: about.mind.words,
+    mark: mark === null ? null : cardMark(mark),
+    choices: [],
+    ask: '',
+    when: '',
+  } : {
     name: running?.name ?? ROUTINE_NAME,
     line: running !== null
       ? (offered === undefined ? 'An open model.' : modelLine(offered))

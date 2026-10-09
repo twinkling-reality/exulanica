@@ -303,7 +303,9 @@ outside program decides for (Who decides' read lists it among those run from out
 that read names it, its arrival did not say the world decides) has no Change, and its Mind is Who
 decides' own words (`outsideWords`, through the bridge, naming an AI agent only where the door's
 entry says an AI runs it), with Came from in the same words (`cameWords`). Where that program's latest answer was not taken, the
-Mind says so under its line in Who decides' own Lately words (`outsideLatestWords`), and nothing while it was. Before that read names it,
+Mind says so under its line in Who decides' own Lately words (`outsideLatestWords`), and nothing while it was. While a person
+plays a being, its Mind is that person ("You", or "Another person") with Who decides' own words for it
+(`playedWords`), and offers no Change: its own mind rests until it is given back. Before that read names it,
 the card says only "Decided from outside, through" the bridge: a grant whose program decides says
 nothing about a person, so none is claimed. One of the world's own people a grant lets a program run reads the
 same way. A visitor the world decides for has its world mind like any being, the model named or

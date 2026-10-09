@@ -16,7 +16,7 @@ import type { DoorBridge } from '../src/door-bridges-api.js';
 import type { LookReference } from '../src/thing-card-api.js';
 import { readKindFacts, readLookFacts } from '../src/thing-card-api.js';
 import { readCrossingManifest } from '../src/crossing-manifest-api.js';
-import { cameWords, outsideLatestWords, outsideShort, outsideWords } from '../src/ui/society-models.js';
+import { cameWords, outsideLatestWords, outsideShort, outsideWords, playedWords } from '../src/ui/society-models.js';
 import type { OutsideDecider } from '../src/society-models-api.js';
 import { AN_AI_MODEL, markLabel, markOf } from '../src/composition/thing-marks.js';
 
@@ -104,6 +104,24 @@ describe('a person of a society of things, on the card', () => {
     expect(placed.holding).toBeNull();
     const villager = personCard('person-0', about(being({ kind: ref('villager'), cameBy: 'populated', placedId: null })), null);
     expect(villager.cameFrom).toBe('One of the people who live in this world.');
+  });
+});
+
+describe('a being a person plays, its mind on the card', () => {
+  // Agreed with UI (CARD.txt, 2026-10-08 night): while a person plays it, the card's Mind shows Who
+  // decides' own words (playedWords) and offers no Change; its mind rests until it is given back.
+  it('says who plays it in Who decides\' words, with nothing to change, to the player and to anyone else', () => {
+    const QWEN = { provider: 'nebius_token_factory', modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507', name: 'Qwen3 235B Instruct', description: 'An open model.', refusal: null, price: null } as never;
+    for (const byYou of [true, false]) {
+      const played = { byYou };
+      const card = personCard('knight-0', about(being({}), { running: null, words: playedWords(played), played }), [QWEN]);
+      expect(card.mind?.line).toBe(playedWords(played));
+      expect(card.mind?.choices).toEqual([]);
+      const view = buildThingCard({ onChoose: async () => '', onAllMinds: () => undefined, onCompare: () => undefined });
+      view.render(card);
+      expect(view.root.querySelector('[data-action="card.mind.change"]')).toBeNull();
+      expect(view.root.querySelector('[data-action="card.mind.compare"]')).toBeNull();
+    }
   });
 });
 
