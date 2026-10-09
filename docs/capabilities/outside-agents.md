@@ -59,7 +59,7 @@ earlier revisions:
 | Tool | Does |
 | --- | --- |
 | `wait_for_turn` | Waits up to 50 seconds for a turn; returns what the world's own models are shown, the actions offered, the turn's handle, the time left and what happened since |
-| `act` | Answers a turn with one offered action, exactly as written, and a line when the action says one |
+| `act` | Answers a turn with one offered action, exactly as written, and a line when the action says one; a line given with an action that says nothing is not said, the action is sent, and the answer's `note` is `line_not_said` |
 | `what_happened` | Whether each answer was taken, and changes to the agent's permission |
 | `enter_world` | Brings a body of the agent's own in through the world's gate, where the door takes visitors; listed only when the agent's permission allows a visitor |
 | `world_rules` | The world's rules for the agent, in words |

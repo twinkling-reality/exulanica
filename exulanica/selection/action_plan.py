@@ -138,7 +138,7 @@ __all__ = [
 ]
 
 #: Bumped when a prompt below or a form's construction changes; recorded with every plan.
-ACTION_PROMPT_VERSION: Final = "action-plan-8"
+ACTION_PROMPT_VERSION: Final = "action-plan-9"
 PLAN_PROFILE: Final = "exulanica.companion-action-plan/v1"
 
 #: One try and one repair for the drafter, then a refusal; the classifier is asked once and a
@@ -670,12 +670,14 @@ or from what it is put beside, never from you.
 where the person is pointing. 'remove_object' takes a listed object away. 'undo_last_edit' takes \
 back the newest change. 'place_arrangement' adds one of the listed arrangements.
 - 'place_thing' adds one of the listed things that can be added. Its options name the kind it \
-adds and, when the request says what it goes beside, that too: a listed thing, object or being, \
-or the kind of thing an earlier step of this request adds. 'A knight by the well' is one step, \
-and its options are the knight and the well.
+adds and, when the request says what it goes beside, that too: a thing, object or being in this \
+world by the label it is listed with there, not by its kind, or the kind of thing an earlier step \
+of this request adds. 'A knight by the well' is one step, and its options are the knight and the \
+well.
 - 'send_to' asks one listed being to walk to one listed place. 'use' asks one listed being to use \
-one listed place, as the place says. Their options name the being and the place: places are listed \
-apart from the things they belong to, so going to the well names the well's place.
+one listed place, as the place says: asking a being to visit a place, rest at it or do what else \
+it is for is 'use', and 'send_to' only walks it there. Their options name the being and the place: \
+places are listed apart from the things they belong to, so going to the well names the well's place.
 - 'pick_up' asks one listed being to pick up one listed thing. 'put_down' asks one listed being to \
 put down a thing it holds. 'give' asks a listed being to give a listed thing it holds to another \
 listed being. 'take' asks a listed being to take a listed thing from the being holding it. Name \

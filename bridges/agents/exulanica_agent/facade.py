@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any, Final
 
 from exulanica_agent.body import Body
-from exulanica_agent.turns import Turn
+from exulanica_agent.turns import LINE_NOT_SAID, Turn
 
 __all__ = [
     "PROMPT",
@@ -208,6 +208,7 @@ ACT: Final = ToolSpec(
             "turn": {"type": "string"},
             "action": {"type": "string"},
             "line": {"type": "string"},
+            "note": {"type": "string"},
         },
     },
     read_only=False,
@@ -470,14 +471,18 @@ class Facade:
             if answer.refusal in _TURN_OVER:
                 words += " Call wait_for_turn for your next turn."
             return _refuse(words)
+        said_line = None if answer.note == LINE_NOT_SAID else line
         structured: dict[str, Any] = {"received": True, "turn": handle, "action": action}
-        if line:
-            structured["line"] = line
-        said = f' and the line "{line}"' if line else ""
+        if said_line:
+            structured["line"] = said_line
+        if answer.note is not None:
+            structured["note"] = answer.note
+        said = f' and the line "{said_line}"' if said_line else ""
+        noted = f" {answer.words}" if answer.note is not None else ""
         return ToolResult(
             text=(
-                f"Received: {action}{said}. This turn is answered: call wait_for_turn for your "
-                "next one. Whether this answer was taken arrives there or with what_happened."
+                f"Received: {action}{said}.{noted} This turn is answered: call wait_for_turn for "
+                "your next one. Whether this answer was taken arrives there or with what_happened."
             ),
             structured=structured,
         )

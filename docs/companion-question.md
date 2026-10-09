@@ -789,9 +789,10 @@ conversation (`tests/test_companion_action_policy_boundary.py`). Scripted tests 
 two measurements of a live model reading held-out requests into these plans, before and after
 each step's options moved last under a 640-token ceiling, are in
 [evidence and limits](#evidence-and-limits). The later binds the prompt `action-plan-5`; the
-current prompt, `action-plan-8`, adds things and beings and a being's hands acts, asks each step's
-options to name what a thing goes beside or where a being goes as well as what is added or asked,
-and is measured by neither.
+current prompt, `action-plan-9`, adds things and beings and a being's hands acts, asks each step's
+options to name what a thing goes beside or where a being goes as well as what is added or asked
+(what stands in the world by its listed label; a visit to a place as using it), and is measured by
+neither.
 
 ### Things and beings
 

@@ -52,7 +52,7 @@ for turn in body.turns():
 | `turn.tool`, `turn.tool_choice` | The one function, `act`, a model answers by, and the choice forcing it |
 | `turn.options` | The actions offered, each exactly as an answer must repeat it, and whether it says a line |
 | `turn.seconds_left` | How long is left to answer; after that the world's own routine decides that minute |
-| `turn.act(action, line)` | Answer with one offered action, and its line when it says one |
+| `turn.act(action, line)` | Answer with one offered action, and its line when it says one; a line with an action that says nothing is left out, and the answer's `note` is `line_not_said` |
 
 `body.happened()` says what became of each answer, `body.permission` what the agent may do and
 until when, and `body.rules()` the world's rules in words.
@@ -71,7 +71,7 @@ settings entry for MCP clients is in [`examples/mcp-settings.json`](examples/mcp
 | Tool | Does |
 | --- | --- |
 | `wait_for_turn` | Waits up to 50 seconds for a turn, and returns what the world's own models are shown, the actions offered, the turn's handle and what happened since |
-| `act` | Answers a turn with one offered action, and a line when it says one |
+| `act` | Answers a turn with one offered action, and a line when it says one; a line with an action that says nothing is not said, and the result's `note` says so |
 | `what_happened` | Whether each answer was taken, and changes to the agent's permission |
 | `enter_world` | Brings the agent's own body in through the world's gate; listed only when its permission allows a visitor |
 | `world_rules` | The world's rules for the agent, in words |

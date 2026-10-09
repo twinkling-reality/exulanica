@@ -266,13 +266,32 @@ def test_a_line_goes_with_an_action_that_says_one(door, body):
     turn = body.next_turn(5)
     assert [option.says_line for option in turn.options] == [False, False, False, True]
     assert turn.act(says).refusal == "line_missing"
-    assert turn.act("wait a minute", "hello").refusal == "line_not_offered"
     assert turn.act(says, "x" * 41).refusal == "line_out_of_bounds"
     assert door.requests_to("/door/channel/answers") == []
     assert turn.act(says, "Hello, is the well water safe?").received
     [sent] = door.requests_to("/door/channel/answers")
     assert sent["body"]["label"] == says
     assert sent["body"]["line"] == "Hello, is the well water safe?"
+
+
+def test_a_line_with_an_action_that_says_nothing_is_left_out_and_the_action_sent(door, body):
+    """A mind that writes a line for every action keeps its turn: the action goes to the door
+    without the line, and the answer says the line was not said."""
+    frame = with_a_line(person_ask(), "say something to everyone near you", maximum=40)
+    door.push(frame)
+    turn = body.next_turn(5)
+    answer = turn.act("wait a minute", "hello")
+    assert (answer.received, answer.refusal, answer.note) == (True, None, "line_not_said")
+    assert "not said" in answer.words
+    [sent] = door.requests_to("/door/channel/answers")
+    assert sent["body"] == {
+        "request_id": frame["request_id"],
+        "request_sha256": frame["request_sha256"],
+        "label": "wait a minute",
+    }
+    # As given, an answer carries no note.
+    door.push(person_ask())
+    assert body.next_turn(5).act("wait a minute").note is None
 
 
 def test_an_action_not_offered_is_refused_before_anything_is_sent(door, body):

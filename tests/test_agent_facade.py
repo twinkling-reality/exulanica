@@ -178,6 +178,23 @@ def test_act_answers_the_turn_it_names(door, tools):
     assert sent["body"]["request_id"] == frame["request_id"]
 
 
+def test_act_with_a_line_for_an_action_that_says_nothing_answers_and_says_so(door, tools):
+    door.push(person_ask())
+    handle = tools.call("wait_for_turn", {"wait_seconds": 5}).structured["turn"]["turn"]
+    result = tools.call("act", {"turn": handle, "action": "wait a minute", "line": "hello"})
+    assert not result.is_error, result.text
+    _valid("act", result.structured)
+    assert result.structured == {
+        "received": True,
+        "turn": handle,
+        "action": "wait a minute",
+        "note": "line_not_said",
+    }
+    assert "not said" in result.text and "hello" not in result.text
+    [sent] = door.requests_to("/door/channel/answers")
+    assert "line" not in sent["body"]
+
+
 def test_act_refusals_say_how_to_put_them_right(door, tools):
     frame = person_ask()
     door.push(frame)

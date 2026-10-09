@@ -16,11 +16,12 @@ from __future__ import annotations
 import copy
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Final
 
 __all__ = [
     "ARRIVAL_MARGIN_SECONDS",
+    "LINE_NOT_SAID",
     "Answer",
     "FrameRefused",
     "Option",
@@ -56,15 +57,23 @@ class Option:
         return document
 
 
+#: A received answer's note when a line came with an action that says nothing: the action was
+#: sent and the line was not said.
+LINE_NOT_SAID: Final = "line_not_said"
+
+
 @dataclass(frozen=True, slots=True)
 class Answer:
     """What became of an answer: ``received`` when the door stored it; otherwise the refusal's
-    code and words. The world's host decides later whether a received answer is taken, which
+    code and words. ``note`` names how a received answer differs from the one given, with its
+    words: ``line_not_said`` when a line came with an action that says nothing; absent, it was
+    sent as given. The world's host decides later whether a received answer is taken, which
     arrives as a happening."""
 
     received: bool
     refusal: str | None = None
     words: str = ""
+    note: str | None = None
 
 
 def _text(value: object, where: str) -> str:
@@ -262,7 +271,8 @@ class Turn:
         """Answer with one offered action, exactly as written, and its line when it says one.
 
         An answer the turn itself shows to be wrong is refused here, with words saying how to put
-        it right, before anything is sent; the door checks every answer again.
+        it right, before anything is sent; the door checks every answer again. A line given with
+        an action that says nothing is left out: the action is sent, and the answer notes it.
         """
         if not isinstance(action, str):
             return Answer(False, "answer_not_offered", "An action is text, as it is offered.")
@@ -279,7 +289,17 @@ class Turn:
         if option.says_line and line is None:
             return Answer(False, "line_missing", "This action says something: give its line.")
         if not option.says_line and line is not None:
-            return Answer(False, "line_not_offered", "This action says nothing: give no line.")
+            # A mind that writes a line for every action would otherwise answer twice and miss
+            # the turn's time: the action is sent, and its line is not said.
+            answer = self._answer(self, action, None)
+            if not answer.received:
+                return answer
+            return replace(
+                answer,
+                note=LINE_NOT_SAID,
+                words="Your line was not said: this action says nothing. To speak, choose an "
+                "action that says something.",
+            )
         maximum = option.line_characters_maximum
         if line is not None and (not isinstance(line, str) or len(line) > (maximum or 0)):
             return Answer(

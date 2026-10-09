@@ -48,6 +48,9 @@ PINNED = {
     # `action-plan-8`: a step's options name what it goes beside or where it goes as well as what
     # it adds or asks; a walk or a use names the place; describing words are no step of their own.
     "action-plan-8": "d68afb2a32f23689d55f39037076128559150a7b2ac07da58259363ae1d83bbd",
+    # `action-plan-9`: what stands in the world is named by its listed label, not its kind; a visit
+    # to a place, or doing what else it is for, is a use, and a walk only walks there.
+    "action-plan-9": "0c6c4c32250b7f4bc214e347777ae8b481d2795dbab897e243702e9942319ed4",
     # The appearance drafter for a design choice drawn from no evidence; its own family, so the
     # evidence drafter's texts and `proposal-4` are untouched.
     "proposal-authored-1": "7b840134c24bc8152ab423f0665362b1d37bdd3cfb9b96cf208cfc6a46308d9a",
