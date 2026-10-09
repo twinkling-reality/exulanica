@@ -1241,6 +1241,7 @@ def build_services(
             stores.workspace_style_packs,
             retained_bytes_limit=retained_bytes_limit(environ),
             uploads=_style_pack_uploads(environ),
+            generated_pieces=stores.generated_pieces,
         ),
         character_appearance=_character_appearance_runtime(store, environ, stores.workspace_assets),
         tiles=stores.tiles,

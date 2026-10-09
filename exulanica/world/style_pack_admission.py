@@ -37,6 +37,7 @@ from exulanica.world import style_packs
 from exulanica.world.style_pack_pieces import StylePieceRefused, check_piece_profile
 from exulanica.world.style_pack_preview import PreviewRefused, walk_preview
 from exulanica.world.workspace_style_packs import (
+    GENERATED_PREFIX,
     AdmittedStylePack,
     PackBase,
     PackFile,
@@ -254,6 +255,13 @@ def admit(
             "invalid_style_data",
             f"an uploaded pack's id never begins {ERASED_PREFIX}, which a workspace's erasure "
             "gives the versions it erases",
+            path="pack_id",
+        )
+    if manifest["pack_id"].startswith(GENERATED_PREFIX):
+        raise StylePackAdmissionRefused(
+            "invalid_style_data",
+            f"an uploaded pack's id never begins {GENERATED_PREFIX}, which the looks made of "
+            "generated pieces take",
             path="pack_id",
         )
     rights = declaration.rights

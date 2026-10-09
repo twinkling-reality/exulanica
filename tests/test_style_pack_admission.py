@@ -142,6 +142,9 @@ def test_an_uploaded_pack_is_the_creators_own_and_states_the_declared_licence():
     # The ids a workspace's erasure gives its erased versions are never an upload's.
     erased = upload(pack_id="erased.x" + "0" * 24)
     assert _refused(erased) == ("invalid_style_data", "pack_id")
+    # Nor the ids of looks made of generated pieces.
+    generated = upload(pack_id="generated.cozy-town")
+    assert _refused(generated) == ("invalid_style_data", "pack_id")
     mismatched = upload()
     mismatched.rights.update(basis="licensed", licence_id="CC0-1.0")
     assert _refused(mismatched) == ("licence_mismatch", "licence")

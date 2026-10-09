@@ -89,6 +89,7 @@ def _build(
         library=library_palettes,
         name=f"{name}:style-pack-checks",
         workspace_source=source,
+        generated_pieces=stores.generated_pieces,
     )
     return AssetPreparationWorker(
         database,

@@ -151,6 +151,7 @@ def _repository(
         stores=runtime.stores,
         retained_bytes_limit=runtime.retained_bytes_limit,
         installation_bytes_limit=runtime.installation_bytes_limit,
+        generated_pieces=runtime.generated_pieces,
     )
 
 

@@ -11,9 +11,10 @@ Status: the manifest, both readers, the resolver, the fit rules, the piece budge
 reading of a palette piece, drawing a generated town in a pack (section 7), three authored packs
 (section 8), the committed library the host serves (section 9) and a world's appearance naming its
 pack (section 10) are built, as are a creator's own packs in their workspace: kept, uploaded,
-checked, served, downloaded as an archive, offered for publication and withdrawn (section 11).
-Wearing a workspace pack in a world, publishing one to the library, the page's upload control, and
-drafting a pack with a model are planned and not built.
+checked, served, downloaded as an archive, offered for publication and withdrawn (section 11), and
+looks made of generated pieces, recorded, checked and served (section 11.2). Wearing a workspace
+pack in a world, publishing one to the library, the page's upload control, and drafting a pack with
+a model are planned and not built.
 
 ## 1. In plain words
 
@@ -454,3 +455,33 @@ holds every module with a registered hosted call site away from the modules that
 or serve a workspace's packs, indirect imports counted, and `tests/test_hosted_boundary.py` runs
 every registered call path over a workspace holding a ready pack with a sentinel in each of those
 strings and in its preview, and finds none in any request.
+
+### 11.2 Looks made of generated pieces
+
+A world's own look made of [generated pieces](generated-pieces-contract.md) is a version of a
+workspace's own pack of origin `generated`: drawn on a library pack, with pieces the generation
+worker made at a person's request in place of some of its own (`exulanica/generation/looks.py`
+builds its manifest). One migration (`a_workspace_look_wears_generated_pieces`) adds it to section
+11's tables, and `WorkspaceStylePackRepository.record_generated` records one; no route uploads one.
+
+| Part | What it holds |
+| --- | --- |
+| The version | Origin `generated`; a pack id in `generated.`, which the schema keeps for these versions and the upload admission refuses; licensed `CC0-1.0` with no attribution; drawn on a version the library holds. Its declaration is the worker's (`exulanica.workspace-style-pack-generated-declaration/v1`): whose request it was and the licence, and no words of anybody's. Its receipt names what it is made of (its base chain and pieces, by which a world applying the same pieces again wears it rather than another) and the pieces' receipts |
+| Its files | Each a generated piece by digest, with source `generated_piece`: the bytes live in the one shared `generated-pieces` store, not in the workspace's namespace, and no inventory record names them |
+
+- **Held.** A generated piece is held while a passed output of the workspace (`piece_output`,
+  `within`) names its digest. A version is recorded only once every piece is held, becomes ready
+  only while each still is, and `workspace_style_pack_wearable` asks the same before it is worn or
+  served. Its check reads each piece from the shared store and holds it to the base's palette, as
+  an upload's is.
+- **Bounds.** A person's bounds (16 live versions, 256 MiB) count their uploads only. A workspace
+  holds at most 64 live generated versions (`workspace_style_pack_generated_limit`): every distinct
+  set of pieces a world wears is one, and applying a set again reuses its version. Generated pieces
+  count toward no byte total; each version's documents count as every version's do. A generated
+  version's check takes one of the four places the workspace's checks share.
+- **Erasure.** A workspace tombstone erases a generated version as it erases every version (its
+  documents, pack id, file paths and receipt), and the piece batch migration's trigger deletes the
+  workspace's outputs, so the version is never worn or served again. Nothing is queued for its
+  pieces and the tombstone's completion never waits on them: the shared bytes stay, holding nothing
+  of the person, as [generated pieces](generated-pieces-contract.md#53-the-shared-store-of-generated-pieces)
+  says.

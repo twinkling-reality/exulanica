@@ -38,8 +38,16 @@ from psycopg.types.json import Jsonb
 from exulanica.db.read_check import final_read_check
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
+from exulanica.store.base import ContentAddressedStore
 from exulanica.store.namespaces import WorkspaceStores, workspace_style_pack_write_key
-from exulanica.world.style_packs import StylePackContext, load_context
+from exulanica.world.style_pack_library import style_pack_library
+from exulanica.world.style_packs import (
+    StylePackContext,
+    StylePackRefused,
+    canonical_json,
+    load_context,
+    read_manifest,
+)
 from exulanica.world.workspace_preparations import (
     DEFAULT_RETAINED_BYTES,
     DELIVERY_CHUNK_BYTES,
@@ -57,9 +65,12 @@ __all__ = [
     "DEFAULT_INSTALLATION_DAY_ATTEMPTS",
     "DEFAULT_WORKSPACE_DAY_ATTEMPTS",
     "FAILURE_CLASSES",
+    "GENERATED_DECLARATION_PROFILE",
+    "GENERATED_PREFIX",
     "USE_POLICY",
     "AdmittedStylePack",
     "AuthorizedPackFile",
+    "GeneratedStylePackRefused",
     "PackBase",
     "PackFile",
     "StylePackAttemptsExceeded",
@@ -93,12 +104,18 @@ DEFAULT_WORKSPACE_DAY_ATTEMPTS: Final = 32
 DEFAULT_INSTALLATION_DAY_ATTEMPTS: Final = 512
 #: Every workspace's retained style pack bytes together, at most.
 DEFAULT_INSTALLATION_BYTES: Final = 16 * 1024 * 1024 * 1024
+#: The pack ids of looks made of generated pieces: a generated version's alone (the schema holds
+#: it), so the upload admission refuses one.
+GENERATED_PREFIX: Final = "generated."
+#: The declaration a generated version is recorded under: the worker's, naming whose request it
+#: was, never a person's words.
+GENERATED_DECLARATION_PROFILE: Final = "exulanica.workspace-style-pack-generated-declaration/v1"
 
 _VERSION_COLUMNS: Final = (
     "v.manifest_sha256, v.pack_id, v.version, v.manifest_canonical, v.manifest_byte_size, "
     "v.rights_basis, v.licence_id, v.base_source, v.base_pack_id, v.base_version, "
     "v.base_manifest_sha256, v.file_count, v.file_byte_size, v.preview_sha256, "
-    "v.declaration_sha256, v.created_by, v.created_at, v.erased_at, "
+    "v.declaration_sha256, v.created_by, v.created_at, v.erased_at, v.origin, "
     "p.state, p.failure_class, p.failure_message, p.attempts, "
     "exists (select 1 from workspace_style_pack_withdrawal w "
     "  where w.workspace_id = v.workspace_id and w.manifest_sha256 = v.manifest_sha256) "
@@ -108,6 +125,14 @@ _VERSION_COLUMNS: Final = (
 
 class WorkspaceStylePackError(PreparationError):
     """A workspace style pack refused by name."""
+
+
+class GeneratedStylePackRefused(WorkspaceStylePackError):
+    """A derived look of generated pieces that cannot be recorded, with its code."""
+
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(detail)
+        self.code = code
 
 
 class UnknownStylePack(WorkspaceStylePackError):
@@ -201,6 +226,9 @@ class PackFile:
     content_sha256: str
     byte_size: int
     media_type: str
+    #: ``workspace``, the workspace's own namespace; ``generated_piece``, the shared store of
+    #: generated pieces.
+    source: str = "workspace"
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,6 +304,8 @@ class StylePackVersionRecord:
     failure_message: str | None
     attempts: int
     withdrawn: bool
+    #: ``uploaded``, a person's own pack, or ``generated``, a look made of generated pieces.
+    origin: str = "uploaded"
 
     @property
     def ready(self) -> bool:
@@ -313,6 +343,7 @@ def _record(row: Mapping[str, Any]) -> StylePackVersionRecord:
         state=row["state"],
         failure_class=row["failure_class"],
         failure_message=row["failure_message"],
+        origin=row["origin"],
         attempts=row["attempts"],
         withdrawn=row["withdrawn"],
     )
@@ -371,6 +402,9 @@ class WorkspaceStylePackRuntime:
     installation_day_attempts: int = DEFAULT_INSTALLATION_DAY_ATTEMPTS
     #: Whether this installation takes uploads at all (``EXULANICA_WORKSPACE_STYLE_PACK_UPLOADS``).
     uploads: bool = False
+    #: The shared store of generated pieces, which a generated version's files are read from; None
+    #: where this process holds none, and then such a file is not served.
+    generated_pieces: ContentAddressedStore | None = None
 
     @classmethod
     def over(
@@ -428,11 +462,13 @@ class WorkspaceStylePackRepository:
         stores: WorkspaceStores,
         retained_bytes_limit: int = DEFAULT_RETAINED_BYTES,
         installation_bytes_limit: int = DEFAULT_INSTALLATION_BYTES,
+        generated_pieces: ContentAddressedStore | None = None,
     ) -> None:
         self.connection = connection
         self.workspace_id = workspace_id
         self.actor = actor
         self.stores = stores
+        self.generated_pieces = generated_pieces
         self.retained_bytes_limit = retained_bytes_limit
         self.installation_bytes_limit = installation_bytes_limit
 
@@ -498,7 +534,7 @@ class WorkspaceStylePackRepository:
                     raise IntegrityError("a style pack file was not stored under its digest")
         return self.version(admitted.manifest_sha256), created
 
-    def _record_rows(self, admitted: AdmittedStylePack) -> bool:
+    def _record_rows(self, admitted: AdmittedStylePack, *, origin: str = "uploaded") -> bool:
         manifest_sha256 = admitted.manifest_sha256
         with self.connection.transaction():
             self.connection.execute(
@@ -550,9 +586,9 @@ class WorkspaceStylePackRepository:
                 "  declaration_sha256, rights_basis, licence_id, licence_attribution, base_source, "
                 "  base_pack_id, "
                 "  base_version, base_manifest_sha256, file_count, file_byte_size, "
-                "  preview_sha256, receipt_document, use_policy, created_by) "
+                "  preview_sha256, receipt_document, use_policy, created_by, origin) "
                 "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
-                "  %s, %s, %s)",
+                "  %s, %s, %s, %s)",
                 (
                     self.workspace_id,
                     manifest_sha256,
@@ -575,13 +611,14 @@ class WorkspaceStylePackRepository:
                     Jsonb(dict(admitted.receipt)),
                     USE_POLICY,
                     self.actor,
+                    origin,
                 ),
             )
             for ordinal, file in enumerate(admitted.files):
                 self.connection.execute(
                     "insert into workspace_style_pack_file (workspace_id, manifest_sha256, "
-                    "  ordinal, path, content_sha256, byte_size, media_type) "
-                    "values (%s, %s, %s, %s, %s, %s, %s)",
+                    "  ordinal, path, content_sha256, byte_size, media_type, source) "
+                    "values (%s, %s, %s, %s, %s, %s, %s, %s)",
                     (
                         self.workspace_id,
                         manifest_sha256,
@@ -590,6 +627,7 @@ class WorkspaceStylePackRepository:
                         file.content_sha256,
                         file.byte_size,
                         file.media_type,
+                        file.source,
                     ),
                 )
             for digest, content in sorted(admitted.contents.items()):
@@ -625,6 +663,157 @@ class WorkspaceStylePackRepository:
         if row is None or not row["allowed"]:
             raise WorkspaceStylePacksReadOnly("this deployment keeps style packs read-only")
 
+    # -- generated looks -----------------------------------------------------------------------
+
+    def record_generated(
+        self,
+        manifest_canonical: bytes,
+        *,
+        content_sha256: str,
+        asked_by: uuid.UUID,
+        context: StylePackContext,
+    ) -> tuple[StylePackVersionRecord, bool]:
+        """Record a derived look of generated pieces, made at ``asked_by``'s request, to be checked.
+
+        ``manifest_canonical`` is the look's manifest as :mod:`exulanica.generation.looks` builds
+        it, its id in ``generated.``; ``content_sha256`` is what it is made of (its base chain and
+        pieces, without a version), by which :meth:`generated_version` finds it again. It is read
+        by the style pack reader and recorded only as a look of origin ``generated``, licensed
+        CC0-1.0 with no attribution, drawn on a version the library holds, whose every file is a
+        piece a passed output of this workspace names. Its files are named by digest in the shared
+        store of generated pieces, and no byte is written. A person's upload bounds do not count
+        it, and its pieces count toward no byte total; its documents count as every version's
+        do. The version is recorded requested, and its check reads each piece before any world
+        wears it. The same manifest answers the version already held. Refused by name with
+        :class:`GeneratedStylePackRefused`, or as :meth:`record` refuses an identity.
+        """
+        try:
+            value = json.loads(manifest_canonical)
+            canonical = canonical_json(value).encode("ascii")
+        except (ValueError, UnicodeEncodeError) as error:
+            raise GeneratedStylePackRefused(
+                "manifest_unreadable", "a generated look's manifest is not canonical JSON"
+            ) from error
+        if canonical != manifest_canonical:
+            raise GeneratedStylePackRefused(
+                "manifest_unreadable", "a generated look's manifest is sent as its canonical JSON"
+            )
+        try:
+            manifest = read_manifest(value, context)
+        except StylePackRefused as refused:
+            raise GeneratedStylePackRefused("manifest_refused", str(refused)) from refused
+        named = manifest["base"]
+        if manifest["origin"] != "generated" or not manifest["pack_id"].startswith(
+            GENERATED_PREFIX
+        ):
+            raise GeneratedStylePackRefused(
+                "not_generated",
+                f"a generated look is of origin generated, its id in {GENERATED_PREFIX}",
+            )
+        if manifest["licence"] != {"id": "CC0-1.0", "attribution": None}:
+            raise GeneratedStylePackRefused(
+                "licence_not_cc0", "a generated look is CC0-1.0 with no attribution"
+            )
+        if manifest["preview"] is not None:
+            raise GeneratedStylePackRefused("preview_given", "a generated look has no preview")
+        if named is None or not style_pack_library().holds(
+            named["pack_id"], named["version"], named["manifest_sha256"]
+        ):
+            raise GeneratedStylePackRefused(
+                "base_not_library", "a generated look is drawn on a version the library holds"
+            )
+        files = tuple(
+            PackFile(
+                file["path"], file["sha256"], file["bytes"], file["media_type"], "generated_piece"
+            )
+            for file in manifest["files"]
+        )
+        if any(file.media_type != "model/gltf-binary" for file in files):
+            raise GeneratedStylePackRefused(
+                "file_not_a_piece", "every file of a generated look is a generated piece"
+            )
+        digests = sorted({file.content_sha256 for file in files})
+        held = {
+            row["piece_sha256"]
+            for row in self.connection.execute(
+                "select distinct piece_sha256 from piece_output "
+                "where workspace_id = %s and within and piece_sha256 = any(%s)",
+                (self.workspace_id, digests),
+            ).fetchall()
+        }
+        if missing := [digest for digest in digests if digest not in held]:
+            raise GeneratedStylePackRefused(
+                "piece_not_held",
+                f"{len(missing)} of the look's pieces no passed output of this workspace names",
+            )
+        manifest_sha256 = hashlib.sha256(manifest_canonical).hexdigest()
+        declaration = canonical_json(
+            {
+                "profile": GENERATED_DECLARATION_PROFILE,
+                "manifest_sha256": manifest_sha256,
+                "asked_by": str(asked_by),
+                "rights": {"basis": "licensed", "licence_id": "CC0-1.0", "attribution": None},
+            }
+        ).encode("ascii")
+        admitted = AdmittedStylePack(
+            manifest_canonical=manifest_canonical,
+            pack_id=manifest["pack_id"],
+            version=manifest["version"],
+            declaration_canonical=declaration,
+            rights_basis="licensed",
+            licence_id="CC0-1.0",
+            base=PackBase("library", named["pack_id"], named["version"], named["manifest_sha256"]),
+            files=files,
+            contents={},
+            preview_sha256=None,
+            receipt={
+                "checks": ["base", "manifest", "pieces_held"],
+                "content_sha256": content_sha256,
+                "receipts": list(manifest["provenance"]["receipts"]),
+            },
+        )
+        self._may_append()
+        recorder = WorkspaceStylePackRepository(
+            self.connection,
+            self.workspace_id,
+            asked_by,
+            stores=self.stores,
+            retained_bytes_limit=self.retained_bytes_limit,
+            installation_bytes_limit=self.installation_bytes_limit,
+            generated_pieces=self.generated_pieces,
+        )
+        with object_lock(self.connection, workspace_style_pack_write_key(self.workspace_id)):
+            try:
+                created = retrying(lambda: recorder._record_rows(admitted, origin="generated"))
+            except psycopg.Error as error:
+                raise _refused(error) from error
+        return self.version(manifest_sha256), created
+
+    def next_generated_version(self, pack_id: str) -> int:
+        """The version a new generated look at ``pack_id`` takes: one more than the highest this
+        workspace holds unerased."""
+        row = self.connection.execute(
+            "select coalesce(max(version), 0) + 1 as next from workspace_style_pack_version "
+            "where workspace_id = %s and pack_id = %s and erased_at is null",
+            (self.workspace_id, pack_id),
+        ).fetchone()
+        return int(row["next"]) if row is not None else 1
+
+    def generated_version(self, content_sha256: str) -> StylePackVersionRecord | None:
+        """The newest unwithdrawn generated version made of ``content_sha256``, or None: a world
+        applying the same pieces on the same base again wears it rather than another."""
+        row = self.connection.execute(
+            "select v.manifest_sha256 from workspace_style_pack_version v "
+            "where v.workspace_id = %s and v.origin = 'generated' and v.erased_at is null "
+            "  and v.receipt_document->>'content_sha256' = %s "
+            "  and not exists (select 1 from workspace_style_pack_withdrawal w "
+            "                   where w.workspace_id = v.workspace_id "
+            "                     and w.manifest_sha256 = v.manifest_sha256) "
+            "order by v.version desc limit 1",
+            (self.workspace_id, content_sha256),
+        ).fetchone()
+        return None if row is None else self.version(row["manifest_sha256"])
+
     # -- reads ---------------------------------------------------------------------------------
 
     def version(self, manifest_sha256: str) -> StylePackVersionRecord:
@@ -653,14 +842,31 @@ class WorkspaceStylePackRepository:
     def files(self, manifest_sha256: str) -> list[PackFile]:
         """The files a version lists, in its manifest's order."""
         rows = self.connection.execute(
-            "select path, content_sha256, byte_size, media_type from workspace_style_pack_file "
+            "select path, content_sha256, byte_size, media_type, source "
+            "from workspace_style_pack_file "
             "where workspace_id = %s and manifest_sha256 = %s order by ordinal",
             (self.workspace_id, manifest_sha256),
         ).fetchall()
         return [
-            PackFile(row["path"], row["content_sha256"], row["byte_size"], row["media_type"])
+            PackFile(
+                row["path"],
+                row["content_sha256"],
+                row["byte_size"],
+                row["media_type"],
+                row["source"],
+            )
             for row in rows
         ]
+
+    def store_for(self, file: PackFile) -> ContentAddressedStore:
+        """Where ``file``'s bytes are: the workspace's own namespace, or the shared store of
+        generated pieces for a generated version's file (:class:`StylePackNotReady` where this
+        process holds none)."""
+        if file.source == "generated_piece":
+            if self.generated_pieces is None:
+                raise StylePackNotReady("this process reads no generated pieces")
+            return self.generated_pieces
+        return self.stores.for_workspace(self.workspace_id)
 
     def wearable(self, manifest_sha256: str) -> bool:
         """Whether a world may wear this version and its files be served, as of now. A write or a
@@ -688,19 +894,20 @@ class WorkspaceStylePackRepository:
         if record.state != "ready":
             raise StylePackNotReady("this style pack version has not passed its check")
         listed = self.connection.execute(
-            "select f.media_type, f.byte_size from workspace_style_pack_file f "
+            "select f.media_type, f.byte_size, f.source from workspace_style_pack_file f "
             "join workspace_style_pack_chain(%s, %s) c on c.manifest_sha256 = f.manifest_sha256 "
             "where f.workspace_id = %s and f.content_sha256 = %s limit 1",
             (self.workspace_id, manifest_sha256, self.workspace_id, content_sha256),
         ).fetchone()
         if listed is None:
             raise UnknownStylePack("this style pack version lists no such file")
+        named = PackFile(
+            None, content_sha256, int(listed["byte_size"]), listed["media_type"], listed["source"]
+        )
         try:
-            body = self.stores.for_workspace(self.workspace_id).open_verified(
-                BlobId.from_hex(content_sha256)
-            )
+            body = self.store_for(named).open_verified(BlobId.from_hex(content_sha256))
         except BlobNotFoundError as error:
-            raise StylePackNotReady("this file's bytes are missing from the namespace") from error
+            raise StylePackNotReady("this file's bytes are missing from their store") from error
         output = AuthorizedPackFile(body, int(listed["byte_size"]), listed["media_type"])
         try:
             if body.seek(0, io.SEEK_END) != output.byte_size:
@@ -736,7 +943,6 @@ class WorkspaceStylePackRepository:
             )
         if record.state != "ready" or record.manifest_canonical is None:
             raise StylePackNotReady("this style pack version has not passed its check")
-        store = self.stores.for_workspace(self.workspace_id)
         body = tempfile.TemporaryFile()  # noqa: SIM115 - handed to the response, closed by it
         output = AuthorizedPackFile(body, 0, ARCHIVE_MEDIA_TYPE)
         try:
@@ -746,10 +952,12 @@ class WorkspaceStylePackRepository:
                 for file in self.files(manifest_sha256):
                     assert file.path is not None
                     try:
-                        source = store.open_verified(BlobId.from_hex(file.content_sha256))
+                        source = self.store_for(file).open_verified(
+                            BlobId.from_hex(file.content_sha256)
+                        )
                     except BlobNotFoundError as error:
                         raise StylePackNotReady(
-                            "a file of this version is missing from the namespace"
+                            "a file of this version is missing from its store"
                         ) from error
                     with source:
                         archive.addfile(_tar_entry(file.path, file.byte_size), source)

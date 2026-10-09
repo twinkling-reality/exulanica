@@ -25,10 +25,12 @@ from typing import Any, Final
 from exulanica.db.session import Database
 from exulanica.errors import BlobNotFoundError
 from exulanica.evidence.blob import BlobId
+from exulanica.store.base import ContentAddressedStore
 from exulanica.store.namespaces import WorkspaceStores
 from exulanica.world.style_pack_library import style_pack_library
 from exulanica.world.style_pack_pieces import StylePieceRefused, read_palette_piece
 from exulanica.world.workspace_style_packs import (
+    StylePackNotReady,
     StylePackVersionRecord,
     WorkspaceStylePackError,
     WorkspaceStylePackRepository,
@@ -135,17 +137,23 @@ def check_version(
     palette = _palette(repository, record, library)
     if palette is None:
         return "base_unavailable", "a pack this one is drawn on could not be read", {}
-    store = stores.for_workspace(repository.workspace_id)
     report: dict[str, Any] = {"pieces": {}}
     for file in repository.files(record.manifest_sha256):
         if file.media_type != "model/gltf-binary":
             continue
         if clock() - started > seconds:
             return "interrupted", f"the check ran past its {seconds:g} s bound", report
+        # A generated version's pieces are read from the shared store of generated pieces, every
+        # other file from the workspace's own namespace (``stores``).
         try:
+            store = (
+                stores.for_workspace(repository.workspace_id)
+                if file.source == "workspace"
+                else repository.store_for(file)
+            )
             data = store.get(BlobId.from_hex(file.content_sha256))
-        except BlobNotFoundError:
-            return "interrupted", f"{file.path}: its bytes are missing from the namespace", report
+        except (BlobNotFoundError, StylePackNotReady):
+            return "interrupted", f"{file.path}: its bytes are missing from their store", report
         try:
             piece = read_palette_piece(data, table)
         except StylePieceRefused as refused:
@@ -182,9 +190,11 @@ class StylePackCheckWorker:
         limit_per_pass: int = 16,
         workspace_source: Callable[[], Iterable[uuid.UUID]] | None = None,
         seconds: float = CHECK_SECONDS,
+        generated_pieces: ContentAddressedStore | None = None,
     ) -> None:
         self._database = database
         self._stores = stores
+        self._generated_pieces = generated_pieces
         self._workspaces = workspaces
         self._table = table
         self._library = library
@@ -211,7 +221,11 @@ class StylePackCheckWorker:
                 try:
                     connection = sessions.enter_context(self._database.session(workspace_id))
                     repository = WorkspaceStylePackRepository(
-                        connection, workspace_id, uuid.UUID(int=0), stores=self._stores
+                        connection,
+                        workspace_id,
+                        uuid.UUID(int=0),
+                        stores=self._stores,
+                        generated_pieces=self._generated_pieces,
                     )
                     outcome.exhausted += repository.expire_exhausted(
                         max_attempts=self._max_attempts
