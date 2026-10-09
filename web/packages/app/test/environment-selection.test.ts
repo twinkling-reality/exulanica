@@ -813,6 +813,11 @@ describe('persisted living world controls',()=>{
     expect(inspector.textContent).toContain('Resident 1');
     expect(inspector.textContent).toContain('Needs tracked');
     expect(inspector.textContent).not.toMatch(/of 1000|district:marker|f2343140-4293-5eb0-b94b-d26c426ef252/);
+    // The catalog's living words are phrases; the Now line made of them reads as a sentence.
+    const now = inspector.querySelector('.living-world-activity')?.textContent ?? '';
+    expect(now.length).toBeGreaterThan(0);
+    expect(now.charAt(0)).toBe(now.charAt(0).toUpperCase());
+    expect(now.charAt(0)).not.toBe(now.charAt(0).toLowerCase());
     mount.dispose();
   });
   it('renders the canonical population and advances only on explicit user action',async()=>{

@@ -1,7 +1,7 @@
 import { ApiError } from '@exulanica/graph-client';
 import { problemRecord } from './words/problems.js';
 import { technicalRecord } from './system/components.js';
-import { say } from './copy.js';
+import { fill, say } from './copy.js';
 import { el } from './dom.js';
 import { buildThinkingStatus } from './thinking-status.js';
 
@@ -68,6 +68,7 @@ export function worldOpeningReason(error: unknown): string | null {
       if (cause.code === 'database_privilege_refused') {
         return say('world.opening.database_privilege_refused');
       }
+      if (cause.code === 'bytes_missing') return say('world.opening.bytes_missing');
       if (cause.status >= 500) return 'The server did not answer.';
       return null;
     }
@@ -83,12 +84,23 @@ export function worldOpeningReason(error: unknown): string | null {
   return null;
 }
 
-/** A server grant refusal cannot change when the person presses the same action again. */
+/**
+ * What Your worlds says of a world that did not open after it was chosen: which one, then why
+ * where that is known (`worldOpeningReason`), never only the opening screen it left.
+ */
+export function worldDidNotOpen(title: string, error: unknown): string {
+  const reason = worldOpeningReason(error);
+  const which = fill('world.opening.didNotOpen', { title });
+  return reason === null ? which : `${which} ${reason}`;
+}
+
+/** A refusal that cannot change when the person presses the same action again. */
 export function worldOpeningCanRetry(error: unknown): boolean {
   const seen = new Set<Error>();
   let cause: unknown = error;
   while (cause instanceof Error && !seen.has(cause)) {
-    if (cause instanceof ApiError && cause.code === 'database_privilege_refused') return false;
+    // Neither changes when the same world is asked again: a grant refusal, or a stored file gone.
+    if (cause instanceof ApiError && ['database_privilege_refused', 'bytes_missing'].includes(cause.code)) return false;
     seen.add(cause);
     cause = cause.cause;
   }

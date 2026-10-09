@@ -65,6 +65,7 @@ import { PlaceNameRightsClient } from './place-name-rights-api.js';
 import {
   buildStartupState,
   buildWorldOpeningFailure,
+  worldDidNotOpen,
   worldOpeningCanRetry,
   worldOpeningReason,
 } from './ui/startup-state.js';
@@ -76,7 +77,7 @@ import { redrawWorldLook } from './composition/world-look-redraw.js';
 import { buildLookRow, buildLookSheet } from './ui/look-sheet.js';
 import type { WorldStylePackBinding } from './world-style-api.js';
 import { readLookLibrary, type LookLibrary } from './composition/look-library.js';
-import { fill } from './ui/copy.js';
+import { fill, say } from './ui/copy.js';
 import { actionState, perform } from './ui/actions/surfaces.js';
 import { actionSpec, availability } from './ui/actions/registry.js';
 import type { PlannedRequest } from './ui/actions/planned.js';
@@ -243,6 +244,8 @@ async function mountNoWorld(deps: {
    * this page was open, so the list held in memory is what it was before that.
    */
   readonly refresh?: boolean;
+  /** A world chosen here that did not open, said at the top of Your worlds in its place. */
+  readonly failed?: string;
 }): Promise<void> {
   const client = state.worldEntries;
   if (deps.refresh === true && client !== null) {
@@ -254,7 +257,7 @@ async function mountNoWorld(deps: {
     }
   }
   if (state.savedWorldEntries.length > 0) {
-    await mountWorldEntry();
+    await mountWorldEntry(deps.failed);
     return;
   }
   showWorldOpeningFailure(
@@ -450,7 +453,7 @@ function showWorldRecipes(
 }
 
 /** Show Your worlds. Only `mountNoWorld` calls this. */
-async function mountWorldEntry(): Promise<void> {
+async function mountWorldEntry(failed?: string): Promise<void> {
   const entries = state.worldEntries;
   canvas.hidden = true;
   shell.setAttribute('data-world-state', 'entry');
@@ -486,7 +489,7 @@ async function mountWorldEntry(): Promise<void> {
         });
       },
     }),
-    arrivalFailure: worldOpeningReason(state.worldEntryError),
+    arrivalFailure: failed ?? worldOpeningReason(state.worldEntryError),
     ...(() => {
       const personalWorld = personalWorldControl();
       return personalWorld === undefined ? {} : { personalWorld };
@@ -567,7 +570,27 @@ async function recordAuthoredEntryAdvance(
     entry.entryId === updated.entryId ? updated : entry));
   afterEntryAdvanced();
 }
+/**
+ * Open the active world. Opening hands the whole shell to its opening screen first, so a failure
+ * after that would leave "Opening your world" up with the place that asked for it gone: here a world
+ * that does not open goes back to Your worlds, which says which and why (`worldDidNotOpen`). With no
+ * saved world to go back to, and in the preview, the failure is the caller's to say, as before.
+ */
 async function mount(): Promise<void> {
+  try {
+    await mountWorld();
+  } catch (error: unknown) {
+    if (preview || state.savedWorldEntries.length === 0) throw error;
+    const title = state.activeWorldEntry?.title ?? say('world.opening.thisWorld');
+    disposeMountListeners(state);
+    disposeRenderer(state);
+    shell.removeAttribute('data-booting');
+    shell.removeAttribute('aria-busy');
+    await mountNoWorld({ retry: mount, failed: worldDidNotOpen(title, error) });
+  }
+}
+
+async function mountWorld(): Promise<void> {
   shell.setAttribute('data-booting', '');
   shell.setAttribute('aria-busy', 'true');
   const retainedLoading = shell.querySelector<HTMLElement>('.startup-thinking') ?? buildStartupState();

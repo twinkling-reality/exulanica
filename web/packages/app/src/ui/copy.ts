@@ -524,6 +524,12 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   // while a world opens, so a database refusal there means the starter was not made.
   'world.opening.database_privilege_refused':
     'This server is not set up to save new worlds, so none was made.',
+  // A tile the world names is recorded but its stored file is gone (409 bytes_missing).
+  'world.opening.bytes_missing':
+    'Part of its ground is saved, but the stored file that draws it is missing, so it cannot be drawn.',
+  // Your worlds, back from a world that did not open: which one, then why where that is known.
+  'world.opening.didNotOpen': '{title} did not open.',
+  'world.opening.thisWorld': 'That world',
   // A district's geographic view, with its memory layer composed over it or kept apart.
   'world.about.district-memory-shown':
     'City and memory layers are intentionally composed. Purple memory forms are not city semantics.',

@@ -37,6 +37,7 @@
  */
 
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
+import { toApiError } from '@exulanica/graph-client';
 import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
 import type { Credentials } from '../config.js';
 import { fill, say } from '../ui/copy.js';
@@ -142,7 +143,10 @@ async function worldTileBytes(
     credentials: 'same-origin',
   });
   if (!response.ok) {
-    throw new Error(`Tile ${bakedTileId} of this world could not be read: HTTP ${response.status}.`);
+    // The route's refusal is kept as the cause, by its code, so the page can say why in words.
+    throw new Error(`Tile ${bakedTileId} of this world could not be read: HTTP ${response.status}.`, {
+      cause: await toApiError(response),
+    });
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
   const stated = response.headers.get('ETag')?.replaceAll('"', '') ?? null;

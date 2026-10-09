@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { groundNear, isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generated-world.js';
 import type { GeneratedGround, GeneratedTile, SavedWorldEntry } from '../src/world-entry-api.js';
+import { worldDidNotOpen } from '../src/ui/startup-state.js';
 
 // The tile runtime and the texture library are replaced, so a test sees what the page hands the
 // runtime: which containers, in which roles, read from where.
@@ -93,6 +94,18 @@ describe('a saved generated world of several tiles', () => {
       expect(loaded).toEqual({ waiting, ground: ground(tiles) });
     }
     expect(fetch).not.toHaveBeenCalled();
+    expect(loadGeneratedTile).not.toHaveBeenCalled();
+  });
+
+  it('says in words why the world did not open when a recorded tile\'s stored file is missing', async () => {
+    // The route's own answer when a tile is recorded and its bytes are not in the store.
+    const tiles = [tile(0, 'baked')];
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      code: 'bytes_missing', detail: 'baked tile is recorded and its bytes are not in the store',
+    }), { status: 409, headers: { 'content-type': 'application/json' } })));
+    const failed = await loadGeneratedWorld(access, entry(tiles), '?look=today').then(() => null, (error: unknown) => error);
+    expect(worldDidNotOpen('A market town', failed)).toBe('A market town did not open. Part of its ground is saved, '
+      + 'but the stored file that draws it is missing, so it cannot be drawn.');
     expect(loadGeneratedTile).not.toHaveBeenCalled();
   });
 

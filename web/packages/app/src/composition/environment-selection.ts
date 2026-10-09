@@ -327,6 +327,11 @@ export interface PeopleControls {
   reread(): Promise<void>;
 }
 
+/** Words that open a sentence: the first letter capitalised, the rest as the catalog says. */
+function sentenceCase(words: string): string {
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 /** The People and clock refusals this surface meets, in words (codes stay in the technical record). */
 const PEOPLE_PROBLEMS: Readonly<Record<string, ProblemWords>> = {
   // Thrown by this module when the place a saved world opens at cannot be drawn.
@@ -1187,7 +1192,8 @@ export function mountEnvironmentSelection(
       title: words.who,
       showSubject: false,
       description: words.what,
-      activity: `${words.doing}${goal?.destination_id ? ` at ${where(goal.destination_id)}` : ''}. ${words.why}`,
+      // The catalog's living words are phrases ("walking home to eat"); the line is a sentence.
+      activity: sentenceCase(`${words.doing}${goal?.destination_id ? ` at ${where(goal.destination_id)}` : ''}. ${words.why}`),
       details: [
         ['Origin', 'Simulated person; not a memory'],
         ['Shown as', shown],

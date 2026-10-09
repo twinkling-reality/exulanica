@@ -112,6 +112,8 @@ describe('one world that did not open', () => {
     // A refusal the server gave a reason for is not a dropped connection, and must not be
     // reported as one.
     expect(worldOpeningReason(new ApiError(409, 'saved_world_conflict', 'no'))).toBeNull();
+    // A stored file gone stays gone: the same world asked again would fail the same way.
+    expect(worldOpeningCanRetry(new Error('wrapped', { cause: new ApiError(409, 'bytes_missing', 'gone') }))).toBe(false);
   });
 
   it('says in words that the server may not make the starter world', async () => {
