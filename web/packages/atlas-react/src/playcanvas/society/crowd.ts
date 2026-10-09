@@ -223,6 +223,20 @@ const SAME_POINT_METRES = 0.001;
  */
 const CATCH_UP_SPEED_LIMIT = 1.5;
 /**
+ * A visitor who crossed in through a gate and stands within this many metres of it is drawn stepping
+ * out of it when it arrives and back into it when it leaves; one farther off appears and goes where
+ * it stands. The state records neither step: it places a visitor beside its gate in the minute it
+ * arrives and has it gone in the minute it leaves.
+ */
+export const GATE_STEP_METRES = 5;
+/** The pace of that step, metres a second: a walk. */
+export const GATE_STEP_SPEED = 1.4;
+/**
+ * How long a visitor who has just crossed in stays unseen, waiting for the gate it came through to
+ * be read (the page reads a minute's events just after its state), before it is drawn where it stands.
+ */
+export const GATE_WAIT_MS = 3_000;
+/**
  * The most recorded walking that may wait for a person, in ticks: the tick being walked and the one
  * just read. More would keep them walking in the past for longer than a tick, so they are carried
  * forward along their own path to the last tick's walk instead, as a named jump.
@@ -300,6 +314,12 @@ export class SocietyCrowd {
   private readonly nearKeys = new Map<string, string>();
   private figures: CrowdFigures | null = null;
   private walkers = new Map<string, Walker>();
+  /** Each crossed visitor's gate, plan metres in the society's frame, as the page read their arrivals. */
+  private gates: ReadonlyMap<string, Point> = new Map();
+  /** Visitors the state has gone from who are still drawn walking back into their gate. */
+  private readonly leaving = new Set<string>();
+  /** Visitors who have just crossed in, unseen until their gate is read or the wait ends, by when it ends. */
+  private readonly entering = new Map<string, number>();
   private state: OwnedSocietyState | null = null;
   private scope = '';
   private tick = -1;
@@ -372,7 +392,11 @@ export class SocietyCrowd {
       return { ...this.counts, population: state.inhabitants.filter((p) => p.synthetic === true).length };
     }
     const scope = `${state.society_id ?? 'preview'}:${state.branch_id ?? ''}`;
-    if (scope !== this.scope) this.releaseNear();
+    if (scope !== this.scope) {
+      this.releaseNear();
+      this.leaving.clear();
+      this.entering.clear();
+    }
     const continuing = scope === this.scope && this.state !== null;
     const consecutive = continuing && state.tick === this.tick + 1;
     const later = continuing && state.tick > this.tick;
@@ -423,6 +447,7 @@ export class SocietyCrowd {
       let walked = 0;
       let startsAtMs = nowMs;
       let jumped = false;
+      let stepping = false;
       const jump = (reason: CrowdJumpReason, metres: number) => {
         if (metres <= SAME_POINT_METRES) return;
         jumped = true;
@@ -435,8 +460,14 @@ export class SocietyCrowd {
         // recorded position.
         route = pathful && consecutive && recorded?.length ? recorded : [end];
       } else if (previous === undefined) {
-        // Never drawn before: the person appears where the state says they are.
-        route = [end];
+        // Never drawn before: the person appears where the state says they are; a visitor who has
+        // just crossed in beside its gate steps out of the gate to there, unseen until its gate is read.
+        const gate = later ? this.gateNear(person.id, end) : null;
+        stepping = gate !== null;
+        route = gate === null ? [end] : [gate, end];
+        if (later && gate === null && person.came_by === 'crossed' && !this.gates.has(person.id)) {
+          this.entering.set(person.id, nowMs + GATE_WAIT_MS);
+        }
       } else if (!later) {
         route = [end];
         jump('not-newer', apart(previous.position, end));
@@ -478,7 +509,7 @@ export class SocietyCrowd {
         total,
         walked,
         budget,
-        rate: spread
+        rate: stepping ? GATE_STEP_SPEED / MILLISECONDS_PER_SECOND : spread
           ? Math.min(
             Math.max(
               (total - walked) / (this.intervalMs + this.startLagMs),
@@ -508,6 +539,27 @@ export class SocietyCrowd {
       };
       walkers.set(person.id, walker);
     }
+    // A visitor the state has gone from, drawn near the gate it came through, walks back into it
+    // and goes there; one still on that walk keeps walking.
+    for (const [id, walker] of continuing ? this.walkers : []) {
+      if (walkers.has(id)) continue;
+      if (this.leaving.has(id)) {
+        walkers.set(id, walker);
+        continue;
+      }
+      const from: Point = [walker.drawn[0], walker.drawn[2]];
+      const gate = later && !walker.indoors ? this.gateNear(id, from) : null;
+      if (gate === null) continue;
+      const route = [from, gate] as const;
+      const { lengths, total } = polyline(route);
+      walkers.set(id, {
+        ...walker, route, lengths, total, walked: 0, budget: walker.budget ?? GATE_STEP_SPEED,
+        rate: GATE_STEP_SPEED / MILLISECONDS_PER_SECOND, startsAtMs: nowMs, activity: null, arrived: total === 0,
+        place: null, facingRule: null, partnerId: null, target: null, settle: null, seatBlend: 0, onSeat: false,
+      });
+      this.leaving.add(id);
+    }
+    for (const id of this.entering.keys()) if (!walkers.has(id) || this.leaving.has(id)) this.entering.delete(id);
     this.walkers = walkers;
     this.jumpsRead = jumps;
     this.missesRead = misses;
@@ -544,6 +596,8 @@ export class SocietyCrowd {
     this.stopAwaiting = null;
     this.state = null;
     this.walkers.clear();
+    this.leaving.clear();
+    this.entering.clear();
     this.releaseNear();
     this.far.update([]);
     this.farIds = [];
@@ -648,6 +702,27 @@ export class SocietyCrowd {
   }
 
   /**
+   * The gate each visitor who crossed in came through, by the visitor's id: the gate's position,
+   * millimetres in the society's frame, as the page read it from the visitor's arrival. A visitor
+   * within `GATE_STEP_METRES` of its gate steps out of it at the state that first holds it and back
+   * into it at the state that no longer does. The page reads a minute's events just after its state,
+   * so a visitor who has just crossed in is unseen until its gate is read here, at most `GATE_WAIT_MS`.
+   */
+  setGates(gates: ReadonlyMap<string, readonly [number, number]>): void {
+    this.gates = new Map([...gates].map(([id, [x, z]]) => [id, [x / 1000, z / 1000] as const]));
+  }
+
+  /** Whether a visitor the state has gone from is still drawn walking back into its gate. */
+  isLeaving(id: string): boolean {
+    return this.leaving.has(id);
+  }
+
+  private gateNear(id: string, at: Point): Point | null {
+    const gate = this.gates.get(id);
+    return gate !== undefined && Math.hypot(gate[0] - at[0], gate[1] - at[1]) <= GATE_STEP_METRES ? gate : null;
+  }
+
+  /**
    * Whether a person's drawn walk for the latest state has reached its end, as a hand-over waits for:
    * a thing changes hands when the later of the two parties' walks ends. Someone this crowd does
    * not walk has nothing to wait for.
@@ -656,10 +731,10 @@ export class SocietyCrowd {
     return this.walkers.get(id)?.arrived ?? true;
   }
 
-  /** The walker of an inhabitant drawn outdoors now, near or far, or null. */
+  /** The walker of an inhabitant drawn outdoors now, near or far, or null (a visitor still unseen in its gate is not drawn). */
   private drawnOutdoors(id: string): Walker | null {
     const walker = this.walkers.get(id);
-    if (walker === undefined || walker.indoors) return null;
+    if (walker === undefined || walker.indoors || this.entering.has(id)) return null;
     const renderable = this.near.get(id);
     if (renderable === undefined && !this.farIds.includes(id)) return null;
     if (renderable && (!renderable.root.enabled || renderable.root.tags.has('native-character-hidden'))) return null;
@@ -721,6 +796,7 @@ export class SocietyCrowd {
     const people = new Map((this.state?.inhabitants ?? []).map((person) => [person.id, person]));
     for (const walker of this.walkers.values()) {
       const person = people.get(walker.id);
+      if (person === undefined && this.leaving.has(walker.id) && figures !== null) continue;
       walker.figure = person === undefined || figures === null ? null : figures.figureFor(person);
       this.faceAsPlaced(walker, person);
     }
@@ -740,6 +816,8 @@ export class SocietyCrowd {
     const people = new Map((this.state?.inhabitants ?? []).map((person) => [person.id, person]));
     for (const walker of this.walkers.values()) {
       const person = people.get(walker.id);
+      // A visitor walking back into its gate keeps the figure it is drawn by until it goes.
+      if (person === undefined && this.leaving.has(walker.id)) continue;
       walker.figure = person === undefined ? null : figures.figureFor(person);
       this.faceAsPlaced(walker, person);
     }
@@ -1010,7 +1088,7 @@ export class SocietyCrowd {
       const renderable = (walker.figure?.factory ?? this.factory)(this.device, this.root, { ...identity, inhabitantId: id }, 'near');
       this.nearKeys.set(id, walker.figure?.key ?? '');
       // Posed at once, so a new full character is drawn and pickable before the next frame.
-      renderable.setVisible(!walker.indoors);
+      renderable.setVisible(!walker.indoors && !this.entering.has(id));
       renderable.pose({ ...this.poseOf(walker), deltaSeconds: 1 / 60, discontinuity: true });
       this.near.set(id, renderable);
       this.discontinuity = true;
@@ -1025,6 +1103,28 @@ export class SocietyCrowd {
     const walkedFrom = this.lastWalkMs;
     if (!reduced) this.lastWalkMs = Math.max(this.lastWalkMs, nowMs);
     let moving = false;
+    // A visitor who has just crossed in steps out of its gate once the gate is read, or is drawn where
+    // it stands when the wait ends first.
+    for (const [id, until] of this.entering) {
+      const walker = this.walkers.get(id);
+      const end = walker?.route[walker.route.length - 1];
+      const gate = end === undefined ? null : this.gateNear(id, end);
+      if (walker !== undefined && end !== undefined && gate !== null && !reduced) {
+        const route = [gate, end] as const;
+        const { lengths, total } = polyline(route);
+        this.walkers.set(id, {
+          ...walker, route, lengths, total, walked: 0, budget: walker.budget ?? GATE_STEP_SPEED,
+          rate: GATE_STEP_SPEED / MILLISECONDS_PER_SECOND, startsAtMs: nowMs, arrived: false,
+          position: gate, drawn: [gate[0], 0, gate[1]],
+        });
+        this.entering.delete(id);
+        this.fresh.add(id);
+      } else if (walker === undefined || reduced || nowMs >= until || this.gates.has(id)) {
+        this.entering.delete(id);
+      } else {
+        moving = true;
+      }
+    }
     for (const walker of this.walkers.values()) {
       // Someone getting up from a seat walks on once they are back at their place.
       if (walker.total > 0 && walker.settle === null) {
@@ -1050,6 +1150,16 @@ export class SocietyCrowd {
       const settling = this.settle(walker, dt, reduced);
       moving ||= !walker.arrived || settling;
     }
+    // A visitor who has walked back into its gate is gone.
+    let gone = false;
+    for (const id of this.leaving) {
+      if (!(this.walkers.get(id)?.arrived ?? true)) continue;
+      this.leaving.delete(id);
+      this.walkers.delete(id);
+      if (this.selectedId === id) this.selectedId = null;
+      gone = true;
+    }
+    if (gone) this.assignDetail();
     this.moving = moving;
     if (!draw) return;
     this.frame += 1;
@@ -1058,7 +1168,7 @@ export class SocietyCrowd {
       const slot = this.slots.get(id)!;
       const position = walker.drawn;
       const discontinuity = this.fresh.delete(id);
-      renderable.setVisible(!walker.indoors);
+      renderable.setVisible(!walker.indoors && !this.entering.has(id));
       slot.pendingSeconds += dt;
       // Frames, not seconds: a slow frame must not make more posing due. The gait advances by
       // the distance walked since the last pose, so a longer gap costs update rate, not stride.
@@ -1074,7 +1184,7 @@ export class SocietyCrowd {
       }
     }
     this.far.update(
-      this.farIds.map((id) => {
+      this.farIds.filter((id) => !this.entering.has(id)).map((id) => {
         const walker = this.walkers.get(id)!;
         return {
           id,

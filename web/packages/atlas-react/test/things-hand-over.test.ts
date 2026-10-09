@@ -116,6 +116,24 @@ describe('a thing changing hands, as the people walk to it', () => {
     expect(inHandOf()).toBe('taker');
   });
 
+  it('keeps what a visitor carries out in its hand while the crowd draws it walking into its gate', async () => {
+    const { layer, figures, walkEnded, step, inHandOf, state, sword } = await setup();
+    layer.setSociety(state('taker'), figures, walkEnded);
+    step();
+    expect(inHandOf()).toBe('taker');
+    // The next minute the taker has gone home with the sword: the state lists neither, and the crowd
+    // still draws the taker walking back into its gate.
+    let walking = true;
+    layer.setSociety({ ...state('taker'), tick: 3, things: [] }, figures, walkEnded, (id) => id === 'taker' && walking);
+    step();
+    expect(inHandOf()).toBe('taker');
+    expect(sword.root.enabled).toBe(true);
+    // In its gate: gone, and the sword with it.
+    walking = false;
+    step();
+    expect(sword.root.enabled).toBe(false);
+  });
+
   it('waits for the giver too when the taker arrives first', async () => {
     const { layer, figures, ended, walkEnded, step, inHandOf, state } = await setup();
     layer.setSociety(state('giver'), figures, walkEnded);

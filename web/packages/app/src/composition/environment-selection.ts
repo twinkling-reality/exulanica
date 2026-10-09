@@ -102,6 +102,7 @@ import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
 import { DoorGrantsClient, type DoorGrant } from '../door-grants-api.js';
 import { ThingLooksClient, type ResolveWorkspaceLook, type ThingLookChoice } from '../thing-looks-api.js';
 import { kindDocumentLabel, kindKey, noticeKinds, visitorNotice, VisitorNoticeWatch, type FreshEvent, type KindReference } from './visitor-notices.js';
+import { VisitorGates } from './visitor-gates.js';
 import { heardBy, saidBy, type BeingLine } from './being-lines.js';
 import '../ui/thing-marks.css';
 
@@ -582,6 +583,8 @@ export function mountEnvironmentSelection(
   let bridgesReading = false;
   /** Which of a society's events are new, and the bridge each visitor crossed through. */
   const visitorWatch = new VisitorNoticeWatch();
+  /** The gate each visitor came through, which the crowd draws it stepping out of and back into. */
+  const visitorGates = new VisitorGates();
   /** The lines said since the page first read the society. */
   const lineWatch = new LineWatch();
   /** Crossings read but not yet told, while the door says which bridge they came through. */
@@ -1959,6 +1962,8 @@ export function mountEnvironmentSelection(
       const skips = renderedSnapshot !== null && renderedSnapshot.societyId === society.societyId
         && society.currentTick > renderedSnapshot.currentTick + 1;
       const waitForEvents = skips && !view.eventsAvailable && view.status === 'loading';
+      // Each visitor's gate, from its arrival, before the crowd draws the state it steps out of.
+      if (view.eventsAvailable && visitorGates.see(society.societyId, view.events, society.state)) runtime.setGates(visitorGates.gates);
       if (!waitForEvents && (renderedSnapshot?.stateSha256 !== society.stateSha256 || renderedSnapshot?.societyId !== society.societyId)) {
         drawSavedWorldMinutes(runtime, society, skips && view.eventsAvailable ? view.events : null);
         renderedSnapshot = society;
@@ -2453,6 +2458,7 @@ export function mountEnvironmentSelection(
         reducedMotion: () => deps.env.systemReducedMotion.matches,
         walkEnded: (id) => atlas.authoredSociety?.walkEnded(id) ?? true,
         society: () => atlas.authoredSociety ?? null,
+        leaving: (id) => atlas.authoredSociety?.isLeaving(id) ?? false,
       });
       if ((phase as string) === 'disposed') { things.destroy(); things = null; return; }
       await things.setPlaced(placed);

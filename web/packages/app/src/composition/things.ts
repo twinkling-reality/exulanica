@@ -67,6 +67,11 @@ export interface ThingsDependencies {
   readonly walkEnded?: (subjectId: string) => boolean;
   /** The society drawn now (its crowd's root and where each person's feet are), for Play this one's rings. */
   readonly society?: ThingLayerOptions['society'];
+  /**
+   * Whether a visitor the state has gone from is still drawn walking back into its gate (the
+   * society's crowd), whose carried-out things stay in its hand until then; nobody is, when left out.
+   */
+  readonly leaving?: (subjectId: string) => boolean;
 }
 
 export interface MountedThings {
@@ -199,7 +204,7 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
       await layer.setPlaced(things.map(placedThingRecord));
     },
     setSociety(state) {
-      if (!destroyed) layer.setSociety(state, state === null ? null : crowdFigures, deps.walkEnded ?? (() => true));
+      if (!destroyed) layer.setSociety(state, state === null ? null : crowdFigures, deps.walkEnded ?? (() => true), deps.leaving ?? (() => false));
     },
     crowdFigures,
     setLooks(choices) {

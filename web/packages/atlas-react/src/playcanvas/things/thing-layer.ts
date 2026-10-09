@@ -376,16 +376,23 @@ export class ThingLayer {
    * A thing that changes hands, or is picked up or put down, moves when the people it passes between
    * have walked to where the state ends their walks (`walkEnded`, the crowd's): the later of the two
    * walks for a hand-over, the actor's own for a pick up or put down. Until then it is drawn where it
-   * was, in the giver's socket or on the ground; a pair already in reach exchanges at once.
+   * was, in the giver's socket or on the ground; a pair already in reach exchanges at once. What a
+   * visitor carries out stays in its hand while the crowd still draws it walking back into its gate
+   * (`leaving`, the crowd's), and goes with it.
    */
-  setSociety(state: OwnedSocietyState | null, figures: ThingCrowdFigures | null, walkEnded: (subjectId: string) => boolean = () => true): void {
+  setSociety(
+    state: OwnedSocietyState | null,
+    figures: ThingCrowdFigures | null,
+    walkEnded: (subjectId: string) => boolean = () => true,
+    leaving: (subjectId: string) => boolean = () => false,
+  ): void {
     if (state?.things === undefined) {
       this.society = null;
       this.shown.clear();
       this.pending.clear();
     } else {
       const target = new Map(state.things.map((thing) => [thingKey(thing), thing as HeldThing]));
-      this.society = { things: target, figures, walkEnded };
+      this.society = { things: target, figures, walkEnded, leaving };
       for (const [key, thing] of target) {
         const shown = this.shown.get(key);
         if (shown === undefined || holderOf(shown) === holderOf(thing)) {
@@ -397,8 +404,8 @@ export class ThingLayer {
       }
       for (const key of [...this.shown.keys()]) {
         if (target.has(key)) continue;
-        this.shown.delete(key);
         this.pending.delete(key);
+        if (!this.goesWithItsHolder(key)) this.shown.delete(key);
       }
       this.settle();
     }
@@ -410,7 +417,14 @@ export class ThingLayer {
     readonly things: ReadonlyMap<string, HeldThing>;
     readonly figures: ThingCrowdFigures | null;
     readonly walkEnded: (subjectId: string) => boolean;
+    readonly leaving: (subjectId: string) => boolean;
   } | null = null;
+
+  /** Whether a thing the state no longer lists is in the hand of a visitor still drawn leaving. */
+  private goesWithItsHolder(key: string): boolean {
+    const holder = this.shown.get(key)?.held_by;
+    return holder != null && this.society !== null && this.society.leaving(holder);
+  }
   /** Each society thing as it is drawn now: the state's, or the last before a move still waiting on a walk. */
   private readonly shown = new Map<string, HeldThing>();
   /** Things whose move waits for these people's walks to end. */
@@ -424,6 +438,10 @@ export class ThingLayer {
       if (!parties.every((id) => society.walkEnded(id))) continue;
       this.shown.set(key, society.things.get(key)!);
       this.pending.delete(key);
+    }
+    // What a visitor carried out goes once the crowd no longer draws it leaving.
+    for (const key of this.shown.keys()) {
+      if (!society.things.has(key) && !this.goesWithItsHolder(key)) this.shown.delete(key);
     }
   }
   /** The people who held something at the last look, so a hand emptied is told so. */

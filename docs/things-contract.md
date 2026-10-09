@@ -885,6 +885,17 @@ it was, in the giver's socket or on the ground; a pair already in reach exchange
 event's `at_ms` is the simulation's own instant and is not what the drawing waits on: the crowd
 spreads a walk over the presented minute, the state's budget being a bound.
 
+A visitor who crossed in is drawn stepping out of the gate it came through, at a walk (1.4 m a
+second), from the gate to where the state first places it, and back into the gate when the state no
+longer holds it, carrying what it carries out, which leaves the hand only when the visitor goes. Its
+gate is the placement its `thing_arrived` event names, at that placement's position; the page reads
+a minute's events just after its state, so a visitor who has just crossed in is unseen until its gate
+is read, at most 3 seconds. Neither step is in the state: the state places a visitor beside its gate
+in the minute it arrives and has it gone in the minute it leaves, so the drawing presents a departure
+for the second or two the step takes after the minute that records it. A visitor more than 5 m from
+its gate, or one whose arrival the page never read, appears and goes where it stands, as does everyone
+under reduced motion.
+
 A thing wears the look chosen for it where one is, from the looks chosen for its version's society
 (`GET /world/versions/{version_id}/thing-looks`): a person in the crowd, a placed thing in the layer; a
 thing with none wears its kind's first look. The choices are read when a society of things is first

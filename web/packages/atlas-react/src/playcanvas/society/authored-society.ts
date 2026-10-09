@@ -131,6 +131,16 @@ export class AuthoredRegionSociety {
     return this.crowd.walkEnded(id);
   }
 
+  /** The gate each visitor who crossed in came through (`SocietyCrowd.setGates`). */
+  setGates(gates: ReadonlyMap<string, readonly [number, number]>): void {
+    this.crowd.setGates(gates);
+  }
+
+  /** Whether a visitor the state has gone from is still drawn walking into its gate (`SocietyCrowd.isLeaving`). */
+  isLeaving(id: string): boolean {
+    return this.crowd.isLeaving(id);
+  }
+
   /** Ask the things' figures again, as after the looks chosen for them change (`SocietyCrowd.refreshFigures`). */
   refreshFigures(): void {
     this.crowd.refreshFigures();
