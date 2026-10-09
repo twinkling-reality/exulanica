@@ -353,6 +353,17 @@ def character_decisions(api: Api, world: dict[str, Any], characters: set[str]) -
     return {"counts": counts, "not_applied": reasons}
 
 
+def world_things_held(api: Api, world: dict[str, Any], character: str) -> list[str]:
+    """The kinds of the world's own things (placed by its author) the character holds now, from
+    the society's current state; what it brought in is not among them."""
+    state = api("GET", world["society"], params=world["scope"]).get("state") or {}
+    return sorted(
+        str((thing.get("kind") or {}).get("kind"))
+        for thing in state.get("things", [])
+        if thing.get("held_by") == character and thing.get("placed_id")
+    )
+
+
 def close_grant(api: Api, grant_id: str) -> bool:
     """End the grant this check issued, in a world it did not build: revoking twice changes
     nothing. False when the stack did not answer."""
@@ -374,6 +385,7 @@ def luanti_world(
     lives_s: float = 20.0,
     calls_home: bool = False,
     mapping: str = MAPPING_FILE,
+    call_home_on_signal: bool = False,
 ) -> Path:
     """A fresh flat world and its server settings: a check world with the check mod (told how long
     the world's owner lets a character live in the world, ``lives_s``, and whether the door lets
@@ -410,6 +422,8 @@ def luanti_world(
             f"exulanica_gate_check.scenario = {scenario}",
             f"exulanica_gate_check.lives_s = {round(lives_s)}",
             f"exulanica_gate_check.home_route = {'true' if calls_home else 'false'}",
+            "exulanica_gate_check.call_home_on_signal = "
+            + ("true" if call_home_on_signal else "false"),
         ]
     else:
         settings += [
@@ -516,6 +530,11 @@ def lines_kept_in_the_world(exchanges: list[dict[str, Any]], told: list[str]) ->
     }
 
 
+#: How long after the called-home crossing's arrival the check calls home anyway, with
+#: ``--call-home-when-holding``, when the character has taken hold of nothing of the world.
+CALL_HOME_LIMIT_S = 150.0
+
+
 #: How long a character lives in the world before its owner sends it home, at 1x, unless
 #: ``--lives-s`` says otherwise: two world minutes and a little more, so the world has asked about
 #: it and decided at least once.
@@ -530,13 +549,20 @@ def act_as_owner(
     limit_s: int,
     lives_s: float = LIVES_S,
     closes_after: int = 2,
+    *,
+    holding: Any = None,
+    signal: Path | None = None,
+    signal_limit_s: float = CALL_HOME_LIMIT_S,
 ) -> dict[str, Any]:
     """Wait for the check's server to stop, acting meanwhile as the world's owner, each act once,
     from the mod's recording: send the character home once it has lived in the world for
     ``lives_s``, unless it has left by itself (where minds decide for it), and close the gate a
     few seconds after its ``closes_after``-th arrival (by then its player has left the game; 0:
-    never)."""
+    never). Given ``signal``, write it once the character of the second crossing (the one its
+    player calls home) holds a thing of the world, as ``holding`` reads it, or ``signal_limit_s``
+    after it arrived: the check mod calls it home then."""
     acts: dict[str, Any] = {}
+    held_read_at = 0.0
     arrivals: list[tuple[float, str | None]] = []
     departed: set[str | None] = set()
     start = 0
@@ -566,6 +592,18 @@ def act_as_owner(
                     expected=(202, 404),
                 )
                 acts["sent_home" if "sent_away" in sent else "left_by_itself"] = lived
+        if signal is not None and len(arrivals) >= 2 and "call_home_signal" not in acts:
+            arrived_at, character = arrivals[1]
+            if now - held_read_at >= 2:
+                held_read_at = now
+                held = holding(character) if holding and character else []
+                if held or now - arrived_at >= signal_limit_s:
+                    signal.parent.mkdir(parents=True, exist_ok=True)
+                    signal.write_text("call home\n")
+                    acts["call_home_signal"] = {
+                        "holding": held,
+                        "after_arrival_s": round(now - arrived_at, 1),
+                    }
         if closes_after and len(arrivals) >= closes_after and "revoked" not in acts:
             arrived_at = arrivals[closes_after - 1][0]
             if now - arrived_at >= 5:
@@ -771,6 +809,18 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="serve the stack's API with a scripted model answering from PLAN (no provider, no "
         "key, no cost): with --traveller-mind, the travellers' mind is asked of it",
+    )
+    parser.add_argument(
+        "--call-home-when-holding",
+        action="store_true",
+        help="the check's player calls its character home only once it holds a thing of the world "
+        "(read from the society's state), or after --call-home-limit-s",
+    )
+    parser.add_argument(
+        "--call-home-limit-s",
+        type=float,
+        default=CALL_HOME_LIMIT_S,
+        help="with --call-home-when-holding: when to call home anyway, in seconds after it arrived",
     )
     parser.add_argument(
         "--mapping",
@@ -986,7 +1036,10 @@ def main(argv: list[str] | None = None) -> int:
             lives_s=arguments.lives_s,
             calls_home=offers["calls_home"],
             mapping=arguments.mapping,
+            call_home_on_signal=arguments.call_home_when_holding,
         )
+        if arguments.call_home_when_holding and not offers["calls_home"]:
+            raise Refused("call-home", "this door publishes no home route to call a character by")
         recorded = luanti / "exulanica_gate" / "exchanges.jsonl"
         server = start_luanti(
             folder,
@@ -1000,6 +1053,14 @@ def main(argv: list[str] | None = None) -> int:
         # The gate closes a few seconds after the last crossing the check mod plays, the one whose
         # player leaves the game; an invite's check plays none such.
         closes_after = 0 if arguments.invite else (3 if offers["calls_home"] else 2)
+        # The file the check mod waits for before its player calls the character home.
+        signal = None
+        if arguments.call_home_when_holding:
+            signal = luanti / "exulanica_gate_check" / "call_home"
+
+        def holding(character: str) -> list[str]:
+            return world_things_held(api, world, character)
+
         summary["owner_acts"] = act_as_owner(
             api,
             summary["grant_id"],
@@ -1008,6 +1069,9 @@ def main(argv: list[str] | None = None) -> int:
             arguments.limit_s,
             arguments.lives_s,
             closes_after,
+            holding=holding,
+            signal=signal,
+            signal_limit_s=arguments.call_home_limit_s,
         )
         exit_code = server.returncode
         summary["luanti_exit"] = exit_code
@@ -1090,6 +1154,7 @@ def main(argv: list[str] | None = None) -> int:
                 "asks_left_to_the_world": len(summary.get("receipts", [])),
                 "the_world_decided": world_decided,
                 "came_home": summary.get("check", {}).get("came_home"),
+                "called_home": summary.get("check", {}).get("called_home"),
                 "lines": lines,
                 "character_decisions": summary.get("character_decisions"),
                 "mind_decided": mind_decided,

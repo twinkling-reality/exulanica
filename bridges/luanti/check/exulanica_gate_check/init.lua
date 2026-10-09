@@ -160,6 +160,21 @@ local function count(inventory, item)
 	return found
 end
 
+-- Whether the player holds their five torches and every other thing that came home.
+local function holds_all(delivered)
+	local holds = count(player.inventory, "default:torch") == 5
+	local given = {}
+	for _, item in ipairs(delivered or {}) do
+		if item ~= "default:torch" then
+			given[item] = (given[item] or 0) + 1
+		end
+	end
+	for item, number in pairs(given) do
+		holds = holds and count(player.inventory, item) >= number
+	end
+	return holds
+end
+
 -- The line the gate mod shows a player while their character is away, or nil.
 local function line_shown(stand)
 	for _, hud in pairs(stand.huds) do
@@ -192,6 +207,18 @@ result.scenario = scenario
 -- How long the world's owner (check.py) lets the character live in the world before sending it
 -- home, in seconds; where minds decide for it, the character may come home sooner by itself.
 local lives_s = tonumber(core.settings:get("exulanica_gate_check.lives_s")) or 20
+-- Whether the player calls their character home only once check.py says so, by a file in the world
+-- folder: once the character holds a thing of the world, or a time has passed.
+local call_home_on_signal =
+	core.settings:get_bool("exulanica_gate_check.call_home_on_signal", false)
+local function call_home_signalled()
+	local file = io.open(core.get_worldpath() .. "/exulanica_gate_check/call_home")
+	if file then
+		file:close()
+		return true
+	end
+	return false
+end
 -- The look a character crosses in when the world cannot show the player's own, as the adapter says.
 local adapter_file = assert(io.open(core.get_modpath("exulanica_gate") .. "/adapter.json"))
 local FREE_LOOK = core.parse_json(adapter_file:read("*a")).looks.otherwise
@@ -459,16 +486,7 @@ else
 		local words = opening and player:heard_since(0, opening .. result.world_words
 			.. ", carrying ")
 		local delivered = details.delivered or {}
-		local holds = count(player.inventory, "default:torch") == 5
-		local given = {}
-		for _, item in ipairs(delivered) do
-			if item ~= "default:torch" then
-				given[item] = (given[item] or 0) + 1
-			end
-		end
-		for item, number in pairs(given) do
-			holds = holds and count(player.inventory, item) >= number
-		end
+		local holds = holds_all(delivered)
 		result.came_home = {why = details.why, delivered = delivered}
 		verdict(home_check, holds and words ~= nil and words:find("a torch", 1, true) ~= nil
 			and line_shown(player) == nil, tostring(words))
@@ -503,7 +521,7 @@ end)
 if scenario == "crossing" or core.settings:get_bool("exulanica_gate_check.home_route", false) then
 	local calling
 	local home_call = "a player calls their character home with /comehome, and it comes home"
-	step(home_call, lives_s + 120, function()
+	step(home_call, lives_s + (call_home_on_signal and 360 or 120), function()
 		local comehome = core.registered_chatcommands.comehome.func
 		if not calling then
 			local ok, said = comehome("checker")
@@ -513,7 +531,8 @@ if scenario == "crossing" or core.settings:get_bool("exulanica_gate_check.home_r
 		end
 		local journey = check.journey("checker")
 		if calling.stage == "walking" then
-			if journey and journey.state == "across" then
+			if journey and journey.state == "across"
+					and (not call_home_on_signal or call_home_signalled()) then
 				calling.stage = "called"
 				calling.heard = #player.heard
 				comehome("checker")
@@ -526,14 +545,18 @@ if scenario == "crossing" or core.settings:get_bool("exulanica_gate_check.home_r
 		local answered = player:heard_since(calling.heard, "Your character is on its way home from "
 			.. result.world_words .. ".")
 		local words = player:heard_since(calling.heard, "Your character came home from "
-			.. result.world_words .. ", carrying a torch.")
+			.. result.world_words .. ", carrying a torch")
 		local called = mark_since(calling.marks, "called_home", function(details)
 			return details.status == 202
 		end)
+		-- Whatever the character held of the world comes home with it, besides the torch.
+		local departed = mark_since(calling.marks, "departed")
+		local delivered = departed and departed.details.delivered or {}
+		result.called_home = {delivered = delivered}
 		local ok = calling.ok == false and calling.said == "Your character is here with you."
 			and answered ~= nil and called ~= nil and words ~= nil
 			and called.line == "Your character is coming home from " .. result.world_words .. "..."
-			and count(player.inventory, "default:torch") == 5 and line_shown(player) == nil
+			and holds_all(delivered) and line_shown(player) == nil
 		-- What the player was told from the call on, when the call did not bring it home.
 		local heard = {}
 		for at = calling.heard + 1, #player.heard do

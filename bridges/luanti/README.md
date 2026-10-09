@@ -68,8 +68,8 @@ scene's gate, carrying things both ways. For a scene that names its travellers (
 through and the mind the world gives them), the grant opens that gate and, where the door's grants
 can say so, says the world decides for them; their paid mind is named only with `--traveller-mind`,
 under an allocation, or with a scripted model answering for it (`--scripted-model PLAN`, plans in
-`run/plans/`: the travellers wait, say a line to everyone near, leave, or pick up the world's sword
-and leave carrying it), which calls no provider and costs nothing. The check then expects no ask about the character
+`run/plans/`: the travellers wait, say a line to everyone near, leave, pick up the world's sword
+and leave carrying it, or pick it up and wait), which calls no provider and costs nothing. The check then expects no ask about the character
 to reach the gate. With
 `--invite` the Luanti server has no channel credential of its own: the check gives the world an
 invite and the stand-in player types it into `/cross` (the bridge's own credential and the code
@@ -86,8 +86,10 @@ the free look with the player told why. It then reads the world's own records: t
 answer, each ask about the character was settled by the world, no line said where the character was
 reached the player's chat, a mind the grant named decided for the character at least once (counted
 from the world's events: asking it is not enough, since a minute may refuse its answer), and the
-society replays with no game running. Each run's folder (ignored) holds the server's log, the mod's recording of every exchange
-and a summary with no credential in it. `--mapping NAME` crosses with another published mapping
+society replays with no game running. With `--call-home-when-holding` the stand-in player calls its character home only once
+it holds a thing of the world (read from the society's state; `--call-home-limit-s` calls anyway),
+so what it took hold of comes home with it. Each run's folder (ignored) holds the server's log, the
+mod's recording of every exchange and a summary with no credential in it. `--mapping NAME` crosses with another published mapping
 version than the newest, to show a deployment pinned to it still works. With `--against fake` the same crossing runs against the
 stand-in door instead, with no stack, where the character is given a sword (with a line said to it,
 and one it says back) and leaves on its own, and is called home with `/comehome` on a later visit.
