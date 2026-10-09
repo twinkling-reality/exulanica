@@ -372,6 +372,20 @@ when it does not, naming the role.
 - OPEN. An egress control at the network, and a request rate limit, are a deployment's to add.
   Admission ([deployment](deployment.md#541-admission)) bounds how much work one API process holds
   at once, per class and per workspace; it counts work in progress, not requests per unit of time.
+- OPEN. A generated piece's bytes are trusted to the generation bucket. The piece generation worker
+  holds two credentials, both from the operator's environment and read in its own process: the
+  `exulanica_app` connection and the bucket's key file, whose requests put, get and list objects and
+  delete none; it calls no model, and its requests to the key file's endpoint are outside the egress
+  allowlist. The shared store's boundary
+  ([generated pieces](generated-pieces-contract.md#53-the-shared-store-of-generated-pieces)) takes
+  only a piece made from catalog content whose receipt reads against its request, names the
+  session's models and states its bytes; it cannot tell that the session made those bytes. Anyone
+  holding a key that writes the bucket's `out/` and `done/` could therefore have such a piece kept
+  and its request settled, at no more than its reservation. The bound is who holds a key: the
+  operator, the session's own job, and the worker. The worker's key can read and write the whole
+  bucket, including the code a session is started from; the session runs only the entry script,
+  code archive and session record its start command pins by digest, so such a key can make a start
+  fail but cannot run other code on the GPU (built; verified at the next live session).
 - OPEN. A baked tile's bytes are trusted to the tile publisher. `record_baked_tile_bake` narrows
   what `exulanica_tiles` can touch (one function, the current stage, a key whose stored row is the
   bake its arguments describe), not which bytes it publishes, and it does not check that a key is

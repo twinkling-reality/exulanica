@@ -434,6 +434,7 @@ def test_the_shared_store_override_gives_the_purge_identity_to_maintenance_and_r
             "preparation",
             "playback-worker",
             "tile-worker",
+            "piece-generation",
         }
         | publishes
     )

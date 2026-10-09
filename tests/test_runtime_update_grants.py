@@ -65,9 +65,16 @@ RUNTIME_UPDATES: dict[str, str] = {
     ),
     "person_subject": "a consent write locks its subject FOR KEY SHARE (api person consent)",
     "personal_model_right": "withdrawal, once; migration 0073 refuses every other change",
+    "piece_batch": (
+        "the generation worker records a batch's claim and its end (generation/batches.py)"
+    ),
     "piece_request": (
         "a person cancels a piece request no session has taken (generation/store.py), and a "
         "workspace tombstone cancels every open one (the trigger the table's migration adds)"
+    ),
+    "piece_settlement": (
+        "the generation worker marks a decided settlement settled once, settled_at only "
+        "(generation/batches.py mark_settled; the table's trigger refuses every other change)"
     ),
     "pipeline_run": "the ledger attaches, locks and closes runs; an event insert locks its run",
     "place": "a place bridge decision locks its place",

@@ -75,6 +75,7 @@ __all__ = [
     "JUDGE_WRITE_TABLES",
     "REACHED_TABLES",
     "SEED_FORMAT_VERSION",
+    "WORKSPACE_ROW_PREDICATES",
     "SeedManifest",
     "SeedRefused",
     "classify_tables",
@@ -193,6 +194,7 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     # it cannot resolve there reads as unavailable rather than borrowing the source's catalog.
     "character_catalog_publication": "host-admin character catalog publication, per deployment",
     "character_catalog_withdrawal": "host-admin character catalog withdrawal, per deployment",
+    "generation_session": "the operator's register of GPU sessions, per deployment",
     # The bake stage a deployment runs is stated by its own migrations, as its schema is; an
     # owner's decision to serve a faulted tile is about that deployment's bakes (migration 0144).
     "baked_tile_stage": "the bake stage the destination's own migrations state",
@@ -216,12 +218,32 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
 #: ``%(workspace_id)s`` is a bound parameter. None of this is ever formatted into SQL as text.
 #: ``%(baked_tile_ids)s`` is bound too: the baked tiles :func:`_reached_baked_tiles` finds in
 #: Python, because a generated world names its tiles through its receipt rather than in a column.
+#: Workspace tables carried narrower than the whole workspace, with the exact predicate.
+#:
+#: ``piece_request``: only ended requests. The export refuses a workspace holding an open request
+#: before it copies anything, but it copies on a connection that sees each statement's own
+#: snapshot, so a request asked between that refusal and the copy would otherwise be carried
+#: open, and a destination's generation worker would make pieces nobody asked it for.
+WORKSPACE_ROW_PREDICATES: Final[Mapping[str, str]] = {
+    "piece_request": (
+        "t.workspace_id = %(workspace_id)s and t.state not in ('requested', 'queued')"
+    ),
+}
+
 REACHED_TABLES: Final[Mapping[str, str]] = {
     "blob": (
         "t.blob_sha256 in ("
         "  select c.blob_sha256 from capture c where c.workspace_id = %(workspace_id)s)"
     ),
     "baked_tile": "t.baked_tile_id = any(%(baked_tile_ids)s::uuid[])",
+    # The installation's index of kept generated pieces: catalog content with no workspace_id,
+    # written by the generation worker, never by a migration, so a fresh stack holds none. Carried
+    # narrowed to the pieces this workspace's outputs name, which each output's foreign key needs.
+    "generated_piece": (
+        "(t.cache_key, t.variant) in ("
+        "  select o.cache_key, o.variant from piece_output o"
+        "   where o.workspace_id = %(workspace_id)s)"
+    ),
     "media_track": (
         "t.blob_sha256 in ("
         "  select c.blob_sha256 from capture c where c.workspace_id = %(workspace_id)s)"
@@ -930,6 +952,29 @@ def _refuse_private_workspace_style_packs(
         )
 
 
+def _refuse_open_piece_requests(connection: psycopg.Connection, workspace_id: uuid.UUID) -> None:
+    """A workspace holding piece requests still open cannot be seeded.
+
+    An open request is a standing ask for GPU time: restored elsewhere, the destination's generation
+    worker would make pieces its workspace never asked for there, under the destination's own
+    allowance. Ended requests, their batches and outputs hold catalog keys, digests and numbers
+    only, and are carried; an open one is refused until it ends or its asker cancels it.
+    """
+    present = connection.execute("select to_regclass('piece_request') is not null as present")
+    if not present.fetchone()["present"]:
+        return
+    held = connection.execute(
+        "select count(*) as n from piece_request where workspace_id = %s "
+        "and state in ('requested', 'queued')",
+        (workspace_id,),
+    ).fetchone()
+    if held["n"]:
+        raise SeedRefused(
+            f"workspace {workspace_id} holds {held['n']} open piece request(s), standing asks for "
+            "GPU time a seed would hand to another deployment; cancel them or let them end first"
+        )
+
+
 def export_seed(
     connection: psycopg.Connection,
     store: ContentAddressedStore,
@@ -966,6 +1011,7 @@ def export_seed(
     _refuse_private_workspace_assets(connection, workspace_id)
     _refuse_held_things(connection, workspace_id)
     _refuse_private_workspace_style_packs(connection, workspace_id)
+    _refuse_open_piece_requests(connection, workspace_id)
 
     buckets = classify_tables(connection)
     exported = list(buckets["workspace"]) + list(buckets["reached"])
@@ -984,7 +1030,9 @@ def export_seed(
 
     for position, table in enumerate(order):
         columns = _loadable_columns(connection, table)
-        predicate = REACHED_TABLES.get(table, "t.workspace_id = %(workspace_id)s")
+        predicate = REACHED_TABLES.get(
+            table, WORKSPACE_ROW_PREDICATES.get(table, "t.workspace_id = %(workspace_id)s")
+        )
         query = sql.SQL("copy (select {} from {} t where {}) to stdout").format(
             sql.SQL(", ").join(sql.Identifier("t", name) for name in columns),
             sql.Identifier(table),

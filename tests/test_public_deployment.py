@@ -38,6 +38,11 @@ CREDENTIAL_PROBE = "must-not-be-written-anywhere"
 #: The services that serve for the life of the server, each with a restart policy of its own in
 #: compose.yaml or here.
 LONG_RUNNING = ("postgres", "api", "client", "maintenance", "preparation", "tile-worker", "edge")
+#: The compose profiles this server never names. The reconstruction workers start only with
+#: theirs: the seed of every world here is generated, not reconstructed from photographs. The piece
+#: generation worker likewise starts only with its own: it serves an operator's GPU session, which
+#: this server does not hold. A service under one of these is neither built nor pulled here.
+UNNAMED_PROFILES = ('profiles: ["reconstruction"]', 'profiles: ["generation"]')
 
 
 def _directives(text: str) -> str:
@@ -117,7 +122,8 @@ def test_no_service_pulls_on_the_server():
     built_or_pulled = {
         name
         for name, block in BASE_SERVICES.items()
-        if ("build:" in block or "image:" in block) and 'profiles: ["reconstruction"]' not in block
+        if ("build:" in block or "image:" in block)
+        and not any(profile in block for profile in UNNAMED_PROFILES)
     }
     assert built_or_pulled <= set(OVERLAY_SERVICES), built_or_pulled - set(OVERLAY_SERVICES)
     script = _directives(SCRIPT.read_text(encoding="utf-8")).replace("\\\n", " ")
@@ -166,16 +172,15 @@ def test_each_recipe_runs_under_one_image_name_the_script_loads():
         for name, block in OVERLAY_SERVICES.items()
         if re.search(r"^    image: ", block, re.M)
     }
-    # The reconstruction workers start only with their compose profile, which this server never
-    # names: the seed of every world here is generated, not reconstructed from photographs.
     built = {
         name
         for name, block in BASE_SERVICES.items()
-        if "build:" in block and 'profiles: ["reconstruction"]' not in block
+        if "build:" in block and not any(profile in block for profile in UNNAMED_PROFILES)
     }
     assert built <= set(named), built - set(named)
     script = SCRIPT.read_text(encoding="utf-8")
     assert "reconstruction" not in _directives(script)
+    assert "--profile generation" not in _directives(script)
     declared = {
         re.search(rf'^{variable}="(\S+)"$', script, re.M).group(1)
         for variable in (

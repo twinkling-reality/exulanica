@@ -413,7 +413,7 @@ def _assets_session(args: argparse.Namespace) -> int:
     from exulanica_appearance.assets import queue as session_queue
 
     if args.step == "serve":
-        from exulanica_appearance.assets.remote import backend_for, publish
+        from exulanica_appearance.assets.remote import backend_for, components_sha256, publish
         from exulanica_appearance.assets.session import serve
 
         root, work, ledger = Path(args.root), Path(args.work), Path(args.ledger)
@@ -421,6 +421,8 @@ def _assets_session(args: argparse.Namespace) -> int:
             root=root,
             session_raw=Path(args.session).read_bytes(),
             code_sha256=args.code_sha256,
+            # The weights manifests the backend's directory was prepared and checked against.
+            components_sha256=components_sha256(Path(args.code), args.route),
             backend=backend_for(args.route, Path(args.weights)),
             repository=Path(args.code),
             work=work,
@@ -431,6 +433,8 @@ def _assets_session(args: argparse.Namespace) -> int:
     from exulanica_appearance.assets import nebius
 
     if args.step == "record":
+        import secrets
+
         from exulanica_appearance.canonical import sha256_hex
 
         raw = session_queue.build_session(
@@ -438,9 +442,21 @@ def _assets_session(args: argparse.Namespace) -> int:
             code_sha256=sha256_hex(nebius.code_archive(Path(args.repository))),
             idle_seconds=args.idle,
             stop_seconds=args.stop,
+            # Drawn fresh for every record: two sessions never share a digest or its markers.
+            nonce=secrets.token_hex(16),
         )
         Path(args.out).write_bytes(raw)
         result = {"session_sha256": sha256_hex(raw), **session_queue.read_session(raw)}
+        if args.manifest:
+            from exulanica_appearance.assets.remote import components_sha256
+
+            manifest = session_queue.build_session_manifest(
+                raw,
+                components_sha256=components_sha256(Path(args.repository), args.route),
+                container="sha256:" + nebius.IMAGE.split("@sha256:")[1],
+            )
+            Path(args.manifest).write_bytes(manifest)
+            result["manifest"] = session_queue.read_session_manifest(manifest, raw)
     elif args.step == "stage":
         result = nebius.session_stage(
             repository=Path(args.repository),
@@ -470,7 +486,8 @@ def _assets_session(args: argparse.Namespace) -> int:
             mode="session",
         )
     elif args.step == "submit":
-        from datetime import UTC, datetime
+        import uuid
+        from datetime import UTC, datetime, timedelta
 
         from exulanica_pieces.geometry.postprocess import POSTPROCESS_VERSION
         from exulanica_pieces.records import read_job
@@ -492,12 +509,16 @@ def _assets_session(args: argparse.Namespace) -> int:
                 f"{len(requests) - len(kept)} of the job's requests are already made under the "
                 "same cache key; build the job without them"
             )
+        queued_at = datetime.now(UTC).replace(microsecond=0)
         result = nebius.queue(
+            entry_id=uuid.uuid4().hex,
+            session_sha256=args.session_sha256,
             job_raw=job_raw,
             requests=requests,
             bucket=args.bucket,
             region=args.region,
-            queued_at=datetime.now(UTC),
+            queued_at=queued_at,
+            not_after=queued_at + timedelta(seconds=args.wait),
         )
     elif args.step == "status":
         result = nebius.session_status(
@@ -742,6 +763,9 @@ def main(argv: list[str] | None = None) -> int:
         session_record.add_argument(name, required=True)
     session_record.add_argument("--idle", type=int, default=session_queue_idle())
     session_record.add_argument("--stop", type=int, required=True)
+    session_record.add_argument(
+        "--manifest", help="also write the session manifest the product's register reads"
+    )
     session_stage = on_session.add_parser("stage")
     for name in ("--repository", "--session", "--bucket", "--region"):
         session_stage.add_argument(name, required=True)
@@ -752,8 +776,14 @@ def main(argv: list[str] | None = None) -> int:
     session_start.add_argument("--bound-cents", type=int, required=True)
     session_start.add_argument("--dry-run", action="store_true")
     session_submit = on_session.add_parser("submit")
-    for name in ("--job", "--requests", "--receipts", "--bucket", "--region"):
+    for name in ("--job", "--requests", "--receipts", "--bucket", "--region", "--session-sha256"):
         session_submit.add_argument(name, required=True)
+    session_submit.add_argument(
+        "--wait",
+        type=int,
+        default=3600,
+        help="seconds a session may still take the entry; after that no session runs it",
+    )
     for step in ("status", "stop"):
         command = on_session.add_parser(step)
         for name in ("--session-sha256", "--bucket", "--region"):

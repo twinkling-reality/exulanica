@@ -410,7 +410,8 @@ def test_stage_and_submit_hand_the_key_to_aws_by_environment_only(
     )  # fmt: skip
     assert created == {"metadata": {"id": "aijob-1"}}
     nebius_line = next(line for line in log.read_text().splitlines() if line.startswith("nebius|"))
-    assert f"--args|/mnt/data/runs/{staged['job_sha256']}/job.sh|" in nebius_line
+    assert f"--args|-c '{nebius.loader_script(staged['job_sha256'])}'|" in nebius_line
+    assert f"cp /mnt/data/runs/{staged['job_sha256']}/job.sh /opt/job.sh" in nebius_line
     assert "--on-demand|" in nebius_line and "--dry-run" not in nebius_line
     assert "--async|--format|json|" in nebius_line
     assert nebius_line.endswith("ENV AWS_SHARED_CREDENTIALS_FILE= KEY=must-not-reach-aws SECRET=")

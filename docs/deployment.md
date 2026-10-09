@@ -115,6 +115,7 @@ boundary ([security floor](security-floor.md)).
 | Scene worker | `exulanica-scene-worker` | Recovers camera poses and publishes scenes for queued scene jobs | 5.2.3 |
 | Purge worker | `exulanica-purge` | Destroys stored bytes that committed tombstones ask for | 5.2.4 |
 | Material bake worker | `exulanica-material-bake` | Bakes requested material recipes in a Node process | 5.2.5 |
+| Piece generation worker | `exulanica-piece-generation` | Serves the operator's GPU session with the workspaces' piece requests and keeps what it made; started only with the `generation` compose profile | 5.2.12 |
 | Generated-tile worker | `exulanica-generated-tile-worker` | Bakes the tiles generated towns wait for, in a Node process, and publishes each as the tile role | 9.1 |
 | Arrival worlds | `exulanica-arrival-worlds` | Makes the installation's arrival worlds in its own workspace, so their tiles are baked before a visitor's copy | 8.2 |
 | Tile faults | `exulanica-tile-fault` | Lists faulted baked tiles, and records the owner's decision to serve one's stored first bake | 9.1 |
@@ -181,6 +182,9 @@ With `EXULANICA_STORE_KIND` unset or `local`, the store is directories under `EX
 - `materials/<workspace>/`: each workspace's material bakes.
 - `workspace-assets/<workspace>/`: each workspace's own admitted 3D assets and their prepared
   outputs (migration 0126); never shared between workspaces, and erased only with the workspace.
+- `generated-pieces/`: generated pieces, one store for everybody, because a piece is made only from
+  catalog content; [generated pieces](generated-pieces-contract.md#53-the-shared-store-of-generated-pieces)
+  owns what it takes and its bound.
 - `looks/<workspace>/`: the containers of each workspace's own looks, a drafted creature's sketch
   or a traveller's admitted look (`exulanica/world/thing_store.py`); never shared between
   workspaces, served only through a look the workspace holds, and destroyed by `exulanica-purge`
@@ -809,6 +813,15 @@ its own role. The [local database](local-database.md) guide owns its steps.
   writes one line of JSON per event on standard output, and on `SIGTERM` or `SIGINT` lets a round
   in progress finish or roll back before it exits. It opens the connections the API's playback and
   traffic controller would (5.4.3) and one more, idle, that holds its lock.
+- `exulanica-piece-generation` serves the operator's registered generation session with the
+  piece requests of the workspaces `EXULANICA_WORKSPACE_IDS`, `--workspace` or
+  `EXULANICA_ACCOUNT_DATABASE_URL` name, as `exulanica_app`, under `EXULANICA_SPENDING=durable`
+  with `EXULANICA_SPENDING_WITNESS_DIR` on the shared spending witness volume.
+  It needs `EXULANICA_GENERATION_BUCKET_KEY_FILE` (the bucket key file the operator creates for it)
+  and keeps pieces in the `generated-pieces` namespace up to `EXULANICA_GENERATED_PIECES_MAX_BYTES`
+  (two gibibytes by default). The operator registers and closes sessions with
+  `python -m exulanica.generation session open|close|status` as the owner;
+  [generated pieces](generated-pieces-contract.md#5-who-runs-the-gpu-and-who-pays) owns both.
 - `exulanica-wmp` is owned by the [world memory package](world-memory-package.md), and
   `exulanica-gsplat-scene-v1` by [scene training](gsplat-scene-jobs.md).
 - `TAVILY_API_KEY`, `EXULANICA_REFERENCE_WORKER`, `EXULANICA_REFERENCE_WORKSPACES` and

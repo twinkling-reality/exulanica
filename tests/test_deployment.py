@@ -199,10 +199,10 @@ def test_runtime_containers_use_the_rls_role_and_only_migrations_use_the_owner()
     directives = _directives(COMPOSE)
     runtime_urls = [line for line in directives.splitlines() if "EXULANICA_DATABASE_URL:" in line]
     # The owner twice (migrate, catalogs), then the API, the derivative, scene, preparation,
-    # generated-tile and playback workers and maintenance (for the door's sweep alone) as the RLS
-    # role. The tile worker publishes through a second URL, the tile role's, which is not the owner
-    # (migration 0138).
-    assert len(runtime_urls) == 9, runtime_urls
+    # piece generation, generated-tile and playback workers and maintenance (for the door's sweep
+    # alone) as the RLS role. The tile worker publishes through a second URL, the tile role's, which
+    # is not the owner (migration 0138).
+    assert len(runtime_urls) == 10, runtime_urls
     assert all("postgresql://${POSTGRES_USER:-exulanica}:" in url for url in runtime_urls[:2])
     assert all("postgresql://exulanica_app:" in line for line in runtime_urls[2:]), runtime_urls
     assert "EXULANICA_APP_ROLE_PASSWORD:?" in COMPOSE
@@ -261,8 +261,9 @@ def test_the_pose_worker_is_separate_restartable_and_provenance_configured():
 
 
 def test_non_http_workers_do_not_inherit_the_api_health_probe():
-    # The derivative, scene, preparation, generated-tile and playback workers serve no HTTP.
-    assert COMPOSE.count('"import os; os.kill(1, 0)"') == 5
+    # The derivative, scene, preparation, piece generation, generated-tile and playback workers
+    # serve no HTTP.
+    assert COMPOSE.count('"import os; os.kill(1, 0)"') == 6
 
 
 def test_no_deployment_artefact_names_a_target():
@@ -291,3 +292,35 @@ def test_no_artefact_claims_a_storage_property_the_platform_does_not_have():
         lowered = _directives(text).lower()
         found = [word for word in forbidden if word in lowered]
         assert found == [], f"{name} claims {found}, which the platform does not provide"
+
+
+def _services(text: str) -> dict[str, str]:
+    """Each service's block of the compose file, by name, with its comments stripped."""
+    directives = _directives(text)
+    body = directives[directives.index("\nservices:\n") :]
+    body = body[: body.index("\nvolumes:\n")] if "\nvolumes:\n" in body else body
+    blocks: dict[str, str] = {}
+    for part in re.split(r"\n(?=  [a-z][a-z0-9-]*:\n)", body)[1:]:
+        name = part.split(":", 1)[0].strip()
+        blocks[name] = part
+    return blocks
+
+
+def test_every_spending_process_shares_the_witness_volume():
+    """A process that spends through the durable authority needs the witness: without its
+    directory every admission under a witnessed authority is refused (witness_not_configured)."""
+    spending = {
+        name: block
+        for name, block in _services(COMPOSE).items()
+        if re.search(r"^      EXULANICA_SPENDING:", block, re.M)
+    }
+    assert {"api", "piece-generation"} <= set(spending), sorted(spending)
+    for name, block in spending.items():
+        assert re.search(
+            r"^      EXULANICA_SPENDING_WITNESS_DIR: /var/lib/exulanica-spending-witness$",
+            block,
+            re.M,
+        ), name
+        assert re.search(
+            r"^      - spending-witness:/var/lib/exulanica-spending-witness$", block, re.M
+        ), name

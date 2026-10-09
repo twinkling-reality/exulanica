@@ -10,7 +10,7 @@ import json
 import struct
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any
 
 import numpy as np
 
@@ -26,6 +26,7 @@ from exulanica_pieces.geometry.mesh import (
     simplify_to,
 )
 from exulanica_pieces.records import (
+    POSTPROCESS_VERSION,
     box_fill_minimum,
     box_fill_permille,
     measures_box_fill,
@@ -33,10 +34,6 @@ from exulanica_pieces.records import (
 )
 
 __all__ = ["POSTPROCESS_VERSION", "Piece", "make_piece"]
-
-#: v2 adds the yaw choice of a contained piece; an output is cached under its version, so a piece
-#: made by v1 is never served as v2.
-POSTPROCESS_VERSION: Final = "exulanica.generated-asset-postprocess/v2"
 
 
 @dataclass(frozen=True)

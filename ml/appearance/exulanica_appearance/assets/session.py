@@ -6,13 +6,14 @@ it runs (``job.sh`` has already held the archive to that digest), its idle stop 
 It loads the route's backend once and then, every poll:
 
 1. ends if ``session/<id>/stop`` exists, or no entry has been ready for its idle stop;
-2. takes the oldest ready entry nobody has claimed (by ``queued_at``, then the job's digest),
-   unless its job's own stop would carry the session past its hard stop, in which case the entry
-   waits for a later session;
-3. writes ``claimed/<job>.json``, reads the entry strictly, runs every item through the same
-   runner a single job uses, publishes the outputs, and writes ``done/<job>.json`` with each
-   request's milliseconds, so each request is charged what its items took. An entry the reader
-   refuses is never run: its done marker states the refusal.
+2. takes the oldest ready entry nobody has claimed (by ``queued_at``, then its id) that names this
+   session and whose ``not_after`` has not passed, unless its job's own stop would carry the
+   session past its hard stop, in which case the entry waits; an entry for another session, or past
+   its ``not_after``, is never claimed or run;
+3. writes ``claimed/<entry>.json``, reads the entry strictly, runs every item through the same
+   runner a single job uses, publishes the outputs, and writes ``done/<entry>.json`` with each
+   request's milliseconds and the receipts it published, so each request is charged what its
+   items took. An entry the reader refuses is never run: its done marker states the refusal.
 
 A heartbeat thread writes ``session/<id>/beat-<UTC stamp>.json`` every 30 seconds (a new file each
 time, since the mount refuses renames and a file is written once) with the state, the job in hand
@@ -37,8 +38,8 @@ from exulanica_pieces.records import read_job
 from exulanica_appearance.assets.job import Backend, run_job
 from exulanica_appearance.assets.queue import (
     BEAT_PROFILE,
-    CLAIM_PROFILE,
-    DONE_PROFILE,
+    build_claim,
+    build_done,
     instant,
     read_entry,
     read_ready,
@@ -93,9 +94,19 @@ def _beat(root: Path, session: str, state: _State, started_at: str, clock: Clock
         _write_new(path, canonical_bytes(document))
 
 
-def _ready(root: Path) -> list[tuple[str, str]]:
-    """Unclaimed entries whose ready.json reads, as (queued_at, job sha256), oldest first; an
-    entry whose ready.json does not read is claimed and refused, so it is looked at once."""
+@dataclass(frozen=True, slots=True)
+class _Ready:
+    queued_at: str
+    entry_id: str
+    #: None when ready.json does not read: such an entry is claimed and refused, so it is looked
+    #: at once.
+    job_sha256: str | None = None
+    not_after: str | None = None
+
+
+def _ready(root: Path, session_sha256: str) -> list[_Ready]:
+    """This session's unclaimed entries with a ready.json, oldest first (by queued_at, then id); one
+    whose ready.json does not read is claimed and refused, so it is looked at once."""
     queue = root / "queue"
     found = []
     for directory in sorted(queue.iterdir()) if queue.is_dir() else ():
@@ -106,10 +117,14 @@ def _ready(root: Path) -> list[tuple[str, str]]:
         try:
             ready = read_ready(directory)
         except Refused:
-            found.append(("", directory.name))
+            found.append(_Ready("", directory.name))
             continue
-        found.append((ready["queued_at"], directory.name))
-    return sorted(found)
+        if ready["session_sha256"] != session_sha256:
+            continue
+        found.append(
+            _Ready(ready["queued_at"], directory.name, ready["job_sha256"], ready["not_after"])
+        )
+    return sorted(found, key=lambda entry: (entry.queued_at, entry.entry_id))
 
 
 def serve(
@@ -117,6 +132,7 @@ def serve(
     root: Path,
     session_raw: bytes,
     code_sha256: str,
+    components_sha256: str,
     backend: Backend,
     repository: Path,
     work: Path,
@@ -128,7 +144,8 @@ def serve(
     """Serve the queue under ``root`` until a stop; returns why it ended and what it served.
 
     ``code_sha256`` is the digest ``job.sh`` checked the running archive against; a session
-    record naming another is refused before anything is served. ``work`` is the machine's own
+    record naming another is refused before anything is served. ``components_sha256`` is the digest
+    of the pinned models the backend loaded; an entry whose job names others is refused. ``work`` is the machine's own
     disk, where outputs are written before ``publish`` copies them to ``root/out``."""
     clock = clock or Clock()
     session = read_session(session_raw)
@@ -161,12 +178,14 @@ def serve(
                 reason = "stop"
                 break
             elapsed = clock.monotonic() - started
-            entries = _ready(root)
+            now = instant(clock.now())
             chosen = None
-            for _, job_sha256 in entries:
-                stop = _job_stop(root / "queue" / job_sha256)
+            for entry in _ready(root, session_sha256):
+                if entry.not_after is not None and now > entry.not_after:
+                    continue
+                stop = _job_stop(root / "queue" / entry.entry_id)
                 if stop is None or elapsed + stop <= session["stop_seconds"]:
-                    chosen = job_sha256
+                    chosen = entry
                     break
             if chosen is None:
                 if clock.monotonic() - last_work >= session["idle_seconds"]:
@@ -178,13 +197,14 @@ def serve(
                 clock.sleep(poll_seconds)
                 continue
             with state.lock:
-                state.state, state.job = "working", chosen
+                state.state, state.job = "working", chosen.job_sha256
             served.append(
                 _serve_one(
                     root=root,
-                    job_sha256=chosen,
+                    entry=chosen,
                     session=session,
                     session_sha256=session_sha256,
+                    components_sha256=components_sha256,
                     backend=backend,
                     repository=repository,
                     work=work,
@@ -216,9 +236,10 @@ def _job_stop(directory: Path) -> int | None:
 def _serve_one(
     *,
     root: Path,
-    job_sha256: str,
+    entry: _Ready,
     session: dict[str, Any],
     session_sha256: str,
+    components_sha256: str,
     backend: Backend,
     repository: Path,
     work: Path,
@@ -226,33 +247,36 @@ def _serve_one(
     budgets: Any,
     clock: Clock,
 ) -> dict[str, Any]:
-    claimed_at = instant(clock.now())
+    claimed = clock.now()
+    claimed_at = instant(claimed)
+    # An entry whose ready.json did not read names no job; its claim and done name a digest of
+    # nothing, which no batch holds.
+    job_sha256 = entry.job_sha256 or sha256_hex(b"")
     _write_new(
-        root / "claimed" / f"{job_sha256}.json",
-        canonical_bytes(
-            {
-                "at": claimed_at,
-                "job_sha256": job_sha256,
-                "profile": CLAIM_PROFILE,
-                "session_sha256": session_sha256,
-            }
+        root / "claimed" / f"{entry.entry_id}.json",
+        build_claim(
+            entry_id=entry.entry_id,
+            job_sha256=job_sha256,
+            session_sha256=session_sha256,
+            at=claimed,
         ),
     )
-    done: dict[str, Any] = {
-        "claimed_at": claimed_at,
+    marker = {
+        "entry_id": entry.entry_id,
         "job_sha256": job_sha256,
-        "profile": DONE_PROFILE,
         "session_sha256": session_sha256,
+        "claimed_at": claimed_at,
     }
     try:
         job_raw, requests = read_entry(
-            root / "queue" / job_sha256,
+            root / "queue" / entry.entry_id,
             route=session["route"],
             code_sha256=session["code_sha256"],
+            components_sha256=components_sha256,
             budgets=budgets,
         )
     except Refused as refusal:
-        done.update(ended_at=instant(clock.now()), refused=str(refusal))
+        raw = build_done(**marker, ended_at=instant(clock.now()), refused=str(refusal))
     else:
         results = run_job(
             job_raw=job_raw,
@@ -267,16 +291,19 @@ def _serve_one(
         for item in results["items"]:
             key = item["request_sha256"]
             milliseconds[key] = milliseconds.get(key, 0) + item["milliseconds"]
-        done.update(
+        raw = build_done(
+            **marker,
             ended_at=instant(clock.now()),
-            items={
-                "made": sum("piece" in item for item in results["items"]),
-                "total": len(results["items"]),
-                "within": sum(bool(item.get("within")) for item in results["items"]),
+            ran={
+                "items": {
+                    "made": sum("piece" in item for item in results["items"]),
+                    "total": len(results["items"]),
+                    "within": sum(bool(item.get("within")) for item in results["items"]),
+                },
+                "receipts": [item["receipt"] for item in results["items"] if "receipt" in item],
+                "request_milliseconds": milliseconds,
+                "results_ended_at": results["ended_at"],
             },
-            request_milliseconds=milliseconds,
-            results_ended_at=results["ended_at"],
         )
-    raw = canonical_bytes(done)
-    _write_new(root / "done" / f"{job_sha256}.json", raw)
+    _write_new(root / "done" / f"{entry.entry_id}.json", raw)
     return parse_canonical(raw, "done")

@@ -271,6 +271,41 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # The piece generation worker (docs/generated-pieces-contract.md): serves the operator's GPU session
+  # with the workspaces' piece requests over the generation bucket, and keeps what it made in the
+  # shared generated-pieces namespace. Started only with `--profile generation`. Its credentials are
+  # the runtime role and the bucket's key file the operator creates for it (put, get, list; no
+  # delete), mounted read-only. It calls no model: its only outbound requests go to the endpoint
+  # its key file names and to the content store, and no network rule here narrows that further.
+  piece-generation:
+    profiles: ["generation"]
+    build: *backend-build
+    command: ["exulanica-piece-generation"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    environment:
+      EXULANICA_DATABASE_URL: postgresql://exulanica_app:${EXULANICA_APP_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_WORKSPACE_IDS: ${EXULANICA_WORKSPACE_IDS:-}
+      EXULANICA_ACCOUNT_DATABASE_URL: ${EXULANICA_ACCOUNT_DATABASE_URL:-}
+      EXULANICA_DATA_DIR: /var/lib/exulanica
+      EXULANICA_SPENDING: durable
+      # Every spending process shares the witness volume (above); without it every admission
+      # under a witnessed authority is refused.
+      EXULANICA_SPENDING_WITNESS_DIR: /var/lib/exulanica-spending-witness
+      EXULANICA_GENERATION_BUCKET_KEY_FILE: /run/secrets/generation-bucket-key.json
+      EXULANICA_GENERATED_PIECES_MAX_BYTES: ${EXULANICA_GENERATED_PIECES_MAX_BYTES:-}
+    volumes:
+      - media:/var/lib/exulanica
+      - spending-witness:/var/lib/exulanica-spending-witness
+      - ${EXULANICA_GENERATION_BUCKET_KEY_FILE:-/dev/null}:/run/secrets/generation-bucket-key.json:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   # The generated-tile worker (docs/deployment.md 9.1): bakes the tiles generated towns wait for,
   # off the request, with the tessellator compiled to JavaScript and run by Node
   # (deploy/installation/tiles.Dockerfile), and publishes each bake as the tile role, which may do

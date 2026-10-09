@@ -119,6 +119,22 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
         f"exulanica/generation/store.py::{name} [piece_request]": _BY_PIECE_REQUEST
         for name in ("answer_for_key", "cancel_piece_request", "read_piece_request")
     },
+    **{
+        f"exulanica/generation/batches.py::{name} [piece_request]": (
+            "the generation worker serves a workspace's queue across every world it holds; each "
+            "request row names its own world"
+        )
+        for name in (
+            "answer_from_cache",
+            "batches_in_flight",
+            "decide_cancelled",
+            "end_batch",
+            "fail_unreadable",
+            "record_batch",
+            "unsettled",
+            "waiting_requests",
+        )
+    },
     "exulanica/generation/store.py::open_worst_case [piece_request]": (
         "the GPU allowance is the workspace's, so what its open requests can still cost is summed "
         "over every world it holds"
@@ -131,6 +147,9 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
         "the door grants that ran out in the settle window are found across a workspace's worlds "
         "(every workspace's for the maintenance sweep); a traveller mind is matched by its grant's "
         "id, which names one world, and each grant is then settled in that world"
+    ),
+    "exulanica/orchestration/judge_seed.py::_refuse_open_piece_requests [piece_request]": (
+        "a seed is the whole workspace, so an open request for any of its worlds refuses it"
     ),
 }
 

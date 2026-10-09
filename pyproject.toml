@@ -178,6 +178,11 @@ exulanica-asset-preparation = "exulanica.orchestration.installation.preparation:
 # publishes each bake as the tile role (migration 0138). Needs Node and the tessellator, compiled
 # or from web/.
 exulanica-generated-tile-worker = "exulanica.ingest.generated_tiles_command:main"
+# `uv run exulanica-piece-generation --workspace <uuid> --once`. Serves the operator's GPU session
+# (Nebius AI Cloud, the operator's account, registered with `python -m exulanica.generation session
+# open`) with the workspaces' piece requests over the generation bucket, and keeps what it made.
+# Starts nothing in the cloud; downloads nothing but the session's outputs.
+exulanica-piece-generation = "exulanica.generation.command:main"
 # `uv run exulanica-arrival-worlds check|prepare --workspace <uuid>`. Makes the installation's
 # arrival worlds (exulanica/world/arrival-worlds.v1.json) once in its own workspace, so their tiles
 # are baked before any visitor's copy is made. Downloads nothing.

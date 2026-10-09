@@ -3,9 +3,10 @@ state and settlement.
 
 The bucket is the product's signed S3 client against the S3 double (``tests/object_store_double``),
 so every byte goes through the real request path. What is written is read back with the session's
-own strict reader (``exulanica_pieces.queue.read_entry``), the markers are the ones warm session 1
-wrote (``ml/appearance/evidence/generated-assets-session-1``), and settlement is checked against the
-charge lines both warm sessions' run records state.
+own strict reader (``exulanica_pieces.queue.read_entry``), the markers are built with the session's
+own builders (and session 1's version 1 marker is refused as an entry's), the outputs are warm
+session 1's receipts (``ml/appearance/evidence/generated-assets-session-1``), and settlement is
+checked against the charge lines both warm sessions' run records state.
 """
 
 from __future__ import annotations
@@ -28,7 +29,13 @@ from exulanica.generation.session import session_state
 from exulanica.store.object import ObjectRequests, ObjectStoreCredentials, ObjectStoreLocation
 from exulanica_pieces.budgets import read_budgets
 from exulanica_pieces.canonical import Refused, canonical_bytes, sha256_hex
-from exulanica_pieces.queue import BEAT_PROFILE, read_entry, read_session
+from exulanica_pieces.queue import (
+    BEAT_PROFILE,
+    build_claim,
+    build_done,
+    read_entry,
+    read_session,
+)
 from exulanica_pieces.records import read_job, read_request
 
 from object_store_double import S3Double
@@ -68,24 +75,51 @@ def _job() -> tuple[bytes, list[bytes]]:
     return job_raw, requests
 
 
+ENTRY = "e1" * 16
+
+
+def _write(bucket, job_raw: bytes, requests: list[bytes], entry: str = ENTRY) -> None:
+    entries.write_files(bucket, entry, job_raw, requests)
+    entries.write_ready(
+        bucket,
+        entry,
+        job_raw,
+        requests,
+        session_sha256="5e" * 32,
+        queued_at=NOW,
+        not_after=NOW + timedelta(hours=1),
+    )
+
+
 def test_an_entry_is_what_the_session_s_own_reader_takes(bucket, tmp_path) -> None:
     job_raw, requests = _job()
     _session_raw, session = _session()
-    job_sha256 = entries.queue_entry(bucket, job_raw, requests, NOW)
-    assert job_sha256 == sha256_hex(job_raw)
+    _write(bucket, job_raw, requests)
     # Lay the bucket's entry out as the session's mount does and read it as the session does.
-    entry = tmp_path / "queue" / job_sha256
-    for key in bucket.keys(f"queue/{job_sha256}/"):
+    for key in bucket.keys(f"queue/{ENTRY}/"):
         target = tmp_path / key
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(bucket.get(key))
     read_job_raw, read_requests = read_entry(
-        entry,
+        tmp_path / "queue" / ENTRY,
         route=session["route"],
         code_sha256=session["code_sha256"],
+        components_sha256=read_job(job_raw)["components_sha256"],
         budgets=read_budgets(ROOT),
     )
     assert read_job_raw == job_raw and sorted(read_requests) == sorted(requests)
+    ready = json.loads(bucket.get(f"queue/{ENTRY}/ready.json"))
+    assert (
+        ready["entry_id"],
+        ready["job_sha256"],
+        ready["session_sha256"],
+        ready["not_after"],
+    ) == (
+        ENTRY,
+        sha256_hex(job_raw),
+        "5e" * 32,
+        "2026-10-08T04:00:00Z",
+    )
 
 
 def test_ready_is_written_last(bucket) -> None:
@@ -93,36 +127,71 @@ def test_ready_is_written_last(bucket) -> None:
     put = bucket.put
     bucket.put = lambda key, data: (written.append(key), put(key, data))  # type: ignore[method-assign]
     job_raw, requests = _job()
-    entries.queue_entry(bucket, job_raw, requests, NOW)
-    assert written[-1].endswith("/ready.json") and len(written) == len(requests) + 2
+    _write(bucket, job_raw, requests)
+    assert written[-1] == f"queue/{ENTRY}/ready.json" and len(written) == len(requests) + 2
 
 
-def _copy(bucket, source: Path, key: str) -> bytes:
-    raw = source.read_bytes()
-    bucket.put(key, raw)
-    return raw
+def _markers(job_sha256: str, session_sha256: str, *, entry: str = ENTRY, at: datetime = NOW):
+    claim = build_claim(entry_id=entry, job_sha256=job_sha256, session_sha256=session_sha256, at=at)
+    stamp = at.strftime("%Y-%m-%dT%H:%M:%SZ")
+    done = build_done(
+        entry_id=entry,
+        job_sha256=job_sha256,
+        session_sha256=session_sha256,
+        claimed_at=stamp,
+        ended_at=stamp,
+        ran={
+            "items": {"made": 1, "total": 1, "within": 1},
+            "receipts": ["ab" * 32],
+            "request_milliseconds": {"cd" * 32: 1000},
+            "results_ended_at": stamp,
+        },
+    )
+    return claim, done
 
 
-def test_markers_are_read_only_as_this_session_s_end_of_this_job(bucket) -> None:
+def test_markers_are_read_only_as_this_entry_s_of_its_job_and_session(bucket) -> None:
     session_raw, _ = _session()
     session_sha256 = sha256_hex(session_raw)
-    marker = min((SESSION_1 / "done").glob("*.json"))
-    job_sha256 = marker.stem
-    assert entries.done(bucket, job_sha256, session_sha256) is None
-    assert not entries.claimed(bucket, job_sha256, session_sha256)
-    _copy(bucket, marker, f"done/{job_sha256}.json")
-    _copy(bucket, SESSION_1 / "claimed" / marker.name, f"claimed/{job_sha256}.json")
-    document = entries.done(bucket, job_sha256, session_sha256)
-    assert document is not None and document["items"]["total"] == 12
-    assert entries.claimed(bucket, job_sha256, session_sha256)
-    with pytest.raises(Refused, match="not this session"):
-        entries.done(bucket, job_sha256, "0" * 64)
-    with pytest.raises(Refused, match="not this session"):
-        entries.claimed(bucket, job_sha256, "0" * 64)
-    # A marker filed under another job's name is not that job's.
-    bucket.put(f"done/{'1' * 64}.json", marker.read_bytes())
-    with pytest.raises(Refused, match="not this session"):
-        entries.done(bucket, "1" * 64, session_sha256)
+    job_sha256 = "a1" * 32
+    asked = {"job_sha256": job_sha256, "session_sha256": session_sha256, "queued_at": NOW}
+    assert entries.done(bucket, ENTRY, **asked) is None
+    assert entries.claim(bucket, ENTRY, **asked) is None
+    claim, done = _markers(job_sha256, session_sha256)
+    bucket.put(f"claimed/{ENTRY}.json", claim)
+    bucket.put(f"done/{ENTRY}.json", done)
+    assert entries.done(bucket, ENTRY, **asked)["receipts"] == ["ab" * 32]
+    assert entries.claim(bucket, ENTRY, **asked)["at"] == "2026-10-08T03:00:00Z"
+    for changed in ({"session_sha256": "0" * 64}, {"job_sha256": "0" * 64}):
+        for read in (entries.done, entries.claim):
+            with pytest.raises(entries.EntryRefused) as refused:
+                read(bucket, ENTRY, **{**asked, **changed})
+            assert refused.value.code == "marker_not_this_entry"
+    # Another entry's markers filed under this entry's name are not this entry's.
+    other_claim, other_done = _markers(job_sha256, session_sha256, entry="e2" * 16)
+    bucket.put(f"claimed/{ENTRY}.json", other_claim)
+    bucket.put(f"done/{ENTRY}.json", other_done)
+    for read in (entries.done, entries.claim):
+        with pytest.raises(entries.EntryRefused) as refused:
+            read(bucket, ENTRY, **asked)
+        assert refused.value.code == "marker_not_this_entry"
+    # A claim more than the clocks' allowance before the entry was queued is not its claim.
+    early_claim, early_done = _markers(job_sha256, session_sha256, at=NOW - timedelta(minutes=3))
+    bucket.put(f"claimed/{ENTRY}.json", early_claim)
+    bucket.put(f"done/{ENTRY}.json", early_done)
+    for read in (entries.done, entries.claim):
+        with pytest.raises(entries.EntryRefused) as refused:
+            read(bucket, ENTRY, **asked)
+        assert refused.value.code == "marker_not_this_entry"
+    within_claim, within_done = _markers(job_sha256, session_sha256, at=NOW - timedelta(minutes=2))
+    bucket.put(f"claimed/{ENTRY}.json", within_claim)
+    bucket.put(f"done/{ENTRY}.json", within_done)
+    assert entries.claim(bucket, ENTRY, **asked) is not None
+    # A version 1 marker, named by its job (as session 1 wrote them), is not an entry's.
+    bucket.put(f"done/{ENTRY}.json", min((SESSION_1 / "done").glob("*.json")).read_bytes())
+    with pytest.raises(entries.EntryRefused) as refused:
+        entries.done(bucket, ENTRY, **asked)
+    assert refused.value.code == "marker_unreadable"
 
 
 def _beat(session_sha256: str, at: datetime, state: str) -> bytes:
@@ -179,7 +248,19 @@ def _output_for(receipt_path: Path, piece: bytes) -> bytes:
     return canonical_bytes(document)
 
 
-def test_a_job_s_outputs_are_its_receipts_and_their_pieces_checked(bucket) -> None:
+def _marker_naming(job_sha256: str, receipts: list[str]) -> dict:
+    stamp = NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return {
+        "claimed_at": stamp,
+        "ended_at": stamp,
+        "entry_id": ENTRY,
+        "job_sha256": job_sha256,
+        "receipts": sorted(receipts),
+        "session_sha256": "5e" * 32,
+    }
+
+
+def test_an_entry_s_outputs_are_the_receipts_its_marker_names_and_their_pieces(bucket) -> None:
     job_raw, requests = _job()
     job_sha256 = sha256_hex(job_raw)
     budgets = read_budgets(ROOT)
@@ -201,20 +282,28 @@ def test_a_job_s_outputs_are_its_receipts_and_their_pieces_checked(bucket) -> No
         raw = _output_for(path, piece)
         bucket.put(f"out/receipts/{sha256_hex(raw)}.json", raw)
         bucket.put(f"out/pieces/{sha256_hex(piece)}.glb", piece)
-        pieces[sha256_hex(raw)] = piece
-    found = entries.outputs(bucket, job_sha256, by_digest)
-    # Every receipt of this job, none of the other job's, each with its piece's bytes.
+        pieces[sha256_hex(raw)] = (path, piece)
+    named = [digest for digest, (path, _) in pieces.items() if path != other]
+    # Only the receipts the marker names are read: the other job's stays unread in the bucket.
+    found = entries.outputs(bucket, _marker_naming(job_sha256, named), by_digest)
     assert len(found) == len(mine) == 12
     assert {output.request_sha256 for output in found} == set(by_digest)
     for output in found:
-        assert output.piece == pieces[output.receipt_sha256]
+        assert output.piece == pieces[output.receipt_sha256][1]
+    # A named receipt of another job is refused, by its code.
+    with pytest.raises(entries.EntryRefused) as refused:
+        entries.outputs(bucket, _marker_naming(job_sha256, list(pieces)), by_digest)
+    assert refused.value.code == "outputs_unreadable"
+    # A named receipt that is missing is refused.
+    with pytest.raises(entries.EntryRefused, match="missing"):
+        entries.outputs(bucket, _marker_naming(job_sha256, [*named, "0" * 64]), by_digest)
     # A piece whose bytes are not the digest its receipt states is refused.
     bucket.put(f"out/pieces/{found[0].piece_sha256}.glb", b"tampered")
-    with pytest.raises(Refused, match="not its bytes"):
-        entries.outputs(bucket, job_sha256, by_digest)
+    with pytest.raises(entries.EntryRefused, match="not its bytes"):
+        entries.outputs(bucket, _marker_naming(job_sha256, named), by_digest)
 
 
-def test_a_receipt_naming_a_request_the_job_did_not_hold_is_refused(bucket) -> None:
+def test_a_receipt_naming_a_request_the_entry_did_not_hold_is_refused(bucket) -> None:
     job_raw, _requests = _job()
     path = next(
         p
@@ -223,8 +312,8 @@ def test_a_receipt_naming_a_request_the_job_did_not_hold_is_refused(bucket) -> N
     )
     raw = path.read_bytes()
     bucket.put(f"out/receipts/{sha256_hex(raw)}.json", raw)
-    with pytest.raises(Refused, match="did not hold"):
-        entries.outputs(bucket, sha256_hex(job_raw), {})
+    with pytest.raises(entries.EntryRefused, match="did not hold"):
+        entries.outputs(bucket, _marker_naming(sha256_hex(job_raw), [sha256_hex(raw)]), {})
 
 
 def test_a_request_settles_to_the_charge_its_run_record_states() -> None:

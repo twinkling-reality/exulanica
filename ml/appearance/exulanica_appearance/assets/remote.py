@@ -33,7 +33,14 @@ from exulanica_appearance.assets.gittree import tree_id
 from exulanica_appearance.canonical import Refused as WeightsRefused
 from exulanica_appearance.weights import read_weights, verify_directory
 
-__all__ = ["ROUTE_WEIGHTS", "fetch_upstream", "prepare", "publish", "weights_directory"]
+__all__ = [
+    "ROUTE_WEIGHTS",
+    "components_sha256",
+    "fetch_upstream",
+    "prepare",
+    "publish",
+    "weights_directory",
+]
 
 #: The weights manifests each route loads, by file name under ml/appearance/weights.
 ROUTE_WEIGHTS: Final = {
@@ -53,6 +60,22 @@ ROUTE_WEIGHTS: Final = {
         "microsoft__TRELLIS-image-large@25e0d31ffbeb.json",
     ),
 }
+COMPONENTS_PROFILE: Final = "exulanica.generated-asset-components/v1"
+
+
+def components_sha256(repository: Path, route: str) -> str:
+    """The digest a job and a receipt name for a route's pinned models: the route and the digest of
+    each weights manifest it loads (ml/appearance/weights), canonical JSON."""
+    weights = repository / "ml/appearance/weights"
+    manifests = {
+        name: hashlib.sha256((weights / name).read_bytes()).hexdigest()
+        for name in ROUTE_WEIGHTS[route]
+    }
+    return hashlib.sha256(
+        canonical_bytes({"profile": COMPONENTS_PROFILE, "route": route, "weights": manifests})
+    ).hexdigest()
+
+
 #: Read by repository id through the Hugging Face cache rather than from a path.
 ROUTE_CACHED: Final = {"B": ("facebook__dinov2-with-registers-large@e4c89a4e0558.json",)}
 _CHUNK: Final = 1 << 20

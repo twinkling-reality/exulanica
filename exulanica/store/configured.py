@@ -59,6 +59,7 @@ from exulanica.store.base import ContentAddressedStore
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import (
     BLOB_NAMESPACE,
+    GENERATED_PIECE_NAMESPACE,
     LOOK_NAMESPACE,
     MATERIAL_NAMESPACE,
     SHARED_NAMESPACES,
@@ -230,6 +231,10 @@ class ContentStores:
     @property
     def tiles(self) -> ContentAddressedStore:
         return self.shared(TILE_NAMESPACE)
+
+    @property
+    def generated_pieces(self) -> ContentAddressedStore:
+        return self.shared(GENERATED_PIECE_NAMESPACE)
 
     def namespaces(self) -> Iterator[tuple[str, ContentAddressedStore]]:
         """Every store that holds bytes here, with the name a backup set records for it.

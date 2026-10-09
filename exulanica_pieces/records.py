@@ -65,6 +65,7 @@ __all__ = [
     "HOLD_FILL_MINIMUM_PER_MILLE",
     "JOB_PROFILE",
     "JOB_PROFILE_V1",
+    "POSTPROCESS_VERSION",
     "PROMPT_VERSION",
     "PROMPT_VERSIONS",
     "RECEIPT_PROFILE",
@@ -111,6 +112,11 @@ REGENERATION: Final = (
 )
 #: A: concept picture, TRELLIS-image-large for shape and colour. B: concept picture, Step1X-3D
 #: geometry for shape, colour from the picture and the palette. S: the stub of the dry run.
+#: The deterministic post-process's version. v2 adds the yaw choice of a contained piece; an output
+#: is cached under its version, so a piece made by v1 is never served as v2. Here, beside the cache
+#: key, so the product reads it without the post-process's numpy half
+#: (:mod:`exulanica_pieces.geometry.postprocess` makes pieces under it).
+POSTPROCESS_VERSION: Final = "exulanica.generated-asset-postprocess/v2"
 ROUTES: Final = frozenset({"A", "B", "S"})
 _SEED_PREFIX: Final = b"exulanica.generated-asset-seed/v1\x00"
 _PACK_ID: Final = re.compile(r"[a-z][a-z0-9.-]{0,63}")

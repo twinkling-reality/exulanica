@@ -36,6 +36,7 @@ from exulanica.store.local import LocalContentAddressedStore
 
 __all__ = [
     "BLOB_NAMESPACE",
+    "GENERATED_PIECE_NAMESPACE",
     "LOOK_NAMESPACE",
     "MATERIAL_NAMESPACE",
     "SHARED_NAMESPACES",
@@ -60,6 +61,12 @@ MATERIAL_NAMESPACE: Final = "materials"
 #: tile is a pure function of public inputs, so the same key names the same bytes for everyone
 #: (migration 0072).
 TILE_NAMESPACE: Final = "tiles"
+#: Where generated pieces live: one store, not one per workspace. A generated piece is made only
+#: from catalog content (a shipped thing kind, a recipe catalog's words, a committed pack's palette,
+#: a pinned model and a seed drawn from the request), refused otherwise at the store's own write
+#: path (exulanica.generation.pieces), so the same digest names the same bytes for everyone, like a
+#: baked tile, and no workspace's erasure reaches it; the workspace rows naming a piece are erased.
+GENERATED_PIECE_NAMESPACE: Final = "generated-pieces"
 #: Where each workspace's own admitted assets and their prepared outputs live (migration 0126).
 #: One namespace per workspace, like the material bakes, so erasing a workspace's assets is a
 #: question about its own rows and never about anyone else's.
@@ -73,7 +80,11 @@ LOOK_NAMESPACE: Final = "looks"
 WORKSPACE_STYLE_PACK_NAMESPACE: Final = "workspace-style-packs"
 
 #: The namespaces holding one store for every workspace, in the order they are listed.
-SHARED_NAMESPACES: Final[tuple[str, ...]] = (BLOB_NAMESPACE, TILE_NAMESPACE)
+SHARED_NAMESPACES: Final[tuple[str, ...]] = (
+    BLOB_NAMESPACE,
+    TILE_NAMESPACE,
+    GENERATED_PIECE_NAMESPACE,
+)
 #: The namespaces holding one store per workspace, each under ``<name>/<workspace hex>``.
 WORKSPACE_NAMESPACES: Final[tuple[str, ...]] = (
     MATERIAL_NAMESPACE,

@@ -36,7 +36,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Final
 
-from exulanica_pieces.canonical import Refused, parse_canonical, sha256_hex
+from exulanica_pieces.canonical import Refused, is_sha256, parse_canonical, sha256_hex
 
 from exulanica_appearance.assets.queue import (
     BEAT_PROFILE,
@@ -72,6 +72,11 @@ _CODE: Final = (
     "ml/appearance/weights",
 )
 _MOUNT: Final = "/mnt/data"
+#: The entry script this tree stages (session_stage and stage copy it to runs/<sha256>/).
+JOB_SCRIPT: Final = Path(__file__).resolve().parents[2] / "container/assets/job.sh"
+#: Where the container copies the staged entry script before checking it: the machine's own disk,
+#: so the bytes checked are the bytes run.
+_LOCAL_SCRIPT: Final = "/opt/job.sh"
 
 
 def code_archive(repository: Path) -> bytes:
@@ -228,17 +233,28 @@ def submit_arguments(
     profile: str,
     dry_run: bool = False,
     mode: str = "job",
+    job_script_sha256: str | None = None,
 ) -> list[str]:
     """The ``nebius ai job create`` command, or a refusal when the worst case passes the bound.
 
     In ``session`` mode ``job_sha256`` is the session record's digest and ``timeout_seconds`` its
-    hard stop."""
+    hard stop. Nothing the machine runs is taken from the bucket on trust: the container copies the
+    staged ``job.sh`` to its own disk and runs it only when it is ``job_script_sha256`` (by default
+    the digest of this tree's :data:`JOB_SCRIPT`), and ``job.sh`` holds the code archive and the
+    session record to the digests this command names. Anyone who can write the bucket can
+    therefore make a start fail, never run other code. The container command is ``sh -c`` with the
+    check as its script, which relies on the service splitting ``--args`` as a shell does; the
+    sessions measured so far ran a single path there, so this form is verified only by the next
+    live session (contract: generated pieces, 5.1)."""
     if route not in ("A", "B", "C"):
         raise Refused("a job on the rented machine takes route A, B or C")
     if mode not in ("job", "session"):
         raise Refused("a submission runs one job or a session")
     # The service's shortest timeout is one hour, so a shorter stop still risks an hour; the
     # job's own stop is enforced inside the job (STOP_SECONDS in job.sh).
+    script_sha256 = job_script_sha256 or sha256_hex(JOB_SCRIPT.read_bytes())
+    if not is_sha256(script_sha256):
+        raise Refused("job_script_sha256 is a sha256")
     service_timeout = max(timeout_seconds, 3600)
     worst = worst_case_cents(service_timeout, rate_cents_per_hour)
     if worst > bound_cents:
@@ -262,8 +278,9 @@ def submit_arguments(
         "--env", f"CODE_SHA256={code_sha256}",
         "--env", f"STOP_SECONDS={timeout_seconds}",
         "--env", f"MODE={mode}",
+        "--env", f"JOB_SCRIPT_SHA256={script_sha256}",
         "--container-command", "sh",
-        "--args", f"{_MOUNT}/runs/{job_sha256}/job.sh",
+        "--args", f"-c '{loader_script(job_sha256)}'",
         "--async",
         "--format", "json",
     ]  # fmt: skip
@@ -271,6 +288,18 @@ def submit_arguments(
     if dry_run:
         command.append("--dry-run")
     return command
+
+
+def loader_script(job_sha256: str) -> str:
+    """The container's own script: copy the staged ``job.sh`` to local disk, refuse it unless it
+    is the digest the submit command pinned (``JOB_SCRIPT_SHA256``), then run the copy. It holds no
+    single quote, so it sits inside one."""
+    staged = f"{_MOUNT}/runs/{job_sha256}/job.sh"
+    return (
+        f"set -eu; cp {staged} {_LOCAL_SCRIPT}; "
+        f'test "$(sha256sum {_LOCAL_SCRIPT} | cut -c1-64)" = "$JOB_SCRIPT_SHA256"; '
+        f"exec sh {_LOCAL_SCRIPT}"
+    )
 
 
 def submit(**arguments: Any) -> dict[str, Any]:
@@ -358,19 +387,30 @@ def session_stage(
 
 def queue(
     *,
+    entry_id: str,
+    session_sha256: str,
     job_raw: bytes,
     requests: Sequence[bytes],
     bucket: str,
     region: str,
     queued_at: datetime,
+    not_after: datetime,
 ) -> dict[str, Any]:
-    """Put a batch in the queue: its job and requests first, then ``ready.json`` in a second copy,
-    so the session never sees a ready entry whose files are not all there."""
-    job_sha256 = sha256_hex(job_raw)
-    prefix = f"queue/{job_sha256}/"
+    """Put a batch in the queue as entry ``entry_id``: its job and requests first, then
+    ``ready.json`` in a second copy, so the session never sees a ready entry whose files are not
+    all there. Only the session ``session_sha256`` takes it, and none after ``not_after``."""
+    ready = build_ready(
+        entry_id,
+        job_raw,
+        requests,
+        session_sha256=session_sha256,
+        queued_at=queued_at,
+        not_after=not_after,
+    )
+    prefix = f"queue/{entry_id}/"
     _copy(region, bucket, entry_files(job_raw, requests), prefix)
-    _copy(region, bucket, {"ready.json": build_ready(job_raw, requests, queued_at)}, prefix)
-    return {"job_sha256": job_sha256, "requests": len(requests)}
+    _copy(region, bucket, {"ready.json": ready}, prefix)
+    return {"entry_id": entry_id, "job_sha256": sha256_hex(job_raw), "requests": len(requests)}
 
 
 def session_stop(*, session_sha256: str, bucket: str, region: str) -> dict[str, Any]:

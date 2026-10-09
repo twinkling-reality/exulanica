@@ -63,6 +63,8 @@ TABLE_PRIVILEGES = {
     "material_recipe": {"SELECT"},
     "material_recipe_source": {"SELECT"},
     "person_derivative_dependency": {"SELECT"},
+    "piece_batch": {"SELECT", "DELETE"},
+    "piece_output": {"SELECT", "DELETE"},
     # The erasure (0172) enqueues an erased creature's containers on its creature tombstone, and
     # a workspace tombstone its style pack files.
     "purge_job": {"INSERT"},
@@ -137,6 +139,7 @@ DEFINERS = {
             "tg_spending_event_ends_guest_policies()",
             "tg_thing_erasure_erases()",
             "tg_thing_store_erases_on_tombstone()",
+            "tg_tombstone_erases_piece_batches()",
             "tg_tombstone_withdraws_project_context()",
             "tg_world_project_item_erases_on_withdrawal()",
             "tg_world_project_withdraws_its_items()",
@@ -201,10 +204,10 @@ def _definers(admin) -> dict[str, str]:
 def test_every_definer_belongs_to_the_login_less_owner_and_the_check_passes(admin):
     definers = _definers(admin)
     # 0044, 0066, 0090, 0107, 0124, 0126, 0127, 0139, 0144, 0149 (door_prune, whose body 0157
-    # replaced), 0155 and the search query retention migration (reference_lookup_clear_queries)
-    # define 23, the migration that erases a drafted creature whole three more, and the migration
-    # that keeps a workspace's own style packs five more: these 31. A create or replace that drops
-    # SECURITY DEFINER leaves this set, so it fails here.
+    # replaced), 0155, the search query retention migration (reference_lookup_clear_queries) and
+    # the piece batch migration define 24, the migration that erases a drafted creature whole three
+    # more, and the migration that keeps a workspace's own style packs five more: these 32. A create
+    # or replace that drops SECURITY DEFINER leaves this set, so it fails here.
     assert set(definers) == set(DEFINERS), definers
     assert {owner for owner in definers.values()} == {DEFINER_ROLE}, definers
     schema = admin.execute("select current_schema() s").fetchone()["s"]

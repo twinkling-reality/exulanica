@@ -14,7 +14,9 @@ trigger's update.
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
+from decimal import Decimal
 
 import pytest
 from exulanica.generation import store
@@ -110,3 +112,97 @@ def test_a_restore_replays_the_tombstone_onto_the_request_the_backup_held_open(
         purged, tmp_path, withdraw=lambda: _workspace_tombstone_as_runtime(purged), current=current
     )
     assert _state(purged, made) == ("cancelled", "workspace_deleted")
+
+
+def _made_batch(purged) -> None:
+    """A request queued into a batch that ended done with one output, as the worker records it."""
+    from exulanica.generation import batches
+    from exulanica.generation.entries import Output
+    from exulanica_pieces.canonical import canonical_bytes, sha256_hex
+
+    made = _open_request(purged)
+    connection, workspace_id = purged.repository.connection, purged.workspace_id
+    queued_at = dt.datetime.now(dt.UTC)
+    batches.record_batch(
+        connection,
+        workspace_id,
+        generation_session_id=uuid.uuid4(),
+        job_raw=b'{"a job":"for the test"}',
+        queued_at=queued_at,
+        not_after=queued_at + dt.timedelta(hours=1),
+        queued=[
+            batches.QueuedReservation(
+                piece_request_id=made,
+                reservation_id=uuid.uuid4(),
+                authority_id=uuid.uuid4(),
+                holder="worker:test",
+            )
+        ],
+    )
+    [batch] = batches.batches_in_flight(connection, workspace_id)
+    receipt = canonical_bytes({"a receipt": "for the test"})
+    piece = b"a piece"
+    output = Output(
+        receipt_sha256=sha256_hex(receipt),
+        receipt=receipt,
+        document={
+            "request_sha256": batch.requests[0].request_sha256,
+            "variant": 0,
+            "verdict": {"over": [], "within": True},
+        },
+        piece_sha256=sha256_hex(piece),
+        piece=piece,
+    )
+    batches.end_batch(
+        connection,
+        workspace_id,
+        batch,
+        state="done",
+        ended_at=dt.datetime.now(dt.UTC),
+        settlements={made: ("reported", Decimal("0.01"))},
+        outputs=[
+            batches.KeptOutput(
+                output=output,
+                cache_key="ca" * 32,
+                components_sha256="c0" * 32,
+                postprocess_version="exulanica.generated-asset-postprocess/v2",
+            )
+        ],
+    )
+    connection.commit()
+
+
+def _batch_rows(purged) -> int:
+    [row] = purged.rows(
+        "select (select count(*) from piece_batch) + (select count(*) from piece_output) as n"
+    )
+    return row["n"]
+
+
+def test_a_workspace_tombstone_erases_the_workspace_s_batches_and_outputs(purged) -> None:
+    _made_batch(purged)
+    assert _batch_rows(purged) == 2
+    _workspace_tombstone_as_runtime(purged)
+    assert _batch_rows(purged) == 0
+
+
+def test_the_administrative_role_s_tombstone_erases_them_too(purged) -> None:
+    _made_batch(purged)
+    with purged.database().session(purged.workspace_id) as connection:
+        connection.execute(
+            "insert into tombstone (workspace_id, scope, requested_by, reason) "
+            "values (%s, 'workspace', %s, 'an operator deleted the workspace')",
+            (purged.workspace_id, uuid.uuid4()),
+        )
+    assert _batch_rows(purged) == 0
+
+
+def test_a_restore_erases_the_batches_the_backup_held(purged, commands, tmp_path) -> None:
+    _made_batch(purged)
+    assert not _through_a_restore(
+        purged,
+        tmp_path,
+        withdraw=lambda: _workspace_tombstone_as_runtime(purged),
+        current=lambda: _batch_rows(purged) == 2,
+    )
+    assert _batch_rows(purged) == 0

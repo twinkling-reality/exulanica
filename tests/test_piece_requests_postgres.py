@@ -10,6 +10,7 @@ test's own, not through the store.
 from __future__ import annotations
 
 import dataclasses
+import datetime as dt
 import hashlib
 import json
 import uuid
@@ -17,7 +18,7 @@ import uuid
 import psycopg
 import pytest
 from exulanica.errors import TombstonedError
-from exulanica.generation import store
+from exulanica.generation import batches, store
 from exulanica.generation.requests import (
     GPU_PROVIDER,
     LookReference,
@@ -60,6 +61,29 @@ def _ask(connection, workspace_id, kinds=(("well", 1),), **changes):
 def world(repository):
     registered_world(repository.connection, repository.workspace_id, actor=ACTOR)
     return repository
+
+
+def _queue(
+    connection, workspace_id, piece_request_id, job_raw: bytes = b'{"a job":"for the test"}'
+) -> uuid.UUID:
+    """Queue one request into a batch of its own, as the generation worker does."""
+    queued_at = dt.datetime.now(dt.UTC)
+    return batches.record_batch(
+        connection,
+        workspace_id,
+        generation_session_id=uuid.uuid4(),
+        job_raw=job_raw,
+        queued_at=queued_at,
+        not_after=queued_at + dt.timedelta(hours=1),
+        queued=[
+            batches.QueuedReservation(
+                piece_request_id=piece_request_id,
+                reservation_id=uuid.uuid4(),
+                authority_id=uuid.uuid4(),
+                holder="worker:test",
+            )
+        ],
+    )
 
 
 def _row(connection, piece_request_id) -> dict:
@@ -125,11 +149,7 @@ def test_a_person_cancels_only_a_request_no_session_has_taken(world) -> None:
     assert refused.value.state == "cancelled"
     assert store.cancel_piece_request(connection, workspace_id, uuid.uuid4()) is None
     (taken,), _ = _ask(connection, workspace_id, kinds=(("gate", 1),))
-    connection.execute(
-        "update piece_request set state = 'queued', queued_at = statement_timestamp() "
-        "where piece_request_id = %s and world_id = %s",
-        (taken.piece_request_id, FIXTURE_WORLD_ID),
-    )
+    _queue(connection, workspace_id, taken.piece_request_id)
     with pytest.raises(store.PieceRequestNotCancellable):
         store.cancel_piece_request(connection, workspace_id, taken.piece_request_id)
 
@@ -223,11 +243,7 @@ def test_the_workspace_s_open_requests_are_counted(world) -> None:
 def test_a_workspace_tombstone_cancels_every_open_request_and_takes_no_new_one(world) -> None:
     connection, workspace_id = world.connection, world.workspace_id
     open_, _ = _ask(connection, workspace_id, kinds=(("well", 1), ("gate", 1)))
-    connection.execute(
-        "update piece_request set state = 'queued', queued_at = statement_timestamp() "
-        "where piece_request_id = %s and world_id = %s",
-        (open_[1].piece_request_id, FIXTURE_WORLD_ID),
-    )
+    _queue(connection, workspace_id, open_[1].piece_request_id)
     (ended,), _ = _ask(connection, workspace_id, kinds=(("lantern", 1),))
     store.cancel_piece_request(connection, workspace_id, ended.piece_request_id)
     tombstone = connection.execute(
@@ -332,3 +348,133 @@ def test_the_store_writes_no_request_whose_look_role_is_not_its_kinds(world, rol
     with pytest.raises(ValueError, match="look role"):
         _ask(connection, workspace_id, planned=[forged])
     assert connection.execute("select count(*) as n from piece_request").fetchone()["n"] == 0
+
+
+def test_a_workspace_holding_an_open_piece_request_cannot_be_seeded(world, tmp_path) -> None:
+    """A judge seed carries a workspace to another deployment; an open ask for GPU time does not
+    go with it, and an ended one does."""
+    from exulanica.orchestration.judge_seed import SeedRefused, export_seed
+    from exulanica.store.local import LocalContentAddressedStore
+
+    connection, workspace_id = world.connection, world.workspace_id
+    blobs = LocalContentAddressedStore(tmp_path / "blobs")
+
+    def export(name: str) -> None:
+        export_seed(
+            connection,
+            blobs,
+            workspace_id=workspace_id,
+            destination=tmp_path / name,
+            created_at="2026-10-08T00:00:00Z",
+            allow_absent=True,
+        )
+
+    export("before")  # the control: nothing open, so the seed is written
+    (made,), _ = _ask(connection, workspace_id)
+    with pytest.raises(SeedRefused, match="holds 1 open piece request"):
+        export("open")
+    store.cancel_piece_request(connection, workspace_id, made.piece_request_id)
+    export("ended")
+
+
+def test_a_seed_carries_ended_requests_only_with_the_kept_pieces_their_outputs_name(
+    world, tmp_path, monkeypatch
+) -> None:
+    """The kept pieces have no workspace column: a seed carries exactly the ones its outputs name
+    (each output's foreign key needs its row). A request asked after the export refused open ones,
+    but before it copied, is not carried open."""
+    from decimal import Decimal
+
+    from exulanica.generation.entries import Output
+    from exulanica.orchestration import judge_seed
+    from exulanica.store.local import LocalContentAddressedStore
+
+    connection, workspace_id = world.connection, world.workspace_id
+    (well,), _ = _ask(connection, workspace_id)
+    _queue(connection, workspace_id, well.piece_request_id)
+    [batch] = batches.batches_in_flight(connection, workspace_id)
+
+    def kept(key: str, variant: int) -> batches.KeptOutput:
+        receipt = canonical_bytes({"a receipt": key, "variant": variant})
+        output = Output(
+            receipt_sha256=sha256_hex(receipt),
+            receipt=receipt,
+            document={
+                "request_sha256": batch.requests[0].request_sha256,
+                "variant": variant,
+                "verdict": {"over": [], "within": True},
+            },
+            piece_sha256=sha256_hex(receipt + b"piece"),
+            piece=receipt + b"piece",
+        )
+        return batches.KeptOutput(
+            output, key, "c0" * 32, "exulanica.generated-asset-postprocess/v2"
+        )
+
+    batches.end_batch(
+        connection,
+        workspace_id,
+        batch,
+        state="done",
+        ended_at=dt.datetime.now(dt.UTC),
+        settlements={well.piece_request_id: ("reported", Decimal("0.01"))},
+        outputs=[kept("ca" * 32, 0)],
+    )
+    # A kept piece no output of this workspace names.
+    with connection.cursor() as cursor:
+        batches._record_generated(cursor, kept("cb" * 32, 0))
+    # The race: the export's refusal of open requests has run, and then the person asks.
+    monkeypatch.setattr(judge_seed, "_refuse_open_piece_requests", lambda *_: None)
+    _ask(connection, workspace_id, kinds=(("lantern", 1),))
+    connection.commit()
+    judge_seed.export_seed(
+        connection,
+        LocalContentAddressedStore(tmp_path / "blobs"),
+        workspace_id=workspace_id,
+        destination=tmp_path / "seed",
+        created_at="2026-10-08T00:00:00Z",
+        allow_absent=True,
+    )
+    rows = {
+        entry["table"]: entry["rows"]
+        for entry in json.loads((tmp_path / "seed" / "manifest.json").read_text())["rows"].values()
+    }
+    assert rows["piece_request"] == 1
+    assert rows["generated_piece"] == 1
+    assert rows["piece_output"] == 1
+
+
+def test_a_request_is_queued_only_into_an_open_batch_of_its_workspace(world) -> None:
+    connection, workspace_id = world.connection, world.workspace_id
+    (well, lantern), _ = _ask(connection, workspace_id, kinds=(("well", 1), ("lantern", 1)))
+    batch = _queue(connection, workspace_id, well.piece_request_id)
+    connection.execute(
+        "update piece_batch set state = 'expired', ended_at = statement_timestamp() "
+        "where workspace_id = %s and piece_batch_id = %s",
+        (workspace_id, batch),
+    )
+    connection.commit()
+
+    def queue_into(piece_batch_id: uuid.UUID) -> None:
+        with connection.transaction():
+            connection.execute(
+                "update piece_request set state = 'queued', queued_at = statement_timestamp(), "
+                "piece_batch_id = %s, reservation_id = %s, reservation_authority_id = %s, "
+                "reservation_holder = 'worker:test' where workspace_id = %s "
+                "and piece_request_id = %s",
+                (
+                    piece_batch_id,
+                    uuid.uuid4(),
+                    uuid.uuid4(),
+                    workspace_id,
+                    lantern.piece_request_id,
+                ),
+            )
+
+    with pytest.raises(psycopg.errors.CheckViolation, match="open batches"):
+        queue_into(batch)
+    with pytest.raises(psycopg.errors.CheckViolation, match="open batches"):
+        queue_into(uuid.uuid4())
+    # The control: an open batch of the workspace takes it.
+    _queue(connection, workspace_id, lantern.piece_request_id, b'{"a second job":"for the test"}')
+    assert _row(connection, lantern.piece_request_id)["state"] == "queued"

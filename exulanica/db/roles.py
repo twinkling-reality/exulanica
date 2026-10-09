@@ -162,6 +162,9 @@ READ_ONLY_TABLES: Final = (
     # connection; a request never does.
     "character_catalog_publication",
     "character_catalog_withdrawal",
+    # The piece batch migration: the operator registers and closes generation sessions with the
+    # owner connection; the generation worker only reads the register.
+    "generation_session",
 )
 
 #: What the runtime may call on migration 0124's durable spending: admit, dispatch and settle an
@@ -295,6 +298,12 @@ INSERT_ONLY_TABLES: Final = (
     # The piece request migration records each ask under a caller's key once and refuses every
     # update of one.
     "piece_ask",
+    # The piece batch migration appends each item a request was answered with and refuses every
+    # update of one; only its tombstone trigger, as the definer owner, deletes.
+    "piece_output",
+    # The piece batch migration's installation-wide index of the generated pieces kept: catalog
+    # content, appended once, never changed or removed (no workspace's deletion reaches it).
+    "generated_piece",
     # Migration 0159 appends each version of a workspace's own body recipes, body plans, thing
     # kinds and looks, and each withdrawal of one of its looks, and refuses every update and delete
     # of each.
@@ -350,6 +359,8 @@ STYLE_PACK_RUNTIME_FUNCTIONS: Final = (
 #: was used and the time a secret was revoked, each once, and nothing else about a secret changes.
 COLUMN_UPDATE_TABLES: Final[tuple[tuple[str, tuple[str, ...]], ...]] = (
     ("door_secret", ("used_at", "revoked_at")),
+    # The piece batch migration: a request's decided settlement is marked settled once.
+    ("piece_settlement", ("settled_at",)),
 )
 
 #: Tables the read-only role is never granted: migration 0149's door secrets and refused

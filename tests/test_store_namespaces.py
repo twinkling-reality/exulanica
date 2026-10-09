@@ -34,6 +34,7 @@ TESTS = Path(__file__).resolve().parent
 STABLE = {
     "blobs": "shared",
     "tiles": "shared",
+    "generated-pieces": "shared",
     "materials": "per-workspace",
     "workspace-assets": "per-workspace",
     "looks": "per-workspace",

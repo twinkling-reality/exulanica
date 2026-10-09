@@ -7,7 +7,10 @@ here with hashlib; a batch's milliseconds come from the test's clock, a quarter 
 
 from __future__ import annotations
 
+import itertools
 import json
+import shutil
+import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -38,6 +41,9 @@ CODE = "c0" * 32
 BENCH = {"look_role": "prop.bench", "slot_mm": {"width": 1800, "height": 900, "depth": 700}}
 LANTERN = {"look_role": "prop.lantern", "slot_mm": {"width": 180, "height": 300, "depth": 180}}
 START = datetime(2026, 10, 7, 12, 0, 0, tzinfo=UTC)
+#: The entry each job was last queued as, so a test names an entry by its job.
+ENTRIES: dict[str, str] = {}
+_ENTRY_NUMBERS = itertools.count()
 
 
 class FakeClock(Clock):
@@ -73,6 +79,7 @@ def _job(
     code: str = CODE,
     estimate: int = 60,
     cutout: bool = False,
+    components: str = "5a" * 32,
 ):
     budgets = read_budgets(repository)
     requests = [
@@ -81,7 +88,7 @@ def _job(
     ]
     job = build_job(
         route="S",
-        components_sha256="5a" * 32,
+        components_sha256=components,
         requests=requests,
         code_sha256=code,
         container="stub",
@@ -92,13 +99,41 @@ def _job(
     return job, requests
 
 
-def _enqueue(root: Path, job: bytes, requests: list[bytes], queued_at: datetime = START) -> Path:
-    directory = root / "queue" / sha256_hex(job)
+def _session_raw(idle: int = 20, stop: int = 600) -> bytes:
+    """The record ``_serve`` starts its session from, by default."""
+    return build_session(route="S", code_sha256=CODE, idle_seconds=idle, stop_seconds=stop)
+
+
+def _enqueue(
+    root: Path,
+    job: bytes,
+    requests: list[bytes],
+    queued_at: datetime = START,
+    not_after: datetime | None = None,
+    session: bytes | None = None,
+) -> Path:
+    # A fresh id for every entry, as the product's batch ids are: identical jobs are two entries.
+    entry = sha256_hex(f"{next(_ENTRY_NUMBERS)}:{root}:{sha256_hex(job)}".encode())[:32]
+    ENTRIES[sha256_hex(job)] = entry
+    directory = root / "queue" / entry
     for name, data in entry_files(job, requests).items():
         (directory / name).parent.mkdir(parents=True, exist_ok=True)
         (directory / name).write_bytes(data)
-    (directory / "ready.json").write_bytes(build_ready(job, requests, queued_at))
+    (directory / "ready.json").write_bytes(
+        build_ready(
+            entry,
+            job,
+            requests,
+            session_sha256=sha256_hex(session or _session_raw()),
+            queued_at=queued_at,
+            not_after=not_after or queued_at + timedelta(hours=1),
+        )
+    )
     return directory
+
+
+def _entry(job: bytes) -> str:
+    return ENTRIES[sha256_hex(job)]
 
 
 def _serve(
@@ -108,17 +143,13 @@ def _serve(
     on_publish: Any = None,
     **session: Any,
 ) -> dict[str, Any]:
-    raw = build_session(
-        route="S",
-        code_sha256=CODE,
-        idle_seconds=session.get("idle", 20),
-        stop_seconds=session.get("stop", 600),
-    )
+    raw = _session_raw(session.get("idle", 20), session.get("stop", 600))
     work = root.parent / "work"
     return serve(
         root=root,
         session_raw=raw,
         code_sha256=CODE,
+        components_sha256="5a" * 32,
         backend=backend or StubBackend(),
         repository=repository,
         work=work,
@@ -129,12 +160,19 @@ def _serve(
 
 
 def _done(root: Path, job: bytes) -> dict[str, Any]:
-    return read_done((root / "done" / f"{sha256_hex(job)}.json").read_bytes())
+    return read_done((root / "done" / f"{_entry(job)}.json").read_bytes())
 
 
 def test_a_session_record_holds_its_stops_to_root_s_bounds() -> None:
     raw = build_session(route="A", code_sha256=CODE, stop_seconds=3600)
     assert read_session(raw)["idle_seconds"] == 600
+    # A nonce keeps two sessions with the same settings apart; a record without one still reads.
+    first = build_session(route="A", code_sha256=CODE, stop_seconds=3600, nonce="1" * 32)
+    second = build_session(route="A", code_sha256=CODE, stop_seconds=3600, nonce="2" * 32)
+    assert len({sha256_hex(raw), sha256_hex(first), sha256_hex(second)}) == 3
+    assert "nonce" not in read_session(raw)
+    with pytest.raises(Refused, match="nonce"):
+        read_session(canonical_bytes(dict(json.loads(raw), nonce="x")))
     for changes, match in (
         ({"stop_seconds": 3601}, "hard stop"),
         ({"idle_seconds": 3700}, "idle stop"),
@@ -152,7 +190,7 @@ def test_a_session_serves_a_ready_batch_once_then_stops_when_idle(
     root = tmp_path / "bucket"
     job, requests = _job(repository, BENCH, LANTERN)
     _enqueue(root, job, requests)
-    done_path = root / "done" / f"{sha256_hex(job)}.json"
+    done_path = root / "done" / f"{_entry(job)}.json"
     published = []
 
     def publish_first() -> None:
@@ -168,10 +206,17 @@ def test_a_session_serves_a_ready_batch_once_then_stops_when_idle(
     assert served["items"] == {"made": 4, "total": 4, "within": 4}
     # Each item reads the clock twice, a quarter second apart; two variants a request.
     assert served["request_milliseconds"] == {sha256_hex(raw): 500 for raw in requests}
-    claim = json.loads((root / "claimed" / f"{sha256_hex(job)}.json").read_bytes())
-    assert claim["session_sha256"] == result["session_sha256"]
-    # The outputs were published before the batch was marked done.
-    assert len(list((root / "out" / "receipts").glob("*.json"))) == 4
+    claim = json.loads((root / "claimed" / f"{_entry(job)}.json").read_bytes())
+    assert (claim["session_sha256"], claim["entry_id"], claim["job_sha256"]) == (
+        result["session_sha256"],
+        _entry(job),
+        sha256_hex(job),
+    )
+    # The outputs were published before the batch was marked done, and the marker names them.
+    published_receipts = sorted(p.stem for p in (root / "out" / "receipts").glob("*.json"))
+    assert len(published_receipts) == 4
+    assert served["receipts"] == published_receipts
+    assert served["entry_id"] == _entry(job)
     beats = sorted((root / "session" / result["session_sha256"]).glob("beat-*.json"))
     assert json.loads(beats[0].read_bytes())["state"] == "idle"
     assert json.loads(beats[-1].read_bytes())["state"] == "ended: idle"
@@ -193,7 +238,54 @@ def test_an_entry_is_taken_only_once_ready_and_oldest_first(
         sha256_hex(older),
         sha256_hex(newer),
     ]
-    assert not (root / "claimed" / f"{sha256_hex(unready)}.json").exists()
+    assert not (root / "claimed" / f"{_entry(unready)}.json").exists()
+
+
+def test_two_identical_jobs_are_two_entries_each_run_and_marked_once(
+    repository: Path, tmp_path: Path
+) -> None:
+    root = tmp_path / "bucket"
+    job, requests = _job(repository, BENCH)
+    first = _enqueue(root, job, requests, START - timedelta(minutes=1)).name
+    second = _enqueue(root, job, requests, START).name
+    result = _serve(repository, root)
+    assert [done["entry_id"] for done in result["served"]] == [first, second]
+    for entry in (first, second):
+        assert read_done((root / "done" / f"{entry}.json").read_bytes())["job_sha256"] == (
+            sha256_hex(job)
+        )
+
+
+def test_an_entry_queued_for_another_session_on_the_bucket_is_never_taken(
+    repository: Path, tmp_path: Path
+) -> None:
+    # Two sessions started from one tree differ by their records; each entry names its own.
+    root = tmp_path / "bucket"
+    job, requests = _job(repository, BENCH)
+    other = build_session(
+        route="S", code_sha256=CODE, idle_seconds=20, stop_seconds=600, nonce="0f" * 16
+    )
+    theirs = _enqueue(root, job, requests, START - timedelta(minutes=1), session=other).name
+    mine = _enqueue(root, job, requests, START).name
+    backend = CountingBackend()
+    result = _serve(repository, root, backend)
+    assert [done["entry_id"] for done in result["served"]] == [mine]
+    assert not (root / "claimed" / f"{theirs}.json").exists()
+
+
+def test_an_entry_past_its_not_after_is_never_claimed_or_run(
+    repository: Path, tmp_path: Path
+) -> None:
+    root = tmp_path / "bucket"
+    job, requests = _job(repository, BENCH)
+    entry = _enqueue(
+        root, job, requests, START - timedelta(hours=1), START - timedelta(seconds=1)
+    ).name
+    backend = CountingBackend()
+    result = _serve(repository, root, backend)
+    assert (result["reason"], result["served"], backend.meshes) == ("idle", [], 0)
+    assert not (root / "claimed" / f"{entry}.json").exists()
+    assert not (root / "done" / f"{entry}.json").exists()
 
 
 @pytest.mark.parametrize(
@@ -212,7 +304,16 @@ def test_an_entry_is_taken_only_once_ready_and_oldest_first(
             lambda d, job, reqs: (d / "ready.json").write_bytes(
                 canonical_bytes(
                     dict(
-                        json.loads(build_ready(job, reqs, START)),
+                        json.loads(
+                            build_ready(
+                                d.name,
+                                job,
+                                reqs,
+                                session_sha256=sha256_hex(_session_raw()),
+                                queued_at=START,
+                                not_after=START + timedelta(hours=1),
+                            )
+                        ),
                         files={"job.json": sha256_hex(job), "../../runs/x/job.sh": "ab" * 32},
                     )
                 )
@@ -220,7 +321,16 @@ def test_an_entry_is_taken_only_once_ready_and_oldest_first(
             "other than job.json",
         ),
         (
-            lambda d, job, reqs: (d / "ready.json").write_bytes(build_ready(job, reqs[:1], START)),
+            lambda d, job, reqs: (d / "ready.json").write_bytes(
+                build_ready(
+                    d.name,
+                    job,
+                    reqs[:1],
+                    session_sha256=sha256_hex(_session_raw()),
+                    queued_at=START,
+                    not_after=START + timedelta(hours=1),
+                )
+            ),
             "exactly the files",
         ),
     ],
@@ -266,6 +376,20 @@ def test_an_entry_for_another_code_archive_or_from_a_cut_out_is_refused(
     assert backend.meshes == 0
 
 
+def test_an_entry_naming_other_models_than_the_session_loaded_is_refused(
+    repository: Path, tmp_path: Path
+) -> None:
+    # A receipt copies the job's components digest, so a job naming other models would have the
+    # session's pieces claim models that did not make them.
+    root = tmp_path / "bucket"
+    other, other_requests = _job(repository, BENCH, components="5b" * 32)
+    _enqueue(root, other, other_requests)
+    backend = CountingBackend()
+    _serve(repository, root, backend)
+    assert "other models than this session loaded" in _done(root, other)["refused"]
+    assert backend.meshes == 0
+
+
 def test_a_symlinked_file_in_an_entry_is_refused(repository: Path, tmp_path: Path) -> None:
     root = tmp_path / "bucket"
     job, requests = _job(repository, BENCH)
@@ -302,7 +426,7 @@ def test_a_batch_that_could_not_finish_before_the_hard_stop_waits(
     _enqueue(root, job, requests)
     result = _serve(repository, root, idle=60, stop=400)
     assert (result["reason"], result["served"]) == ("idle", [])
-    assert not (root / "claimed" / f"{sha256_hex(job)}.json").exists()
+    assert not (root / "claimed" / f"{_entry(job)}.json").exists()
 
 
 def test_a_request_already_made_under_the_same_key_is_not_queued_again(
@@ -405,5 +529,70 @@ def test_a_session_is_submitted_in_session_mode_within_its_bound() -> None:
     command = nebius.submit_arguments(bound_cents=180, **arguments)
     assert "MODE=session" in command and "STOP_SECONDS=3600" in command
     assert f"exulanica-gen-session-a-{sha256_hex(raw)[:12]}" in command
+    # The staged job.sh runs only as the digest of this tree's own, pinned on the command.
+    tree_script = sha256_hex(nebius.JOB_SCRIPT.read_bytes())
+    assert f"JOB_SCRIPT_SHA256={tree_script}" in command
+    assert command[command.index("--args") + 1] == f"-c '{nebius.loader_script(sha256_hex(raw))}'"
     with pytest.raises(Refused, match="worst case"):
         nebius.submit_arguments(bound_cents=179, **arguments)
+
+
+def _loader_in(tmp_path: Path, run: str) -> str:
+    """The container's loader script with its two machine paths moved under ``tmp_path``."""
+    return (
+        nebius.loader_script(run)
+        .replace("/mnt/data", str(tmp_path / "mount"))
+        .replace("/opt/job.sh", str(tmp_path / "disk" / "job.sh"))
+    )
+
+
+def test_the_container_runs_the_staged_job_script_only_as_the_pinned_digest(
+    tmp_path: Path,
+) -> None:
+    run = "ab" * 32
+    staged = tmp_path / "mount" / "runs" / run / "job.sh"
+    staged.parent.mkdir(parents=True)
+    (tmp_path / "disk").mkdir()
+    ran = tmp_path / "ran"
+    staged.write_text(f"echo ran > {ran}\n")
+    digest = sha256_hex(staged.read_bytes())
+    script = _loader_in(tmp_path, run)
+    # The container's image has coreutils' sha256sum; a machine without it gets a stand-in that
+    # prints the same "<digest>  <path>" line.
+    path = "/usr/bin:/bin"
+    if shutil.which("sha256sum", path=path) is None:
+        shims = tmp_path / "shims"
+        shims.mkdir()
+        (shims / "sha256sum").write_text('#!/bin/sh\nexec shasum -a 256 "$@"\n')
+        (shims / "sha256sum").chmod(0o755)
+        path = f"{shims}:{path}"
+    good = subprocess.run(
+        ["sh", "-c", script], env={"JOB_SCRIPT_SHA256": digest, "PATH": path},
+        capture_output=True, check=False,
+    )  # fmt: skip
+    assert good.returncode == 0 and ran.read_text() == "ran\n"
+    ran.unlink()
+    # Anyone who can write the bucket can rewrite the staged script; it is then never run.
+    staged.write_text(f"echo other > {ran}\n")
+    bad = subprocess.run(
+        ["sh", "-c", script], env={"JOB_SCRIPT_SHA256": digest, "PATH": path},
+        capture_output=True, check=False,
+    )  # fmt: skip
+    assert bad.returncode != 0 and not ran.exists()
+
+
+def test_the_job_script_checks_and_uses_local_copies_of_what_it_trusts() -> None:
+    lines = nebius.JOB_SCRIPT.read_text().splitlines()
+    uses = [
+        line.strip() for line in lines if '"$run/code.tar"' in line or '"$run/session.json"' in line
+    ]
+    assert uses == [
+        'cp "$run/code.tar" "$stage/code.tar"',
+        'cp "$run/session.json" "$stage/session.json"',
+    ]
+    assert 'test "$(sha256sum "$stage/code.tar" | cut -c1-64)" = "$CODE_SHA256"' in [
+        line.strip() for line in lines
+    ]
+    assert 'test "$(sha256sum "$stage/session.json" | cut -c1-64)" = "$JOB"' in [
+        line.strip() for line in lines
+    ]

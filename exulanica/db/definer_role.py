@@ -203,6 +203,14 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
             }.items()
         },
     ),
+    # The piece batch migration: tg_tombstone_erases_piece_batches reads and deletes a deleted
+    # workspace's batches and outputs.
+    "0175": DefinerGrants(
+        tables={
+            "piece_batch": frozenset({"SELECT", "DELETE"}),
+            "piece_output": frozenset({"SELECT", "DELETE"}),
+        }
+    ),
 }
 
 

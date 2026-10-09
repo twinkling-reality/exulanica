@@ -2,7 +2,8 @@
 # The entry of a generated asset job on Nebius Serverless AI, run from the bucket mount by the image
 # python:3.12-slim-bookworm pinned by digest (the submit command names it).
 #
-#   sh /mnt/data/runs/<job or session sha256>/job.sh
+#   sh /opt/job.sh   (the container's copy of runs/<job or session sha256>/job.sh, run only once
+#                     it is the JOB_SCRIPT_SHA256 the submit command pinned)
 #
 # Environment, set by the submit command: ROUTE (A, B or C), JOB (the job record's sha256, or in
 # a session the session record's), CODE_SHA256 (the staged code archive's), STOP_SECONDS (the job
@@ -30,10 +31,18 @@ case "$mode" in job|session) ;; *) echo "MODE is job or session" >&2; exit 2 ;; 
 route=$(printf '%s' "$ROUTE" | tr ABC abc)
 
 echo "phase code $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-test "$(sha256sum "$run/code.tar" | cut -d' ' -f1)" = "$CODE_SHA256"
-mkdir -p /opt/gen
-tar -xf "$run/code.tar" -C /opt/gen
+# Every file this machine runs or trusts is copied to its own disk first and checked there, so the
+# bytes checked are the bytes used, whoever can write the bucket.
+stage=/opt/stage
+mkdir -p "$stage" /opt/gen
+cp "$run/code.tar" "$stage/code.tar"
+test "$(sha256sum "$stage/code.tar" | cut -c1-64)" = "$CODE_SHA256"
+tar -xf "$stage/code.tar" -C /opt/gen
 code=/opt/gen
+if [ "$mode" = session ]; then
+  cp "$run/session.json" "$stage/session.json"
+  test "$(sha256sum "$stage/session.json" | cut -c1-64)" = "$JOB"
+fi
 
 echo "phase system $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 # Triton compiles some of torch's kernels when they first run and needs a C compiler for it
@@ -76,7 +85,7 @@ case "$ROUTE" in
 esac
 if [ "$mode" = session ]; then
   PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance assets session serve \
-    --code "$code" --route "$ROUTE" --session "$run/session.json" --code-sha256 "$CODE_SHA256" \
+    --code "$code" --route "$ROUTE" --session "$stage/session.json" --code-sha256 "$CODE_SHA256" \
     --root "$data" --weights "$work/weights" --work "$work/out" --ledger "$work/published.txt"
 elif [ "$ROUTE" = C ]; then
   # A creature job: each item from its plan's sketch to a checked skinned look.
