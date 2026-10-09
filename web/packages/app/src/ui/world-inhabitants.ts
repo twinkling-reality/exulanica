@@ -21,7 +21,7 @@ import {
   type SocietyPlaybackSpeed,
 } from '../society-control-api.js';
 import { societyEngine } from '../society-engines.js';
-import { inhabitantWordsFrom, phrase, type BridgeLabel, type InhabitantWords } from '../society-inhabitant-words.js';
+import { inhabitantWordsFrom, optionalPhrase, phrase, type BridgeLabel, type InhabitantWords } from '../society-inhabitant-words.js';
 import { say } from './copy.js';
 import { el, replace, setText } from './dom.js';
 import './world-inhabitants.css';
@@ -318,12 +318,15 @@ type Inhabitant = OwnedSocietyState['inhabitants'][number];
 
 export { REASON_WORDS, type InhabitantWords } from '../society-inhabitant-words.js';
 
-/** A listed place in words: its town's label, with its address number where the town gives one, else "a place". */
+/**
+ * A listed place in words: its town's label, with its address number where the town gives one, else
+ * "a place". A use class the catalog words in its own way (place_named_<use class>) is said so.
+ */
 function listedPlaceWords(name: SocietyPlaceName | null): string {
   if (name?.label == null) return phrase('place_listed');
-  return name.addressNumber === null
-    ? phrase('place_named', { label: name.label })
-    : phrase('place_named_at', { label: name.label, number: name.addressNumber });
+  const values = name.addressNumber === null ? { label: name.label } : { label: name.label, number: name.addressNumber };
+  const code = name.addressNumber === null ? 'place_named' : 'place_named_at';
+  return optionalPhrase(`${code}_${name.useClass}`, values) ?? phrase(code, values);
 }
 
 /**

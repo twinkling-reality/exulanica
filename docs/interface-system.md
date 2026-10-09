@@ -252,7 +252,8 @@ which then reads "How we know". Every word about the subject comes from what the
 Selected already hold; the card writes only its frame words ("Now", "Mind", "Came from"). Where the Now
 line names a place, it is the title of the person's own object, or, for one the input their society
 consumed lists as open that no object names (a town's premises), what its town calls it ("the bakery at
-number 12", from the input's place label and address number), else "a place"; only a place that input
+number 12", from the input's place label and address number, in the words catalog's own phrase where it
+has one for that use class, so a home reads "the house at number 12"), else "a place"; only a place that input
 does not list as open is said to be gone.
 
 The mind is an open model by its served name and line, or "Their own routine" ("What they would do

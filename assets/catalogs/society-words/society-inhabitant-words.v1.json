@@ -352,6 +352,20 @@
       "reason": "Authored: a place the input a person's society consumed lists as open and names from its town (its label, and its address number where the town gives one); never a street, which is presentation."
     },
     {
+      "key": "phrase.place_named_residential",
+      "kind": "phrase",
+      "code": "place_named_residential",
+      "words": "a house",
+      "reason": "Authored: a town place of one use class said in its own words where the generic 'the {label}' reads wrong; the page looks for place_named_<use class> and place_named_at_<use class> and falls back to place_named and place_named_at, so no code names a use class."
+    },
+    {
+      "key": "phrase.place_named_at_residential",
+      "kind": "phrase",
+      "code": "place_named_at_residential",
+      "words": "the house at number {number}",
+      "reason": "Authored: a town place of one use class said in its own words where the generic 'the {label}' reads wrong; the page looks for place_named_<use class> and place_named_at_<use class> and falls back to place_named and place_named_at, so no code names a use class."
+    },
+    {
       "key": "phrase.place_listed",
       "kind": "phrase",
       "code": "place_listed",

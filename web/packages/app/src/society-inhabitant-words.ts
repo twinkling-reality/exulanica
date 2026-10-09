@@ -299,3 +299,9 @@ export interface PlaceWords {
 export function phrase(code: string, values: Readonly<Record<string, string | number>> = {}): string {
   return fill(words('phrase', code), values);
 }
+
+/** A phrase the catalog may or may not state (a per-use-class wording), or null where it states none. */
+export function optionalPhrase(code: string, values: Readonly<Record<string, string | number>> = {}): string | null {
+  const found = TABLES.phrase[code];
+  return found === undefined ? null : fill(found, values);
+}

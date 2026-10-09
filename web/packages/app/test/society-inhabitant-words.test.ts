@@ -192,5 +192,8 @@ describe('a place the input lists that no object of the person names', () => {
     expect(said({ useClass: 'bakery', label: 'bakery', addressNumber: 12 }))
       .toBe(gone.replace(phrase('place_gone'), phrase('place_named_at').replace('{label}', 'bakery').replace('{number}', '12')));
     expect(said({ useClass: 'bakery', label: null, addressNumber: 12 })).toBe(said(null));
+    // A use class the catalog words in its own way: a home is a house.
+    expect(said({ useClass: 'residential', label: 'home', addressNumber: 12 }))
+      .toBe(gone.replace(phrase('place_gone'), phrase('place_named_at_residential').replace('{number}', '12')));
   });
 });
