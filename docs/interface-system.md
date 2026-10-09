@@ -325,7 +325,11 @@ decides' own words (`outsideWords`, through the bridge, naming an AI agent only 
 entry says an AI runs it), with Came from in the same words (`cameWords`). Where that program's latest answer was not taken, the
 Mind says so under its line in Who decides' own Lately words (`outsideLatestWords`), and nothing while it was. While a person
 plays a being, its Mind is that person ("You", or "Another person") with Who decides' own words for it
-(`playedWords`), and offers no Change: its own mind rests until it is given back. Before that read names it,
+(`playedWords`), and offers no Change: its own mind rests until it is given back. A being of a society of
+things nobody plays offers "Play this one" under its Mind ("You choose what it does, in the world, until you give it
+back. Its mind rests meanwhile."), which plays it through the Play screen (`environmentSelection.play`); the one who
+plays it sees "Give it back" (`giveBack`), and anyone else sees neither. Why a being cannot be played is said in the
+Play screen's band. Before that read names it,
 the card says only "Decided from outside, through" the bridge: a grant whose program decides says
 nothing about a person, so none is claimed. One of the world's own people a grant lets a program run reads the
 same way. A visitor the world decides for has its world mind like any being, the model named or

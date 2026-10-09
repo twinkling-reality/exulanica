@@ -160,6 +160,8 @@ export function personCard(
     choices: [],
     ask: '',
     when: '',
+    // Only the one who plays it can give it back; nobody else can take it meanwhile.
+    play: played.byYou ? 'give_back' : null,
   } : {
     name: running?.name ?? ROUTINE_NAME,
     line: running !== null
@@ -172,6 +174,8 @@ export function personCard(
     choices,
     ask: 'Choose who decides what they do.',
     when: 'A new mind takes over at their next choice, within a minute of world time.',
+    // A being of a society of things nobody plays may be played; the band says why where it may not.
+    play: being !== null && about.mind !== null ? 'play' : null,
   };
   return {
     subject: subjectId,
@@ -297,7 +301,8 @@ export interface MountedThingCard {
 }
 
 export function mountThingCard(options: {
-  readonly selection: Pick<MountedEnvironmentSelection, 'decide' | 'models' | 'openDecides'>;
+  readonly selection: Pick<MountedEnvironmentSelection, 'decide' | 'models' | 'openDecides'>
+    & Partial<Pick<MountedEnvironmentSelection, 'play' | 'giveBack'>>;
   /** Open Compare, or null where this world offers no comparison. */
   readonly compare: (() => void) | null;
   /** The shell the drawn ring listens on: closing the card raises the pick event with nothing. */
@@ -492,6 +497,12 @@ export function mountThingCard(options: {
     },
     onCompare: options.compare,
     onLook: chooseLookFor,
+    ...(selection.play === undefined ? {} : {
+      async onPlay() {
+        if (subject !== null) await selection.play!(subject);
+      },
+    }),
+    ...(selection.giveBack === undefined ? {} : { onGiveBack: () => selection.giveBack!() }),
   });
   return {
     view: {

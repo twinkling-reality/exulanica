@@ -149,3 +149,5 @@
 #shell .thing-card-proof { margin-top: var(--space-1); }
 #shell .thing-card-proof summary { cursor: pointer; color: var(--color-accent-text); font-size: var(--text-sm); }
 #shell .thing-card-proof p { overflow-wrap: anywhere; }
+/* Play this one, or Give it back, under the mind: the button and what playing means. */
+#shell .thing-card-play-row { display: grid; gap: var(--space-1); justify-items: start; margin-top: var(--space-1); }

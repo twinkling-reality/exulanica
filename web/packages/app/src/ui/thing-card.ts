@@ -42,7 +42,12 @@ export interface CardMind {
   readonly ask: string;
   /** Under the choices: when a new mind takes over. */
   readonly when: string;
+  /** Whether the reader may play it now (`play`) or give it back (`give_back`); absent offers neither. */
+  readonly play?: 'play' | 'give_back' | null;
 }
+
+/** What playing a being means, said under Play this one (the Play screen's design). */
+export const PLAY_WORDS = 'You choose what it does, in the world, until you give it back. Its mind rests meanwhile.';
 
 /** A link the card shows: its words and where it goes (an https address). */
 export interface CardLink {
@@ -129,6 +134,9 @@ export interface ThingCardHandlers {
   onAllMinds(): void;
   /** Open Compare; null where this world offers no comparison. */
   onCompare: (() => void) | null;
+  /** Play this being, or give it back; absent where the card offers neither. */
+  onPlay?(): Promise<void>;
+  onGiveBack?(): Promise<void>;
   /** Draw it in another look, by the look's key; absent where no look can be changed from the card. */
   onLook?(key: string): Promise<CardLookOutcome>;
 }
@@ -203,6 +211,18 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
       box.append(list, el('p', {
         class: 'thing-card-faint', text: busy ? 'Choosing…' : mind.when,
       }));
+    }
+    if (!choosing && mind.play === 'play' && handlers.onPlay !== undefined) {
+      const onPlay = handlers.onPlay;
+      const button = el('button', { type: 'button', class: 'thing-card-play', text: 'Play this one', 'data-action': 'card.mind.play' });
+      button.addEventListener('click', () => { void onPlay(); });
+      box.append(el('div', { class: 'thing-card-play-row' }, [button, el('p', { class: 'thing-card-faint', text: PLAY_WORDS })]));
+    }
+    if (!choosing && mind.play === 'give_back' && handlers.onGiveBack !== undefined) {
+      const onGiveBack = handlers.onGiveBack;
+      const button = el('button', { type: 'button', class: 'thing-card-play', text: 'Give it back', 'data-action': 'card.mind.give-back' });
+      button.addEventListener('click', () => { void onGiveBack(); });
+      box.append(el('div', { class: 'thing-card-play-row' }, [button]));
     }
     if (outcome !== null) box.append(el('p', { class: 'thing-card-outcome', role: 'status', text: outcome }));
     const all = el('button', { type: 'button', class: 'thing-card-link', text: 'All minds in this world', 'data-action': 'card.mind.all' });

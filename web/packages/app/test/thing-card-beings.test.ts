@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import type { ThingLibrary } from '@exulanica/atlas-react/things';
 import { mountThingCard, personCard } from '../src/composition/thing-card-mount.js';
-import { buildThingCard } from '../src/ui/thing-card.js';
+import { buildThingCard, PLAY_WORDS } from '../src/ui/thing-card.js';
 import type { SelectedBeing, SelectedPerson } from '../src/composition/environment-selection.js';
 import type { DoorBridge } from '../src/door-bridges-api.js';
 import type { LookReference } from '../src/thing-card-api.js';
@@ -104,6 +104,38 @@ describe('a person of a society of things, on the card', () => {
     expect(placed.holding).toBeNull();
     const villager = personCard('person-0', about(being({ kind: ref('villager'), cameBy: 'populated', placedId: null })), null);
     expect(villager.cameFrom).toBe('One of the people who live in this world.');
+  });
+});
+
+describe('playing a being from its card', () => {
+  // UI's Play screen (package 28): the card offers Play this one where nobody plays the being, with
+  // the design's words, and Give it back to the one who plays it; it calls the selection's play and
+  // giveBack, and nothing is offered to anyone else while another person plays it.
+  it('offers Play this one, then Give it back to the player, and nothing to anyone else', async () => {
+    const play = vi.fn(async () => undefined);
+    const giveBack = vi.fn(async () => undefined);
+    const shell = document.createElement('div');
+    document.body.replaceChildren(shell);
+    const mounted = mountThingCard({
+      selection: { decide: vi.fn(), models: () => null, openDecides: vi.fn(), play, giveBack }, compare: null,
+      shell, credentials: { baseUrl: 'https://example.test', token: 't' },
+      library: async () => library(), looks: async () => new Map(), card: async () => null,
+      manifest: async () => { throw new Error('not served'); },
+    });
+    shell.append(mounted.view.root);
+    const root = mounted.view.root;
+    mounted.view.show('knight-0', about(being({}), { running: null, words: 'Their own routine.' }));
+    root.querySelector<HTMLButtonElement>('[data-action="card.mind.play"]')!.click();
+    expect(play).toHaveBeenCalledWith('knight-0');
+    expect(root.textContent).toContain(PLAY_WORDS);
+    const mine = { byYou: true };
+    mounted.view.show('knight-0', about(being({}), { running: null, words: playedWords(mine), played: mine }));
+    expect(root.querySelector('[data-action="card.mind.play"]')).toBeNull();
+    root.querySelector<HTMLButtonElement>('[data-action="card.mind.give-back"]')!.click();
+    expect(giveBack).toHaveBeenCalledOnce();
+    const theirs = { byYou: false };
+    mounted.view.show('knight-0', about(being({}), { running: null, words: playedWords(theirs), played: theirs }));
+    expect(root.querySelector('[data-action="card.mind.play"], [data-action="card.mind.give-back"]')).toBeNull();
   });
 });
 
