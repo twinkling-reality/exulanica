@@ -1597,15 +1597,22 @@ crosses in through a gate placed on the town, at the open node nearest the gate'
 society of things reads only things inputs, and no other society reads one.
 
 **What a crowded town costs.** Measured on a market town (970 place nodes) with 256 placed things,
-each standing on a footway station, on commit d8b1f107 on 2026-10-09, on an otherwise quiet machine
-(87 percent CPU idle), 60 minutes of each: with 256 blocking wells and 96 people a minute took 282
-ms at the median (310 ms at the 95th percentile), of which the purposeful planner took 274 ms and
-the things phase 7 ms; with 128 wells and 128 placed beings, 224 people, a minute took 361 ms (410
-ms), the planner 350 ms and the things phase 11 ms. Both are over the 200 ms tick budget, and the
-excess is the planner's, which grows with people and with the walking graph that cut lines and
-joined places enlarge (2,003 nodes in the first). Not measured: the judges' small town (616 place
-nodes, 40 residents and six things in the town scene) is far smaller, so it is expected, not shown,
-to stay well inside the budget. No cap on placed things or beings applies to a town.
+each standing on a footway station, on commit b9030943 with the planner described here, on
+2026-10-09, on an otherwise quiet machine (at least 81 percent CPU idle), 60 minutes of each: with
+256 blocking wells and 96 people a minute took 53 ms at the median (70 ms at the 95th percentile),
+of which the purposeful planner took 46 ms and the things phase 7 ms; with 128 wells and 128 placed
+beings, 224 people, a minute took 65 ms at the median (86 ms at the 95th percentile), of which the
+purposeful planner took 54 ms and the things phase 11 ms. Both are within the 200 ms tick budget at
+the 95th percentile. The planner builds what depends on the minute's input alone once a minute, not
+once for each person who plans a route: the digest of the navigation that every route records, the
+walking graph, routes, and the standing exclusions, for which each node is held only to the places
+within a standing spacing of it. On commit b9030943 itself, without that, the same minutes, state
+for state and event for event, took 294 ms and 384 ms at the median (the planner 287 ms and 373 ms),
+both over the budget. The planner is still most of a minute (85 and 83 percent), on walking graphs
+that cut lines and joined places enlarge (2,003 and 1,523 nodes). Not measured: the judges' small
+town (616 place nodes, 40 residents and six things in the town scene) is far smaller, so it is
+expected, not shown, to stay well inside the budget. No cap on placed things or beings applies to a
+town.
 
 **A minute.** The planner's minute, the person's direct requests and the people's decisions come
 first, unchanged, and every event they record names v7; then the things phase:
