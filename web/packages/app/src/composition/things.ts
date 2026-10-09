@@ -18,6 +18,7 @@ import {
   ThingCrowdFigures,
   ThingLayer,
   type PlacedThingRecord,
+  type SocietyPoint,
   type ThingLayerOptions,
   type ThingLibrary,
   type ThingMiss,
@@ -64,6 +65,8 @@ export interface ThingsDependencies {
    * thing changing hands waits for; everyone's has, when left out.
    */
   readonly walkEnded?: (subjectId: string) => boolean;
+  /** The society drawn now (its crowd's root and where each person's feet are), for Play this one's rings. */
+  readonly society?: ThingLayerOptions['society'];
 }
 
 export interface MountedThings {
@@ -88,6 +91,10 @@ export interface MountedThings {
   setLooks(choices: ReadonlyMap<string, ThingLookChoice>): void;
   /** Placed things drawn as nothing, and why. */
   readonly misses: readonly ThingMiss[];
+  /** Play this one: ring the being the viewer plays at its feet, or none with null. */
+  setPlayed(subjectId: string | null): void;
+  /** Play this one: ring the ground where the played being's next walk goes (the society's own frame), or none with null. */
+  setDestination(point: SocietyPoint | null): void;
   readonly layer: ThingLayer;
   destroy(): void;
 }
@@ -99,6 +106,26 @@ export interface MountedThings {
 export function signalColour(): string {
   const value = tokenBlock(':root').get('--color-signal');
   if (value === undefined || !/^#[0-9a-f]{6}$/iu.test(value)) throw new Error('tokens.css :root --color-signal is not a colour');
+  return value.toLowerCase();
+}
+
+/**
+ * Play this one's rings: the world-mark person colour, the "You" pill's own, as tokens.css states it
+ * (fixed in every scheme: it stands in the world).
+ */
+export function worldMarkPersonColour(): string {
+  const value = tokenBlock(':root').get('--color-world-mark-person');
+  if (value === undefined || !/^#[0-9a-f]{6}$/iu.test(value)) throw new Error('tokens.css :root --color-world-mark-person is not a colour');
+  return value.toLowerCase();
+}
+
+/**
+ * The dark edge Play this one's rings stand on: the world-mark person ink, the "You" pill's own words
+ * colour, as tokens.css states it (fixed in every scheme), so the yellow ring reads on pale ground.
+ */
+export function worldMarkPersonInk(): string {
+  const value = tokenBlock(':root').get('--color-world-mark-person-ink');
+  if (value === undefined || !/^#[0-9a-f]{6}$/iu.test(value)) throw new Error('tokens.css :root --color-world-mark-person-ink is not a colour');
   return value.toLowerCase();
 }
 
@@ -142,8 +169,11 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
     library,
     regionRoot: deps.regionRoot,
     ringColour: signalColour(),
+    personColour: worldMarkPersonColour(),
+    personEdge: worldMarkPersonInk(),
     invalidate: deps.invalidate,
     reducedMotion: deps.reducedMotion,
+    ...(deps.society ? { society: deps.society } : {}),
   });
   // The ring follows the event, whoever raises it: a pick here, a card closing, a mark.
   const onPick = (event: Event) => {
@@ -191,6 +221,12 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
     },
     get misses() {
       return layer.misses;
+    },
+    setPlayed(subjectId) {
+      if (!destroyed) layer.setPlayed(subjectId);
+    },
+    setDestination(point) {
+      if (!destroyed) layer.setDestination(point);
     },
     layer,
     destroy() {

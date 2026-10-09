@@ -144,6 +144,11 @@ export class AuthoredRegionSociety {
     return this.crowd.anchorOf(id, out);
   }
 
+  /** Where an inhabitant's feet are drawn, in world space (`SocietyCrowd.groundOf`), or false when not drawn outdoors. */
+  groundOf(id: string, out: pc.Vec3): boolean {
+    return this.crowd.groundOf(id, out);
+  }
+
   /** Everyone drawn as everyone else is although their state says what they do, and why. */
   get seatingMisses(): readonly CrowdSeatingMiss[] {
     return this.crowd.seatingMisses;

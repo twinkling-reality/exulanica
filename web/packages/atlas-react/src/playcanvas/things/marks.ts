@@ -26,11 +26,14 @@ import * as pc from 'playcanvas';
 /**
  * What a being's mark says, as the page decided it. `full` is the mark's words for a screen
  * reader; `outside` is an AI agent from outside the world, `short` its name for itself; `from` is
- * where a visitor this world's model runs came from (a bridge's label).
+ * where a visitor this world's model runs came from (a bridge's label). A person's mark (a being
+ * someone plays, or a line they said) draws its `label` as the pill's word; `mine` says the viewer
+ * is the one playing.
  */
 export type ThingMark =
   | { readonly kind: 'ai'; readonly short: string; readonly full: string; readonly outside?: true; readonly from?: string }
-  | { readonly kind: 'from'; readonly label: string; readonly full: string };
+  | { readonly kind: 'from'; readonly label: string; readonly full: string }
+  | { readonly kind: 'person'; readonly label: string; readonly full: string; readonly mine: boolean; readonly from?: string };
 
 export interface MarkedSubject {
   readonly mark: ThingMark | null;

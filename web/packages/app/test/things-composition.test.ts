@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { ThingLibrary, readThingLibrary, type PlacedThingRecord, type ThingLayerOptions, type ThingPick } from '@exulanica/atlas-react/things';
-import { THING_PICK_EVENT, mountThings, signalColour, type ThingPickDetail } from '../src/composition/things.js';
+import { THING_PICK_EVENT, mountThings, signalColour, worldMarkPersonColour, type ThingPickDetail } from '../src/composition/things.js';
 
 // The layer draws and picks in the renderer, tested beside it (atlas-react things-layer.test.ts);
 // here it stands in, recording what the page hands it, so the page's own part is what is tested.
@@ -23,6 +23,10 @@ const { FakeLayer, layers } = vi.hoisted(() => {
     async setPlaced(things: readonly PlacedThingRecord[]) { this.placed = things; }
     pick() { return { pick: { placedId: this.placed[0]!.thingId, thingId: null, subjectId: null }, distance: 3 }; }
     setPicked(pick: ThingPick | null) { this.picked = pick; }
+    played: string | null = null;
+    destination: unknown = null;
+    setPlayed(subjectId: string | null) { this.played = subjectId; }
+    setDestination(point: unknown) { this.destination = point; }
     get drawn() { return this.placed.map((one) => ({ placedId: one.thingId, lookKind: 'light', look: 'spirit-light/v1' })); }
     get misses() { return []; }
     destroy() { this.destroyed = true; }
@@ -150,5 +154,29 @@ describe('drawing the placed things and raising a pick', () => {
 
   it('rings in the design tokens\' signal colour', () => {
     expect(signalColour()).toBe(tokenBlock(':root').get('--color-signal')!.toLowerCase());
+  });
+
+  it('rings what a person plays and where its next walk goes in the person mark\'s colour, in the society drawn', async () => {
+    const fixture = served();
+    const shell = document.createElement('div');
+    const library = new ThingLibrary(readThingLibrary(fixture.list), async () => new ArrayBuffer(0));
+    const society = () => null;
+    const things = await mountThings({
+      app: {} as never, camera: {} as never, shell, credentials: { baseUrl: 'https://example.test', token: 'token' },
+      regionRoot: () => null, invalidate: vi.fn(), reducedMotion: () => false, library: async () => library, society,
+    });
+    const layer = layers.at(-1)!;
+    // The colours agreed with lane UI for the "You" pill and its rings, and the rings' dark edge in the
+    // pill's own ink, which the operator chose (B of package 18's A/B).
+    expect(worldMarkPersonColour()).toBe('#f4ff91');
+    expect(layer.options.personColour).toBe('#f4ff91');
+    expect(layer.options.personEdge).toBe('#1b2430');
+    expect(layer.options.society).toBe(society);
+    things.setPlayed('knight-1');
+    things.setDestination({ xMm: 1000, zMm: -2000 });
+    expect([layer.played, layer.destination]).toEqual(['knight-1', { xMm: 1000, zMm: -2000 }]);
+    things.destroy();
+    things.setPlayed('villager-1');
+    expect(layer.played).toBe('knight-1');
   });
 });

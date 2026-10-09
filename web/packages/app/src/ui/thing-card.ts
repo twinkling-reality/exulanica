@@ -7,10 +7,10 @@
 
 import { el } from './dom.js';
 
-/** The mark beside the title and the mind: "AI", or where a visitor came from. */
+/** The mark beside the title and the mind: "AI", where a visitor came from, or who plays it now. */
 export interface CardMark {
-  readonly kind: 'ai' | 'from';
-  /** The pill's words: "AI", or "from" and the label the door lists for a visitor's bridge. */
+  readonly kind: 'ai' | 'from' | 'person';
+  /** The pill's words: "AI", "from" and the label the door lists for a visitor's bridge, or "You" or "Played". */
   readonly text: string;
   /** What a screen reader says for it. */
   readonly label: string;

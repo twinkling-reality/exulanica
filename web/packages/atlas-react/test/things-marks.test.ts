@@ -185,6 +185,28 @@ describe('marks over the beings a model or someone outside runs', () => {
     expect(onPick).toHaveBeenCalledWith('agent');
   });
 
+  it('marks a being a person plays with the person pill, never an AI\'s, and opens their lines with Person', () => {
+    const { camera, stage } = setup();
+    const overlay = new ThingMarks(stage, () => undefined);
+    // The words agreed with lane UI for Play this one: "You" to the one playing, "Played" to others.
+    const YOU: ThingMark = { kind: 'person', mine: true, label: 'You', full: 'Played by you' };
+    const PLAYED: ThingMark = { kind: 'person', mine: false, label: 'Played', full: 'Played by another person' };
+    overlay.setMarks(marked([['knight', YOU, 'knight'], ['spirit', PLAYED, 'lantern spirit']]));
+    const anchors = new Map([['knight', new pc.Vec3(0, 1, -5)], ['spirit', new pc.Vec3(1, 1, -5)]]);
+    overlay.update(camera, anchors, null, 0);
+    const marks = shown(stage);
+    expect(marks.find((one) => one.subject === 'knight')).toMatchObject({ word: 'You', name: null, origin: null, aria: 'knight: Played by you' });
+    expect(marks.find((one) => one.subject === 'knight')!.classes.split(' ').sort()).toEqual(['thing-mark-person', 'thing-mark-pill']);
+    expect(marks.find((one) => one.subject === 'spirit')).toMatchObject({ word: 'Played', aria: 'lantern spirit: Played by another person' });
+    expect(overlay.counts).toEqual({ marks: 2, aiMarks: 0, lines: 0 });
+    const line: ThingMark = { kind: 'person', mine: false, label: 'Person', full: 'Played by a person' };
+    overlay.showLine({ subjectId: 'knight', text: 'Could I borrow your sword?', mark: line, header: 'knight · played by a person', spoken: 'Played by a person' }, 0);
+    overlay.update(camera, anchors, null, 0);
+    const pill = stage.querySelector<HTMLElement>('.thing-line .thing-mark-pill')!;
+    expect([pill.textContent, pill.getAttribute('aria-label')]).toEqual(['Person', 'Played by a person']);
+    expect(pill.className.split(' ').sort()).toEqual(['thing-mark-person', 'thing-mark-pill']);
+  });
+
   it('writes a line as text over its speaker, for as long as its length allows', () => {
     const { camera, stage } = setup();
     const overlay = new ThingMarks(stage, () => undefined);

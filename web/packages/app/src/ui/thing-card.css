@@ -65,6 +65,8 @@
   background: var(--color-text);
 }
 #shell .thing-card-mark-from { color: var(--color-text); background: var(--color-surface-raised); border: 1.5px solid var(--color-text); }
+/* Played by a person: the world pill's own colours, the same in every scheme. */
+#shell .thing-card-mark-person { color: var(--color-world-mark-person-ink); background: var(--color-world-mark-person); }
 
 #shell .world-panel .thing-card button.thing-card-change {
   margin: 0 0 0 auto;

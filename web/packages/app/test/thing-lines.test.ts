@@ -36,7 +36,22 @@ describe('saidLine', () => {
   it('reads nothing from another event, an empty line or a decider it does not know', () => {
     expect(saidLine(event('thing_arrived', 'v', 1, { line: 'hi', decider: 'model' }))).toBeNull();
     expect(saidLine(said('k', 1, '   '))).toBeNull();
-    expect(saidLine(said('k', 1, 'hi', { decider: 'person' }))).toBeNull();
+    expect(saidLine(said('k', 1, 'hi', { decider: 'routine' }))).toBeNull();
+  });
+});
+
+describe('a line a person said while playing a being', () => {
+  it('is read with its decider, names no model, and is said to be a person\'s', () => {
+    const line = saidLine(said('knight-0', 4, 'Could I borrow your sword?', { decider: 'person' }))!;
+    expect(line).toMatchObject({ speakerId: 'knight-0', decider: 'person', model: null });
+    const drawn = thingLine(line, { running: QWEN, played: { byYou: true } }, {
+      kindLabel: (kind) => (kind.kind === 'knight' ? 'knight' : null), countOf: () => 1,
+    });
+    // The words agreed with lane UI: "<label> · played by a person", the Person pill, never "You".
+    expect(drawn).toEqual({
+      subjectId: 'knight-0', text: 'Could I borrow your sword?', header: 'knight · played by a person',
+      mark: { kind: 'person', mine: false, label: 'Person', full: 'Played by a person' }, spoken: 'Played by a person',
+    });
   });
 });
 

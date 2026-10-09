@@ -656,19 +656,38 @@ export class SocietyCrowd {
     return this.walkers.get(id)?.arrived ?? true;
   }
 
+  /** The walker of an inhabitant drawn outdoors now, near or far, or null. */
+  private drawnOutdoors(id: string): Walker | null {
+    const walker = this.walkers.get(id);
+    if (walker === undefined || walker.indoors) return null;
+    const renderable = this.near.get(id);
+    if (renderable === undefined && !this.farIds.includes(id)) return null;
+    if (renderable && (!renderable.root.enabled || renderable.root.tags.has('native-character-hidden'))) return null;
+    return walker;
+  }
+
   /**
    * Where a mark over an inhabitant hangs, in world space: just over the top of the box they are
    * drawn and picked by, written into `out`. False when they are not drawn outdoors now.
    */
   anchorOf(id: string, out: pc.Vec3): boolean {
-    const walker = this.walkers.get(id);
-    if (walker === undefined || walker.indoors) return false;
-    const renderable = this.near.get(id);
-    if (renderable === undefined && !this.farIds.includes(id)) return false;
-    if (renderable && (!renderable.root.enabled || renderable.root.tags.has('native-character-hidden'))) return false;
+    const walker = this.drawnOutdoors(id);
+    if (walker === null) return false;
     const [x, y, z] = walker.drawn;
-    const height = renderable?.standingHeight ?? this.far.appearanceOf(id).heightMetres;
+    const height = this.near.get(id)?.standingHeight ?? this.far.appearanceOf(id).heightMetres;
     out.set(x, y + height + MARK_CLEARANCE_METRES, z);
+    this.root.getWorldTransform().transformPoint(out, out);
+    return true;
+  }
+
+  /**
+   * Where an inhabitant's feet are drawn now, in world space, written into `out`: the point a ring at
+   * their feet stands on. False when they are not drawn outdoors now.
+   */
+  groundOf(id: string, out: pc.Vec3): boolean {
+    const walker = this.drawnOutdoors(id);
+    if (walker === null) return false;
+    out.set(...walker.drawn);
     this.root.getWorldTransform().transformPoint(out, out);
     return true;
   }

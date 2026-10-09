@@ -125,6 +125,25 @@ describe('a being a person plays, its mind on the card', () => {
   });
 });
 
+describe('a being a person plays, on the card', () => {
+  // The card's pill is the world's (markOf over the same input); the words are the ones agreed with
+  // lane UI (deliveries/DRAW/design-play-this-one-marks.md): "You" to the one playing, "Played" to others.
+  it('wears You to the one playing it and Played to anyone else, as the world marks it', () => {
+    const played = (byYou: boolean) => ({ ...being({}), mark: { running: null, played: { byYou } } }) as SelectedBeing;
+    const mine = personCard('knight-0', about(played(true)), null, facts('kaykit-knight'));
+    expect(mine.mark).toEqual({ kind: 'person', text: 'You', label: 'Played by you' });
+    expect(mine.mark).toEqual({ kind: 'person', text: 'You', label: markLabel(markOf({ running: null, played: { byYou: true } })!) });
+    const theirs = personCard('knight-0', about(played(false)), null, facts('kaykit-knight'));
+    expect(theirs.mark).toEqual({ kind: 'person', text: 'Played', label: 'Played by another person' });
+  });
+
+  it('marks a line a person said while playing it Person, never You, whoever plays it now', () => {
+    const said = [{ tick: 9, speakerId: 'knight-0', speakerName: 'Knight', toId: null, to: null, line: 'I will keep the gate.', decider: 'person' as const, model: null, speaker: { running: null, played: { byYou: true } } }];
+    const card = personCard('knight-0', about(being({ said })), null, facts('kaykit-knight'));
+    expect(card.said).toEqual([{ mark: { kind: 'person', text: 'Person', label: 'Played by a person' }, who: 'To everyone near', line: 'I will keep the gate.', minute: 9 }]);
+  });
+});
+
 describe('who decides for a visitor, from Who decides\' read and its arrival', () => {
   // The words are Who decides' own (ui/society-models.ts), which the card must show, never copy;
   // the marks are the world's (markOf over markInputFor's input).

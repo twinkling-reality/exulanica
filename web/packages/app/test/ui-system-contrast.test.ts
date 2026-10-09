@@ -90,6 +90,7 @@ describe('token contrast', () => {
         ['--color-world-mark-ink', '--color-world-mark-soft'],
         ['--color-world-mark-ink', '--color-world-mark-line'],
         ['--color-world-mark-ink-muted', '--color-world-mark-line'],
+        ['--color-world-mark-person-ink', '--color-world-mark-person'],
       ] as const) {
         const backdrop = over(rgba(base.get(fill)!), world);
         const ratio = contrast(over(rgba(base.get(text)!), backdrop), backdrop);

@@ -97,3 +97,22 @@ describe('where a mark over a person hangs', () => {
     expect(crowd.anchorOf('knight-1', out)).toBe(false);
   });
 });
+
+describe('where a ring at a person\'s feet stands', () => {
+  it('stands where the person is drawn, on the ground, in the world the region is turned into; nowhere for one not drawn outdoors', () => {
+    const crowd = setup();
+    crowd.setFigures(figures);
+    crowd.set(state([person('knight-1', [2000, 0], { kind: KNIGHT }), person('indoors-1', [1000, 0], { indoors: true })]), [0, 0]);
+    const out = new pc.Vec3();
+    // Local (2, 0, 0), a quarter turn to (0, 0, -2), then moved by (10, 0, 5).
+    expect(crowd.groundOf('knight-1', out)).toBe(true);
+    expect(out.x).toBeCloseTo(10, 9);
+    expect(out.y).toBeCloseTo(0, 9);
+    expect(out.z).toBeCloseTo(3, 9);
+    expect(crowd.groundOf('indoors-1', out)).toBe(false);
+    expect(crowd.groundOf('nobody', out)).toBe(false);
+    const root = (crowd as unknown as { near: Map<string, { root: pc.Entity }> }).near.get('knight-1')!.root;
+    root.enabled = false;
+    expect(crowd.groundOf('knight-1', out)).toBe(false);
+  });
+});

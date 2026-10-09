@@ -6,7 +6,9 @@
  * from instead, and is never said to be a person, which nothing it sends shows; a being its own routine
  * runs, and every object, wears nothing. A visitor the world
  * decides for (its arrival said so) is marked by who decides here: the AI mark naming the model asked,
- * with where it came from, or where it came from alone while its routine runs it.
+ * with where it came from, or where it came from alone while its routine runs it. A being a person
+ * plays (Play this one) wears the person mark while they play it, whatever its mind: "You" to the one
+ * playing, "Played" to everyone else; its lines say a person played it, never who.
  */
 
 import type { NamedModelRef } from '../society-models-api.js';
@@ -17,7 +19,9 @@ import type { NamedModelRef } from '../society-models-api.js';
  */
 export type ThingMark =
   | { readonly kind: 'ai'; readonly short: string; readonly full: string; readonly outside?: true; readonly from?: string }
-  | { readonly kind: 'from'; readonly label: string; readonly full: string };
+  | { readonly kind: 'from'; readonly label: string; readonly full: string }
+  /** Played by a person: `label` the pill's word, `mine` whether the viewer is the one playing. */
+  | { readonly kind: 'person'; readonly label: string; readonly full: string; readonly mine: boolean; readonly from?: string };
 
 /** An outside program's entry as the door lists it for this workspace. */
 export interface MarkBridge {
@@ -35,6 +39,8 @@ export interface MarkInput {
   readonly bridge?: MarkBridge | null;
   /** What an outside agent says it is, in its own words. */
   readonly declared?: { readonly name: string } | null;
+  /** Set while a person plays it (the models read's person choice): whether the viewer is that person. */
+  readonly played?: { readonly byYou: boolean } | null;
 }
 
 /** What a mark naming no model says it is run by. */
@@ -45,7 +51,21 @@ function shortName(name: string): string {
   return name.trim().split(/\s+/u)[0] ?? name;
 }
 
+/** Where a visitor the world decides for came from, by its bridge's label; undefined for anyone else. */
+function worldVisitorOrigin(input: MarkInput): string | undefined {
+  return input.crossing != null && input.crossing.decided_by === 'world' ? input.bridge?.label ?? 'outside' : undefined;
+}
+
 export function markOf(input: MarkInput): ThingMark | null {
+  // While a person plays it, the person decides, not its mind, which rests until it is given back.
+  if (input.played != null) {
+    const mine = input.played.byYou;
+    const from = worldVisitorOrigin(input);
+    return {
+      kind: 'person', mine, label: mine ? 'You' : 'Played', full: mine ? 'Played by you' : 'Played by another person',
+      ...(from === undefined ? {} : { from }),
+    };
+  }
   if (input.crossing != null && input.crossing.decided_by === 'world') {
     const origin = input.bridge?.label ?? 'outside';
     if (input.running === null) return { kind: 'from', label: `from ${origin}`, full: `From ${origin}, run by this world` };
@@ -69,6 +89,7 @@ export function markOf(input: MarkInput): ThingMark | null {
 
 /** What a screen reader says for a mark, on the card and over a being. */
 export function markLabel(mark: ThingMark): string {
+  if (mark.kind === 'person') return mark.from === undefined ? mark.full : `${mark.full}, from ${mark.from}`;
   if (mark.kind === 'ai' && mark.outside !== true) {
     // A mark naming no model says only that a model runs it.
     const said = mark.full === UNNAMED_MODEL ? 'run by an AI model' : `run by an AI model, ${mark.full}`;
@@ -77,13 +98,16 @@ export function markLabel(mark: ThingMark): string {
   return mark.full;
 }
 
-/** Who decided a line a being said: the world's own model, or the program it came from. */
-export type LineDecider = 'model' | 'external';
+/** Who decided a line a being said: the world's own model, the program it came from, or a person playing it. */
+export type LineDecider = 'model' | 'external' | 'person';
 
 /** The plain AI mark of a model's line when the page does not know which model wrote it. */
 export const AN_AI_MODEL: ThingMark = { kind: 'ai', short: 'AI', full: UNNAMED_MODEL };
 
 const FROM_OUTSIDE: ThingMark = { kind: 'from', label: 'from outside', full: 'Someone from outside this world' };
+
+/** A line a person said while playing a being: whose it was, no read says. */
+const PERSON_LINE = { kind: 'person', label: 'Person', full: 'Played by a person', mine: false } as const;
 
 export interface LineMarkInput {
   /** Who decided the line, as its said event states; null where no event says (a heard line alone). */
@@ -99,14 +123,20 @@ export interface LineMarkInput {
  * model's line is always an AI's, naming the model only where the line's record names it (the
  * speaker's model now may not be the one that wrote it), else a plain AI mark; it keeps where a
  * visitor the world runs came from. An outside program's line wears its speaker's mark (the game it
- * came from, or an outside agent's), from outside where the speaker is not known; a line no event
- * decides wears none.
+ * came from, or an outside agent's), from outside where the speaker is not known; a person's line
+ * wears the person mark saying a person played it (never "You": no read names who it was), keeping
+ * where a visitor the world decides for came from; a line no event decides wears none.
  */
 export function lineMarkOf(input: LineMarkInput): ThingMark | null {
   if (input.decider === null) return null;
+  if (input.decider === 'person') {
+    const from = input.speaker == null ? undefined : worldVisitorOrigin(input.speaker);
+    return from === undefined ? PERSON_LINE : { ...PERSON_LINE, from };
+  }
   const speaker = input.speaker == null ? null : markOf(input.speaker);
   if (input.decider === 'external') return speaker ?? FROM_OUTSIDE;
-  const from = speaker?.kind === 'ai' && speaker.outside !== true ? speaker.from : undefined;
+  // A model's line keeps where a visitor the world decides for came from, played now or not.
+  const from = (speaker?.kind === 'ai' && speaker.outside !== true) || speaker?.kind === 'person' ? speaker.from : undefined;
   const model = input.model ?? null;
   if (model === null) return from === undefined ? AN_AI_MODEL : { kind: 'ai', short: 'AI', full: UNNAMED_MODEL, from };
   return { kind: 'ai', short: shortName(model.name), full: model.name, ...(from === undefined ? {} : { from }) };

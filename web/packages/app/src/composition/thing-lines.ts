@@ -4,9 +4,10 @@
  * line, who it was said to, both by kind and number as the minute began, and who decided it).
  *
  * Only lines said after the page first read the society are drawn, so nothing from before the visit
- * is replayed. A line's words are set as text only: models and outside programs write them. A model's
- * line always wears the AI mark, naming the model only where the line's own event names it;
- * an outside program's line wears its speaker's mark (the game it came from, or an outside agent's).
+ * is replayed. A line's words are set as text only: models, outside programs and people write them. A
+ * model's line always wears the AI mark, naming the model only where the line's own event names it;
+ * an outside program's line wears its speaker's mark (the game it came from, or an outside agent's);
+ * a line a person said while playing a being wears the person mark and says it was played by a person.
  * Every word but the line comes from the library's kind labels and the marks, never from a kind's,
  * a game's or a model's name in code.
  */
@@ -56,7 +57,7 @@ export function saidLine(event: SocietyEvent): SaidLine | null {
   const text = thing['line'];
   const decider = thing['decider'];
   if (typeof text !== 'string' || text.trim() === '') return null;
-  if (decider !== 'model' && decider !== 'external') return null;
+  if (decider !== 'model' && decider !== 'external' && decider !== 'person') return null;
   return {
     eventId: event.event_id,
     tick: event.tick,
@@ -89,7 +90,7 @@ export function thingLine(line: SaidLine, speaker: MarkInput | null, words: Line
   const model = line.model === null ? null : words.modelName?.(line.model) ?? null;
   const mark = lineMarkOf({ decider: line.decider, model, speaker })!;
   const said = line.to === null ? named(line.from, words) : `${named(line.from, words)} to ${named(line.to, words)}`;
-  const header = model === null ? said : `${said} · ${model.name}`;
+  const header = line.decider === 'person' ? `${said} · played by a person` : model === null ? said : `${said} · ${model.name}`;
   return { subjectId: line.speakerId, text: line.text, mark, header, spoken: markLabel(mark) };
 }
 

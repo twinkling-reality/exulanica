@@ -95,7 +95,10 @@ The application is the brand; the world, and what speaks from inside it, is the 
 
 The marks of who runs a being, and the lines it says, belong to neither: their world-mark tokens
 (`--color-world-mark` and its kin in `tokens.css`) are fixed in every scheme, a dark fill with white
-words and outline, so they read over any world, and no theme or profile changes them.
+words and outline, so they read over any world, and no theme or profile changes them. The one
+exception is a being a person plays, and the rings at its feet and where it walks: the signal yellow
+with dark words, the rings on a dark edge (`--color-world-mark-person` and
+`--color-world-mark-person-ink`), fixed in every scheme too.
 
 Every brand surface but the stage follows the Settings choice "Light or dark"; the world keeps its own light.
 `web/packages/app/src/ui/system/bridge.css` section 4 points the older surfaces' variables at the

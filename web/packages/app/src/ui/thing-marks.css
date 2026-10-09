@@ -46,6 +46,12 @@
   background: var(--color-world-mark-soft);
 }
 
+/* A being a person plays (Play this one), and the lines they say: the signal yellow, fixed over the world. */
+.thing-mark-person {
+  color: var(--color-world-mark-person-ink);
+  background: var(--color-world-mark-person);
+}
+
 .thing-mark-name {
   font-weight: 500;
   letter-spacing: 0;

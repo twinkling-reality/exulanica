@@ -87,3 +87,41 @@ describe('lineMarkOf', () => {
     expect(lineMarkOf({ decider: null, model: QWEN })).toBeNull();
   });
 });
+
+// Play this one (deliveries/DRAW/design-play-this-one-marks.md, agreed with lane UI): "You" to the
+// one playing, "Played" to anyone else, a person's line "Person", "played by a person", never "You".
+describe('the person mark', () => {
+  const crossing = { bridge: 'blockgame', decided_by: 'world' as const };
+  const game = { label: 'Block Game', ai: false };
+
+  it('marks a being the viewer plays You and one another person plays Played, over its mind', () => {
+    expect(markOf({ running: QWEN, played: { byYou: true } })).toEqual({ kind: 'person', mine: true, label: 'You', full: 'Played by you' });
+    expect(markOf({ running: QWEN, played: { byYou: false } }))
+      .toEqual({ kind: 'person', mine: false, label: 'Played', full: 'Played by another person' });
+    expect(markOf({ running: null, played: { byYou: true } })).toMatchObject({ kind: 'person', label: 'You' });
+    // Given back: its mind's mark again.
+    expect(markOf({ running: QWEN, played: null })).toEqual({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct' });
+  });
+
+  it('keeps where a played visitor the world decides for came from, in the words a reader hears only', () => {
+    const mark = markOf({ running: QWEN, crossing, bridge: game, played: { byYou: true } })!;
+    expect(mark).toEqual({ kind: 'person', mine: true, label: 'You', full: 'Played by you', from: 'Block Game' });
+    expect(markLabel(mark)).toBe('Played by you, from Block Game');
+    expect(markLabel(markOf({ running: null, played: { byYou: false } })!)).toBe('Played by another person');
+  });
+
+  it('marks a person\'s line Person, played by a person, never You, keeping a world-decided visitor\'s origin', () => {
+    const line = { kind: 'person', mine: false, label: 'Person', full: 'Played by a person' };
+    expect(lineMarkOf({ decider: 'person', speaker: { running: QWEN, played: { byYou: true } } })).toEqual(line);
+    expect(lineMarkOf({ decider: 'person', speaker: null })).toEqual(line);
+    const visitor = lineMarkOf({ decider: 'person', speaker: { running: null, crossing, bridge: game, played: { byYou: true } } })!;
+    expect(visitor).toEqual({ ...line, from: 'Block Game' });
+    expect(markLabel(visitor)).toBe('Played by a person, from Block Game');
+  });
+
+  it('keeps a model\'s line an AI\'s, with where its speaker came from, while a person plays that speaker now', () => {
+    const speaker = { running: QWEN, crossing, bridge: game, played: { byYou: true } };
+    expect(lineMarkOf({ decider: 'model', model: QWEN, speaker }))
+      .toEqual({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct', from: 'Block Game' });
+  });
+});

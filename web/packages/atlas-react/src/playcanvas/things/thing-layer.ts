@@ -12,7 +12,10 @@
  * hold, a look kind this page does not draw, a container that does not read) is drawn as nothing,
  * and its reason is kept by name in `misses`, never stood in for.
  *
- * Picking meets each figure's pick volume; the nearest wins. The picked thing wears a ring.
+ * Picking meets each figure's pick volume; the nearest wins. The picked thing wears a ring. While a
+ * person plays a being (Play this one), that being wears a steady ring at its feet as the society
+ * draws it, and the ground where its next walk goes wears another, both in the world-mark person
+ * colour on a dark edge in the person ink.
  */
 
 import * as pc from 'playcanvas';
@@ -91,7 +94,31 @@ export interface ThingLayerOptions {
    * library, held to its digest, loaded once a digest by the engine's glTF reader and instantiated.
    */
   readonly instantiate?: (look: LookDrawing) => Promise<InstancedContainer>;
+  /** The world-mark person colour, `#rrggbb`, for Play this one's rings; the pick ring's when left out. */
+  readonly personColour?: string;
+  /** The world-mark person ink, `#rrggbb`, the dark edge Play this one's rings stand on so they read on pale ground; none when left out. */
+  readonly personEdge?: string;
+  /** The society drawn now, which Play this one's rings stand in, or null while none is. */
+  readonly society?: () => DrawnSociety | null;
 }
+
+/** Where the society's people stand as its crowd draws them (`AuthoredSociety`). */
+export interface DrawnSociety {
+  /** The crowd's root: the society's own frame, the state's `position_mm` over 1,000. */
+  readonly root: pc.Entity;
+  /** Where a person's feet are drawn now, in world space, into `out`; false when not drawn outdoors. */
+  groundOf(id: string, out: pc.Vec3): boolean;
+}
+
+/** A point of the society's own frame, millimetres, as the state and a person's walk name one. */
+export interface SocietyPoint {
+  readonly xMm: number;
+  readonly zMm: number;
+}
+
+/** The ring at the feet of the being a person plays, and around where its next walk goes, metres. */
+export const PLAYED_RING_RADIUS = 0.45;
+export const DESTINATION_RING_RADIUS = 0.35;
 
 interface Entry {
   record: PlacedThingRecord;
@@ -119,11 +146,21 @@ export class ThingLayer {
   /** Makes every figure of this page from the library, a container once a digest. */
   readonly maker: ThingFigureMaker;
   private picked: string | null = null;
+  /** Play this one: the being played, ringed where its feet are drawn, and where its next walk goes. */
+  private readonly playedRing: PickRing;
+  private readonly destinationRing: PickRing;
+  private readonly playedAt = new pc.Entity('thing-played-at');
+  private readonly destinationAt = new pc.Entity('thing-destination-at');
+  private played: string | null = null;
+  private destination: SocietyPoint | null = null;
+  private readonly feet = new pc.Vec3();
   private destroyed = false;
   private readonly onUpdate = (dt: number) => this.step(dt);
 
   constructor(private readonly options: ThingLayerOptions) {
     this.ring = new PickRing(options.app.graphicsDevice, options.ringColour);
+    this.playedRing = new PickRing(options.app.graphicsDevice, options.personColour ?? options.ringColour, options.personEdge);
+    this.destinationRing = new PickRing(options.app.graphicsDevice, options.personColour ?? options.ringColour, options.personEdge);
     this.maker = new ThingFigureMaker({
       app: options.app,
       library: options.library,
@@ -221,6 +258,23 @@ export class ThingLayer {
     this.options.invalidate?.();
   }
 
+  /**
+   * Ring the being a person plays at its feet, following its drawn walk, or take the ring away with
+   * null. Steady: the ring says whose it is, it does not ask to be looked at.
+   */
+  setPlayed(subjectId: string | null): void {
+    this.played = subjectId;
+    this.placePlayed();
+    this.options.invalidate?.();
+  }
+
+  /** Ring the ground where the played being's next walk goes, a point of the society's own frame, or none with null. */
+  setDestination(point: SocietyPoint | null): void {
+    this.destination = point;
+    this.placeDestination();
+    this.options.invalidate?.();
+  }
+
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -228,7 +282,41 @@ export class ThingLayer {
     this.ring.place(null, 0);
     for (const [id, entry] of this.entries) this.drop(id, entry);
     this.ring.destroy();
+    this.playedRing.destroy();
+    this.destinationRing.destroy();
+    this.playedAt.destroy();
+    this.destinationAt.destroy();
     this.maker.destroy();
+  }
+
+  /** The played being's ring where the society draws its feet now; none while it is not drawn outdoors. */
+  private placePlayed(): void {
+    const society = this.played === null ? null : this.options.society?.() ?? null;
+    if (society === null || !society.groundOf(this.played!, this.feet)) {
+      this.playedRing.place(null, 0);
+      return;
+    }
+    if (this.playedAt.parent !== this.options.app.root) {
+      this.playedAt.parent?.removeChild(this.playedAt);
+      this.options.app.root.addChild(this.playedAt);
+    }
+    this.playedAt.setPosition(this.feet);
+    this.playedRing.place(this.playedAt, PLAYED_RING_RADIUS);
+  }
+
+  /** The destination's ring on the society's ground, in the crowd's own frame; none without a society. */
+  private placeDestination(): void {
+    const root = this.destination === null ? null : this.options.society?.()?.root ?? null;
+    if (root === null) {
+      this.destinationRing.place(null, 0);
+      return;
+    }
+    if (this.destinationAt.parent !== root) {
+      this.destinationAt.parent?.removeChild(this.destinationAt);
+      root.addChild(this.destinationAt);
+    }
+    this.destinationAt.setLocalPosition(this.destination!.xMm / 1000, 0, this.destination!.zMm / 1000);
+    this.destinationRing.place(this.destinationAt, DESTINATION_RING_RADIUS);
   }
 
   private keyOf(record: PlacedThingRecord): string {
@@ -415,6 +503,9 @@ export class ThingLayer {
     // The society's things the crowd draws: rigged arms over their clips, glows to the camera.
     this.society?.figures?.afterAnimation(camera);
     this.ring.step(dt, reduced);
+    // Play this one's rings follow the society as it is drawn this frame; they never pulse.
+    if (this.played !== null) this.placePlayed();
+    if (this.destination !== null) this.placeDestination();
     if (this.animating) this.options.invalidate?.();
   }
 

@@ -3,8 +3,10 @@
  *
  * The ring is a flat band on the ground in the shell's signal colour (`--color-signal`), drawn
  * unlit and over the ground so it reads in any world's light: at a standing thing's feet, around an
- * object's footprint, under a floating light. Picking meets a figure's pick volume, a box in the
- * figure's root frame or a sphere, carried into the world by the root's transform.
+ * object's footprint, under a floating light. A ring may stand on a dark edge, a band a little wider
+ * just under it, so a pale ring reads on pale ground (Play this one's rings). Picking meets a figure's
+ * pick volume, a box in the figure's root frame or a sphere, carried into the world by the root's
+ * transform.
  */
 
 import * as pc from 'playcanvas';
@@ -13,15 +15,18 @@ import type { PickVolume } from './figures.js';
 const SEGMENTS = 48;
 /** The band's width, as a share of its radius. */
 const BAND = 0.16;
+/** An edged ring's dark edge, as a share of its radius either side of the band. */
+export const RING_EDGE = 0.08;
 
-function bandMesh(device: pc.GraphicsDevice): pc.Mesh {
+/** A flat band from `inner` to `outer`, shares of the ring's radius, on the ground plane. */
+function bandMesh(device: pc.GraphicsDevice, inner = 1 - BAND, outer = 1): pc.Mesh {
   const positions: number[] = [];
   const normals: number[] = [];
   const indices: number[] = [];
   for (let i = 0; i <= SEGMENTS; i += 1) {
     const a = (i / SEGMENTS) * Math.PI * 2;
     const c = Math.cos(a), s = Math.sin(a);
-    positions.push(c * (1 - BAND), 0, s * (1 - BAND), c, 0, s);
+    positions.push(c * inner, 0, s * inner, c * outer, 0, s * outer);
     normals.push(0, 1, 0, 0, 1, 0);
     if (i < SEGMENTS) {
       const k = i * 2;
@@ -36,25 +41,46 @@ function bandMesh(device: pc.GraphicsDevice): pc.Mesh {
   return mesh;
 }
 
+/** Unlit, in `colour`, drawn over the ground it lies on. */
+function bandMaterial(colour: string): pc.StandardMaterial {
+  const material = new pc.StandardMaterial();
+  material.useLighting = false;
+  material.useFog = false;
+  material.diffuse = new pc.Color(0, 0, 0);
+  material.emissive = new pc.Color().fromString(colour);
+  material.cull = pc.CULLFACE_NONE;
+  material.depthBias = -1;
+  material.slopeDepthBias = -1;
+  material.update();
+  return material;
+}
+
 export class PickRing {
   readonly entity: pc.Entity;
   private readonly material: pc.StandardMaterial;
   private readonly mesh: pc.Mesh;
+  /** The dark band an edged ring stands on, or null. */
+  private readonly edge: { readonly mesh: pc.Mesh; readonly material: pc.StandardMaterial } | null;
   private time = 0;
 
-  constructor(device: pc.GraphicsDevice, colour: string) {
+  /** A ring in `colour`, standing on a dark edge in `edge` where one is given. */
+  constructor(device: pc.GraphicsDevice, colour: string, edge?: string) {
     this.mesh = bandMesh(device);
-    this.material = new pc.StandardMaterial();
-    this.material.useLighting = false;
-    this.material.useFog = false;
-    this.material.diffuse = new pc.Color(0, 0, 0);
-    this.material.emissive = new pc.Color().fromString(colour);
-    this.material.cull = pc.CULLFACE_NONE;
-    this.material.depthBias = -1;
-    this.material.slopeDepthBias = -1;
-    this.material.update();
+    this.material = bandMaterial(colour);
     this.entity = new pc.Entity('thing-pick-ring');
     this.entity.addComponent('render', { meshInstances: [new pc.MeshInstance(this.mesh, this.material)], castShadows: false, receiveShadows: false });
+    if (edge === undefined) {
+      this.edge = null;
+    } else {
+      const mesh = bandMesh(device, 1 - BAND - RING_EDGE, 1 + RING_EDGE);
+      const material = bandMaterial(edge);
+      const under = new pc.Entity('thing-pick-ring-edge');
+      under.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, material)], castShadows: false, receiveShadows: false });
+      // Just under the band, so where both are drawn the band is the nearer.
+      under.setLocalPosition(0, -0.004, 0);
+      this.entity.addChild(under);
+      this.edge = { mesh, material };
+    }
     this.entity.enabled = false;
   }
 
@@ -86,6 +112,8 @@ export class PickRing {
     this.entity.destroy();
     this.material.destroy();
     this.mesh.destroy();
+    this.edge?.material.destroy();
+    this.edge?.mesh.destroy();
   }
 }
 

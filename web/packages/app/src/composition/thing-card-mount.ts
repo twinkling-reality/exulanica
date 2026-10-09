@@ -32,7 +32,10 @@ const ROUTINE_KEY = 'routine';
 const ROUTINE_NAME = 'Their own routine';
 const ROUTINE_LINE = 'What they would do anyway. No AI is asked.';
 
-/** The card's pill for a mark: "AI" beside a title and a mind, or where a visitor came from. */
+/**
+ * The card's pill for a mark: "AI" beside a title and a mind, where a visitor came from, or who
+ * plays it ("You" or "Played", and "Person" on a line a person said).
+ */
 export function cardMark(mark: ThingMark): CardMark {
   return { kind: mark.kind, text: mark.kind === 'ai' ? 'AI' : mark.label, label: markLabel(mark) };
 }

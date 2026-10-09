@@ -1,9 +1,10 @@
 /**
  * The lines a being of a society of things said and heard, for its card, from what the society
- * recorded: its own `said` events (the line, to whom, and whether a model or the outside program
- * that sent it decided it) and the lines its state says it heard (`heard`). Only a decider says a
- * line, never a being's routine, so every line was said either by a model or by an outside program;
- * the card marks each by the one rule the world's line bubbles use (`lineMarkOf`, thing-marks.ts),
+ * recorded: its own `said` events (the line, to whom, and whether a model, the outside program that
+ * sent it or a person playing the being decided it) and the lines its state says it heard (`heard`).
+ * Only a decider says a line, never a being's routine, so every line was said by a model, by an
+ * outside program or by a person playing the being; the card marks each by the one rule the world's
+ * line bubbles use (`lineMarkOf`, thing-marks.ts),
  * and said events are read by the drawing's own reader (`saidLine`, thing-lines.ts).
  *
  * A line is the society's text, held to the line rule and treated as untrusted: the card shows it
