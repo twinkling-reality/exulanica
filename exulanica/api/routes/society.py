@@ -13,7 +13,7 @@ import uuid
 from collections.abc import Callable
 from typing import Annotated, Any, Final, Literal
 
-from fastapi import APIRouter, Path, Query, Request
+from fastapi import APIRouter, Path, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -34,11 +34,13 @@ from exulanica.world.society_engines import (
     DEFAULT_ENGINE,
     ENGINES,
 )
+from exulanica.world.society_erasure import SocietyErasureRefused, erase_society
 from exulanica.world.society_presence import PresenceRefused
 from exulanica.world.society_repository import (
     EVENTS_READ_MAXIMUM,
     SocietyRepository,
 )
+from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world", tags=["society"])
 #: The profiles a creation may name: the engine table's, in its order. A retired one is refused
@@ -200,6 +202,31 @@ def society(
         ),
         invalid_status=409,
     )
+
+
+@router.delete("/versions/{version_id}/society", status_code=204)
+def erase_society_records(
+    version_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    world_id: WorldId,
+) -> Response:
+    """Erase this world version's society whole, under a society tombstone: every row that records
+    it (what its people said among them), its clock, its asks to outside programs and its
+    crossings, and the comparisons and experiments started from it; the Companion's answers that
+    cited the version are withdrawn. Refused ``society_unavailable`` (404) where the version holds
+    no society, and ``restore_sealed`` (409) while the installation is sealed for a restore."""
+    require_world(connection, session.workspace_id, world_id)
+    try:
+        erase_society(
+            connection, session.workspace_id, world_id, version_id, erased_by=session.actor
+        )
+    except SocietyErasureRefused as exc:
+        return JSONResponse(
+            status_code=404 if exc.code == "society_unavailable" else 409,
+            content={"code": exc.code, "detail": exc.detail},
+        )
+    return Response(status_code=204)
 
 
 @router.post("/versions/{version_id}/society/steps")

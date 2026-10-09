@@ -318,10 +318,12 @@ def test_a_days_run_is_sealed_hour_by_hour_in_order_holding_its_receipts():
             lambda: _hour(admin, day, day_sha, run, 3, first_sequence=3, count=0),
             message="inside its window",
         )
-        # A sealed hour is never changed.
+        # A sealed hour is never changed, and deleted only with its society's erasure.
         with pytest.raises(psycopg.errors.CheckViolation, match="appended, never changed"):
             admin.execute("update society_comparison_hour set recorded_at=now() where hour=0")
-        with pytest.raises(psycopg.errors.CheckViolation, match="appended, never changed"):
+        with pytest.raises(
+            psycopg.errors.CheckViolation, match="deleted only when its society is erased whole"
+        ):
             admin.execute("delete from society_comparison_hour where hour=0")
 
 

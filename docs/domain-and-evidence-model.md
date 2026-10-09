@@ -1408,6 +1408,14 @@ destroys a container only while no look the workspace still holds names it. No c
 entity or workspace test matches the scope, so it deletes nothing else, and every destroyed byte
 still traces to a tombstone.
 
+**DECISION (del-1d): a society's erasure is a tombstone.** A `society` tombstone (migration 0182)
+is written with a `society_erasure` row when a person erases a world's society
+([synthetic society](synthetic-society-contract.md#erasing-a-society)): the row names the society
+and the tombstone, which has no subject column. The row's trigger withdraws the Companion's answers
+that cited the society's world version and deletes every row that records the society, and a
+workspace tombstone deletes every society's rows the same way. No society record is in the object
+store, so no purge job is due, and every destroyed row traces to a tombstone.
+
 ### 6.3 The gate is a trigger, in the writing transaction
 
 Application-level checks are not sufficient, because retries arrive from stale workers holding

@@ -1549,6 +1549,68 @@
       }
      }
     }
+   },
+   "delete": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Erase Society Records",
+    "description": "Erase this world version's society whole, under a society tombstone: every row that records\nit (what its people said among them), its clock, its asks to outside programs and its\ncrossings, and the comparisons and experiments started from it; the Companion's answers that\ncited the version are withdrawn. Refused ``society_unavailable`` (404) where the version holds\nno society, and ``restore_sealed`` (409) while the installation is sealed for a restore.",
+    "operationId": "erase_society_records_world_versions__version_id__society_delete",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/world/versions/{version_id}/society/decisions": {

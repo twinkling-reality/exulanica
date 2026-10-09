@@ -390,12 +390,20 @@ def test_a_presence_row_is_never_changed_or_removed(saved_world):  # noqa: F811
     _change(society_repository(world), version_id, society, AWAY, actor)
     kept = _presence_rows(world, society["society_id"])
     assert [row["presence"] for row in kept] == [AWAY]
-    for statement in (
-        "update world_society_presence set presence='here' where workspace_id=%s and society_id=%s",
-        "delete from world_society_presence where workspace_id=%s and society_id=%s",
+    # Only the society's erasure deletes its records (migration "a society is erased whole").
+    for statement, refusal in (
+        (
+            "update world_society_presence set presence='here' "
+            "where workspace_id=%s and society_id=%s",
+            "append-only",
+        ),
+        (
+            "delete from world_society_presence where workspace_id=%s and society_id=%s",
+            "deleted only when its society is erased whole",
+        ),
     ):
         with (
-            pytest.raises(psycopg.errors.CheckViolation, match="append-only"),
+            pytest.raises(psycopg.errors.CheckViolation, match=refusal),
             world["connection"].transaction(),
         ):
             world["connection"].execute(statement, (world["workspace"], society["society_id"]))

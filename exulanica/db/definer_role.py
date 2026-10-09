@@ -211,6 +211,74 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
             "piece_output": frozenset({"SELECT", "DELETE"}),
         }
     ),
+    # society_erase_rows (0182) locks a society's parent rows (UPDATE on workspace_id, which no
+    # body writes, for FOR UPDATE) and deletes every row that records one society, for a
+    # society's erasure and a workspace tombstone's; tg_society_erasure_erases withdraws the
+    # Companion's answers that cited the society's world version (three columns of an answer),
+    # as a replayed society tombstone does by the version its erasure names; both read the
+    # tombstone and restore_control under 0161's grant.
+    "0182": DefinerGrants(
+        tables={
+            **{
+                name: frozenset(("SELECT", "DELETE"))
+                for name in (
+                    "comparison_cancellation",
+                    "comparison_run_start",
+                    "door_answer",
+                    "door_ask",
+                    "door_crossing",
+                    "door_crossing_binding",
+                    "society_comparison",
+                    "society_comparison_decision",
+                    "society_comparison_hour",
+                    "society_comparison_outcome",
+                    "society_comparison_replay",
+                    "society_comparison_run",
+                    "society_comparison_start",
+                    "society_experiment_attempt",
+                    "society_experiment_checkpoint",
+                    "society_experiment_definition",
+                    "society_experiment_outcome",
+                    "world_character_appearance_revision",
+                    "world_clock",
+                    "world_clock_event",
+                    "world_clock_traffic_minute",
+                    "world_crossing_occupancy",
+                    "world_society",
+                    "world_society_action_request",
+                    "world_society_control",
+                    "world_society_control_event",
+                    "world_society_decision",
+                    "world_society_decision_request",
+                    "world_society_event",
+                    "world_society_input",
+                    "world_society_model_choice",
+                    "world_society_person_answer",
+                    "world_society_presence",
+                    "world_society_transition",
+                    "world_society_transition_action",
+                    "world_society_transition_decision",
+                )
+            },
+            "companion_answer": frozenset(("SELECT",)),
+            "companion_answer_simulation_citation": frozenset(("SELECT",)),
+            "society_erasure": frozenset(("SELECT",)),
+        },
+        columns={
+            "companion_answer": {
+                name: frozenset(("UPDATE",)) for name in ("status", "withdrawn_at", "withdrawn_by")
+            },
+            **{
+                name: {"workspace_id": frozenset(("UPDATE",))}
+                for name in (
+                    "door_ask",
+                    "society_comparison_run",
+                    "society_comparison_start",
+                    "world_society",
+                )
+            },
+        },
+    ),
 }
 
 

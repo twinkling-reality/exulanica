@@ -311,9 +311,9 @@ back (`not_played` for anybody else, with nothing kept), and a minute takes only
 answer, never one another person posted before they took the being. An answer for a being that
 left the world is not found (404). A line a person types lives in their answer, the receipt's
 proposal, the said event and the society's state (each hearer's heard lines and the speaker's said
-lines), and no tombstone reaches those records yet: a workspace's erasure leaves them, as it leaves
-every society record, until a society-wide erasure lands, which it must before any installation but
-a rehearsal turns societies of things on.
+lines), and erasing the society removes every one of them with it, by its own route or with its
+workspace ([erasing a society](synthetic-society-contract.md#erasing-a-society)); a copy already
+sent to a hosted model provider or an outside program is beyond any erasure.
 
 A played being's request, its turn and its answer are read under the person's own contract
 (`play_contract`): the engine's terms with the sixth action catalog

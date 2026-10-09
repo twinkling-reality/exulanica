@@ -1027,6 +1027,33 @@ each authorization reads the authored version with its whole edit list
 world's edit history (a median of 24 to 761 ms over the same range). Edits consumed in one minute
 leave events naming most of those inputs; a page holds at most 256 events.
 
+### Erasing a society
+
+A society is erased whole, never in part: its records are bound to each other by digest (a
+receipt's own digest, an event's id over its document's digest, each minute's state digest carried
+by the next), so a line blanked in one of them would break every record after it.
+`DELETE /world/versions/{version_id}/society` (`world.write` and `deletion.write`,
+`exulanica/world/society_erasure.py`) takes the workspace's lock and writes a `society` tombstone
+and a `society_erasure` row naming the society and that tombstone (migration "a society is erased
+whole"). The row's trigger, a definer owned by `exulanica_definer`, withdraws the Companion's
+answers that cited the society's world version, their text kept, and deletes every row that
+records the society, children first: its inputs, requests, receipts, transitions and their
+bindings, action requests, events, presences, choices and the answers of the people who play its
+beings; its playback control and receipts; its world clock with the clock's receipts, sealed
+traffic minutes and crossing occupancy; its inhabitants' appearance revisions; its asks to outside
+programs with their answers and its crossings with their bindings; and the comparisons and
+experiments started from it. The route answers 204, 404 `society_unavailable` for a version that
+holds no society and 409 `restore_sealed` while the installation is sealed for a restore.
+Afterwards every read of the society answers 404, nothing is left to replay, and the world may make
+a new society, which starts at its first minute. A workspace tombstone erases every society of the
+workspace the same way. Only the erasure deletes these rows: each table refuses a delete by anyone
+but `exulanica_definer`. A restore carries the erasure before it replays any tombstone
+(`exulanica/deletion/withdrawals.v2.json`), so a society erased after a backup is erased again.
+The erasure leaves a door grant, its revisions and its program's declaration, mapping and
+manifest, and the deliveries and gone notices keyed by the grant: the owner's configuration and the
+things carried out, with no society text. It leaves event ids in a world project item's
+references, and every copy already sent to a hosted model provider or an outside program.
+
 ### Versions that survive upgrades
 
 A routine catalog is published beside the versions before it and never edited in place

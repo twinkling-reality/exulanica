@@ -661,6 +661,11 @@ NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
         ("POST", "/world/versions/{version_id}/society/play/{subject_id}/give-back"): (
             "gives back a being the caller plays (POST /world/versions/{version_id}/society/play)"
         ),
+        ("DELETE", "/world/versions/{version_id}/society"): (
+            "erases the society whole, which a capability read does not offer as something to do "
+            "in the world; the society read (GET /world/versions/{version_id}/society) says "
+            "whether there is one"
+        ),
         ("POST", "/world/versions/{version_id}/society/experiments"): (
             "experiments run over an owned district's living society, which no saved world holds"
         ),

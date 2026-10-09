@@ -824,13 +824,14 @@ _WORLD_READS_READING_ADMISSION: Final = _every(
     "GET /worlds/personal-source",
 )
 
-#: Erasing a creature a workspace drafted from a person's words: a change to its things, so
-#: ``world.write``, and the destruction of a person's content, so ``deletion.write`` as every other
-#: deletion asks. Both browser roles hold both; a token granted ``world.write`` alone erases
-#: nothing.
+#: Erasing a creature a workspace drafted from a person's words, or a world's society with every
+#: record of it: a change to the world, so ``world.write``, and the destruction of a person's
+#: content, so ``deletion.write`` as every other deletion asks. Both browser roles hold both; a
+#: token granted ``world.write`` alone erases nothing.
 _WORLD_ERASURES: Final = _every(
     _requires(_P.WORLD_WRITE, _P.DELETION_WRITE),
     "DELETE /things/kinds/{kind_sha256}",
+    "DELETE /world/versions/{version_id}/society",
 )
 
 #: Issuing, opening and revoking a door grant, and sending its visitors home: a change to who may

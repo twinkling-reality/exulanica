@@ -100,11 +100,67 @@ TABLE_PRIVILEGES = {
     "workspace_style_pack_preparation": {"SELECT", "UPDATE"},
     "workspace_style_pack_publish_request": {"SELECT", "UPDATE"},
     "workspace_style_pack_version": {"SELECT", "UPDATE"},
+    # society_erase_rows (0182) deletes every row that records one society, and
+    # tg_society_erasure_erases withdraws the Companion's answers that cited its world version, as
+    # a replayed society tombstone does by the version its erasure names.
+    "comparison_cancellation": {"SELECT", "DELETE"},
+    "comparison_run_start": {"SELECT", "DELETE"},
+    "door_answer": {"SELECT", "DELETE"},
+    "door_ask": {"SELECT", "DELETE"},
+    "door_crossing": {"SELECT", "DELETE"},
+    "door_crossing_binding": {"SELECT", "DELETE"},
+    "society_comparison": {"SELECT", "DELETE"},
+    "society_comparison_decision": {"SELECT", "DELETE"},
+    "society_comparison_hour": {"SELECT", "DELETE"},
+    "society_comparison_outcome": {"SELECT", "DELETE"},
+    "society_comparison_replay": {"SELECT", "DELETE"},
+    "society_comparison_run": {"SELECT", "DELETE"},
+    "society_comparison_start": {"SELECT", "DELETE"},
+    "society_experiment_attempt": {"SELECT", "DELETE"},
+    "society_experiment_checkpoint": {"SELECT", "DELETE"},
+    "society_experiment_definition": {"SELECT", "DELETE"},
+    "society_experiment_outcome": {"SELECT", "DELETE"},
+    "world_character_appearance_revision": {"SELECT", "DELETE"},
+    "world_clock": {"SELECT", "DELETE"},
+    "world_clock_event": {"SELECT", "DELETE"},
+    "world_clock_traffic_minute": {"SELECT", "DELETE"},
+    "world_crossing_occupancy": {"SELECT", "DELETE"},
+    "world_society": {"SELECT", "DELETE"},
+    "world_society_action_request": {"SELECT", "DELETE"},
+    "world_society_control": {"SELECT", "DELETE"},
+    "world_society_control_event": {"SELECT", "DELETE"},
+    "world_society_decision": {"SELECT", "DELETE"},
+    "world_society_decision_request": {"SELECT", "DELETE"},
+    "world_society_event": {"SELECT", "DELETE"},
+    "world_society_input": {"SELECT", "DELETE"},
+    "world_society_model_choice": {"SELECT", "DELETE"},
+    "world_society_person_answer": {"SELECT", "DELETE"},
+    "world_society_presence": {"SELECT", "DELETE"},
+    "world_society_transition": {"SELECT", "DELETE"},
+    "world_society_transition_action": {"SELECT", "DELETE"},
+    "world_society_transition_decision": {"SELECT", "DELETE"},
+    "companion_answer": {"SELECT"},
+    "companion_answer_simulation_citation": {"SELECT"},
+    "society_erasure": {"SELECT"},
 }
 
 #: Single columns the owner may reach beyond its table privileges: the search query that
-#: reference_lookup_clear_queries clears.
-COLUMN_PRIVILEGES: dict[str, dict[str, set[str]]] = {"reference_lookup": {"query": {"UPDATE"}}}
+#: reference_lookup_clear_queries clears, a Companion answer's withdrawal that
+#: tg_society_erasure_erases writes, and the column whose UPDATE lets society_erase_rows lock a
+#: society's parent rows before it deletes (FOR UPDATE), which no body writes.
+COLUMN_PRIVILEGES: dict[str, dict[str, set[str]]] = {
+    "reference_lookup": {"query": {"UPDATE"}},
+    "companion_answer": {name: {"UPDATE"} for name in ("status", "withdrawn_at", "withdrawn_by")},
+    **{
+        name: {"workspace_id": {"UPDATE"}}
+        for name in (
+            "door_ask",
+            "society_comparison_run",
+            "society_comparison_start",
+            "world_society",
+        )
+    },
+}
 
 #: Every SECURITY DEFINER function, and its search path with the schema written as {schema}:
 #: door_prune and record_baked_tile_bake qualify every name and keep pg_catalog, pg_temp; 0161
@@ -136,6 +192,9 @@ DEFINERS = {
             "tg_saved_world_source_attachment_moves_membership()",
             "tg_saved_world_source_detach_moves_membership()",
             "tg_sealed_checkpoint_refuses_withdrawals()",
+            "society_erase_rows(uuid,uuid)",
+            "tg_society_erasure_erases()",
+            "tg_society_erases_on_tombstone()",
             "tg_spending_event_ends_guest_policies()",
             "tg_thing_erasure_erases()",
             "tg_thing_store_erases_on_tombstone()",

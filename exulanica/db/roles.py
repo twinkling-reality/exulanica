@@ -338,6 +338,9 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0177 appends each answer a person posts for the being they play and refuses
     # every update and delete of one.
     "world_society_person_answer",
+    # Migration 0182 appends a workspace's erasure of one society, whose trigger deletes every row
+    # that records the society as the definer owner; it refuses every update and delete.
+    "society_erasure",
 )
 
 #: Tables the runtime may read and never write (migration 0173): the style pack attempt counters

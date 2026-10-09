@@ -27,6 +27,7 @@ from exulanica.api import creator_grants
 from exulanica.api.account_repository import AccountRejected, AccountRepository, secret_digest
 from exulanica.canonical import canonical_json
 from exulanica.consent.training import TrainingTerms
+from exulanica.db.session import set_workspace
 from exulanica.deletion.restore import RestoreRefused, verify_restore
 from exulanica.deletion.withdrawals import CATALOG, read_withdrawals
 from exulanica.evidence.blob import BlobId
@@ -46,7 +47,12 @@ from exulanica.world.character_catalog_publication import (
     withdraw_catalog,
 )
 from exulanica.world.character_catalogs import CatalogRegistry, read_publication_document
-from exulanica.world.companion_memory import AnswerCitation, CompanionMemoryRepository
+from exulanica.world.companion_memory import (
+    AnswerCitation,
+    CompanionMemoryRepository,
+    SimulationCitation,
+)
+from exulanica.world.society_erasure import erase_society
 from exulanica.world.thing_store import ThingStore, admitted_look
 from exulanica.world_package.training_store import record_training_decision
 
@@ -68,6 +74,8 @@ from test_restore_replay_search_entries import commands as commands
 from test_scene_training_right import GPU, TRAINING_PURPOSE
 from test_search_entries_on_stop import ACCOUNT, _as_runtime, _authorize, _stop
 from test_search_entries_on_stop import indexed as indexed
+from test_society_authored_world_postgres import create_society, place_object
+from test_society_authored_world_postgres import saved_world as saved_world
 from test_workspace_style_packs_postgres import Packs, admitted
 
 pytestmark = pytest.mark.postgres
@@ -1082,3 +1090,72 @@ def test_a_base_withdrawn_after_its_dependent_was_refused_stays_withdrawn(
         dependent.manifest_sha256,
     )
     assert (state["state"], state["failure_class"]) == ("cancelled", "base_unavailable")
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_society_erased_after_the_backup_stays_erased(purged, saved_world, commands, tmp_path):
+    """A workspace's erasure of a world's society (migration "a society is erased whole") is carried
+    by a restore: the backup holds the society and a Companion answer that cited its version; the
+    carried erasure deletes the society's rows again, and the society tombstone replayed after it
+    withdraws the answer again, by the version the erasure names, since the society's rows are gone
+    by then (the catalog carries only a person's own withdrawal of an answer)."""
+    world, binding = saved_world, saved_world["binding"]
+    set_workspace(world["connection"], world["workspace"])
+    place_object(world, world["plate"], "object:cushion", 3_000, 5_000)
+    society, _document = create_society(world)
+    world["connection"].commit()
+    with purged.database().session(purged.workspace_id) as connection:
+        answer = CompanionMemoryRepository(connection, purged.workspace_id, ACCOUNT).record_answer(
+            _answer(
+                question="Who is resting?",
+                answer_text="Nobody is resting.",
+                world_id=binding.world_id,
+                simulation_citations=(
+                    SimulationCitation(
+                        ordinal=0,
+                        result_kind="synthetic_inhabitant",
+                        version_id=binding.version_id,
+                        inhabitant_id=uuid.uuid4(),
+                        event_id=None,
+                        tick=0,
+                    ),
+                ),
+            )
+        )
+
+    def held() -> bool:
+        [row] = purged.rows(
+            "select count(*) as n from world_society where workspace_id = %s and society_id = %s",
+            purged.workspace_id,
+            society["society_id"],
+        )
+        return row["n"] == 1
+
+    def erase() -> None:
+        with purged.database().session(purged.workspace_id) as connection:
+            erase_society(
+                connection,
+                purged.workspace_id,
+                binding.world_id,
+                binding.version_id,
+                erased_by=ACCOUNT,
+            )
+
+    assert not _through_a_restore(purged, tmp_path, withdraw=erase, current=held)
+    [row] = purged.rows(
+        "select a.status::text as status, t.scope::text as scope, "
+        "(select count(*) from society_erasure) as erasures, "
+        "(select count(*) from world_society_input where society_id = %s) as inputs "
+        "from companion_answer a left join tombstone t on t.tombstone_id = a.withdrawn_by "
+        "where a.answer_id = %s",
+        society["society_id"],
+        answer.answer_id,
+    )
+    # The answer withdrawn again by the society's tombstone, the one erasure carried, and none of
+    # the society's records left.
+    assert (row["status"], row["scope"], row["erasures"], row["inputs"]) == (
+        "withdrawn",
+        "society",
+        1,
+        0,
+    )

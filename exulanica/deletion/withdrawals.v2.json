@@ -214,6 +214,17 @@
       "order": null
     },
     {
+      "kind": "society_erasure",
+      "table": "society_erasure",
+      "shape": "event",
+      "note": "A workspace erasing one society of a world (exulanica/world/society_erasure.py), beside the society tombstone it names: its trigger deletes every row that records the society (its inputs, requests, receipts, transitions, events, presences, choices and the answers of the people who play its beings, its control, clock, door asks and crossings, and the comparisons and experiments started from it), so a restore from an older backup loses them again. The row names the society by its id and its world version only. The Companion's answers its trigger withdrew are not carried (companion_memory carries a person's own withdrawal alone): the society tombstone replayed after it withdraws them again, by the version the row names.",
+      "identity": ["workspace_id", "erasure_id"],
+      "withdrawn": {"column": "erased_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "world_society", "columns": ["workspace_id", "society_id"]},
+      "order": null
+    },
+    {
       "kind": "retraction",
       "table": "retraction",
       "shape": "event",
