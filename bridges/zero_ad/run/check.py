@@ -4,12 +4,12 @@ world on this checkout's stack, lives there as the world decides, leaves, and is
     <checkout>/.venv/bin/python bridges/zero_ad/run/check.py [--port-base 19500]
         [--game http://127.0.0.1:19508] [--match FILE] [--minutes-speed 1] [--lives-s 60]
         [--limit-s 900] [--look cc0-hoplite] [--scripted-model PLAN [--traveller-mind]]
-        [--keep-stack]
+        [--keep-stack] [--mapping FILE]
     <checkout>/.venv/bin/python bridges/zero_ad/run/check.py --declare OUT [--label WORDS]
-        [--game-words WORDS]
+        [--game-words WORDS] [--mapping FILE]
     <checkout>/.venv/bin/python bridges/zero_ad/run/check.py --api URL --token-file FILE
         --record FILE [--scene FILE] [--game http://127.0.0.1:19508] [--lives-s 60]
-        [--traveller-mind]
+        [--traveller-mind] [--mapping FILE]
 
 The game runs first, on this machine, with its interface on (``pyrogenesis
 --rl-interface=127.0.0.1:19508``). What this does, refusing by name at the first thing that is not
@@ -48,12 +48,17 @@ reads (``launch.py up --door-bridges OUT``) and stops: beside the bridges OUT al
 one stack lets several games in (the Luanti tool's ``declare`` writes its file anew, so it goes
 first), and in place of an earlier entry of this bridge. The bridge is declared in neutral words
 (``--label`` and ``--game-words``, by default "another open-source game", each one line of 1 to 80
-characters as the door takes them), since a film or a demo names no game.
+characters as the door takes them), since a film or a demo names no game. The declaration pins
+every published version of the mapping, the one ``--mapping`` names first.
 ``--api URL --token-file FILE --record FILE [--scene FILE]`` joins a stack this check did not start,
 where a scene was built for a take: it starts and stops no stack and builds nothing, crosses into
 the world the scene builder's record names, reads the owner's token once into this process, and
 closes the grant it issued when it ends; the stack keeps running. The summary keeps the words the
 stack shows for the bridge.
+
+``--mapping FILE`` names the published mapping a crossing says hello with:
+``zero-ad-empires-ascendant.v1.json`` by default, or ``zero-ad-empires-ascendant.v2.json``, which
+crosses the same in words that name no game, so a visitor's card in a film or a demo names none.
 
 ``--scripted-model PLAN`` serves the stack's API with ``scripts/acceptance/scripted_model.py``
 answering every model request from PLAN (``run/plans/``), with no provider, key or cost; with
@@ -76,6 +81,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -92,8 +98,11 @@ from exulanica_zero_ad.bridge import Bridge  # noqa: E402
 from exulanica_zero_ad.gate import Gate, game_type, place_marker, template  # noqa: E402
 from exulanica_zero_ad.rl import GameRefused, RLInterface  # noqa: E402
 
-MAPPING = ZERO_AD / "mapping" / "zero-ad-empires-ascendant.v1.json"
-READS = ZERO_AD / "mapping" / "reads.json"
+MAPPINGS = ZERO_AD / "mapping"
+#: The mapping a crossing says hello with unless ``--mapping`` names another published version:
+#: version 2 says what version 1 says in words that name no game, for a film or a demo.
+MAPPING_FILE = "zero-ad-empires-ascendant.v1.json"
+READS = MAPPINGS / "reads.json"
 MATCH = ZERO_AD / "matches" / "greek-acropolis-athenians.json"
 #: The standard stood on the gate: the Athenians' rally point flag, a marker the game itself draws.
 MARKER = "special/rallypoints/athen"
@@ -128,13 +137,20 @@ def plain_words(text: str, what: str) -> str:
     return words
 
 
+def published_mappings() -> list[Path]:
+    """Every published version of this adapter's mapping file."""
+    return sorted(MAPPINGS.glob("zero-ad-empires-ascendant.v*.json"), reverse=True)
+
+
 def declaration(
-    mapping_sha256: str, *, label: str = NEUTRAL_WORDS, game: str = NEUTRAL_WORDS
+    pinned: Sequence[str], *, label: str = NEUTRAL_WORDS, game: str = NEUTRAL_WORDS
 ) -> dict[str, Any]:
     """The door bridge entry a stack is started with for this adapter (``launch.py up
     --door-bridges``): run by a server, unlisted, offered to the stack's synthetic workspaces,
-    pinning the mapping by ``mapping_sha256`` and admitting the adapter's version, shown in
-    ``label`` and ``game`` words. Its own credential is random and only its digest is written."""
+    pinning the mappings ``pinned`` names by their digests (every published version, the one a
+    crossing says hello with first, so a stack lets in whichever its adapter chooses) and
+    admitting the adapter's version, shown in ``label`` and ``game`` words. Its own credential is
+    random and only its digest is written."""
     return {
         "bridge": "zero-ad",
         "label": plain_words(label, "label"),
@@ -142,7 +158,7 @@ def declaration(
         "run_by": "server",
         "ai": False,
         "credential_sha256": hashlib.sha256(secrets.token_urlsafe(32).encode()).hexdigest(),
-        "mapping_sha256": [mapping_sha256],
+        "mapping_sha256": list(pinned),
         "adapter_versions": [ADAPTER_VERSION],
         "listed": False,
         "workspaces": "synthetic",
@@ -429,6 +445,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--label", default=NEUTRAL_WORDS, help="the bridge's declared label")
     parser.add_argument("--game-words", default=NEUTRAL_WORDS, help="the bridge's declared game")
     parser.add_argument(
+        "--mapping",
+        default=MAPPING_FILE,
+        help="the published mapping file a crossing says hello with (default: %(default)s)",
+    )
+    parser.add_argument(
         "--api",
         metavar="URL",
         help="join a stack this check did not start, with --token-file and --record",
@@ -450,15 +471,23 @@ def main(argv: list[str] | None = None) -> int:
     Refused, Api = luanti.Refused, luanti.Api
     from exulanica.canonical import sha256_of_canonical
 
-    mapping = json.loads(MAPPING.read_text())
+    published = {path.name: json.loads(path.read_text()) for path in published_mappings()}
+    if arguments.mapping not in published:
+        parser.error(f"--mapping names no published mapping: {sorted(published)}")
+    mapping = published[arguments.mapping]
     reads = json.loads(READS.read_text())
     mapping_sha256 = sha256_of_canonical(mapping).hex()
+    pinned = [mapping_sha256] + [
+        sha256_of_canonical(other).hex()
+        for name, other in published.items()
+        if name != arguments.mapping
+    ]
     [visitor] = mapping["visitors"]
     soldier = template(visitor["game_type"])
     looks = {look["look_key"]: look["look"] for look in visitor["looks"]}
     if arguments.look not in looks:
         parser.error(f"--look names no look the mapping offers: {sorted(looks)}")
-    entry = declaration(mapping_sha256, label=arguments.label, game=arguments.game_words)
+    entry = declaration(pinned, label=arguments.label, game=arguments.game_words)
     if arguments.declare:
         count = declare(arguments.declare, entry)
         print(
@@ -481,6 +510,7 @@ def main(argv: list[str] | None = None) -> int:
         "profile": "exulanica-zero-ad.check-run/v1",
         "started_at": now(),
         "adapter_version": ADAPTER_VERSION,
+        "mapping_file": arguments.mapping,
         "mapping_sha256": mapping_sha256,
         "look_key": arguments.look,
         "look": looks[arguments.look],

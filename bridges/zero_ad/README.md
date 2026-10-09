@@ -18,6 +18,11 @@ rank, formation and stance, carried resources, garrison, position, and every uni
 not name. `mapping/reads.json` is what the adapter declares it reads; the door checks the two
 against each other at hello.
 
+`mapping/zero-ad-empires-ascendant.v2.json` crosses exactly the same in words that name no game: its
+game reads "another open-source game" and its visitor "a soldier from another open-source game", so a
+visitor's card in a film or a demo names none. Version 1 stays the default; the adapter and the run
+check take version 2 with `--mapping`, and the run check's declaration pins both.
+
 ## How it works
 
 The game, started with `--rl-interface=127.0.0.1:<port>`, serves `/reset`, `/step`, `/evaluate` and

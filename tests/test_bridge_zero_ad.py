@@ -40,8 +40,13 @@ def _module(name: str) -> Any:
     return importlib.import_module(f"{package}.{name}")
 
 
-def _mapping() -> dict[str, Any]:
-    return json.loads((ADAPTER / "mapping" / "zero-ad-empires-ascendant.v1.json").read_text())
+#: Every published version of the mapping, oldest first.
+MAPPINGS = sorted((ADAPTER / "mapping").glob("zero-ad-empires-ascendant.v*.json"))
+
+
+def _mapping(version: int = 1) -> dict[str, Any]:
+    named = ADAPTER / "mapping" / f"zero-ad-empires-ascendant.v{version}.json"
+    return json.loads(named.read_text())
 
 
 class _Answer(io.BytesIO):
@@ -124,14 +129,45 @@ def _on_gate(owner: int = 1, template: str = HOPLITE) -> dict[str, Any]:
     return {"template": template, "owner": owner, "position": [503.0, 498.0]}
 
 
-def test_the_mapping_and_its_reads_meet_the_door_s_checks():
+@pytest.mark.parametrize("published", MAPPINGS, ids=lambda path: path.name)
+def test_every_published_mapping_and_its_reads_meet_the_door_s_checks(published):
+    assert [path.name for path in MAPPINGS] == [
+        "zero-ad-empires-ascendant.v1.json",
+        "zero-ad-empires-ascendant.v2.json",
+    ]
     reads = json.loads((ADAPTER / "mapping" / "reads.json").read_text())
-    mapping = check_mapping(_mapping())
+    mapping = check_mapping(json.loads(published.read_text()))
     assert check_reads(mapping, reads)
     assert [visitor["kind"] for visitor in mapping["visitors"]] == [
         {"key": "traveller", "version": 2}
     ]
     assert mapping["items"] == []  # a 0 A.D. unit carries no item, so none crosses either way
+
+
+def test_the_second_mapping_crosses_what_the_first_does_in_words_that_name_no_game():
+    """A film or a demo names no game, and a visitor's card shows its manifest's words, which are
+    its mapping's: version 2 crosses exactly what version 1 crosses, and only its words differ."""
+    from test_door_names_no_game import GAME_NAMES
+
+    first, second = _mapping(1), _mapping(2)
+    assert GAME_NAMES.search(json.dumps(first)) is not None
+    assert GAME_NAMES.search(json.dumps(second)) is None
+    assert second["game"] == {"label": "another open-source game"}
+    assert second["visitors"][0]["label"] == "a soldier from another open-source game"
+
+    def crossings(mapping: dict[str, Any]) -> dict[str, Any]:
+        """The mapping without its version and the words a person reads for its game and
+        visitor."""
+        kept = json.loads(json.dumps(mapping))
+        for key in ("version", "game"):
+            kept.pop(key)
+        for visitor in kept["visitors"]:
+            for key in ("label", "words"):
+                visitor.pop(key)
+        return kept
+
+    assert crossings(second) == crossings(first)
+    assert (first["version"], second["version"]) == (1, 2)
 
 
 def test_the_interface_client_posts_each_route_as_the_engine_reads_it():
@@ -313,7 +349,27 @@ def test_the_run_declares_its_bridge_in_words_that_name_no_game(tmp_path):
     assert GAME_NAMES.search(entry["label"] + " " + entry["game"]) is None
     bridge = _admitted(out)["zero-ad"]
     assert (bridge.label, bridge.game) == (entry["label"], entry["game"])
-    assert bridge.mapping_sha256 == {sha256_of_canonical(_mapping()).hex()}
+    digests = [sha256_of_canonical(json.loads(path.read_text())).hex() for path in MAPPINGS]
+    assert bridge.mapping_sha256 == set(digests)
+    # Version 1, which a crossing says hello with unless another is chosen, is pinned first.
+    assert entry["mapping_sha256"][0] == digests[0]
+
+
+def test_a_declaration_pins_every_published_mapping_the_chosen_one_first(tmp_path):
+    """Every published version stays let in, whichever a crossing says hello with."""
+    from exulanica.canonical import sha256_of_canonical
+
+    out = tmp_path / "bridges.json"
+    chosen = "zero-ad-empires-ascendant.v2.json"
+    assert _run_check().main(["--declare", str(out), "--mapping", chosen]) == 0
+    [entry] = json.loads(out.read_text())
+    digests = {
+        path.name: sha256_of_canonical(json.loads(path.read_text())).hex() for path in MAPPINGS
+    }
+    assert entry["mapping_sha256"][0] == digests[chosen]
+    assert sorted(entry["mapping_sha256"]) == sorted(digests.values())
+    with pytest.raises(SystemExit):
+        _run_check().main(["--declare", str(out), "--mapping", "reads.json"])
 
 
 def test_a_declaration_joins_the_file_another_game_declared_first(tmp_path):
