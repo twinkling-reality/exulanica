@@ -1,0 +1,137 @@
+{
+  "input_sha256": "101020e2e68bbca9a8d059b86eff82d9ccafca6deb8cad9f44e117694d2c9ec9",
+  "minutes": [
+    {
+      "events": 15,
+      "events_sha256": "27e0c764ae60b78533e0ed7db639ca6bbb62b1bbb0876318a7e7b32a22e48187",
+      "state_sha256": "96f0c7443307837f26e5cf65505c986c9017ce0f8713db09441dace20b8088c8",
+      "tick": 1
+    },
+    {
+      "events": 1,
+      "events_sha256": "cf3290a720b3ab0bb4a20ff7cb7cc272cec67d4aeeddbe162cc7623ba2c8eaac",
+      "state_sha256": "bc878e1974918bbf658aee8e083b58303cf67ba7f8a4d41cda500615da38c721",
+      "tick": 2
+    },
+    {
+      "events": 4,
+      "events_sha256": "eed7c7f1cdb8a0ffc2be93f2a3be8401991d8dbc7e248d1d43e3f2e2b41e4930",
+      "state_sha256": "e4175cd0fa8a3685d606c6f06e9494d1a4dd890d26ba5d9ca3989cec54a1bd49",
+      "tick": 3
+    },
+    {
+      "events": 4,
+      "events_sha256": "d227268747a42d5bba171775b7ad6b5899d5e1804df2e1ec4c5f501468d1f3fb",
+      "state_sha256": "b276b45464ca34f18f688994511689301ee5c1b4d2c40460e7b3e22ff5ed81a2",
+      "tick": 4
+    },
+    {
+      "events": 2,
+      "events_sha256": "8536ee3012588b1447f4a23032ebd9202f872bccaec63d39acc05016ea1cd3c2",
+      "state_sha256": "31c18ea1042c389d41b7ae9787022b1e0effa78371031229c1d9b47c5b023d2f",
+      "tick": 5
+    },
+    {
+      "events": 5,
+      "events_sha256": "889c74f6729c72ac9ef9272fc13eee58694e6894662e93ebf740ec9cedbf8730",
+      "state_sha256": "9a82fab31a7dd578976f75e11986ae720bf360e21fb21f24a571c75811a5dc79",
+      "tick": 6
+    },
+    {
+      "events": 3,
+      "events_sha256": "76d2e82f05668180c5e4376fc37db84a7cea3328f40b5f13060702a53cbbcb27",
+      "state_sha256": "ba253bc94f449a3facd0a8e3fbae113cf018f311571f3df31337c0ae5ec5d326",
+      "tick": 7
+    },
+    {
+      "events": 2,
+      "events_sha256": "38a7a1d3042929b4fc762c21793918667c03606a7056f3217e5c49cd3f559572",
+      "state_sha256": "3d8f92eb0692d5aca500baddb358b9919c2ef2e849b154942ae18a72b0a5975c",
+      "tick": 8
+    },
+    {
+      "events": 2,
+      "events_sha256": "752d2ce4dcab5d66b3ea4dc69ac14663a682aac16da3de159439145168dbfaa6",
+      "state_sha256": "2a317e471f01312ca6406ce0b859a33d8469e864146b89d2525a45c8250b2a2b",
+      "tick": 9
+    },
+    {
+      "events": 5,
+      "events_sha256": "f48fef12c52823929f936cae0792e7877e0a73bb50a311f9cbccf33d4e7c81db",
+      "state_sha256": "94cbd119bca9819bcc67cf58e7946147df13dcf87b9c8e155c7e3bbb336db837",
+      "tick": 10
+    },
+    {
+      "events": 3,
+      "events_sha256": "162764796a085cd8e2c3d9d88797c1b60556e45009dd8d7f8c9518e4d9a43682",
+      "state_sha256": "d73b3078055ca60a76155e87e4ba84656b6c739dcc7d5cf724c0294eef1c3cb5",
+      "tick": 11
+    },
+    {
+      "events": 3,
+      "events_sha256": "7c3534a46d7c597104874d9fb276c5a66ff0c04d01e059c2c2d48c87c0c9c46b",
+      "state_sha256": "813a697d12fc74898bf7ab77c8ca430d42ba40f4fd0cdbb4dafb78720022dbce",
+      "tick": 12
+    },
+    {
+      "events": 2,
+      "events_sha256": "d9f9b971880264c849d4f5ec9d46b9917a02d4ce6b96e92c7037e844e7f237f7",
+      "state_sha256": "a1c79aa4c30f0e503fcb597b4eb165b6acd3d0d7e455ab24ecc20e37d6e42dc6",
+      "tick": 13
+    },
+    {
+      "events": 1,
+      "events_sha256": "75b2551c58800a07f8982a3240fe8e63ae65277d75fbe20e09a19b824f0b246c",
+      "state_sha256": "4c4a976312cfb4e05fd804e2e1658199994cc375e1cb4b497766e474af81ed8c",
+      "tick": 14
+    },
+    {
+      "events": 3,
+      "events_sha256": "38ace235e1ae24f9b0e314a5f31629874258e8ebac7c2624be5e73ec29585180",
+      "state_sha256": "9db859b8dedf090fc5513504ef280dadec28964173bf8eb815209b9b3afcda27",
+      "tick": 15
+    },
+    {
+      "events": 3,
+      "events_sha256": "8cdf9299922a044f0e4845e1f00f5dfe8a825cca08836a846f6143b599cfa025",
+      "state_sha256": "10e8deb5275ae83de116864d01522a54ffc96ef5739bb580425678f611ef3162",
+      "tick": 16
+    },
+    {
+      "events": 3,
+      "events_sha256": "406f5fb607f62238170c89073a4ccc0c432e2d1da1850ead94a458873656bff4",
+      "state_sha256": "bdbbb9a734fffb86524e9a758ce8ec95d9f2a98e89d8f56067c6a745f91d103f",
+      "tick": 17
+    },
+    {
+      "events": 2,
+      "events_sha256": "6437150fa1a8d84939465d58b5c3b490abcd897e1322b881dd85090f763748b7",
+      "state_sha256": "8a8c6e380dfd6d053b9ca18823a16a2b569a493968a6ecc1f3f17f39f54a32c5",
+      "tick": 18
+    },
+    {
+      "events": 1,
+      "events_sha256": "ef292d061a9bc54621156c8c7bcf78712def545e4f29fdfc75466a1dbcc0c7c0",
+      "state_sha256": "3a0d01cccc6f55dfafa74b2770053e4cc79852eef193b95c3bb28d36300a1224",
+      "tick": 19
+    },
+    {
+      "events": 2,
+      "events_sha256": "9636218bf7b3a39e81f821dd55fd2c8289a449d10814d738956a38b19afa40db",
+      "state_sha256": "c9330b8121c31415ee0d5fa64f8147b133136dd96a1e05bed990be8ae4638b06",
+      "tick": 20
+    }
+  ],
+  "modules": [
+    "exulanica-ability/crossing/v1",
+    "exulanica-ability/hands/v2",
+    "exulanica-ability/notice/v1",
+    "exulanica-ability/purposeful/v2",
+    "exulanica-ability/remember/v1",
+    "exulanica-ability/say/v1"
+  ],
+  "population": 6,
+  "recorded_by": "main 99e2f181, before the follow module is built",
+  "seed": "5555555555555555555555555555555555555555555555555555555555555555",
+  "society_id": "2ffa3c14-09d0-5988-ac8d-e28e7eecea1a"
+}

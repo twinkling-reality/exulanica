@@ -142,7 +142,7 @@ served by one ability module, with what it needs of the body and what its target
 | --- | --- | --- | --- | --- |
 | `wait`, `stand`, `talk`, `rest`, `visit` | `exulanica-ability/purposeful/v1` | a way to move, except `wait` | `talk_to`, `rest_at`, `visit` for `talk`, `rest`, `visit` | |
 | `pick_up`, `put_down`, `give`, `take` | `exulanica-ability/hands/v1` | a socket, and a way to move except `put_down` | `holdable`, a top or the ground, `receive`, `let_take` | |
-| `follow` | `exulanica-ability/follow/v1` | a way to move | `be_followed` | |
+| `follow` | `exulanica-ability/follow/v2` | a way to move | `be_followed` | |
 | `say` | `exulanica-ability/say/v1` | nothing; takes a line | `hear` | |
 | `leave` | `exulanica-ability/crossing/v1` | a way to move | `leave_through`, or none | `quiet_minutes` 1 to 60 |
 
@@ -160,9 +160,11 @@ version runs it for its whole life, where every being may do all five.
 by version, read by [`registry.py`](../exulanica/abilities/registry.py): the abilities it serves,
 its bounded parameters (a figure the module uses itself, or a range a kind states within), the
 event kinds its minute records, and whether it is built. Purposeful (versions 1 and 2), say,
-crossing and hands (versions 1 and 2: `reach_mm` 1,500, `approach_mm` 8,000, `walk_minutes_maximum`
-3) are built;
-follow is not connected and is refused by name (`follow_not_built`). A society of things records
+crossing (versions 1 and 2, the second naming a visitor in every summary by what it is, from
+outside, never as simulated) and hands (versions 1 and 2: `reach_mm` 1,500, `approach_mm` 8,000,
+`walk_minutes_maximum` 3) are built, and so is follow's second version (`follow_distance_mm` 2,000, `lost_after_minutes`
+3); its first was stated and never built, so no society records it, and it is still refused by name
+(`follow_not_built`). A society of things records
 the modules it runs in its first input and runs exactly those for its whole life
 ([society contract](synthetic-society-contract.md#the-society-of-things-v7)), so a module version
 stays in the table while any stored society names it, and a new version is a new row. A later
@@ -298,8 +300,9 @@ answers 424 `unavailable_society_input`, as the society read does. The card stat
   and how it came (`placed`, `crossed` or `populated`);
 - what it can do here and what others can do with it (`abilities`, `offers`, each `{key, words,
   module}`): only what a module the society runs acts on, the modules listed as `runs`, each
-  entry naming the version the society runs, so an ability or offer of a module that is not built,
-  as following is not, is never listed; nor is an offer whose taking-up activity the being's own
+  entry naming the version the society runs, so an ability or offer of a module the society does
+  not run (following, in a society made before it was built) is never listed; nor is an offer
+  whose taking-up activity the being's own
   kind does not do under the second purposeful module (a talk takes two beings whose kinds both
   list it, so a lantern spirit's card offers no talk);
 - where it is (`where`: on the ground, held by whom and in which socket) and, for a being of a
@@ -1047,8 +1050,11 @@ These are material limits of the boundary above, not partial behaviour:
 - The society of things ([society contract](synthetic-society-contract.md#the-society-of-things-v7))
   reads a placed thing's kind, places its beings, lets visitors cross in and leave, says the lines
   its beings' deciders choose and does the hands acts they choose or the world's owner asks for by
-  a direct request, but following is not built. The routine says nothing and uses no hands; only a
-  model chosen for a being, a visitor's own program, or the world's owner's direct request does.
+  a direct request. A being follows another only where a person playing it chooses to: no model or
+  outside program is offered following yet (the engine's terms state no follow action), the
+  routine never follows (so a lantern spirit's `follow_holders_of` is unread), and no direct request
+  asks it. The routine says nothing and uses no hands; only a model chosen for a being, a visitor's
+  own program, or the world's owner's direct request does.
   A visitor the world decides for takes no person's direct request yet, and nobody in the app can
   take a being over and play it.
 - A workspace's own kinds and looks are kept and served (a creature's by the creature route, a look

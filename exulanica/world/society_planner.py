@@ -60,6 +60,7 @@ from exulanica.world.society_input_policy import (
     validate_unread_placements,
 )
 from exulanica.world.society_legacy import initial_society
+from exulanica.world.society_summaries import summary_name
 from exulanica.world.society_thing_inputs import validate_input_things
 
 PURPOSEFUL_PROFILE = "exulanica-society/v2"
@@ -1248,6 +1249,13 @@ def _asked_stand(policy: dict | None, stand: PurposefulActivity | None) -> bool:
     )
 
 
+def _follows(policy: dict | None) -> bool:
+    """Whether a goal policy is a follower's walk toward the being it follows (the follow module,
+    :mod:`exulanica.world.society_follow`), which ends a stand under way as a request does, so the
+    follower keeps near. Only a society recording the module is ever given one."""
+    return policy is not None and policy.get("follow") is not None
+
+
 def _meets(person: dict, people: dict[str, dict]) -> bool:
     """Whether the person somebody means to talk with still means to talk with them.
 
@@ -1813,8 +1821,8 @@ def _advance_purposeful_society(
     def emit(person: dict, kind: str, reason: str, outcome: str, doc: dict) -> None:
         order = len(events)
         summary = (
-            f"{person['display_name']} (simulated): {outcome.replace('_', ' ')}; "
-            f"{reason.replace('_', ' ')}."
+            f"{summary_name(result, person, person['display_name'])}: "
+            f"{outcome.replace('_', ' ')}; {reason.replace('_', ' ')}."
         )
         document = {
             "summary": summary,
@@ -2007,7 +2015,11 @@ def _advance_purposeful_society(
             policy = (goal_policy or {}).get(person["id"])
             if (
                 policy is not None
-                and (policy.get("preferred_target_id") or _asked_stand(policy, stand))
+                and (
+                    policy.get("preferred_target_id")
+                    or _asked_stand(policy, stand)
+                    or _follows(policy)
+                )
                 and ends_on_request(routine, person)
                 and _location_valid(person, nodes, edges)
             ):
@@ -2082,6 +2094,7 @@ def _advance_purposeful_society(
                     policy.get("preferred_target_id")
                     or policy.get("wait")
                     or _asked_stand(policy, stand)
+                    or _follows(policy)
                 )
             )
             or pairing is not None

@@ -995,7 +995,14 @@ no words, only that the two stopped to talk. Event documents contain determinist
 order, input sequence/digest, typed target, reason/outcome, goal/action facts, position/path and
 previous-state/seed lineage. Event UUIDs bind society, tick, order and document digest. Authored
 string IDs stay inside typed targets; SQL `object_id` remains null rather than coercing a string
-into a UUID. Summaries are deterministic templates, never invented biographies.
+into a UUID. Summaries are deterministic templates, never invented biographies. A summary names its
+person "(simulated)" after its name, as every society of people has; in a society of things whose
+first input records the crossing module's second version (`exulanica-ability/crossing/v2`, every
+one made since it was built) a visitor is named by what it is instead, "(from outside, decided by
+its own program)" or "(from outside, decided by this world)", in every event about it and in its
+explanation, and a crossing refused before anybody arrived "(from outside)"
+(`exulanica/world/society_summaries.py`). A society that recorded the first version names its
+visitors as it always did, so its stored events keep their bytes.
 
 `world_society` retains the state and digest. `world_society_event` retains events. V2 additionally
 requires `world_society_input` and `world_society_transition`, supplied by the integration migration.
@@ -1535,8 +1542,9 @@ a generated town (`creates` does not name it, so a new world's society stays v2 
 world made from a world kind is lived in by the living society only, and refuses it. The route makes
 one only on a host that sets `EXULANICA_SOCIETY_OF_THINGS` on, and refuses it by name elsewhere
 (`society_engine_not_offered`). Its people walk, choose, stay and talk by the purposeful planner's
-rules, use their hands where a decider chooses or the world's owner asks (below) and follow nobody
-yet; a person may play one of them ([decision roles](decision-roles-contract.md#a-person-playing-a-being)).
+rules, use their hands where a decider chooses or the world's owner asks (below), and follow
+another being where a person playing one chooses to (below); a person may play one of them
+([decision roles](decision-roles-contract.md#a-person-playing-a-being)).
 Each of them names its kind by key, version and digest, and how it came: `populated` (the
 people its ground's population brings, the purposeful genesis's own people with the same names and
 draws, of the kind the ground's catalog entry names, `population_kind`), `placed` (a being the
@@ -1706,6 +1714,25 @@ first, unchanged, and every event they record names v7; then the things phase:
   (`hands_missed`) when the thing or the other being is gone (`thing_gone`) or the module's three
   minutes of walking pass first (`out_of_reach`). A hands act takes no line, and the routine never
   chooses one;
+* where the society runs the follow module (`exulanica-ability/follow/v2`, every society of things
+  made since it was built), who follows whom, in the order of the beings' numbers, over where the
+  minute's walks ended. A being whose decider chose to follow another (offered where its kind
+  lists follow, toward a being within hearing reach whose kind offers `be_followed`) begins to
+  (`followed`, `chose_to_follow`, naming the other by kind and number; one following somebody else
+  first stops, `chose_otherwise`), and its state says whom it follows and since when. It follows
+  while its decider chooses each minute to go on, as a person playing it does (a minute with no
+  answer carries on; carrying on is offered at its choice point too while it follows). It stops
+  (`stopped_following`) when its decider chooses to stop (`chose_to_stop_following`) or anything but
+  going on or saying something (`chose_otherwise`), in a minute nobody decides for it, as when it is
+  given back to its routine (`not_kept`), when the one it follows is not here (`target_gone`), or
+  after the module's three minutes in a row ending more than its 2,000 mm off with no open node
+  within that distance (`lost_target`). Before the planner moves anybody, each
+  follower that a direct request or another choice did not take that minute is given its walk
+  from where everybody stood as the minute began: within the 2,000 mm it waits where it stands
+  when nothing is under way, and farther off it stands at the open node within that distance
+  nearest itself, a stand under way ending for the walk as a request ends a stay. Only a person
+  playing a being is offered following (the seventh action and policy catalogs,
+  [decision roles](decision-roles-contract.md#a-person-playing-a-being)); the routine never follows;
 * where the society runs the memory module, last: the minute's events, in the order it recorded
   them, are written into the memory of each being a model or a program decides for (one a receipt
   the minute consumed names, or a visitor its own program decides for, from that minute on), as

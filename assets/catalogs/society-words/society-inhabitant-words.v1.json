@@ -1703,6 +1703,41 @@
       "reason": "Authored: why a society of things recorded a pending hands act as left undone: the world's owner asked for another, said after 'because'."
     },
     {
+      "key": "event_reason.chose_to_follow",
+      "kind": "event_reason",
+      "code": "chose_to_follow",
+      "words": "it chose to follow them",
+      "reason": "Authored: why a society of things recorded a being beginning to follow another or stopping: the decider's choice, or what ended it, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_to_stop_following",
+      "kind": "event_reason",
+      "code": "chose_to_stop_following",
+      "words": "it chose to stop following",
+      "reason": "Authored: why a society of things recorded a being beginning to follow another or stopping: the decider's choice, or what ended it, said after 'because'."
+    },
+    {
+      "key": "event_reason.target_gone",
+      "kind": "event_reason",
+      "code": "target_gone",
+      "words": "the one it followed left",
+      "reason": "Authored: why a society of things recorded a being beginning to follow another or stopping: the decider's choice, or what ended it, said after 'because'."
+    },
+    {
+      "key": "event_reason.lost_target",
+      "kind": "event_reason",
+      "code": "lost_target",
+      "words": "it could not come near the one it followed",
+      "reason": "Authored: why a society of things recorded a being beginning to follow another or stopping: the decider's choice, or what ended it, said after 'because'."
+    },
+    {
+      "key": "event_reason.not_kept",
+      "kind": "event_reason",
+      "code": "not_kept",
+      "words": "nothing chose to keep it following",
+      "reason": "Authored: why a society of things recorded a being beginning to follow another or stopping: the decider's choice, or what ended it, said after 'because'."
+    },
+    {
       "key": "outcome.picked_up",
       "kind": "outcome",
       "code": "picked_up",
@@ -1736,6 +1771,20 @@
       "code": "not_done",
       "words": "did not do it",
       "reason": "Authored: what a society of things recorded a being's hands doing, by the outcome the event records; the thing and the other being are named in the event."
+    },
+    {
+      "key": "outcome.followed",
+      "kind": "outcome",
+      "code": "followed",
+      "words": "began to follow somebody",
+      "reason": "Authored: what a society of things recorded a being doing about following another, by the outcome the event records; the one it follows is named in the event."
+    },
+    {
+      "key": "outcome.stopped_following",
+      "kind": "outcome",
+      "code": "stopped_following",
+      "words": "stopped following somebody",
+      "reason": "Authored: what a society of things recorded a being doing about following another, by the outcome the event records; the one it follows is named in the event."
     }
   ]
 }

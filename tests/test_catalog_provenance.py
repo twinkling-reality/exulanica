@@ -102,10 +102,10 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     assert set(found) == {ENTRY_SHAPE, CITED_SHAPE, GLYPH_SHAPE}, sorted(found)
     # Counted from the tree, so adding a catalog to a family is visible here as a number: eighteen
     # city catalogs, city version 4's edition of the street hierarchy and city version 5's edition
-    # of the material catalog, thirty-nine society catalogs (the living society's five and a town's
+    # of the material catalog, forty-two society catalogs (the living society's five and a town's
     # three, the purposeful routine's two versions, what is
     # recorded and said of each kind of its activity, the legacy identities of the first three
-    # engines, a person's decision contract's two in five versions each, six versions of a
+    # engines, a person's decision contract's two in seven versions each, six versions of a
     # person's score, four of the protocol, six of the seeds a comparison of models reads,
     # and a catalog of measured typical comparison costs),
     # the grounds a society stands on, the words both the inspector and the
@@ -130,7 +130,7 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # in two versions, the second fitting every plan with bones), the body grammar a creature's
     # body recipe is read against, the generated piece recipes in two versions, and what generating
     # a piece costs and the style words a piece request carries for each pack.
-    assert len(found[ENTRY_SHAPE]) == 118
+    assert len(found[ENTRY_SHAPE]) == 120
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
     # mappings, the road derivation and the signal placement.
     assert len(found[CITED_SHAPE]) == 7

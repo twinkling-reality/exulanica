@@ -43,6 +43,7 @@ from exulanica.world.deciders import receipt_decider
 from exulanica.world.role_decisions import DecisionDisposition
 from exulanica.world.society import SOCIETY_NAMESPACE, SocietyEvent, society_state_sha256
 from exulanica.world.society_decision_contract import (
+    FOLLOW_KINDS,
     HANDS_KINDS,
     POINT_KIND,
     THINGS_KINDS,
@@ -54,7 +55,9 @@ from exulanica.world.society_decision_contract import (
     recheck_point,
     recheck_talk,
 )
+from exulanica.world.society_follow import KEEPS_FOLLOWING, follow_goal_policy, runs_follow
 from exulanica.world.society_planner import input_sha256
+from exulanica.world.society_summaries import summary_name
 
 __all__ = [
     "DECISION_EVENT_KIND",
@@ -90,8 +93,15 @@ def model_goal_policies(
     *,
     profile: str | None = None,
 ) -> tuple[dict[str, dict[str, Any]], tuple[DecisionDisposition, ...]]:
-    """The minute's goal policies, a direct request's and each applied choice's, and what every
-    receipt did, in decision order.
+    """The minute's goal policies, a direct request's, each applied choice's and each follower's,
+    and what every receipt did, in decision order.
+
+    In a society running the follow module, a choice to follow is applied where the one chosen is
+    still here and offers to be followed, with that minute's walk toward it; a choice to stop is
+    applied with no goal. A being that follows somebody and was asked nothing else this minute,
+    or chose only to go on or say something, is given its follow policy
+    (:func:`~exulanica.world.society_follow.follow_goal_policy`) after every choice, so a request
+    or another choice takes the minute first.
 
     ``directed`` is the direct requests' policies for this minute, which are kept as they are and
     come first. ``document`` is the input the minute consumes last. ``profile`` is the receipt
@@ -110,6 +120,8 @@ def model_goal_policies(
         raise ValueError("person decision receipts are consumed once each, in decision order")
     present = {person["id"] for person in state["inhabitants"]}
     settled: dict[int, tuple[str, str]] = {}
+    # The kind of each applied choice, by subject: whether a follower goes on following.
+    chosen_kinds: dict[str, str] = {}
     talks: list[tuple[int, str, DecisionOption]] = []
     # What each person's own model chose for them this minute, applied or not: somebody it chose
     # anything for, but a conversation with the one asking, is not free to be asked to talk.
@@ -135,11 +147,32 @@ def model_goal_policies(
         else:
             option = DecisionOption.from_record(receipt["proposal"]["option"])
             own[subject] = option
+            if option.kind in FOLLOW_KINDS:
+                # Following one being from this minute, or stopping: the things phase records it.
+                follow = (
+                    None
+                    if option.kind == "stop_following"
+                    else follow_goal_policy(
+                        state, document, subject, str(option.addressee_id), promised
+                    )
+                )
+                if isinstance(follow, str):
+                    settled[index] = ("rejected", follow)
+                    continue
+                applied.add(subject)
+                chosen_kinds[subject] = option.kind
+                if follow is not None:
+                    policies[subject] = follow
+                    if "place_node_id" in follow:
+                        promised.add(follow["place_node_id"])
+                settled[index] = ("applied", reason)
+                continue
             if option.kind in THINGS_KINDS:
                 # Going on, saying something or leaving changes no goal: the planner goes on as
                 # it would, and the things phase says the line or lets the visitor go.
                 disposition = "applied"
                 applied.add(subject)
+                chosen_kinds[subject] = option.kind
                 settled[index] = (disposition, reason)
                 continue
             if option.kind in HANDS_KINDS:
@@ -206,6 +239,8 @@ def model_goal_policies(
         policies[subject] = option_goal_policy(option, promise)
         promised.update((promise.node_id, promise.partner_node_id))
         taken_into[promise.partner_id] = (subject, promise)
+    if runs_follow(state):
+        _follow_policies(state, document, policies, promised, directed, applied, chosen_kinds)
     dispositions = tuple(
         DecisionDisposition(
             decision_seq=receipt["decision_seq"],
@@ -218,6 +253,32 @@ def model_goal_policies(
         for index, receipt in enumerate(receipts)
     )
     return policies, dispositions
+
+
+def _follow_policies(
+    state: Mapping[str, Any],
+    document: Mapping[str, Any],
+    policies: dict[str, dict[str, Any]],
+    promised: set[str],
+    directed: Mapping[str, Any],
+    applied: set[str],
+    chosen_kinds: Mapping[str, str],
+) -> None:
+    """Each follower's policy for the minute, in the order of the beings' numbers, into
+    ``policies``: for a being that follows somebody, unless a direct request or another choice took
+    the minute (a choice to go on or to say something keeps it following)."""
+    for person in sorted(state["inhabitants"], key=lambda p: p["ordinal"]):
+        following = person.get("following")
+        subject = person["id"]
+        if following is None or subject in directed or subject in policies:
+            continue
+        if subject in applied and chosen_kinds.get(subject) not in KEEPS_FOLLOWING:
+            continue
+        policy = follow_goal_policy(state, document, subject, following["being"], promised)
+        if isinstance(policy, dict):
+            policies[subject] = policy
+            if "place_node_id" in policy:
+                promised.add(policy["place_node_id"])
 
 
 def append_decision_events(
@@ -240,14 +301,18 @@ def append_decision_events(
         # A person no longer here (sent away before the minute consumed their receipt) is named
         # by id alone: the event still closes what their receipt asked.
         person = people.get(disposition.subject_id)
-        who = "Someone no longer here" if person is None else person["display_name"]
+        who = (
+            "Someone no longer here (simulated)"
+            if person is None
+            else summary_name(next_state, person, person["display_name"])
+        )
         provider = receipt["provider"]
         # Who decided: a model, an outside program, or a person playing the being.
         decided = receipt_decider(receipt)
         order = len(result)
         event_document = {
             "summary": (
-                f"{who} (simulated): the {_DECIDED_WORDS[decided]}'s "
+                f"{who}: the {_DECIDED_WORDS[decided]}'s "
                 f"decision was "
                 f"{disposition.disposition}; {disposition.reason.replace('_', ' ')}."
             ),

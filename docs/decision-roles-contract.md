@@ -316,12 +316,18 @@ workspace ([erasing a society](synthetic-society-contract.md#erasing-a-society))
 sent to a hosted model provider or an outside program is beyond any erasure.
 
 A played being's request, its turn and its answer are read under the person's own contract
-(`play_contract`): the engine's terms with the sixth action catalog
-(`assets/catalogs/society/society-decision-action.v6.json`), which adds `point`, "walk to a spot
-you choose", at the being's choice point wherever the routine has people stand and the being's
-kind does, and the sixth policy catalog, which holds the fifth's bounds, as action and policy
-versions go in pairs. No model's or outside program's request is asked under it, so none is
-offered the walk, and every stored request keeps the catalog it recorded. Its answer gives the spot
+(`play_contract`): the engine's terms with the seventh action catalog
+(`assets/catalogs/society/society-decision-action.v7.json`), which states the sixth's `point`,
+"walk to a spot you choose", at the being's choice point wherever the routine has people stand and
+the being's kind does, and adds `follow`, "follow {name}, {metres} m away", toward each other being
+within hearing reach whose kind offers to be followed (nearest first, at most the policy's
+`follow_options_maximum`, 4), and `stop_following`, "stop following {name}", while it follows
+somebody (with `carry_on` at its choice point then too, so a minute with no answer keeps it
+following), where the society runs the follow module and the being's kind lists follow; and the
+seventh policy catalog, which holds the sixth's bounds and that one, as action and policy versions
+go in pairs. No model's or outside program's request is asked under it, so none is offered the
+walk or following, and every stored request keeps the catalog it recorded (a played being's request
+made before the seventh pair recorded the sixth). Its answer gives the spot
 as `point: [x_mm, z_mm]`; when the minute comes the host takes the open node nearest it (no
 activity's place, nobody standing at or headed to it, one the being can walk to, within the graph's
 longest step of the spot), and the receipt names that node (`node_id`, which a receipt states for

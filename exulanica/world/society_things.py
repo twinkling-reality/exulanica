@@ -75,6 +75,7 @@ from exulanica.world.society_planner import (
     routine_withheld,
     validate_society_input,
 )
+from exulanica.world.society_summaries import SIMULATED, crossing_name, summary_name
 from exulanica.world.society_thing_inputs import (
     arrival_points,
     placed_beings,
@@ -122,6 +123,9 @@ THING_EVENT_KINDS: Final = (
     "gave",
     "took",
     "hands_missed",
+    # Where the society records the follow module: a being began following another, or stopped.
+    "followed",
+    "stopped_following",
 )
 #: Every reason the things phase records, stated once: the browser has words for exactly these.
 THING_REASONS: Final = frozenset(
@@ -166,6 +170,17 @@ THING_REASONS: Final = frozenset(
         # decider's act a request replaced.
         "chose_otherwise",
         "asked_otherwise",
+        # A being's decider chose to follow another being, or to stop; or it stopped because the one
+        # it followed left, or because it ended the module's minutes in a row farther off than the
+        # follow distance with nowhere to stand within it. A follower whose decider chose anything
+        # else stops as ``chose_otherwise``.
+        "chose_to_follow",
+        "chose_to_stop_following",
+        "target_gone",
+        "lost_target",
+        # A minute in which no decider's choice kept a follower following: it was given back to a
+        # decider that has not chosen, or left to its routine, which never follows.
+        "not_kept",
     }
 )
 #: Every outcome the things phase records, stated once: the browser has words for exactly these.
@@ -182,6 +197,8 @@ THING_OUTCOMES: Final = (
     "gave",
     "took",
     "not_done",
+    "followed",
+    "stopped_following",
 )
 #: The reasons an outside program's request ends with for a visitor, counted as a quiet minute: it
 #: had no live connection, it did not answer in time, the grant it came under was revoked or has
@@ -300,6 +317,13 @@ def _runs_hands(state: Mapping[str, Any]) -> bool:
     from exulanica.abilities.registry import recorded_row
 
     return recorded_row(state.get("modules", ()), "hands") is not None
+
+
+def _runs_follow(state: Mapping[str, Any]) -> bool:
+    """Whether a society's first input recorded the follow module, which its minutes then run."""
+    from exulanica.world.society_follow import runs_follow
+
+    return runs_follow(state)
 
 
 def _gone_home(thing: Mapping[str, Any], here: set[str]) -> bool:
@@ -465,9 +489,17 @@ class _Minute:
         name: str,
         details: Mapping[str, Any],
         at_ms: int = 0,
+        outside: bool = False,
     ) -> SocietyEvent:
+        """Record one event of the things phase. Its summary names ``person`` as the society names
+        its people (:func:`~exulanica.world.society_summaries.summary_name`), or, with nobody here,
+        ``name`` as a crossing from ``outside`` or as one of the society's own."""
         order = len(self.events)
-        summary = f"{name} (simulated): {outcome.replace('_', ' ')}; {reason.replace('_', ' ')}."
+        if person is not None:
+            named = summary_name(self.state, person, name)
+        else:
+            named = crossing_name(self.state, name) if outside else f"{name} ({SIMULATED})"
+        summary = f"{named}: {outcome.replace('_', ' ')}; {reason.replace('_', ' ')}."
         document = {
             "summary": summary,
             "synthetic": True,
@@ -865,6 +897,7 @@ def _arrive(minute: _Minute, crossing: Crossing, document: Mapping[str, Any]) ->
             person=None,
             name=_label(kind) if kind is not None else "A visitor",
             details=details,
+            outside=True,
         )
         return BoundCrossing(crossing.crossing_id, "refused", reason, event.event_id)
     assert node is not None and kind is not None
@@ -963,6 +996,7 @@ def _malformed(minute: _Minute, crossing: Crossing) -> BoundCrossing:
         person=None,
         name="A visitor",
         details={"crossing_id": str(crossing.crossing_id)},
+        outside=True,
     )
     return BoundCrossing(crossing.crossing_id, "refused", MALFORMED, event.event_id)
 
@@ -994,6 +1028,7 @@ def _depart(minute: _Minute, crossing: Crossing, document: Mapping[str, Any]) ->
             person=None,
             name="A visitor",
             details={"crossing_id": str(crossing.crossing_id), "came_by": "crossed"},
+            outside=True,
         )
         return BoundCrossing(crossing.crossing_id, "not_here", "not_here", event.event_id)
     event = minute.leave(
@@ -1128,6 +1163,8 @@ def advance_things(
     if _runs_hands(result):
         _asked(minute, asked)
         _hands(minute, previous)
+    if _runs_follow(result):
+        _follow(minute, decisions)
     if _remembers(result):
         _remember(minute, decisions)
     validate_things_state(result)
@@ -1483,6 +1520,105 @@ def _hands(minute: _Minute, previous: Mapping[str, Any]) -> None:
         )
 
 
+def _follow(minute: _Minute, decisions: Sequence[tuple[Mapping[str, Any], Any]]) -> None:
+    """The follow step, after the hands step, in the order of the beings' numbers, over where the
+    minute's walks ended: a being whose decider's applied choice was to follow another begins to
+    (``followed``; one following somebody else first stops, ``chose_otherwise``); and a being that
+    follows somebody stops (``stopped_following``) when its decider's applied choice was to stop
+    (``chose_to_stop_following``) or anything but going on or saying something
+    (``chose_otherwise``), when no decider's choice kept it this minute (``not_kept``: a being
+    follows while its decider chooses each minute to go on, as a person playing it does, a minute
+    with no answer carrying on), when the one it follows is not here (``target_gone``), or when it
+    has ended the follow module's ``lost_after_minutes`` minutes in a row farther off than the
+    follow distance with no open node within it (``lost_target``); ending within the distance, or
+    with such a node to walk to, counts no minute lost."""
+    from exulanica.world.society_decision_contract import DecisionOption
+    from exulanica.world.society_follow import KEEPS_FOLLOWING, approach_node, follow_row
+
+    state = minute.state
+    row = follow_row(state)
+    assert row is not None
+    within, lost_after = row.value("follow_distance_mm"), row.value("lost_after_minutes")
+    chosen = {
+        str(receipt["subject_id"]): DecisionOption.from_record(receipt["proposal"]["option"])
+        for receipt, disposition in decisions
+        if disposition.disposition == "applied" and receipt["proposal"] is not None
+    }
+    people = {person["id"]: person for person in state["inhabitants"]}
+    for person in sorted(state["inhabitants"], key=lambda p: p["ordinal"]):
+        option = chosen.get(person["id"])
+        following = person.get("following")
+        if option is not None and option.kind == "follow":
+            target = people.get(str(option.addressee_id))
+            if following is not None and (target is None or following["being"] != target["id"]):
+                _stop_following(minute, person, "chose_otherwise" if target else "target_gone")
+            if target is None or (following is not None and following["being"] == target["id"]):
+                continue
+            person["following"] = {
+                "being": target["id"],
+                "kind": dict(target["kind"]),
+                "number": target["ordinal"] + 1,
+                "since": state["tick"],
+                "lost": 0,
+            }
+            minute.emit(
+                "followed",
+                person["id"],
+                "chose_to_follow",
+                "followed",
+                person=person,
+                name=person["display_name"],
+                details=_followed(person["following"]),
+            )
+            continue
+        if following is None:
+            continue
+        if option is not None and option.kind == "stop_following":
+            _stop_following(minute, person, "chose_to_stop_following")
+            continue
+        if option is not None and option.kind not in KEEPS_FOLLOWING:
+            _stop_following(minute, person, "chose_otherwise")
+            continue
+        if option is None:
+            _stop_following(minute, person, "not_kept")
+            continue
+        target = people.get(following["being"])
+        if target is None:
+            _stop_following(minute, person, "target_gone")
+            continue
+        near = _distance_mm(person["position_mm"], target["position_mm"]) <= within
+        if near or approach_node(state, minute.document, person, target, within) is not None:
+            following["lost"] = 0
+            continue
+        following["lost"] += 1
+        if following["lost"] >= lost_after:
+            _stop_following(minute, person, "lost_target")
+
+
+def _followed(following: Mapping[str, Any]) -> dict[str, Any]:
+    """Whom a follow event names: the being, by its kind and number as it began, and since when."""
+    return {
+        "with": following["being"],
+        "with_kind": dict(following["kind"]),
+        "with_number": following["number"],
+        "since": following["since"],
+    }
+
+
+def _stop_following(minute: _Minute, person: dict[str, Any], reason: str) -> None:
+    """The being stops following, by name: ``stopped_following`` naming whom it followed."""
+    following = person.pop("following")
+    minute.emit(
+        "stopped_following",
+        person["id"],
+        reason,
+        "stopped_following",
+        person=person,
+        name=person["display_name"],
+        details=_followed(following),
+    )
+
+
 def _as_began(person: Mapping[str, Any], began: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     """``person`` where it stood as the minute began, where it was here then."""
     then = began.get(person["id"])
@@ -1698,6 +1834,24 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
                 validate_recollection(person["recollection"])
             except ValueError as exc:
                 raise ValueError(f"a being's recollection is out of shape: {exc}") from exc
+        following = person.get("following")
+        _require(
+            following is None
+            or (
+                _runs_follow(state)
+                and isinstance(following, dict)
+                and set(following) == {"being", "kind", "number", "since", "lost"}
+                and isinstance(following["being"], str)
+                and _reference_shape(following["kind"])
+                and type(following["number"]) is int
+                and following["number"] >= 1
+                and type(following["since"]) is int
+                and 0 <= following["since"] <= state["tick"]
+                and type(following["lost"]) is int
+                and following["lost"] >= 0
+            ),
+            "a being states whom it follows only in a society running follow",
+        )
         intent = person.get("hands")
         _require(
             intent is None

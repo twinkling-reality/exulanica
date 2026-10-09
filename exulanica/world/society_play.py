@@ -71,10 +71,11 @@ ANSWERS_PER_MINUTE: Final = 12
 #: How many minutes in a row a played being carries on with no answer from its person before the
 #: host gives it back (``player_left``).
 QUIET_MINUTES: Final = 5
-#: The contract catalogs' version that first states the person's own walk to a spot (``point``),
-#: its policy holding the fifth's bounds: a played being's requests are asked under it, or under a
-#: later one the engine's terms state.
-PLAY_CATALOG_VERSION: Final = 6
+#: The contract catalogs' version a played being's requests are asked under, or a later one the
+#: engine's terms state: the sixth first states the person's own walk to a spot (``point``), its
+#: policy holding the fifth's bounds, and the seventh adds following another being and stopping
+#: (``follow``, ``stop_following``) with the bound on those options.
+PLAY_CATALOG_VERSION: Final = 7
 #: Why an answer is refused, by the code the route answers with, its detail and its status.
 PLAY_REFUSALS: Final = {
     "minute_passed": (

@@ -33,6 +33,7 @@ from exulanica.world.society_planner import (
     supports,
     validate_society_input,
 )
+from exulanica.world.society_summaries import summary_name
 
 ACTION_REQUEST_PROFILE: Final = "exulanica.society-action-request/v1"
 #: A request for a hands act, read beside v1: v1's fields without ``target``.
@@ -554,7 +555,7 @@ def append_action_events(
         order = len(result)
         event_document = {
             "summary": (
-                f"{person['display_name']} (simulated): user action request "
+                f"{summary_name(next_state, person, person['display_name'])}: user action request "
                 f"{disposition.disposition}; {disposition.reason.replace('_', ' ')}."
             ),
             "synthetic": True,

@@ -20,6 +20,7 @@ import pytest
 from exulanica.abilities.registry import (
     BEFORE_RECORDED,
     CROSSING,
+    FOLLOW_KEEPING_NEAR,
     MODULES_PATH,
     PURPOSEFUL,
     PURPOSEFUL_BY_KIND,
@@ -97,7 +98,8 @@ def test_a_new_society_records_each_module_at_its_newest_built_version_and_older
     assert built_module(PURPOSEFUL).abilities == built_module(PURPOSEFUL_BY_KIND).abilities
     assert recorded_modules({"modules": list(BEFORE_RECORDED)}) == BEFORE_RECORDED
     assert recorded_row(recorded_modules({}), "purposeful") == built_module(PURPOSEFUL)
-    assert recorded_row(newest, "follow") is None
+    # Following was stated as a first version never built; a new society records the second.
+    assert recorded_row(newest, "follow") == built_module(FOLLOW_KEEPING_NEAR)
     with pytest.raises(AbilityError, match="one version of the purposeful module"):
         recorded_row([PURPOSEFUL, PURPOSEFUL_BY_KIND], "purposeful")
 
@@ -149,8 +151,14 @@ ROWS_SHA256 = {
     "exulanica-ability/crossing/v1": (
         "fa49cfcedc547827a63dd9376ad2fd3f3b0c6401d810db711986f2ae4c086c27"
     ),
+    "exulanica-ability/crossing/v2": (
+        "02aee737b3cf287643fa4799260b5a4bd73373faf541176bca702cf848940c0f"
+    ),
     "exulanica-ability/follow/v1": (
         "ae012193437836a90eed9f9e1cb3cc1c4cc4db13626cee9b43777611ceddc491"
+    ),
+    "exulanica-ability/follow/v2": (
+        "bec43870ccfdce763f9d3c5d9dac161707e7349c4e8d5909dcc7d5321d568f1a"
     ),
     "exulanica-ability/hands/v1": (
         "be1b97b54ef116a851ff9d4452a22fbf6311110c237f65b178ffd1f242d52719"

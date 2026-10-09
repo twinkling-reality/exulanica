@@ -303,6 +303,59 @@
       "status": "built",
       "refusal": null,
       "reason": "Hands as version 1 serves them, with one change to where a being walks to act: of the open nodes of the walking graph within reach of the thing, or of the being it hands a thing to or takes one from, it walks to the one nearest itself, so it comes up on its own side and never walks past or through what it acts on, where version 1 walks to the open node nearest the thing or the being. A society of things records it in its first input once it is built, and one that recorded version 1 runs version 1 for its whole life."
+    },
+    {
+      "module": "exulanica-ability/follow/v2",
+      "abilities": [
+        "follow"
+      ],
+      "parameters": [
+        {
+          "name": "follow_distance_mm",
+          "value": 2000,
+          "minimum": 500,
+          "maximum": 20000,
+          "unit": "mm",
+          "reason": "How near a follower keeps to the one it follows."
+        },
+        {
+          "name": "lost_after_minutes",
+          "value": 3,
+          "minimum": 1,
+          "maximum": 60,
+          "unit": "minutes",
+          "reason": "How many minutes in a row the follower may end farther off than the follow distance with no open node within it before it stops following, so one it can no longer come near is let go."
+        }
+      ],
+      "events": [
+        "followed",
+        "stopped_following"
+      ],
+      "status": "built",
+      "refusal": null,
+      "reason": "Keeping near another being that offers to be followed, chosen by a being's decider: each minute it has nothing else under way it waits within the follow distance of the one it follows, or walks to the open node within that distance nearest itself, a stand under way ending for the walk; it stops when its decider chooses anything but going on or saying something, when the one followed leaves, or after the lost minutes in a row ending farther off with nowhere to stand within the distance. The first version was stated and never built, so no society records it; a society of things records this one in its first input from when it was built."
+    },
+    {
+      "module": "exulanica-ability/crossing/v2",
+      "abilities": [
+        "leave"
+      ],
+      "parameters": [
+        {
+          "name": "quiet_minutes",
+          "value": null,
+          "minimum": 1,
+          "maximum": 60,
+          "unit": "minutes",
+          "reason": "How many minutes in a row a visitor's program may leave unanswered (no live connection, or no answer in time) before the visitor goes home; each kind states its own."
+        }
+      ],
+      "events": [
+        "thing_departed"
+      ],
+      "status": "built",
+      "refusal": null,
+      "reason": "A visitor from another program going home, as version 1: by its decider's choice, or when its program stays quiet for as many minutes as its kind waits, taking what it holds. Every summary the society's events and its people's explanations give of a visitor names it by what it is, from outside and decided by its own program or by this world, never as simulated, and a crossing refused before anybody arrived as from outside. A society of things records it in its first input once it is built; one that recorded version 1 names its visitors as version 1 did."
     }
   ]
 }

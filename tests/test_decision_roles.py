@@ -65,6 +65,7 @@ from exulanica.world.role_decisions import (
     validate_role_receipt,
 )
 from exulanica.world.society_engines import ENGINES
+from exulanica.world.society_play import play_contract
 
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
 
@@ -802,11 +803,16 @@ def test_an_engine_states_terms_only_for_a_role_it_hosts_and_with_a_prompt_of_it
 def test_a_contract_stating_a_line_bound_outside_its_range_is_refused_when_it_loads(monkeypatch):
     person = load_decision_roles().role("society_decision")
     versions = person.terms(THINGS).versions
-    # The positive control: v7's contract loads, its values within every range.
+    # The positive control: v7's contract loads, its values within every range it states, and the
+    # contract a played being answers under, which states every bound, within all of them.
     assert person.contract(versions).value("hearing_reach_mm") == 8_000
     ranges = person.adapter.POLICY_RANGES
-    for key, (low, high) in ranges.items():
-        assert low <= person.contract(versions).value(key) <= high, key
+    played = play_contract(person, THINGS)
+    for contract in (person.contract(versions), played):
+        for key, (low, high) in ranges.items():
+            if key in contract.policy:
+                assert low <= contract.value(key) <= high, key
+    assert set(ranges) <= set(played.policy)
     # A range the stated value falls outside of refuses the contract by name, as a value of 0
     # lines kept or 0 ways of saying something would be.
     fresh = load_decision_roles().role("society_decision")

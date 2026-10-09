@@ -80,16 +80,16 @@ def test_a_thing_s_card_says_what_it_is_does_here_and_wears(app):
         "being",
         "placed",
     )
-    assert "exulanica-ability/hands/v2" in card["runs"]
+    assert {"exulanica-ability/hands/v2", "exulanica-ability/follow/v2"} <= set(card["runs"])
     abilities = {ability["key"] for ability in card["abilities"]}
-    # Only what a running module acts on: hands and lines are run, following is not built.
-    assert {"pick_up", "give", "say"} <= abilities and "follow" not in abilities
+    # What a running module acts on: a society made now runs hands, lines and following.
+    assert {"pick_up", "give", "say", "follow"} <= abilities
     # The routine's abilities, by the version of the purposeful module a society made now runs.
     routine = {"wait", "stand", "talk", "rest", "visit"}
     assert {a["module"] for a in card["abilities"] if a["key"] in routine} == {PURPOSEFUL_BY_KIND}
     assert routine <= abilities
     offers = {offer["key"] for offer in card["offers"]}
-    assert {"receive", "hear"} <= offers and "be_followed" not in offers
+    assert {"receive", "hear", "be_followed"} <= offers
     assert all(entry["module"] in card["runs"] for entry in card["abilities"] + card["offers"])
     assert card["holding"] == [] and card["lines"] == []
     assert (card["decider"]["kind"], card["decider"]["may_change"]) == ("routine", True)

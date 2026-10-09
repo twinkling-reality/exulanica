@@ -35,7 +35,9 @@ from typing import Any, Final, Literal
 __all__ = [
     "BEFORE_RECORDED",
     "CROSSING",
+    "CROSSING_NAMING_VISITORS",
     "FOLLOW",
+    "FOLLOW_KEEPING_NEAR",
     "HANDS",
     "HANDS_FROM_OWN_SIDE",
     "MODULES_PATH",
@@ -66,10 +68,15 @@ PURPOSEFUL: Final = "exulanica-ability/purposeful/v1"
 PURPOSEFUL_BY_KIND: Final = "exulanica-ability/purposeful/v2"
 SAY: Final = "exulanica-ability/say/v1"
 CROSSING: Final = "exulanica-ability/crossing/v1"
+#: Crossing whose summaries name a visitor by what it is, from outside, never as simulated.
+CROSSING_NAMING_VISITORS: Final = "exulanica-ability/crossing/v2"
 HANDS: Final = "exulanica-ability/hands/v1"
 #: Hands whose being walks up to act on its own side of the thing or the being it acts with.
 HANDS_FROM_OWN_SIDE: Final = "exulanica-ability/hands/v2"
 FOLLOW: Final = "exulanica-ability/follow/v1"
+#: Following, built: a being keeps near the one it follows, re-planned each minute it has nothing
+#: else under way. The first version was stated and never built, so no society records it.
+FOLLOW_KEEPING_NEAR: Final = "exulanica-ability/follow/v2"
 NOTICE: Final = "exulanica-ability/notice/v1"
 REMEMBER: Final = "exulanica-ability/remember/v1"
 #: The modules a society of things runs whose first input records none: the ones every society

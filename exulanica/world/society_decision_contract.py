@@ -98,6 +98,7 @@ __all__ = [
     "ACTION_FIELDS",
     "DECISION_REASONS",
     "FEWEST_OPTIONS",
+    "FOLLOW_KINDS",
     "LINE_KINDS",
     "NAMED_FIELDS",
     "PERSON_REASONS",
@@ -190,6 +191,9 @@ ACTION_FIELDS: Final = {
     "put_down": frozenset({"thing"}),
     "give": frozenset({"thing", "who", "number", "metres"}),
     "take": frozenset({"thing", "who", "number", "metres"}),
+    # And, from the seventh action catalog, following another being and stopping.
+    "follow": frozenset({"who", "number", "metres"}),
+    "stop_following": frozenset({"who", "number"}),
 }
 #: The placeholders a kind's words may name instead, from the fourth action catalog: the being by
 #: the name the page shows for it (``name``) rather than by number, so a line that copies the words
@@ -199,6 +203,8 @@ NAMED_FIELDS: Final = {
     "say_to": frozenset({"name", "metres"}),
     "give": frozenset({"thing", "name", "metres"}),
     "take": frozenset({"thing", "name", "metres"}),
+    "follow": frozenset({"name", "metres"}),
+    "stop_following": frozenset({"name"}),
 }
 #: The kinds whose option says something: a choice offering one takes a line.
 LINE_KINDS: Final = frozenset({"say_to", "say_all"})
@@ -214,6 +220,7 @@ POLICY_KEYS_FROM: Final = {
         }
     ),
     4: frozenset({"hands_options_maximum"}),
+    7: frozenset({"follow_options_maximum"}),
 }
 #: The range each policy value a society of things adds must fall in, so a contract stating
 #: another is refused when it loads: a line carries one metre to fifty, holds at most what the
@@ -226,6 +233,7 @@ POLICY_RANGES: Final = {
     "lines_heard_maximum": (1, HEARD_LINES_MAXIMUM),
     "say_options_maximum": (2, 16),
     "hands_options_maximum": (1, 16),
+    "follow_options_maximum": (1, 16),
 }
 #: What every recorded option states; one to talk with also states who, as ``partner_id``, so an
 #: option of the first contract records exactly the bytes it always did.
@@ -238,12 +246,17 @@ _NAMED_FIELDS: Final = {
     "say_to": "addressee_id",
     "give": "addressee_id",
     "take": "addressee_id",
+    "follow": "addressee_id",
+    "stop_following": "addressee_id",
 }
 #: The kinds only a society of things' people are offered, beside the routine's own.
 THINGS_KINDS: Final = frozenset({"carry_on", "say_to", "say_all", "leave"})
 #: The kinds a society of things' people's hands are offered, from the fourth action catalog, where
 #: the society records the hands module.
 HANDS_KINDS: Final = frozenset({"pick_up", "put_down", "give", "take"})
+#: Following another being and stopping, from the seventh action catalog, where the society records
+#: the follow module: the being followed is the option's ``addressee_id``.
+FOLLOW_KINDS: Final = frozenset({"follow", "stop_following"})
 #: The walk to a spot a person playing a being chooses, from the sixth action catalog: offered only
 #: in a request asked under a contract that states it, which only a played being's are
 #: (exulanica/world/society_play.py), and answered with the open node taken for the person's point.
@@ -381,7 +394,12 @@ def _abilities(kind: Any) -> frozenset[str]:
 
 
 def _hears(kind: Any) -> bool:
-    return kind is not None and any(offer["key"] == "hear" for offer in kind.document["offers"])
+    return _offers(kind, "hear")
+
+
+def _offers(kind: Any, offer: str) -> bool:
+    """Whether a being's kind offers ``offer`` to others: hearing, being followed."""
+    return kind is not None and any(held["key"] == offer for held in kind.document["offers"])
 
 
 def hearers(
@@ -457,6 +475,76 @@ def things_options(
         found.append(_things_option(contract, "leave"))
     if document is not None:
         found.extend(hands_options(state, document, person, contract))
+        found.extend(follow_options(state, person, contract))
+    return found
+
+
+def follow_options(
+    state: Mapping[str, Any], person: Mapping[str, Any], contract: DecisionContract
+) -> list[DecisionOption]:
+    """What a society of things' person may do about following, where its society records the
+    follow module, its kind lists follow and the contract states the follow actions: while it
+    follows somebody still here, stop following them, and, at its choice point, carry on (keep
+    following), which is offered under way already and is what a minute with no answer takes; and
+    follow each other being within hearing reach whose kind offers to be followed, nearest first
+    and then by number, at most the policy's ``follow_options_maximum``, never the one it follows.
+    Empty for anybody else."""
+    from exulanica.abilities.registry import recorded_row
+
+    if (
+        recorded_row(state.get("modules", ()), "follow") is None
+        or not set(contract.words) >= FOLLOW_KINDS
+    ):
+        return []
+    kind = kind_of(person)
+    if kind is None or "follow" not in _abilities(kind):
+        return []
+    people = {other["id"]: other for other in state["inhabitants"]}
+    following = (person.get("following") or {}).get("being")
+    found = []
+    if following in people:
+        other = people[following]
+        found.append(
+            _things_option(
+                contract,
+                "stop_following",
+                label=contract.words["stop_following"].format(
+                    who=kind_of(other).document["label"],
+                    number=other["ordinal"] + 1,
+                    name=page_name(other).lower(),
+                ),
+                addressee_id=following,
+            )
+        )
+        if at_choice_point(person):
+            found.append(_things_option(contract, "carry_on"))
+    x, y = person["position_mm"]
+    reach = contract.value("hearing_reach_mm")
+    near = []
+    for other in state["inhabitants"]:
+        if other["id"] in (person["id"], following) or not _offers(kind_of(other), "be_followed"):
+            continue
+        distance = math.isqrt(
+            (other["position_mm"][0] - x) ** 2 + (other["position_mm"][1] - y) ** 2
+        )
+        if distance <= reach:
+            near.append((distance, other["ordinal"], other))
+    for distance, _ordinal, other in sorted(near, key=lambda row: row[:2])[
+        : contract.value("follow_options_maximum")
+    ]:
+        found.append(
+            _things_option(
+                contract,
+                "follow",
+                label=contract.words["follow"].format(
+                    who=kind_of(other).document["label"],
+                    number=other["ordinal"] + 1,
+                    name=page_name(other).lower(),
+                    metres=round(distance / 1000),
+                ),
+                addressee_id=other["id"],
+            )
+        )
     return found
 
 
