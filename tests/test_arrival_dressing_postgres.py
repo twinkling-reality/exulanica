@@ -7,9 +7,11 @@ application a deployment runs:
     in a society on the scene's engine with the town's own people and the scene's beings, and each
     being's mind is the scene's; asking again makes no second world and places or records nothing
     more;
-*   a host that does not offer the scene's engine places nothing, makes no society and says so by
-    the code the society routes answer with, so no world holds beings no society seats;
-*   an arrival world naming no scene is made as before, with nothing placed;
+*   a host that does not offer the scene's engine places nothing and says so by the code the
+    society routes answer with, so no world holds beings no society seats, and the town lives on
+    its living engine instead, with its own people;
+*   an arrival world naming no scene lives on its living engine, with nothing placed;
+*   a living engine that cannot make the arrival's society is named as the ``society`` step;
 *   a dressing refused comes back by its code as an incomplete step, and the world stands.
 """
 
@@ -126,17 +128,34 @@ def test_a_guest_s_arrival_town_is_dressed_with_its_scene_and_lives(made, baked)
     assert _choices(api) == choices
 
 
-def test_a_host_that_does_not_offer_the_engine_places_nothing_and_says_so(made, baked):
+def _lives_on_its_own(api, arrival: dict, engine: str) -> None:
+    """The arrival town's society on ``engine``, peopled by the town alone, with nothing placed."""
+    assert _things(api, arrival) == {}
+    society = _society(api, arrival)
+    assert society.status_code == 200, society.text
+    assert society.json()["profile"] == engine
+    people = society.json()["state"]["inhabitants"]
+    assert people and all(person.get("came_by") != "placed" for person in people)
+
+
+def test_a_host_that_does_not_offer_the_engine_places_nothing_and_the_town_lives(made, baked):
     api = made
     _offer(api, offered=False)
+    (world, *_) = load_arrival_worlds()
     arrival, dressing = _enter_arrival(api)
     assert arrival is not None
     assert dressing == [{"step": "scene", "code": "society_engine_not_offered"}]
-    assert _things(api, arrival) == {}
-    assert _society(api, arrival).status_code == 404
+    _lives_on_its_own(api, arrival, world.society_engine)
+    # Asking again reads the same society back and makes nothing new.
+    before = _society(api, arrival).json()["society_id"]
+    again, dressing = _enter_arrival(api)
+    assert again == arrival and dressing == [
+        {"step": "scene", "code": "society_engine_not_offered"}
+    ]
+    assert _society(api, arrival).json()["society_id"] == before
 
 
-def test_an_arrival_world_naming_no_scene_is_made_as_before(made, baked, monkeypatch):
+def test_an_arrival_world_naming_no_scene_lives_on_its_living_engine(made, baked, monkeypatch):
     api = made
     _offer(api)
     (world, *_) = load_arrival_worlds()
@@ -144,7 +163,23 @@ def test_an_arrival_world_naming_no_scene_is_made_as_before(made, baked, monkeyp
     monkeypatch.setattr(arrival_worlds, "load_arrival_worlds", lambda: (bare,))
     arrival, dressing = _enter_arrival(api)
     assert arrival is not None and dressing == []
-    assert _things(api, arrival) == {}
+    _lives_on_its_own(api, arrival, "exulanica-society/v5")
+
+
+def test_a_living_engine_that_cannot_make_the_arrival_s_society_is_named(made, baked, monkeypatch):
+    """The engine the entry names is the one asked: one the catalog would refuse (a living engine
+    over a district, not a saved world) is answered by the society route's own code, and the
+    world stands with no society."""
+    api = made
+    _offer(api)
+    (world, *_) = load_arrival_worlds()
+    district = dataclasses.replace(world, scene=None, society_engine="exulanica-society/v4")
+    monkeypatch.setattr(arrival_worlds, "load_arrival_worlds", lambda: (district,))
+    arrival, dressing = _enter_arrival(api)
+    assert arrival is not None
+    assert [problem["step"] for problem in dressing] == ["society"]
+    assert dressing[0]["code"]
+    assert _society(api, arrival).status_code == 404
 
 
 def test_a_dressing_refused_is_named_and_the_world_stands(made, baked):

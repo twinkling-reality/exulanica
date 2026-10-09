@@ -8,11 +8,21 @@ each being's mind recorded as the owner's choice, so a guest's own allowance pay
 and the routine decides once it is spent. Asking again finishes a dressing stopped part way and
 places or records nothing twice.
 
+Where no scene is laid, because the world names none or the host does not offer its engine, the
+copy is not left empty: the arrival version's living society is made on the engine the arrival list
+names for it (``exulanica-society/v5`` unless it names another) through
+:func:`~exulanica.api.society_making.make_society`, exactly as ``POST
+/world/versions/{version_id}/society`` makes one, in the arrival's own region. Asking again reads
+the society back and makes nothing new.
+
 What did not happen is answered as the guest entry's ``incomplete`` steps (``{"step": "scene",
 "code": ...}``), never raised, so the world stands with what was laid:
 
 *   a host that does not offer the scene's engine (``society_engine_not_offered``) is told before
-    anything is placed, so a world is never left holding beings that no society seats;
+    anything is placed, so a world is never left holding beings that no society seats, and the
+    copy lives on its living engine instead;
+*   a living society refused comes back as ``{"step": "society", "code": ...}``, by the code the
+    society routes answer with;
 *   a refusal of the dressing itself comes back by its code (``scene_ground_mismatch``,
     ``thing_limit_reached``, ...), with what was placed before it kept;
 *   a society refused after the things are placed comes back by its code, the things kept;
@@ -43,9 +53,15 @@ from collections.abc import Sequence
 from typing import Any, Final
 
 from exulanica.api.scene_dressing import dress_saved_world
-from exulanica.api.society_making import SOCIETY_ENGINE_NOT_OFFERED, SocietyHooks
+from exulanica.api.society_making import (
+    SOCIETY_ENGINE_NOT_OFFERED,
+    SocietyHooks,
+    make_society,
+    society_refusal,
+)
 from exulanica.world.arrival_worlds import ArrivalWorld
-from exulanica.world.scenes import SceneRefused
+from exulanica.world.saved_entries import SavedWorldEntryRepository
+from exulanica.world.scenes import SceneRefused, scene_arrival
 from exulanica.world.society_engines import society_engine
 
 __all__ = ["INSTALLATION_ACTOR", "dress_arrival", "main"]
@@ -61,16 +77,20 @@ def dress_arrival(
     hooks: SocietyHooks, connection: Any, session: Any, entry_id: uuid.UUID, world: ArrivalWorld
 ) -> list[dict[str, str]]:
     """Lay ``world``'s scene into the saved world ``entry_id`` names, in ``session``'s workspace and
-    as its actor, and answer what did not happen as ``incomplete`` steps; an empty list when the
-    world names no scene or every part of it was laid. ``connection`` is the workspace's, idle."""
+    as its actor, or, where no scene is laid, make its living society; and answer what did not
+    happen as ``incomplete`` steps, an empty list when everything was done. ``connection`` is the
+    workspace's, idle."""
     scene = world.scene
     if scene is None:
-        return []
+        return _live(hooks, connection, session, entry_id, world)
     if (
         society_engine(scene.document["engine"]).state_family == "things"
         and not hooks.services.societies_of_things
     ):
-        return [{"step": "scene", "code": SOCIETY_ENGINE_NOT_OFFERED}]
+        return [
+            {"step": "scene", "code": SOCIETY_ENGINE_NOT_OFFERED},
+            *_live(hooks, connection, session, entry_id, world),
+        ]
     try:
         dressed = dress_saved_world(hooks, connection, session, entry_id, scene)
     except SceneRefused as refused:
@@ -85,6 +105,35 @@ def dress_arrival(
         if mind["refused"] is not None
     )
     return problems
+
+
+def _live(
+    hooks: SocietyHooks, connection: Any, session: Any, entry_id: uuid.UUID, world: ArrivalWorld
+) -> list[dict[str, str]]:
+    """The arrival version's living society on ``world.society_engine``, made as the society route
+    makes one, in the region the world's arrival names; or the step that refused it."""
+    try:
+        entry = SavedWorldEntryRepository(
+            connection, session.workspace_id, hooks.services.store
+        ).entry(entry_id)
+        make_society(
+            hooks,
+            connection,
+            session,
+            entry.world_id,
+            entry.authored_version_id,
+            region_id=scene_arrival(entry).region_id,
+            profile=world.society_engine,
+        )
+    except SceneRefused as refused:
+        return [{"step": "society", "code": refused.code}]
+    except Exception as exc:
+        refusal = society_refusal(exc)
+        if refusal is None:
+            raise
+        _LOG.warning("an arrival world's society was not made: %s", refusal.code)
+        return [{"step": "society", "code": refusal.code}]
+    return []
 
 
 def _hooks(services: Any) -> SocietyHooks:

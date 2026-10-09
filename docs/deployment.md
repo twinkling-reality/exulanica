@@ -1439,9 +1439,13 @@ recorded as the owner's choice, so a guest's own allowance pays for those minds 
 decides once it is spent. That engine is a society of things, which the overlay hands the API
 alone, off unless `public.env` sets `EXULANICA_SOCIETY_OF_THINGS=on` (the first one a
 non-rehearsal server plays fixes how its engine version must replay). A host that does not offer
-it places nothing, so the arrival town opens undressed as it did before, and names the step
-`scene` with `society_engine_not_offered` in the entry's `incomplete`; any other refusal is named
-there by its code, with what was laid kept.
+it places nothing and names the step `scene` with `society_engine_not_offered` in the entry's
+`incomplete`; any other refusal is named there by its code, with what was laid kept. Wherever no
+scene is laid (the entry names none, or the host does not offer its engine), the copy's living
+society is made instead, as `POST /world/versions/{version_id}/society` makes one, on the engine
+the entry's optional `society_engine` names (`exulanica-society/v5` when absent; only a creatable
+living engine over a saved world is accepted), so a visitor never opens on an empty town; a
+refusal is named as the step `society`.
 
 **Built and not built.**
 - Built: the composition, `deploy/public/public.sh`, the tile worker and the arrival worlds, and the

@@ -277,3 +277,29 @@ def test_an_arrival_world_naming_no_scene_holds_none(tmp_path):
     for entry in (_TOWN, {**_TOWN, "scene": None}):
         (world,) = load_arrival_worlds(_catalog(tmp_path, [entry]))
         assert world.scene is None
+
+
+@pytest.mark.parametrize(
+    ("engine", "named"),
+    [
+        ("exulanica-society/v7", "not a living society over a saved world"),
+        ("exulanica-society/v4", "not a living society over a saved world"),
+        ("exulanica-society/v3", "makes no new society"),
+        ("exulanica-society/v99", "makes no new society"),
+    ],
+)
+def test_an_arrival_world_s_living_engine_is_a_creatable_one_over_a_saved_world(
+    tmp_path, engine, named
+):
+    with pytest.raises(ArrivalWorldsInvalid, match=named):
+        load_arrival_worlds(_catalog(tmp_path, [{**_TOWN, "society_engine": engine}]))
+
+
+def test_an_arrival_world_lives_on_v5_unless_it_names_another(tmp_path):
+    for entry in (_TOWN, {**_TOWN, "society_engine": None}):
+        (world,) = load_arrival_worlds(_catalog(tmp_path, [entry]))
+        assert world.society_engine == "exulanica-society/v5"
+    (named,) = load_arrival_worlds(
+        _catalog(tmp_path, [{**_TOWN, "society_engine": "exulanica-society/v5"}])
+    )
+    assert named.society_engine == "exulanica-society/v5"

@@ -21,7 +21,11 @@ things a visitor finds already placed in front of them, the society they live in
 model each being's mind is. Making the world here never lays it; the dressing is the HTTP
 surface's (:mod:`exulanica.api.arrival_dressing`), which lays it into each copy, the
 installation's own included, through the same edit and society paths a person's choices take.
-Without a scene an arrival world is made exactly as before.
+
+Where no scene is laid (the world names none, or the host does not offer the scene's engine), the
+copy lives on its own: the same dressing makes the arrival version's living society on the engine
+the entry's optional ``society_engine`` names (:data:`LIVING_ENGINE` when absent), so a visitor
+never opens on an empty town.
 """
 
 from __future__ import annotations
@@ -37,10 +41,12 @@ from typing import Any, Final
 
 from exulanica.env import env_get
 from exulanica.world.scenes import Scene, SceneRefused, shipped_scene
+from exulanica.world.society_engines import RetiredSocietyEngine, creatable_engine
 from exulanica.world.worlds import GENERATED, world_kind
 
 __all__ = [
     "ARRIVAL_WORLDS_PATH",
+    "LIVING_ENGINE",
     "PROFILE",
     "ArrivalWorld",
     "ArrivalWorldNotBaked",
@@ -52,6 +58,8 @@ __all__ = [
 ]
 
 PROFILE: Final = "exulanica.arrival-worlds/v1"
+#: The engine an arrival world lives on where no scene is laid, unless its entry names another.
+LIVING_ENGINE: Final = "exulanica-society/v5"
 ARRIVAL_WORLDS_PATH: Final = Path(__file__).with_name("arrival-worlds.v1.json")
 
 
@@ -68,6 +76,25 @@ class ArrivalWorld:
     world_id: str
     #: The scene each copy is dressed with, read at the catalog's digest; None for none.
     scene: Scene | None = None
+    #: The engine each copy's living society is made on where no scene is laid.
+    society_engine: str = LIVING_ENGINE
+
+
+def _living_engine(key: object, named: object) -> str:
+    """The engine an arrival world's ``society_engine`` field names, or :data:`LIVING_ENGINE` when
+    it names none. Refused by name: an engine no new society is made with (unknown or retired), and
+    one that is not a living society over a saved world, which is what an arrival world is."""
+    if named is None:
+        return LIVING_ENGINE
+    try:
+        engine = creatable_engine(named)
+    except (RetiredSocietyEngine, ValueError) as refused:
+        raise ArrivalWorldsInvalid(f"{key}: {named!r} makes no new society: {refused}") from refused
+    if engine.state_family != "living" or not engine.saved_world:
+        raise ArrivalWorldsInvalid(
+            f"{key}: {engine.engine} is not a living society over a saved world"
+        )
+    return engine.engine
 
 
 #: The fields a catalog's scene reference holds, and nothing else.
@@ -103,8 +130,9 @@ def load_arrival_worlds(environ: Mapping[str, str] | None = None) -> tuple[Arriv
     """The catalog ``EXULANICA_ARRIVAL_WORLDS`` names, or the shipped one, checked.
 
     Refused by name: another profile, no world, a repeated key or identity, an identity that is
-    not a generated world's, a title outside 1 to 200 characters, or a scene that is not shipped
-    at the digest named or not laid out for a generated town (:func:`_arrival_scene`). Whether
+    not a generated world's, a title outside 1 to 200 characters, a scene that is not shipped
+    at the digest named or not laid out for a generated town (:func:`_arrival_scene`), or a
+    ``society_engine`` that is not a creatable living engine (:func:`_living_engine`). Whether
     each recipe and its values generate is the recipe gate's and the composer's to refuse, when the
     world is made.
     """
@@ -139,6 +167,7 @@ def load_arrival_worlds(environ: Mapping[str, str] | None = None) -> tuple[Arriv
                 title=title,
                 world_id=world_id,
                 scene=_arrival_scene(entry.get("key"), entry.get("scene")),
+                society_engine=_living_engine(entry.get("key"), entry.get("society_engine")),
             )
         )
     for field in ("key", "world_id"):
