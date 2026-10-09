@@ -75,7 +75,10 @@ dresses look roles only, never a slot, an engine role or a position.
 | Primitive | animal | Nothing yet: the engine's primitive |
 
 A slot is resolved by its leaf, then by the family's `default` leaf in the pack (its base chain
-already applied); when neither is dressed the caller draws the engine's primitive. The caller states
+already applied); when neither is dressed the caller draws the engine's primitive. The server asks
+the same of a role before any slot's fit (`exulanica.world.style_packs.role_offer`: its leaf, its
+family's default, or nothing), to find the kinds a look dresses only with a default or the
+primitive. The caller states
 what a slot can take: a surface a tile already drew takes only a swatch or texture set, a hole a tile
 left takes only a piece, and a primitive takes either, a surface before a piece at each leaf. When a
 family has several variants, the part's identity picks one: FNV-1a over `identity|leaf` in UTF-8,

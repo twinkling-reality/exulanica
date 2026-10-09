@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from functools import cache
 from pathlib import Path
@@ -65,6 +65,8 @@ __all__ = [
 
 #: The spending ledger's provider for GPU generation on Nebius AI Cloud (design-7, ruling D).
 GPU_PROVIDER: Final = "nebius_ai_cloud_gpu"
+#: What a person reads for each spending provider an estimate names: the service that runs the GPU.
+PROVIDER_LABELS: Final = {GPU_PROVIDER: "Nebius AI Cloud"}
 #: Kinds one ask may name: a world's things fill in a few at a time.
 MAXIMUM_KINDS: Final = 16
 _ROOT: Final = Path(__file__).resolve().parents[2]
@@ -118,6 +120,10 @@ class Estimate:
     usd_typical: Decimal
     usd_worst_case: Decimal
     provider: str
+    #: Where the item figures come from (``measured_runs`` with its counts), or ``fixed_table`` for
+    #: an entry that does not say, so a page never states a typical figure as measured when it is
+    #: not.
+    basis: dict[str, Any] = field(default_factory=lambda: {"kind": "fixed_table"})
 
     def document(self) -> dict[str, Any]:
         return {
@@ -128,6 +134,8 @@ class Estimate:
             "usd_typical": str(self.usd_typical),
             "usd_worst_case": str(self.usd_worst_case),
             "provider": self.provider,
+            "provider_label": PROVIDER_LABELS.get(self.provider, self.provider),
+            "basis": dict(self.basis),
         }
 
 
@@ -272,4 +280,5 @@ def estimate(planned: Sequence[PlannedRequest], compute: ComputeEntry) -> Estima
         usd_typical=compute.typical_usd(items),
         usd_worst_case=compute.worst_case_usd(items),
         provider=compute.provider,
+        basis={"kind": "fixed_table"} if compute.basis is None else compute.basis.document(),
     )

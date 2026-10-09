@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from decimal import ROUND_CEILING, Decimal
 from pathlib import Path
 from types import MappingProxyType
-from typing import Final
+from typing import Any, Final
 
 from exulanica_pieces.canonical import (
     Refused,
@@ -58,6 +58,12 @@ _ENTRY_KEYS: Final = (
     "service_minimum_seconds",
 )
 _LICENCE_KEYS: Final = ("content_source", "licence_source", "origin", "spdx", "verdict")
+#: An entry may state where its item figures come from (optional, so the catalog grows by it).
+_BASIS_KEYS: Final = ("evidence", "items", "kind", "runs")
+#: The one kind of basis: measured runs, each named by its evidence folder, holding ``items``
+#: receipts between them.
+MEASURED_RUNS: Final = "measured_runs"
+_EVIDENCE: Final = re.compile(r"ml/appearance/evidence/[a-z0-9][a-z0-9-]{0,63}")
 _KEY: Final = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 #: The spending ledger's provider names (0124's check on the provider column).
 _PROVIDER: Final = re.compile(r"[a-z0-9][a-z0-9_.-]{0,63}")
@@ -65,6 +71,21 @@ _NAME: Final = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 _REASON_WORDS: Final = 5
 #: The ledger holds amounts to eight decimal places (0124).
 _USD_QUANTUM: Final = Decimal("0.00000001")
+
+
+@dataclass(frozen=True, slots=True)
+class ComputeBasis:
+    """Where an entry's item figures come from: ``runs`` measured runs, named by their evidence
+    folders, holding ``items`` receipts between them."""
+
+    kind: str
+    runs: int
+    items: int
+    evidence: tuple[str, ...]
+
+    def document(self) -> dict[str, Any]:
+        """What an estimate states of it: the kind and the counts, not the folders."""
+        return {"kind": self.kind, "runs": self.runs, "items": self.items}
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +103,8 @@ class ComputeEntry:
     item_seconds_bound: int
     cold_start_seconds: int
     service_minimum_seconds: int
+    #: Where the item figures come from, or None for an entry that does not say (a fixed table).
+    basis: ComputeBasis | None = None
 
     def usd_for_seconds(self, seconds: int) -> Decimal:
         """The listed rate times ``seconds``, rounded up to the ledger's quantum."""
@@ -139,7 +162,13 @@ def read_compute(raw: bytes) -> PieceCompute:
     found: dict[str, ComputeEntry] = {}
     for index, value in enumerate(entries):
         at = f"{where}: entries[{index}]"
-        entry = exact_keys(value, _ENTRY_KEYS, at)
+        entry = exact_keys(
+            value,
+            (*_ENTRY_KEYS, "basis")
+            if isinstance(value, dict) and "basis" in value
+            else _ENTRY_KEYS,
+            at,
+        )
         if not isinstance(entry["key"], str) or _KEY.fullmatch(entry["key"]) is None:
             raise Refused(f"{at}.key is lower case letters, digits and hyphens")
         if entry["key"] in found:
@@ -180,12 +209,30 @@ def read_compute(raw: bytes) -> PieceCompute:
             item_seconds_bound=entry["item_seconds_bound"],
             cold_start_seconds=entry["cold_start_seconds"],
             service_minimum_seconds=entry["service_minimum_seconds"],
+            basis=_basis(entry["basis"], f"{at}.basis") if "basis" in entry else None,
         )
     return PieceCompute(
         catalog_version=document["catalog_version"],
         sha256=sha256_hex(canonical_bytes(document)),
         entries=MappingProxyType(found),
     )
+
+
+def _basis(value: object, where: str) -> ComputeBasis:
+    basis = exact_keys(value, _BASIS_KEYS, where)
+    if basis["kind"] != MEASURED_RUNS:
+        raise Refused(f"{where}.kind is {MEASURED_RUNS}")
+    if not is_count(basis["runs"], 1) or not is_count(basis["items"], 1):
+        raise Refused(f"{where}: runs and items are whole numbers from 1")
+    evidence = basis["evidence"]
+    if (
+        not isinstance(evidence, list)
+        or len(evidence) != basis["runs"]
+        or len(set(evidence)) != len(evidence)
+        or not all(isinstance(path, str) and _EVIDENCE.fullmatch(path) for path in evidence)
+    ):
+        raise Refused(f"{where}.evidence names each run's evidence folder once")
+    return ComputeBasis(MEASURED_RUNS, basis["runs"], basis["items"], tuple(evidence))
 
 
 def load_compute(repository: Path) -> PieceCompute:

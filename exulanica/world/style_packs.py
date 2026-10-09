@@ -26,7 +26,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -51,6 +51,7 @@ __all__ = [
     "manifest_sha256",
     "read_manifest",
     "read_piece_budgets",
+    "role_offer",
     "split_look_role",
 ]
 
@@ -469,6 +470,34 @@ def split_look_role(role: str, path: str) -> tuple[str, str]:
     if not dot or _KEY.fullmatch(family) is None or _LEAF.fullmatch(leaf) is None:
         _fail("shape", path, f"{json.dumps(role)} is not a look role family.leaf")
     return family, leaf
+
+
+def role_offer(
+    chain: Sequence[Mapping[str, Any]], role: str, context: StylePackContext
+) -> str | None:
+    """What a pack offers ``role`` before any slot's fit: ``leaf`` when a manifest of ``chain``
+    (the pack, then its bases, nearest first) dresses the role itself, ``default`` when only its
+    family's ``default`` leaf is dressed, None when the page draws the engine's primitive. The
+    order is the page's ``resolveLookRole`` (``web/packages/atlas-core/src/style-pack.ts``): the
+    leaf, then the family's default, a surface or a module as the family takes. A slot's size can
+    still pass a dressed role to the primitive at draw time; this is the question a role asks of a
+    look."""
+    family, leaf = split_look_role(role, "role")
+    kind = context.families.get(family)
+    if kind is None:
+        return None
+    surfaces = kind.dressing in ("surface", "both")
+    modules = kind.dressing in ("module", "both")
+    candidates = [(role, "leaf")]
+    if leaf != "default":
+        candidates.append((f"{family}.default", "default"))
+    for name, offer in candidates:
+        for manifest in chain:
+            if (surfaces and name in manifest["surfaces"]) or (
+                modules and name in manifest["modules"]
+            ):
+                return offer
+    return None
 
 
 def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:

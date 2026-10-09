@@ -23,6 +23,7 @@ caller's key) is addressed within the workspace and answers with the world it is
 
 from __future__ import annotations
 
+import functools
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -151,6 +152,9 @@ class PieceRequestRecord:
                 "key": self.kind_key,
                 "version": self.kind_version,
                 "sha256": self.kind_sha256,
+                # The shipped kind's own label, so a page names what arrived without another read;
+                # null for a version this server no longer ships.
+                "label": _kind_label(self.kind_key, self.kind_version),
             },
             "look": {
                 "pack_id": self.pack_id,
@@ -183,6 +187,16 @@ class PieceRequestRecord:
                 }
             ),
         }
+
+
+@functools.cache
+def _shipped_labels() -> Mapping[tuple[str, int], str]:
+    """Every shipped kind's label, read once a process: the kinds ship with the code."""
+    return {key: kind.label for key, kind in shipped_thing_kinds().items()}
+
+
+def _kind_label(key: str, version: int) -> str | None:
+    return _shipped_labels().get((key, version))
 
 
 def _record(row: Mapping[str, Any]) -> PieceRequestRecord:

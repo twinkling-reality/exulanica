@@ -73,6 +73,10 @@ def test_the_compute_figures_are_the_measured_runs() -> None:
         assert run["rate_cents_per_hour"] == entry.rate_cents_per_hour
         assert run["instance_type"].startswith(f"{entry.platform}, preset {entry.preset}")
     assert entry.service_minimum_seconds == 3600
+    # The basis an estimate states is these runs: each named by its folder, the items they timed.
+    assert entry.basis is not None
+    assert entry.basis.evidence == tuple(f"ml/appearance/evidence/{folder}" for folder in SESSIONS)
+    assert (entry.basis.runs, entry.basis.items) == (len(SESSIONS), len(measured))
 
 
 def test_the_estimates_are_the_rate_times_the_seconds() -> None:
@@ -104,6 +108,21 @@ def _compute(**changes: Any) -> dict[str, Any]:
         (_compute(rate_source="read"), "where the rate was read"),
         (_compute(reason="It is fast."), "what was measured"),
         (_compute(colour="red"), "has exactly"),
+        (
+            _compute(basis={"kind": "guessed", "runs": 1, "items": 1, "evidence": ["x"]}),
+            "measured_runs",
+        ),
+        (
+            _compute(
+                basis={
+                    "kind": "measured_runs",
+                    "runs": 2,
+                    "items": 80,
+                    "evidence": ["ml/appearance/evidence/generated-assets-session-1"],
+                }
+            ),
+            "each run's evidence folder once",
+        ),
         ({**_compute(), "catalog_id": "piece-cost"}, "catalog 'piece-compute'"),
         ({**_compute(), "entries": []}, "at least one GPU"),
     ],

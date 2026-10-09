@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import hashlib
 import json
 import uuid
 from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -20,7 +22,9 @@ from exulanica.api.services import Services
 from exulanica.db.roles import provision_runtime_role
 from exulanica.generation.requests import GPU_PROVIDER
 from exulanica.store.local import LocalContentAddressedStore
+from exulanica.things.kinds import shipped_thing_kinds
 from exulanica.world.style_pack_library import style_pack_library
+from exulanica_pieces.records import read_job
 from fastapi.testclient import TestClient
 
 from conftest import scratch_role_database
@@ -33,6 +37,9 @@ pytestmark = pytest.mark.postgres
 TOKEN = "pieces-owner-token-at-least-32-characters"
 STRANGER_TOKEN = "pieces-stranger-token-at-least-32-characters"
 READ_ONLY_ROLE = "exulanica_pieces_ro_suite"
+SESSION_1 = (
+    Path(__file__).resolve().parents[1] / "ml/appearance/evidence/generated-assets-session-1"
+)
 
 
 @pytest.fixture(name="bench")
@@ -135,6 +142,12 @@ def test_an_ask_answers_at_once_with_its_requests_and_their_estimate(api) -> Non
     assert answered.status_code == 202, answered.text
     view = answered.json()
     assert [r["kind"]["key"] for r in view["piece_requests"]] == ["well", "gate"]
+    # Each names its shipped kind's own label, so a page names what arrived without another read.
+    shipped = shipped_thing_kinds()
+    assert [r["kind"]["label"] for r in view["piece_requests"]] == [
+        shipped[("well", 1)].label,
+        shipped[("gate", 1)].label,
+    ]
     assert {r["state"] for r in view["piece_requests"]} == {"requested"}
     assert view["session"]["state"] == "off"
     # 2 kinds of 4 variants: 16 s to both first variants, 64 s to all; USD 0.032 typical and
@@ -147,6 +160,8 @@ def test_an_ask_answers_at_once_with_its_requests_and_their_estimate(api) -> Non
         "usd_typical": "0.03200000",
         "usd_worst_case": "0.12000000",
         "provider": "nebius_ai_cloud_gpu",
+        "provider_label": "Nebius AI Cloud",
+        "basis": {"kind": "measured_runs", "runs": 2, "items": 80},
     }
     # The same ask while both wait answers with the same requests.
     again = _ask(client)
@@ -179,6 +194,34 @@ def test_a_world_s_requests_are_read_and_cancelled_by_their_workspace_only(api) 
         "piece_request_not_cancellable",
         "cancelled",
     )
+
+
+def test_the_answer_states_the_piece_maker_from_the_operator_s_register(api, repository) -> None:
+    client = api()
+    listed = _call(client, "GET", f"/world/piece-requests?world_id={FIXTURE_WORLD_ID}").json()
+    assert listed["session"]["state"] == "off"
+    # The operator registers a session for an hour: every answer then says it runs, until when.
+    session_raw = (SESSION_1 / "session.json").read_bytes()
+    job = read_job(min((SESSION_1 / "jobs").glob("*.json")).read_bytes())
+    row = repository.connection.execute(
+        "insert into generation_session (session_canonical, session_sha256, route, code_sha256, "
+        "  components_sha256, container, compute_key, provider_job_id, opened_by, window_ends_at) "
+        "values (%s, %s, 'A', %s, %s, %s, 'nebius-ai-cloud-rtx-pro-6000', 'aijob-test', "
+        "  'test operator', now() + interval '1 hour') returning window_ends_at",
+        (
+            session_raw.decode("ascii"),
+            hashlib.sha256(session_raw).hexdigest(),
+            job["code_sha256"],
+            job["components_sha256"],
+            job["container"],
+        ),
+    ).fetchone()
+    repository.connection.commit()
+    until = row["window_ends_at"].astimezone(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    listed = _call(client, "GET", f"/world/piece-requests?world_id={FIXTURE_WORLD_ID}").json()
+    assert (listed["session"]["state"], listed["session"]["until"]) == ("running", until)
+    asked = _ask(client)
+    assert asked.status_code == 202 and asked.json()["session"]["state"] == "running"
 
 
 def test_pieces_are_taken_back_only_by_their_workspace_and_only_once_taken_in(api) -> None:

@@ -86,7 +86,8 @@ keyed on the workspace.
 | `DELETE /world/piece-requests/{piece_request_id}` | Cancels a request no session has taken. |
 | `POST /world/piece-requests/{piece_request_id}/take-back` | Asks for a request's pieces to leave its world's look (section 5.4). `202` with the request; asked again, `202` as it stands. |
 
-Every answer naming a request carries its latest step in its world's look (`look_step`: its
+Every answer naming a request carries its kind's own label beside its key and version (null for a
+version this server no longer ships), and its latest step in its world's look (`look_step`: its
 `kind`, `reason`, the look's `manifest_sha256` and the appearance's `style_version_id`, or null
 before any). Asking needs `world.write` and `model.invoke`; reading needs `world.read`; cancelling
 and taking back need `world.write`. Refusals use the API's problem shape:
@@ -119,6 +120,11 @@ are weighed one after the other. It reserves nothing, because a reservation laps
 minutes and a request may wait hours for a session. A guest asks only
 while a session is running.
 
+Whether a session is running is read from the operator's register (section 5.1): every answer
+states `session` as `off`, or `running` with `until`, the UTC end of the latest registered
+session's window that is not closed. A running session still loading its models takes requests in
+turn once it has; each request's own state says what it is doing.
+
 ### 5.1 The session
 
 The operator starts a session on their own account with the generation tooling
@@ -142,11 +148,11 @@ record without one, and the register holds each digest once.
 A session takes only the entries whose ready marker names it, never one past its not-after instant,
 and none the worker withdrew as far as it can see: it reads the withdrawals when it lists the queue
 and again as it claims, so a withdrawal written or shown after that claim still lets the entry run
-(its requests are then settled `unknown`, so the money holds until reconciled). It passes over a directory that is not an entry or whose ready marker
-does not read, since nothing then shows the entry is its own. It writes its last heartbeat, which
-says it ended, only after every claim and done marker it will write, and the bucket mount writes
-each file whole before the next is begun; the worker relies on both when it releases an entry an
-ended session never claimed.
+(its requests are then settled `unknown`, so the money holds until reconciled). It passes over a
+directory that is not an entry or whose ready marker does not read, since nothing then shows the
+entry is its own. It writes its last heartbeat, which says it ended, only after every claim and done
+marker it will write, and the bucket mount writes each file whole before the next is begun; the
+worker relies on both when it releases an entry an ended session never claimed.
 
 Nothing the session runs is taken from the bucket on trust. Its start command pins the digest of
 the entry script beside the code archive's; the container copies the staged script to its own disk
@@ -334,7 +340,11 @@ chosen bounds the test checks lie above everything measured:
 - the service's shortest timeout, one hour.
 
 An estimate states the items, the seconds to every request's first variant and to every variant on
-a running session, the cold start, and the typical and worst-case dollars. Four variants of one kind
+a running session, the cold start, the typical and worst-case dollars, the spending provider and
+the service a person reads for it (`provider_label`, Nebius AI Cloud), and where the item figures
+come from (`basis`): `measured_runs` with the runs and items the catalog entry's `basis` names by
+their evidence folders (the test counts the items there), or `fixed_table` for an entry that names
+none, so a page never states a typical figure as measured when it is not. Four variants of one kind
 are USD 0.016 typically and USD 0.06 at worst.
 
 ## 7. Limits

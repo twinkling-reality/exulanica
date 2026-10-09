@@ -16,6 +16,15 @@
       "cold_start_seconds": 680,
       "service_minimum_seconds": 3600,
       "reason": "Measured in two warm sessions on Nebius AI Cloud (ml/appearance/evidence/generated-assets-session-1 and -2, 2026-10-07): the 80 items took 6.6 to 23.0 seconds with a median of 8.0, the slowest being each session's first; from the first starting state to the first batch took 596 and 608 seconds (the gpu-run records and done markers), after about 70 seconds of provisioning, so a cold start is stated as 680 seconds. The service's shortest timeout is one hour.",
+      "basis": {
+        "kind": "measured_runs",
+        "runs": 2,
+        "items": 80,
+        "evidence": [
+          "ml/appearance/evidence/generated-assets-session-1",
+          "ml/appearance/evidence/generated-assets-session-2"
+        ]
+      },
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",

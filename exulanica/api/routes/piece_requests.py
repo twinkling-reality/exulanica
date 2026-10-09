@@ -4,7 +4,8 @@
 version and manifest digest) the pieces are made in, and up to 16 shipped thing kinds. Each kind
 becomes one request (:mod:`exulanica.generation.requests`): its words come from catalogs alone, so
 a request holds no text a person typed. The answer is ``202`` with the requests, what they will
-take in items, seconds and US dollars, and whether a generation session is running, at once; an
+take in items, seconds and US dollars, and whether a generation session is running (the operator's
+register: the latest registered session whose window is open, until its end), at once; an
 idempotency key answers ``200`` with the requests its first answer held, and an ask for pieces
 already waiting for the same world answers ``200`` with them. A deleted workspace answers ``410``.
 Asking is the consent to the world's look taking each passed piece in as it arrives; the world
@@ -33,6 +34,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Final
 
@@ -48,7 +50,7 @@ from exulanica.api.dependencies import (
     get_services,
 )
 from exulanica.api.services import Services
-from exulanica.generation import store
+from exulanica.generation import batches, store
 from exulanica.generation.requests import (
     GPU_PROVIDER,
     LookReference,
@@ -68,12 +70,26 @@ router = APIRouter(prefix="/world", tags=["world"])
 #: Another workspace's request answers exactly as one that does not exist.
 _UNKNOWN: Final = "unknown_piece_request"
 _UNKNOWN_DETAIL: Final = "nothing at this address is available to this credential"
-#: Whether a generation session is running: none can be until the worker that starts and follows
-#: one lands, so every answer says so.
+#: The answer while no session the operator registered is open.
 _SESSION_OFF: Final = {
     "state": "off",
     "detail": "the piece maker is off; requests wait until the operator starts it",
 }
+
+
+def _session_state(connection: Any) -> dict[str, Any]:
+    """Whether the piece maker runs, from the operator's register of generation sessions: the latest
+    registered one whose window is open and which is not closed, with its window's end. A session
+    still loading its models takes requests in turn once it has; the page's waiting line says what
+    each request is doing."""
+    found = batches.open_session(connection, datetime.now(UTC))
+    if found is None:
+        return dict(_SESSION_OFF)
+    return {
+        "state": "running",
+        "until": found.window_ends_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "detail": "the piece maker is running; requests are taken in turn",
+    }
 
 
 class KindBody(BaseModel):
@@ -152,11 +168,11 @@ def _weigher(services: Services, workspace_id: uuid.UUID) -> store.Weigh:
 
 
 def _answer(
-    records: list[store.PieceRequestRecord], extra: dict[str, Any] | None = None
+    connection: Any, records: list[store.PieceRequestRecord], extra: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     return {
         "piece_requests": [record.document() for record in records],
-        "session": dict(_SESSION_OFF),
+        "session": _session_state(connection),
         **(extra or {}),
     }
 
@@ -186,7 +202,7 @@ def ask_for_pieces(
             "this workspace holds as many looks of generated pieces as it may; no new pieces can "
             "be taken into a look",
         )
-    if _is_guest(request, services):
+    if _is_guest(request, services) and _session_state(connection)["state"] != "running":
         return _refusal(
             409,
             "generation_session_off",
@@ -220,7 +236,7 @@ def ask_for_pieces(
             409, "idempotency_key_reused", "the key names an earlier ask with another body"
         )
     return JSONResponse(
-        _answer(records, {"estimate": estimate(planned, compute).document()}),
+        _answer(connection, records, {"estimate": estimate(planned, compute).document()}),
         status_code=202 if made else 200,
     )
 
@@ -233,7 +249,7 @@ def list_piece_requests(
 ) -> JSONResponse:
     """A world's piece requests, newest first, and whether the piece maker is running."""
     return JSONResponse(
-        _answer(store.list_piece_requests(connection, session.workspace_id, world_id))
+        _answer(connection, store.list_piece_requests(connection, session.workspace_id, world_id))
     )
 
 
