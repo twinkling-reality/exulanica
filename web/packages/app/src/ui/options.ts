@@ -187,7 +187,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
   const lookGroup = el('div', { class: 'option-group look-options', hidden: true }, [
     el('h2', { text: 'Look' }),
     el('div', { class: 'look-options-row' }, [lookName, changeLook]),
-    el('p', { class: 'option-note', text: 'How this town is drawn. Its places, people and history stay as they are.' }),
+    el('p', { class: 'option-note', text: 'How this world is drawn. Its places, people and history stay as they are.' }),
   ]);
   const root = el('section', {
     class: 'system-overlay options-view atlas-instrument held-plate',

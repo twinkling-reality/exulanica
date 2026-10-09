@@ -194,6 +194,30 @@ ask by dispatching `exulanica:world-look-redraw` on the shell with the pack as t
 redraw's own result with its time. A redraw changes nothing the world's appearance names: that is
 the appearance's own Apply (section 10).
 
+### 7.1 Drawing a site in a pack
+
+A world made from a world kind (its site, [world kinds](world-kinds-contract.md#the-drawing)) is
+drawn in a pack too, chosen the same way as a town's: the address's, else the pack its appearance
+names, else the host's default. `packSiteDresser`
+(`web/packages/atlas-react/src/playcanvas/style-pack/site-dresser.ts`) dresses the site's drawn
+slots; nothing it does changes a slot, the walk or the seats, and taking the site down puts every
+material back and shows every primitive again.
+
+| Part | What it does |
+| --- | --- |
+| Light | The pack's default preset is the site's render look, as it is a town's |
+| Resolving | Each slot by its look role (section 3): a slot the engine draws as a primitive takes either a surface or a piece, a surface before a piece at each leaf; a `none` slot, a hole only a pack fills, takes a piece alone |
+| Surfaces | A swatch, with its up swatch, becomes the material of the slot's primitive, in the pack's shading. A site holds no texture set's images, so a leaf the pack dresses with a texture set is resolved as if the pack left it out, and takes its family's `default` |
+| Pieces | Placed by the family's fit and baked one mesh per swatch, as a town's are (`dressSlots`); the slot's primitive is hidden while its piece stands |
+| The rest | A slot the pack does not dress keeps the engine's primitive in its fallback colour, drawn in the pack's shading; when the shading draws ink, everything the site draws is outlined |
+
+The app (`web/packages/app/src/composition/site-world.ts`) reads the pack and fetches its pieces
+before it mounts the site. A pack it cannot read is not stood in for: the site opens in the tile
+look in the engine's colours, and `data-world-look` states the pack asked for, what chose it and why
+it was not drawn. The Look sheet is offered on a site as on a town, and `redrawWorldLook` mounts the
+site's drawing, already read and checked, again in the new pack's light and dressing on the same
+host.
+
 ## 8. The authored packs
 
 Three packs are committed under `assets/style-packs/packs/`, each CC0-1.0 and authored by Exulanica:

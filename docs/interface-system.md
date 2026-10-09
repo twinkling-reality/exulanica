@@ -392,8 +392,9 @@ A thing's abilities join the card as the server serves them.
 ### Look
 
 Look (`web/packages/app/src/ui/look-sheet.ts`, `ui/look-sheet.css`) is where the owner of a generated
-town chooses which of the host's style packs it is drawn in ([style packs](style-pack-contract.md)).
-Design names the look the town is drawn in now, with Change look; the sheet opens over the world on
+town, or of a world made from a world kind, chooses which of the host's style packs it is drawn in
+([style packs](style-pack-contract.md)).
+Design names the look the world is drawn in now, with Change look; the sheet opens over the world on
 the dark stage in Your worlds' language. It names the chosen pack large with its own title and
 description, its licence ("CC0, free to use") and who made it, and one primary action, Use this
 look, which the pack the world is drawn in now does not offer; under it a strip holds every pack

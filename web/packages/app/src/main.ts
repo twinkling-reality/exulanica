@@ -1268,10 +1268,12 @@ async function mountWorld(): Promise<void> {
     }),
   ]);
   let status: MountedStatusAndInspector;
-  // Look: the style pack a generated town is drawn in, chosen in the Look sheet (ui/look-sheet.ts)
-  // and saved as an appearance version (`useStylePack`). Only generated towns are drawn in packs.
+  // Look: the style pack a generated town, or a site made from a world kind, is drawn in, chosen in
+  // the Look sheet (ui/look-sheet.ts) and saved as an appearance version (`useStylePack`). Only those
+  // two are drawn in packs.
   const lookAccess = state.credentials;
-  const lookOffered = state.activeWorldEntry?.generatedGround != null && lookAccess !== null && state.worldStyles !== null;
+  const drawnInPacks = state.activeWorldEntry?.generatedGround != null || state.activeWorldEntry?.generatedSite != null;
+  const lookOffered = drawnInPacks && lookAccess !== null && state.worldStyles !== null;
   let openLook: () => Promise<void> = async () => undefined;
   const appearance = mountAppearance({
     env,

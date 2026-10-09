@@ -195,7 +195,7 @@ export function buildLookSheet(options: {
     replace(meta, [
       el('span', { text: licenceWords(option.licence) }),
       ...(option.authors.length === 0 ? [] : [el('span', { text: authorWords(option.authors) })]),
-      el('span', { text: 'Your streets, people and history stay as they are' }),
+      el('span', { text: 'Your places, people and history stay as they are' }),
     ]);
     const picture = card.earlier !== null ? card.earlier.picture : option.picture;
     replace(backdrop, live || picture === null ? [] : [el('img', { src: picture, alt: '', decoding: 'async' })]);

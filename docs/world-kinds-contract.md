@@ -274,8 +274,11 @@ and refuses a document of another profile or world by name; a drawing that canno
 drawn and the page says so. While the kind worker is still making the drawing, the page says the
 world is still being drawn and asks again after each `Retry-After`, at most six times. Each slot is drawn as its primitive at its base, turned by its quarter
 turns counterclockwise seen from above, in a fallback colour of its look family (or, for a ground,
-path or road, of a material its leaf names) until a style pack dresses it, under the generated
-tile's sky, sun and fog. A person exploring stands on the floor and nowhere beyond it, and every
+path or road, of a material its leaf names). The site is drawn in the look the page chooses for any
+world, the address's, else the pack its appearance names, else the host's default: the pack's
+light lights it and the pack dresses its slots by their look roles, its swatches on the primitives
+and its pieces in their slots ([drawing a site in a pack](style-pack-contract.md#71-drawing-a-site-in-a-pack));
+a slot the pack does not dress keeps its primitive and fallback colour. A person exploring stands on the floor and nowhere beyond it, and every
 blocker and keep-out box is an obstacle the movement resolver collides against with the society's
 340 mm walking radius, so a person comes into a building through its door. The About panel says
 the world was made from its kind. The person's view stays first person, as on a generated tile,
@@ -389,8 +392,8 @@ town's receipt or digest depends on the adapter.
 
 ## Limits
 
-- The application draws a site's slots as the engine's primitives in fallback colours; no style
-  pack dresses them.
+- A site takes a pack's swatches and pieces only: it holds no texture set's images, so a leaf a pack
+  dresses with a texture set takes its family's `default`.
 - A draft's state lives in the API process that started it, so drafting needs one API process or
   routing that sends each person to the same one ([deployment guide](deployment.md), 5.4): a poll
   another process answers reads `kind_draft_unknown` while the draft still runs. A draft still

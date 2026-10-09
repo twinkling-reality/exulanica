@@ -51,14 +51,7 @@ import {
   type GeneratedWorldReady,
 } from './generated-world-ready.js';
 import { committedTextureLibrary } from '../texture-library.js';
-import {
-  WORLD_LOOK_REDRAW_ATTRIBUTE,
-  WORLD_LOOK_REDRAW_EVENT,
-  isRedrawableWorld,
-  setRedrawableWorld,
-  type RedrawableWorld,
-  type WorldLookRedraw,
-} from './world-look-redraw.js';
+import { WORLD_LOOK_ATTRIBUTE, swappableDrawing } from './world-look-redraw.js';
 
 /** The media type a baked tile's container is served as. */
 const CONTAINER_MEDIA_TYPE = 'application/vnd.exulanica.owd';
@@ -85,7 +78,7 @@ export { GENERATED_WORLD_WAITING_ATTRIBUTE };
 /** Marks the note saying why a world shows no vehicles; it names the refusal's code. */
 export const WORLD_TRAFFIC_NOTE_ATTRIBUTE = 'data-world-traffic-note';
 /** States the look a generated world is drawn in: the pack asked for, and whether it was drawn. */
-export const WORLD_LOOK_ATTRIBUTE = 'data-world-look';
+export { WORLD_LOOK_ATTRIBUTE };
 /** The prefix every refusal to read a generated world's records carries. */
 const UNREADABLE_PREFIX = 'generated_world_';
 /** What the note names when the page could not load its own traffic code. */
@@ -298,84 +291,19 @@ export function switchableWorld(
   shell: Element,
 ): { readonly tile: LoadedGeneratedTile; readonly bodies: () => VehicleBodies | null; readonly bodiesChanged: (listener: () => void) => () => void } {
   let current: { readonly tile: LoadedGeneratedTile; readonly bodies: () => VehicleBodies | null } = world;
-  let host: GeneratedTileHost | null = null;
-  let attachment: GeneratedTileAttachment | null = null;
   const listeners = new Set<() => void>();
-  let queue: Promise<unknown> = Promise.resolve();
-  const redrawable: RedrawableWorld = {
-    redraw(pack) {
-      const run = queue.then(async (): Promise<WorldLookRedraw> => {
-        const started = performance.now();
-        const { DEFAULT_WORLD_LOOK } = await import('../world-look.js');
-        let packId = pack?.packId ?? DEFAULT_WORLD_LOOK;
-        const result = (drawn: boolean, reason: string | null): WorldLookRedraw => ({
-          pack: packId, source: 'redraw', drawn, reason, elapsedMs: Math.round(performance.now() - started),
-        });
-        let next: Awaited<ReturnType<GeneratedWorld['relook']>>;
-        try {
-          // No pack: the default, the one the host's list marks.
-          next = await world.relook(pack === null
-            ? { packId, manifestSha256: null, source: 'default' }
-            : { packId: pack.packId, manifestSha256: pack.manifestSha256, source: 'redraw' });
-        } catch (error) {
-          return result(false, error instanceof Error ? error.message : String(error));
-        }
-        packId = next.look.pack;
-        if (host === null) return result(false, 'The world was taken down before its new look was ready');
-        // The old look comes down before the new one goes up: each sets the scene's light, and
-        // taking one down after the other went up would undo the new one.
-        attachment?.dispose();
-        current = next;
-        attachment = current.tile.attach(host);
-        for (const listener of listeners) listener();
-        stated({ ...next.look, source: 'redraw' });
-        return result(next.look.drawn, null);
-      }).then((done) => {
-        // Every redraw states what it drew, however it was asked: through `redrawWorldLook`
-        // (the Look sheet's Use) or through the shell's event.
-        shell.setAttribute(WORLD_LOOK_REDRAW_ATTRIBUTE, JSON.stringify(done));
-        return done;
-      });
-      queue = run;
-      return run;
-    },
-  };
-  const onRedraw = (event: Event): void => {
-    const detail = (event as CustomEvent<WorldStylePackBinding | null>).detail ?? null;
-    void redrawable.redraw(detail);
-  };
+  const drawing = swappableDrawing(world.tile, (choice) => world.relook(choice), (next) => next.tile, (next) => {
+    current = next;
+    for (const listener of listeners) listener();
+    stated({ ...next.look, source: 'redraw' });
+  }, shell);
   return {
     bodies: () => current.bodies(),
     bodiesChanged(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    tile: {
-      ...world.tile,
-      attach(next: GeneratedTileHost): GeneratedTileAttachment {
-        host = next;
-        attachment = current.tile.attach(next);
-        setRedrawableWorld(redrawable);
-        shell.addEventListener(WORLD_LOOK_REDRAW_EVENT, onRedraw);
-        let metrics = attachment.metrics;
-        return {
-          get metrics() {
-            metrics = attachment?.metrics ?? metrics;
-            return metrics;
-          },
-          get animating() {
-            return attachment?.animating ?? false;
-          },
-          dispose() {
-            shell.removeEventListener(WORLD_LOOK_REDRAW_EVENT, onRedraw);
-            if (isRedrawableWorld(redrawable)) setRedrawableWorld(null);
-            attachment?.dispose();
-            attachment = null;
-            host = null;
-          },
-        };
-      },
-    },
+    tile: { ...world.tile, attach: (host) => drawing.attach(host) },
   };
 }
 
