@@ -60,11 +60,13 @@ from exulanica.selection.action_plan import (
     BRING_PEOPLE,
     CONTROL,
     CONTROL_STEP,
+    DIRECT,
     MOVE,
     PLACE,
     REMOVE,
     STYLE_APPLY,
     STYLE_PREVIEW,
+    THING_PLACE,
     UNDO,
     ClockReader,
     SimulationAction,
@@ -94,6 +96,7 @@ _EDIT_KINDS: Final[Mapping[str, str]] = {
     REMOVE: "remove_object",
     UNDO: "undo",
     ARRANGE: "add_object",
+    THING_PLACE: "add_thing",
 }
 #: The playback controls a simulation plan's chain is sent to.
 _CONTROLS: Final = frozenset({CONTROL, CONTROL_STEP})
@@ -172,6 +175,8 @@ def _one_step(
         return _style_apply_step(connection, session, world_id, steps)
     if operation == BRING_PEOPLE:
         return _bring_people_step(connection, session, world_id, version_id, step)
+    if operation == DIRECT:
+        return _direct_step(connection, session, world_id, version_id, step)
     raise InvalidOutcomeStep(f"{operation!r} is not an operation a Companion plan names")
 
 
@@ -246,6 +251,8 @@ def _subjects(step: Mapping[str, Any]) -> list[str | None]:
         return [str(item.get("object_id")) for item in preview.get("would_add") or ()]
     if operation == PLACE:
         return [str(((step.get("body") or {}).get("placement") or {}).get("subject_id"))]
+    if operation == THING_PLACE:
+        return [str((step.get("body") or {})["thing_id"])]
     if operation in (MOVE, REMOVE):
         return [str((step.get("bind") or {}).get("object_id"))]
     return [None]
@@ -274,7 +281,7 @@ def _edit_step(
         answer = _answer(step)
         named = None if answer is None else (int(answer["edit_seq"]), str(answer["state_sha256"]))
     rows = connection.execute(
-        "select edit_id,edit_seq,kind,object_id,undone_edit_id,base_state_sha256,"
+        "select edit_id,edit_seq,kind,object_id,thing_id,undone_edit_id,base_state_sha256,"
         "result_state_sha256,after_document,actor from world_alternate_version_edit "
         "where workspace_id=%s and world_id=%s and version_id=%s and edit_seq>%s "
         "order by edit_seq",
@@ -321,7 +328,10 @@ def _edit_step(
         "applied",
         receipts=[_edit_reference(step, world_id, version_id, row) for row in own],
         repeats=others,
-        matches_preview=len(expected) == len(own)
+        # A step from a route with no preview has nothing to compare its records with.
+        matches_preview=None
+        if step.get("preview") is None and step.get("operation") == THING_PLACE
+        else len(expected) == len(own)
         and all(
             _same(row["after_document"], item) for row, item in zip(own, expected, strict=True)
         ),
@@ -331,7 +341,8 @@ def _edit_step(
 def _made_by(row: Mapping[str, Any], kind: str, subject: str | None) -> bool:
     if row["kind"] != kind:
         return False
-    return subject is None or row["object_id"] == subject
+    named = row["thing_id"] if kind == "add_thing" else row["object_id"]
+    return subject is None or named == subject
 
 
 def _edit_reference(
@@ -339,7 +350,7 @@ def _edit_reference(
 ) -> dict[str, Any]:
     """An accepted-operation reference, carrying the ids a project's context stores for it, under
     the same names."""
-    return {
+    reference = {
         "operation": step.get("operation"),
         "world_id": world_id,
         "version_id": str(version_id),
@@ -349,6 +360,66 @@ def _edit_reference(
         "kind": row["kind"],
         "object_id": row["object_id"],
     }
+    if row["kind"] == "add_thing":
+        reference["thing_id"] = row["thing_id"]
+    return reference
+
+
+def _direct_step(
+    connection: psycopg.Connection,
+    session: Session,
+    world_id: str,
+    version_id: uuid.UUID,
+    step: Mapping[str, Any],
+) -> dict[str, Any]:
+    """A direct request step: the request its answer names, made by the caller for the step's
+    being and intent, and what the minute that took it did with it. ``pending`` while no minute
+    has; ``applied`` when the minute applied it; ``not_applied`` with the minute's reason when it
+    did not, or when no request of the caller's is named."""
+    with _client_shape(step):
+        body = step.get("body") or {}
+        subject = str(body["subject_id"])
+        intent = dict(body["intent"])
+        answer = _answer(step)
+        named = None if answer is None else answer.get("request_id")
+        request_id = None if named is None else uuid.UUID(str(named))
+    if request_id is None:
+        return _step(step, "not_applied")
+    row = connection.execute(
+        "select r.society_id,r.action_seq,r.request_id,r.requested_by,r.subject_id,r.document,"
+        "r.document_sha256,t.tick,t.disposition,e.document as event "
+        "from world_society_action_request r "
+        "join world_society s using(workspace_id,society_id) "
+        "left join world_society_transition_action t using(workspace_id,society_id,action_seq) "
+        "left join world_society_event e on e.workspace_id=t.workspace_id "
+        "and e.society_id=t.society_id and e.event_id=t.event_id "
+        "where r.workspace_id=%s and s.world_id=%s and s.version_id=%s and r.request_id=%s",
+        (session.workspace_id, world_id, version_id, request_id),
+    ).fetchone()
+    if (
+        row is None
+        or row["requested_by"] != session.actor
+        or str(row["subject_id"]) != subject
+        or {key: value for key, value in row["document"]["intent"].items()} != intent
+    ):
+        return _step(step, "not_applied")
+    receipt = {
+        "operation": step.get("operation"),
+        "world_id": world_id,
+        "version_id": str(version_id),
+        "society_id": str(row["society_id"]),
+        "request_id": str(row["request_id"]),
+        "action_seq": int(row["action_seq"]),
+        "document_sha256": row["document_sha256"],
+        "tick": None if row["tick"] is None else int(row["tick"]),
+        "disposition": row["disposition"],
+    }
+    if row["disposition"] is None:
+        return _step(step, "pending", receipts=[receipt])
+    if row["disposition"] == "applied":
+        return _step(step, "applied", receipts=[receipt])
+    reason = None if row["event"] is None else row["event"].get("reason")
+    return _step(step, "not_applied", receipts=[receipt], code=reason)
 
 
 def _proposal_id(steps: Sequence[Mapping[str, Any]]) -> uuid.UUID | None:

@@ -93,7 +93,7 @@ def _values(schema: dict) -> list:
 def test_the_form_offers_exactly_the_options_the_reads_listed():
     schema = plan._world_edit_form(_world()).model_json_schema()
     step = schema["$defs"]["WorldEditStep"]["properties"]
-    assert _values(step["operation"]) == [operation.value for operation in Op]
+    assert _values(step["operation"]) == list(plan.DRAFT_OPERATIONS)
     assert _values(step["options"]["items"]) == [
         "cc0.bench",
         "cc0.seating-planter",
@@ -260,6 +260,12 @@ def test_every_code_a_plan_can_carry_is_declared():
         "speed_required",
         "minutes_required",
         "region_required",
+        "kind_ambiguous",
+        "anchor_ambiguous",
+        "being_required",
+        "being_ambiguous",
+        "place_required",
+        "place_ambiguous",
     } == plan.CLARIFICATIONS
     assert "no_change" in plan.ACTION_REFUSALS
     json.dumps(sorted(plan.ACTION_REFUSALS))

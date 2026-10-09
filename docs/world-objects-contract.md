@@ -5,9 +5,10 @@ places in them, the reviewed asset and behaviour registries those objects draw f
 of several objects placed in one request, durable environment placements, the edit log, undo,
 concurrency and reopening. Object rendering and bounded-motion controls have synthetic browser
 coverage, and the authored-world and environment-instances package extensions project this state.
-Authored objects are not a kind of [unified retrieval](world-composition-contract.md#unified-queries-and-filters),
-the Companion places no objects, and visual acceptance of objects in a scene made from photographs
-is not established.
+Authored objects are not a kind of [unified retrieval](world-composition-contract.md#unified-queries-and-filters).
+The Companion places objects and things only as plans of the exact requests these routes take
+([world actions](companion-question.md#world-actions)). Visual acceptance of objects in a scene made
+from photographs is not established.
 
 This is the fourth world plane under [ADR-0007](adr/0007-world-composition-and-customization.md).
 The other three, structure, appearance and comfort settings, are the

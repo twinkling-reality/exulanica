@@ -39,6 +39,9 @@ PINNED = {
     "action-plan-3": "aa66c6c57167604ee4824c79c7222bf65f3dd8828ba2732c0839db7aa61cd00e",
     # `action-plan-5`: the world-edit drafter is no longer asked to write the form on one line.
     "action-plan-5": "ea26b399ae2499732432cd0f279aec2ae30dc0e39dc32d39c801c6fd4b14d9d0",
+    # `action-plan-6`: things added by their kind and beings asked to go to or use a place; the
+    # classifier counts asking a being as a world edit; up to eight steps of four options each.
+    "action-plan-6": "332b30f3cad261a8376b043c0589f33c3c155a5a98f485e4195202db454417c6",
     # The appearance drafter for a design choice drawn from no evidence; its own family, so the
     # evidence drafter's texts and `proposal-4` are untouched.
     "proposal-authored-1": "7b840134c24bc8152ab423f0665362b1d37bdd3cfb9b96cf208cfc6a46308d9a",

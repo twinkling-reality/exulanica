@@ -43,10 +43,16 @@ Rules this module holds by construction rather than by asking the model:
     from the response to the one before; a refusal stops the chain where it is. The chain runs only
     while the world is paused: a playing world is paused first and played again at its speed last,
     and the plan shows both steps.
+*   **Things are added by their kind, and beings asked by the route that takes direct requests.**
+    A world edit may add a thing (``place_thing``) or ask one of the world's beings to go to a
+    place or use it (``direct_thing``); :mod:`exulanica.selection.action_things` reads, lays out and
+    prepares both, from routes that already exist. Neither route has a preview, so their own checks
+    run in process before a step is offered.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -62,13 +68,14 @@ from exulanica.canonical import canonical_json
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
 from exulanica.models.manifest import Role
+from exulanica.selection import action_things
 from exulanica.selection.calls import CallLog, ModelCall
 from exulanica.selection.proposal import RefusalCode, appearance_change, source_catalogue
 from exulanica.selection.request_names import RequestNames
 from exulanica.selection.runaway_repair import RUNAWAY_REPAIRS as _RUNAWAY_REPAIRS
 from exulanica.selection.validation import Session
 from exulanica.store.base import ContentAddressedStore
-from exulanica.world import WorldNotConfigured, WorldStyleRepository
+from exulanica.world import InvalidStructuralData, WorldNotConfigured, WorldStyleRepository
 from exulanica.world.arrangements import (
     ArrangementRequest,
     arrangement_catalog,
@@ -91,8 +98,10 @@ from exulanica.world.object_edit_preview import (
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import Transform
 from exulanica.world.repository import AUTHORED_DESIGN_BASIS, EVIDENCE_BASIS
+from exulanica.world.society_authored_ground import read_authored_ground
 from exulanica.world.society_controls import SPEEDS
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
+from exulanica.world.thing_looks import look_choices
 from exulanica.world.traffic_signal_repository import TrafficSignalRepository
 
 __all__ = [
@@ -100,15 +109,20 @@ __all__ = [
     "ACTION_PROMPT_VERSION",
     "ACTION_REFUSALS",
     "CLARIFICATIONS",
+    "DIRECT",
+    "DRAFT_OPERATIONS",
     "MAX_MINUTES",
     "MAX_PLAN_STEPS",
     "PLAN_PROFILE",
     "SIMULATION_OPERATIONS",
+    "THING_PLACE",
+    "THING_UNDO",
     "ActionKind",
     "ClockReader",
     "PlannedAction",
     "Previewer",
     "SimulationAction",
+    "SocietyReader",
     "TimeSpending",
     "WorldEditOperation",
     "action_bound_seconds",
@@ -122,7 +136,7 @@ __all__ = [
 ]
 
 #: Bumped when a prompt below or a form's construction changes; recorded with every plan.
-ACTION_PROMPT_VERSION: Final = "action-plan-5"
+ACTION_PROMPT_VERSION: Final = "action-plan-6"
 PLAN_PROFILE: Final = "exulanica.companion-action-plan/v1"
 
 #: One try and one repair for the drafter, then a refusal; the classifier is asked once and a
@@ -141,9 +155,10 @@ ACTION_PATH_CALLS: Final[tuple[tuple[Role, int], ...]] = (
     (Role.STRUCTURED_EXTRACTION, CLASSIFIER_CALLS + DRAFT_ATTEMPTS),
 )
 
-#: How many changes one request may ask for, and how many options one slot may name.
-MAX_STEPS: Final = 3
-MAX_CANDIDATES: Final = 3
+#: How many changes one request may ask for, and how many options one step may name: a kind and
+#: up to three things it could go beside, or a being and the places it could be asked to.
+MAX_STEPS: Final = 8
+MAX_CANDIDATES: Final = 4
 #: How many of a version's objects the drafter is shown: the newest, and the selected one always.
 MAX_OBJECT_CHOICES: Final = 24
 #: How many simulated minutes one request may move time forward, and so how many steps a plan can
@@ -175,7 +190,27 @@ class WorldEditOperation(StrEnum):
     REMOVE_OBJECT = "remove_object"
     UNDO_LAST_EDIT = "undo_last_edit"
     PLACE_ARRANGEMENT = "place_arrangement"
+    PLACE_THING = "place_thing"
+    DIRECT_THING = "direct_thing"
     OTHER = "other"
+
+
+#: The operations the world-edit drafter's form offers, in the drafter's words: the matrix's own,
+#: but a direct step is named by what it asks (``send_to`` a place, or ``use`` it), each read back
+#: as one ``direct_thing`` with its act.
+DRAFT_OPERATIONS: Final = (
+    "place_object",
+    "move_object",
+    "remove_object",
+    "undo_last_edit",
+    "place_arrangement",
+    "place_thing",
+    "send_to",
+    "use",
+    "other",
+)
+#: A drafted direct step's operation and the act its typed action states.
+_DRAFT_ACTS: Final = {"send_to": "go_to", "use": "use"}
 
 
 class SimulationAction(StrEnum):
@@ -219,6 +254,13 @@ CLARIFICATIONS: Final = frozenset(
         "speed_required",
         "minutes_required",
         "region_required",
+        # A thing to add, and what it goes beside; a being to ask, and the place.
+        "kind_ambiguous",
+        "anchor_ambiguous",
+        "being_required",
+        "being_ambiguous",
+        "place_required",
+        "place_ambiguous",
     }
 )
 
@@ -235,6 +277,10 @@ UNDO: Final = f"POST {_VERSION}/objects/undo"
 UNDO_PREVIEW: Final = f"POST {_VERSION}/objects/undo/preview"
 ARRANGE: Final = f"POST {_VERSION}/arrangements/apply"
 ARRANGE_PREVIEW: Final = f"POST {_VERSION}/arrangements/preview"
+#: A thing placed by its kind, the route that takes its placing back, and a being's direct request.
+THING_PLACE: Final = action_things.THING_PLACE
+THING_UNDO: Final = f"POST {_VERSION}/things/undo"
+DIRECT: Final = action_things.DIRECT
 #: The playback controls a simulation plan's steps are sent to, and the creation of its people.
 CONTROL: Final = f"PUT {_VERSION}/society/control"
 CONTROL_STEP: Final = f"POST {_VERSION}/society/control/steps"
@@ -246,7 +292,9 @@ CLOCK_READ: Final = f"GET {_VERSION}/clock"
 @dataclass(frozen=True, slots=True)
 class _Row:
     commit: str
-    preview: str
+    #: The route that previews the request, or None for one with no preview route: its own pure
+    #: checks run in process instead (:mod:`exulanica.selection.action_things`).
+    preview: str | None
     #: Where a later edit's base comes from and what replaying the request does.
     replay: str
     receipt: str
@@ -262,6 +310,12 @@ _MATRIX: Final[Mapping[WorldEditOperation, _Row]] = {
     WorldEditOperation.UNDO_LAST_EDIT: _Row(UNDO, UNDO_PREVIEW, _STALE, "version_edit", None),
     WorldEditOperation.PLACE_ARRANGEMENT: _Row(
         ARRANGE, ARRANGE_PREVIEW, _STALE, "version_edits", UNDO, atomic=True
+    ),
+    WorldEditOperation.PLACE_THING: _Row(THING_PLACE, None, _STALE, "version_edit", THING_UNDO),
+    # Sent again with its key it answers the request already recorded; a later minute is another
+    # request, prepared again.
+    WorldEditOperation.DIRECT_THING: _Row(
+        DIRECT, None, "same_key_returns_the_recorded_request", "society_action_request", None
     ),
 }
 
@@ -281,6 +335,13 @@ Grant = Callable[[str], tuple[list[str], bool]]
 #: The version's clock read (``exulanica.world-clock/v1``), as ``GET .../clock`` answers it. The
 #: route reads it only when a plan needs it, on the connection it plans with.
 ClockReader = Callable[[], Mapping[str, Any]]
+#: What a direct request made now would be made against: the society, the input its state
+#: consumed, the newest input's sequence and the beings already asked at this minute, as the
+#: actions route reads them (``SocietyActionRepository.request_context``), or None for a version
+#: whose society takes none.
+SocietyReader = Callable[
+    [], tuple[Mapping[str, Any], Mapping[str, Any], int, frozenset[str]] | None
+]
 
 
 # -- what the request is, and what the world offers ---------------------------------------------
@@ -310,6 +371,12 @@ class _Context:
             selected_object_id=context.get("selected_object_id"),
             saved_entry=request.get("saved_entry"),
         )
+
+    def viewer_point(self) -> tuple[int, int] | None:
+        """Where the person stands on the ground, region-local, where the page said."""
+        if self.viewer is None:
+            return None
+        return (int(self.viewer["x_mm"]), int(self.viewer["z_mm"]))
 
     def edit_entry(self) -> dict[str, Any] | None:
         """The saved entry as an authored edit takes it: without the style version."""
@@ -348,6 +415,15 @@ class _World:
     region_ids: tuple[str, ...] = ()
     society_held: bool = False
     society_engine: str | None = None
+    #: What a plan of things rests on, and the drafter's options for it: the kinds a thing may be
+    #: added as, the version's placed objects, the society's beings and the places they use.
+    things: action_things.ThingsRead | None = None
+    #: Who asks, as a direct request records it.
+    actor: uuid.UUID | None = None
+    kinds: tuple[_Choice, ...] = ()
+    placed: tuple[_Choice, ...] = ()
+    beings: tuple[_Choice, ...] = ()
+    places: tuple[_Choice, ...] = ()
 
     def descriptor(self, operation: str) -> Mapping[str, Any] | None:
         return self.descriptors.get(operation)
@@ -361,8 +437,11 @@ def read_world(
     world_id: str,
     capabilities: Mapping[str, Any],
     store: ContentAddressedStore | None,
+    society: SocietyReader | None = None,
 ) -> _World:
-    """The version, the kinds a person may place, its objects and the published arrangements.
+    """The version, the kinds a person may place, its objects and the published arrangements, and
+    what a plan of things rests on: the kinds a thing may be added as, the version's placed objects
+    and, where ``society`` reads one, the society's beings and the places they use.
 
     Raises ``UnknownWorldResource`` for a version this world does not hold, as every version read
     does. Objects are listed newest first by the last edit that touched them, at most
@@ -373,10 +452,28 @@ def read_world(
     repository = WorldObjectRepository(
         connection, session.workspace_id, world_id=world_id, store=store
     )
+    # Read as the actions route reads it, before the snapshot below: authorizing its inputs needs
+    # a transaction of its own at read committed.
+    held = None if society is None else society()
     with read_only_snapshot(connection):
         version = repository.version(context.version_id, with_availability=False)
         registry = {row.content_sha256: row for row in repository.reviewed_assets()}
         placeable = repository.placeable_assets(store)
+        chosen = look_choices(connection, session.workspace_id, world_id, context.version_id)
+        looks = {str(row["thing_id"]): row["look"] for row in chosen["looks"]}
+        elevation = _ground_elevation(
+            connection,
+            session,
+            world_id,
+            version.source_snapshot_id,
+            region_id=(
+                str(held[0]["region_id"])
+                if held is not None
+                else None
+                if context.placement is None
+                else str(context.placement["region_id"])
+            ),
+        )
     assets = tuple(
         _Choice(label=row.asset_key, value=row.asset_key, title=row.title, detail=row.summary)
         for row in placeable
@@ -415,7 +512,17 @@ def read_world(
         # The matrix operations are bound to the version alone, so each key is listed once.
         descriptors.setdefault(str(descriptor["operation"]), descriptor)
     regions = capabilities.get("regions") or {}
-    society = capabilities.get("society") or {}
+    stated = capabilities.get("society") or {}
+    read = action_things.read_things(
+        world_id=world_id,
+        version=version,
+        reviewed=registry,
+        looks=looks,
+        society=held,
+        elevation_mm=elevation,
+        viewer=context.viewer_point(),
+    )
+    kinds, placed, beings, places = _thing_choices(read)
     return _World(
         world_id=world_id,
         version_id=context.version_id,
@@ -428,9 +535,90 @@ def read_world(
         descriptors=descriptors,
         object_ids=frozenset(obj.object_id for obj in standing),
         region_ids=tuple(str(region) for region in regions.get("region_ids") or ()),
-        society_held=bool(society.get("held")),
-        society_engine=None if society.get("engine") is None else str(society["engine"]),
+        society_held=bool(stated.get("held")),
+        society_engine=None if stated.get("engine") is None else str(stated["engine"]),
+        things=read,
+        actor=session.actor,
+        kinds=kinds,
+        placed=placed,
+        beings=beings,
+        places=places,
     )
+
+
+def _ground_elevation(
+    connection: psycopg.Connection,
+    session: Session,
+    world_id: str,
+    snapshot_id: uuid.UUID,
+    *,
+    region_id: str | None,
+) -> int | None:
+    """The elevation the version's ground stands at in ``region_id``, as the society reads it, or
+    None where the version states no ground there (a world made from photographs)."""
+    if region_id is None:
+        return None
+    try:
+        ground = read_authored_ground(
+            connection, session.workspace_id, world_id, snapshot_id, region_id=region_id
+        )
+    except (InvalidStructuralData, ValueError):
+        return None
+    return None if ground is None else ground.elevation_mm
+
+
+def _thing_choices(
+    read: action_things.ThingsRead,
+) -> tuple[tuple[_Choice, ...], tuple[_Choice, ...], tuple[_Choice, ...], tuple[_Choice, ...]]:
+    """The drafter's options for a plan of things, each by an opaque label: kinds by their key,
+    placed objects, beings and places by number. A being from outside is named by its kind and
+    number alone."""
+    kinds = tuple(
+        _Choice(label=kind.key, value=kind.key, title=kind.label, detail=kind.summary)
+        for kind in read.kinds
+    )
+    placed = tuple(
+        _Choice(
+            label=f"thing-{index}",
+            value=f"thing:{item.thing_id}",
+            title=item.label
+            if item.look_label in (None, item.label)
+            else f"{item.label} (looks like: {item.look_label})",
+        )
+        for index, item in enumerate(read.placed, start=1)
+    )
+    society = read.society
+    beings: tuple[_Choice, ...] = ()
+    places: tuple[_Choice, ...] = ()
+    if society is not None:
+        beings = tuple(
+            _Choice(
+                label=f"being-{index}",
+                value=being.id,
+                title=(
+                    f"{being.display_name} (a visitor from outside)"
+                    if being.from_outside
+                    else being.display_name
+                    + (
+                        ""
+                        if being.kind_label is None
+                        else f" (kind: {being.kind_label}"
+                        + ("" if being.look_label is None else f"; looks like: {being.look_label}")
+                        + ")"
+                    )
+                ),
+            )
+            for index, being in enumerate(society.beings, start=1)
+        )
+        places = tuple(
+            _Choice(
+                label=f"place-{index}",
+                value=place.target_id,
+                title=f"the {place.title}, to {place.affordance.replace('_', ' ')}",
+            )
+            for index, place in enumerate(society.places, start=1)
+        )
+    return kinds, placed, beings, places
 
 
 # -- the model: which of five things, then which change ------------------------------------------
@@ -440,13 +628,16 @@ application that shows them a world they can walk through and change, and you de
 five things it is. You do not answer it and you do not act on it.
 
 - 'world_edit': they ask for something in the world to be added, put somewhere, moved, taken \
-away, arranged, or for the last change to be taken back. Benches, lamps, trees, tables, stalls \
-and small arrangements of them are things in the world.
+away, arranged, or for the last change to be taken back, or for one of the beings living there to \
+go somewhere or use something. Benches, lamps, trees, tables, stalls, wells, gates, swords, \
+lanterns and small arrangements of them are things in the world, and so are beings such as a \
+knight, a traveller or a lantern spirit.
 - 'appearance': they ask for the world itself to look or feel different: its colour, how clear or \
 soft it is, how much detail it carries, how lively it looks, how fast it moves, what its surfaces \
 are made of. Not the things in it.
 - 'simulation': they ask for the world's simulated people or its time to start, stop, pause, go \
-faster or slower, move forward, or for people to be brought in or sent away.
+faster or slower, move forward, or for people to be brought in or sent away. Asking one particular \
+being to do something is a world edit, not this.
 - 'capabilities': they ask what they can do, change or add here.
 - 'question': anything else, including questions about their photographs, about the people in the \
 world or about why something happened. Anything you are unsure about is this one.
@@ -462,19 +653,24 @@ _WORLD_EDIT_SYSTEM: Final = """You turn a request to change the things in a worl
 filled-in form. You do not apply anything. What you fill in is shown to the person, who confirms \
 it or throws it away, and nothing changes until they do.
 
-The form has one step for each change the request asks for, at most three, in the order asked. \
+The form has one step for each change the request asks for, at most eight, in the order asked. \
 Each step says which kind of change it is, then the listed options it names. You cannot \
 give a position, a size, an identifier that is not listed, a permission or anything else: every \
 value is one of the listed options. Where something goes comes from where the person is pointing, \
-not from you.
+or from what it is put beside, never from you.
 
-- 'place_object' adds one of the listed kinds. 'move_object' moves a listed object to where the \
-person is pointing. 'remove_object' takes a listed object away. 'undo_last_edit' takes back the \
-newest change. 'place_arrangement' adds one of the listed arrangements.
+- 'place_object' adds one of the listed kinds of object. 'move_object' moves a listed object to \
+where the person is pointing. 'remove_object' takes a listed object away. 'undo_last_edit' takes \
+back the newest change. 'place_arrangement' adds one of the listed arrangements.
+- 'place_thing' adds one of the listed things that can be added. When the request says what it \
+goes beside, name that too: a listed thing, object or being, or the kind of thing an earlier step \
+of this request adds.
+- 'send_to' asks one listed being to walk to one listed place. 'use' asks one listed being to use \
+one listed place, as the place says.
 - 'other' is a change these cannot express: turning or resizing something, changing its colour or \
 what it does, making something that is not listed. Never approximate it with a nearby change.
-- In a step's options, name every option the words could mean for that kind of change: one when \
-the request is clear, two or three when it could be any of them, none when it names nothing \
+- In a step's options, name every option the words could mean for each thing the step names: one \
+when the request is clear, two or three when it could be any of them, none when it names nothing \
 listed. Name each option once.
 - The object marked (selected) is the one the person has selected; 'this', 'that' or 'it' usually \
 means it.
@@ -541,15 +737,15 @@ def _world_edit_form(world: _World) -> type[BaseModel]:
     """
     fields: dict[str, Any] = {
         "operation": (
-            Literal[tuple(operation.value for operation in WorldEditOperation)],  # type: ignore[valid-type]
+            Literal[DRAFT_OPERATIONS],  # type: ignore[valid-type]
             Field(description="Which kind of change this step is."),
         )
     }
-    options = (*world.assets, *world.objects, *world.arrangements)
+    options = _offered(world)
     if options:
         fields["options"] = (
             _option_list(options),
-            Field(description="The listed kinds, objects or arrangements this step could mean."),
+            Field(description="The listed options this step could mean."),
         )
     step = create_model("WorldEditStep", __config__=ConfigDict(extra="forbid"), **fields)
     return create_model(
@@ -562,23 +758,45 @@ def _world_edit_form(world: _World) -> type[BaseModel]:
     )
 
 
+def _offered(world: _World) -> tuple[_Choice, ...]:
+    """Every option the drafter is shown, in the order it is shown them."""
+    return (
+        *world.assets,
+        *world.kinds,
+        *world.objects,
+        *world.placed,
+        *world.beings,
+        *world.places,
+        *world.arrangements,
+    )
+
+
 def _render_options(world: _World) -> str:
-    lines = ["KINDS THAT CAN BE PLACED"]
-    lines += [f"  {choice.label}: {choice.title}. {choice.detail}" for choice in world.assets]
-    if not world.assets:
-        lines.append("  (none)")
-    lines += ["", "OBJECTS IN THIS WORLD"]
-    lines += [
-        f"  {choice.label}: {choice.title}{' (selected)' if choice.selected else ''}"
-        for choice in world.objects
-    ]
-    if not world.objects:
-        lines.append("  (none)")
-    lines += ["", "ARRANGEMENTS"]
-    lines += [f"  {choice.label}: {choice.title}. {choice.detail}" for choice in world.arrangements]
-    if not world.arrangements:
-        lines.append("  (none)")
-    return "\n".join(lines)
+    def section(title: str, choices: Sequence[_Choice], detailed: bool = False) -> list[str]:
+        lines = [title]
+        for choice in choices:
+            detail = f". {choice.detail}" if detailed and choice.detail else ""
+            selected = " (selected)" if choice.selected else ""
+            lines.append(f"  {choice.label}: {choice.title}{detail}{selected}")
+        return [*lines, *(["  (none)"] if not choices else [])]
+
+    return "\n".join(
+        [
+            *section("KINDS OF OBJECT THAT CAN BE PLACED", world.assets, detailed=True),
+            "",
+            *section("THINGS THAT CAN BE ADDED", world.kinds, detailed=True),
+            "",
+            *section("OBJECTS IN THIS WORLD", world.objects),
+            "",
+            *section("THINGS IN THIS WORLD", world.placed),
+            "",
+            *section("BEINGS IN THIS WORLD", world.beings),
+            "",
+            *section("PLACES THE BEINGS USE", world.places),
+            "",
+            *section("ARRANGEMENTS", world.arrangements, detailed=True),
+        ]
+    )
 
 
 def _draft_world_edit(
@@ -634,15 +852,41 @@ def _repair(rejected: StructuredOutputError | TruncatedResponseError) -> dict[st
 
 @dataclass(frozen=True, slots=True)
 class _Action:
-    """One typed change: an operation and the option each slot resolved to (None: not needed)."""
+    """One typed change: an operation and the option each slot resolved to (None: not needed).
+
+    A thing to add names its kind, the id minted for it when the plan was made and what it goes
+    beside (``near``: ``thing:``, ``object:`` or ``being:`` and an id, or None for the pointed
+    spot). A being asked to act names the act, the being and the place."""
 
     operation: WorldEditOperation
     asset_key: str | None = None
     object_id: str | None = None
     arrangement_key: str | None = None
     arrangement_version: int | None = None
+    kind: str | None = None
+    kind_version: int | None = None
+    thing_id: str | None = None
+    near: str | None = None
+    act: str | None = None
+    subject_id: str | None = None
+    target_id: str | None = None
 
     def document(self) -> dict[str, Any]:
+        if self.operation is WorldEditOperation.PLACE_THING:
+            return {
+                "operation": self.operation.value,
+                "kind": self.kind,
+                "kind_version": self.kind_version,
+                "thing_id": self.thing_id,
+                "near": self.near,
+            }
+        if self.operation is WorldEditOperation.DIRECT_THING:
+            return {
+                "operation": self.operation.value,
+                "act": self.act,
+                "subject_id": self.subject_id,
+                "target_id": self.target_id,
+            }
         return {
             "operation": self.operation.value,
             "asset_key": self.asset_key,
@@ -692,12 +936,38 @@ def _typed_from_draft(steps: Sequence[Mapping[str, Any]], world: _World) -> _Ver
     Every label is looked up in the list it was offered from; the form's enums make any other value
     impossible, and this lookup is what makes it impossible here too. Candidates are kept for a
     clarification; a slot with none is decided per operation.
+
+    Adding something is read by the list its label came from: a kind of object is placed as the
+    reviewed object it is, and a kind of thing as a thing, whichever of the two operations names
+    it, since the label alone says which. A thing to add is minted its id here, so a later step of
+    the same request can name it before it exists; a step naming two kinds of thing, one of them a
+    kind an earlier step adds, adds the other beside it.
     """
     verdict = _Verdict()
-    pending: list[tuple[_Action, str, list[_Choice]]] = []
+    actions: list[_Action] = []
+    #: Each step's slots that name options: the step, the slot and the options it could mean.
+    slots: list[tuple[int, str, list[_Choice]]] = []
     undone = False
+    #: Each kind of thing and kind of object an earlier step adds, for a later step to name.
+    added_things: dict[str, str] = {}
+    added_objects: set[str] = set()
     for index, step in enumerate(steps):
-        operation = WorldEditOperation(step["operation"])
+        drafted = str(step["operation"])
+        labels = step.get("options") or ()
+        if drafted in _DRAFT_ACTS:
+            beings = _by_label(world.beings, labels)
+            places = _by_label(world.places, labels)
+            actions.append(
+                _Action(
+                    WorldEditOperation.DIRECT_THING,
+                    act=_DRAFT_ACTS[drafted],
+                    subject_id=beings[0].value if beings else None,
+                    target_id=places[0].value if places else None,
+                )
+            )
+            slots += [(index, "subject_id", beings), (index, "target_id", places)]
+            continue
+        operation = WorldEditOperation(drafted)
         if operation is WorldEditOperation.OTHER:
             verdict.refusal = _refusal(
                 "action_not_offered",
@@ -717,8 +987,24 @@ def _typed_from_draft(steps: Sequence[Mapping[str, Any]], world: _World) -> _Ver
                 )
                 return verdict
             undone = True
-        if operation is WorldEditOperation.PLACE_OBJECT:
-            candidates = _by_label(world.assets, step.get("options") or ())
+        if operation in (WorldEditOperation.PLACE_OBJECT, WorldEditOperation.PLACE_THING):
+            kinds = _by_label(world.kinds, labels)
+            candidates = [
+                asset
+                for asset in _by_label(world.assets, labels)
+                if asset.value not in added_objects
+            ] or _by_label(world.assets, labels)
+            # The list a label came from says what is added; where a step names both, the
+            # operation it was drafted as says which.
+            if kinds and (operation is WorldEditOperation.PLACE_THING or not candidates):
+                action, named = _thing_to_add(
+                    index, kinds, labels, world, added_things, added_objects
+                )
+                if action.kind is not None:
+                    added_things[action.kind] = str(action.thing_id)
+                actions.append(action)
+                slots += [(index, slot, found) for slot, found in named]
+                continue
             if not candidates:
                 verdict.refusal = _refusal(
                     "not_in_catalogue",
@@ -726,14 +1012,17 @@ def _typed_from_draft(steps: Sequence[Mapping[str, Any]], world: _World) -> _Ver
                     step=index,
                 )
                 return verdict
-            action = _Action(operation, asset_key=candidates[0].value)
-            pending.append((action, "asset_key", candidates))
+            actions.append(_Action(WorldEditOperation.PLACE_OBJECT, asset_key=candidates[0].value))
+            added_objects.add(candidates[0].value)
+            slots.append((index, "asset_key", candidates))
         elif operation in (WorldEditOperation.MOVE_OBJECT, WorldEditOperation.REMOVE_OBJECT):
-            candidates = _by_label(world.objects, step.get("options") or ())
-            action = _Action(operation, object_id=candidates[0].value if candidates else None)
-            pending.append((action, "object_id", candidates))
+            candidates = _by_label(world.objects, labels)
+            actions.append(
+                _Action(operation, object_id=candidates[0].value if candidates else None)
+            )
+            slots.append((index, "object_id", candidates))
         elif operation is WorldEditOperation.PLACE_ARRANGEMENT:
-            candidates = _by_label(world.arrangements, step.get("options") or ())
+            candidates = _by_label(world.arrangements, labels)
             if not candidates:
                 verdict.refusal = _refusal(
                     "not_in_catalogue",
@@ -742,25 +1031,90 @@ def _typed_from_draft(steps: Sequence[Mapping[str, Any]], world: _World) -> _Ver
                 )
                 return verdict
             key = candidates[0].value
-            action = _Action(
-                operation, arrangement_key=key, arrangement_version=world.arrangement_versions[key]
+            actions.append(
+                _Action(
+                    operation,
+                    arrangement_key=key,
+                    arrangement_version=world.arrangement_versions[key],
+                )
             )
-            pending.append((action, "arrangement_key", candidates))
+            slots.append((index, "arrangement_key", candidates))
         else:
-            pending.append((_Action(operation), "", []))
-    verdict.actions = [action for action, _slot, _candidates in pending]
-    for index, (_action, slot, candidates) in enumerate(pending):
-        if slot and len(candidates) > 1:
-            code = {
-                "asset_key": "asset_ambiguous",
-                "object_id": "object_ambiguous",
-                "arrangement_key": "arrangement_ambiguous",
-            }[slot]
+            actions.append(_Action(operation))
+    verdict.actions = actions
+    for index, slot, candidates in slots:
+        if len(candidates) > 1:
             verdict.clarification = _clarification(
-                code, index, slot, verdict.actions, candidates=candidates
+                _AMBIGUOUS[slot], index, slot, actions, candidates=candidates
             )
             return verdict
     return verdict
+
+
+#: The clarification a slot asks when the words could mean more than one listed option.
+_AMBIGUOUS: Final = {
+    "asset_key": "asset_ambiguous",
+    "object_id": "object_ambiguous",
+    "arrangement_key": "arrangement_ambiguous",
+    "kind": "kind_ambiguous",
+    "near": "anchor_ambiguous",
+    "subject_id": "being_ambiguous",
+    "target_id": "place_ambiguous",
+}
+
+
+def _anchors(world: _World) -> tuple[_Choice, ...]:
+    """What a thing may be put beside, each valued as a typed action's ``near`` names it."""
+    return (
+        *world.placed,
+        *(dataclasses.replace(choice, value=f"object:{choice.value}") for choice in world.objects),
+        *(dataclasses.replace(choice, value=f"being:{choice.value}") for choice in world.beings),
+    )
+
+
+def _thing_to_add(
+    index: int,
+    kinds: Sequence[_Choice],
+    labels: Sequence[str],
+    world: _World,
+    added_things: Mapping[str, str],
+    added_objects: set[str],
+) -> tuple[_Action, list[tuple[str, list[_Choice]]]]:
+    """A place step naming kinds of thing: the kind it adds, and what it goes beside.
+
+    One kind named is the one added. Of two or more, those an earlier step adds are what it goes
+    beside, when exactly one other is left to add; otherwise the kind is asked about. Beside that,
+    what it goes beside is any listed thing, object or being the step names, or a kind of object an
+    earlier step adds (the newest of that kind the Companion placed)."""
+    anchors = _by_label(_anchors(world), labels)
+    if len(kinds) == 1:
+        to_add = list(kinds)
+    else:
+        later = [kind for kind in kinds if kind.value not in added_things]
+        earlier = [kind for kind in kinds if kind.value in added_things]
+        if len(later) == 1 and earlier:
+            to_add = later
+            anchors += [
+                dataclasses.replace(kind, value=f"thing:{added_things[kind.value]}")
+                for kind in earlier
+            ]
+        else:
+            to_add = list(kinds)
+    anchors += [
+        dataclasses.replace(asset, value=f"newest-object:{asset.value}")
+        for asset in _by_label(world.assets, labels)
+        if asset.value in added_objects
+    ]
+    kind = to_add[0].value
+    offered = world.things.kind(kind) if world.things is not None else None
+    action = _Action(
+        WorldEditOperation.PLACE_THING,
+        kind=kind,
+        kind_version=None if offered is None else offered.version,
+        thing_id=action_things.minted_thing_id(world.version_id, world.state_sha256, index, kind),
+        near=anchors[0].value if anchors else None,
+    )
+    return action, [("kind", list(to_add)), ("near", list(anchors))]
 
 
 def _clarification(
@@ -784,6 +1138,8 @@ def _clarification(
             document[slot] = None
             if slot == "arrangement_key":
                 document["arrangement_version"] = None
+            if slot == "kind":
+                document["kind_version"] = None
         open_actions.append(document)
     return {
         "code": code,
@@ -839,9 +1195,73 @@ def _typed_from_request(actions: Sequence[Mapping[str, Any]], world: _World) -> 
                     ),
                 )
             )
+        elif operation is WorldEditOperation.PLACE_THING:
+            typed = _thing_from_request(raw, world, index)
+            if isinstance(typed, dict):
+                verdict.refusal = typed
+                return verdict
+            verdict.actions.append(typed)
+        elif operation is WorldEditOperation.DIRECT_THING:
+            # A being or a place this society does not hold is left to the route's own builder,
+            # which answers it the way it answers a direct request (``unknown_inhabitant``,
+            # ``canonical_target_changed``), when the step is prepared.
+            act = raw.get("act")
+            if act not in action_things.DIRECT_ACTS:
+                verdict.refusal = _refusal(
+                    "action_not_offered", "a being is asked to go to a place or use it", step=index
+                )
+                return verdict
+            verdict.actions.append(
+                _Action(
+                    operation,
+                    act=str(act),
+                    subject_id=_text_or_none(raw.get("subject_id")),
+                    target_id=_text_or_none(raw.get("target_id")),
+                )
+            )
         else:
             verdict.actions.append(_Action(operation))
     return verdict
+
+
+def _text_or_none(value: Any) -> str | None:
+    return None if value is None else str(value)
+
+
+#: What a typed thing step's ``near`` may name, by its prefix.
+_NEAR_PREFIXES: Final = ("thing:", "object:", "being:", "newest-object:")
+
+
+def _thing_from_request(
+    raw: Mapping[str, Any], world: _World, index: int
+) -> _Action | dict[str, Any]:
+    """A typed thing step a client sent back, its kind checked against the kinds offered, its
+    minted id against the shape minted here, and its ``near`` against the forms it may take; or the
+    refusal. Whether what ``near`` names is still here is the preparation's to say."""
+    kind = raw.get("kind")
+    offered = None if kind is None or world.things is None else world.things.kind(str(kind))
+    if kind is not None and offered is None:
+        return _refusal("not_in_catalogue", "no kind of thing to add has that key", step=index)
+    version = raw.get("kind_version")
+    if offered is not None and version is not None and version != offered.version:
+        return _refusal("not_in_catalogue", "that kind is offered at another version", step=index)
+    thing_id = raw.get("thing_id")
+    if thing_id is not None and (kind is None or not action_things.valid_minted_id(thing_id, kind)):
+        return _refusal(
+            "not_understood", "a thing to add carries the id its plan minted", step=index
+        )
+    near = raw.get("near")
+    if near is not None and not (
+        isinstance(near, str) and near.startswith(_NEAR_PREFIXES) and len(near) <= 300
+    ):
+        return _refusal("not_understood", "a thing goes beside something named", step=index)
+    return _Action(
+        WorldEditOperation.PLACE_THING,
+        kind=None if offered is None else offered.key,
+        kind_version=None if offered is None else offered.version,
+        thing_id=None if thing_id is None else str(thing_id),
+        near=None if near is None else str(near),
+    )
 
 
 def _requirements(
@@ -850,6 +1270,32 @@ def _requirements(
     """The first thing a step needs that neither the draft nor the page supplied, as a question."""
     for index, action in enumerate(actions):
         operation = action.operation
+        if operation is WorldEditOperation.PLACE_THING:
+            if action.kind is None:
+                return _clarification(
+                    "kind_ambiguous", index, "kind", actions, candidates=world.kinds
+                )
+            if context.origin_role is None:
+                return {
+                    **_clarification("origin_role_required", index, None, actions),
+                    "candidates": [
+                        {"value": "fictional", "title": "", "selected": False},
+                        {"value": "personal", "title": "", "selected": False},
+                    ],
+                }
+            if action.near is None and context.placement is None:
+                return _clarification("placement_required", index, None, actions)
+            continue
+        if operation is WorldEditOperation.DIRECT_THING:
+            if action.subject_id is None:
+                return _clarification(
+                    "being_required", index, "subject_id", actions, candidates=world.beings
+                )
+            if action.target_id is None:
+                return _clarification(
+                    "place_required", index, "target_id", actions, candidates=world.places
+                )
+            continue
         if operation is WorldEditOperation.PLACE_OBJECT and action.asset_key is None:
             return _clarification(
                 "asset_ambiguous", index, "asset_key", actions, candidates=world.assets
@@ -1071,6 +1517,8 @@ def _prepared_step(
     caller's grant whether one is opened at all.
     """
     row = _MATRIX[action.operation]
+    if row.preview is None:
+        return _prepared_things_step(index, action, context, world)
     descriptor = world.descriptor(row.commit) or {}
     bind, body, preview_body = _bodies(action, context, world, index)
     with previewer(row.preview) as repository:
@@ -1100,6 +1548,192 @@ def _prepared_step(
         }
     )
     return step
+
+
+def _prepared_things_step(
+    index: int, action: _Action, context: _Context, world: _World
+) -> dict[str, Any]:
+    """A thing step with its exact request and pins, from a route with no preview: the route's own
+    checks run in process (:mod:`exulanica.selection.action_things`), and a step they refuse is
+    ``blocked`` with the route's code. A direct step that must wait for the society's next minute
+    is ``pending`` with the code that says so; a client prepares it again before sending."""
+    row = _MATRIX[action.operation]
+    descriptor = world.descriptor(row.commit) or {}
+    if action.operation is WorldEditOperation.PLACE_THING:
+        body, code = _thing_placement(index, action, context, world)
+        pins: dict[str, Any] | None = {
+            "base_state_sha256": world.state_sha256,
+            "edit_seq": world.edit_seq,
+        }
+        state = "blocked" if code is not None else "prepared"
+    else:
+        society = None if world.things is None else world.things.society
+        if society is None:
+            body, code = None, "unavailable_society_input"
+        else:
+            body, code = action_things.direct_body(
+                society,
+                requested_by=world.actor or uuid.UUID(int=0),
+                subject_id=str(action.subject_id),
+                act=str(action.act),
+                target_id=str(action.target_id),
+            )
+        pins = (
+            None
+            if society is None
+            else {"tick": society.tick, "society_state_sha256": society.state_sha256}
+        )
+        state = (
+            "prepared"
+            if code is None
+            else "pending"
+            if code in action_things.WAIT_CODES
+            else "blocked"
+        )
+    step = _step(index, action, row, world, state, code)
+    step.update(
+        {
+            "body": body,
+            "requires": list(descriptor.get("requires", ())),
+            "permitted": bool(descriptor.get("permitted", False)),
+            "pins": pins,
+            "effects": [dict(effect) for effect in descriptor.get("effects", ())],
+            "titles": _titles(action, world),
+        }
+    )
+    return step
+
+
+def _titles(action: _Action, world: _World) -> dict[str, str]:
+    """What a thing step names, as the reads label it: the kind and what it goes beside, or the
+    being and the place. The labels the drafter and a clarification show, for the page's words."""
+    read = world.things
+    titles: dict[str, str | None] = {}
+    if action.operation is WorldEditOperation.PLACE_THING:
+        kind = None if read is None or action.kind is None else read.kind(action.kind)
+        titles["kind"] = None if kind is None else kind.label
+        if action.near is not None:
+            prefix, _, named = action.near.partition(":")
+            if prefix == "thing":
+                found = next((c for c in world.placed if c.value == action.near), None)
+                minted = named.split(":")[1] if named.startswith("companion:") else None
+                added = None if minted is None or read is None else read.kind(minted)
+                titles["near"] = (
+                    found.title if found is not None else None if added is None else added.label
+                )
+            elif prefix == "object":
+                found = next((c for c in world.objects if c.value == named), None)
+                titles["near"] = None if found is None else found.title.lower()
+            elif prefix == "newest-object":
+                found = next((c for c in world.assets if c.value == named), None)
+                titles["near"] = None if found is None else found.title.lower()
+            elif prefix == "being" and read is not None:
+                being = read.being(named)
+                titles["near"] = None if being is None else being.display_name
+    elif action.operation is WorldEditOperation.DIRECT_THING and read is not None:
+        being = None if action.subject_id is None else read.being(action.subject_id)
+        place = None if action.target_id is None else read.place(action.target_id)
+        titles["subject"] = None if being is None else being.display_name
+        titles["place"] = None if place is None else place.title
+        titles["affordance"] = None if place is None else place.affordance
+        titles["act"] = action.act
+    return {key: value for key, value in titles.items() if value is not None}
+
+
+def _anchor(
+    near: str, world: _World
+) -> tuple[action_things.Footprint, str | None, int | None] | None:
+    """What a thing is put beside, where it stands, its region and its height where known; None
+    for something no longer here."""
+    read = world.things
+    if read is None:
+        return None
+    prefix, _, named = near.partition(":")
+    if prefix == "being":
+        being = read.being(named)
+        if being is None or read.society is None:
+            return None
+        return being.footprint, read.society.region_id, None
+    return read.footprint(prefix, named)
+
+
+def _thing_placement(
+    index: int, action: _Action, context: _Context, world: _World
+) -> tuple[dict[str, Any] | None, str | None]:
+    """The body ``POST .../things`` takes for this step, or the code it would refuse it with."""
+    read = world.things
+    kind = None if read is None or action.kind is None else read.kind(action.kind)
+    if read is None or kind is None:
+        return None, "invalid_thing_placement"
+    viewer = context.viewer_point()
+    spot_region = None if context.placement is None else str(context.placement["region_id"])
+    spot_transform = None if context.placement is None else context.placement["transform"]
+    if action.near is not None:
+        anchored = _anchor(action.near, world)
+        if anchored is None:
+            return None, "anchor_not_here"
+        anchor, region_id, anchor_y = anchored
+        spot = None
+    else:
+        if spot_region is None or spot_transform is None:
+            return None, "placement_required"
+        anchor, region_id, anchor_y = None, spot_region, int(spot_transform["y_mm"])
+        spot = (int(spot_transform["x_mm"]), int(spot_transform["z_mm"]))
+    region = region_id or spot_region
+    if region is None:
+        return None, "invalid_thing_placement"
+    taken = [footprint for _id, footprint in read.taken]
+    if read.society is not None:
+        taken += [being.footprint for being in read.society.beings]
+    point = action_things.lay_out(
+        kind.half_mm, anchor=anchor, spot=spot, viewer=viewer, taken=taken
+    )
+    if point is None:
+        return None, "no_free_place_near"
+    y_mm = (
+        read.elevation_mm
+        if read.elevation_mm is not None
+        else anchor_y
+        if anchor_y is not None
+        else 0
+        if spot_transform is None
+        else int(spot_transform["y_mm"])
+    )
+    yaw = action_things.facing_yaw(
+        point,
+        viewer,
+        otherwise=0 if spot_transform is None else int(spot_transform["yaw_microradians"]),
+    )
+    thing_id = action.thing_id or action_things.minted_thing_id(
+        world.version_id, world.state_sha256, index, kind.key
+    )
+    origin_role = str(context.origin_role)
+    transform = action_things.thing_transform(point, y_mm, yaw)
+    refused = action_things.placement_refusal(
+        thing_id=thing_id,
+        kind=kind,
+        region_id=region,
+        transform=transform,
+        origin_role=origin_role,
+        region_ids=frozenset(world.region_ids) or frozenset({region}),
+        things=read,
+    )
+    if refused is not None:
+        return None, refused
+    return {
+        "base_state_sha256": world.state_sha256,
+        "thing_id": thing_id,
+        "kind": {"kind": kind.key, "version": kind.version, "sha256": kind.sha256},
+        "region_id": region,
+        "pose": {
+            "x_mm": transform.x_mm,
+            "y_mm": transform.y_mm,
+            "z_mm": transform.z_mm,
+            "yaw_microradians": transform.yaw_microradians,
+        },
+        "origin_role": origin_role,
+        "saved_entry": context.edit_entry(),
+    }, None
 
 
 def _step(
@@ -1140,7 +1774,10 @@ def _pending_step(index: int, action: _Action, world: _World) -> dict[str, Any]:
     bind = {"version_id": str(world.version_id)}
     if action.object_id is not None:
         bind["object_id"] = action.object_id
-    return _step(index, action, row, world, "pending", None, bind)
+    step = _step(index, action, row, world, "pending", None, bind)
+    if row.preview is None:
+        step["titles"] = _titles(action, world)
+    return step
 
 
 # -- the plan document ---------------------------------------------------------------------------
@@ -1892,6 +2529,7 @@ def prepare_action(
     store: ContentAddressedStore | None,
     previewer: Previewer,
     clock: ClockReader,
+    society: SocietyReader | None = None,
 ) -> dict[str, Any]:
     """Typed actions to a plan, with no model: a clarification answered, or a later step.
 
@@ -1907,6 +2545,7 @@ def prepare_action(
         world_id=world_id,
         capabilities=capabilities,
         store=store,
+        society=society,
     )
     if world.state_sha256 != context.base_state_sha256:
         return _stale(world)
@@ -1989,9 +2628,8 @@ def capabilities_document(world: _World, appearance: Mapping[str, Any]) -> dict[
 
 def iter_labels(world: _World) -> Iterator[str]:
     """Every option label the drafter was shown, for tests that hold the form to the reads."""
-    for group in (world.assets, world.objects, world.arrangements):
-        for choice in group:
-            yield choice.label
+    for choice in _offered(world):
+        yield choice.label
 
 
 # -- appearance: the style lifecycle's two requests ------------------------------------------------
@@ -2230,6 +2868,7 @@ def plan_action(
     previewer: Previewer,
     grant: Grant,
     clock: ClockReader,
+    society: SocietyReader | None = None,
 ) -> PlannedAction:
     """One utterance to a plan, a clarification, a refusal, what this world offers, or a question.
 
@@ -2247,6 +2886,7 @@ def plan_action(
         world_id=world_id,
         capabilities=capabilities,
         store=store,
+        society=society,
     )
     if world.state_sha256 != context.base_state_sha256:
         return PlannedAction(_stale(world))

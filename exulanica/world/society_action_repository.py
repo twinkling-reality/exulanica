@@ -229,6 +229,31 @@ class SocietyActionRepository:
             )
             return self._envelope(society["society_id"], request)
 
+    def request_context(
+        self, version_id: uuid.UUID
+    ) -> tuple[dict[str, Any], dict[str, Any], int, frozenset[str]]:
+        """What a request made now would be made against, read as :meth:`create` reads it and
+        writing nothing: the society, the input its state consumed (authorized), the newest
+        input's sequence, and the beings a request was already made for at this minute. A request
+        is taken only while those two inputs are the same one, and one per being per minute."""
+        with self.connection.transaction():
+            self._lock()
+            society = self._society(version_id)
+            consumed = self._input(society["society_id"], society["state"]["input_seq"])
+            self._authorize(consumed)
+            newest = self._input(society["society_id"])["input_seq"]
+            asked = self.connection.execute(
+                "select subject_id from world_society_action_request where workspace_id=%s "
+                "and society_id=%s and base_tick=%s",
+                (self.workspace_id, society["society_id"], society["current_tick"]),
+            ).fetchall()
+            return (
+                society,
+                consumed,
+                int(newest),
+                frozenset(str(row["subject_id"]) for row in asked),
+            )
+
     def read(self, version_id: uuid.UUID, request_id: uuid.UUID) -> dict[str, Any]:
         with self.connection.transaction():
             self._lock()

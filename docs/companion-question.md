@@ -653,24 +653,30 @@ saved-entry lock and refusal as the same operation sent directly, because it is 
 | Play, pause or change speed | none; the plan carries the clock read its bases came from | `PUT .../society/control` |
 | Move time on 1 to 10 simulated minutes | none, as above | `POST .../society/control/steps` once a minute, chained; a playing world is paused first and played again last |
 | Bring people into a world with none | none | `POST .../society` |
+| Add a thing by its kind, beside something named or where the person points | none; the route's own checks run in process | `POST .../things` |
+| Ask one of the world's beings to go to a place or use it | none; the step is prepared again just before it is sent | `POST .../society/actions` |
 
 A plan names each step's route key, path values, body, the permissions its route declares, the
 version pins (`base_state_sha256` and `edit_seq`), the authority's preview document and its digest,
 what replaying the request does and which route compensates it. The model fills enums only: an
 operation from the fixed vocabulary above or `other`, and options from the reads a direct client
-makes, the reviewed kinds a person may place, the version's objects offered by opaque label so a
-client-chosen id never reaches a hosted request, and the published arrangements. Positions come
-from the page's placement or viewer context, and the origin role of anything added is the person's
-stated choice. What is missing is asked about before anything is prepared (`asset_ambiguous`,
-`object_ambiguous`, `object_required`, `arrangement_ambiguous`, `origin_role_required`,
-`placement_required`, `viewer_required`); the answer goes to `POST /selection/actions/prepare`
-(`world.read`, no model), which validates typed actions as any direct body is validated.
+makes, the reviewed kinds a person may place, the kinds of thing an author may add, the version's
+objects and placed things offered by opaque label so a client-chosen id never reaches a hosted
+request, the society's beings and the places they use, and the published arrangements. Positions
+come from the page's placement or viewer context, or from what a thing is put beside, and the
+origin role of anything added is the person's stated choice. What is missing is asked about before
+anything is prepared (`asset_ambiguous`, `object_ambiguous`, `object_required`,
+`arrangement_ambiguous`, `origin_role_required`, `placement_required`, `viewer_required`,
+`kind_ambiguous`, `anchor_ambiguous`, `being_required`, `being_ambiguous`, `place_required`,
+`place_ambiguous`); the answer goes to `POST /selection/actions/prepare` (`world.read`, no model),
+which validates typed actions as any direct body is validated.
 
 A step the operations cannot express (`other`) refuses the whole plan. A drafted plan takes back at
 most one change: a second `undo_last_edit` step is refused `action_not_offered`, and asking again
-takes back the next. Each world-edit step the model fills is an operation and then one list of up to
-three options drawn from the listed kinds, objects and arrangements; the list is read in the one its
-operation takes options from, and an option from another list names nothing. The list is the step's
+takes back the next. A plan has at most eight steps, and each world-edit step the model fills is an
+operation and then one list of up to four options drawn from the listed kinds, objects, things,
+beings, places and arrangements; the list is read by the list each label came from, and an option
+from a list the operation takes nothing from names nothing. The list is the step's
 last field, so a list that names something can be followed only by the step's closing brace: under a
 strict schema a list followed by another field needs a comma, and a model that writes a line break
 there instead can then write only whitespace. The world-edit and simulation drafters each make one
@@ -773,14 +779,52 @@ Bringing people in reads back the version's society in the region the step named
 answer names it.
 
 Behaviour changes, photo point maps, environment instances, model choices, comparisons, character
-looks, style rollback, interaction policy, sending people away or bringing them back, and a
-person's directed actions are not prepared by the Companion: the drafter's form has no slot for
-them, so a request for one is refused `action_not_offered`. Conversation and remembered context
-never make a step permitted, and the planner imports neither the interaction-policy plane nor stored
+and thing looks, style rollback, interaction policy, sending people away or bringing them back,
+and playing a being are not prepared by the Companion: the drafter's form has no slot for them, so
+a request for one is refused `action_not_offered`. Conversation and remembered context never make a
+step permitted, and the planner imports neither the interaction-policy plane nor stored
 conversation (`tests/test_companion_action_policy_boundary.py`). Scripted tests hold the mechanics;
 two measurements of a live model reading held-out requests into these plans, before and after
 each step's options moved last under a 640-token ceiling, are in
-[evidence and limits](#evidence-and-limits).
+[evidence and limits](#evidence-and-limits). The later binds the prompt `action-plan-5`; the
+current prompt, `action-plan-6`, adds things and beings and is measured by neither.
+
+### Things and beings
+
+A thing is added as `place_thing`, the request `POST /world/versions/{version_id}/things` takes
+([world_things.py](../exulanica/api/routes/world_things.py)): a kind an author may place, at its
+newest shipped version and by its digest, an id minted when the plan is made
+(`companion:<kind>:<12 hex digits>`, carried in the typed step so a later step of the same request
+can name it before it exists), a pose and the person's origin role. The drafter names the kind and
+what it goes beside: a listed thing, object or being, or the kind of thing an earlier step of the
+request adds. A kind whose first look draws a reviewed object's own container is offered as that
+object (`place_object`), so a request for a bench takes the measured object path. Where it stands
+is laid out without the model ([action_things.py](../exulanica/selection/action_things.py)):
+beside what is named, on its side toward the person first, then its right, its left and behind it,
+the two sizes and a clearance apart; otherwise at the pointed spot, or on rings about it when that
+is taken; at the society ground's elevation, turned to face the person. The route has no preview,
+so its own pure checks run in process before a step is offered, and a step they refuse is
+`blocked` with the route's code (`invalid_object_state`, `thing_limit_reached`,
+`invalid_thing_placement`), or with `no_free_place_near` or `anchor_not_here`; the route stays the
+authority when the step is sent.
+
+One of a world's own beings is asked as `direct_thing`, the request
+`POST /world/versions/{version_id}/society/actions` takes: to go to a place the society's consumed
+input lists (`go_to`), or to use it (`perform` its activity). The request is built by the function
+the route builds it with, on the society's state and the input a request would be made against now,
+so a step is offered only where the route would take it, and a refusal is the route's own name
+(`decided_from_outside` for a visitor its program decides for, `target_unreachable`,
+`destination_full`). Its pins are that minute's, so the browser prepares it again just before
+sending it; while the society holds an input it has not taken in, the step is `pending` with
+`society_input_queued`, and while the being is in the middle of something, or was already asked
+something at this minute (the route takes one request per being per minute), with
+`inhabitant_action_in_progress`; the browser waits for the next minute, at most 90 seconds, before
+saying it was not sent. Each
+thing step carries `titles`, what it names as the reads label them, for the page's words. A being
+from outside is offered to the drafter by its kind and number alone, so nothing its program
+declared reaches a hosted request. A placing step reads back as its own `add_thing` edit; an
+asking step reads back as the request its answer names, `pending` until a minute takes it, then
+`applied`, or `not_applied` with the minute's reason.
 
 ### The browser's path
 

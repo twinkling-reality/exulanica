@@ -35,6 +35,7 @@ from typing import Annotated, Any, Literal
 import psycopg
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from psycopg import pq
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 
 from exulanica.api.dependencies import (
@@ -59,6 +60,7 @@ from exulanica.selection.action_plan import (
     ClockReader,
     Grant,
     Previewer,
+    SocietyReader,
     plan_action,
     prepare_action,
 )
@@ -66,6 +68,9 @@ from exulanica.selection.validation import Session
 from exulanica.world.object_edit_preview import read_only_snapshot
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import OBJECT_ID_PATTERN
+from exulanica.world.placed_things import PLACED_THING_ID_PATTERN
+from exulanica.world.society import UnavailableSocietyInput, UnknownSociety
+from exulanica.world.society_action_repository import SocietyActionRepository
 from exulanica.world.society_controls import SPEEDS
 from exulanica.world.world_clock_repository import WorldClockRepository
 from exulanica.world.worlds import require_world
@@ -128,12 +133,28 @@ class TypedActionBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     operation: Literal[
-        "place_object", "move_object", "remove_object", "undo_last_edit", "place_arrangement"
+        "place_object",
+        "move_object",
+        "remove_object",
+        "undo_last_edit",
+        "place_arrangement",
+        "place_thing",
+        "direct_thing",
     ]
     asset_key: str | None = Field(default=None, max_length=200, pattern=r"^[a-z][a-z0-9.-]*$")
     object_id: str | None = Field(default=None, max_length=200, pattern=OBJECT_ID_PATTERN)
     arrangement_key: str | None = Field(default=None, max_length=200, pattern=r"^[a-z][a-z0-9_]*$")
     arrangement_version: int | None = Field(default=None, ge=1)
+    #: A thing to add: its kind and version, the id its plan minted, and what it goes beside
+    #: (``thing:``, ``object:``, ``being:`` or ``newest-object:`` and an id or key).
+    kind: str | None = Field(default=None, max_length=48, pattern=r"^[a-z][a-z0-9_]{0,47}$")
+    kind_version: int | None = Field(default=None, ge=1, le=10_000)
+    thing_id: str | None = Field(default=None, max_length=200, pattern=PLACED_THING_ID_PATTERN)
+    near: str | None = Field(default=None, min_length=1, max_length=300)
+    #: A being asked to act: what it is asked, the being and the place, by the society's ids.
+    act: Literal["go_to", "use"] | None = None
+    subject_id: str | None = Field(default=None, max_length=200)
+    target_id: str | None = Field(default=None, max_length=1000)
 
 
 class TypedSimulationBody(BaseModel):
@@ -178,6 +199,8 @@ OutcomeOperation = Literal[
     "POST /world/versions/{version_id}/objects/{object_id}/remove",
     "POST /world/versions/{version_id}/objects/undo",
     "POST /world/versions/{version_id}/arrangements/apply",
+    "POST /world/versions/{version_id}/things",
+    "POST /world/versions/{version_id}/society/actions",
     "POST /world/styles/previews",
     "POST /world/styles/previews/{preview_id}/apply",
     "PUT /world/versions/{version_id}/society/control",
@@ -223,6 +246,8 @@ class OutcomeAnswerBody(BaseModel):
     revision: int | None = Field(default=None, ge=0)
     last_event_seq: int | None = Field(default=None, ge=0)
     society_id: uuid.UUID | None = None
+    #: A direct request's own id, as the actions route's envelope names it under ``request``.
+    request_id: uuid.UUID | None = None
 
 
 class OutcomeStepBody(BaseModel):
@@ -321,6 +346,9 @@ class ActionStepView(BaseModel):
     #: ``chained``: the first step's confirmation covers this one; each is still its own commit,
     #: and a refusal stops the chain where it is.
     confirmation: Literal["required", "chained"]
+    #: For a thing step, what it names as the reads label it (``kind`` and ``near``, or
+    #: ``subject``, ``place``, ``affordance`` and ``act``), for the page's words; absent otherwise.
+    titles: dict[str, str] | None = None
     replay: str
     receipt: str
     compensation: dict[str, str] | None
@@ -475,6 +503,50 @@ def _clock_reader(
     return read
 
 
+@contextmanager
+def _read_committed(connection: psycopg.Connection) -> Iterator[None]:
+    """A read-only transaction at read committed, the isolation authorizing a society's inputs
+    needs (migration 0041's asset read barrier refuses any other), or a savepoint in the caller's
+    own transaction."""
+    if connection.info.transaction_status != pq.TransactionStatus.IDLE:
+        with connection.transaction():
+            yield
+        return
+    with connection.transaction():
+        connection.execute("set transaction read only")
+        yield
+
+
+def _society_reader(
+    request: Request,
+    scoped: psycopg.Connection,
+    session: Session,
+    world_id: str,
+    version_id: uuid.UUID,
+) -> SocietyReader:
+    """What a direct request made now would be made against, read as the actions route reads it
+    (``SocietyActionRepository.request_context``) on the role that route uses, in a read-only
+    transaction; None for a version with no society, or one whose engine takes no request."""
+
+    def read() -> tuple[dict[str, Any], dict[str, Any], int] | None:
+        authorizer = getattr(request.app.state, "society_input_authorizer", None)
+        repository = SocietyActionRepository(
+            scoped,
+            session.workspace_id,
+            world_id=world_id,
+            input_authorizer=(
+                None if authorizer is None else lambda doc: authorizer(scoped, session, doc)
+            ),
+        )
+        try:
+            with _read_committed(scoped):
+                return repository.request_context(version_id)
+        except (UnknownSociety, UnavailableSocietyInput, ValueError):
+            return None
+
+    return read
+
+
 def _view(document: dict[str, Any], execution: ExecutionView, names: Any) -> ActionPlanView:
     return ActionPlanView.model_validate({**document, "execution": execution, "names": names})
 
@@ -506,6 +578,7 @@ def plan_actions(
         previewer=_previewer(request, session, held, world_id),
         grant=_grant(held),
         clock=_clock_reader(connection, session, world_id, body.version_id),
+        society=_society_reader(request, scoped, session, world_id, body.version_id),
     )
     return _view(
         planned.document,
@@ -538,6 +611,7 @@ def prepare_actions(
         store=get_services(request).store,
         previewer=_previewer(request, session, held, world_id),
         clock=_clock_reader(connection, session, world_id, body.version_id),
+        society=_society_reader(request, scoped, session, world_id, body.version_id),
     )
     return _view(document, _execution((), (), prompt_version=ACTION_PROMPT_VERSION), {})
 

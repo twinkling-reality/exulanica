@@ -21530,6 +21530,20 @@
       ],
       "title": "Confirmation"
      },
+     "titles": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "string"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Titles"
+     },
      "replay": {
       "type": "string",
       "title": "Replay"
@@ -30858,6 +30872,18 @@
        }
       ],
       "title": "Society Id"
+     },
+     "request_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Request Id"
      }
     },
     "additionalProperties": false,
@@ -31030,6 +31056,8 @@
        "POST /world/versions/{version_id}/objects/{object_id}/remove",
        "POST /world/versions/{version_id}/objects/undo",
        "POST /world/versions/{version_id}/arrangements/apply",
+       "POST /world/versions/{version_id}/things",
+       "POST /world/versions/{version_id}/society/actions",
        "POST /world/styles/previews",
        "POST /world/styles/previews/{preview_id}/apply",
        "PUT /world/versions/{version_id}/society/control",
@@ -32371,10 +32399,12 @@
         "mapping": {
          "advance": "#/components/schemas/TypedSimulationBody",
          "bring_people": "#/components/schemas/TypedSimulationBody",
+         "direct_thing": "#/components/schemas/TypedActionBody",
          "move_object": "#/components/schemas/TypedActionBody",
          "pause": "#/components/schemas/TypedSimulationBody",
          "place_arrangement": "#/components/schemas/TypedActionBody",
          "place_object": "#/components/schemas/TypedActionBody",
+         "place_thing": "#/components/schemas/TypedActionBody",
          "play": "#/components/schemas/TypedSimulationBody",
          "remove_object": "#/components/schemas/TypedActionBody",
          "set_speed": "#/components/schemas/TypedSimulationBody",
@@ -40147,7 +40177,9 @@
        "move_object",
        "remove_object",
        "undo_last_edit",
-       "place_arrangement"
+       "place_arrangement",
+       "place_thing",
+       "direct_thing"
       ],
       "title": "Operation"
      },
@@ -40201,6 +40233,97 @@
        }
       ],
       "title": "Arrangement Version"
+     },
+     "kind": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 48,
+        "pattern": "^[a-z][a-z0-9_]{0,47}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kind"
+     },
+     "kind_version": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 10000.0,
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kind Version"
+     },
+     "thing_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "pattern": "^[a-z0-9]([a-z0-9:._-]{0,198}[a-z0-9])?$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Thing Id"
+     },
+     "near": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 300,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Near"
+     },
+     "act": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "go_to",
+         "use"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Act"
+     },
+     "subject_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Subject Id"
+     },
+     "target_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 1000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target Id"
      }
     },
     "additionalProperties": false,
