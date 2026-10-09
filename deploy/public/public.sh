@@ -562,7 +562,8 @@ PY
     # failures in a row:
     # - the API's own liveness, read from inside the client container over the compose network.
     #   Docker never restarts a container whose health check fails (deployment.md section 9), so
-    #   three failures recreate the API container;
+    #   three failures recreate the API container, which keeps the model credential of the one it
+    #   replaces;
     # - the path the edge takes, read from inside the edge container: the client proxy, then the
     #   API. While the API is well, three failures here mean the proxy cannot reach it (nginx finds
     #   `api` by name once, at its start), so they restart the client proxy, never the API;
@@ -608,6 +609,23 @@ PY
     repaired=""
     if [ "$failures" -ge 3 ]; then
       echo "$now recreating api after $failures failures of its own liveness"
+      # The model credential lives only in the environment `up` gave the API's container, and this
+      # check runs from a timer that holds none: a recreation would start the API without it, and
+      # every model mind would stop until somebody ran `up` again. So the container being replaced
+      # hands its own on: read here into this process's environment alone, for the one command
+      # below. It is never printed, logged, put on a command line or written to a file.
+      if [ -z "${NEBIUS_API_KEY:-}" ]; then
+        replaced="$(compose ps -a -q api 2>/dev/null | head -n 1 || true)"
+        if [ -n "$replaced" ]; then
+          NEBIUS_API_KEY="$(
+            docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$replaced" 2>/dev/null \
+              | sed -n 's/^NEBIUS_API_KEY=//p' | head -n 1 || true
+          )"
+          export NEBIUS_API_KEY
+        fi
+      fi
+      [ -n "${NEBIUS_API_KEY:-}" ] \
+        || echo "$now the replaced api held no NEBIUS_API_KEY: the recreated api asks no model until up is run with it"
       compose up -d --no-build --pull never --no-deps --force-recreate api
       echo 0 >"$watch_state"
       repaired=api

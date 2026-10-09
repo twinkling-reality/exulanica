@@ -708,7 +708,14 @@ _WATCH_STUBS = {
 case " $* " in
   *" exec -T client "*) echo "$WATCH_INSIDE" ;;
   *" exec -T edge "*) echo "$WATCH_PROXIED" ;;
-  *" up "*) echo "up $*" >>"$WATCH_ACTIONS" ;;
+  *" ps -a -q api "*) [ -n "${WATCH_REPLACED-container}" ] && echo "${WATCH_REPLACED-container}" ;;
+  *" inspect "*)
+    echo "PATH=/usr/bin"
+    [ -n "${WATCH_HELD_KEY:-}" ] && printf 'NEBIUS_API_KEY=%s\n' "$WATCH_HELD_KEY"
+    echo "EXULANICA_SPENDING=durable" ;;
+  *" up "*)
+    echo "up $*" >>"$WATCH_ACTIONS"
+    printf '%s' "${NEBIUS_API_KEY:-}" >"$WATCH_ACTIONS.key" ;;
   *" restart "*) echo "restart $*" >>"$WATCH_ACTIONS" ;;
   *) echo "unexpected docker $*" >>"$WATCH_ACTIONS"; exit 1 ;;
 esac
@@ -719,7 +726,9 @@ printf '%s' "$WATCH_LIVE"
 }
 
 
-def _watch(tmp_path: pathlib.Path, inside: str, proxied: str, live: str) -> tuple[str, list[str]]:
+def _watch(
+    tmp_path: pathlib.Path, inside: str, proxied: str, live: str, **extra: str
+) -> tuple[str, list[str]]:
     stubs = tmp_path / "stubs"
     if not stubs.exists():
         stubs.mkdir()
@@ -737,9 +746,10 @@ def _watch(tmp_path: pathlib.Path, inside: str, proxied: str, live: str) -> tupl
         WATCH_PROXIED=proxied,
         WATCH_LIVE=live,
         WATCH_ACTIONS=str(actions),
+        **extra,
     )
     assert result.returncode == 0, result.stderr
-    return result.stdout, actions.read_text(encoding="utf-8").splitlines()
+    return result.stdout + result.stderr, actions.read_text(encoding="utf-8").splitlines()
 
 
 @needs_shell
@@ -774,6 +784,47 @@ def test_watch_recreates_an_api_that_fails_its_own_liveness_and_not_the_proxy(tm
     output, actions = _watch(tmp_path, inside="000", proxied="000", live="502")
     assert len(actions) == 1 and "--force-recreate api" in actions[0], actions
     assert "proxy_failures=0" in output
+
+
+def _recreation(tmp_path: pathlib.Path, **extra: str) -> tuple[str, list[str], str]:
+    """The third failed liveness check in a row, which recreates the API: what watch printed, the
+    docker commands it ran, and the model credential the recreating command held."""
+    for _ in range(2):
+        _watch(tmp_path, inside="000", proxied="000", live="502", **extra)
+    output, actions = _watch(tmp_path, inside="000", proxied="000", live="502", **extra)
+    held = (tmp_path / "actions.log.key").read_text(encoding="utf-8")
+    return output, actions, held
+
+
+@needs_shell
+def test_a_recreated_api_keeps_the_model_credential_of_the_one_it_replaces(tmp_path):
+    """The timer that runs watch holds no model credential, so the recreation takes it from the
+    container it replaces: the recreating command holds exactly that value, and it appears in
+    nothing watch prints and in no command line."""
+    output, actions, held = _recreation(tmp_path, WATCH_HELD_KEY=CREDENTIAL_PROBE)
+    assert held == CREDENTIAL_PROBE
+    assert len(actions) == 1 and "--force-recreate api" in actions[0], actions
+    assert CREDENTIAL_PROBE not in output
+    assert CREDENTIAL_PROBE not in "\n".join(actions)
+    assert "held no NEBIUS_API_KEY" not in output
+    for path in tmp_path.rglob("*"):
+        if path.is_file() and path.name != "actions.log.key" and path.parent.name != "stubs":
+            assert CREDENTIAL_PROBE.encode() not in path.read_bytes(), path
+
+
+@needs_shell
+@pytest.mark.parametrize(
+    "extra",
+    [{}, {"WATCH_REPLACED": ""}],
+    ids=["the container holds none", "no container to replace"],
+)
+def test_a_recreation_with_no_credential_to_keep_says_so_by_the_variable_s_name(tmp_path, extra):
+    """A replaced container with no credential, or none to replace, still recreates the API
+    (liveness comes first) and the journal names the variable, never a value."""
+    output, actions, held = _recreation(tmp_path, **extra)
+    assert len(actions) == 1 and "--force-recreate api" in actions[0], actions
+    assert held == ""
+    assert "the replaced api held no NEBIUS_API_KEY" in output
 
 
 @needs_shell
