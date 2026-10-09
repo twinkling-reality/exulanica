@@ -867,7 +867,8 @@ its own role. The [local database](local-database.md) guide owns its steps.
 - `EXULANICA_CREATURE_WORKER` and `EXULANICA_CREATURE_WORKSPACES` configure creatures drafted from
   words, owned by the [things contract](things-contract.md#drafting-a-creature-from-words): the
   worker runs in the API process unless set off, for the JSON array of workspace ids listed (none
-  when absent).
+  when absent). Every API process of an installation needs the same values and a model client:
+  each ends at startup the drafts of every workspace it knows but does not serve.
 - The test suite's settings, such as `EXULANICA_TEST_DATABASE_URL`, `EXULANICA_TEST_POSTGRES`,
   `EXULANICA_TEST_DATABASE_URLS`, `EXULANICA_REQUIRE_POSTGRES` and
   `EXULANICA_REFERENCE_DATABASE_URL`, are in [development setup](development-setup.md).

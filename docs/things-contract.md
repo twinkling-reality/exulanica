@@ -698,7 +698,10 @@ took it and when it ended.
 
 A draft is a row and a job on the shared job queue, claimed with a lease and a claim token as a
 reference job is. The words live only in the job until the draft ends, and the draft keeps nothing
-of them, not even their digest: a digest of a short sentence is the sentence. A kept draft names
+of them, not even their digest: a digest of a short sentence is the sentence. What the draft makes
+is the workspace's own: a kept creature's kind and plan name the digest of the words it was drafted
+from in their origin (`words_sha256`, below), which anyone holding the workspace's `world.read`
+reads with the kind until the creature is erased. A kept draft names
 its kind by the digest of the kind's document alone, with no key and no foreign key, so erasing the
 creature (below) is never held up by it; a refused draft keeps a code and a field, never a
 sentence, since a check's own sentence may quote the drafted label, and the table refuses anything
@@ -710,8 +713,25 @@ words that are not one plain line, `words_refused`. A workspace with a draft sti
 running is not seeded for another server, as the draft's job holds the words. A workspace's
 tombstone ends its unfinished drafts in the tombstone's own transaction, whoever writes it, a
 restore's replay included: each job is cancelled with its words blanked, and its draft ends
-`cancelled`. A worker that drafted for a cancelled draft keeps nothing; a call it had already sent
-finishes at the provider, and its answer is discarded.
+`cancelled`. A draft is asked under the workspace's lock, and never once that tombstone is
+written: it is refused `410 tombstoned` and no job is written, so a draft and its workspace's
+tombstone never interleave. A worker that drafted for a cancelled draft keeps nothing; a call it had
+already sent finishes at the provider, and its answer is discarded.
+
+Spending is keyed by the job: under durable spending a job taken again after a crash is admitted
+under the same key, and the authority refuses what was already paid; under process spending
+(`EXULANICA_SPENDING=process`) the key is not checked, so a job taken again may pay again, once for
+each of its at most two claims. Every API process of an installation carries the same creature
+settings: at startup each process ends, as `not_served`, the unfinished drafts of every workspace
+it knows but does not serve, so a process started with the worker off, a shorter list or no model
+client would end another process's drafts, one being drafted included.
+
+The words leave the live rows when a draft ends, but copies outlive them: PostgreSQL keeps dead row
+versions until vacuum and the write-ahead log keeps them until it is recycled, and a backup taken
+while a draft was queued or running keeps the job's words for as long as that backup is kept. A
+restore from it brings them back into the live job until the draft is played or the restored
+installation's startup ends it. A draft of a workspace that no process knows any more (no token,
+account or list names it) waits with its words until one does.
 
 ## A workspace's own things
 

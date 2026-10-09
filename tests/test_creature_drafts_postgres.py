@@ -16,19 +16,23 @@ replies scripted (no network, no key, no money):
     words blanked; a worker that lost its claim ends nothing;
 *   a workspace tombstone, written by the runtime role or by the owner, cancels the workspace's
     unfinished drafts with their words blanked in its own transaction, and nothing of another
-    workspace or of another kind of tombstone; a worker whose draft was cancelled while it drafted
-    keeps nothing.
+    workspace or of another kind of tombstone; a draft asked once the tombstone is written, or while
+    it is being written, is refused with no job written; a worker whose draft was cancelled while it
+    drafted keeps nothing.
 """
 
 from __future__ import annotations
 
 import json
 import re
+import threading
+import time
 import uuid
 
 import psycopg
 import pytest
 from exulanica.db.roles import RUNTIME_ROLE, provision_runtime_role
+from exulanica.errors import TombstonedError
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role, load_manifest
@@ -474,6 +478,63 @@ def test_a_workspace_tombstone_cancels_its_unfinished_drafts_and_blanks_their_wo
         kept = drafts.read_draft(connection, elsewhere, other.draft_id)
         assert kept is not None and kept.status == "queued"
         assert _payload(connection, other)["sent"] == WORDS
+
+
+def test_a_draft_asked_after_its_workspace_s_tombstone_is_refused_and_queues_nothing(
+    served, repository
+):
+    database, workspace_id, _stores = served
+    _tombstone("runtime", database, repository, workspace_id)
+    with database.session(workspace_id) as connection, pytest.raises(TombstonedError):
+        _queue(connection, workspace_id, uuid.uuid4())
+    held = repository.connection.execute(
+        "select (select count(*) from job where workspace_id=%s and kind=%s) as jobs, "
+        "(select count(*) from creature_draft where workspace_id=%s) as drafts",
+        (workspace_id, drafts.JOB_KIND, workspace_id),
+    ).fetchone()
+    assert (held["jobs"], held["drafts"]) == (0, 0)
+
+
+def test_a_draft_asked_while_its_workspace_s_tombstone_is_written_waits_and_is_refused(
+    served, repository
+):
+    database, workspace_id, _stores = served
+    outcome: list[str] = []
+
+    def ask() -> None:
+        with database.session(workspace_id) as connection:
+            try:
+                _queue(connection, workspace_id, uuid.uuid4())
+            except TombstonedError:
+                outcome.append("refused")
+            else:
+                outcome.append("queued")
+
+    asking = threading.Thread(target=ask)
+    with database.session(workspace_id) as erasing, erasing.transaction():
+        erasing.execute(
+            "insert into tombstone (workspace_id, scope, requested_by, reason) "
+            "values (%s, 'workspace', %s, 'the person left')",
+            (workspace_id, uuid.uuid4()),
+        )
+        asking.start()
+        # The draft waits on the workspace's lock, which the tombstone's transaction holds.
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and not outcome:
+            waiting = repository.connection.execute(
+                "select count(*) as n from pg_locks where locktype='advisory' and not granted"
+            ).fetchone()["n"]
+            repository.connection.commit()
+            if waiting:
+                break
+            time.sleep(0.05)
+    asking.join(timeout=60)
+    assert outcome == ["refused"]
+    held = repository.connection.execute(
+        "select count(*) as n from job where workspace_id=%s and kind=%s",
+        (workspace_id, drafts.JOB_KIND),
+    ).fetchone()
+    assert held["n"] == 0
 
 
 def test_a_worker_whose_draft_was_cancelled_while_it_drafted_keeps_nothing(

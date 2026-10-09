@@ -23,14 +23,19 @@ person reads the code's fixed sentence (:func:`refusal_sentence`), as a check's 
 quote the drafted label. A draft is queued only for a workspace a worker here serves, and at most
 :data:`MAX_OPEN_PER_ACTOR` unfinished and :data:`MAX_PER_ACTOR_HOUR` in an hour for any one
 requester, since each spends model calls. Only its requester reads a draft through the routes.
-Spending is keyed by the job, so a job taken again after a crash is admitted under the same key and
-the authority refuses what already happened rather than paying for it twice.
+Spending is keyed by the job, so under durable spending a job taken again after a crash is admitted
+under the same key and the authority refuses what already happened rather than paying for it
+twice; under process spending the key is not checked, and a job taken again may pay again, once
+for each of its at most :data:`MAXIMUM_CLAIMS` claims. Every API process of an installation carries
+the same creature settings, since each ends at startup the drafts of the workspaces it knows but
+does not serve (:func:`end_unserved`).
 
 A workspace tombstone ends the workspace's unfinished drafts in its own transaction (a trigger on
 ``tombstone``): each queued or running job is cancelled with its words blanked, and its draft ends
-``cancelled``, failure ``workspace_deleted``. A worker that drafted for a cancelled draft reads that
-its claim is gone and keeps nothing; a call it already sent finishes at the provider, and its answer
-is discarded.
+``cancelled``, failure ``workspace_deleted``. A draft is asked under the workspace's lock and never
+once that tombstone is written (:func:`create_draft`). A worker that drafted for a cancelled draft
+reads that its claim is gone and keeps nothing; a call it already sent finishes at the provider, and
+its answer is discarded.
 """
 
 from __future__ import annotations
@@ -50,7 +55,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from exulanica.env import env_name
-from exulanica.errors import ExulanicaError
+from exulanica.errors import ExulanicaError, TombstonedError
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ModelError
 from exulanica.models.manifest import Role
@@ -68,6 +73,7 @@ from exulanica.store.base import ContentAddressedStore
 from exulanica.things.bodies import body_grammar
 from exulanica.things.lines import check_line
 from exulanica.world.thing_store import STORE_CODES, ThingStore, ThingStoreRefused
+from exulanica.world.workspace_lock import lock_workspace
 
 __all__ = [
     "CANCELLATION_CODES",
@@ -344,7 +350,10 @@ def create_draft(
     words with every saved name replaced and ``placeholders`` the record of those replacements,
     which the job hands the boundary. ``offered_to`` is every workspace a worker here takes
     creature drafts for; a draft for any other is :class:`DraftNotOffered`, so its words are never
-    queued for nobody."""
+    queued for nobody. The workspace's lock is taken first, and a workspace being erased (a
+    ``workspace`` tombstone) drafts nothing more (:class:`TombstonedError`): a draft and its
+    workspace's tombstone never interleave, so the tombstone either finds the draft committed and
+    cancels it, or the draft finds the tombstone and no job holds the words."""
     if workspace_id not in offered_to:
         raise DraftNotOffered("creatures are not drafted for this workspace here")
     check_line(words, maximum=MAX_WORDS_CHARACTERS)
@@ -355,6 +364,14 @@ def create_draft(
         "placeholders": {str(entity): label for entity, label in placeholders.items()},
     }
     with connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
+        lock_workspace(connection, workspace_id)
+        if cursor.execute(
+            "select 1 from tombstone where workspace_id=%s and scope='workspace' limit 1",
+            (workspace_id,),
+        ).fetchone():
+            raise TombstonedError(
+                "tombstoned: the workspace has been deleted and drafts nothing more"
+            )
         cursor.execute(
             "select pg_advisory_xact_lock(hashtextextended(%s, %s))",
             (f"{workspace_id}:{owner_actor_id}", _REQUESTER_LOCK_SEED),
