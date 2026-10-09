@@ -973,10 +973,22 @@ def standing_exclusions(document: dict[str, Any]) -> frozenset[str]:
             excluded.add(edge["from_node_id"])
         if edge["from_node_id"] in places:
             excluded.add(edge["to_node_id"])
+    if spacing <= 0:
+        return frozenset(excluded)
+    # Each place is filed in a grid of cells one spacing wide, so a node is held to the places in
+    # the cells about its own: a place nearer than one spacing is never more than one cell away.
+    cells: dict[tuple[int, int], list[tuple[int, int]]] = {}
+    for place in places:
+        px, pz = positions[place]
+        cells.setdefault((px // spacing, pz // spacing), []).append((px, pz))
+    reach = spacing**2
     for node, (x, z) in positions.items():
+        cx, cz = x // spacing, z // spacing
         if any(
-            (x - positions[place][0]) ** 2 + (z - positions[place][1]) ** 2 < spacing**2
-            for place in places
+            (x - px) ** 2 + (z - pz) ** 2 < reach
+            for dx in (-1, 0, 1)
+            for dz in (-1, 0, 1)
+            for px, pz in cells.get((cx + dx, cz + dz), ())
         ):
             excluded.add(node)
     return frozenset(excluded)
@@ -1749,7 +1761,26 @@ def advance_purposeful_society(
 
     The state is a purposeful society's or a society of things' (``PLANNED_FAMILIES``), and every
     event it records names the state's own engine.
+
+    What depends on an input alone (its navigation's digest, which every route records, its
+    walking graph, its routes and its standing exclusions) is built once for the minute: under the
+    caller's :func:`input_memo` where one holds (a comparison's run and its replay), else under
+    the minute's own. The values are the same either way, so the minute is too.
     """
+    if _MEMO.get() is not None:
+        return _advance_purposeful_society(state, seed, inputs, goal_policy=goal_policy)
+    with input_memo(len(inputs)):
+        return _advance_purposeful_society(state, seed, inputs, goal_policy=goal_policy)
+
+
+def _advance_purposeful_society(
+    state: dict[str, Any],
+    seed: str,
+    inputs: list[dict[str, Any]],
+    *,
+    goal_policy: dict[str, dict[str, Any]] | None = None,
+) -> tuple[dict[str, Any], tuple[SocietyEvent, ...]]:
+    """:func:`advance_purposeful_society`'s minute, under an input memo."""
     _require(
         society_engine(state["profile"]).state_family in PLANNED_FAMILIES,
         "unsupported purposeful profile",
