@@ -224,7 +224,10 @@ the reviewed catalog.
 ## Routes
 
 Every route requires a session for the workspace. Writes need `admission.write` and reads
-`world.read`.
+`world.read`. A browser session's `POST /workspace-assets` needs its account's creator grant as
+well, which the operator gives with `exulanica-creator-grant`
+([deployment 5.1.4](deployment.md#514-browser-accounts)); without it the answer is 403
+`creator_grant_required`, before the body is read. A bearer token's `admission.write` is enough.
 
 | Route | Answers |
 | --- | --- |

@@ -68,6 +68,18 @@ world or read a tile's bytes until somebody grants it here deliberately. An expl
 header never falls back to the cookie. Rejected alternative: letting a browser session inherit whatever a bearer token would hold,
 which has no source to inherit from.
 
+**A creator's upload needs the operator's grant.** DECISION. Every account that signs in owns a
+workspace and so holds `admission.write`. The two routes that admit a creator's bytes into a
+workspace, `POST /workspace-style-packs` and `POST /workspace-assets` (`CREATOR_GRANT_ROUTES`), also
+ask a browser session whether its account holds the creator grant, read where the session is
+resolved, on the account role. Without it the floor answers 403 `creator_grant_required` before the
+workspace's upload share is claimed or a byte of the body is read. The operator grants and revokes
+it with `exulanica-creator-grant` ([deployment](deployment.md#514-browser-accounts)), and a
+restore from an older backup keeps a newer revocation. A bearer token holds what its grant names
+and needs no creator grant, because the token is the operator's own grant to a program. Rejected
+alternative: a permission of its own in the vocabulary, which every token that uploads would then
+have to be issued again with.
+
 **Routes that reach a model** require `model.invoke` beside their read or write permission:
 `/selection/plan`, `/selection/ask`, `/selection/appearance` and `/selection/environment`. The test
 that finds them reads each endpoint's source for all three markers. `POST

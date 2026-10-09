@@ -119,6 +119,7 @@ boundary ([security floor](security-floor.md)).
 | Generated-tile worker | `exulanica-generated-tile-worker` | Bakes the tiles generated towns wait for, in a Node process, and publishes each as the tile role | 9.1 |
 | Arrival worlds | `exulanica-arrival-worlds` | Makes the installation's arrival worlds in its own workspace, so their tiles are baked before a visitor's copy | 8.2 |
 | Tile faults | `exulanica-tile-fault` | Lists faulted baked tiles, and records the owner's decision to serve one's stored first bake | 9.1 |
+| Creator grants | `exulanica-creator-grant` | Grants and revokes the accounts whose browser sessions may upload a style pack or a workspace asset, and lists them | 5.1.4 |
 | Ingest | `exulanica-ingest` | Ingests a directory of photographs from the command line | 5.2.6 |
 | Catalog preflight | `exulanica-preflight` | Checks every model identifier against its provider's catalog | 5.2.7, 7 |
 | Restore | `python -m exulanica.orchestration.restore` | Replays every withdrawal into a restored database | 5.2.8 |
@@ -346,7 +347,7 @@ Where a table says "no default", the process refuses to start without the settin
 | `EXULANICA_GOOGLE_CLIENT_ID`, `EXULANICA_GOOGLE_CLIENT_SECRET`, `EXULANICA_GOOGLE_CALLBACK_URI`, `EXULANICA_GOOGLE_RETURN_URIS`, `EXULANICA_ACCOUNT_BROWSER_ORIGINS`, `EXULANICA_ACCOUNT_DATABASE_URL` | Google sign-in and browser accounts (5.1.4) | Optional, all six or none: a partial set stops startup |
 | `EXULANICA_SOCIETY_CONTROL_WORKSPACES`, `EXULANICA_SOCIETY_TICK_INTERVAL_MS`, `EXULANICA_SOCIETY_CONTROL_WORKER` | Society playback (5.1.5) | Playback is off by default |
 | `EXULANICA_API_THREADS`, `EXULANICA_API_REQUESTS`, `EXULANICA_API_UPLOADS`, `EXULANICA_API_STREAMS`, `EXULANICA_API_WORKSPACE_REQUESTS`, `EXULANICA_API_WORKSPACE_UPLOADS`, `EXULANICA_API_WORKSPACE_STREAMS`, `EXULANICA_API_DECODES`, `EXULANICA_INTAKE_QUEUED_JOBS` | How much work this process accepts at once (5.4) | 40, 24, 2, 128, 12, 1, 8, 2 and 4. A value that is not a whole number, is outside its bounds, gives a workspace more than its class, or leaves fewer than four threads beside the admitted requests stops startup with the setting named |
-| `EXULANICA_WORKSPACE_STYLE_PACK_UPLOADS` | Whether `POST /workspace-style-packs` takes a creator's style pack ([style pack contract](style-pack-contract.md#11-a-workspaces-own-packs)) | `off`: the route answers 503 `style_pack_uploads_off`. `on` turns uploads on; any other value stops startup. Keep it off wherever sign-in is open to everyone until the creator grant is built |
+| `EXULANICA_WORKSPACE_STYLE_PACK_UPLOADS` | Whether `POST /workspace-style-packs` takes a creator's style pack ([style pack contract](style-pack-contract.md#11-a-workspaces-own-packs)) | `off`: the route answers 503 `style_pack_uploads_off`. `on` turns uploads on; any other value stops startup. It switches every pack upload off at once. Where sign-in is open to everyone, a browser session still uploads only with its account's creator grant (5.1.4) |
 
 #### 5.1.1 The database roles
 
@@ -448,8 +449,8 @@ the fix is to update the pinned URLs as well as the allowlist. The callback and 
 require HTTPS; a plain HTTP preview is not a sign-in deployment.
 
 `GET /auth/google/start` begins sign-in, `GET /auth/google/callback` completes it,
-`GET /auth/session` returns the current membership and CSRF token, and `POST /auth/logout` revokes
-the cookie. Cookie-authenticated writes require the matching `X-CSRF-Token` and an exact permitted
+`GET /auth/session` returns the current membership, the CSRF token and whether the account holds
+the creator grant (`creator`), and `POST /auth/logout` revokes the cookie. Cookie-authenticated writes require the matching `X-CSRF-Token` and an exact permitted
 `Origin`. An explicit Authorization header uses the bearer path and never falls back to a cookie.
 Without accounts configured, the account endpoints answer 503. With accounts configured,
 `EXULANICA_API_TOKENS` may be absent, but a token setting that is present and invalid is still
@@ -464,6 +465,27 @@ configured workspaces with a fresh account-role query for active owner and guest
 accounts are configured; a browser session is never taken as membership authority. Account
 revocation keeps historical attribution. Full account-data deletion, invitations and retention
 cleanup are not built. Access logs must redact callback query values, cookies and CSRF tokens.
+
+**The creator grant.** Every account that signs in owns a workspace, and an owner holds
+`admission.write`. A browser session uploads a style pack (`POST /workspace-style-packs`) or a
+workspace asset (`POST /workspace-assets`) only while its account also holds the creator grant,
+which the operator gives and revokes; without it the route answers 403 `creator_grant_required`
+before it reads the body. A bearer token's `admission.write` is enough, because the token is the
+operator's own grant to a program. The person reads their account's id as `user_id` at
+`GET /auth/session`, and the operator runs, with `EXULANICA_ACCOUNT_DATABASE_URL`:
+
+```bash
+uv run exulanica-creator-grant grant --user <user id> --reason <code> --operator <code>
+uv run exulanica-creator-grant revoke --user <user id> --reason <code> --operator <code>
+uv run exulanica-creator-grant list
+```
+
+A reason and an operator are codes (lower case letters, digits and `_`; and `:._-` for an
+operator), never words. Each answers JSON: `recorded` is false when the account already held, or
+already lacked, the grant. `list` names every account holding it, with the grant that holds it. The
+grants are events in `account_creator_grant_event`, an account table the application roles cannot
+read, and a revocation is carried across a restore from an older backup (the withdrawal catalog's
+`creator_grant` kind, 5.2.8).
 
 **The guest entry.** A host may also admit visitors with no account of their own (migration 0139),
 with or without Google sign-in beside it:
@@ -758,7 +780,9 @@ source or restored database, or any role with `BYPASSRLS`), `EXULANICA_PURGE_DAT
 and the content store. The API then reads `EXULANICA_RESTORE_STATE_PATH` (5.1). The procedure is
 [ADR-0019](adr/0019-offline-restore-tombstone-replay.md)'s, and
 [ADR-0026](adr/0026-a-restore-carries-every-withdrawal.md) states which withdrawals a restore
-carries.
+carries. A checkpoint records the identity of the withdrawal catalog it was sealed under
+(`exulanica/deletion/withdrawals.v2.json`), and a replay under another catalog refuses it, so after
+deploying a version whose catalog differs, seal or export a fresh checkpoint.
 
 | Action | What it does |
 | --- | --- |

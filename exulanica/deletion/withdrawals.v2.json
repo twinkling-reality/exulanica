@@ -120,6 +120,17 @@
       "workspace": null
     },
     {
+      "kind": "creator_grant",
+      "table": "account_creator_grant_event",
+      "shape": "event",
+      "note": "The operator revoking an account's creator grant: its browser sessions upload no style pack or workspace asset until the operator grants it again. Each account's grants and revocations alternate in one chain, so the first revocation a restored chain lacks follows the grant it ends.",
+      "identity": ["event_id"],
+      "withdrawn": {"column": "kind", "in": ["revoke"]},
+      "workspace": null,
+      "ends": {"table": "account_creator_grant_event", "columns": ["user_id"]},
+      "order": "sequence"
+    },
+    {
       "kind": "place_name_right",
       "table": "place_name_right_event",
       "shape": "event",

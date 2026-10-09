@@ -194,6 +194,9 @@ def _session_view(
         "expires_at": account.expires_at,
         "csrf_token": account.csrf_token,
         "role": account.role,
+        # Whether a style pack or workspace asset upload from this session is let through: the
+        # operator's creator grant (exulanica-creator-grant).
+        "creator": account.creator,
     }
     if account.role == "guest":
         workspace = account.session.workspace_id

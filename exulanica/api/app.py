@@ -81,7 +81,11 @@ from exulanica.api.admission import (
 from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.api.body_limit import BodyLimit, BodyTooLarge
 from exulanica.api.dependencies import authorise_route
-from exulanica.api.permissions import PermissionRefused, require_complete_declaration
+from exulanica.api.permissions import (
+    CreatorGrantRequired,
+    PermissionRefused,
+    require_complete_declaration,
+)
 from exulanica.api.quotas import TileQuotaExceeded, TileQuotaUndeclared
 from exulanica.api.routes import (
     accounts,
@@ -572,6 +576,12 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         # 404 on an id-addressed route and 403 elsewhere, decided in exulanica.api.permissions
         # from the route template alone, so the answer cannot depend on whether the id exists.
         return _problem(exc.status, exc.code, exc.detail)
+
+    @app.exception_handler(CreatorGrantRequired)
+    async def _creator_grant(_request: Request, exc: CreatorGrantRequired) -> JSONResponse:
+        # A browser session whose account holds no creator grant, on a route that admits a
+        # creator's bytes; none of those routes names an id, so a 403 tells nothing exists.
+        return _problem(exc.status, exc.code, str(exc))
 
     @app.exception_handler(InsufficientPrivilege)
     async def _database_privilege(request: Request, exc: InsufficientPrivilege) -> JSONResponse:

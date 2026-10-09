@@ -191,6 +191,10 @@ exulanica-arrival-worlds = "exulanica.world.arrival_worlds:main"
 # The owner's recorded decision to serve a faulted tile's stored first bake (migration 0144); it
 # never changes or deletes the stored tile.
 exulanica-tile-fault = "exulanica.world.tile_faults:main"
+# `uv run exulanica-creator-grant grant|revoke --user <uuid> --reason <code> --operator <code>`, or
+# `list`. The operator's grant of the accounts whose browser sessions may upload a style pack or a
+# workspace asset; connects as the account role (EXULANICA_ACCOUNT_DATABASE_URL).
+exulanica-creator-grant = "exulanica.api.creator_grants:main"
 # `uv run exulanica-installation check|facts|backup|verify|maintenance|restore`. A complete
 # installation's profile facts, backup sets, unattended maintenance and declared crash recovery;
 # docs/deployment.md section 9 owns its settings and procedures.

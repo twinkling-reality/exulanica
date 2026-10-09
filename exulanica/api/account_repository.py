@@ -63,6 +63,11 @@ class AccountSession:
     expires_at: datetime
     #: The membership role the session is held in: ``owner`` (Google sign-in) or ``guest``.
     role: str = "owner"
+    #: Whether the account holds the operator's creator grant now: the newest event of its chain
+    #: in ``account_creator_grant_event`` is a grant. Read by :meth:`AccountRepository.session`
+    #: alone; a route that admits a creator's bytes asks it of a browser session
+    #: (:data:`exulanica.api.permissions.CREATOR_GRANT_ROUTES`).
+    creator: bool = False
 
 
 @dataclass(frozen=True)
@@ -297,7 +302,9 @@ class AccountRepository:
         digest = secret_digest(require_secret(token))
         row = self.connection.execute(
             "select s.user_id,s.workspace_id,s.csrf_token,s.expires_at,u.actor_id,"
-            "m.membership_role,s.seen_at "
+            "m.membership_role,s.seen_at,"
+            "coalesce((select g.kind='grant' from account_creator_grant_event g "
+            "where g.user_id=s.user_id order by g.sequence desc limit 1),false) creator "
             "from account_browser_session s join account_user u using(user_id) "
             "join account_membership m using(user_id,workspace_id) "
             "join account_workspace w using(workspace_id) where s.session_sha256=%s "
@@ -320,6 +327,7 @@ class AccountRepository:
             row["csrf_token"],
             row["expires_at"],
             row["membership_role"],
+            row["creator"],
         )
 
     def enter_guest(

@@ -24,6 +24,9 @@ ACCOUNT_TABLES = (
     # Migration 0139: a guest's entry, and each day's count of them.
     "account_guest_entry",
     "account_guest_day",
+    # The operator's creator grants and their revocations, which a browser session's upload needs
+    # (migration a_creator_uploads_only_under_the_operator_s_grant).
+    "account_creator_grant_event",
 )
 
 #: The tables migration 0058 made, which every database with accounts holds. A database

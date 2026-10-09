@@ -56,6 +56,14 @@ for an account membership and the migrations allow those two roles. That is a de
 the roles the database enforces, not a default: a role added to the latest check fails
 ``tests/test_route_permissions.py`` until it is given a grant of its own here.
 
+**A creator's upload needs the operator's grant as well.** Sign-in makes any Google identity the
+owner of a workspace, and an owner holds ``admission.write``, so a route that admits a creator's
+bytes into a workspace (:data:`CREATOR_GRANT_ROUTES`) also asks a browser session whether its
+account holds the creator grant, which the operator gives and revokes with
+``exulanica-creator-grant``; without it the route answers 403 ``creator_grant_required`` before
+its body is read. A bearer token is the operator's own grant to a program, so the permissions it
+names are enough there.
+
 **Consent withdrawal rides with consent.** ``POST /person-subjects/{subject_id}/consents`` records
 ``granted``, ``revoked`` and ``withdrawn`` alike, and ``/identity/subjects/unlink`` withdraws what
 ``/identity/subjects/link`` confirmed. Both sit under ``consent.write``, so a credential that may
@@ -95,6 +103,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ACCOUNT_OWNER_PERMISSIONS",
+    "CREATOR_GRANT_ROUTES",
     "GUEST_PERMISSIONS",
     "MEMBERSHIP_ROLE_PERMISSIONS",
     "ROUTE_RULES",
@@ -102,6 +111,7 @@ __all__ = [
     "SELF_CHARGING_TILE_ROUTES",
     "Authentication",
     "Channel",
+    "CreatorGrantRequired",
     "Permission",
     "PermissionRefused",
     "Public",
@@ -114,6 +124,7 @@ __all__ = [
     "record_refusal",
     "require",
     "require_complete_declaration",
+    "require_creator",
     "route_key",
     "rule_for",
     "stale_declarations",
@@ -315,6 +326,18 @@ GUEST_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
 #: widened by 0139).
 MEMBERSHIP_ROLE_PERMISSIONS: Final[Mapping[str, frozenset[Permission]]] = MappingProxyType(
     {"owner": ACCOUNT_OWNER_PERMISSIONS, "guest": GUEST_PERMISSIONS}
+)
+
+#: Routes that admit a creator's bytes into a workspace, each with what it admits. A browser
+#: session reaches one only while its account holds the operator's creator grant
+#: (:func:`require_creator`), beside the permissions the route declares; a bearer token's grant
+#: is enough. Each is a declared route that names no id, so its 403 says nothing about what exists
+#: (:func:`require_complete_declaration` holds both).
+CREATOR_GRANT_ROUTES: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
+    {
+        ("POST", "/workspace-style-packs"): "a creator's own style pack",
+        ("POST", "/workspace-assets"): "a creator's own 3D asset",
+    }
 )
 _LIBRARY_READ = _requires(_P.LIBRARY_READ)
 _LIBRARY_WRITE = _requires(_P.LIBRARY_WRITE)
@@ -979,6 +1002,29 @@ def require(
     return rule
 
 
+class CreatorGrantRequired(ExulanicaError):
+    """A browser session reached a route that admits a creator's bytes, and its account holds no
+    creator grant. The route never ran and read nothing of the body. Always a 403: no such route
+    names an id."""
+
+    status = 403
+    code = "creator_grant_required"
+
+
+def require_creator(creator: bool | None, method: str, path: str | None) -> None:
+    """Refuse a browser session whose account holds no creator grant on a creator's upload route.
+
+    ``creator`` is the account's grant for a browser session and None for a bearer token, which
+    holds what its grant names (:data:`CREATOR_GRANT_ROUTES`).
+    """
+    if creator is False and (method.upper(), path) in CREATOR_GRANT_ROUTES:
+        raise CreatorGrantRequired(
+            f"{method.upper()} {path} admits {CREATOR_GRANT_ROUTES[(method.upper(), path)]}, "
+            "which a browser session may upload only while its account holds the creator grant; "
+            "the operator grants it"
+        )
+
+
 def parse_permissions(raw: object, *, where: str) -> frozenset[Permission]:
     """A grant's permission list, validated, or a ``ValueError`` naming what is wrong.
 
@@ -1041,6 +1087,15 @@ def require_complete_declaration(app: object) -> int:
         problems.append(
             "these declarations name routes the application does not serve: "
             + ", ".join(f"{method} {path}" for method, path in stale)
+        )
+    if unheld := sorted(
+        key
+        for key in CREATOR_GRANT_ROUTES
+        if not isinstance(ROUTE_RULES.get(key), Requires) or addressed_by_id(key[1])
+    ):
+        problems.append(
+            "these creator grant routes are not declared routes that require a permission and "
+            "name no id: " + ", ".join(f"{method} {path}" for method, path in unheld)
         )
     if problems:
         raise RouteDeclarationError(" ".join(problems))

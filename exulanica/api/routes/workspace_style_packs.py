@@ -280,8 +280,8 @@ def _base_resolver(repository: WorkspaceStylePackRepository) -> Callable[[Mappin
 async def admit_workspace_style_pack(
     request: Request, session: CurrentSession, sessions: ScopedSessions
 ) -> JSONResponse:
-    # Off unless the installation turns uploads on (UPLOADS_SETTING): until the operator-held
-    # creator grant exists, no installation where sign-in is open may take a creator's pack.
+    # Off unless the installation turns uploads on (UPLOADS_SETTING), its switch for every pack
+    # upload. A browser session reached here only with its account's creator grant (the floor).
     try:
         if not _runtime(request).uploads:
             return _problem(

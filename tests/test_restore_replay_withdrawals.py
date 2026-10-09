@@ -23,6 +23,7 @@ import uuid
 
 import psycopg
 import pytest
+from exulanica.api import creator_grants
 from exulanica.api.account_repository import AccountRejected, AccountRepository, secret_digest
 from exulanica.canonical import canonical_json
 from exulanica.consent.training import TrainingTerms
@@ -684,6 +685,22 @@ def test_an_account_disabled_after_the_backup_stays_disabled(purged, commands, t
         purged, tmp_path, withdraw=lambda: accounts.disable_account(user), current=current
     )
     assert not _session_current(accounts, token), "disabling revoked its session too"
+
+
+def test_a_creator_grant_revoked_after_the_backup_stays_revoked(purged, commands, tmp_path):
+    """A revocation is written again, so a restore never hands a creator's uploads back."""
+    token, user = _signed_in(purged)
+    connection = purged.repository.connection
+    accounts = AccountRepository(connection)
+    assert creator_grants.grant(connection, user, reason="invited_creator", operator="ops")
+    assert not _through_a_restore(
+        purged,
+        tmp_path,
+        withdraw=lambda: creator_grants.revoke(
+            connection, user, reason="creator_left", operator="ops"
+        ),
+        current=lambda: accounts.session(token).creator,
+    )
 
 
 # -- the seal, a stale checkpoint and a checkpoint the restored database disagrees with ------

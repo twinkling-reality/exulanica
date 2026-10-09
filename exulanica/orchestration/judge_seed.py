@@ -164,6 +164,7 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     "account_workspace": "per-deployment account-owned workspace registry",
     "account_guest_entry": "per-deployment guest entry that made a guest's account",
     "account_guest_day": "per-deployment count of a day's guest entries",
+    "account_creator_grant_event": "per-deployment operator's grants of who may upload",
     # Cross-workspace match calibration, keyed on `predicate_id` and accumulated by whichever
     # deployment ran the matcher. Carrying one deployment's empirical bins into another would be
     # importing a confidence curve measured on a corpus the destination does not hold.
