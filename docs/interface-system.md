@@ -432,9 +432,10 @@ to the well", "Knight, give the sword to Traveller"; an activity's words are the
 and a step the server could not name fully shows no detail rather than half a sentence. A step asking
 a being is prepared again just before it is sent, because the world moves on every minute; while it
 must wait for the next minute (the server's wait codes, `WAIT_CODES` in
-`composition/companion-plan.ts`) its row shows Waiting and "At the world's next minute", or, while
-the world is paused, that the world is paused and how to move it on, for at most 90 seconds, after
-which the step is not sent and says so. A question the plan needs first is asked by code and, where
+`composition/companion-plan.ts`, held to the server's by a test) its row shows Waiting and "At the
+world's next minute", or "Waiting for a free place at the well." where every place there is taken this
+minute, or, while the world is paused, that it is paused and how to move it on, for at most 90
+seconds, after which the step is not sent and says so in the action's words. A question the plan needs first is asked by code and, where
 it differs, by slot ("Who is the other person?" for a give or take's other being).
 
 Every interactive control a driver needs carries a `data-action` name (`people.bring-in`,

@@ -34,19 +34,31 @@ import type {
 import { availability, actionSpec, refusalWords, type RefusalWords } from '../ui/actions/registry.js';
 import { PLAN_ACTIONS, plannedEntry, plannedRequest, stepAnswer } from '../ui/actions/planned.js';
 import { performPlanned, type ActionHost } from '../ui/actions/surfaces.js';
-import { plannedStepView, type PlanSheet, type PlanStepView } from '../ui/companion-plan.js';
+import { plannedStepView, thePlace, type PlanSheet, type PlanStepView } from '../ui/companion-plan.js';
 import { OBJECT_ROLE_LABELS, isObjectRole } from '../world-objects-api.js';
 import { PLAN_WAITED, PLAN_WORDS, planRefusalWords } from '../ui/words/companion-plan.js';
 
 /**
  * The codes a step asking one of the world's beings is prepared with while it must wait for the
  * world's next minute (`WAIT_CODES` in exulanica/selection/action_things.py): an input the world
- * has not taken in, or the being in the middle of something.
+ * has not taken in, the being in the middle of something, or the place it is asked to go full this
+ * minute (its places free up as visits end).
  */
-export const WAIT_CODES: ReadonlySet<string> = new Set(['society_input_queued', 'inhabitant_action_in_progress']);
+export const WAIT_CODES: ReadonlySet<string> = new Set(['society_input_queued', 'inhabitant_action_in_progress', 'destination_full']);
 /** How often such a step is prepared again while it waits, and for how long at most. */
 export const WAIT_POLL_MS = 2_000;
 export const WAIT_LIMIT_MS = 90_000;
+
+/**
+ * What a step waiting to be sent says it waits for: a free place where it asked to go, else the
+ * world's next minute; while the world is paused, how to move it on, whatever it waits for.
+ */
+function waitingWords(waiting: PlanStep, paused: boolean): string {
+  if (paused) return PLAN_WORDS.pausedMinute;
+  const place = waiting.titles['place'];
+  return waiting.code === 'destination_full' && place !== undefined
+    ? PLAN_WORDS.freePlace.replace('{place}', thePlace(place)) : PLAN_WORDS.nextMinute;
+}
 
 /** Where a sentence goes after the plan route has read it. */
 export type PlanRouting =
@@ -255,7 +267,7 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
           while (asking && again.outcome === 'plan' && again.steps[0]?.state === 'pending'
             && WAIT_CODES.has(again.steps[0].code ?? '') && waited < WAIT_LIMIT_MS) {
             deps.sheet.setStep(step.index, {
-              kind: 'waiting', when: deps.paused?.() === true ? PLAN_WORDS.pausedMinute : PLAN_WORDS.nextMinute,
+              kind: 'waiting', when: waitingWords(again.steps[0], deps.paused?.() === true),
             });
             await pause(WAIT_POLL_MS);
             waited += WAIT_POLL_MS;

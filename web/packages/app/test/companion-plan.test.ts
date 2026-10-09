@@ -12,7 +12,7 @@ import {
   type CompanionActionsClient,
 } from '../src/companion-actions-api.js';
 import { parseWorldCapabilities, type OperationDescriptors } from '../src/capabilities-api.js';
-import { appearanceWireFromPlan, mountCompanionPlans, type CompanionPlansDeps } from '../src/composition/companion-plan.js';
+import { appearanceWireFromPlan, mountCompanionPlans, WAIT_CODES, type CompanionPlansDeps } from '../src/composition/companion-plan.js';
 import type { PlannedRequest } from '../src/ui/actions/planned.js';
 import { ACTIONS } from '../src/ui/actions/registry.js';
 import type { ActionHost } from '../src/ui/actions/surfaces.js';
@@ -407,6 +407,40 @@ describe('a plan of things', () => {
     for (let i = 0; i < 50 && h.sheet.root.querySelector('[data-action="plan.close"]') === null; i += 1) await settle();
     expect(h.sent).toEqual([]);
     expect(h.sheet.root.querySelector('.companion-plan-step-held')?.textContent).toBe('Every place there is taken. Ask again when someone leaves.');
+  });
+
+  it('says a step waits for a free place where every place is taken, and names an unnamed place plainly', async () => {
+    const served = fixture('thing-direct-waiting') as { steps: Record<string, unknown>[] };
+    const full = (place: string) => ({ ...served, steps: [{ ...served.steps[0], code: 'destination_full',
+      titles: { subject: 'Knight', act: 'go_to', affordance: 'visit', place } }] });
+    const answers = [full('bakery at number 12'), full('a place'), fixture('thing-direct-plan')];
+    const h = harness({
+      plan: async () => fixture('thing-direct-plan'),
+      prepare: async () => answers.shift(),
+      outcome: { profile: 'exulanica.companion-action-outcome/v1', state: 'pending', steps: [], alternatives: [] },
+    });
+    await h.plans.route('send the knight to the bakery');
+    await confirmAndWait(h);
+    expect(h.whens).toEqual(['Waiting for a free place at the bakery at number 12.', 'Waiting for a free place at a place.']);
+    expect(stepStates(h.sheet)).toEqual(['done']);
+  });
+
+  it('waits on exactly the codes the server prepares a waiting step with', () => {
+    // exulanica/selection/action_things.py states them as one frozenset literal.
+    const python = readFileSync(`${repository}/exulanica/selection/action_things.py`, 'utf8');
+    const stated = /WAIT_CODES: Final = frozenset\(\s*\{([^}]*)\}\s*\)/u.exec(python)?.[1];
+    expect(stated).toBeDefined();
+    const codes = [...stated!.matchAll(/"([a-z_]+)"/gu)].map((match) => match[1]);
+    expect([...WAIT_CODES].sort()).toEqual(codes.sort());
+  });
+
+  it('titles a refusal said after a question as the plan, not as the question', () => {
+    const sheet = buildPlanSheet({ onConfirm: vi.fn(), onCancel: vi.fn(), onChoose: vi.fn(), onPlay: vi.fn() });
+    const served = fixture('thing-direct-plan') as Record<string, unknown>;
+    sheet.showClarification(parseActionPlan({ ...served, outcome: 'clarify', steps: [], clarification: {
+      code: 'place_required', step: 0, slot: null, candidates: [], actions: [] } }), 'go somewhere', (_v, title) => title);
+    sheet.say({ happened: 'There is no free room for it there.', next: 'Make some space, or ask to put it somewhere else.' });
+    expect(sheet.root.querySelector('h2, h3, .x-panel-title, [class*=title]')?.textContent).toBe('Check this plan');
   });
 
   it('sends nothing, and says why, when the world never moves on', async () => {

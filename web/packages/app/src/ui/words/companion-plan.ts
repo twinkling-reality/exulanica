@@ -30,6 +30,8 @@ export const PLAN_WORDS = Object.freeze({
   clarifyTitle: 'One question first',
   /** A step asking one of the world's beings, waiting for the minute that can take it. */
   nextMinute: 'At the world’s next minute',
+  /** A step asking a being to go where every place is taken this minute: `{place}` with its article. */
+  freePlace: 'Waiting for a free place at {place}.',
   /** The same step while the world is paused: it waits for the person to move the world on. */
   pausedMinute: 'At the world’s next minute: the world is paused, so play it or move it on a minute.',
 });

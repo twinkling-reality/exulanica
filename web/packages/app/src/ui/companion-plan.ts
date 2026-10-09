@@ -69,6 +69,14 @@ const PROGRESS_LOOK: Readonly<Record<StepProgress['kind'], { state: InterfaceSta
 };
 
 /**
+ * A place's served title with its article: "the well", "the bakery at number 12"; a title that
+ * already says one ("a place", the server's words for a place no one named) is kept as it is.
+ */
+export function thePlace(title: string): string {
+  return /^(a|an|the) /iu.test(title) ? title : `the ${title}`;
+}
+
+/**
  * A thing step's particulars in words, from the labels the server's reads gave it: "Knight, beside
  * the well", "Knight, go to the well", "Traveller, rest at the bench". An activity's words are the
  * catalog's (`society-activity-words.ts`), never restated.
@@ -90,7 +98,7 @@ export function thingDetail(step: PlanStep): string | null {
       .replace('{with}', titles['with'] ?? '');
   }
   if (step.action.operation === 'direct_thing' && titles['subject'] !== undefined && titles['place'] !== undefined) {
-    const place = `the ${titles['place']}`;
+    const place = thePlace(titles['place']);
     if (titles['act'] === 'go_to') return `${titles['subject']}, go to ${place}`;
     const activity = titles['affordance'];
     const words = activity !== undefined && isObjectActivity(activity)
@@ -205,6 +213,8 @@ export function buildPlanSheet(options: PlanSheetOptions): PlanSheet {
     },
     say(words) {
       rows.clear();
+      // What it says is the plan's answer, not a question, whatever was asked before it.
+      surface.title.textContent = PLAN_WORDS.title;
       const close = button({ label: PLAN_WORDS.close, onClick: options.onCancel });
       close.dataset['action'] = 'plan.close';
       surface.body.replaceChildren(el('p', { class: 'companion-plan-intro', role: 'status', text: `${words.happened} ${words.next}` }));
