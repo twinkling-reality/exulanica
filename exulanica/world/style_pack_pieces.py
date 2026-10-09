@@ -173,20 +173,23 @@ def hold_pieces(
 ) -> dict[str, int]:
     """Each piece held, in path order, to the canonical pack-piece profile and its family's budget:
     its file size, its triangles (a tiled family's limit scales with the variant's width, and a
-    second level of detail keeps at most its share of the first's) and its materials. Returns each
-    piece's triangles by path, or raises :class:`PieceOutOfBounds` for the first that fails."""
+    second level of detail keeps at most its share of the first's) and its materials. Every piece's
+    size is held in one pass before any piece is opened, so a far level sorting before its first
+    never opens the first unchecked. Returns each piece's triangles by path, or raises
+    :class:`PieceOutOfBounds` for the first that fails."""
+    data = {path: read(path) for path in sorted(pieces)}
+    for path, (family, _variant, _lod1) in sorted(pieces.items()):
+        if len(data[path]) > budgets[family].glb_bytes:
+            raise PieceOutOfBounds("over_budget", "a piece is over its family's file size", path)
     measured: dict[str, int] = {}
     for path, (family, variant, lod1) in sorted(pieces.items()):
-        data = read(path)
         budget = budgets[family]
-        if len(data) > budget.glb_bytes:
-            raise PieceOutOfBounds("over_budget", "a piece is over its family's file size", path)
-        profile = _profile(data, path)
+        profile = _profile(data[path], path)
         limit = budget.triangle_limit(variant["size_mm"][0])
         if lod1:
             first = measured.get(variant["file"])
             if first is None:
-                first = _profile(read(variant["file"]), variant["file"]).triangles
+                first = _profile(data[variant["file"]], variant["file"]).triangles
             limit = first * lod1_share_permille // 1000
         if profile.triangles > limit or profile.materials > budget.materials:
             raise PieceOutOfBounds(

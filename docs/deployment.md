@@ -487,6 +487,14 @@ grants are events in `account_creator_grant_event`, an account table the applica
 read, and a revocation is carried across a restore from an older backup (the withdrawal catalog's
 `creator_grant` kind, 5.2.8).
 
+The grant covers those two routes alone: photographs (`POST /intake`) and a world kind's document
+(`POST /worlds/kinds`) are not covered by it. A revoke stops new uploads only: what the account
+uploaded under the grant stays, and its owner may still prepare it, withdraw it or ask for it to be
+published. While a restore checkpoint is sealed, grant and revoke are refused (the command prints
+the database's refusal and exits 1). An export carries revocations only through its
+`covered_through`, so after a declared recovery from an export run again any revoke made inside the
+window the restore command printed, and check the result with `list`.
+
 **The guest entry.** A host may also admit visitors with no account of their own (migration 0139),
 with or without Google sign-in beside it:
 

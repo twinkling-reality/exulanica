@@ -31,7 +31,7 @@ import psycopg
 import pytest
 from exulanica.api import permissions
 from exulanica.api.account_repository import AccountSession
-from exulanica.api.admission import AdmissionSettings
+from exulanica.api.admission import CAPACITY_ROUTES, UPLOADS, AdmissionSettings
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import TokenDirectory, TokenNotAccepted, load_token_directory
 from exulanica.api.authorisation import TokenNotAccepted as _NotAccepted
@@ -394,6 +394,26 @@ def test_a_guest_holds_the_journey_and_nothing_else():
         Permission.LIBRARY_WRITE,
         Permission.DELETION_WRITE,
     } == GUEST_PERMISSIONS
+
+
+def test_every_upload_route_asks_for_the_creator_grant_or_says_why_not():
+    """An upload route is asked for the creator grant, or named with why it is not, so a new route
+    of the uploads class cannot reach a creator's bytes without a decision."""
+    uploads = {key for key, kind in CAPACITY_ROUTES.items() if kind == UPLOADS}
+    asked, exempt = set(permissions.CREATOR_GRANT_ROUTES), set(permissions.CREATOR_GRANT_EXEMPT)
+    assert uploads == asked | exempt
+    assert not asked & exempt
+    assert all(reason.strip() for reason in permissions.CREATOR_GRANT_EXEMPT.values())
+
+
+def test_only_an_explicit_yes_reaches_a_creator_s_upload_route():
+    """A bearer token passes as True; a browser session passes only while its account holds the
+    grant; anything else, a session read that yielded nothing included, is refused."""
+    for allowed in (False, None):
+        with pytest.raises(permissions.CreatorGrantRequired):
+            permissions.require_creator(allowed, "POST", "/workspace-assets")  # type: ignore[arg-type]
+    permissions.require_creator(True, "POST", "/workspace-assets")
+    permissions.require_creator(False, "POST", "/intake")
 
 
 def test_the_owner_grant_is_everything_but_tiles():

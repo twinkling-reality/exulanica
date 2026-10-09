@@ -389,12 +389,13 @@ refuses a workspace holding any style pack version, files or none, since they ne
 (`exulanica.workspace-style-pack-admission/v1`: the manifest's digest and size, the rights, own work
 or licensed under `CC0-1.0` or `CC-BY-4.0` with its attribution, the source the creator names and
 the statement they affirm), a `manifest` field holding the manifest's canonical bytes, and one file
-part per path the manifest lists, named by that path. It is off unless the installation sets
+part per path the manifest lists, named by that path. It needs `admission.write`, and a browser
+session needs its account's creator grant as well, which the operator gives with
+`exulanica-creator-grant` ([deployment 5.1.4](deployment.md#514-browser-accounts)); without it the
+answer is 403 `creator_grant_required`, before the body is read. A bearer token's `admission.write`
+is enough. Past those, it is off unless the installation sets
 `EXULANICA_WORKSPACE_STYLE_PACK_UPLOADS` to `on`, answering 503 `style_pack_uploads_off`
-otherwise. It needs `admission.write`, and a browser session needs its account's creator grant as
-well, which the operator gives with `exulanica-creator-grant`
-([deployment 5.1.4](deployment.md#514-browser-accounts)); without it the answer is 403
-`creator_grant_required`, before the body is read. A bearer token's `admission.write` is enough.
+otherwise.
 It joins the uploads admission class, and its body is bounded at 68,485,120 bytes. The route declares no form parameter,
 so the caller is authenticated, holds the permission and their workspace's upload share, and has
 the attempt counted before a byte of the body is read; and it holds no database connection while

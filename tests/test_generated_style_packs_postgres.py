@@ -25,20 +25,29 @@ and verdict, not how the generation worker came to write it.
 from __future__ import annotations
 
 import dataclasses
+import datetime as dt
 import hashlib
 import json
 import uuid
 from pathlib import Path
 
+import psycopg
 import pytest
 from exulanica.deletion import queue
 from exulanica.evidence.blob import BlobId
 from exulanica.generation.looks import GeneratedVariant, build_derived_look
-from exulanica.world.style_pack_checks import StylePackCheckWorker, colour_table, library_palettes
+from exulanica.world.style_pack_checks import (
+    StylePackCheckWorker,
+    check_version,
+    colour_table,
+    library_palettes,
+)
 from exulanica.world.style_pack_pieces import check_piece_profile
 from exulanica.world.style_packs import canonical_json, load_context, read_manifest
 from exulanica.world.workspace_style_packs import (
     GeneratedStylePackRefused,
+    PackBase,
+    PackFile,
     StylePackGeneratedNotOffered,
     StylePackQuotaExceeded,
     StylePackVersionRecord,
@@ -287,3 +296,99 @@ def test_a_generated_look_is_never_offered_to_the_shared_library(packs):
         repository.request_publish(
             record.manifest_sha256, licence_id="CC0-1.0", attribution=None, statement="ours"
         )
+
+
+def test_the_held_clause_is_served_by_its_index(packs):
+    [index] = packs.owner_rows(
+        "select indexdef from pg_indexes where schemaname = current_schema() "
+        "and indexname = 'piece_output_held_idx'"
+    )
+    assert "(workspace_id, piece_sha256) WHERE within" in index["indexdef"], index
+
+
+def test_a_generated_version_is_never_without_its_library_base(packs):
+    _output(packs)
+    record = _recorded(packs)
+    with (
+        packs.purged.database().session(packs.workspace_id) as owner,
+        pytest.raises(psycopg.errors.CheckViolation) as refused,
+        owner.transaction(),
+    ):
+        # The guards' triggers off: the table's own constraint is what refuses.
+        owner.execute("set local session_replication_role = replica")
+        owner.execute(
+            "update workspace_style_pack_version set base_source = null, base_pack_id = null, "
+            "  base_version = null, base_manifest_sha256 = null "
+            "where workspace_id = %s and manifest_sha256 = %s",
+            (packs.workspace_id, record.manifest_sha256),
+        )
+    assert refused.value.diag.constraint_name == "generated_ids_are_generated_versions"
+
+
+class _CountedPieces:
+    """A stand-in repository holding one generated version's files, whose store counts its reads."""
+
+    def __init__(self, files: list[PackFile]) -> None:
+        self.workspace_id = uuid.uuid4()
+        self._files = files
+        self.reads = 0
+
+    def files(self, _manifest_sha256: str) -> list[PackFile]:
+        return self._files
+
+    def store_for(self, _file: PackFile) -> _CountedPieces:
+        return self
+
+    def get(self, _blob: BlobId) -> bytes:
+        self.reads += 1
+        return PIECE
+
+
+def test_a_check_past_its_bound_reads_no_further_piece():
+    manifest, _content = _look()
+    document = json.loads(manifest)
+    base = document["base"]
+    [listed] = document["files"]
+    pieces = _CountedPieces(
+        [PackFile(listed["path"], DIGEST, len(PIECE), "model/gltf-binary", "generated_piece")]
+    )
+    record = StylePackVersionRecord(
+        manifest_sha256=hashlib.sha256(manifest).hexdigest(),
+        pack_id="generated.cozy-town",
+        version=1,
+        manifest_canonical=manifest,
+        manifest_byte_size=len(manifest),
+        rights_basis="licensed",
+        licence_id="CC0-1.0",
+        base=PackBase("library", base["pack_id"], base["version"], base["manifest_sha256"]),
+        file_count=1,
+        file_byte_size=len(PIECE),
+        preview_sha256=None,
+        declaration_sha256="0" * 64,
+        created_by=uuid.uuid4(),
+        created_at=dt.datetime.now(dt.UTC),
+        erased=False,
+        state="running",
+        failure_class=None,
+        failure_message=None,
+        attempts=1,
+        withdrawn=False,
+        origin="generated",
+    )
+    # The check starts at 0 s and every later reading of the clock is past its one-second bound.
+    readings = iter([0.0])
+    failure, message, _report = check_version(
+        pieces,  # type: ignore[arg-type]
+        None,  # type: ignore[arg-type]
+        record,
+        table=colour_table(ROOT),
+        library=library_palettes,
+        budgets=read_budgets(ROOT),
+        seconds=1,
+        clock=lambda: next(readings, 5.0),
+    )
+    assert (failure, message, pieces.reads) == (
+        "interrupted",
+        "the check ran past its 1 s bound",
+        0,
+    )

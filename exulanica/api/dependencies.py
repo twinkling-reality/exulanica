@@ -153,18 +153,23 @@ def _grant(request: Request, authorization: str | None) -> tuple[Session, frozen
 
 def _resolve(
     request: Request, authorization: str | None
-) -> tuple[Session, frozenset[Permission], bool | None]:
-    """:func:`_grant`, and for a browser session whether its account holds the creator grant,
-    read in the same lookup (None for a bearer token, whose grant is the operator's own)."""
+) -> tuple[Session, frozenset[Permission], bool]:
+    """:func:`_grant`, and whether the caller may make a creator's upload: a browser session while
+    its account holds the creator grant, read in the same lookup, and a bearer token always, its
+    grant being the operator's own (:func:`~exulanica.api.permissions.require_creator`)."""
     services = get_services(request)
     if authorization is None and services.accounts is not None:
         account = services.accounts.browser_session(request)
-        return account.session, MEMBERSHIP_ROLE_PERMISSIONS[account.role], account.creator
+        return (
+            account.session,
+            MEMBERSHIP_ROLE_PERMISSIONS[account.role],
+            account.creator is True,
+        )
     scheme, _, presented = (authorization or "").partition(" ")
     if scheme.lower() != "bearer" or not presented:
         raise TokenNotAccepted("expected an Authorization header of the form 'Bearer <token>'")
     session, held = services.tokens.grant_for(presented.strip())
-    return session, held, None
+    return session, held, True
 
 
 async def authorise_route(request: Request) -> None:
@@ -246,7 +251,7 @@ CurrentChannel = Annotated[ChannelSession, Depends(current_channel)]
 
 def _authorise(request: Request, path: str | None) -> None:
     """The half of :func:`authorise_route` that may reach a database, run in a worker thread."""
-    session, held, creator = _resolve(request, request.headers.get("authorization"))
+    session, held, creator_allowed = _resolve(request, request.headers.get("authorization"))
     services = get_services(request)
     try:
         rule = require(held, request.method, path)
@@ -260,7 +265,7 @@ def _authorise(request: Request, path: str | None) -> None:
             )
         raise
     # Before the workspace's share is claimed, so a refused upload holds no slot.
-    require_creator(creator, request.method, path)
+    require_creator(creator_allowed, request.method, path)
     claim_workspace(request.scope, session.workspace_id)
     charges_here = (request.method.upper(), path) not in SELF_CHARGING_TILE_ROUTES
     if (
@@ -287,11 +292,11 @@ def current_session(
     authorised = getattr(request.state, _AUTHORISED, None)
     if authorised is not None:
         return authorised
-    session, held, creator = _resolve(request, authorization)
+    session, held, creator_allowed = _resolve(request, authorization)
     path = _matched_path(request)
     if not _needs_no_credential(request, path):
         require(held, request.method, path)
-        require_creator(creator, request.method, path)
+        require_creator(creator_allowed, request.method, path)
     return session
 
 

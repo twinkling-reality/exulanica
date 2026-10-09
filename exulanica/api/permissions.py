@@ -103,6 +103,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ACCOUNT_OWNER_PERMISSIONS",
+    "CREATOR_GRANT_EXEMPT",
     "CREATOR_GRANT_ROUTES",
     "GUEST_PERMISSIONS",
     "MEMBERSHIP_ROLE_PERMISSIONS",
@@ -337,6 +338,19 @@ CREATOR_GRANT_ROUTES: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
     {
         ("POST", "/workspace-style-packs"): "a creator's own style pack",
         ("POST", "/workspace-assets"): "a creator's own 3D asset",
+    }
+)
+
+#: The routes of the uploads admission class that the creator grant does not cover, each with
+#: why. Every route of that class is in :data:`CREATOR_GRANT_ROUTES` or here
+#: (``tests/test_route_permissions.py``), so a new upload route is asked for the grant or named
+#: with its reason.
+CREATOR_GRANT_EXEMPT: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
+    {
+        ("POST", "/intake"): (
+            "a person's own photographs, admitted under intake.write and each held to its "
+            "consents before anything is drawn from it; not a creator's bytes for others to wear"
+        ),
     }
 )
 _LIBRARY_READ = _requires(_P.LIBRARY_READ)
@@ -1011,13 +1025,14 @@ class CreatorGrantRequired(ExulanicaError):
     code = "creator_grant_required"
 
 
-def require_creator(creator: bool | None, method: str, path: str | None) -> None:
-    """Refuse a browser session whose account holds no creator grant on a creator's upload route.
+def require_creator(allowed: bool, method: str, path: str | None) -> None:
+    """Refuse a caller not allowed a creator's upload on a creator's upload route.
 
-    ``creator`` is the account's grant for a browser session and None for a bearer token, which
-    holds what its grant names (:data:`CREATOR_GRANT_ROUTES`).
+    ``allowed`` is True for a bearer token, which holds what its grant names, and for a browser
+    session only while its account holds the creator grant (:data:`CREATOR_GRANT_ROUTES`).
+    Anything but True refuses, so a session read that yields nothing refuses too.
     """
-    if creator is False and (method.upper(), path) in CREATOR_GRANT_ROUTES:
+    if allowed is not True and (method.upper(), path) in CREATOR_GRANT_ROUTES:
         raise CreatorGrantRequired(
             f"{method.upper()} {path} admits {CREATOR_GRANT_ROUTES[(method.upper(), path)]}, "
             "which a browser session may upload only while its account holds the creator grant; "

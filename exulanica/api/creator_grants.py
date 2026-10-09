@@ -33,6 +33,9 @@ from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV
 
 __all__ = ["CreatorGrantRefused", "creators", "grant", "main", "revoke"]
 
+#: How long the command waits for the account database to answer before it says so.
+_CONNECT_SECONDS = 5
+
 _REASON = re.compile(r"[a-z][a-z0-9_]{0,63}")
 _OPERATOR = re.compile(r"[a-z0-9][a-z0-9:._-]{0,95}")
 
@@ -49,17 +52,18 @@ def _record(
     if _OPERATOR.fullmatch(operator) is None:
         raise CreatorGrantRefused("an operator is a code: lower case letters, digits and :._-")
     with connection.transaction():
+        # One account's events are written in turn, so two operators' commands for it never meet
+        # the chain's unique number. Taken first, before any read, so the second reads after the
+        # first has committed under any isolation level.
+        connection.execute(
+            "select pg_advisory_xact_lock(hashtextextended(%s,880059))",
+            (f"creator_grant:{user_id}",),
+        )
         if (
             connection.execute("select 1 from account_user where user_id=%s", (user_id,)).fetchone()
             is None
         ):
             raise CreatorGrantRefused(f"no account {user_id} is held here")
-        # One account's events are written in turn, so two operators' commands for it never meet
-        # the chain's unique number.
-        connection.execute(
-            "select pg_advisory_xact_lock(hashtextextended(%s,880059))",
-            (f"creator_grant:{user_id}",),
-        )
         last = connection.execute(
             "select sequence,kind from account_creator_grant_event where user_id=%s "
             "order by sequence desc limit 1",
@@ -138,17 +142,25 @@ def main(
     if not url:
         print(f"exulanica-creator-grant: {ACCOUNT_DATABASE_URL_ENV} is required", file=sys.stderr)
         return 2
-    with psycopg.connect(url, autocommit=True, row_factory=dict_row) as connection:
-        if args.command == "list":
-            document: Any = {"creators": creators(connection)}
-        else:
-            write = grant if args.command == "grant" else revoke
-            try:
+    try:
+        with psycopg.connect(
+            url, autocommit=True, row_factory=dict_row, connect_timeout=_CONNECT_SECONDS
+        ) as connection:
+            if args.command == "list":
+                document: Any = {"creators": creators(connection)}
+            else:
+                write = grant if args.command == "grant" else revoke
                 recorded = write(connection, args.user, reason=args.reason, operator=args.operator)
-            except CreatorGrantRefused as refused:
-                print(f"exulanica-creator-grant: {refused}", file=sys.stderr)
-                return 1
-            document = {"user_id": str(args.user), "kind": args.command, "recorded": recorded}
+                document = {"user_id": str(args.user), "kind": args.command, "recorded": recorded}
+    except CreatorGrantRefused as refused:
+        print(f"exulanica-creator-grant: {refused}", file=sys.stderr)
+        return 1
+    except psycopg.Error as error:
+        # The database's own refusal by its message: a sealed restore checkpoint refuses every
+        # grant event, and an account database that does not answer is said so.
+        message = (error.diag.message_primary if error.diag else None) or str(error)
+        print(f"exulanica-creator-grant: {message}", file=sys.stderr)
+        return 1
     print(json.dumps(document, sort_keys=True), file=output)
     return 0
 

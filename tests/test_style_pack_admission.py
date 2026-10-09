@@ -20,12 +20,15 @@ from exulanica.world import style_packs
 from exulanica.world.style_pack_admission import StylePackAdmissionRefused, admit
 from exulanica.world.style_pack_checks import colour_table
 from exulanica.world.style_pack_pieces import (
+    PieceOutOfBounds,
     StylePieceRefused,
     check_piece_profile,
+    hold_pieces,
+    piece_roles,
     read_palette_piece,
 )
 from exulanica.world.style_pack_preview import PreviewRefused, walk_preview
-from exulanica_pieces.budgets import read_budgets
+from exulanica_pieces.budgets import PieceBudget, read_budgets
 
 from style_pack_upload_support import COZY, Upload, jpeg, png, upload
 
@@ -335,3 +338,22 @@ def test_archives_are_bounded_per_process_and_one_per_workspace():
     assert slots.take(third) == "capacity_exhausted"
     slots.give_back(first)
     assert slots.take(third) is None
+
+
+def test_every_piece_s_size_is_held_before_any_piece_is_opened():
+    """A second level of detail sorting before its first never opens the first unchecked: the
+    oversize first level is refused by its size, not read by the profile."""
+    piece = (COZY / "pieces/tree.glb").read_bytes()
+    budget = PieceBudget(
+        triangles=3000,
+        triangles_per_metre=0,
+        materials=2,
+        texture_side_px=512,
+        glb_bytes=len(piece),
+    )
+    variant = {"file": "z_first.glb", "lod1": "a_far.glb", "size_mm": [1000, 1000, 1000]}
+    pieces = piece_roles({"modules": {"plant.default": {"variants": [variant]}}})
+    files = {"a_far.glb": piece, "z_first.glb": bytes(len(piece) + 1)}
+    with pytest.raises(PieceOutOfBounds) as refused:
+        hold_pieces(pieces, files.__getitem__, {"plant": budget}, 500)
+    assert (refused.value.code, refused.value.path) == ("over_budget", "z_first.glb")

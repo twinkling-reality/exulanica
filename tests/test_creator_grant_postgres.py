@@ -7,7 +7,12 @@ provider, on the account role a deployment provisions, with the operator's comma
     ``creator_grant_required``, while their bodies are still arriving, and nothing is written;
 *   once the operator grants it, the same owner's asset upload is admitted, and the style pack
     upload reaches the installation's switch; once the grant is revoked, refused again;
-*   a bearer token holding ``admission.write`` uploads with no grant at all.
+*   a bearer token holding ``admission.write`` uploads with no grant at all;
+*   with the installation's switch on, a granted pack upload passes it and is counted, where one
+    without the grant was counted nothing;
+*   an account's chain of grant events refuses a revoke first, a second grant, a gap, any change
+    and any deletion, a repeated grant records nothing, and two writers racing for one number meet
+    the unique key.
 
 The revocation's way across a restore is ``tests/test_restore_replay_withdrawals.py``'s.
 """
@@ -16,12 +21,15 @@ from __future__ import annotations
 
 import io
 import json
+import threading
+import time
 import uuid
 from dataclasses import dataclass
 from typing import Any
 
 import anyio
 import httpx2
+import psycopg
 import pytest
 from exulanica.api import creator_grants
 from exulanica.api.account_runtime import SESSION_COOKIE, AccountRuntime, GoogleOIDCProvider
@@ -34,6 +42,7 @@ from exulanica.store.namespaces import LocalWorkspaceStores
 from exulanica.world.workspace_assets import WorkspaceAssetRuntime
 from exulanica.world.workspace_style_packs import WorkspaceStylePackRuntime
 from fastapi.testclient import TestClient
+from psycopg.rows import dict_row
 
 from account_fixtures import FakeGoogle, google_config, production_shaped_allowlist
 from account_fixtures import account_role as account_role
@@ -92,8 +101,7 @@ class Site:
             }
 
 
-@pytest.fixture
-def site(repository, spine_schema, account_role, tmp_path):
+def _site(repository, spine_schema, account_role, tmp_path, *, uploads: bool) -> Site:
     _, scratch = spine_schema
     database = scratch_database(scratch)
     config = google_config()
@@ -124,14 +132,24 @@ def site(repository, spine_schema, account_role, tmp_path):
         model_client=None,
         accounts=runtime,
         workspace_assets=WorkspaceAssetRuntime(stores=LocalWorkspaceStores(tmp_path / "assets")),
-        # The installation's switch left off, as by default.
         workspace_style_packs=WorkspaceStylePackRuntime.over(
-            LocalWorkspaceStores(tmp_path / "packs")
+            LocalWorkspaceStores(tmp_path / "packs"), uploads=uploads
         ),
     )
     app = create_app(services, verify=False)
     client = TestClient(app, base_url=_ORIGIN, follow_redirects=False)
     return Site(app, client, database, account_role, fake, repository.workspace_id)
+
+
+@pytest.fixture
+def site(repository, spine_schema, account_role, tmp_path):
+    """The installation's switch for pack uploads left off, as by default."""
+    return _site(repository, spine_schema, account_role, tmp_path, uploads=False)
+
+
+@pytest.fixture
+def site_with_uploads(repository, spine_schema, account_role, tmp_path):
+    return _site(repository, spine_schema, account_role, tmp_path, uploads=True)
 
 
 def _held(site: Site, path: str, account: dict[str, Any]) -> Exchange:
@@ -210,3 +228,92 @@ def test_a_bearer_token_uploads_on_its_own_admission_write(site):
     admitted = site.upload_asset({"Authorization": f"Bearer {_TOKEN}"})
     assert admitted.status_code == 201, admitted.text
     assert site.rows(site.token_workspace)["workspace_asset"] == 1
+
+
+def test_with_uploads_on_a_granted_pack_upload_passes_the_switch_and_is_counted(site_with_uploads):
+    site = site_with_uploads
+    account = site.signed_in()
+    workspace = uuid.UUID(account["workspace_id"])
+    headers = {"Origin": _ORIGIN, "X-CSRF-Token": account["csrf_token"]}
+    refused = site.client.post("/workspace-style-packs", headers=headers, files={"x": b""})
+    assert (refused.status_code, refused.json()["code"]) == (403, "creator_grant_required")
+    assert site.rows(workspace)["workspace_style_pack_attempt_day"] == 0
+    site.operator(
+        "grant", "--user", account["user_id"], "--reason", "invited_creator", "--operator", "ops"
+    )
+    # Past the grant and the switch, the attempt is counted before the body is read; this body is
+    # no pack.
+    counted = site.client.post("/workspace-style-packs", headers=headers, files={"x": b""})
+    assert (counted.status_code, counted.json()["code"]) == (422, "invalid_style_pack_body")
+    assert site.rows(workspace)["workspace_style_pack_attempt_day"] == 1
+
+
+def _insert(connection: psycopg.Connection, user: uuid.UUID, sequence: int, kind: str) -> None:
+    connection.execute(
+        "insert into account_creator_grant_event "
+        "(event_id, user_id, sequence, kind, reason, operator) values (%s, %s, %s, %s, %s, %s)",
+        (uuid.uuid4(), user, sequence, kind, "test_case", "ops"),
+    )
+
+
+def _refused(connection: psycopg.Connection, statement: str, *parameters: object) -> str:
+    """The message the database refuses ``statement`` with, as a check violation."""
+    with pytest.raises(psycopg.errors.CheckViolation) as refused:
+        connection.execute(statement, parameters)
+    return refused.value.diag.message_primary or ""
+
+
+def test_an_account_s_grant_events_keep_their_chain(site):
+    user = uuid.UUID(site.signed_in()["user_id"])
+    table = "account_creator_grant_event"
+    insert = f"insert into {table} (event_id, user_id, sequence, kind, reason, operator) "
+    insert += "values (gen_random_uuid(), %s, %s, %s, 'test_case', 'ops')"
+    with psycopg.connect(site.account_role, autocommit=True, row_factory=dict_row) as accounts:
+        assert "alternate" in _refused(accounts, insert, user, 1, "revoke")
+        assert creator_grants.grant(accounts, user, reason="invited_creator", operator="ops")
+        assert not creator_grants.grant(accounts, user, reason="invited_creator", operator="ops")
+        assert "alternate" in _refused(accounts, insert, user, 2, "grant")
+        assert "alternate" in _refused(accounts, insert, user, 3, "revoke")
+        assert "immutable" in _refused(
+            accounts, f"update {table} set reason = 'changed' where user_id = %s", user
+        )
+        # The account role holds no delete at all; even the table's owner meets 0058's rule.
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            accounts.execute(f"delete from {table} where user_id = %s", (user,))
+    with psycopg.connect(site.database.url, autocommit=True) as owner:
+        assert "retained" in _refused(owner, f"delete from {table} where user_id = %s", user)
+    with psycopg.connect(site.account_role, autocommit=True, row_factory=dict_row) as accounts:
+        held = accounts.execute(
+            f"select sequence, kind from {table} where user_id = %s", (user,)
+        ).fetchall()
+        assert held == [{"sequence": 1, "kind": "grant"}]
+    # Two writers racing for the next number: the second waits on the first's key and is refused
+    # by it once the first commits, rather than both being recorded.
+    with (
+        psycopg.connect(site.account_role) as first,
+        psycopg.connect(site.account_role) as second,
+        psycopg.connect(site.database.url, autocommit=True) as watcher,
+    ):
+        _insert(first, user, 2, "revoke")
+        outcome: dict[str, BaseException] = {}
+
+        def race() -> None:
+            try:
+                _insert(second, user, 2, "revoke")
+                second.commit()
+            except psycopg.Error as error:
+                outcome["error"] = error
+                second.rollback()
+
+        racer = threading.Thread(target=race)
+        racer.start()
+        deadline = time.monotonic() + 10
+        while not watcher.execute(
+            "select 1 from pg_stat_activity where pid = %s and wait_event_type = 'Lock'",
+            (second.info.backend_pid,),
+        ).fetchone():
+            assert time.monotonic() < deadline, "the second writer never waited on the first"
+            time.sleep(0.05)
+        first.commit()
+        racer.join(10)
+        assert isinstance(outcome.get("error"), psycopg.errors.UniqueViolation), outcome

@@ -155,7 +155,14 @@ def check_version(
     report: dict[str, Any] = {"pieces": {}}
     read: dict[str, bytes] = {}
     if record.origin == "generated":
-        held = _hold_generated(repository, record, budgets or read_budgets(_TREE), read)
+        held = _hold_generated(
+            repository,
+            record,
+            budgets or read_budgets(_TREE),
+            read,
+            late=lambda: clock() - started > seconds,
+            seconds=seconds,
+        )
         if held is not None:
             return (*held, report)
     for file in repository.files(record.manifest_sha256):
@@ -198,11 +205,18 @@ class _Missing(Exception):
     """A piece's bytes are not in its store."""
 
 
+class _Late(Exception):
+    """The check ran past its time bound while it read the pieces."""
+
+
 def _hold_generated(
     repository: WorkspaceStylePackRepository,
     record: StylePackVersionRecord,
     budgets: PieceBudgets,
     read: dict[str, bytes],
+    *,
+    late: Callable[[], bool],
+    seconds: float,
 ) -> tuple[str, str] | None:
     """A generated version's pieces held to the profile and their families' budgets: None when every
     piece holds, else the failure class and what failed. Each piece read is kept in ``read``."""
@@ -211,6 +225,8 @@ def _hold_generated(
     files = {file.path: file for file in repository.files(record.manifest_sha256)}
 
     def fetch(path: str) -> bytes:
+        if late():
+            raise _Late
         file = files[path]
         try:
             data = repository.store_for(file).get(BlobId.from_hex(file.content_sha256))
@@ -226,6 +242,8 @@ def _hold_generated(
             budgets.families,
             budgets.lod1_share_permille,
         )
+    except _Late:
+        return "interrupted", f"the check ran past its {seconds:g} s bound"
     except _Missing as missing:
         return "interrupted", f"{missing}: its bytes are missing from their store"
     except PieceOutOfBounds as refused:

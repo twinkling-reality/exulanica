@@ -76,9 +76,13 @@ resolved, on the account role. Without it the floor answers 403 `creator_grant_r
 workspace's upload share is claimed or a byte of the body is read. The operator grants and revokes
 it with `exulanica-creator-grant` ([deployment](deployment.md#514-browser-accounts)), and a
 restore from an older backup keeps a newer revocation. A bearer token holds what its grant names
-and needs no creator grant, because the token is the operator's own grant to a program. Rejected
-alternative: a permission of its own in the vocabulary, which every token that uploads would then
-have to be issued again with.
+and needs no creator grant, because the token is the operator's own grant to a program. The grant
+covers those two routes and no other: a person's photographs (`POST /intake`, under `intake.write`
+and each person's consents) and a world kind's document (`POST /worlds/kinds`) are not covered by
+it. Every route of the uploads admission class is in `CREATOR_GRANT_ROUTES` or in
+`CREATOR_GRANT_EXEMPT` with its reason (`tests/test_route_permissions.py`), so a new upload route
+is asked for the grant or named. Rejected alternative: a permission of its own in the vocabulary,
+which every token that uploads would then have to be issued again with.
 
 **Routes that reach a model** require `model.invoke` beside their read or write permission:
 `/selection/plan`, `/selection/ask`, `/selection/appearance` and `/selection/environment`. The test
