@@ -308,6 +308,96 @@ def test_a_visitor_s_card_reads_what_came_across_by_its_arrival_in_its_world(doo
     }
 
 
+def _stored_manifest(world, society_id: str, arrival_id: str) -> str:
+    """The digest of the manifest an arrival into one society names, read from the door's rows."""
+    row = (
+        world["connection"]
+        .execute(
+            "select c.document->>'translation_manifest_sha256' as digest from door_crossing c "
+            "where c.workspace_id = %s and c.society_id = %s and c.crossing_id = %s",
+            (world["workspace"], uuid.UUID(society_id), uuid.UUID(arrival_id)),
+        )
+        .fetchone()
+    )
+    world["connection"].commit()
+    return row["digest"]
+
+
+def test_an_arrival_id_sent_into_two_versions_is_read_by_its_version(door, crossings):
+    """A bridge chooses its arrival ids and each society holds an id once, so one id sent into two
+    versions' societies of a world names two arrivals: a card names its version and reads its own;
+    with no version, an arrival its minute took answers before one it refused, though newer."""
+    world, society = _world(door)
+    client = door["client"]
+    scope = {"world_id": world["binding"].world_id}
+    _first_grant, channel = _grant(door)
+    assert _hello(door, channel).status_code == 200
+    arrival_id = str(uuid.uuid4())
+    assert _arrive(client, channel, arrival_id).status_code == 201
+    society = _step(client, world, society)
+    assert len(_visitors(society)) == 1
+
+    # A second version of the same world, holding a society of things and no gate: the same id
+    # sent there arrives in its society's crossings and its minute refuses it (no arrival place).
+    made = client.post(
+        "/world/versions",
+        headers=OWNER,
+        params=scope,
+        json={
+            "title": "the same world again",
+            "source_snapshot_id": str(world["binding"].source_snapshot_id),
+        },
+    )
+    assert made.status_code == 201, made.text
+    second = {
+        **world,
+        "binding": world["binding"].model_copy(
+            update={"version_id": uuid.UUID(made.json()["version_id"])}
+        ),
+    }
+    _place(client, second, "well", "well", 2, -4_000, 2_000)
+    other_society = _make_society(client, second)
+    _second_grant, other_channel = _grant(
+        {**door, "world": second}, key="visitors-0002", may_carry_in=False
+    )
+    assert _hello(door, other_channel).status_code == 200
+    assert _arrive(client, other_channel, arrival_id, carried=[]).status_code == 201
+    other_society = _step(client, second, other_society)
+    assert _visitors(other_society) == []
+    bound = (
+        world["connection"]
+        .execute(
+            "select disposition, reason from door_crossing_binding "
+            "where workspace_id = %s and society_id = %s and crossing_id = %s",
+            (world["workspace"], uuid.UUID(other_society["society_id"]), uuid.UUID(arrival_id)),
+        )
+        .fetchone()
+    )
+    world["connection"].commit()
+    assert (bound["disposition"], bound["reason"]) == ("refused", "no_arrival_place")
+
+    first = _stored_manifest(world, society["society_id"], arrival_id)
+    other = _stored_manifest(world, other_society["society_id"], arrival_id)
+    assert first != other  # the first carried a sword, the second nothing
+
+    def read(**version: str) -> Any:
+        answer = client.get(
+            f"/door/crossings/{arrival_id}/manifest", headers=OWNER, params={**scope, **version}
+        )
+        assert answer.status_code == 200, answer.text
+        return answer.json()["manifest_sha256"]
+
+    assert read(version_id=str(world["binding"].version_id)) == first
+    assert read(version_id=str(second["binding"].version_id)) == other
+    assert read() == first
+    elsewhere = client.get(
+        f"/door/crossings/{arrival_id}/manifest",
+        headers=OWNER,
+        params={**scope, "version_id": str(uuid.uuid4())},
+    )
+    assert (elsewhere.status_code, elsewhere.json()["code"]) == (404, "unknown_reference")
+
+
 def test_a_second_visitor_waits_for_room_and_an_unshipped_look_is_refused(door, crossings):
     world, society = _world(door)
     client = door["client"]

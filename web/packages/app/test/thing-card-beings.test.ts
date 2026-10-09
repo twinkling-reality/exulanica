@@ -235,14 +235,19 @@ describe('what came across with a visitor, on its card', () => {
     const shell = document.createElement('div');
     document.body.replaceChildren(shell);
     const asked: string[] = [];
+    const versions: string[] = [];
     const card = mountThingCard({
       selection: { decide: vi.fn(), models: () => null, openDecides: vi.fn() }, compare: null,
       shell, credentials: { baseUrl: 'https://example.test', token: 't' },
       library: async () => library(), looks: async () => new Map(), card: async () => null,
-      manifest: async (world, arrival) => { asked.push(arrival); return readCrossingManifest(await manifest(world, arrival)); },
+      manifest: async (world, version, arrival) => {
+        asked.push(arrival);
+        versions.push(version);
+        return readCrossingManifest(await manifest(world, arrival));
+      },
     });
     shell.append(card.view.root);
-    return { card, root: card.view.root, asked };
+    return { card, root: card.view.root, asked, versions };
   }
   const visitor = being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'arrival-1', decidedBy: 'program' } });
   const answer = {
@@ -273,6 +278,19 @@ describe('what came across with a visitor, on its card', () => {
     expect(asked).toEqual(['arrival-2']);
     expect(rowText(root, 'Came across')).toBe('Came acrossa steel sword is a sword herea player crosses as a travellerit crosses as a person of this world');
     expect(rowText(root, 'Stayed behind')).toBe('Stayed behindthe player\'s healththis world has no health');
+  });
+
+  it('reads a crossing in the version its visitor is in, so one arrival id in two versions is read for each', async () => {
+    const { card, asked, versions } = mountWith(async () => answer);
+    const inVersion = (versionId: string) => ({ ...visitor, world: { worldId: 'world:authored:saved', versionId } });
+    card.view.show('visitor-1', about(inVersion('version-a')));
+    await settle();
+    card.view.show('visitor-1', about(inVersion('version-b')));
+    await settle();
+    card.view.show('visitor-1', about(inVersion('version-a')));
+    await settle();
+    expect(asked).toEqual(['arrival-1', 'arrival-1']);
+    expect(versions).toEqual(['version-a', 'version-b']);
   });
 
   it('reads a visitor\'s crossing even when its kind and look were read for another card first', async () => {

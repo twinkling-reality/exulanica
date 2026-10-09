@@ -1,7 +1,7 @@
 /**
  * What came across with a visitor and what stayed behind, from its crossing's translation manifest
- * (`GET /door/crossings/{arrival_id}/manifest?world_id=`, the stored
- * `exulanica.translation-manifest/v2` byte for byte): each field the game's mapping accounted for,
+ * (`GET /door/crossings/{arrival_id}/manifest?world_id=&version_id=`, read in the version the card
+ * shows; the stored `exulanica.translation-manifest/v2` byte for byte): each field the game's mapping accounted for,
  * in the game's own words, with its reason in words wherever it did not cross exactly. The page
  * holds no words of any game: every line comes from the manifest.
  *
@@ -33,7 +33,8 @@ export interface CrossingRows {
 
 export interface CrossingManifest {
   readonly manifestSha256: string;
-  readonly from: { readonly bridge: string; readonly label: string; readonly ai: boolean };
+  /** The bridge it came through; its label and whether an AI runs it are null where the deployment no longer declares it. */
+  readonly from: { readonly bridge: string; readonly label: string | null; readonly ai: boolean | null };
   /** Null for a manifest of the first profile, which states no words. */
   readonly rows: CrossingRows | null;
 }
@@ -87,19 +88,21 @@ export function readCrossingManifest(value: unknown): CrossingManifest {
   if (!/^[0-9a-f]{64}$/u.test(sha256)) invalid('digest');
   const from = object(body['from'], 'from');
   const ai = from['ai'];
-  if (typeof ai !== 'boolean') return invalid('from ai');
+  if (typeof ai !== 'boolean' && ai !== null) return invalid('from ai');
+  const label = from['label'] === null ? null : text(from['label'], 'label');
   return {
     manifestSha256: sha256,
-    from: { bridge: text(from['bridge'], 'bridge'), label: text(from['label'], 'label'), ai },
+    from: { bridge: text(from['bridge'], 'bridge'), label, ai },
     rows: crossingRows(body['manifest']),
   };
 }
 
 export async function fetchCrossingManifest(
-  access: Credentials, worldId: string, arrivalId: string, fetcher: typeof fetch = fetch,
+  access: Credentials, worldId: string, versionId: string, arrivalId: string, fetcher: typeof fetch = fetch,
 ): Promise<CrossingManifest> {
+  // The version names the society the visitor is in, since a bridge may send one arrival id into two versions.
   const response = await fetcher(
-    `${access.baseUrl}/door/crossings/${encodeURIComponent(arrivalId)}/manifest?world_id=${encodeURIComponent(worldId)}`,
+    `${access.baseUrl}/door/crossings/${encodeURIComponent(arrivalId)}/manifest?world_id=${encodeURIComponent(worldId)}&version_id=${encodeURIComponent(versionId)}`,
     { headers: accessHeaders(access), credentials: 'same-origin' },
   );
   if (!response.ok) throw new Error(`What came across with this visitor is unavailable: HTTP ${response.status}`);

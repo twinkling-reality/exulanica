@@ -177,13 +177,20 @@ class ArrivalManifest:
 
 
 def manifest_of_arrival(
-    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, arrival_id: uuid.UUID
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    arrival_id: uuid.UUID,
+    version_id: uuid.UUID | None = None,
 ) -> ArrivalManifest | None:
-    """The manifest of the arrival ``arrival_id`` into one of ``world_id``'s societies, or None
-    where no arrival of that id came into that world: a departure's id, another world's arrival
-    and an id nobody sent are all None. A bridge chooses its arrival ids and each society holds
-    one id once, so an id sent into two versions' societies of a world names two arrivals: the
-    newest answers. Read through the world's societies, so each is looked up by its key."""
+    """The manifest of the arrival ``arrival_id`` into one of ``world_id``'s societies (the one
+    ``version_id`` holds, when it is named), or None where no arrival of that id came into it: a
+    departure's id, another world's arrival and an id nobody sent are all None, while an arrival
+    its minute refused still has the manifest it was sent with. A bridge chooses its arrival ids
+    and each society holds one id once, so an id sent into two versions' societies of a world
+    names two arrivals: the version names its own, and with no version an arrival its minute did
+    not refuse answers before one it refused, then the newest. Read through the world's societies,
+    each by its key."""
     row = connection.execute(
         "select c.document->>'translation_manifest_sha256' as manifest_sha256, "
         "       c.document->'origin'->'by'->>'bridge' as bridge, m.document as manifest "
@@ -192,10 +199,13 @@ def manifest_of_arrival(
         " and c.society_id = s.society_id and c.crossing_id = %(a)s and c.kind = 'arrival' "
         "join door_manifest m on m.workspace_id = c.workspace_id "
         " and m.manifest_sha256 = c.document->>'translation_manifest_sha256' "
+        "left join door_crossing_binding b on b.workspace_id = c.workspace_id "
+        " and b.society_id = c.society_id and b.crossing_id = c.crossing_id "
         "where s.workspace_id = %(w)s and s.world_id = %(world)s "
-        "order by c.recorded_at desc, c.society_id "
+        "  and (%(v)s::uuid is null or s.version_id = %(v)s::uuid) "
+        "order by b.disposition is not distinct from 'refused', c.recorded_at desc, c.society_id "
         "limit 1",
-        {"w": workspace_id, "world": world_id, "a": arrival_id},
+        {"w": workspace_id, "world": world_id, "a": arrival_id, "v": version_id},
     ).fetchone()
     if row is None:
         return None

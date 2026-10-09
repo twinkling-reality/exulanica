@@ -314,8 +314,8 @@ export function mountThingCard(options: {
   readonly library?: () => Promise<ThingLibrary>;
   /** A version's look choices by placed id; read with the credentials when left out. */
   readonly looks?: (worldId: string, versionId: string) => Promise<ReadonlyMap<string, LookReference>>;
-  /** A visitor's crossing manifest; read with the credentials when left out. */
-  readonly manifest?: (worldId: string, arrivalId: string) => Promise<CrossingManifest>;
+  /** A visitor's crossing manifest, in the version it is in; read with the credentials when left out. */
+  readonly manifest?: (worldId: string, versionId: string, arrivalId: string) => Promise<CrossingManifest>;
   /** A thing's served card by its society id (null where none is served); read with the credentials when left out. */
   readonly card?: (worldId: string, versionId: string, thingId: string) => Promise<ThingCardRoute | null>;
   /** Choose the look a thing is drawn in; sent with the credentials when left out. */
@@ -332,7 +332,8 @@ export function mountThingCard(options: {
     return library;
   };
   const readLooks = options.looks ?? ((worldId: string, versionId: string) => fetchThingLooks(options.credentials, worldId, versionId));
-  const readManifest = options.manifest ?? ((worldId: string, arrivalId: string) => fetchCrossingManifest(options.credentials, worldId, arrivalId));
+  const readManifest = options.manifest
+    ?? ((worldId: string, versionId: string, arrivalId: string) => fetchCrossingManifest(options.credentials, worldId, versionId, arrivalId));
   const readCard = options.card ?? ((worldId: string, versionId: string, thingId: string) => fetchThingCardRoute(options.credentials, worldId, versionId, thingId));
   const sendLook = options.chooseLook
     ?? ((worldId: string, versionId: string, thingId: string, look: CardLookReference) => chooseThingLook(options.credentials, worldId, versionId, thingId, look));
@@ -354,16 +355,18 @@ export function mountThingCard(options: {
   };
   /** What the card shows now with a served card, so a look chosen on it reaches the right thing; redrawn after a swap. */
   let target: { readonly worldId: string; readonly versionId: string; readonly thingId: string; readonly redraw: () => void } | null = null;
-  /** Each crossing's rows by its arrival, read once (a manifest never changes); null where unreadable. */
+  /** Each crossing's rows by its version and arrival, read once (a manifest never changes); null where unreadable. */
   const manifests = new Map<string, CrossingRows | null>();
-  /** When a manifest read last failed, by arrival: asked again at most once a minute, quietly. */
+  /** When a manifest read last failed, by crossing: asked again at most once a minute, quietly. */
   const manifestFailedAt = new Map<string, number>();
   const manifestDue = (arrival: string): boolean => {
     if (!manifests.has(arrival)) return true;
     const failed = manifestFailedAt.get(arrival);
     return failed !== undefined && performance.now() - failed >= 60_000;
   };
-  const crossingOf = (being: SelectedBeing): string | null => (being.world === null ? null : being.crossing?.arrivalId ?? null);
+  /** A visitor's crossing by its version and arrival: a bridge may send one arrival id into two versions. */
+  const crossingOf = (being: SelectedBeing): string | null =>
+    (being.world === null || !being.crossing ? null : `${being.world.versionId}/${being.crossing.arrivalId}`);
 
   // A being's card is drawn again every minute, so what it reads is kept: kinds and looks by their
   // digests (they never change), the version's look choices for a minute at a time.
@@ -419,10 +422,11 @@ export function mountThingCard(options: {
     // What it holds is named by each held thing's own kind; one that cannot be read is left unnamed.
     await Promise.allSettled(being.holding.map((held) => readKind(held.kind)));
     const arrival = crossingOf(being);
-    if (arrival !== null && manifestDue(arrival) && being.world !== null) {
+    if (arrival !== null && manifestDue(arrival) && being.world !== null && being.crossing) {
       // A server without the route answers no manifest, and a first-profile manifest states no words:
       // no rows, and a failed read is asked again at most once a minute.
-      manifests.set(arrival, await readManifest(being.world.worldId, arrival).then((read) => {
+      const { worldId, versionId } = being.world;
+      manifests.set(arrival, await readManifest(worldId, versionId, being.crossing.arrivalId).then((read) => {
         manifestFailedAt.delete(arrival);
         return read.rows;
       }, () => {

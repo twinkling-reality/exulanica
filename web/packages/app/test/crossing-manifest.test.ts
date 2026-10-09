@@ -5,7 +5,7 @@
 // expected lines are that file's words.
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { crossingRows, readCrossingManifest } from '../src/crossing-manifest-api.js';
+import { crossingRows, fetchCrossingManifest, readCrossingManifest } from '../src/crossing-manifest-api.js';
 
 const repository = `${process.cwd()}/..`;
 
@@ -83,5 +83,23 @@ describe('a crossing\'s manifest on the card', () => {
     expect(read.from).toEqual({ bridge: 'blockgame', label: 'Block Game', ai: false });
     expect(read.rows?.stayed.length).toBe(mapping.never_crosses.length);
     expect(() => readCrossingManifest({ manifest_sha256: 'short', manifest, from: { bridge: 'blockgame', label: 'Block Game', ai: false } })).toThrow();
+  });
+
+  it('shows the rows of a visitor whose bridge the deployment no longer declares, with no words for the bridge', () => {
+    const read = readCrossingManifest({ manifest_sha256: 'c'.repeat(64), manifest, from: { bridge: 'blockgame', label: null, ai: null } });
+    expect(read.from).toEqual({ bridge: 'blockgame', label: null, ai: null });
+    expect(read.rows?.stayed.length).toBe(mapping.never_crosses.length);
+    expect(() => readCrossingManifest({ manifest_sha256: 'c'.repeat(64), manifest, from: { bridge: 'blockgame', label: null, ai: 'no' } })).toThrow();
+    expect(() => readCrossingManifest({ manifest_sha256: 'c'.repeat(64), manifest, from: { bridge: 'blockgame', label: '', ai: false } })).toThrow();
+  });
+
+  it('asks for the crossing in the version the card shows', async () => {
+    const asked: string[] = [];
+    const fetcher = (async (url: string) => {
+      asked.push(url);
+      return new Response(JSON.stringify({ manifest_sha256: 'c'.repeat(64), manifest, from: { bridge: 'blockgame', label: 'Block Game', ai: false } }));
+    }) as unknown as typeof fetch;
+    await fetchCrossingManifest({ baseUrl: 'https://example.test', token: 't' }, 'world:authored:a b', 'version-1', 'arrival-1', fetcher);
+    expect(asked).toEqual(['https://example.test/door/crossings/arrival-1/manifest?world_id=world%3Aauthored%3Aa%20b&version_id=version-1']);
   });
 });

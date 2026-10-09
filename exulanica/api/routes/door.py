@@ -58,6 +58,7 @@ from exulanica.api.dependencies import (
     CurrentChannel,
     CurrentSession,
     HeldPermissions,
+    ReadOnlyConnection,
     ScopedConnection,
     get_services,
 )
@@ -422,14 +423,16 @@ def crossing_manifest(
     request: Request,
     arrival_id: uuid.UUID,
     session: CurrentSession,
-    connection: ScopedConnection,
+    connection: ReadOnlyConnection,
     world_id: WorldId,
+    version_id: uuid.UUID | None = None,
 ) -> Any:
     """What came across with one visitor and what stayed behind: the translation manifest its
-    arrival into this world named, as the door kept it, with its digest, and the bridge it came
-    through in the words the deployment declares for it (null for a bridge it no longer
-    declares). One answer for an id that names no arrival into this world."""
-    found = manifest_of_arrival(connection, session.workspace_id, world_id, arrival_id)
+    arrival into this world (into the society ``version_id`` holds, when it is named) named, as
+    the door kept it, with its digest, and the bridge it came through in the words the
+    deployment declares for it (null for a bridge it no longer declares). One answer for an id
+    that names no arrival there."""
+    found = manifest_of_arrival(connection, session.workspace_id, world_id, arrival_id, version_id)
     if found is None:
         return _problem(404, "unknown_reference", "nothing at this address is available")
     directory = _bridges_of(request)

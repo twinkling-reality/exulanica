@@ -20754,7 +20754,7 @@
      "door"
     ],
     "summary": "Crossing Manifest",
-    "description": "What came across with one visitor and what stayed behind: the translation manifest its\narrival into this world named, as the door kept it, with its digest, and the bridge it came\nthrough in the words the deployment declares for it (null for a bridge it no longer\ndeclares). One answer for an id that names no arrival into this world.",
+    "description": "What came across with one visitor and what stayed behind: the translation manifest its\narrival into this world (into the society ``version_id`` holds, when it is named) named, as\nthe door kept it, with its digest, and the bridge it came through in the words the\ndeployment declares for it (null for a bridge it no longer declares). One answer for an id\nthat names no arrival there.",
     "operationId": "crossing_manifest_door_crossings__arrival_id__manifest_get",
     "parameters": [
      {
@@ -20776,6 +20776,23 @@
        "minLength": 1,
        "maxLength": 200,
        "title": "World Id"
+      }
+     },
+     {
+      "name": "version_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Version Id"
       }
      },
      {
