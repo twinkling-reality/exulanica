@@ -8602,7 +8602,7 @@
      "intake"
     ],
     "summary": "Upload photographs. Intake runs now; the model stages are queued.",
-    "description": "Admit what can be admitted, refuse the rest by name, and queue what remains.\n\nThe batch is opened before anything is read so a client that subscribes immediately finds\nsomething to subscribe to, and its declared size is written once, from what was accepted,\nrather than accumulated. A denominator that grows is one that moves under a fraction\nsomebody is already reading.\n\n**The batch is closed here only when there is nothing to queue.** Otherwise the worker\ncloses it, because a batch's terminal event tells a client to stop listening and it has to\ncome after all of the work. A request that closed the batch it opened would emit \"finished\"\nbefore the vision stage had started.",
+    "description": "Read the upload's body, then admit its photographs.\n\nThe route declares no form parameter, so the framework reads none of the body before the app's\ndependencies have authenticated the caller and claimed the workspace's upload share; and it\nopens its connection only once the body is in, so none is held while it arrives.",
     "operationId": "intake_intake_post",
     "parameters": [
      {
@@ -8622,16 +8622,6 @@
       }
      }
     ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "multipart/form-data": {
-       "schema": {
-        "$ref": "#/components/schemas/Body_intake_intake_post"
-       }
-      }
-     }
-    },
     "responses": {
      "202": {
       "description": "Successful Response",
@@ -8649,6 +8639,30 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "files"
+        ],
+        "properties": {
+         "files": {
+          "type": "array",
+          "items": {
+           "type": "string",
+           "contentMediaType": "application/octet-stream"
+          },
+          "title": "Files",
+          "description": "The photographs to ingest."
+         }
         }
        }
       }
@@ -23585,24 +23599,6 @@
     ],
     "title": "BindingBody",
     "description": "One enclosing scope's values, as a caller states them.\n\nDeliberately almost unvalidated here. ``level`` and every key of ``values`` are checked by\n:meth:`CascadeBinding.of` and the cascade, which refuse an unknown level, an unknown\nparameter, a level too fine for a parameter, a second binding at one level and a value outside\nits declared range, each naming the thing that was wrong. A pattern on this model would refuse\nfirst and name a field path instead, which is a worse answer to the same question."
-   },
-   "Body_intake_intake_post": {
-    "properties": {
-     "files": {
-      "items": {
-       "type": "string",
-       "contentMediaType": "application/octet-stream"
-      },
-      "type": "array",
-      "title": "Files",
-      "description": "The photographs to ingest."
-     }
-    },
-    "type": "object",
-    "required": [
-     "files"
-    ],
-    "title": "Body_intake_intake_post"
    },
    "BootstrapWorldBody": {
     "properties": {

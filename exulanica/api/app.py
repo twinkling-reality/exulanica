@@ -446,6 +446,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
             *door.BODY_LIMITS,
             *workspace_assets.BODY_LIMITS,
             *workspace_style_packs.BODY_LIMITS,
+            *intake.BODY_LIMITS,
         ),
     )
 

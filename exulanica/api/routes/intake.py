@@ -38,26 +38,35 @@ The eight checks, in the order a part meets them:
     anywhere, and which the database asks again inside the writing transaction.
 
 **What is bounded here and what is not.** Checks 3 to 5 bound what reaches the store and the
-database, which is what they are for. They do not bound the temporary file a multipart parser
-has already written by the time this function runs: the body is received and parsed before any
-route sees it. :mod:`exulanica.api.body_limit` refuses an over-large declared body ahead of that,
-and a request that declares no length at all is a reverse proxy's to bound.
+database, which is what they are for. The route reads its own body, after the caller is
+authenticated and the workspace's upload share claimed, and holds no database connection while it
+arrives; :mod:`exulanica.api.body_limit` bounds that body to :data:`INTAKE_BODY_MAXIMUM`
+(``BODY_LIMITS``), a declared length before a byte is read and an undeclared one as it is counted.
+A body the multipart parser cannot read is 422 ``invalid_intake_body``, and nothing is written.
 """
 
 from __future__ import annotations
 
 import time
 import uuid
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import PurePosixPath
-from typing import Annotated, Final, Literal
+from typing import Any, Final, Literal
 
-from fastapi import APIRouter, Depends, File, UploadFile
+import psycopg
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict
+from python_multipart.exceptions import ParseError
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile
+from starlette.exceptions import HTTPException
+from starlette.formparsers import MultiPartException
 
 from exulanica.api.admission import DerivativeQueueFull
-from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
+from exulanica.api.dependencies import CurrentSession, ScopedSessions, get_services
 from exulanica.api.services import Services
 from exulanica.corpus.decode import DecodeBusy, decoding
 from exulanica.ingest import derivative_queue
@@ -70,6 +79,7 @@ from exulanica.ingest.pipeline import (
 )
 from exulanica.ingest.report import IngestOutcome
 from exulanica.ingest.repository import IngestRepository
+from exulanica.selection.validation import Session
 
 router = APIRouter(prefix="/intake", tags=["intake"])
 
@@ -81,6 +91,37 @@ MAX_PARTS: Final = 200
 #: The most bytes one part may carry. Comfortably past any consumer camera's JPEG and past a
 #: 16-bit TIFF of the same frame.
 MAX_PART_BYTES: Final = 64 * 1024 * 1024
+
+#: The most an upload's body may hold, framing included. Refused before any of it is read
+#: (:mod:`exulanica.api.body_limit`), below the server-wide limit.
+INTAKE_BODY_MAXIMUM: Final = 256 * 1024 * 1024
+BODY_LIMITS: Final = (("POST", "/intake", INTAKE_BODY_MAXIMUM),)
+#: The upload's form, stated for the API description: the route reads its own body, so the
+#: framework derives none.
+_UPLOAD_FORM: Final[dict[str, Any]] = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "multipart/form-data": {
+                "schema": {
+                    "type": "object",
+                    "required": ["files"],
+                    "properties": {
+                        "files": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "contentMediaType": "application/octet-stream",
+                            },
+                            "title": "Files",
+                            "description": "The photographs to ingest.",
+                        }
+                    },
+                }
+            }
+        },
+    }
+}
 
 #: How many times the pipeline's stage registration is tried before the upload is answered
 #: ``busy``. The registration is an idempotent write to two tables migration 0041 guards, refused
@@ -153,12 +194,57 @@ class IntakeAccepted(BaseModel):
     status_code=202,
     response_model=IntakeAccepted,
     summary="Upload photographs. Intake runs now; the model stages are queued.",
+    openapi_extra=_UPLOAD_FORM,
 )
-def intake(
-    connection: ScopedConnection,
-    session: CurrentSession,
-    services: Annotated[Services, Depends(get_services)],
-    files: Annotated[list[UploadFile], File(description="The photographs to ingest.")],
+async def intake(
+    request: Request, session: CurrentSession, sessions: ScopedSessions
+) -> IntakeAccepted | JSONResponse:
+    """Read the upload's body, then admit its photographs.
+
+    The route declares no form parameter, so the framework reads none of the body before the app's
+    dependencies have authenticated the caller and claimed the workspace's upload share; and it
+    opens its connection only once the body is in, so none is held while it arrives.
+    """
+    try:
+        form = await request.form()
+    except (MultiPartException, ParseError):
+        # ParseError: a body the multipart parser cannot read, such as a part with more headers,
+        # or a longer header line, than it reads.
+        return _unreadable()
+    except HTTPException as error:
+        # Inside an app, Starlette answers its own parser's limits with a 400; any other answer
+        # passes on as it is.
+        if error.status_code != 400:
+            raise
+        return _unreadable()
+    try:
+        files = [part for part in form.getlist("files") if isinstance(part, UploadFile)]
+        if not files:
+            return _unreadable("an upload carries its photographs as file parts named files")
+        return await run_in_threadpool(_intake, sessions, session, get_services(request), files)
+    finally:
+        await form.close()
+
+
+def _unreadable(detail: str = "the multipart body is refused") -> JSONResponse:
+    return JSONResponse(status_code=422, content={"code": "invalid_intake_body", "detail": detail})
+
+
+def _intake(
+    sessions: Callable[[], AbstractContextManager[psycopg.Connection]],
+    session: Session,
+    services: Services,
+    files: list[UploadFile],
+) -> IntakeAccepted | JSONResponse:
+    with sessions() as connection:
+        return _admit(connection, session, services, files)
+
+
+def _admit(
+    connection: psycopg.Connection,
+    session: Session,
+    services: Services,
+    files: list[UploadFile],
 ) -> IntakeAccepted | JSONResponse:
     """Admit what can be admitted, refuse the rest by name, and queue what remains.
 

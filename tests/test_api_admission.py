@@ -247,6 +247,53 @@ def test_an_asset_upload_is_authenticated_and_held_to_its_share_before_its_body_
     assert read_when_answered == {"again": 0, "stranger": 0}
 
 
+def test_a_photograph_upload_is_authenticated_and_held_to_its_share_before_its_body_is_read(served):
+    # As an asset upload: the route reads its own body, so each refusal below is answered while its
+    # body is still arriving, which a route the framework parsed first could not do.
+    app = served.app(requests=2, workspace_requests=1, uploads=3, workspace_uploads=1, threads=9)
+    multipart = (b"content-type", b"multipart/form-data; boundary=held")
+    holder = Exchange(
+        app,
+        "POST",
+        "/intake",
+        headers=[*auth(FIRST_TOKEN), multipart],
+        body=[b"--held\r\n"],
+        hold_body=True,
+    )
+    again = Exchange(
+        app,
+        "POST",
+        "/intake",
+        headers=[*auth(FIRST_TOKEN), multipart],
+        body=[b"--held\r\n"],
+        hold_body=True,
+    )
+    stranger = Exchange(
+        app, "POST", "/intake", headers=[multipart], body=[b"--held\r\n"], hold_body=True
+    )
+    read_when_answered: dict[str, int] = {}
+
+    async def main() -> None:
+        with anyio.fail_after(10):
+            async with anyio.create_task_group() as group:
+                group.start_soon(holder.run)
+                await _until(lambda: holder._sent == 1)
+                group.start_soon(again.run)
+                group.start_soon(stranger.run)
+                await again.started.wait()
+                read_when_answered["again"] = again._sent
+                await stranger.started.wait()
+                read_when_answered["stranger"] = stranger._sent
+                for exchange in (holder, again, stranger):
+                    exchange.leave()
+
+    anyio.run(main)
+    assert (again.status, again.json()["code"]) == (429, "workspace_capacity_exhausted")
+    assert again.json()["capacity"] == "uploads"
+    assert stranger.status == 401
+    assert read_when_answered == {"again": 0, "stranger": 0}
+
+
 def test_an_asset_upload_over_its_routes_limit_is_refused_before_its_body_is_read(served):
     # The server-wide limit is sized for photographs; an asset upload's own is one asset and one
     # declaration at their bounds, with the framing around them.

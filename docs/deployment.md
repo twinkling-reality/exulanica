@@ -354,10 +354,12 @@ in section 5 names, and the bootstrap owner's connection belongs to `exulanica-d
 
 #### 5.1.2 The request body bound
 
-`POST /intake` is multipart, and the body is received and parsed before any route function and any
-dependency runs, so before authentication. Starlette's `max_part_size` bounds only the parts that
-are not files, and the route's own `MAX_PART_BYTES` check in `exulanica/api/routes/intake.py` reads
-a part that is already spooled, so neither bounds what reaches the disk.
+`POST /intake` is multipart. The route reads its own body, only after its caller is authenticated
+and its workspace's upload share is claimed, and holds no database connection while the body
+arrives; a body the multipart parser cannot read is 422 `invalid_intake_body`, with nothing
+written. Starlette's `max_part_size` bounds only the parts that are not files, and the route's own
+`MAX_PART_BYTES` check in `exulanica/api/routes/intake.py` reads a part that is already spooled,
+so neither bounds what reaches the disk.
 
 `exulanica/api/body_limit.py` is pure ASGI middleware upstream of all of that, and applies two
 bounds to `MAX_BODY_BYTES` (512 MiB):
@@ -368,7 +370,8 @@ bounds to `MAX_BODY_BYTES` (512 MiB):
   is one chunk rather than the whole body.
 
 A route may declare a lower bound beside itself (`BODY_LIMITS`), which the same middleware applies
-the same two ways. `POST /workspace-assets` holds one asset and one declaration at their bounds with
+the same two ways. `POST /intake` holds at most 256 MiB, framing included, so a person's
+photographs arrive in uploads of at most that size. `POST /workspace-assets` holds one asset and one declaration at their bounds with
 the framing around them, and reads its own body only after its caller is authenticated and its
 workspace's upload share is claimed ([workspace asset admission](workspace-asset-admission.md#admission)).
 `POST /workspace-style-packs` likewise holds one pack's files, manifest and declaration at their

@@ -30,6 +30,7 @@ import pytest
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.body_limit import MAX_BODY_BYTES
+from exulanica.api.routes import intake as intake_routes
 from exulanica.api.services import Services
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest import derivative_queue
@@ -473,14 +474,13 @@ def test_8_bytes_the_user_has_deleted_are_refused_and_no_byte_reaches_the_store(
 
 
 def test_an_over_large_declared_body_is_refused_before_any_route_sees_it(upload):
-    """The only bound that can be applied before a multipart parser writes to disk.
+    """The route's own bound, below the server-wide one, applied before a byte of the body is read.
 
-    A route runs after the body has been received and parsed, so the checks inside the route
-    bound what reaches the store and the database and cannot bound the temporary file. This one
-    is pure ASGI and runs ahead of routing. What it does NOT cover is a request that declares no
-    length at all, which is a reverse proxy's to bound; ``docs/deployment.md`` says so.
+    The checks inside the route bound what reaches the store and the database; this one bounds
+    what the multipart parser may spool, and is pure ASGI ahead of routing.
     """
-    declared = MAX_BODY_BYTES + 1
+    assert intake_routes.INTAKE_BODY_MAXIMUM < MAX_BODY_BYTES
+    declared = intake_routes.INTAKE_BODY_MAXIMUM + 1
     response = upload.client.post(
         "/intake",
         content=b"x" * 64,
@@ -510,7 +510,7 @@ def test_a_body_with_no_declared_length_is_bounded_by_counting_it(upload, monkey
     test pass with the counting removed.
     """
     limit = 256 * 1024
-    monkeypatch.setattr("exulanica.api.body_limit.MAX_BODY_BYTES", limit)
+    monkeypatch.setattr(intake_routes, "BODY_LIMITS", (("POST", "/intake", limit),))
     app = create_app(upload.client.app.state.services, verify=False)
 
     def endless():
@@ -533,6 +533,21 @@ def test_a_body_with_no_declared_length_is_bounded_by_counting_it(upload, monkey
         )
     assert response.status_code == 413, response.text
     assert response.json()["code"] == "body_too_large"
+    assert upload.rows("select batch_id from intake_batch") == []
+
+
+def test_a_body_the_multipart_parser_cannot_read_is_refused_with_nothing_written(upload):
+    """The route reads its own body: a body the parser refuses, or one with no photograph parts,
+    is 422 ``invalid_intake_body``, and no batch is opened."""
+    headers = {
+        "Authorization": f"Bearer {_TOKEN}",
+        "Content-Type": "multipart/form-data; boundary=b",
+    }
+    long_header = b"--b\r\nContent-Disposition: form-data; name=" + b"x" * 8192 + b"\r\n\r\n"
+    for body in (long_header + b"--b--\r\n", b"--b--\r\n"):
+        response = upload.client.post("/intake", content=body, headers=headers)
+        assert response.status_code == 422, response.text
+        assert response.json()["code"] == "invalid_intake_body"
     assert upload.rows("select batch_id from intake_batch") == []
 
 
