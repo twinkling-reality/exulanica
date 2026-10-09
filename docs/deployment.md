@@ -459,7 +459,10 @@ refused. Readiness checks account persistence without contacting Google.
 The browser checks `/auth/session` when no development token is built in. A signed-in session opens
 the owned workspace with cookie credentials and adds its in-memory CSRF value to writes; a
 signed-out session is offered Google sign-in; a host without account configuration shows the
-developer-token entry instead. An account starts with an empty workspace of its own, with no world
+developer-token entry instead. Both signed-out answers (401 `authentication_failed`, 503
+`account_unavailable`) carry `sign_in`, how a browser may come in: `google` (true or false) and
+`guest` (`code` when `POST /auth/guest` takes the entry code, `open` when it takes none, `off` when
+it admits nobody new); neither the code nor its digest is in it. An account starts with an empty workspace of its own, with no world
 copied into it and no link inferred to existing bearer data. Derivative workers combine their
 configured workspaces with a fresh account-role query for active owner and guest memberships when
 accounts are configured; a browser session is never taken as membership authority. Account

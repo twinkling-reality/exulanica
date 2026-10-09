@@ -202,6 +202,43 @@ def test_no_accounts_configured_answer_as_every_account_route_does(
     assert refused.json()["code"] == "account_unavailable"
 
 
+def test_a_signed_out_session_read_says_how_a_browser_may_come_in(
+    guest_app, account_role, spine_schema, tmp_path
+):
+    """The gate asks before anyone is signed in: Google or not, and the guest entry's mode, on the
+    401 and the 503 answers alike; the code itself and its digest are never in it."""
+    import dataclasses
+
+    for mode in ("code", "open"):
+        read = guest_app(mode).get("/auth/session")
+        assert read.status_code == 401
+        assert read.json()["code"] == "authentication_failed"
+        assert read.json()["sign_in"] == {"google": False, "guest": mode}
+        assert CODE not in read.text and hashlib.sha256(CODE.encode()).hexdigest() not in read.text
+    client = guest_app("open")
+    runtime = client.app.state.services.accounts
+    object.__setattr__(runtime, "guest", dataclasses.replace(runtime.guest, mode="closed"))
+    assert client.get("/auth/session").json()["sign_in"] == {"google": False, "guest": "off"}
+
+    _, scratch = spine_schema
+    app = FastAPI()
+    app.state.services = Services(
+        database=scratch_database(scratch),
+        readonly_database=scratch_database(scratch),
+        store=LocalContentAddressedStore(tmp_path / "none"),
+        tokens=TokenDirectory(sessions={}),
+        executor_shares_the_write_role=True,
+        model_client=None,
+        accounts=None,
+    )
+    app.include_router(accounts.router)
+    with TestClient(app, base_url=ORIGIN) as none:
+        unavailable = none.get("/auth/session")
+    assert unavailable.status_code == 503
+    assert unavailable.json()["code"] == "account_unavailable"
+    assert unavailable.json()["sign_in"] == {"google": False, "guest": "off"}
+
+
 def test_a_day_admits_its_stated_number_and_no_more_even_raced(account_role):
     """The day's count is taken in the entry's own transaction: seven entries racing on seven
     connections are admitted exactly up to the limit, set four above the day's count so far."""

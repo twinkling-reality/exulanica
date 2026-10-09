@@ -93,18 +93,34 @@ def _runtime(request: Request) -> AccountRuntime:
     return runtime
 
 
-def _failure(exc: Exception) -> JSONResponse:
+def _failure(exc: Exception, *, sign_in: dict[str, Any] | None = None) -> JSONResponse:
     unavailable = isinstance(exc, AccountUnavailable)
-    return JSONResponse(
-        status_code=503 if unavailable else 401,
-        content={
-            "code": "account_unavailable" if unavailable else "authentication_failed",
-            "detail": "Google sign-in is not configured or unavailable"
-            if unavailable
-            else "Sign-in or session was not accepted",
-        },
-        headers=_HEADERS,
-    )
+    content: dict[str, Any] = {
+        "code": "account_unavailable" if unavailable else "authentication_failed",
+        "detail": "Google sign-in is not configured or unavailable"
+        if unavailable
+        else "Sign-in or session was not accepted",
+    }
+    if sign_in is not None:
+        content["sign_in"] = sign_in
+    return JSONResponse(status_code=503 if unavailable else 401, content=content, headers=_HEADERS)
+
+
+def _sign_in(request: Request) -> dict[str, Any] | None:
+    """How a signed-out browser may come in here, from this server's own configuration: whether
+    Google sign-in is offered, and whether the guest entry takes a code (``code``), takes none
+    (``open``) or admits nobody new (``off``). Nothing in it is a secret: the code's digest is never
+    named. None when the configuration cannot be read, and the answer then leaves it out."""
+    try:
+        runtime = getattr(request.app.state.services, "accounts", None)
+        if runtime is None:
+            return {"google": False, "guest": "off"}
+        guest = runtime.guest
+        mode = "off" if guest is None or guest.mode == "closed" else str(guest.mode)
+        return {"google": runtime.config is not None, "guest": mode}
+    except Exception as exc:
+        _LOG.warning("this server's sign-in could not be read: %s", type(exc).__qualname__)
+        return None
 
 
 @router.get("/google/start")
@@ -216,6 +232,14 @@ def _session_view(
 
 @router.get("/session")
 def account_session(request: Request) -> Response:
+    """The browser's session: its account, workspace, role and CSRF token.
+
+    A signed-out browser is answered 401 (``authentication_failed``), and a server with no browser
+    accounts 503 (``account_unavailable``); both answers also carry ``sign_in``, how a browser may
+    come in here: ``google`` (true or false) and ``guest`` (``code`` when ``POST /auth/guest``
+    takes the entry code, ``open`` when it takes none, ``off`` when it admits nobody new). An
+    answer without ``sign_in`` is one whose server could not read its own configuration.
+    """
     try:
         account = _runtime(request).browser_session(request)
         return JSONResponse(
@@ -223,7 +247,7 @@ def account_session(request: Request) -> Response:
             headers=_HEADERS,
         )
     except (AccountRejected, AccountUnavailable, TokenNotAccepted) as exc:
-        return _failure(exc)
+        return _failure(exc, sign_in=_sign_in(request))
 
 
 class GuestEntryBody(BaseModel):

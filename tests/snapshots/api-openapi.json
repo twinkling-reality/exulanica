@@ -128,6 +128,7 @@
      "accounts"
     ],
     "summary": "Account Session",
+    "description": "The browser's session: its account, workspace, role and CSRF token.\n\nA signed-out browser is answered 401 (``authentication_failed``), and a server with no browser\naccounts 503 (``account_unavailable``); both answers also carry ``sign_in``, how a browser may\ncome in here: ``google`` (true or false) and ``guest`` (``code`` when ``POST /auth/guest``\ntakes the entry code, ``open`` when it takes none, ``off`` when it admits nobody new). An\nanswer without ``sign_in`` is one whose server could not read its own configuration.",
     "operationId": "account_session_auth_session_get",
     "responses": {
      "200": {
