@@ -197,13 +197,16 @@ AFFORDANCE_DIGESTS: Final = {1: "ca280468cc1051bd5f4dfadc72625c9b14be9a9fdeec840
 #: on with what is under way, say a line, leave) with the bounds on lines, and the fourth also what
 #: their hands do (pick up, put down, give, take) with the bound on those options; the fifth policy
 #: raises the context bound for what a being notices and remembers, beside a fifth action catalog
-#: that offers what the fourth does. Every request
+#: that offers what the fourth does; the sixth action catalog adds the person's own walk to a spot
+#: they choose, beside a sixth policy catalog that holds the fifth's bounds, and only a request a
+#: person answers for the being they play is asked under the pair (exulanica/world/society_play.py).
+#: Every request
 #: records the versions it was asked under, so every version any request names stays beside the
 #: next; the person role's registry entry states which versions a new request records, for each
 #: engine that states its own.
 _DECISION_CATALOG_VERSIONS: Final = {
-    "society-decision-action": (1, 2, 3, 4, 5),
-    "society-decision-policy": (1, 2, 3, 4, 5),
+    "society-decision-action": (1, 2, 3, 4, 5, 6),
+    "society-decision-policy": (1, 2, 3, 4, 5, 6),
 }
 #: How a person's hour is scored, and the protocol and seeds a comparison of models is made under.
 PERSON_SCORE_CATALOG: Final = "society-person-score"

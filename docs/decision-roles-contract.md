@@ -225,9 +225,11 @@ does not touch the owner's own choice naming one of those visitors, which decide
 changes it or the visitor leaves. Who decides for such a visitor is, in order: a choice naming
 it, the latest group choice of its grant where its kind allows that decider, and the routine. The
 bound on the people models run counts, in a society of things, only the beings still in it, and
-holds when a minute asks: for own choices of a model, in the order they were made, past it the
+holds when a minute asks: for own choices of a model, in the order they took effect, past it the
 routine deciding for the latest (`choice_over_bound`, as for a placed being an edit removed and an
-undo restored by its id), then for a group's visitors, in the order they came, past it the routine
+undo restored by its id, or a being given back after a person played it, whose model takes effect
+again only then, after any chosen while it was played), then for a group's visitors, in the order
+they came, past it the routine
 deciding for the rest (`travellers_over_bound`). The host and the Companion's plan read who decides
 by `SocietyModelChoiceRepository.deciding`, under the contract the society's engine is asked under,
 and the visitor's program is never asked. No visitor, whoever decides for it, may be handed to
@@ -239,9 +241,10 @@ person's role and the contract can ask by a verified mechanism; otherwise it is 
 `model_not_declared`, `model_not_offered`, `model_not_askable` and `too_many_model_people` (more than
 `model_people_maximum` people run by models at once; an outside program's subjects are not counted),
 and `409` for a society whose engine takes no choice (`engine_takes_no_model_choice`), a key reused
-for another choice (`choice_key_reused`) and somebody who came into the world from outside, whose own
+for another choice (`choice_key_reused`), somebody who came into the world from outside, whose own
 program decides for them (`decided_from_outside`: the owner may end its grant or send them away,
-never choose for them). An exact retry of a key is answered with the choice it recorded before
+never choose for them), and a being a person plays (`being_played`, the whole choice refused for
+any one of them, as the play routes refuse it). An exact retry of a key is answered with the choice it recorded before
 anything else is checked, so it still returns after its model stops being offered. Whether this
 process can reach the model's provider, or the program's door, is the host's to say, never a reason
 to refuse the choice: a choice outlives a deployment.
@@ -289,21 +292,42 @@ comparison's definition of everybody outside its group alike.
 
 Each minute the being is due. `GET .../{subject_id}/turn` reads what it is offered in the minute to
 come, from the stored state, as its request will offer it: each option's label, kind, the place or
-being it names and whether it takes a line; the line's bound; `played_by_you`; how many quiet
-minutes are left; and, where the society plays, when the minute is due and how long a minute is.
-`POST .../{subject_id}/answer` takes `{base_tick, label, line}` for that minute (202): an offered
-label, a line exactly where the option says something, held to the line rule, and no name the
-account holder saved in the line (`line_refused_by_rules`); a minute already played is refused
-`minute_passed` (409, with `current_tick`), and more than 12 answers from one account for one
-minute `too_many_answers` (429). Answers are kept in `world_society_person_answer`, appended under
-the workspace's row security, each naming the account that posted it, which no read shows. Only the
-person playing the being answers for it or gives it back (`not_played` for anybody else, with
-nothing kept), and a minute takes only that person's answer, never one another person posted
-before they took the being. An answer for a being that left the world is not found (404). A line a
-person types lives in their answer, the receipt's proposal, the said event and the society's state
-(each hearer's heard lines and the speaker's said lines), and no tombstone reaches those records
-yet: a workspace's erasure leaves them, as it leaves every society record, until a society-wide
-erasure lands, which it must before any installation but a rehearsal turns societies of things on.
+being it names and whether it takes a line or a spot (`takes_line`, `takes_point`); the line's bound;
+`played_by_you`; how many quiet minutes are left; and, where the society plays, when the minute is
+due and how long a minute is. `POST .../{subject_id}/answer` takes `{base_tick, label, line,
+point}` for that minute (202): an offered label, a line exactly where the option says something,
+held to the line rule, and no name the account holder saved in the line (`line_refused_by_rules`);
+a spot exactly where the option walks to one (`point_needed`, `point_not_taken`), on the walking
+ground (`not_walkable` where no node of the input's graph lies within its longest step). The line
+is read in Unicode normal form C and trimmed before the rule reads it, so a pasted line passes as
+it reads. A minute already played is refused `minute_passed` (409, with `current_tick`), and so is
+one that has already taken the being's answer, its request reserved, since nothing would read a
+later one (`current_tick` is then the answer's own minute, still to run). More than 12 answers
+from one account for one minute are refused `too_many_answers` (429, with `Retry-After`, the
+seconds until the next minute is due, where the society plays). Answers are kept in
+`world_society_person_answer`, appended under the workspace's row security, each naming the account
+that posted it, which no read shows. Only the person playing the being answers for it or gives it
+back (`not_played` for anybody else, with nothing kept), and a minute takes only that person's
+answer, never one another person posted before they took the being. An answer for a being that
+left the world is not found (404). A line a person types lives in their answer, the receipt's
+proposal, the said event and the society's state (each hearer's heard lines and the speaker's said
+lines), and no tombstone reaches those records yet: a workspace's erasure leaves them, as it leaves
+every society record, until a society-wide erasure lands, which it must before any installation but
+a rehearsal turns societies of things on.
+
+A played being's request, its turn and its answer are read under the person's own contract
+(`play_contract`): the engine's terms with the sixth action catalog
+(`assets/catalogs/society/society-decision-action.v6.json`), which adds `point`, "walk to a spot
+you choose", at the being's choice point wherever the routine has people stand and the being's
+kind does, and the sixth policy catalog, which holds the fifth's bounds, as action and policy
+versions go in pairs. No model's or outside program's request is asked under it, so none is
+offered the walk, and every stored request keeps the catalog it recorded. Its answer gives the spot
+as `point: [x_mm, z_mm]`; when the minute comes the host takes the open node nearest it (no
+activity's place, nobody standing at or headed to it, one the being can walk to, within the graph's
+longest step of the spot), and the receipt names that node (`node_id`, which a receipt states for
+this option alone); with none open near it the being carries on, `person_no_answer`. The minute
+applies the walk as a chosen stand at that node, refused `place_taken_this_minute` where somebody
+took it first, and its replay reads the node from the receipt.
 
 Before the minute the host reserves the being's request as for any decider, with the provider
 record `{kind: person, contract}`, and answers it at once from the latest answer for that minute
@@ -311,12 +335,19 @@ record `{kind: person, contract}`, and answers it at once from the latest answer
 it asks no model for as well. Every minute stepped answers it first, however it is stepped (the
 playback claim, a control's manual step or the step route all advance through
 `SocietyRepository.advance`), and a being the host answered already is left as it is, so a played
-being's minute never falls to its routine. Its receipt is an accepted one with `{kind: person,
-answer_sha256}`, or, where none was posted, its idle option (carrying on, else waiting),
-`person_no_answer`, with no digest; never the routine and never a model. A line carrying a name saved since it was posted is not said. Five such minutes in a row
-(`QUIET_MINUTES`) and the host gives the being back, `ended: player_left`. The minute applies the
-receipt as any decider's: its `decision_applied` event's `origin` and a line's `said` event's
-`decider` read `person`. The models read shows a played being's choice as `{"kind": "person"}` with
+being's minute never falls to its routine. A step refused for a stale base (409) may already have
+recorded its minute's played answers; the next step of that minute applies them. Its receipt is an
+accepted one with `{kind: person, answer_sha256}`, or, where none was posted, its idle option
+(carrying on, else waiting), `person_no_answer`, with no digest; never the routine and never a
+model. A line carrying a name saved since it was posted is not said: the being carries on,
+`person_line_withheld`, with no digest, a minute its person answered and so no quiet one. Five
+minutes in a row with no answer (`QUIET_MINUTES`) and the host gives the being back, `ended:
+player_left`. The minute applies the receipt as any decider's: its `decision_applied` event's
+`origin` and a line's `said` event's `decider` read `person`, and the Companion's line for the goal
+it set says the person playing them chose it, never a model, by that event's origin (as it says an
+outside program's choice is the program's); the inspector's words take the same phrase where the
+page says the being is played (`playedByPerson` in
+`web/packages/app/src/society-inhabitant-words.ts`). The models read shows a played being's choice as `{"kind": "person"}` with
 `played_by_you` and no `chosen_by`, and the thing card's decider as `{kind: person, played_by_you,
 may_change: false, refusal: being_played}`. Replay reads the receipts and needs no player.
 

@@ -17,7 +17,7 @@ from typing import Any, Final
 
 from psycopg.types.json import Jsonb
 
-from exulanica.world.deciders import EXTERNAL_REASONS, is_external, is_person_ask
+from exulanica.world.deciders import EXTERNAL_REASONS, PERSON_REASONS, is_external, is_person_ask
 from exulanica.world.decision_roles import (
     DecisionContract,
     DecisionRole,
@@ -389,8 +389,9 @@ class SocietyDecisionRepository:
                         "reason": "provider_configuration_changed",
                         "proposal": None,
                     }
-                elif not (played and result["reason"] == "person_no_answer"):
-                    # A played being that carried on, its person posting nothing, says so.
+                elif not (played and result["reason"] in PERSON_REASONS):
+                    # A played being that carried on, its person posting nothing or a line it
+                    # may not say, says so.
                     result = {**result, "reason": "validated_choice"}
         if result["status"] != "accepted":
             # Only an accepted answer is kept as a proposal; the rest record why none applies.

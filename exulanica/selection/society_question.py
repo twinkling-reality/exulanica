@@ -123,6 +123,13 @@ _CHOSEN_BY_THEIR_MODEL: Final = "chosen_by_their_model"
 #: What a decision event says a consumed receipt did when the minute acted on the model's choice
 #: (``_DISPOSITIONS`` in ``exulanica/world/society_model_decisions.py``).
 _APPLIED: Final = "applied"
+#: The words for a goal its decider chose (``chosen_by_their_model``) where no model decided it, by
+#: the ``origin`` the minute's one applied decision event records: a person playing the being, or
+#: the outside program that decides for it. Neither credits a model.
+_ORIGIN_PHRASES: Final = {
+    "person": "chosen_by_their_player",
+    "external": "chosen_by_their_program",
+}
 
 #: The outcomes and event kinds that record two people talking. Their lines say that they talked
 #: and with whom, and nothing more.
@@ -482,6 +489,9 @@ class SocietyScene:
     #: The name of the model a person's owner chose, by the minute and the person whose goal it
     #: picked, for each such goal whose model one decision event of that minute names.
     deciding_models: Mapping[tuple[int, str], str] = field(default_factory=dict)
+    #: Who decided, by the minute and the person whose goal it picked, where one applied decision
+    #: event of that minute names its origin: a model, an outside program or a person playing.
+    deciding_origins: Mapping[tuple[int, str], str] = field(default_factory=dict)
     #: For each placed object an event targets and the authored ``edit_seq`` its input followed,
     #: the version edit that last set that object at or before it, as ``(edit_seq, edit_id)``.
     object_edits: Mapping[tuple[str, int], tuple[int, uuid.UUID]] = field(default_factory=dict)
@@ -718,6 +728,7 @@ def read_scene(
         )
     if decisions:
         scene.deciding_models = _deciding_models(decisions, load_manifest())
+        scene.deciding_origins = _deciding_origins(decisions)
     scene.object_edits = _object_edits(
         connection,
         workspace_id,
@@ -753,6 +764,23 @@ def _deciding_models(
         if isinstance(model, Mapping) and isinstance(model.get("model_id"), str):
             named[key] = manifest.model_name(model["model_id"])
     return named
+
+
+def _deciding_origins(decisions: Iterable[Mapping[str, Any]]) -> dict[tuple[int, str], str]:
+    """Who decided for each minute and person, by the ``origin`` of that minute's one applied
+    decision event for them, as :func:`_deciding_models` reads the model: none, or several, leave
+    it out."""
+    applied: dict[tuple[int, str], list[Mapping[str, Any]]] = {}
+    for event in decisions:
+        document = event["document"]
+        if document.get("disposition") == _APPLIED:
+            key = (int(event["tick"]), str(event["subject_id"]))
+            applied.setdefault(key, []).append(document)
+    return {
+        key: documents[0]["origin"]
+        for key, documents in applied.items()
+        if len(documents) == 1 and isinstance(documents[0].get("origin"), str)
+    }
 
 
 def _authorized_events(
@@ -1118,15 +1146,24 @@ class _Builder:
             else self.catalog.words("phrase", "partner_unknown")
         )
         minute = self.minute(tick)
+        reason = str(document.get("reason") or "")
+        # A goal a person playing the being, or its outside program, chose credits no model.
+        origin = (
+            self.scene.deciding_origins.get((tick, subject))
+            if reason == _CHOSEN_BY_THEIR_MODEL
+            else None
+        )
         line = self.catalog.words("line", "event").format(
             minute=minute.text,
             subject=subject_label,
             outcome=outcome_words,
-            reason=self.catalog.reason(str(document.get("reason") or "")),
+            reason=self.catalog.words("phrase", _ORIGIN_PHRASES[origin])
+            if origin in _ORIGIN_PHRASES
+            else self.catalog.reason(reason),
         )
         deciding = (
             self.scene.deciding_models.get((tick, subject))
-            if document.get("reason") == _CHOSEN_BY_THEIR_MODEL
+            if reason == _CHOSEN_BY_THEIR_MODEL
             else None
         )
         if deciding is not None:

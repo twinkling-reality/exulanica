@@ -353,6 +353,8 @@ export function inhabitantWords(
    * only a target the input does not list as enabled is said to be gone.
    */
   listed: ReadonlyMap<string, SocietyPlaceName | null> | null = null,
+  /** Set where a person plays this being (`inhabitantWordsFrom`). */
+  playedByPerson = false,
 ): InhabitantWords {
   const named = new Map<string, string>();
   for (const row of rows) if (row.status.kind === 'usable') named.set(row.status.targetId, row.label);
@@ -364,6 +366,7 @@ export function inhabitantWords(
     null,
     decidedFromOutside,
     bridgeLabel,
+    playedByPerson,
   );
 }
 

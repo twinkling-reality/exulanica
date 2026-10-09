@@ -12,8 +12,18 @@ in a row is given back, ``player_left``.
 
 An answer is checked when it is posted as every decider's is: a label the minute offers, a line
 exactly where the option says something, held to the line rule, and no name the account holder saved
-in the line (``line_refused_by_rules``), checked again when the minute takes it. An answer names no
+in the line (``line_refused_by_rules``), checked again when the minute takes it: a line carrying a
+name saved meanwhile is not said, and the being carries on (``person_line_withheld``), which is no
+quiet minute. An answer is kept only while its minute can still take it: once the being's request
+for that minute is reserved, a later answer is refused ``minute_passed``. An answer names no
 account in its document; its row names the account that posted it, which no read shows.
+
+A played being's request is asked under :func:`play_contract`, whose action catalog also states the
+person's own walk to a spot they choose (``point``): no model's or outside program's request is ever
+asked under it, so none is offered that walk. Its answer gives the spot as ``point: [x_mm, z_mm]``
+on the walking ground; when the minute comes the host takes the open node nearest it
+(:func:`~exulanica.world.society_decision_contract.point_node`) and the receipt names that node, so
+the minute and its replay read the node and ask nobody.
 """
 
 from __future__ import annotations
@@ -28,11 +38,11 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from exulanica.canonical import canonical_json
+from exulanica.world.decision_roles import DecisionContract, DecisionRole
 from exulanica.world.society_engines import society_engine
 
 if TYPE_CHECKING:
     from exulanica.epistemics.saved_names import SavedName
-    from exulanica.world.decision_roles import DecisionContract, DecisionRole
     from exulanica.world.society_decision_repository import SocietyDecisionRepository
     from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
     from exulanica.world.society_repository import SocietyRepository
@@ -40,6 +50,7 @@ if TYPE_CHECKING:
 __all__ = [
     "ANSWERS_PER_MINUTE",
     "PERSON_ANSWER_PROFILE",
+    "PLAY_CATALOG_VERSION",
     "PLAY_REFUSALS",
     "QUIET_MINUTES",
     "PlayRefused",
@@ -47,6 +58,7 @@ __all__ = [
     "answer_played",
     "latest_answer",
     "person_result",
+    "play_contract",
     "quiet_minutes",
     "record_answer",
 ]
@@ -59,6 +71,10 @@ ANSWERS_PER_MINUTE: Final = 12
 #: How many minutes in a row a played being carries on with no answer from its person before the
 #: host gives it back (``player_left``).
 QUIET_MINUTES: Final = 5
+#: The contract catalogs' version that first states the person's own walk to a spot (``point``),
+#: its policy holding the fifth's bounds: a played being's requests are asked under it, or under a
+#: later one the engine's terms state.
+PLAY_CATALOG_VERSION: Final = 6
 #: Why an answer is refused, by the code the route answers with, its detail and its status.
 PLAY_REFUSALS: Final = {
     "minute_passed": (
@@ -70,6 +86,9 @@ PLAY_REFUSALS: Final = {
     "line_not_taken": ("that option says nothing: give no line", 422),
     "line_out_of_bounds": ("the line breaks the line rule", 422),
     "line_refused_by_rules": ("the line carries a name this workspace keeps", 422),
+    "point_needed": ("that option walks to a spot: give the point", 422),
+    "point_not_taken": ("that option walks to no spot: give no point", 422),
+    "not_walkable": ("the point is not on the ground anybody walks", 422),
     "too_many_answers": ("too many answers for this minute; the latest one counts", 429),
 }
 
@@ -87,8 +106,25 @@ class PlayRefused(ValueError):
         self.tick = tick
 
 
-def answer_document(subject_id: str, base_tick: int, label: str, line: str | None) -> dict:
-    """What an answer states: the being, the minute, the option's label and its line, if any."""
+def play_contract(role: DecisionRole, engine: str) -> DecisionContract:
+    """The contract a played being's request, its turn and its answer are read under: the engine's
+    terms, with the catalogs that state the person's own walk to a spot, never older than the
+    terms' own."""
+    versions = dict(role.terms(engine).versions)
+    for catalog in (role.action_catalog, role.policy_catalog):
+        versions[catalog] = max(int(versions[catalog]), PLAY_CATALOG_VERSION)
+    return role.contract(versions)
+
+
+def answer_document(
+    subject_id: str,
+    base_tick: int,
+    label: str,
+    line: str | None,
+    point: Sequence[int] | None = None,
+) -> dict:
+    """What an answer states: the being, the minute, the option's label, and its line or the spot
+    it walks to (``point``, ``[x_mm, z_mm]``), if any."""
     document: dict[str, Any] = {
         "profile": PERSON_ANSWER_PROFILE,
         "subject_id": subject_id,
@@ -97,6 +133,8 @@ def answer_document(subject_id: str, base_tick: int, label: str, line: str | Non
     }
     if line is not None:
         document["line"] = line
+    if point is not None:
+        document["point"] = [int(point[0]), int(point[1])]
     return document
 
 
@@ -114,13 +152,35 @@ def record_answer(
     document: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Keep ``document``, an answer checked by its route, as the latest for its being and minute.
-    Refused ``too_many_answers`` past :data:`ANSWERS_PER_MINUTE` from one account."""
+    Refused ``too_many_answers`` past :data:`ANSWERS_PER_MINUTE` from one account, and
+    ``minute_passed`` where its minute has been played or its being's request for that minute
+    is already reserved, so an answer is never kept that no minute will read.
+
+    The society's row is read under a share lock before the being's own lock: a minute reserving
+    the being's request waits for the answer and then reads it, and an answer after the
+    reservation finds it."""
     subject_id = uuid.UUID(document["subject_id"])
     base_tick = int(document["base_tick"])
     with connection.transaction():
+        society = connection.execute(
+            "select current_tick from world_society where workspace_id = %s and world_id = %s "
+            "and society_id = %s for share",
+            (workspace_id, world_id, society_id),
+        ).fetchone()
+        if society is None or society["current_tick"] != base_tick:
+            raise PlayRefused(
+                "minute_passed", tick=None if society is None else society["current_tick"]
+            )
         connection.execute(
             "select pg_advisory_xact_lock(hashtextextended(%s, 175001))", (str(subject_id),)
         )
+        reserved = connection.execute(
+            "select 1 from world_society_decision_request where workspace_id = %s "
+            "and society_id = %s and base_tick = %s and subject_id = %s",
+            (workspace_id, society_id, base_tick, subject_id),
+        ).fetchone()
+        if reserved is not None:
+            raise PlayRefused("minute_passed", tick=base_tick)
         held = connection.execute(
             "select coalesce(max(answer_seq), 0) as latest, "
             "count(*) filter (where account_id = %(a)s) as mine "
@@ -189,9 +249,9 @@ def answer_played(
     """Answer, for the coming minute, every present being a person plays in ``version_id``'s
     society: its request reserved as any decider's, and its receipt the latest answer its person
     posted for this minute, else its idle option (``person_no_answer``); a line carrying a name
-    saved since it was posted is not said. A being whose person posted nothing for
-    :data:`QUIET_MINUTES` minutes in a row is given back (``player_left``), by ``actor``, or with
-    none by that person.
+    saved since it was posted is not said (``person_line_withheld``). A being whose person posted
+    nothing for :data:`QUIET_MINUTES` minutes in a row is given back (``player_left``), by
+    ``actor``, or with none by that person.
 
     Nobody is asked and nothing is spent, so the decision host answers played beings before it
     asks any model and wherever it asks none, and every minute stepped answers them before it
@@ -268,11 +328,15 @@ def _answer_one(
     quiet minutes (:func:`answer_played`)."""
     from exulanica.epistemics.saved_names import recognised_spans
     from exulanica.world.society import asked_again_after_a_race
+    from exulanica.world.society_decision_contract import point_node
     from exulanica.world.society_model_choice_repository import ModelChoiceRefused
 
     tick = row["current_tick"]
     account = uuid.UUID(choice["decider"]["account_id"])
     line_kinds = tuple(getattr(role.adapter, "LINE_KINDS", ()))
+    point_kinds = tuple(getattr(role.adapter, "POINT_KINDS", ()))
+    # Asked under the person's own contract, which also offers the walk to a spot they choose.
+    asked = play_contract(role, row["engine_version"])
 
     def answer(_last_try: bool) -> dict[str, Any] | None:
         with connection.transaction():
@@ -285,8 +349,8 @@ def _answer_one(
                 subject_id=uuid.UUID(subject),
                 base_tick=tick,
                 base_state_sha256=row["state_sha256"],
-                contract=contract,
-                provider_config={"kind": "person", "contract": contract.binding()},
+                contract=asked,
+                provider_config={"kind": "person", "contract": asked.binding()},
             )
             request = reserved["request"]
             if not fresh or request is None:
@@ -300,13 +364,24 @@ def _answer_one(
                 tick,
                 account_id=account,
             )
-            if posted is not None and recognised_spans(posted.get("line") or "", names):
-                posted = None
+            # A line carrying a name saved since it was posted is not said.
+            withheld = posted is not None and bool(
+                recognised_spans(posted.get("line") or "", names)
+            )
+            node = None
+            if posted is not None and not withheld and "point" in posted:
+                # The open node nearest the spot, as the minute begins.
+                latest = society._chain(row)
+                document = society._inputs(row, [latest])[latest]
+                node = point_node(row["state"], document, subject, posted["point"])
             result = person_result(
                 request["context"],
                 role.idle_label(request["context"]),
                 posted,
                 line_kinds=line_kinds,
+                point_kinds=point_kinds,
+                node_id=node,
+                withheld=withheld,
             )
             if result is None:
                 return None
@@ -348,18 +423,33 @@ def person_result(
     answer: Mapping[str, Any] | None,
     *,
     line_kinds: Sequence[str],
+    point_kinds: Sequence[str] = (),
+    node_id: str | None = None,
+    withheld: bool = False,
 ) -> dict[str, Any] | None:
     """The receipt a played being's request takes: the person's ``answer`` where the request offers
     its label, else the idle option (``person_no_answer``); None where the request offers no idle
-    option either, which no request of a played being's role does."""
+    option either, which no request of a played being's role does. A walk to a spot takes the node
+    the host found for its point (``node_id``); with none open near it the being carries on, as
+    with no answer. An answer whose line carries a name saved since it was posted (``withheld``)
+    is not said: the idle option, ``person_line_withheld``, which is no quiet minute, since the
+    person answered."""
     options = context["options"]
-    if answer is not None:
+    if answer is not None and not withheld:
         option = next((held for held in options if held["label"] == answer["label"]), None)
         takes_line = option is not None and option.get("kind") in line_kinds
-        if option is not None and takes_line == ("line" in answer):
+        takes_point = option is not None and option.get("kind") in point_kinds
+        if (
+            option is not None
+            and takes_line == ("line" in answer)
+            and takes_point == ("point" in answer)
+            and (node_id is not None or not takes_point)
+        ):
             proposal: dict[str, Any] = {"label": option["label"], "option": dict(option)}
             if takes_line:
                 proposal["line"] = answer["line"]
+            if takes_point:
+                proposal["node_id"] = node_id
             return {
                 "status": "accepted",
                 "reason": "validated_choice",
@@ -371,7 +461,7 @@ def person_result(
         return None
     return {
         "status": "accepted",
-        "reason": "person_no_answer",
+        "reason": "person_line_withheld" if answer is not None and withheld else "person_no_answer",
         "proposal": {"label": idle["label"], "option": dict(idle)},
         "provider": {"kind": "person", "answer_sha256": None},
     }
@@ -386,13 +476,24 @@ def quiet_minutes(
     since_tick: int,
 ) -> int:
     """How many of ``subject_id``'s latest receipts in a row, for minutes from ``since_tick`` (the
-    minute its play began), carried on with no answer from its person."""
+    minute its play began), carried on with no answer from its person. Read through the being's
+    requests by minute, newest first, so a short play reads a few rows, never the society's whole
+    history."""
     rows = connection.execute(
-        "select document->>'reason' as reason from world_society_decision "
-        "where workspace_id = %s and society_id = %s and document->>'profile' = %s "
-        "and document->>'subject_id' = %s and (document->>'base_tick')::bigint >= %s "
-        "order by decision_seq desc limit %s",
-        (workspace_id, society_id, receipt_profile, subject_id, since_tick, QUIET_MINUTES),
+        "select d.document->>'reason' as reason from world_society_decision_request r "
+        "join world_society_decision d on d.workspace_id = r.workspace_id "
+        "and d.society_id = r.society_id and d.request_id = r.request_id "
+        "where r.workspace_id = %s and r.society_id = %s and r.base_tick >= %s "
+        "and r.subject_id = %s and d.document->>'profile' = %s "
+        "order by r.base_tick desc limit %s",
+        (
+            workspace_id,
+            society_id,
+            since_tick,
+            uuid.UUID(subject_id),
+            receipt_profile,
+            QUIET_MINUTES,
+        ),
     ).fetchall()
     count = 0
     for row in rows:

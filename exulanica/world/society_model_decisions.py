@@ -44,12 +44,14 @@ from exulanica.world.role_decisions import DecisionDisposition
 from exulanica.world.society import SOCIETY_NAMESPACE, SocietyEvent, society_state_sha256
 from exulanica.world.society_decision_contract import (
     HANDS_KINDS,
+    POINT_KIND,
     THINGS_KINDS,
     DecisionOption,
     TalkPromise,
     option_goal_policy,
     person_role,
     recheck_option,
+    recheck_point,
     recheck_talk,
 )
 from exulanica.world.society_planner import input_sha256
@@ -158,7 +160,13 @@ def model_goal_policies(
                 # Checked once every other choice of the minute is known.
                 talks.append((index, subject, option))
                 continue
-            refused, place = recheck_option(state, document, subject, option, promised)
+            if option.kind == POINT_KIND:
+                # A walk to the spot a person playing the being chose: the node the host took for
+                # their point, stood at as a chosen stand is, where nobody took it first.
+                node = str(receipt["proposal"]["node_id"])
+                refused, place = recheck_point(state, document, subject, node, promised)
+            else:
+                refused, place = recheck_option(state, document, subject, option, promised)
             if refused is not None:
                 disposition, reason = "rejected", refused
             else:

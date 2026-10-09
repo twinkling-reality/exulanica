@@ -192,7 +192,17 @@ def latest_choices(
     play (``ended``) restores what the subject had before the play began: its own earlier choice,
     or none. Every reader of who decides for a subject reads it here, the models read and a
     comparison's definition alike."""
+    return _latest(role, choices)[0]
+
+
+def _latest(
+    role: DecisionRole, choices: Sequence[Mapping[str, Any]]
+) -> tuple[dict[str, Mapping[str, Any]], dict[str, int]]:
+    """:func:`latest_choices`, and the ``choice_seq`` of the choice from which each subject's
+    latest choice decides: its own, or, for one restored when a play ended, the choice that ended
+    it."""
     current: dict[str, Mapping[str, Any]] = {}
+    since: dict[str, int] = {}
     before: dict[str, Mapping[str, Any] | None] = {}
     for choice in choices:
         for subject in choice[role.choice_subjects]:
@@ -200,13 +210,16 @@ def latest_choices(
                 held = before.pop(subject, None)
                 if held is None:
                     current.pop(subject, None)
+                    since.pop(subject, None)
                 else:
                     current[subject] = held
+                    since[subject] = int(choice["choice_seq"])
                 continue
             if is_played(choice["decider"]):
                 before[subject] = current.get(subject)
             current[subject] = choice
-    return current
+            since[subject] = int(choice["choice_seq"])
+    return current, since
 
 
 def _asked_model(model: Any) -> dict[str, Any] | None:
@@ -388,15 +401,20 @@ class SocietyModelChoiceRepository:
             # Only beings still here count toward the bound, so one that leaves and comes back
             # by the same id (a placed being an edit removed and an undo restored) could take a
             # place chosen meanwhile: past the bound, the latest own choices of a model go to the
-            # routine (``choice_over_bound``), the earliest keeping theirs.
+            # routine (``choice_over_bound``), the earliest keeping theirs. A being given back
+            # after a person played it takes its model again from then, after any chosen while it
+            # was played, which keep theirs.
             here = set(role.adapter.subjects(state))
+            since = _latest(
+                role, [_view(row["document"], row["recorded_at"]) for row in self._of(role, rows)]
+            )[1]
             chosen = sorted(
                 (
                     subject
                     for subject, choice in found.items()
                     if subject in here and choice["decider"]["kind"] == "model"
                 ),
-                key=lambda subject: (found[subject]["choice_seq"], subject),
+                key=lambda subject: (since[subject], subject),
             )
             for subject in chosen[bound:]:
                 if not kind_allows(state, subject, "routine"):

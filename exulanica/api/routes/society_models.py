@@ -69,9 +69,11 @@ PROFILE: Final = "exulanica.society-models/v1"
 #: the world's age: at the contract's hourly bound, some hours of a world's decisions.
 DECISIONS_READ: Final = 2000
 #: A refusal of a choice answered with 409 rather than 422: the society or the key, not the body.
-#: ``/world/versions/{version_id}/models/{role_key}`` answers a choice of any role by this too.
+#: ``/world/versions/{version_id}/models/{role_key}`` answers a choice of any role by this too. A
+#: choice naming a being a person plays is refused whole (``being_played``), as the play routes
+#: refuse it.
 CHOICE_CONFLICTS: Final = frozenset(
-    {"engine_takes_no_model_choice", "choice_key_reused", "decided_from_outside"}
+    {"engine_takes_no_model_choice", "choice_key_reused", "decided_from_outside", "being_played"}
 )
 #: What the People panel shows: a society's people, so these routes serve the role that decides
 #: for them, as its registry entry names what it decides for.

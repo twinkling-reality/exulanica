@@ -101,6 +101,7 @@ __all__ = [
     "LINE_KINDS",
     "NAMED_FIELDS",
     "PERSON_REASONS",
+    "POINT_KIND",
     "POLICY_KEYS_FROM",
     "POLICY_RANGES",
     "ContractError",
@@ -120,9 +121,12 @@ __all__ = [
     "option_goal_policy",
     "person_role",
     "places_to_stand",
+    "point_node",
     "recheck_option",
+    "recheck_point",
     "recheck_talk",
     "situation",
+    "walkable_point",
 ]
 
 #: How a goal policy says a model chose it, so the planner records the model's own reason code
@@ -178,6 +182,8 @@ ACTION_FIELDS: Final = {
     "say_to": frozenset({"who", "number", "metres"}),
     "say_all": frozenset(),
     "leave": frozenset(),
+    # From the sixth action catalog, a person playing a being walks it to a spot they choose.
+    "point": frozenset(),
     # And, from the fourth action catalog, what their hands do: pick a thing up, put it down, give
     # it to another being, take it from one.
     "pick_up": frozenset({"thing", "metres"}),
@@ -238,6 +244,10 @@ THINGS_KINDS: Final = frozenset({"carry_on", "say_to", "say_all", "leave"})
 #: The kinds a society of things' people's hands are offered, from the fourth action catalog, where
 #: the society records the hands module.
 HANDS_KINDS: Final = frozenset({"pick_up", "put_down", "give", "take"})
+#: The walk to a spot a person playing a being chooses, from the sixth action catalog: offered only
+#: in a request asked under a contract that states it, which only a played being's are
+#: (exulanica/world/society_play.py), and answered with the open node taken for the person's point.
+POINT_KIND: Final = "point"
 
 
 def person_role() -> DecisionRole:
@@ -683,10 +693,21 @@ def choice_options(
         stand.key in withheld or not places_to_stand(state, document, subject_id)
     ):
         stand = None
+    # A person playing a being may walk it to a spot they choose, stood at as a chosen stand is,
+    # wherever the routine has people stand and the being's kind does.
+    point = _off_place(routine, document, "open") if POINT_KIND in contract.words else None
+    if point is not None and (not of_things(state["profile"]) or point.key in withheld):
+        point = None
     # Places and people by the walk to each, a place before a person at the same walk, then by id:
     # as many as the options left beside waiting, standing and the things a society offers, and
     # none where those fill them (a negative bound would cut from the end instead).
-    room = contract.value("options_maximum") - 1 - (stand is not None) - len(things)
+    room = (
+        contract.value("options_maximum")
+        - 1
+        - (stand is not None)
+        - (point is not None)
+        - len(things)
+    )
     nearest = sorted(
         [(walk, 0, target_id, target) for walk, target_id, target in found]
         + [(walk, 1, other["id"], other) for walk, other in partners],
@@ -694,7 +715,7 @@ def choice_options(
     )[: max(0, room)]
     kept = [(walk, key, entry) for walk, kind, key, entry in nearest if kind == 0]
     near = [(walk, entry) for walk, kind, _key, entry in nearest if kind == 1]
-    if not kept and not near and stand is None and not things:
+    if not kept and not near and stand is None and point is None and not things:
         return ()
     options: list[DecisionOption] = []
     labels: dict[str, int] = {}
@@ -740,6 +761,17 @@ def choice_options(
                 action=contract.action_keys["stand"],
                 target_id=None,
                 activity=stand.key,
+                walk_mm=None,
+            )
+        )
+    if point is not None:
+        options.append(
+            DecisionOption(
+                label=contract.words[POINT_KIND],
+                kind=POINT_KIND,
+                action=contract.action_keys[POINT_KIND],
+                target_id=None,
+                activity=point.key,
                 walk_mm=None,
             )
         )
@@ -1154,6 +1186,90 @@ def places_to_stand(
     ]
 
 
+def longest_step_mm(document: Mapping[str, Any]) -> int:
+    """The longest step between two joined nodes of the input's walking graph."""
+    nodes, _adjacent, edges = _input_graph(document)
+
+    def length(edge: Mapping[str, Any]) -> int:
+        (ax, az) = nodes[edge["from_node_id"]]["position_mm"]
+        (bx, bz) = nodes[edge["to_node_id"]]["position_mm"]
+        return math.isqrt((ax - bx) ** 2 + (az - bz) ** 2)
+
+    return max((length(edge) for edge in edges.values()), default=0)
+
+
+def walkable_point(document: Mapping[str, Any], point: Sequence[int]) -> bool:
+    """Whether ``point`` (``[x_mm, z_mm]``) lies on the input's walking ground: some node of its
+    graph within the graph's longest step of it."""
+    nodes, _adjacent, _edges = _input_graph(document)
+    step = longest_step_mm(document)
+    x, z = point
+    return any(
+        (node["position_mm"][0] - x) ** 2 + (node["position_mm"][1] - z) ** 2 <= step * step
+        for node in nodes.values()
+    )
+
+
+def point_node(
+    state: Mapping[str, Any],
+    document: Mapping[str, Any],
+    subject_id: str,
+    point: Sequence[int],
+) -> str | None:
+    """The open node a played being walks to for ``point``, as the minute begins: of the open nodes
+    of the input's graph (:func:`~exulanica.world.society_planner.open_ground`: no activity's
+    place, an edge, nobody else standing at or headed to it) that the being can walk to and that
+    lie within the graph's longest step of the point, the nearest the point, by squared distance
+    and then node id, first among those nobody waiting would be in the way at; None where none
+    is."""
+    from exulanica.world.society_planner import open_ground
+
+    person = _person(state, subject_id)
+    if not _available(document):
+        return None
+    nodes, paths, _held, _here = _reachable(state, document, person)
+    others = [other for other in state["inhabitants"] if other["id"] != subject_id]
+    step = longest_step_mm(document)
+    x, z = point
+    for pool in open_ground(dict(document), others):
+        near = [
+            (
+                (nodes[node]["position_mm"][0] - x) ** 2 + (nodes[node]["position_mm"][1] - z) ** 2,
+                node,
+            )
+            for node in pool
+            if node in paths
+        ]
+        near = [pair for pair in near if pair[0] <= step * step]
+        if near:
+            return min(near)[1]
+    return None
+
+
+def recheck_point(
+    state: Mapping[str, Any],
+    document: Mapping[str, Any],
+    subject_id: str,
+    node_id: str,
+    promised: set[str],
+) -> tuple[str | None, str | None]:
+    """Whether the spot a played being's person chose, the node the host took for their point,
+    still holds this minute: ``(None, node_id)``, or ``(reason, None)`` naming why not."""
+    person = _person(state, subject_id)
+    if not at_choice_point(person):
+        return "action_in_progress", None
+    if not _available(document):
+        return "input_unavailable", None
+    nodes, paths, held, _here = _reachable(state, document, person)
+    if not _location_valid(dict(person), nodes, _input_graph(document)[2]):
+        return "current_position_invalidated", None
+    if node_id not in paths:
+        return "known_target_unreachable", None
+    if node_id in held or node_id in promised:
+        return "place_taken_this_minute", None
+    return None, node_id
+
+
 def _recheck_stand(
     state: Mapping[str, Any],
     document: Mapping[str, Any],
@@ -1239,7 +1355,7 @@ def option_goal_policy(option: DecisionOption, promise: str | TalkPromise | None
     """
     if option.kind == "wait":
         return {"allowed_target_ids": [], "wait": True}
-    if option.kind == "stand" and isinstance(promise, str):
+    if option.kind in ("stand", POINT_KIND) and isinstance(promise, str):
         return {
             "allowed_target_ids": [],
             "activity": option.activity,

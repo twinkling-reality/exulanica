@@ -29,6 +29,7 @@ from exulanica.world.society_decision_contract import (
     LINE_KINDS,
     NAMED_FIELDS,
     PERSON_REASONS,
+    POINT_KIND,
     POLICY_KEYS_FROM,
     POLICY_RANGES,
     DecisionOption,
@@ -56,6 +57,7 @@ __all__ = [
     "KINDS",
     "LINE_KINDS",
     "NAMED_KINDS",
+    "POINT_KINDS",
     "POLICY_KEYS_FROM",
     "POLICY_RANGES",
     "REASONS",
@@ -83,6 +85,9 @@ IDLE_KIND: Final = "wait"
 #: What changes nothing, first preferred first: going on with what is under way, where it is
 #: offered (to a society of things' people asked while something is under way), else waiting.
 IDLE_KINDS: Final = ("carry_on", IDLE_KIND)
+#: The kinds whose answer names the node the decision host took for the spot a person chose: the
+#: walk a person playing a being chooses (exulanica/world/society_play.py).
+POINT_KINDS: Final = frozenset({POINT_KIND})
 REASONS: Final = PERSON_REASONS
 
 

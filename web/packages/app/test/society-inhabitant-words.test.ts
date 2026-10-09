@@ -124,6 +124,19 @@ describe('a person a program from outside decides for', () => {
     expect({ ...outside, why: '' }).toEqual({ ...ours, why: '' });
   });
 
+  it('says the person playing them chose, where a model is credited for anyone else', () => {
+    const person = chosen?.person ?? ({
+      display_name: 'Visitor', role: null, goal: null,
+      action: { kind: 'idle', status: 'active', target_id: null, remaining_ticks: 0, reason: 'chosen_by_their_model' },
+    } as unknown as WordedPerson);
+    const because = (words: string) => phrase('because').replace('{reason}', words);
+    const ours = inhabitantWordsFrom(person, () => 'the well', () => 'Knight', null, null, false);
+    const played = inhabitantWordsFrom(person, () => 'the well', () => 'Knight', null, null, false, null, true);
+    expect(played.why).toBe(because(phrase('chosen_by_their_player')));
+    expect(played.why).not.toMatch(/model/u);
+    expect({ ...played, why: '' }).toEqual({ ...ours, why: '' });
+  });
+
   it('leaves every other reason as it is', () => {
     const person = {
       display_name: 'Visitor', role: null, goal: null,

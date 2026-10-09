@@ -37,6 +37,7 @@ from exulanica.models.manifest import AnsweringMechanism
 from exulanica.things.lines import LineRefused, check_line, names_listener
 from exulanica.world.deciders import (
     EXTERNAL_REASONS,
+    PERSON_REASONS,
     DeciderRefused,
     check_external_config,
     check_external_record,
@@ -416,12 +417,16 @@ def check_role_result(
         takes_line = isinstance(option, Mapping) and option.get("kind") in getattr(
             role.adapter, "LINE_KINDS", frozenset()
         )
-        if (
-            set(proposal) != ({"label", "option", "line"} if takes_line else {"label", "option"})
-            or option not in offered
-            or proposal["label"] != option["label"]
-        ):
+        # A walk to a spot a person chose names the node the decision host took for it.
+        takes_point = isinstance(option, Mapping) and option.get("kind") in getattr(
+            role.adapter, "POINT_KINDS", frozenset()
+        )
+        fields = {"label", "option"} | ({"line"} if takes_line else set())
+        fields |= {"node_id"} if takes_point else set()
+        if set(proposal) != fields or option not in offered or proposal["label"] != option["label"]:
             raise ValueError(f"a {role.key} decision proposes one of the options it offered")
+        if takes_point and not (isinstance(proposal["node_id"], str) and proposal["node_id"]):
+            raise ValueError(f"a {role.key} decision's walk names the node it walks to")
         if takes_line:
             # The line an option says, held to the line rule at the bound its request states.
             try:
@@ -451,7 +456,7 @@ def check_role_result(
             check_person_record(provider)
         except DeciderRefused as exc:
             raise ValueError(f"a {role.key} decision records the person's answer: {exc}") from exc
-        if result["status"] == "accepted" and (result["reason"] == "person_no_answer") != (
+        if result["status"] == "accepted" and (result["reason"] in PERSON_REASONS) != (
             provider["answer_sha256"] is None
         ):
             raise ValueError(

@@ -436,6 +436,13 @@
       "reason": "Authored: why a person did what they do when the program that came with them from outside decides for them: their choice is recorded with the reason a decider's choice records (chosen_by_their_model), but no model of this world was asked, so the words never credit one."
     },
     {
+      "key": "phrase.chosen_by_their_player",
+      "kind": "phrase",
+      "code": "chosen_by_their_player",
+      "words": "the person playing them chose it",
+      "reason": "Authored: why a being did what it does when a person plays it: its choice is recorded with the reason a decider's choice records (chosen_by_their_model), but the person playing chose and no model was asked, so the words never credit one."
+    },
+    {
       "key": "phrase.because",
       "kind": "phrase",
       "code": "because",
@@ -1336,6 +1343,13 @@
       "kind": "decision_reason",
       "code": "person_no_answer",
       "words": "the person playing them chose nothing that minute, so they carried on",
+      "reason": "Authored: why a person's decider was or was not followed when a person plays them, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.person_line_withheld",
+      "kind": "decision_reason",
+      "code": "person_line_withheld",
+      "words": "the line the person playing them chose carried a name this world's rules keep out, so it was not said and they carried on",
       "reason": "Authored: why a person's decider was or was not followed when a person plays them, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
     },
     {

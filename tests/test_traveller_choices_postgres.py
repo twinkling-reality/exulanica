@@ -509,6 +509,70 @@ def test_a_placed_being_restored_past_the_bound_leaves_the_latest_choice_to_the_
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_being_given_back_takes_its_model_after_those_chosen_while_it_was_played(app):
+    # The knight runs on a model at the bound; a person plays it, and the villager is given a model
+    # meanwhile. Given back, the knight takes its model again from then: past the bound it goes to
+    # the routine, and the villager, chosen while the knight was played, keeps its model.
+    world, client = app
+    client.app.state.services = dataclasses.replace(
+        client.app.state.services, societies_of_things=True
+    )
+    services = decisions._services(client)
+    manifest, model_id = decisions._offered()
+    model = {"provider": manifest.spec(model_id).provider, "model_id": model_id}
+    role, version, actor = person_role(), world["binding"].version_id, world["session"].actor
+    things_api._place(client, world, "well", "well", 2, -4_000, 2_000)
+    things_api._place(client, world, "knight", "knight", 1, 3_000, 3_000)
+    snapshot = things_api._make_society(client, world)
+    knight = next(p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "placed")
+    villager = next(p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "populated")
+    with services.database.session(world["workspace"]) as connection:
+        repository = _repository(connection, world)
+
+        def choose(subject):
+            repository.record_choice(
+                version,
+                role,
+                request_id=uuid.uuid4(),
+                subjects=[subject],
+                model=model,
+                chosen_by=actor,
+                manifest=manifest,
+                contract=_Bound(1),
+            )
+
+        choose(knight["id"])
+        repository.record_play(
+            version,
+            role,
+            request_id=uuid.uuid4(),
+            subject=knight["id"],
+            account_id=actor,
+            contract=_Bound(1),
+        )
+        choose(villager["id"])
+        repository.give_back(
+            version,
+            role,
+            request_id=uuid.uuid4(),
+            subject=knight["id"],
+            account_id=actor,
+            chosen_by=actor,
+            contract=_Bound(1),
+            ended="given_back",
+        )
+        deciding = repository.deciding(version, role, _Bound(1))
+    assert (deciding[villager["id"]]["decider"]["kind"], deciding[villager["id"]]["from"]) == (
+        "model",
+        "choice",
+    )
+    assert (deciding[knight["id"]]["decider"]["kind"], deciding[knight["id"]]["from"]) == (
+        "routine",
+        "choice_over_bound",
+    )
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_a_gate_s_choice_decides_strictly_before_its_end(app):
     world, client = app
     services = decisions._services(client)

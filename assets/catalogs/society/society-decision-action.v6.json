@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-decision-action",
+  "catalog_version": 6,
+  "entries": [
+    {
+      "key": "go",
+      "kind": "target",
+      "words": "{activity}, {metres} m away",
+      "reason": "Going somewhere to do what is done there: one option for each place the person can reach that has room for them this minute, named by what the world's routine says people do at it and how far the walk is, so options are told apart by what they are and never by where they sit in a list. The engine applies it only if the place is still enabled, unchanged, reachable and free when the minute runs.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "wait",
+      "kind": "wait",
+      "words": "wait here a minute",
+      "reason": "Staying where they are for one simulated minute, after which they choose again. It is offered only beside at least one other action, a place to go, somebody to talk with or a spot to stand at: a person with nothing else to do is left to the routine, and no model is asked.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "stand",
+      "kind": "stand",
+      "words": "stand a while nearby",
+      "reason": "Stopping to stand a while, as the world's routine has people do: offered when an open spot lies within the routine's standing reach of the person, and applied by the routine's own rules, the spot drawn among the open ones as the minute begins, as the routine draws it, and the stay as long as the routine draws for standing. Standing relieves nothing, as the routine says. The engine promises the spot before the minute, so nobody else takes it in that minute.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "talk",
+      "kind": "talk",
+      "words": "talk with {name}, {metres} m away",
+      "reason": "Stopping to talk with one other person, as the world's routine has two people do: one option for each person the routine itself could pair them with now, somebody within its talking reach who is free to choose or standing, with two open spots beside each other that both can walk to. The other person is named as the page names it unless the account holder saved another name for it: a placed being or a visitor by its kind's label and a number from the second present at once (the knight, knight 2), a villager by its simulated name and its kind (ari ash 1 (a villager)); a line that copies the words names somebody a viewer can find. A label the workspace's rules would change is left out, as every label is; options are told apart by that name and by how far the walk to them is. The engine applies it only if the other person is still free to talk when the minute runs and nobody, their own model included, decided for them in that minute, and it promises both spots before the minute; the talk lasts as long as the routine draws. Nothing is said in the simulation.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "carry_on",
+      "kind": "carry_on",
+      "words": "carry on with what you are doing",
+      "reason": "Going on with whatever is under way for them: offered to a person of a society of things who is asked while something is under way, as somebody a line was said to is the minute after, or one an outside program decides for every minute. It changes nothing: the goal and the action stay as they were, and a person with nothing under way is never offered it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "say_to",
+      "kind": "say_to",
+      "words": "say something to {name}, {metres} m away",
+      "reason": "Saying one line to one being who hears it, within the policy's hearing reach: an option for each of the nearest such beings, at most the policy's number of ways to say something less one, each named as the page names it, saying its kind once, unless the account holder saved another name for it: a placed being or a visitor by its kind's label and a number from the second present at once (the knight, knight 2), a villager by its simulated name and its kind (ari ash 1 (a villager)); a line that copies the words names somebody a viewer can find. A label the workspace's rules would change is left out, as every label is. Only a being whose kind has the say ability is offered it. The line is its decider's: a model writes it in the choice's line argument and an outside program sends it with its answer; the routine never says anything. Saying does not interrupt what the speaker is doing, and the one it is said to is asked the next minute.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "say_all",
+      "kind": "say_all",
+      "words": "say something to everyone near you",
+      "reason": "Saying one line to everybody who hears within the policy's hearing reach, offered beside the ways of saying something to one being when anybody hears. The line is the decider's, as for saying something to one being, and nobody is made to answer it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "leave",
+      "kind": "leave",
+      "words": "leave this world",
+      "reason": "Going back where it came from, taking what it holds: offered to a being whose kind has the leave ability, a visitor from another program, and recorded as its departure by its own choice.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "pick_up",
+      "kind": "pick_up",
+      "words": "pick up the {thing}, {metres} m away",
+      "reason": "Picking a thing up into a free hand that fits it: offered to a being whose kind has the pick_up ability for a holdable thing on the ground near enough to walk to, and carried out, by the hands module, once the being stands within its reach.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "put_down",
+      "kind": "put_down",
+      "words": "put down the {thing}",
+      "reason": "Putting what a being holds down on the ground where it stands: offered to a being whose kind has the put_down ability for each thing it holds.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "give",
+      "kind": "give",
+      "words": "give the {thing} to {name}, {metres} m away",
+      "reason": "Handing a held thing to another being who offers to receive it and has a free hand that fits it: offered to a being whose kind has the give ability, the other being named as the page names it unless the account holder saved another name for it: a placed being or a visitor by its kind's label and a number from the second present at once (the knight, knight 2), a villager by its simulated name and its kind (ari ash 1 (a villager)); a line that copies the words names somebody a viewer can find. A label the workspace's rules would change is left out, as every label is; carried out once both stand within the hand-over distance.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "take",
+      "kind": "take",
+      "words": "take the {thing} from {name}, {metres} m away",
+      "reason": "Taking a thing another being holds and lets be taken into a free hand that fits it: offered to a being whose kind has the take ability, the other being named as the page names it unless the account holder saved another name for it: a placed being or a visitor by its kind's label and a number from the second present at once (the knight, knight 2), a villager by its simulated name and its kind (ari ash 1 (a villager)); a line that copies the words names somebody a viewer can find. A label the workspace's rules would change is left out, as every label is; carried out once both stand within the hand-over distance.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "point",
+      "kind": "point",
+      "words": "walk to a spot you choose",
+      "reason": "Walking to a spot on the ground the person playing a being chooses: offered only in a request a person answers for the being they play, at its choice point, where its kind moves and the routine has a standing activity. The person's answer gives the spot as a point; the decision host takes the open node of the walking graph nearest it as the minute begins, and the minute applies a stand there, as a chosen stand is applied. A model or an outside program is never offered it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    }
+  ]
+}

@@ -124,10 +124,12 @@ EXTERNAL_REASONS: Final = frozenset(
 #: contract; never which account.
 PERSON_CONFIG: Final = frozenset({"kind", "contract"})
 #: What a receipt records about a person's answer: the digest of the answer they posted, or none
-#: where they posted none and the subject carried on (:data:`PERSON_REASONS`). No account, no cost.
+#: where the subject carried on instead (:data:`PERSON_REASONS`). No account, no cost.
 PERSON_RECORD: Final = frozenset({"kind", "answer_sha256"})
-#: Why a played subject's receipt took the idle option: the person posted no answer for the minute.
-PERSON_REASONS: Final = frozenset({"person_no_answer"})
+#: Why a played subject's receipt took the idle option: the person posted no answer for the minute,
+#: or the line of the one they posted carries a name saved since, so it is not said; only the first
+#: is a quiet minute.
+PERSON_REASONS: Final = frozenset({"person_no_answer", "person_line_withheld"})
 #: The longest an outside program may be given to answer, in milliseconds: the playback lease's 30
 #: seconds, which no role's contract deadline may outlast either.
 _DEADLINE_CEILING_MS: Final = 30_000

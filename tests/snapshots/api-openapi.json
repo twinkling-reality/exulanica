@@ -3816,7 +3816,7 @@
      "society"
     ],
     "summary": "Answer",
-    "description": "The reader's answer for the being they play, for the minute ``base_tick``: one option the\nminute offers, by its label, and its line where it says something. Checked as any decider's\nanswer is, and kept as the latest for that minute; the minute takes the latest. Refused\n``minute_passed`` (409, with the current minute) where that minute has been played,\n``not_played`` where the reader does not play the being, and by the check that fails.",
+    "description": "The reader's answer for the being they play, for the minute ``base_tick``: one option the\nminute offers, by its label, and its line where it says something or the spot it walks to\n(``point``) where it walks to one the reader chooses. Checked as any decider's answer is, its\nline read in Unicode normal form C and trimmed first, and kept as the latest for that minute;\nthe minute takes the latest. Refused ``minute_passed`` (409, with the current minute) where\nthat minute has been played or has taken the being's answer already, ``not_played`` where the\nreader does not play the being, ``too_many_answers`` (429, with ``Retry-After`` where the\nsociety plays) past twelve answers a minute, and by the check that fails.",
     "operationId": "answer_world_versions__version_id__society_play__subject_id__answer_post",
     "parameters": [
      {
@@ -32625,6 +32625,24 @@
        }
       ],
       "title": "Line"
+     },
+     "point": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "integer",
+         "maximum": 1000000000.0,
+         "minimum": -1000000000.0
+        },
+        "type": "array",
+        "maxItems": 2,
+        "minItems": 2
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Point"
      }
     },
     "additionalProperties": false,

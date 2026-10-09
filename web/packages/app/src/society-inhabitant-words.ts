@@ -168,7 +168,7 @@ export function inhabitantWordsFrom(
   /**
    * Set where a program from outside the world decides for this person: their choices are recorded
    * as any decider's are (`chosen_by_their_model`), but no model was asked, so the words say their
-   * own program chose. The server's Companion does not pass it.
+   * own program chose. The server's Companion reads the same from the minute's decision event.
    */
   decidedFromOutside = false,
   /**
@@ -177,6 +177,12 @@ export function inhabitantWordsFrom(
    * "outside this world" where there is none) and who decides for them here.
    */
   bridgeLabel: BridgeLabel | null = null,
+  /**
+   * Set where a person plays this being: its choices are recorded as any decider's are
+   * (`chosen_by_their_model`), but the person playing chose, so the words say so and credit no
+   * model. The server's Companion reads the same from the minute's decision event.
+   */
+  playedByPerson = false,
 ): InhabitantWords {
   const living = person as unknown as {
     readonly ordinal?: number;
@@ -242,7 +248,10 @@ export function inhabitantWordsFrom(
   const acting = action.status === 'blocked'
     || (under !== undefined && under.setting !== 'object' && action.reason !== under.underWayReason);
   const code = !acting && goal !== null ? goal.reason : action.reason;
-  const reason = decidedFromOutside && code === 'chosen_by_their_model' ? words('phrase', 'chosen_by_their_program') : reasonWords(code);
+  const reason = code !== 'chosen_by_their_model' ? reasonWords(code)
+    : playedByPerson ? words('phrase', 'chosen_by_their_player')
+    : decidedFromOutside ? words('phrase', 'chosen_by_their_program')
+    : reasonWords(code);
   return { who, what, doing, why: fill(words('phrase', 'because'), { reason }) };
 }
 

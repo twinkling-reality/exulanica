@@ -10,6 +10,7 @@ reader (``played_by_you``).
 
 from __future__ import annotations
 
+import unicodedata
 import uuid
 from typing import Annotated, Any, Final
 
@@ -25,6 +26,7 @@ from exulanica.world.deciders import decider, is_played
 from exulanica.world.decision_roles import DecisionRole, decision_roles
 from exulanica.world.errors import UnknownWorldResource
 from exulanica.world.society import UnavailableSocietyInput, UnknownSociety
+from exulanica.world.society_decision_contract import walkable_point
 from exulanica.world.society_model_choice_repository import (
     ModelChoiceRefused,
     SocietyModelChoiceRepository,
@@ -33,6 +35,7 @@ from exulanica.world.society_play import (
     QUIET_MINUTES,
     PlayRefused,
     answer_document,
+    play_contract,
     quiet_minutes,
     record_answer,
 )
@@ -76,6 +79,15 @@ class PlayAnswerBody(BaseModel):
     label: Annotated[str, Field(min_length=1, max_length=400)]
     #: What the being says, exactly where the option says something.
     line: Annotated[str, Field(min_length=1, max_length=2000)] | None = None
+    #: The spot the being walks to, ``[x_mm, z_mm]`` on the walking ground, exactly where the
+    #: option walks to a spot the person chooses.
+    point: (
+        Annotated[
+            list[Annotated[StrictInt, Field(ge=-(10**9), le=10**9)]],
+            Field(min_length=2, max_length=2),
+        ]
+        | None
+    ) = None
 
 
 def _role() -> DecisionRole:
@@ -102,6 +114,22 @@ def _society(
 
 def _refused(code: str, detail: str, status: int, **more: Any) -> JSONResponse:
     return JSONResponse(status_code=status, content={"code": code, "detail": detail, **more})
+
+
+def _retry_after(
+    connection: ScopedConnection, workspace_id: uuid.UUID, society_id: uuid.UUID
+) -> str | None:
+    """Whole seconds until the society's next minute is due, where it plays: a person's answers
+    for this minute are spent until then. None where it does not play."""
+    control = connection.execute(
+        "select mode, next_due_at, "
+        "ceil(extract(epoch from next_due_at - statement_timestamp()))::bigint as wait "
+        "from world_society_control where workspace_id = %s and society_id = %s",
+        (workspace_id, society_id),
+    ).fetchone()
+    if control is None or control["mode"] != "playing" or control["next_due_at"] is None:
+        return None
+    return str(max(1, int(control["wait"])))
 
 
 def _choice_refused(exc: ModelChoiceRefused) -> JSONResponse:
@@ -228,11 +256,12 @@ def turn(
         return _refused("unavailable_society_input", str(exc), 424)
     if subject not in set(role.adapter.subjects(row["state"])):
         return _refused("person_not_in_this_world", "nobody of that id is here", 404)
-    contract = role.contract(role.terms(row["engine_version"]).versions)
+    contract = play_contract(role, row["engine_version"])
     options = role.adapter.options(
         role, row["state"], document, subject, contract, seed=row["seed"]
     )
     line_kinds = frozenset(getattr(role.adapter, "LINE_KINDS", ()))
+    point_kinds = frozenset(getattr(role.adapter, "POINT_KINDS", ()))
     held = _played_by(connection, session, world_id, version_id, role, subject)
     quiet = (
         0
@@ -262,6 +291,7 @@ def turn(
                 "target_id": option.target_id,
                 "being_id": option.partner_id or option.addressee_id,
                 "takes_line": option.kind in line_kinds,
+                "takes_point": option.kind in point_kinds,
             }
             for option in options
         ],
@@ -288,10 +318,13 @@ def answer(
     world_id: WorldId,
 ) -> Any:
     """The reader's answer for the being they play, for the minute ``base_tick``: one option the
-    minute offers, by its label, and its line where it says something. Checked as any decider's
-    answer is, and kept as the latest for that minute; the minute takes the latest. Refused
-    ``minute_passed`` (409, with the current minute) where that minute has been played,
-    ``not_played`` where the reader does not play the being, and by the check that fails."""
+    minute offers, by its label, and its line where it says something or the spot it walks to
+    (``point``) where it walks to one the reader chooses. Checked as any decider's answer is, its
+    line read in Unicode normal form C and trimmed first, and kept as the latest for that minute;
+    the minute takes the latest. Refused ``minute_passed`` (409, with the current minute) where
+    that minute has been played or has taken the being's answer already, ``not_played`` where the
+    reader does not play the being, ``too_many_answers`` (429, with ``Retry-After`` where the
+    society plays) past twelve answers a minute, and by the check that fails."""
     society = _society(connection, session, request, world_id)
     role = _role()
     subject = str(subject_id)
@@ -312,13 +345,20 @@ def answer(
             return _refused("person_not_in_this_world", "nobody of that id is here", 404)
         latest = society._chain(row)
         document = society._inputs(row, [latest])[latest]
-        contract = role.contract(role.terms(row["engine_version"]).versions)
+        contract = play_contract(role, row["engine_version"])
         options = role.adapter.options(
             role, row["state"], document, subject, contract, seed=row["seed"]
         )
         option = next((offered for offered in options if offered.label == body.label), None)
         if option is None:
             raise PlayRefused("label_not_offered")
+        takes_point = option.kind in frozenset(getattr(role.adapter, "POINT_KINDS", ()))
+        if takes_point and body.point is None:
+            raise PlayRefused("point_needed")
+        if not takes_point and body.point is not None:
+            raise PlayRefused("point_not_taken")
+        if body.point is not None and not walkable_point(document, body.point):
+            raise PlayRefused("not_walkable")
         takes_line = option.kind in frozenset(getattr(role.adapter, "LINE_KINDS", ()))
         line = body.line
         if takes_line and line is None:
@@ -326,6 +366,9 @@ def answer(
         if not takes_line and line is not None:
             raise PlayRefused("line_not_taken")
         if line is not None:
+            # A line pasted in another normal form, or with white space at its ends, is the same
+            # line: it is read in normal form C and trimmed before the line rule reads it.
+            line = unicodedata.normalize("NFC", line).strip()
             try:
                 line = check_line(line, maximum=contract.value("line_characters_maximum"))
             except LineRefused as exc:
@@ -338,11 +381,19 @@ def answer(
             world_id=world_id,
             society_id=row["society_id"],
             account_id=session.actor,
-            document=answer_document(subject, row["current_tick"], option.label, line),
+            document=answer_document(subject, row["current_tick"], option.label, line, body.point),
         )
     except UnavailableSocietyInput as exc:
         return _refused("unavailable_society_input", str(exc), 424)
     except PlayRefused as exc:
         more = {} if exc.tick is None else {"current_tick": exc.tick}
-        return _refused(exc.code, exc.detail, exc.status, **more)
+        refused = _refused(exc.code, exc.detail, exc.status, **more)
+        wait = (
+            _retry_after(connection, session.workspace_id, row["society_id"])
+            if exc.code == "too_many_answers"
+            else None
+        )
+        if wait is not None:
+            refused.headers["Retry-After"] = wait
+        return refused
     return {"subject_id": subject, "base_tick": kept["base_tick"], "answer_seq": kept["answer_seq"]}

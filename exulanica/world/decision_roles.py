@@ -179,8 +179,10 @@ GENERIC_REASONS: Final = frozenset(
         "decider_passed",
         "saved_name_withheld",
         # A person playing the subject posted no answer for the minute, so it carried on, or waited
-        # at a choice point: never the routine, never a model.
+        # at a choice point: never the routine, never a model. Or the line of the answer they posted
+        # carries a name saved since, so it is not said and the subject carries on as well.
         "person_no_answer",
+        "person_line_withheld",
     }
 )
 #: The shape of each profile a role's documents carry, the shapes migration 0117 admits by the

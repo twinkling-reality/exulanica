@@ -25,6 +25,7 @@ from exulanica.selection.society_question import (
     _AuthorizedOnce,
     _Builder,
     _deciding_models,
+    _deciding_origins,
 )
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_decision_contract import DECISION_REASONS, person_role
@@ -169,6 +170,29 @@ def test_the_line_names_no_model_it_has_no_decision_for():
     catalog = inhabitant_words_catalog()
     item = _Builder(_scene({}), catalog).event(_goal(_CHOSEN_BY_THEIR_MODEL))
     assert "That model was" not in item.line
+
+
+@pytest.mark.parametrize(
+    ("origin", "phrase"),
+    [
+        ("person", "chosen_by_their_player"),
+        ("external", "chosen_by_their_program"),
+        ("model", None),
+    ],
+)
+def test_the_line_of_a_goal_a_person_or_a_program_chose_credits_no_model(origin, phrase):
+    # The goal records chosen_by_their_model whichever decider chose it; the minute's one applied
+    # decision event says who did, and only a model's choice is said to be the model's.
+    catalog = inhabitant_words_catalog()
+    decision = _decision(7, SUBJECT, "applied", None)
+    decision["document"]["origin"] = origin
+    scene = dataclasses.replace(_scene({}), deciding_origins=_deciding_origins([decision]))
+    item = _Builder(scene, catalog).event(_goal(_CHOSEN_BY_THEIR_MODEL))
+    if phrase is None:
+        assert catalog.reason(_CHOSEN_BY_THEIR_MODEL) in item.line
+    else:
+        assert catalog.words("phrase", phrase) in item.line
+        assert catalog.reason(_CHOSEN_BY_THEIR_MODEL) not in item.line
 
 
 def test_a_goal_the_model_did_not_choose_names_no_model():
