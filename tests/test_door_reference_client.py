@@ -102,6 +102,31 @@ def test_the_client_keeps_the_cursor_and_answers_an_offered_label():
     assert sent[1]["timeout"] > 15 and "secret" not in repr(client)
 
 
+def test_the_client_sends_visitors_calls_them_home_and_reports_what_came_back():
+    module = _client_module()
+    sent, opener = _recording(
+        [
+            (201, {"arrival_id": "a1", "thing_id": "t1"}),
+            (202, {"departure_id": "d1", "recorded": True}),
+            (202, {"recorded": True}),
+        ]
+    )
+    client = module.DoorClient("https://door.example", "secret", opener=opener)
+    assert client.arrive("a1", "player", "cc0-traveller")["thing_id"] == "t1"
+    client.home("t1")
+    client.delivered("d1", [{"thing_id": "s1", "game_item": "test:sword"}])
+    assert [(s["method"], s["url"]) for s in sent] == [
+        ("POST", "https://door.example/door/channel/arrivals"),
+        ("POST", "https://door.example/door/channel/home"),
+        ("POST", "https://door.example/door/channel/departures/d1/delivered"),
+    ]
+    assert [s["body"] for s in sent] == [
+        {"arrival_id": "a1", "game_type": "player", "look_key": "cc0-traveller", "carried": []},
+        {"thing_id": "t1"},
+        {"delivered": [{"thing_id": "s1", "game_item": "test:sword"}], "not_delivered": []},
+    ]
+
+
 def test_a_refusal_reaches_the_adapter_as_its_status_and_code():
     module = _client_module()
     _sent, opener = _recording([(404, {"code": "invite_not_redeemable", "detail": "no"})])

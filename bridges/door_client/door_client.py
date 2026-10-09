@@ -1,7 +1,8 @@
 """A reference client for the door's channel, standard library only.
 
 An adapter redeems an invite once with its bridge's own credential, says hello with its adapter's
-version and mapping, then loops: read frames by long-poll, act on each, answer the asks it can. The
+version and mapping, then loops: read frames by long-poll, act on each, answer the asks it can; it
+sends its visitors across, calls them home and reports what they carried back. The
 cursor each poll returns is the adapter's to keep, in whatever storage its host offers, so a restart
 reads on from where it stopped. Everything is in response bodies; nothing here reads a header.
 
@@ -185,6 +186,57 @@ class DoorClient:
             body["line"] = line
         return _call(
             self.opener, self.base_url, self.credential, "POST", "/door/channel/answers", body
+        )
+
+    def arrive(
+        self,
+        arrival_id: str,
+        game_type: str,
+        look_key: str,
+        carried: list[dict[str, Any]] | None = None,
+    ) -> dict:
+        """Send one visitor across: its type, the look it arrives in and the game items it carries,
+        under ``arrival_id``, a random version 4 UUID of the adapter's own. An arrival whose answer
+        was lost is sent again under the same id, which the door answers as the same arrival."""
+        body = {
+            "arrival_id": arrival_id,
+            "game_type": game_type,
+            "look_key": look_key,
+            "carried": [] if carried is None else carried,
+        }
+        return _call(
+            self.opener, self.base_url, self.credential, "POST", "/door/channel/arrivals", body
+        )
+
+    def home(self, thing_id: str) -> dict:
+        """Call one of the grant's visitors home at the world's next minute, as its player asked."""
+        return _call(
+            self.opener,
+            self.base_url,
+            self.credential,
+            "POST",
+            "/door/channel/home",
+            {"thing_id": thing_id},
+        )
+
+    def delivered(
+        self,
+        departure_id: str,
+        delivered: list[dict[str, str]],
+        not_delivered: list[dict[str, str]] | None = None,
+    ) -> dict:
+        """Report, once, what a departed visitor carried home: each thing given back in the game
+        (``{thing_id, game_item}``) and each that could not be (``{thing_id, reason}``)."""
+        return _call(
+            self.opener,
+            self.base_url,
+            self.credential,
+            "POST",
+            f"/door/channel/departures/{urllib.parse.quote(departure_id)}/delivered",
+            {
+                "delivered": delivered,
+                "not_delivered": [] if not_delivered is None else not_delivered,
+            },
         )
 
     @staticmethod
