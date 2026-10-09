@@ -662,7 +662,8 @@ what replaying the request does and which route compensates it. The model fills 
 operation from the fixed vocabulary above or `other`, and options from the reads a direct client
 makes, the reviewed kinds a person may place, the kinds of thing an author may add, the version's
 objects and placed things offered by opaque label so a client-chosen id never reaches a hosted
-request, the society's beings and the places they use, and the published arrangements. Positions
+request, the society's beings and the places they use (a town's premises and benches by the name
+and number the town gives them), and the published arrangements. Positions
 come from the page's placement or viewer context, or from what a thing is put beside, and the
 origin role of anything added is the person's stated choice. What is missing is asked about before
 anything is prepared (`asset_ambiguous`, `object_ambiguous`, `object_required`,
@@ -818,10 +819,11 @@ so a step is offered only where the route would take it, and a refusal is the ro
 (`decided_from_outside` for a visitor its program decides for, `target_unreachable`,
 `destination_full`). Its pins are that minute's, so the browser prepares it again just before
 sending it; while the society holds an input it has not taken in, the step is `pending` with
-`society_input_queued`, and while the being is in the middle of something, or was already asked
+`society_input_queued`; while the being is in the middle of something, or was already asked
 something at this minute (the route takes one request per being per minute), with
-`inhabitant_action_in_progress`; the browser waits for the next minute, at most 90 seconds, before
-saying it was not sent. Each
+`inhabitant_action_in_progress`; and while every place at the destination is taken, with
+`destination_full`, since places free as visits end and the person asked for that place. The
+browser waits for the next minute, at most 90 seconds, before saying it was not sent. Each
 thing step carries `titles`, what it names as the reads label them, for the page's words. A being
 from outside is offered to the drafter by its kind and number alone, so nothing its program
 declared reaches a hosted request. A placing step reads back as its own `add_thing` edit; an

@@ -618,6 +618,78 @@ def test_a_being_already_asked_at_this_minute_waits_for_the_minute_that_takes_it
     assert "inhabitant_action_in_progress" in things.WAIT_CODES
 
 
+def test_a_full_destination_waits_for_a_free_place_rather_than_refusing():
+    read = _society()
+    knight, well = _knight_id(read), _well_place(read)
+    ask = {
+        "requested_by": uuid.UUID(int=0xAC),
+        "subject_id": knight,
+        "act": "go_to",
+        "target_id": well,
+    }
+    # The positive control: the well has room, so the request is made.
+    assert things.direct_body(read.society, **ask)[1] is None
+    state = copy.deepcopy(dict(read.society.state))
+    [target] = [t for t in read.society.document["targets"] if t["target_id"] == well]
+    others = [p for p in state["inhabitants"] if p["id"] != knight]
+    assert len(others) >= len(target["place_node_ids"])
+    nodes = {n["node_id"]: n for n in read.society.document["navigation"]["nodes"]}
+    for person, place in zip(others, target["place_node_ids"], strict=False):
+        # Each of the well's places taken by somebody standing at it.
+        person["location"] = {"node_id": place, "edge": None}
+        person["position_mm"] = list(nodes[place]["position_mm"])
+    full = dataclasses.replace(read.society, state=state, state_sha256=society_state_sha256(state))
+    assert things.direct_body(full, **ask) == (None, "destination_full")
+    assert "destination_full" in things.WAIT_CODES
+
+
+def test_a_town_s_places_are_named_as_the_town_names_them():
+    import test_walking_surfaces_v3 as town
+
+    document = town._compose(*town._scene_things())
+    destinations = {
+        d["destination_id"].split(":", 1)[1]: d for d in town._town()[1]["destinations"]
+    }
+    state = initial_things_society(town.SOCIETY, town.SEED, document, population=2)
+    row = {
+        "society_id": town.SOCIETY,
+        "engine_version": "exulanica-society/v7",
+        "region_id": "region:starter",
+        "current_tick": state["tick"],
+        "state_sha256": society_state_sha256(state),
+        "state": state,
+    }
+    read = things.read_things(
+        world_id=document["world_id"],
+        version=dataclasses.replace(square.version(()), things=()),
+        reviewed={},
+        looks={},
+        society=(row, document, document["input_seq"], frozenset()),
+        elevation_mm=0,
+        viewer=None,
+    )
+    titles = {place.target_id: place.title for place in read.society.places}
+    named = [
+        t
+        for t in document["targets"]
+        if t.get("enabled") and t["origin"] in ("premises", "furniture")
+    ]
+    # The drafter is shown at most 24 places; among them, at least one premises with a number.
+    listed = [t for t in named if t["target_id"] in titles]
+    assert any(t["place"]["label"] and t["place"]["address_number"] is not None for t in listed)
+    for target in listed:
+        destination = destinations[target["object_id"]]
+        label, number = destination["label"], destination["address_number"]
+        expected = (
+            "a place"
+            if label is None
+            else label
+            if number is None
+            else f"{label} at number {number}"
+        )
+        assert titles[target["target_id"]] == expected
+
+
 def test_a_being_its_own_program_decides_for_is_refused_by_the_route_s_name():
     read = _society(crossed=True)
     visitor = next(b for b in read.society.beings if b.from_outside)

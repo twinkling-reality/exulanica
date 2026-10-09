@@ -59,6 +59,7 @@ from exulanica.world.placed_things import (
     validate_placed_thing,
 )
 from exulanica.world.society_actions import HANDS_ABILITIES, ActionIntent, build_action_request
+from exulanica.world.society_input_policy import TARGET_PLACE_FIELD
 from exulanica.world.society_things import THING_NAMESPACE
 from exulanica.world.thing_library import shipped_looks
 
@@ -100,9 +101,13 @@ DIRECT_ACTS: Final = {"go_to": "go_to", "use": "perform"}
 #: is ``hands`` with that ability, the thing and, to give or take, the other being.
 HANDS_ACTS: Final = HANDS_ABILITIES
 #: The codes that say a direct step is waiting for the society's next minute, not refused: an input
-#: it has not taken in yet (after a thing was placed), or a being in the middle of something or
-#: already asked something at this minute (a later step asking the same being).
-WAIT_CODES: Final = frozenset({"society_input_queued", "inhabitant_action_in_progress"})
+#: it has not taken in yet (after a thing was placed), a being in the middle of something or
+#: already asked something at this minute (a later step asking the same being), or every place at
+#: the destination taken now: places free as visits end, and the route refuses the request if they
+#: are still taken when its minute comes.
+WAIT_CODES: Final = frozenset(
+    {"society_input_queued", "inhabitant_action_in_progress", "destination_full"}
+)
 
 #: How many beings, placed things and places the drafter is shown, the nearest to the person first,
 #: as many as it is shown of the version's objects.
@@ -518,7 +523,8 @@ def _society(
         places.append(
             PlaceRead(
                 target_id=str(target["target_id"]),
-                title=titles.get((origin, str(target.get("object_id"))), "a place"),
+                title=_town_name(target)
+                or titles.get((origin, str(target.get("object_id"))), "a place"),
                 affordance=str(target["affordance"]),
             )
         )
@@ -535,6 +541,17 @@ def _society(
         places=tuple(places[:MAX_THING_CHOICES]),
         asked=frozenset(asked),
     )
+
+
+def _town_name(target: Mapping[str, Any]) -> str | None:
+    """What a town's place calls a premises or a bench target, where the input says: its label,
+    with its address number where it has one ("bakery at number 12"); None where it names none."""
+    named = target.get(TARGET_PLACE_FIELD)
+    label = named.get("label") if isinstance(named, Mapping) else None
+    if not isinstance(label, str) or not label:
+        return None
+    number = named.get("address_number")
+    return label if number is None else f"{label} at number {number}"
 
 
 # -- laying a thing out ---------------------------------------------------------------------------
