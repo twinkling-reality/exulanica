@@ -293,10 +293,11 @@ def _records_modules(state: Mapping[str, Any]) -> bool:
 
 
 def _runs_hands(state: Mapping[str, Any]) -> bool:
-    """Whether a society's first input recorded the hands module, which its minutes then run."""
-    from exulanica.abilities.registry import HANDS
+    """Whether a society's first input recorded the hands module, at any version, which its
+    minutes then run."""
+    from exulanica.abilities.registry import recorded_row
 
-    return HANDS in state.get("modules", ())
+    return recorded_row(state.get("modules", ()), "hands") is not None
 
 
 def _gone_home(thing: Mapping[str, Any], here: set[str]) -> bool:

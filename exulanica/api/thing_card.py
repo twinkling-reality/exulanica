@@ -19,7 +19,7 @@ from typing import Any, Final
 
 import psycopg
 
-from exulanica.abilities.registry import HANDS, ability_module, recorded_modules, recorded_row
+from exulanica.abilities.registry import ability_module, recorded_modules, recorded_row
 from exulanica.api.services import Services
 from exulanica.models.manifest import load_manifest
 from exulanica.things.catalogs import CATALOG_DIRECTORY, thing_catalogs
@@ -103,7 +103,7 @@ def _card(
     assert held is not None
     kind = shipped_kind(ThingKindReference(**held["kind"]))
     runs = list(recorded_modules(state))
-    hands = HANDS in runs
+    hands = recorded_row(runs, "hands") is not None
     worn = _worn(connection, workspace_id, world_id, version_id, wanted, kind)
     card = {
         "profile": THING_CARD_PROFILE,

@@ -155,6 +155,9 @@ ROWS_SHA256 = {
     "exulanica-ability/hands/v1": (
         "be1b97b54ef116a851ff9d4452a22fbf6311110c237f65b178ffd1f242d52719"
     ),
+    "exulanica-ability/hands/v2": (
+        "a17e315e1247d8b5de3c249161306e189a68c98f1b0cabccac4a6d7d9f97a6bb"
+    ),
     "exulanica-ability/notice/v1": (
         "de80c0e505dcda86983300fbee44af82046e0817a21c4718f809af447a46e42c"
     ),

@@ -341,10 +341,10 @@ def _hands_reason(
     brought picked up or taken, and the act among those the being is offered over the whole
     approach distance (walking first where it must). Read when the request is built and again by
     the minute that consumes it."""
-    from exulanica.abilities.registry import HANDS
+    from exulanica.abilities.registry import recorded_row
     from exulanica.world.society_hands import acts_offered
 
-    if HANDS not in state.get("modules", ()):
+    if recorded_row(state.get("modules", ()), "hands") is None:
         return "rejected", "act_not_offered"
     things = {thing["id"]: thing for thing in state.get("things", ())}
     here = {other["id"] for other in state["inhabitants"]}

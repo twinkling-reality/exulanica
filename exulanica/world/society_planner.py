@@ -1156,6 +1156,30 @@ def open_node_near(
     return _step_aside({"position_mm": list(point)}, people, graph, places, crowded)
 
 
+def open_ground(document: dict[str, Any], people: list[dict]) -> tuple[list[str], list[str]]:
+    """The nodes of the input's graph somebody new may stand at, as :func:`open_node_near` reads
+    them: no activity's place, an edge, and nobody in ``people`` standing at or headed to it. Two
+    lists, by node id: those nobody waiting would be in the way at, then every open node; both
+    empty where the input is unavailable."""
+    if document["availability"] != "available" or document["navigation"]["unavailable_reason"]:
+        return [], []
+    nodes, adjacent, edges = _input_graph(document)
+    places_here = document["profile"] in PLACE_INPUTS
+    places = (
+        frozenset(n for t in document["targets"] for n in t["place_node_ids"])
+        if places_here
+        else frozenset()
+    )
+    crowded = _crowded(document) if places_here else frozenset()
+    held = held_nodes(people, {}, graph=(nodes, edges))
+    found = sorted(
+        node_id
+        for node_id in nodes
+        if node_id not in places and node_id not in held and adjacent[node_id]
+    )
+    return [node_id for node_id in found if node_id not in crowded], found
+
+
 #: How a target states the stay a person makes there: a fixed duration, or the routine activity
 #: it names. An input of a later profile restates it; where a person heads is the rest of it.
 STAY_TERMS: Final = ("duration_ticks", "activity")

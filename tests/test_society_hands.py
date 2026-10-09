@@ -1,10 +1,10 @@
 """A being's hands in a society of things, in memory: what it is offered, and what a held thing
 does as the author edits the world and as visitors come and go.
 
-The society records the hands module in its first input (``exulanica-ability/hands/v1``), so its
-things state where their author placed them and, while held, the socket they are in. The tests
-drive the hands step directly with receipts, as the minute consumes them, and read what the state
-and the events say.
+The society records the hands module in its first input (``exulanica-ability/hands/v2`` for a
+society made now), so its things state where their author placed them and, while held, the socket
+they are in. The tests drive the hands step directly with receipts, as the minute consumes them,
+and read what the state and the events say.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import uuid
 from pathlib import Path
 
 import pytest
-from exulanica.abilities.registry import HANDS
+from exulanica.abilities.registry import HANDS, HANDS_FROM_OWN_SIDE
 from exulanica.canonical import canonical_json
 from exulanica.world.role_decisions import DecisionDisposition
 from exulanica.world.society_decision_contract import (
@@ -26,7 +26,7 @@ from exulanica.world.society_decision_contract import (
     choice_options,
     person_role,
 )
-from exulanica.world.society_hands import hand_over_mm, reach_mm
+from exulanica.world.society_hands import approach_node, hand_over_mm, reach_mm
 from exulanica.world.society_model_decisions import hands_goal_policy
 from exulanica.world.society_planner import advance_purposeful_society
 from exulanica.world.society_things import (
@@ -86,6 +86,16 @@ def _beside(state, being, point):
     return moved
 
 
+def _standing(state, being, document, point):
+    """``state`` with ``being`` standing still on the graph's node at ``point``."""
+    [node] = [n["node_id"] for n in document["navigation"]["nodes"] if n["position_mm"] == point]
+    moved = copy.deepcopy(state)
+    person = next(p for p in moved["inhabitants"] if p["id"] == being["id"])
+    person.update(position_mm=list(point), location={"node_id": node, "edge": None})
+    person.update(goal=None, route=None)
+    return moved
+
+
 def _receipt(person, option):
     receipt = {
         "subject_id": person["id"],
@@ -108,7 +118,7 @@ def _receipt(person, option):
 def _picked_up(document):
     """The knight, standing beside the sword, picks it up."""
     state = initial_things_society(SOCIETY, SEED, document, population=POPULATION)
-    assert HANDS in state["modules"]
+    assert HANDS_FROM_OWN_SIDE in state["modules"]
     knight = _knight(state)
     options = choice_options(state, document, knight["id"], _contract(), seed=SEED)
     [pick] = [o for o in options if o.kind == "pick_up"]
@@ -176,6 +186,37 @@ def test_beings_on_neighbouring_nodes_hand_a_thing_over_where_they_stand():
     assert gave.document["at_ms"] == 0
     assert _sword(after)["held_by"] == other["id"]
     validate_things_state(after)
+
+
+def test_a_giver_walks_up_on_its_own_side_of_the_being_it_hands_to():
+    """Under the module's second version, which a society made now records, a being walks to the
+    open node within reach of the being it hands a thing to that is nearest itself, so it never
+    walks through it; a society that recorded the first version walks to the open node nearest the
+    other being, here on the far side, as it did when it was made."""
+    document = compose((GATE, KNIGHT, thing("knight-2", "knight", 1, 9_000, 3_000), SWORD))
+    after, _ = _picked_up(document)
+    other = next(p for p in after["inhabitants"] if p["placed_id"] == "knight-2")
+    # The knight holding the sword stands four metres east of the other, beyond handing reach.
+    after = _standing(after, _knight(after), document, [8_000, 2_000])
+    after = _standing(after, other, document, [4_000, 2_000])
+    knight = _knight(after)
+    apart = _distance(knight["position_mm"], [4_000, 2_000])
+    assert apart > hand_over_mm(document)
+    nodes = {n["node_id"]: n["position_mm"] for n in document["navigation"]["nodes"]}
+
+    def stand(state):
+        return nodes[approach_node(state, document, _knight(state), other["id"])]
+
+    own_side = stand(after)
+    assert _distance(own_side, [4_000, 2_000]) <= hand_over_mm(document)
+    assert _distance(own_side, knight["position_mm"]) < apart
+    options = choice_options(after, document, knight["id"], _contract(), seed=SEED)
+    [give] = [o for o in options if o.kind == "give" and o.addressee_id == other["id"]]
+    assert give.walk_mm == _distance(own_side, knight["position_mm"])
+    # A society that recorded the first version still walks round to the far side.
+    first = copy.deepcopy(after)
+    first["modules"] = [HANDS if m == HANDS_FROM_OWN_SIDE else m for m in first["modules"]]
+    assert _distance(stand(first), knight["position_mm"]) > apart
 
 
 @pytest.mark.parametrize("kind", ["villager"])

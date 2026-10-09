@@ -258,6 +258,51 @@
       "status": "built",
       "refusal": null,
       "reason": "The purposeful planner's choices as version 1 makes them, for the beings whose kinds list them: the routine plans, and a decider is offered, only the activities among stand, talk, rest and visit that a being's kind lists, and a talk only between two beings whose kinds both list talk; waiting is everybody's, and a being whose kind does not rest is never tired, since only resting relieves it. A society of things records it in its first input once it is built, and one that recorded version 1 runs version 1 for its whole life."
+    },
+    {
+      "module": "exulanica-ability/hands/v2",
+      "abilities": [
+        "pick_up",
+        "put_down",
+        "give",
+        "take"
+      ],
+      "parameters": [
+        {
+          "name": "reach_mm",
+          "value": 1500,
+          "minimum": 500,
+          "maximum": 5000,
+          "unit": "mm",
+          "reason": "How near a being stands to a thing it picks up: a person's reach, the society's object reach. Two beings hand a thing over within it or within the walking graph's longest step between two joined nodes, whichever is farther, so beings on neighbouring nodes can always hand over."
+        },
+        {
+          "name": "approach_mm",
+          "value": 8000,
+          "minimum": 1500,
+          "maximum": 50000,
+          "unit": "mm",
+          "reason": "How far a thing, or a being a thing is handed to or taken from, may be for a hands act to be offered: the being walks to stand within reach first. The society's hearing reach, so whoever can be spoken to can be walked to."
+        },
+        {
+          "name": "walk_minutes_maximum",
+          "value": 3,
+          "minimum": 1,
+          "maximum": 30,
+          "unit": "minutes",
+          "reason": "How many minutes a being may walk toward what its hands act is for before the act is dropped, named out_of_reach: a thing carried away or a being that keeps moving is not chased for ever."
+        }
+      ],
+      "events": [
+        "picked_up",
+        "put_down",
+        "gave",
+        "took",
+        "hands_missed"
+      ],
+      "status": "built",
+      "refusal": null,
+      "reason": "Hands as version 1 serves them, with one change to where a being walks to act: of the open nodes of the walking graph within reach of the thing, or of the being it hands a thing to or takes one from, it walks to the one nearest itself, so it comes up on its own side and never walks past or through what it acts on, where version 1 walks to the open node nearest the thing or the being. A society of things records it in its first input once it is built, and one that recorded version 1 runs version 1 for its whole life."
     }
   ]
 }

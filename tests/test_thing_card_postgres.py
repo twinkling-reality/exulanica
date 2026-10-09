@@ -80,7 +80,7 @@ def test_a_thing_s_card_says_what_it_is_does_here_and_wears(app):
         "being",
         "placed",
     )
-    assert "exulanica-ability/hands/v1" in card["runs"]
+    assert "exulanica-ability/hands/v2" in card["runs"]
     abilities = {ability["key"] for ability in card["abilities"]}
     # Only what a running module acts on: hands and lines are run, following is not built.
     assert {"pick_up", "give", "say"} <= abilities and "follow" not in abilities

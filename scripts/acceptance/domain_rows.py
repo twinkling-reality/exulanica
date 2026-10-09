@@ -8011,7 +8011,8 @@ def pieces(arguments: argparse.Namespace) -> int:
 #: The plan HN1's stack is served by: every being a model runs picks the sword up when offered,
 #: else gives it, else waits (A-122).
 HANDS_PLAN = HERE / "plans" / "hands.json"
-HANDS_MODULE = "exulanica-ability/hands/v1"
+#: The hands module's version a society of things made now records.
+HANDS_MODULE = "exulanica-ability/hands/v2"
 #: The modules a new society records to show each being what is near and what it remembers (MM1).
 NOTICE_MODULE, REMEMBER_MODULE = "exulanica-ability/notice/v1", "exulanica-ability/remember/v1"
 #: hands.json's rules by index: the one matching the memory block, the one matching the noticing

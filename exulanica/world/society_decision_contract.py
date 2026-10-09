@@ -463,10 +463,13 @@ def hands_options(
     the being walks first as its ``walk_mm`` (0 where it acts where it stands). Two acts that read
     alike (two things of one kind) are told apart by a number, as places are; while something is
     under way only acts within reach are offered."""
-    from exulanica.abilities.registry import HANDS
+    from exulanica.abilities.registry import recorded_row
     from exulanica.world.society_hands import acts_offered
 
-    if HANDS not in state.get("modules", ()) or not set(contract.words) >= HANDS_KINDS:
+    if (
+        recorded_row(state.get("modules", ()), "hands") is None
+        or not set(contract.words) >= HANDS_KINDS
+    ):
         return []
     people = {other["id"]: other for other in state["inhabitants"]}
     things = {thing["id"]: thing for thing in state["things"]}
@@ -905,9 +908,9 @@ def _said(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str, Any]
 def _holding(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str, Any]:
     """What a being of a society running the hands module holds, by its things' kinds' labels in
     the order the state lists them: stated only there, so every other request reads as it did."""
-    from exulanica.abilities.registry import HANDS
+    from exulanica.abilities.registry import recorded_row
 
-    if HANDS not in state.get("modules", ()):
+    if recorded_row(state.get("modules", ()), "hands") is None:
         return {}
     return {
         "holding": [

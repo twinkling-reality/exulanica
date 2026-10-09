@@ -1531,9 +1531,9 @@ for its whole life and may move on to a later things composition, never back.
 [`ability-modules.v1.json`](../exulanica/abilities/ability-modules.v1.json)), and its minutes run
 exactly those for its whole life, whatever a later table adds; no later input states them. A new
 society records every built module at its newest version: today purposeful
-(`exulanica-ability/purposeful/v2`, below), say, crossing, hands (`exulanica-ability/hands/v1`),
-notice (`exulanica-ability/notice/v1`) and memory (`exulanica-ability/remember/v1`), the last two as
-the [minds contract](minds-contract.md) states.
+(`exulanica-ability/purposeful/v2`, below), say, crossing, hands (`exulanica-ability/hands/v2`,
+below), notice (`exulanica-ability/notice/v1`) and memory (`exulanica-ability/remember/v1`), the
+last two as the [minds contract](minds-contract.md) states.
 A society whose first input names none, made before modules were
 recorded, runs purposeful, say and crossing (`BEFORE_RECORDED`), so its people never use their
 hands and its things never move, and records every minute as it did then: a line's event and its
@@ -1699,14 +1699,18 @@ breaks the rule or the workspace's rules would change it
 to is asked the minute after, whatever is under way for it, and every being reads the lines it
 heard, quoted, in its next request.
 
-**Hands.** The hands module (`exulanica-ability/hands/v1`) offers a being whose kind has the
-ability each act within its approach distance (8,000 mm), nearest first: picking up a thing whose
+**Hands.** The hands module (`exulanica-ability/hands/v1` and `v2`) offers a being whose kind has
+the ability each act within its approach distance (8,000 mm), nearest first: picking up a thing whose
 kind offers `holdable` into a free socket that fits it, putting down what it holds, giving what it
 holds to a being whose kind offers `receive` and has a free socket for it, and taking a thing from
 a being whose kind offers `let_take`. A being is told what it holds. An act out of reach is offered
 when an open node within reach of the thing or the other being remains; choosing it sends the
 being to stand a while at that node, as a chosen stand does, and the act is done on arrival; an act
-within reach makes it wait where it stands that minute. While something is under way for a being
+within reach makes it wait where it stands that minute. Under the module's second version, which
+every society of things made since records, that node is the open node within reach nearest the
+being itself, so it walks up on its own side and never past or through what it acts on or the being
+it hands a thing to; a society that recorded the first version walks to the open node nearest the
+thing or the other being for its whole life. While something is under way for a being
 only acts within reach are offered, since the planner reads no new goal then. An act whose parties
 stood within reach as the minute began is done where they stood then (`at_ms` 0), whichever of them
 a walk that minute carries away: one chosen while the being walks on and a hand-over whose receiver

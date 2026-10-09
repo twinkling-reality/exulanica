@@ -37,6 +37,7 @@ __all__ = [
     "CROSSING",
     "FOLLOW",
     "HANDS",
+    "HANDS_FROM_OWN_SIDE",
     "MODULES_PATH",
     "NOTICE",
     "PURPOSEFUL",
@@ -66,6 +67,8 @@ PURPOSEFUL_BY_KIND: Final = "exulanica-ability/purposeful/v2"
 SAY: Final = "exulanica-ability/say/v1"
 CROSSING: Final = "exulanica-ability/crossing/v1"
 HANDS: Final = "exulanica-ability/hands/v1"
+#: Hands whose being walks up to act on its own side of the thing or the being it acts with.
+HANDS_FROM_OWN_SIDE: Final = "exulanica-ability/hands/v2"
 FOLLOW: Final = "exulanica-ability/follow/v1"
 NOTICE: Final = "exulanica-ability/notice/v1"
 REMEMBER: Final = "exulanica-ability/remember/v1"

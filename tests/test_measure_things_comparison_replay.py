@@ -36,7 +36,7 @@ def test_both_grounds_compose_their_scene_and_holdables_with_the_hands_module_on
         expected = {thing["thing_id"] for thing in shipped_scenes()[scene].document["things"]}
         assert expected <= placed
         assert len(placed - expected) == measure.HOLDABLES
-        assert "exulanica-ability/hands/v1" in graph["document"]["modules"]
+        assert "exulanica-ability/hands/v2" in graph["document"]["modules"]
 
 
 def test_the_town_is_measured_at_its_own_residents_and_the_stated_populations_below_them():

@@ -86,6 +86,7 @@ from measure_living_comparison_replay import (  # noqa: E402
     _spread,
 )
 
+from exulanica.abilities.registry import recorded_row  # noqa: E402
 from exulanica.canonical import canonical_json  # noqa: E402
 from exulanica.environment.district_geometry import segment_blocked  # noqa: E402
 from exulanica.world.authored_delta import version_delta_sha256  # noqa: E402
@@ -345,7 +346,7 @@ def _graph(key: str, ground: str, document: dict[str, Any], *, stated: tuple[int
     ]
     if document["availability"] != "available" or unavailable:
         raise SystemExit(f"refused: the {key} graph does not compose with every thing usable")
-    if "exulanica-ability/hands/v1" not in document["modules"]:
+    if recorded_row(document["modules"], "hands") is None:
         raise SystemExit(f"refused: the {key} graph's society does not run the hands module")
     return {
         "key": key,

@@ -17,7 +17,7 @@ import math
 import uuid
 
 import pytest
-from exulanica.abilities.registry import HANDS
+from exulanica.abilities.registry import HANDS_FROM_OWN_SIDE
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_actions import (
     ACTION_REQUEST_PROFILE,
@@ -70,7 +70,7 @@ ASKER = uuid.UUID(int=0xA5)
 def _society(*placed):
     document = compose(placed)
     state = initial_things_society(SOCIETY, SEED, document, population=POPULATION)
-    assert HANDS in state["modules"]
+    assert HANDS_FROM_OWN_SIDE in state["modules"]
     return state, document
 
 

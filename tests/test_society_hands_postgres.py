@@ -28,7 +28,7 @@ import math
 import time
 
 import pytest
-from exulanica.abilities.registry import HANDS
+from exulanica.abilities.registry import HANDS_FROM_OWN_SIDE
 from exulanica.models.transport import HttpResponse
 from exulanica.world.society_controls import LEASE_SECONDS
 from exulanica.world.society_hands import approach_mm
@@ -49,7 +49,7 @@ pytestmark = pytest.mark.postgres
 NEAR = "625fa188f3f60b26f3a5378131b84cac0d97602b2e655b02dd114896b5504c50"
 #: A society seed under which the other knight walks toward the well while the first stands after
 #: picking the sword up, and stays farther than the approach distance for twenty minutes.
-FAR = "bcf06396544e337e456a5763a5b8afd95e8d1fc6a6984717ec8c821933cb107b"
+FAR = "a2aaa14e5173ea468480c68fbc48005d6df31c1c3088af65110d13218f49dc96"
 
 
 class _Hands(FakeTransport):
@@ -105,7 +105,7 @@ def _knights(app, seed: str):
     things_api._place(client, world, "knight-2", "knight", 1, 6_000, 3_000)
     things_api._place(client, world, "sword", "sword", 2, 5_000, 1_000)
     snapshot = things_api._make_society(client, world)
-    assert HANDS in snapshot["state"]["modules"]
+    assert HANDS_FROM_OWN_SIDE in snapshot["state"]["modules"]
     placed = {
         p["placed_id"]: p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "placed"
     }

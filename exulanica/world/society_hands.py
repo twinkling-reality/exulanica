@@ -1,4 +1,4 @@
-"""Hands in a society of things: ``exulanica-ability/hands/v1``.
+"""Hands in a society of things: ``exulanica-ability/hands/v1`` and ``v2``.
 
 A being whose kind has the hands abilities uses its body plan's sockets: it picks a holdable thing
 up into a free socket that fits it, puts what it holds down where it stands, hands a held thing to
@@ -6,7 +6,10 @@ a being that offers to receive it and has a free socket that fits, or takes a he
 being that lets it be taken. Each happens with the thing, or the other being, within the module's
 reach (``reach_mm``) of where the being stands. A thing farther away, within ``approach_mm``, is
 offered too where an open node of the walking graph stands within reach of it: the being walks to
-that node first and acts in the minute it arrives, for at most ``walk_minutes_maximum`` minutes. A
+that node first and acts in the minute it arrives, for at most ``walk_minutes_maximum`` minutes.
+Version 1 walks it to the open node nearest the thing or the other being; version 2 to the one
+within reach nearest the being itself, so it comes up on its own side and never walks past or
+through what it acts on. The two state the same abilities, figures and events. A
 thing fits a socket when its longest side is within the socket's length; a thing that needs two
 hands is not held in this version.
 
@@ -24,7 +27,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
-from exulanica.abilities.registry import HANDS, ability_module
+from exulanica.abilities.registry import HANDS, ability_module, recorded_row
 from exulanica.things.catalogs import Socket, thing_catalogs
 from exulanica.world.placed_things import ThingKindReference, shipped_kind
 
@@ -105,21 +108,36 @@ def approach_node(
     being: Mapping[str, Any],
     target_id: str,
 ) -> str | None:
-    """The open node a being walks to so as to stand within reach of ``target_id``: the one
-    nearest it that nobody else stands at or is headed to, when that node is within reach of it;
-    None where none is, or the target is held or gone."""
-    from exulanica.world.society_planner import open_node_near
+    """The open node a being walks to so as to stand within reach of ``target_id``, one nobody
+    else stands at or is headed to; None where none is, or the target is held or gone. Under the
+    hands module's first version, the open node nearest the target, when that node is within reach
+    of it; under the second, of the open nodes within reach of it the one nearest the being, by
+    squared distance and then node id, first among the nodes nobody waiting would be in the way
+    at, so the being comes up on its own side."""
+    from exulanica.world.society_planner import open_ground, open_node_near
 
     point = _where(state, target_id)
     if point is None:
         return None
     others = [person for person in state["inhabitants"] if person["id"] != being["id"]]
-    node = open_node_near(dict(document), others, list(point))
-    if node is None:
-        return None
     nodes = {n["node_id"]: n["position_mm"] for n in document["navigation"]["nodes"]}
     being_there = any(person["id"] == target_id for person in state["inhabitants"])
     within = hand_over_mm(document) if being_there else reach_mm()
+    row = recorded_row(state.get("modules", ()), "hands")
+    if row is not None and row.version >= 2:
+        x, z = being["position_mm"]
+        for pool in open_ground(dict(document), others):
+            near = [
+                ((nodes[node][0] - x) ** 2 + (nodes[node][1] - z) ** 2, node)
+                for node in pool
+                if _distance(nodes[node], point) <= within
+            ]
+            if near:
+                return min(near)[1]
+        return None
+    node = open_node_near(dict(document), others, list(point))
+    if node is None:
+        return None
     return node if _distance(nodes[node], point) <= within else None
 
 

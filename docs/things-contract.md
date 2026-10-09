@@ -160,7 +160,8 @@ version runs it for its whole life, where every being may do all five.
 by version, read by [`registry.py`](../exulanica/abilities/registry.py): the abilities it serves,
 its bounded parameters (a figure the module uses itself, or a range a kind states within), the
 event kinds its minute records, and whether it is built. Purposeful (versions 1 and 2), say,
-crossing and hands (`reach_mm` 1,500, `approach_mm` 8,000, `walk_minutes_maximum` 3) are built;
+crossing and hands (versions 1 and 2: `reach_mm` 1,500, `approach_mm` 8,000, `walk_minutes_maximum`
+3) are built;
 follow is not connected and is refused by name (`follow_not_built`). A society of things records
 the modules it runs in its first input and runs exactly those for its whole life
 ([society contract](synthetic-society-contract.md#the-society-of-things-v7)), so a module version
