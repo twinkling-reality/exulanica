@@ -7,7 +7,7 @@
  *
  * A manifest of the first profile states no words, so it gives no rows; any other shape is refused.
  */
-import type { Credentials } from './config.js';
+import { accessHeaders, type Credentials } from './config.js';
 
 export const MANIFEST_PROFILE_WITH_WORDS = 'exulanica.translation-manifest/v2';
 
@@ -100,7 +100,7 @@ export async function fetchCrossingManifest(
 ): Promise<CrossingManifest> {
   const response = await fetcher(
     `${access.baseUrl}/door/crossings/${encodeURIComponent(arrivalId)}/manifest?world_id=${encodeURIComponent(worldId)}`,
-    { headers: { Authorization: `Bearer ${access.token}` }, credentials: 'same-origin' },
+    { headers: accessHeaders(access), credentials: 'same-origin' },
   );
   if (!response.ok) throw new Error(`What came across with this visitor is unavailable: HTTP ${response.status}`);
   return readCrossingManifest(await response.json());

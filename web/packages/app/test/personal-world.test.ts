@@ -224,6 +224,18 @@ describe('the choice to make a world from reviewed photographs', () => {
       .toBe(true);
   });
 
+  it('offers nothing about photographs to a person whose access holds none (a guest)', async () => {
+    const control = buildPersonalWorldChoice({
+      read: vi.fn(async () => {
+        throw new ApiError(403, 'not_authorised', 'this credential does not hold admission.read, which GET /worlds/personal-source requires');
+      }),
+      make: vi.fn(), open: vi.fn(),
+    });
+    await control.refresh();
+    expect(control.root.hidden).toBe(true);
+    expect(control.root.textContent).not.toContain('admission.read');
+  });
+
   it('offers the action the server names, with its counts, and opens what it makes', async () => {
     const made = entry();
     const make = vi.fn(async () => made);

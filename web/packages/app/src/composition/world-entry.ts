@@ -532,7 +532,13 @@ export function buildPersonalWorldChoice(deps: PersonalWorldChoice): PersonalWor
     try {
       // A refused press keeps its words on screen through this read; only a new press clears them.
       show(await deps.read());
+      root.hidden = false;
     } catch (error) {
+      // A person whose access holds no photographs (a guest) is offered nothing about them.
+      if (error instanceof ApiError && error.status === 403 && error.code === 'not_authorised') {
+        root.hidden = true;
+        return;
+      }
       show(null);
       status.textContent = entryFailure(error, 'Your photographs could not be checked.');
     }

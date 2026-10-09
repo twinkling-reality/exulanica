@@ -27,7 +27,7 @@
  */
 
 import type { GeneratedSiteMount, SiteDrawing } from '@exulanica/atlas-react/generated-site';
-import type { Credentials } from '../config.js';
+import { accessHeaders, type Credentials } from '../config.js';
 import { say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
 import type { WorldLookChoice } from '../world-look.js';
@@ -94,7 +94,7 @@ export async function loadSiteWorld(
   let response: Response;
   for (let ask = 1; ; ask += 1) {
     response = await fetch(url, {
-      headers: { Authorization: `Bearer ${access.token}`, Accept: 'application/json' },
+      headers: { ...accessHeaders(access), Accept: 'application/json' },
       credentials: 'same-origin',
     });
     if (ask >= DRAWING_ASKS || !(await stillMaking(response))) break;

@@ -119,6 +119,15 @@ describe('listing a city', () => {
     expect(calls[0]!.headers.get('Authorization')).toBe('Bearer scratch-token');
   });
 
+  it('sends no bearer for an account session, whose cookie carries it (an empty bearer is refused)', async () => {
+    const container = await sha256(BYTES);
+    const { fetch, calls } = recorder(() => new Response(JSON.stringify({ city_seed: CITY_SEED, tiles: [document(container)] }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    }));
+    await listBakedTiles({ ...access(fetch), token: '' }, { citySeed: CITY_SEED, lod: 0 });
+    expect(calls[0]!.headers.has('Authorization')).toBe(false);
+  });
+
   it('refuses a seed that is not 64 hex characters before it asks anything', async () => {
     const { fetch, calls } = recorder(() => new Response('never', { status: 200 }));
     await expect(listBakedTiles(access(fetch), { citySeed: 'nonsense' })).rejects.toThrow(TileRouteRefusal);

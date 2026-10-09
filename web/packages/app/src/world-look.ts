@@ -24,7 +24,7 @@ import type { LookFamily, ResolvedStylePack } from '@exulanica/atlas-core';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile, RenderLook } from '@exulanica/atlas-react/generated-tile';
 import type { FetchedPieces, OpeningSlot, PackVehicleBodies, TownLookRoles } from '@exulanica/atlas-react/style-pack';
 import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
-import type { Credentials } from './config.js';
+import { accessHeaders, type Credentials } from './config.js';
 import type { WorldStylePackBinding } from './world-style-api.js';
 import lookFamilyText from '../../../../assets/catalogs/world-kinds/look-family.v1.json?raw';
 import townRolesText from '../../../../assets/style-packs/town-look-roles.v1.json?raw';
@@ -157,7 +157,7 @@ function hex(buffer: ArrayBuffer): string {
 
 async function hostGet(access: Credentials, path: string, what: string): Promise<Response> {
   const response = await fetch(`${access.baseUrl}${path}`, {
-    headers: { Authorization: `Bearer ${access.token}` },
+    headers: accessHeaders(access),
     credentials: 'same-origin',
   });
   if (!response.ok) throw new Error(`${what} unavailable: HTTP ${response.status}`);

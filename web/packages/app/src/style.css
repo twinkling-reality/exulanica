@@ -346,6 +346,53 @@ body {
   cursor: default;
 }
 
+/* A guest's way in: the code they were given in one field, and Enter beside it, first on the gate. */
+.guest-entry {
+  display: grid;
+  gap: 0.6rem;
+  width: min(26.3rem, 82vw);
+}
+
+.guest-entry-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+#shell .guest-entry .guest-code {
+  flex: 1;
+  min-width: 0;
+  height: 2.65rem;
+  padding: 0 1.1rem;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ui-light-ink) 5%, var(--ui-light-canvas));
+  color: var(--ui-light-ink);
+  font: 500 0.95rem / 1 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-align: left;
+}
+
+#shell .guest-entry .guest-enter {
+  flex: none;
+  min-width: 6rem;
+  height: 2.65rem;
+  padding: 0 1.4rem;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  font: 600 0.95rem / 1 var(--font-ui);
+  cursor: pointer;
+}
+
+#shell .guest-entry-row > .guest-enter:only-child { flex: 1; }
+
+#shell .guest-entry .guest-enter:disabled { opacity: 0.45; cursor: default; }
+
+.guest-entry > .gate-failure { margin: 0; text-align: left; }
+
 /* A saved-world threshold is a supported-action rail, not a credential gate. It emphasizes the
  * one useful action available in a fresh workspace without implying that review already composes
  * a world. The extra #shell specificity keeps the later redesign layer from turning the embedded

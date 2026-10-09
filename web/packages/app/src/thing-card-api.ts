@@ -6,7 +6,7 @@
  * Each reader takes only the fields the card shows and refuses any other shape, so a document
  * that changes its meaning is never read as the old one.
  */
-import type { Credentials } from './config.js';
+import { accessHeaders, type Credentials } from './config.js';
 
 /** `exulanica.origin/v1`: who made a thing's kind or look, from what, and under which licence. */
 export interface OriginRecord {
@@ -144,7 +144,7 @@ export async function fetchThingLooks(
 ): Promise<ReadonlyMap<string, LookReference>> {
   const response = await fetcher(
     `${access.baseUrl}/world/versions/${encodeURIComponent(versionId)}/thing-looks?world_id=${encodeURIComponent(worldId)}`,
-    { headers: { Authorization: `Bearer ${access.token}` }, credentials: 'same-origin' },
+    { headers: accessHeaders(access), credentials: 'same-origin' },
   );
   if (!response.ok) throw new Error(`The looks of this world's things are unavailable: HTTP ${response.status}`);
   return readThingLooks(await response.json());

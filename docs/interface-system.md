@@ -139,6 +139,18 @@ the studio before it exists is held and shown when the studio opens.
 Below 60rem the application shows its narrow-window notice; the region rules for narrow screens
 (a bottom bar and a bottom sheet) exist in `layout.css` for when that notice is lifted.
 
+### The way in
+
+The credential gate (`web/packages/app/src/ui/credential-gate.ts`) offers what the server states a
+signed-out browser may use (`sign_in` beside the refusal of `GET /api/auth/session`: Google on or
+off, and a guest entry asking a code, taking none, or off); where the answer states none, it offers
+Google where the server has accounts. Where guests may come in, their entry comes first: "Enter with
+the code you were given.", one field ("Entry code") and Enter, which posts the code to `POST
+/api/auth/guest` from the page's own origin and starts the page in the session its answer sets. A
+refusal is said by its code: a wrong code, a day's guests all admitted (with when to try again, from
+`retry_after_seconds`), guests off, a server that could not admit one just now, or a page not served
+by the server itself. The developer's token entry stays last, under "or, for developers".
+
 ### Your worlds and Create a world
 
 Your worlds (`web/packages/app/src/composition/world-entry.ts`, `ui/your-worlds.css`) is the first

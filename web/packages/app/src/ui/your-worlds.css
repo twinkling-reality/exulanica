@@ -279,6 +279,44 @@
 
 .your-worlds-reconcile:empty { display: none; }
 
+/* Adopting changes saved elsewhere is part of the page: the stage's own tokens, a rule at its left. */
+#shell .your-worlds .world-entry-reconcile {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.125rem 0 0.125rem 1rem;
+  border-left: 2px solid var(--color-border-strong);
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+#shell .your-worlds .world-entry-reconcile label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: var(--color-text);
+}
+
+#shell .your-worlds .world-entry-reconcile input[type='checkbox'] {
+  margin-top: 0.2rem;
+  accent-color: var(--color-text);
+}
+
+#shell .your-worlds .world-entry-reconcile button {
+  justify-self: start;
+  min-height: 2.5rem;
+  padding: 0 1.125rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text);
+  font: 560 0.9rem / 1 var(--font-ui);
+  cursor: pointer;
+}
+
+#shell .your-worlds .world-entry-reconcile button:disabled { cursor: default; opacity: 0.55; }
+
 .your-worlds-reconcile {
   max-width: 30rem;
   margin-top: 1rem;
@@ -400,6 +438,9 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
+
+/* Nothing about photographs for a person whose access holds none: the offer and its room go. */
+#shell .your-worlds > .your-worlds-more:has(> .personal-world-choice[hidden]) { display: none; }
 
 #shell .your-worlds .your-worlds-more h3 {
   margin: 0 0 0.25rem;

@@ -32,7 +32,7 @@
  * interface would be confidently wrong. Re-reading costs one request and cannot drift.
  */
 
-import { readBrowserAccount, type BrowserAccountState } from './account-session.js';
+import { enterAsGuest, readBrowserAccount, type BrowserAccountState } from './account-session.js';
 import {
   anchorId as toAnchorId,
   islandId as toIslandId,
@@ -196,18 +196,21 @@ async function boot(): Promise<void> {
     await start('', account.session.csrfToken);
     return;
   }
-  askForAccess(account.kind);
+  askForAccess(account);
 }
 
 /**
  * Account login is the normal entry. The folded bearer path remains for local operators and
  * retains its previous no-storage behavior.
  */
-function askForAccess(accountState: 'signed-out' | 'unavailable'): void {
+function askForAccess(account: Exclude<BrowserAccountState, { readonly kind: 'authenticated' }>): void {
   replace(shell, [buildCredentialGate({
-    accounts: accountState,
+    accounts: account.kind,
+    modes: account.signIn ?? null,
     signIn: () => window.location.assign('/api/auth/google/start'),
     enter: (token) => start(token),
+    // The guest route sets the session cookie; the page then starts as any signed-in page does.
+    enterAsGuest: async (code) => { await enterAsGuest(code); window.location.reload(); },
   })]);
 }
 

@@ -47,6 +47,18 @@ export interface Credentials {
   readonly csrfToken?: string;
 }
 
+/**
+ * The headers a direct request carries for these credentials, as graph-client's transport sends
+ * them: the bearer only where there is a token (an account session's is empty, and an empty bearer
+ * is refused even beside a valid cookie), and the CSRF token on a write where the session has one.
+ */
+export function accessHeaders(access: Pick<Credentials, 'token' | 'csrfToken'>, method = 'GET'): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (access.token) headers['Authorization'] = `Bearer ${access.token}`;
+  if (access.csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method)) headers['X-CSRF-Token'] = access.csrfToken;
+  return headers;
+}
+
 /** The development token, or null. Never read from the page, never written back to it. */
 export function developmentToken(): string | null {
   const supplied = import.meta.env['VITE_EXULANICA_TOKEN'];

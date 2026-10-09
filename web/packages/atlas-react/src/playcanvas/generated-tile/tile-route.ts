@@ -181,7 +181,8 @@ export async function listBakedTiles(
   const search = new URLSearchParams({ city_seed: query.citySeed });
   if (query.lod !== undefined) search.set('lod', String(query.lod));
   const response = await caller(access)(endpoint(access.baseUrl, `/tiles?${search.toString()}`), {
-    headers: { Authorization: `Bearer ${access.token}`, Accept: 'application/json' },
+    // The bearer only where there is a token: an account session's is empty (its cookie carries it).
+    headers: { ...(access.token ? { Authorization: `Bearer ${access.token}` } : {}), Accept: 'application/json' },
   });
   if (!response.ok) throw await refusalOf(response, `The tile list for city ${query.citySeed}`);
   const body: unknown = await response.json();
@@ -253,7 +254,7 @@ export async function fetchBakedTile(
   }
 
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${access.token}`,
+    ...(access.token ? { Authorization: `Bearer ${access.token}` } : {}),
     Accept: BAKED_TILE_MEDIA_TYPE,
   };
   // The route answers this with 304 and no body.

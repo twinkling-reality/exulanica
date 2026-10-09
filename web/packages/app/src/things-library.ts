@@ -12,7 +12,7 @@
  * digest the list lacks, and a 404 there (absent, withdrawn or another workspace's) is not one.
  */
 import { ThingLibrary, readThingLibrary, type HeldThings } from '@exulanica/atlas-react/things';
-import type { Credentials } from './config.js';
+import { accessHeaders, type Credentials } from './config.js';
 
 export const THING_LIBRARY_PATH = '/things/library';
 
@@ -20,7 +20,7 @@ const DIGEST = /^[0-9a-f]{64}$/u;
 
 async function hostGet(access: Credentials, path: string, what: string, fetcher: typeof fetch): Promise<Response> {
   const response = await fetcher(`${access.baseUrl}${path}`, {
-    headers: { Authorization: `Bearer ${access.token}` },
+    headers: accessHeaders(access),
     credentials: 'same-origin',
   });
   if (!response.ok) throw new Error(`${what} unavailable: HTTP ${response.status}`);
@@ -32,7 +32,7 @@ function heldThings(access: Credentials, fetcher: typeof fetch): HeldThings {
   const held = async (path: string, sha256: string, what: string): Promise<ArrayBuffer | null> => {
     if (!DIGEST.test(sha256)) throw new Error(`${what} is not named by a SHA-256`);
     const response = await fetcher(`${access.baseUrl}${path}`, {
-      headers: { Authorization: `Bearer ${access.token}` },
+      headers: accessHeaders(access),
       credentials: 'same-origin',
     });
     if (response.status === 404) return null;

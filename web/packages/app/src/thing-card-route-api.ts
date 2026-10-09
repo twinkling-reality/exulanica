@@ -9,7 +9,7 @@
  * holds, the look it wears and the looks it may wear, and the society's minute and record as the
  * card was read, which the look swap shows as its proof.
  */
-import type { Credentials } from './config.js';
+import { accessHeaders, type Credentials } from './config.js';
 import { readOrigin, type OriginRecord } from './thing-card-api.js';
 
 export const THING_CARD_PROFILE = 'exulanica.thing-card/v1';
@@ -147,7 +147,7 @@ export async function fetchThingCardRoute(
   access: Credentials, worldId: string, versionId: string, thingId: string, fetcher: typeof fetch = fetch,
 ): Promise<ThingCardRoute | null> {
   const response = await fetcher(cardPath(access, worldId, versionId, thingId), {
-    headers: { Authorization: `Bearer ${access.token}` }, credentials: 'same-origin',
+    headers: accessHeaders(access), credentials: 'same-origin',
   });
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`This thing's card is unavailable: HTTP ${response.status}`);
@@ -164,7 +164,7 @@ export async function chooseThingLook(
 ): Promise<LookChoiceOutcome> {
   const response = await fetcher(cardPath(access, worldId, versionId, thingId, '/look'), {
     method: 'POST',
-    headers: { Authorization: `Bearer ${access.token}`, 'Content-Type': 'application/json' },
+    headers: { ...accessHeaders(access, 'POST'), 'Content-Type': 'application/json' },
     credentials: 'same-origin',
     body: JSON.stringify({ look: lookBody(ref) }),
   });

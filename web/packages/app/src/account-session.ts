@@ -16,10 +16,20 @@ export interface BrowserAccountSession {
   readonly csrfToken: string;
 }
 
+/**
+ * How a signed-out browser may come in, as the server states it beside its refusal (`sign_in`):
+ * Google, and a guest entry that asks for a code, takes none, or is off. Null where the answer
+ * states none (a server older than the field), and the page then judges by the status as before.
+ */
+export interface SignInModes {
+  readonly google: boolean;
+  readonly guest: 'code' | 'open' | 'off';
+}
+
 export type BrowserAccountState =
   | { readonly kind: 'authenticated'; readonly session: BrowserAccountSession }
-  | { readonly kind: 'signed-out' }
-  | { readonly kind: 'unavailable' };
+  | { readonly kind: 'signed-out'; readonly signIn?: SignInModes | null }
+  | { readonly kind: 'unavailable'; readonly signIn?: SignInModes | null };
 
 const nonempty = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 
@@ -30,8 +40,12 @@ export async function readBrowserAccount(
   const response = await fetcher('/api/auth/session', {
     method: 'GET', credentials: 'include', headers: { accept: 'application/json' },
   });
-  if (response.status === 401) return { kind: 'signed-out' };
-  if (response.status === 503) return { kind: 'unavailable' };
+  if (response.status === 401 || response.status === 503) {
+    const kind = response.status === 401 ? 'signed-out' : 'unavailable';
+    // The sign-in modes only where the answer states them.
+    const signIn = await signInModes(response);
+    return signIn === null ? { kind } : { kind, signIn };
+  }
   if (!response.ok) throw await toApiError(response);
   const value = await response.json() as Record<string, unknown>;
   const fields = ['user_id', 'actor', 'workspace_id', 'expires_at', 'csrf_token'] as const;
@@ -43,4 +57,36 @@ export async function readBrowserAccount(
     workspaceId: value.workspace_id as string, expiresAt: value.expires_at as string,
     csrfToken: value.csrf_token as string,
   }) };
+}
+
+/** The sign-in modes a signed-out answer states, or null where it states none or none that reads. */
+async function signInModes(response: Response): Promise<SignInModes | null> {
+  try {
+    const body = await response.json() as Record<string, unknown>;
+    const modes = body['sign_in'];
+    if (modes === null || typeof modes !== 'object' || Array.isArray(modes)) return null;
+    const { google, guest } = modes as Record<string, unknown>;
+    if (typeof google !== 'boolean' || (guest !== 'code' && guest !== 'open' && guest !== 'off')) return null;
+    return Object.freeze({ google, guest });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Enter as a guest (`POST /api/auth/guest`, same origin): with the code where the server asks for
+ * one. Its answer sets the session cookie; a refusal throws as an `ApiError` by its code
+ * (`guest_entry_code_wrong`, `guest_entries_exhausted` with `retry_after_seconds`, `guest_entry_off`,
+ * `guest_entry_unavailable`, `origin_not_permitted`).
+ */
+export async function enterAsGuest(
+  code: string | null,
+  fetcher: typeof globalThis.fetch = globalThis.fetch.bind(globalThis),
+): Promise<void> {
+  const response = await fetcher('/api/auth/guest', {
+    method: 'POST', credentials: 'include',
+    headers: { accept: 'application/json', 'content-type': 'application/json' },
+    body: JSON.stringify(code === null ? {} : { code }),
+  });
+  if (!response.ok) throw await toApiError(response);
 }

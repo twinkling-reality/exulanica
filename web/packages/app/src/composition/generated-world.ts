@@ -39,7 +39,7 @@
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import { toApiError } from '@exulanica/graph-client';
 import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
-import type { Credentials } from '../config.js';
+import { accessHeaders, type Credentials } from '../config.js';
 import { fill, say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
 import type { GeneratedGround, SavedWorldEntry } from '../world-entry-api.js';
@@ -132,7 +132,7 @@ async function worldTileBytes(
   const url = `${access.baseUrl}/world/versions/${encodeURIComponent(entry.authoredVersionId)}`
     + `/tiles/${encodeURIComponent(bakedTileId)}/bytes?${query.toString()}`;
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${access.token}`, Accept: CONTAINER_MEDIA_TYPE },
+    headers: { ...accessHeaders(access), Accept: CONTAINER_MEDIA_TYPE },
     credentials: 'same-origin',
   });
   if (!response.ok) {
@@ -320,7 +320,7 @@ async function bakeState(
   entry: SavedWorldEntry,
 ): Promise<'baked' | 'failed' | 'baking'> {
   const response = await fetch(`${access.baseUrl}/world-entries/${encodeURIComponent(entry.entryId)}`, {
-    headers: { Authorization: `Bearer ${access.token}`, Accept: 'application/json' },
+    headers: { ...accessHeaders(access), Accept: 'application/json' },
     credentials: 'same-origin',
   });
   if (!response.ok) return 'baking';
