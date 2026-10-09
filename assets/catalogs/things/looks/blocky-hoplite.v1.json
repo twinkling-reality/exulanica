@@ -1,0 +1,41 @@
+{
+  "profile": "exulanica.look/v1",
+  "look": "blocky-hoplite",
+  "version": 1,
+  "label": "blocky hoplite",
+  "body_plan": "humanoid/v1",
+  "look_kind": "rigid_on_bones",
+  "container": {
+    "sha256": "3f9c9897cda7b8f36037096b7ef25105727b26d99eb4d5a62993eb897d614648",
+    "bytes": 45920,
+    "media_type": "model/gltf-binary"
+  },
+  "rig": null,
+  "height_mm": 1700,
+  "sampling": "linear",
+  "light": null,
+  "role": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

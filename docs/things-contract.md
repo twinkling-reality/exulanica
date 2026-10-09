@@ -494,7 +494,7 @@ generated lamps its look may be swapped for (870 mm); version 1 stays as it ship
 
 | Look | Look kind | Origin |
 | --- | --- | --- |
-| `blocky-knight`, `blocky-traveller` | `rigid_on_bones` | authored here, CC0 |
+| `blocky-knight`, `blocky-traveller`, `blocky-hoplite` | `rigid_on_bones` | authored here, CC0 |
 | `primitive-sword`, `primitive-lantern`, `primitive-well`, `primitive-gate` | `static` | authored here, CC0 |
 | `spirit-light` | `light` | authored here, CC0 |
 | `people-catalog` | `catalog_person` | imported, CC0: the people catalog's MakeHuman family through MPFB 2, with Quaternius locomotion |

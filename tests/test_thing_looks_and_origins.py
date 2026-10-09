@@ -72,7 +72,7 @@ def test_an_authored_look_s_container_is_admitted_reproducible_and_pinned(look):
     }
 
 
-@pytest.mark.parametrize("look", ["blocky-traveller", "blocky-knight"])
+@pytest.mark.parametrize("look", ["blocky-traveller", "blocky-knight", "blocky-hoplite"])
 def test_a_blocky_figure_stands_every_required_joint_at_the_root_by_its_bone_name(look):
     document = _document(container_of(look))
     roots = [document["nodes"][index] for index in document["scenes"][0]["nodes"]]
