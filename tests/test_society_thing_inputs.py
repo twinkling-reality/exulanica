@@ -8,7 +8,8 @@ What is shown here, with no database:
 *   a thing off the ground states its height and offers no activity, and still blocks;
 *   a gate's arrival point is its kind's, turned with it;
 *   every placed thing is bound by reference, removed ones included, and each kind by digest; a
-    thing whose kind is not shipped at its digest makes the input unavailable by name;
+    thing whose kind is not shipped at its digest makes the input unavailable by name; a thing of a
+    kind its workspace keeps is left out by name, and stops no society;
 *   the input's list of things is held to its shape, and a things input may move on to a later
     things input keeping its arrival, never back to another composition;
 *   an authored object named like a placed thing shares no node or obstacle with it;
@@ -23,7 +24,7 @@ import copy
 import dataclasses
 
 import pytest
-from exulanica.world.placed_things import ThingKindReference
+from exulanica.world.placed_things import ThingKindReference, WorkspaceKindReference
 from exulanica.world.society_input_policy import AUTHORED_GROUND_INPUT_V5
 from exulanica.world.society_planner import (
     CLEARANCE_MM,
@@ -117,6 +118,18 @@ def test_every_placed_thing_is_bound_by_reference_and_an_unshipped_kind_is_refus
         "unknown_thing_kind:well",
     )
     assert unavailable["things"] == []
+
+
+def test_a_thing_of_a_workspace_s_own_kind_is_left_out_and_stops_no_society():
+    creature = dataclasses.replace(
+        WELL, thing_id="creature", kind=WorkspaceKindReference("b" * 64), transform=WELL.transform
+    )
+    document = compose((WELL, creature))
+    assert document["availability"] == "available"
+    assert [entry["placed_id"] for entry in document["things"]] == ["well"]
+    bound = {(r["kind"], r["identity"]) for r in document["dependency_refs"]}
+    assert ("placed_thing", f"{document['version_id']}:well") in bound
+    assert ("placed_thing", f"{document['version_id']}:creature") not in bound
 
 
 @pytest.mark.parametrize(

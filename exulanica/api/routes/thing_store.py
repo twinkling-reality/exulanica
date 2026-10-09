@@ -18,6 +18,9 @@ any byte is sent, so another workspace's thing, a withdrawn look and an absent o
     every cache.
 *   ``GET /things/kinds/{kind_sha256}`` answers the kind the workspace holds at that digest, read
     again with its looks and its plan resolved in the store, never cached.
+*   ``GET /things/plans/{plan_sha256}`` answers the drafted body plan the workspace holds at that
+    digest, read again, never cached: what a page draws a held kind's figure on, since the shipped
+    library holds only the shipped plans.
 *   ``DELETE /things/kinds/{kind_sha256}`` erases a creature the workspace drafted from a
     person's words, whole and at once (:meth:`ThingStore.erase_creature`): its kind and, with its
     drafted plan, the plan, its recipe and every look drawn on it, whose containers the purge
@@ -146,6 +149,24 @@ def held_kind(
     if held is None:
         return _absent()
     return _document(held.document)
+
+
+@router.get(
+    "/plans/{plan_sha256}",
+    summary="A body plan this workspace holds, by the SHA-256 of its document.",
+)
+def held_plan(
+    plan_sha256: Annotated[str, Path(pattern=f"^{DIGEST.pattern}$")],
+    sessions: ReadOnlySessions,
+    session: CurrentSession,
+) -> Any:
+    with sessions() as connection:
+        document = ThingStore(connection, session.workspace_id, None).plan_document_by_digest(
+            plan_sha256
+        )
+    if document is None:
+        return _absent()
+    return _document(document)
 
 
 @router.delete(

@@ -76,6 +76,20 @@ const placedRow = (thingId: string, kind: { kind: string; version: number; sha25
 });
 
 describe('the version document\'s placed things', () => {
+  it('reads a thing of its workspace\'s own kind by the digest alone, and one whose kind is gone as gone', () => {
+    const creature = { source: 'workspace', sha256: 'c'.repeat(64) };
+    const version = parseVersion({
+      schema_version: 5, version_id: 'v', world_id: 'w', source_snapshot_id: 's', parent_version_id: null, title: 't',
+      origin: 'authored', style_version_id: null, state_sha256: '1'.repeat(64), edit_seq: 1, source_invalidated: false,
+      created_by: 'a', created_at: '2026-10-06T00:00:00Z', objects: [], element_overrides: [], edits: [],
+      things: [placedRow('creature-1', creature as never, 0, 0), { ...placedRow('creature-2', creature as never, 0, 0), gone: true }],
+    });
+    expect(version.things!.map((thing) => [thing.thingId, thing.kind, thing.gone])).toEqual([
+      ['creature-1', { source: 'workspace', sha256: 'c'.repeat(64) }, undefined],
+      ['creature-2', { source: 'workspace', sha256: 'c'.repeat(64) }, true],
+    ]);
+  });
+
   it('reads each placed thing: its kind by digest, its region and pose, never a look', () => {
     const { kindRef } = served();
     const version = parseVersion({
@@ -136,6 +150,19 @@ describe('drawing the placed things and raising a pick', () => {
       thingId: 'spirit-1', kind: fixture.kindRef('lantern_spirit'), regionId: 'region:starter',
       transform: { xMm: 0, yMm: 0, zMm: -3000, yawMicroradians: 0, scaleMilli: 1000 }, removed: false,
     }]);
+    // A thing whose workspace kind is gone (its creature erased) is handed to the layer nowhere.
+    const gone = parseVersion({
+      schema_version: 5, version_id: 'v', world_id: 'w', source_snapshot_id: 's', parent_version_id: null, title: 't',
+      origin: 'authored', style_version_id: null, state_sha256: '1'.repeat(64), edit_seq: 1, source_invalidated: false,
+      created_by: 'a', created_at: '2026-10-06T00:00:00Z', objects: [], element_overrides: [], edits: [],
+      things: [
+        placedRow('spirit-1', fixture.kindRef('lantern_spirit'), 0, -3000),
+        { ...placedRow('creature-1', { source: 'workspace', sha256: 'c'.repeat(64) } as never, 0, 0), gone: true },
+      ],
+    });
+    await things.setPlaced(gone.things!);
+    expect(layer.placed.map((one) => one.thingId)).toEqual(['spirit-1']);
+    await things.setPlaced(version.things!);
     const heard: ThingPickDetail[] = [];
     shell.addEventListener(THING_PICK_EVENT, (event) => heard.push((event as CustomEvent<ThingPickDetail>).detail));
     const hit = things.pick([0, 1.25, 2], [0, 0, -1])!;

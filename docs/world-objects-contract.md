@@ -553,7 +553,7 @@ client recipe; this surface has no such prior client, so it does not invent a se
 | `POST` | `/world/versions/{version_id}/objects/undo/preview` | Which edit an undo would reverse and what it would restore; writes nothing |
 | `POST` | `/world/versions/{version_id}/arrangements/preview` | Where an arrangement's objects would stand, or its refusal; writes nothing |
 | `POST` | `/world/versions/{version_id}/arrangements/apply` | Add an arrangement's objects as ordinary edits |
-| `POST` | `/world/versions/{version_id}/things` | Place one thing by its shipped kind (section 14) |
+| `POST` | `/world/versions/{version_id}/things` | Place one thing by its kind, shipped or its workspace's own (section 14) |
 | `POST` | `/world/versions/{version_id}/things/{thing_id}/move` | Replace one placed thing's pose |
 | `POST` | `/world/versions/{version_id}/things/{thing_id}/remove` | Store a placed thing's removal |
 | `POST` | `/world/versions/{version_id}/things/undo` | Reverse the newest edit not already reversed |
@@ -941,9 +941,10 @@ no part of this region's society's input.
 ## 14. Placed things
 
 A thing an author places, a knight by the well, a sword on the ground, the gate visitors arrive
-through, is a row of `world_alternate_thing` (migration 0152): an id the author chooses, unique in
-the version; a shipped thing kind by key, version and the SHA-256 of its document
-([things contract](things-contract.md#a-thing-kind)); a region of the source snapshot and a
+through, a creature drafted from the person's words, is a row of `world_alternate_thing` (migration
+0152): an id the author chooses, unique in the version; a shipped thing kind by key, version and the
+SHA-256 of its document ([things contract](things-contract.md#a-thing-kind)), or a kind its
+workspace keeps by that digest alone (below); a region of the source snapshot and a
 region-local pose of `x_mm`, `y_mm`, `z_mm` and `yaw_microradians`; and `origin.role`, `fictional`
 or `personal`, chosen by the person. It names no look and no asset: how it is drawn is a look chosen
 for it, and what it does is its kind's and the simulation's. It has no scale, since a kind's
@@ -964,6 +965,22 @@ and `remove_thing` append to the version's edit log under the same compare-and-s
 naming the thing in the log's `thing_id`, and undo restores the stored document; an undone addition
 is a retained, removed row, and the same id may be placed again. A branched or carried version keeps
 its placed things as they are, since a shipped kind's version never changes.
+
+A thing may instead name a kind its workspace keeps ([a workspace's own
+things](things-contract.md#a-workspaces-own-things), such as a creature drafted from words) by the
+SHA-256 of the kind's document alone, `{"source": "workspace", "sha256"}`, never by its key or
+version, which the person's words may have made (`kind_source` `workspace`, migration 0188, the
+table refusing a key or version beside it, and a shipped kind without them). It is placed only
+while the workspace holds that kind, a being only where its deciders allow the routine; another
+workspace's kind and an invented digest are refused alike, `422 invalid_thing_placement`. Whether
+the workspace still holds the kind is read whenever the thing is read and never stored: once the
+workspace no longer holds it, or erased it after the thing was placed (so the same creature kept
+again does not bring that thing back), the thing is gone. The version document then marks it
+`"gone": true`, which is no part of the version's state or digest; nothing draws it, a move is
+refused as `410 thing_kind_erased`, and a removal or an undo still stands. A society of things
+leaves such a thing out of its input by name, whatever its region: a society reads shipped kinds
+alone and replays without the workspace's store, so the thing stands where it was placed and stops
+no society.
 
 The version's delta gains a `things` section, sorted by `thing_id`, written only when the version
 holds a placed thing, which selects schema version 4; the version document then reads with

@@ -51,6 +51,19 @@ def test_0167_reads_stored_choices_as_shipped_and_indexes_said_events_by_speaker
         )
         with pg_harness.migrated_schema() as (_psycopg, admin):
             scratch = admin.execute("select current_schema()").fetchone()[0]
+            # Whether a placed thing names a shipped kind or its workspace's own (0188), and the
+            # kind erasures (0172), which today's version read names when it asks whether a thing's
+            # kind is gone. Before 0167 neither exists; the things placed here are shipped kinds,
+            # so a 'shipped' column and an empty view are facts. Both are dropped before 0167 runs.
+            admin.execute(
+                "alter table world_alternate_thing "
+                "add column kind_source text not null default 'shipped'"
+            )
+            admin.execute(
+                "create view thing_erasure as select null::uuid as workspace_id,"
+                "null::text as sha256,null::timestamptz as erased_at where false"
+            )
+            admin.commit()
             base = env_get("TEST_DATABASE_URL")
             assert base is not None
             database = Database(url=make_conninfo(base, options=f"-csearch_path={scratch},public"))
@@ -97,6 +110,8 @@ def test_0167_reads_stored_choices_as_shipped_and_indexes_said_events_by_speaker
                         actor,
                     ),
                 )
+            admin.execute("drop view thing_erasure")
+            admin.execute("alter table world_alternate_thing drop column kind_source")
             admin.execute(by_version[_MIGRATION].sql)
             admin.commit()
             assert [row[0] for row in admin.execute("select source from world_thing_look")] == [

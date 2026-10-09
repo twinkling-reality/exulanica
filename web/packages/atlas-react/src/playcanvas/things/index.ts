@@ -21,18 +21,20 @@ export type {
   ThingLibraryList,
 } from './documents.js';
 export {
+  BODY_PLAN_PROFILE,
   LOOK_KINDS,
   LOOK_PROFILE,
   THING_KIND_PROFILE,
   THING_LIBRARY_PROFILE,
   ThingDocumentRefused,
   drawnHeightMm,
+  readBodyPlanDocument,
   readBodyPlans,
   readKindDrawing,
   readLookDrawing,
   readThingLibrary,
 } from './documents.js';
-export type { HeldThings, LibraryBytes, LibraryRefusal, Named } from './library.js';
+export type { HeldThings, LibraryBytes, LibraryRefusal, Named, WorkspaceNamed } from './library.js';
 export { LibraryRefused, ThingLibrary } from './library.js';
 export type { FigureRefusal, FigureRequest, InstancedContainer } from './dispatch.js';
 export { CatalogPersonFigure, FigureRefused, makeFigure } from './dispatch.js';
@@ -46,7 +48,7 @@ export { SkeletonRefused, dressSkeleton } from './skeleton.js';
 export type { JointPose, MotionInput, Pose, Quat } from './motion.js';
 export { DUTY, gaitOf, solvePose } from './motion.js';
 export { PickRing, rayMeets, ringRadius } from './ring.js';
-export type { DrawnSociety, DrawnThing, PlacedThingRecord, SocietyPoint, ThingLayerOptions, ThingMiss, ThingPick } from './thing-layer.js';
+export type { DrawnSociety, DrawnThing, PlacedKind, PlacedThingRecord, SocietyPoint, ThingLayerOptions, ThingMiss, ThingPick } from './thing-layer.js';
 export { DESTINATION_RING_RADIUS, PLAYED_RING_RADIUS, ThingLayer } from './thing-layer.js';
 export type { FigureMade, FigureMakerOptions } from './figure-maker.js';
 export { ThingFigureMaker } from './figure-maker.js';

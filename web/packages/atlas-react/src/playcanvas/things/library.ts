@@ -12,10 +12,14 @@
  * A kind or look the shipped list does not hold may be one the workspace keeps (its own thing store,
  * `HeldThings`): asked by the same digest, held to it the same way, and its document must name the
  * key and version asked for. A held look's container is fetched by the look's digest and held to
- * the container digest the look's own document names.
+ * the container digest the look's own document names. A kind a world names by its digest alone (a
+ * creature drafted from a person's words, `WorkspaceNamed`) is asked by that digest, its key and
+ * version its document's own, and the drafted body plan it is drawn on by the plan's digest its
+ * document names.
  */
 
 import {
+  readBodyPlanDocument,
   readBodyPlans,
   readKindDrawing,
   readLookDrawing,
@@ -40,6 +44,8 @@ export interface HeldThings {
   look(sha256: string): Promise<ArrayBuffer | null>;
   /** A held look's container, by the look's digest. */
   container(lookSha256: string): Promise<ArrayBuffer | null>;
+  /** A drafted body plan the workspace holds, by its document's digest; none from a host that serves none. */
+  plan?(sha256: string): Promise<ArrayBuffer | null>;
 }
 
 export type LibraryRefusal = 'not_in_library' | 'digest_mismatch' | 'length_mismatch' | 'no_digest_check';
@@ -57,6 +63,14 @@ export interface Named {
   readonly version: number;
   readonly sha256: string;
 }
+
+/** A kind a world names by its document's digest alone: one its workspace keeps. */
+export interface WorkspaceNamed {
+  readonly source: 'workspace';
+  readonly sha256: string;
+}
+
+const byDigest = (named: Named | WorkspaceNamed): named is WorkspaceNamed => 'source' in named && named.source === 'workspace';
 
 const hex = (digest: ArrayBuffer): string => [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 
@@ -96,7 +110,7 @@ export class ThingLibrary {
     return [...this.looks.values()].filter((look) => look.bodyPlan === bodyPlan);
   }
 
-  async kind(named: Named): Promise<KindDrawing> {
+  async kind(named: Named | WorkspaceNamed): Promise<KindDrawing> {
     return readKindDrawing(await this.kindDocument(named));
   }
 
@@ -110,9 +124,28 @@ export class ThingLibrary {
    * A kind's whole document as its canonical JSON, held to its digest, for a reader that needs more
    * than drawing does (the thing card: its summary, abilities and origin).
    */
-  async kindDocument(named: Named): Promise<unknown> {
+  async kindDocument(named: Named | WorkspaceNamed): Promise<unknown> {
+    if (byDigest(named)) return this.heldByDigest(named.sha256, 'kind', (sha256) => this.heldThings!.kind(sha256));
     if (this.shipped(this.kinds, named)) return this.json(named.sha256);
     return this.heldDocument(named, 'kind', (sha256) => this.heldThings!.kind(sha256));
+  }
+
+  /**
+   * The drafted body plan a held kind is drawn on, by the digest its kind names, held to that digest
+   * and to the plan its look names (`key/vN`); null where the workspace holds none at that digest.
+   */
+  async heldPlan(sha256: string, name: string): Promise<BodyPlanEntry | null> {
+    const held = this.heldThings;
+    if (held?.plan === undefined) return null;
+    let document: unknown;
+    try {
+      document = await this.heldByDigest(sha256, 'plan', (digest) => held.plan!(digest));
+    } catch (error) {
+      if (error instanceof LibraryRefused && error.reason === 'not_in_library') return null;
+      throw error;
+    }
+    const plan = readBodyPlanDocument(document);
+    return `${plan.key}/v${plan.version}` === name ? plan : null;
   }
 
   /**
@@ -151,6 +184,17 @@ export class ThingLibrary {
 
   private shipped(entries: ReadonlyMap<string, { readonly sha256: string }>, named: Named): boolean {
     return entries.get(`${named.key}/${named.version}`)?.sha256 === named.sha256;
+  }
+
+  /** A document the workspace keeps, asked by its digest alone and held to it. */
+  private async heldByDigest(sha256: string, field: 'kind' | 'plan', get: (sha256: string) => Promise<ArrayBuffer | null>): Promise<unknown> {
+    const refused = () => new LibraryRefused('not_in_library', `The workspace holds no ${field} at that digest.`);
+    if (this.heldThings === null) throw refused();
+    return JSON.parse(new TextDecoder().decode(await this.fetchFrom(sha256, null, async () => {
+      const bytes = await get(sha256);
+      if (bytes === null) throw refused();
+      return bytes;
+    })));
   }
 
   /** A document the workspace keeps, held to its digest and to the key and version it was asked by. */

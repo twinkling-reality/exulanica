@@ -408,7 +408,8 @@ def read_things(
         )
     titles: dict[tuple[str, str], str] = {}
     for thing in version.things:
-        if not thing.removed:
+        # A thing of a workspace's own kind is not named here: its label is the workspace's.
+        if not thing.removed and isinstance(thing.kind, ThingKindReference):
             found = _kinds().get((thing.kind.kind, thing.kind.version))
             if found is not None:
                 titles[("thing", thing.thing_id)] = found.label

@@ -41,6 +41,7 @@ __all__ = [
     "StaleStructuralBase",
     "StaleStyleVersion",
     "StyleWriteBusy",
+    "ThingKindGone",
     "UnavailableAsset",
     "UnknownWorldResource",
     "WorldNotConfigured",
@@ -149,6 +150,11 @@ class InvalidThingPlacement(WorldStyleError):
 
 class ThingLimitReached(WorldStyleError):
     """A version already holds as many placed things as one version may."""
+
+
+class ThingKindGone(WorldStyleError):
+    """A placed thing's kind is a workspace's own kind the workspace no longer holds, or erased
+    after the thing was placed: the thing is gone, so nothing is done with it."""
 
 
 class InvalidEnvironmentState(WorldStyleError):

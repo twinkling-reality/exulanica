@@ -8,8 +8,9 @@
  * `ThingLibrary` before it is read.
  *
  * A kind or look the list does not hold may be the workspace's own (the thing store's
- * `GET /things/kinds/{sha256}`, `GET /things/looks/{sha256}` and its `/container`): asked only for a
- * digest the list lacks, and a 404 there (absent, withdrawn or another workspace's) is not one.
+ * `GET /things/kinds/{sha256}`, `GET /things/looks/{sha256}` and its `/container`, and the drafted
+ * body plan a held kind is drawn on, `GET /things/plans/{sha256}`): asked only for a digest the list
+ * lacks, and a 404 there (absent, withdrawn or another workspace's) is not one.
  */
 import { ThingLibrary, readThingLibrary, type HeldThings } from '@exulanica/atlas-react/things';
 import { accessHeaders, type Credentials } from './config.js';
@@ -43,6 +44,7 @@ function heldThings(access: Credentials, fetcher: typeof fetch): HeldThings {
     kind: (sha256) => held(`/things/kinds/${sha256}`, sha256, 'A kind of this workspace'),
     look: (sha256) => held(`/things/looks/${sha256}`, sha256, 'A look of this workspace'),
     container: (sha256) => held(`/things/looks/${sha256}/container`, sha256, 'A look\'s container'),
+    plan: (sha256) => held(`/things/plans/${sha256}`, sha256, 'A body plan of this workspace'),
   };
 }
 

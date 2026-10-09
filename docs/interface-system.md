@@ -422,6 +422,16 @@ reader (`saidLine`), and the rows are left out for a being that has said and hea
 
 A thing's abilities join the card as the server serves them.
 
+### Make a creature
+
+Make a creature (`web/packages/app/src/ui/creature-sheet.ts`, `ui/creature-sheet.css`) is a panel
+over the open world, mounted on the shell as Look is rather than in the sheet region, whose scrim
+would dim the world, so the creature is seen arriving behind it: one line for the person's own
+words and Make, what the server says before anyone types (whether creatures are made here, and how
+long one usually takes), then what is happening (imagining it, placing it) or why not, in plain
+words. Enter makes, Escape goes back. It is offered on the rail under Build and in the palette
+([things contract](things-contract.md#drafting-a-creature-from-words)).
+
 ### Look
 
 Look (`web/packages/app/src/ui/look-sheet.ts`, `ui/look-sheet.css`) is where the owner of a generated

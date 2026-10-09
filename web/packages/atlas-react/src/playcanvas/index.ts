@@ -167,6 +167,7 @@ export { openingIsland, type OpeningPlacements, type ServedArrivalPose } from '.
 export { drawDeclaredFloors, type DeclaredFloorSpec, type DrawnDeclaredFloors } from './declared-floor.js';
 export {
   type GeneratedSocietyHost,
+  generatedRegionName,
   hostGeneratedSociety,
   hostRegionSociety,
   type RegionSocietyHost,

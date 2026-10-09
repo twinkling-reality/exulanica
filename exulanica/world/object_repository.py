@@ -75,7 +75,9 @@ from exulanica.world.errors import (
     InvalidObjectData,
     InvalidObjectState,
     InvalidPointMapPlacement,
+    InvalidThingPlacement,
     StaleObjectBase,
+    ThingKindGone,
     ThingLimitReached,
     UnavailableAsset,
     UnknownWorldResource,
@@ -107,6 +109,7 @@ from exulanica.world.placed_things import (
     PlacedThing,
     ThingKindReference,
     ThingPlacement,
+    WorkspaceKindReference,
     placeable_by_author,
     placed_thing_document,
     shipped_kind,
@@ -116,6 +119,7 @@ from exulanica.world.point_map_source_authority import PointMapSourceAuthority
 from exulanica.world.reviewed_catalog import ReviewedAssetRow, ReviewedCatalog
 from exulanica.world.society import inputs_ahead
 from exulanica.world.society_engines import INPUT_ENGINES
+from exulanica.world.thing_store import ThingStore
 from exulanica.world.workspace_assets import (
     ResolvedWorkspaceAsset,
     WorkspaceAssetAuthority,
@@ -2366,10 +2370,13 @@ class WorldObjectRepository:
 
     # -- placed things ----------------------------------------------------------------------
     #
-    # A placed thing names a shipped thing kind by key, version and digest and stands in a region
-    # at its kind's own size (exulanica.world.placed_things). Its kind never changes after it is
-    # placed: migration 0152's trigger refuses it, and a move or a removal changes only its pose
-    # and whether it is removed.
+    # A placed thing names a shipped thing kind by key, version and digest, or a kind its
+    # workspace keeps by the kind's digest alone, and stands in a region at its kind's own size
+    # (exulanica.world.placed_things). Its kind never changes after it is placed: migration 0152's
+    # trigger refuses it, and a move or a removal changes only its pose and whether it is removed.
+    # A workspace kind the workspace no longer holds, or erased after the thing was placed, leaves
+    # the thing gone (PlacedThing.kind_gone, read with it): it is moved nowhere (ThingKindGone),
+    # and removing it or undoing it still works, as for any thing.
 
     def add_thing(
         self,
@@ -2409,6 +2416,8 @@ class WorldObjectRepository:
             current = self._require_thing(version_id, thing_id)
             if current.removed:
                 raise InvalidObjectState(f"{thing_id} is removed in this version")
+            if current.kind_gone:
+                raise ThingKindGone(f"{thing_id}'s kind is no longer held by its workspace")
             moved = replace(current, transform=transform)
             validate_placed_thing(moved, region_ids=frozenset({current.region_id}), kinds=None)
             edit_id = uuid.uuid4()
@@ -2499,7 +2508,15 @@ class WorldObjectRepository:
             ),
             region_ids=self._source_region_ids(row["source_snapshot_id"]),
         )
-        placeable_by_author(shipped_kind(placement.kind))
+        if isinstance(placement.kind, WorkspaceKindReference):
+            held = ThingStore(self.connection, self.workspace_id, None).kind_by_digest(
+                placement.kind.sha256
+            )
+            if held is None:
+                raise InvalidThingPlacement("this workspace holds no thing kind at that digest")
+            placeable_by_author(held)
+        else:
+            placeable_by_author(shipped_kind(placement.kind))
         return placed
 
     def _insert_thing(
@@ -2509,15 +2526,17 @@ class WorldObjectRepository:
         edit_ids: tuple[uuid.UUID, uuid.UUID],
     ) -> None:
         created_edit_id, last_edit_id = edit_ids
+        workspace = isinstance(thing.kind, WorkspaceKindReference)
         written = self.connection.execute(
             """
             insert into world_alternate_thing(
-              workspace_id,world_id,version_id,thing_id,kind,kind_version,kind_sha256,region_id,
-              x_mm,y_mm,z_mm,yaw_microradians,origin_kind,origin_role,removed,created_edit_id,
-              last_edit_id,addition_undone)
-            values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false)
+              workspace_id,world_id,version_id,thing_id,kind_source,kind,kind_version,kind_sha256,
+              region_id,x_mm,y_mm,z_mm,yaw_microradians,origin_kind,origin_role,removed,
+              created_edit_id,last_edit_id,addition_undone)
+            values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false)
             on conflict (workspace_id,world_id,version_id,thing_id) do update set
-              kind=excluded.kind,kind_version=excluded.kind_version,
+              kind_source=excluded.kind_source,kind=excluded.kind,
+              kind_version=excluded.kind_version,
               kind_sha256=excluded.kind_sha256,region_id=excluded.region_id,
               x_mm=excluded.x_mm,y_mm=excluded.y_mm,z_mm=excluded.z_mm,
               yaw_microradians=excluded.yaw_microradians,origin_kind=excluded.origin_kind,
@@ -2532,8 +2551,9 @@ class WorldObjectRepository:
                 self.world_id,
                 version_id,
                 thing.thing_id,
-                thing.kind.kind,
-                thing.kind.version,
+                "workspace" if workspace else "shipped",
+                None if isinstance(thing.kind, WorkspaceKindReference) else thing.kind.kind,
+                None if isinstance(thing.kind, WorkspaceKindReference) else thing.kind.version,
                 bytes.fromhex(thing.kind.sha256),
                 thing.region_id,
                 thing.transform.x_mm,
@@ -2551,11 +2571,21 @@ class WorldObjectRepository:
             raise InvalidObjectState(f"{thing.thing_id} already exists in this version")
 
     def _things(self, version_id: uuid.UUID) -> tuple[PlacedThing, ...]:
+        # A workspace kind is gone when the workspace no longer holds it, or erased it after the
+        # thing was placed (so the same document kept again never brings the thing back).
         rows = self.connection.execute(
-            "select thing_id,kind,kind_version,kind_sha256,region_id,x_mm,y_mm,z_mm,"
-            "yaw_microradians,origin_kind,origin_role,removed from world_alternate_thing "
-            "where workspace_id=%s and world_id=%s and version_id=%s and not addition_undone "
-            "order by thing_id",
+            "select t.thing_id,t.kind_source,t.kind,t.kind_version,t.kind_sha256,t.region_id,"
+            "t.x_mm,t.y_mm,t.z_mm,t.yaw_microradians,t.origin_kind,t.origin_role,t.removed,"
+            "(t.kind_source='workspace' and ("
+            "not exists (select 1 from thing_kind_version k where k.workspace_id=t.workspace_id "
+            "and k.sha256=encode(t.kind_sha256,'hex')) "
+            "or exists (select 1 from thing_erasure e join world_alternate_version_edit p "
+            "on p.workspace_id=t.workspace_id and p.edit_id=t.created_edit_id "
+            "where e.workspace_id=t.workspace_id and e.sha256=encode(t.kind_sha256,'hex') "
+            "and e.erased_at>=p.recorded_at))) as kind_gone "
+            "from world_alternate_thing t "
+            "where t.workspace_id=%s and t.world_id=%s and t.version_id=%s "
+            "and not t.addition_undone order by t.thing_id",
             (self.workspace_id, self.world_id, version_id),
         ).fetchall()
         return tuple(_thing_from_row(row) for row in rows)
@@ -3090,10 +3120,13 @@ def _binding_refusal() -> Iterator[None]:
 
 
 def _thing_from_row(row: Mapping[str, Any]) -> PlacedThing:
+    sha256 = bytes(row["kind_sha256"]).hex()
     return PlacedThing(
         thing_id=row["thing_id"],
-        kind=ThingKindReference(
-            row["kind"], int(row["kind_version"]), bytes(row["kind_sha256"]).hex()
+        kind=(
+            WorkspaceKindReference(sha256)
+            if row["kind_source"] == "workspace"
+            else ThingKindReference(row["kind"], int(row["kind_version"]), sha256)
         ),
         region_id=row["region_id"],
         transform=Transform(
@@ -3101,6 +3134,7 @@ def _thing_from_row(row: Mapping[str, Any]) -> PlacedThing:
         ),
         origin=ObjectOrigin(row["origin_kind"], row["origin_role"]),
         removed=row["removed"],
+        kind_gone=bool(row["kind_gone"]),
     )
 
 

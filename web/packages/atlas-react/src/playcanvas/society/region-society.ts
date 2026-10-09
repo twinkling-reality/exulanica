@@ -42,6 +42,12 @@ export interface GeneratedSocietyHost {
   authoredSociety: AuthoredRegionSociety | null;
 }
 
+/** The name of the entity a saved generated world's region is hung from: what its people and
+ * placed things are drawn under, and how a caller knows that region is the one drawn here. */
+export function generatedRegionName(regionId: string): string {
+  return `generated-region:${regionId}`;
+}
+
 /**
  * A saved generated world's people, hung from its region's frame.
  *
@@ -58,7 +64,7 @@ export function hostGeneratedSociety(
   regionId: string,
   floorMm: number,
 ): AuthoredRegionSociety | null {
-  const name = `generated-region:${regionId}`;
+  const name = generatedRegionName(regionId);
   const held = host.authoredSociety;
   if (held !== null) return held.root.parent?.name === name ? held : null;
   const region = new pc.Entity(name);

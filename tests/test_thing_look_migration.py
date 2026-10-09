@@ -56,6 +56,24 @@ def test_0156_keys_stored_placed_things_to_the_registry_they_already_name(monkey
         )
         with pg_harness.migrated_schema() as (_psycopg, admin):
             scratch = admin.execute("select current_schema()").fetchone()[0]
+            # Whether a placed thing names a shipped kind or its workspace's own (0188), and a
+            # workspace's own kinds and their erasures (0159, 0172), which today's version read
+            # names when it asks whether a thing's kind is gone. Before 0156 none exists; the thing
+            # placed here is a shipped kind, so a 'shipped' column and empty views are facts. All
+            # are dropped before 0156 runs, leaving the rows in the shape that schema held.
+            admin.execute(
+                "alter table world_alternate_thing "
+                "add column kind_source text not null default 'shipped'"
+            )
+            admin.execute(
+                "create view thing_kind_version as select null::uuid as workspace_id,"
+                "null::text as sha256 where false"
+            )
+            admin.execute(
+                "create view thing_erasure as select null::uuid as workspace_id,"
+                "null::text as sha256,null::timestamptz as erased_at where false"
+            )
+            admin.commit()
             base = env_get("TEST_DATABASE_URL")
             assert base is not None
             database = Database(url=make_conninfo(base, options=f"-csearch_path={scratch},public"))
@@ -94,6 +112,9 @@ def test_0156_keys_stored_placed_things_to_the_registry_they_already_name(monkey
                     actor=actor,
                 )
                 assert [thing.thing_id for thing in placed.things] == ["well"]
+            admin.execute("drop view thing_erasure")
+            admin.execute("drop view thing_kind_version")
+            admin.execute("alter table world_alternate_thing drop column kind_source")
             admin.execute(by_version[_MIGRATION].sql)
             admin.commit()
             assert _keys(admin, "world_alternate_thing") == {

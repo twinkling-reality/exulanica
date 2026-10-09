@@ -11925,6 +11925,65 @@
     }
    }
   },
+  "/things/plans/{plan_sha256}": {
+   "get": {
+    "tags": [
+     "things"
+    ],
+    "summary": "A body plan this workspace holds, by the SHA-256 of its document.",
+    "operationId": "held_plan_things_plans__plan_sha256__get",
+    "parameters": [
+     {
+      "name": "plan_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Plan Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Held Plan Things Plans  Plan Sha256  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/things/creatures/offered": {
    "get": {
     "tags": [
@@ -12807,7 +12866,7 @@
     "tags": [
      "world"
     ],
-    "summary": "Place a thing by its shipped kind against the current version state.",
+    "summary": "Place a thing by its kind, shipped or its workspace's own, against the current state.",
     "operationId": "add_thing_world_versions__version_id__things_post",
     "parameters": [
      {
@@ -22576,7 +22635,15 @@
       "title": "Thing Id"
      },
      "kind": {
-      "$ref": "#/components/schemas/ThingKindBody"
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ThingKindBody"
+       },
+       {
+        "$ref": "#/components/schemas/WorkspaceKindBody"
+       }
+      ],
+      "title": "Kind"
      },
      "region_id": {
       "type": "string",
@@ -42162,6 +42229,28 @@
     ],
     "title": "WorkspaceAssetSourceBody",
     "description": "A person's own admitted asset, by the id ``POST /workspace-assets`` returned.\n\n``prepared_sha256`` pins the prepared bytes: optional in a preview, which reports the digest it\nresolved, and required in an apply, so a confirmed apply places exactly what was previewed."
+   },
+   "WorkspaceKindBody": {
+    "properties": {
+     "source": {
+      "type": "string",
+      "const": "workspace",
+      "title": "Source"
+     },
+     "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "source",
+     "sha256"
+    ],
+    "title": "WorkspaceKindBody",
+    "description": "A kind the placing workspace keeps, by the SHA-256 of its document alone, never by a key a\nperson's words made."
    },
    "WorkspaceLookBody": {
     "properties": {

@@ -1,9 +1,12 @@
 """Things placed in an authored version by their kind: place, move, remove and undo, and the look
 each thing of a version wears.
 
-A placed thing names a shipped thing kind by key, version and digest and stands in a region of the
-version's source snapshot at its kind's own size (:mod:`exulanica.world.placed_things`). Every edit
-names the version state it was made against and runs in
+A placed thing names a shipped thing kind by key, version and digest, or a kind its workspace keeps
+(a creature drafted from a person's words) by the digest of the kind's document alone, and stands
+in a region of the version's source snapshot at its kind's own size
+(:mod:`exulanica.world.placed_things`). A thing whose workspace kind is gone (no longer held, or
+erased after it was placed) is moved nowhere (410 ``thing_kind_erased``) and is removed as any
+thing is. Every edit names the version state it was made against and runs in
 :func:`exulanica.api.world_edit.commit_edit`, like every other authored edit, and answers with the
 whole version. ``GET .../thing-looks`` answers the latest look chosen for each thing of the
 version (:mod:`exulanica.world.thing_looks`), never cached.
@@ -40,7 +43,12 @@ from exulanica.api.world_scope import WorldId
 from exulanica.api.world_version_document import AlternateVersionView
 from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.objects import MAX_YAW_MICRORADIANS, ObjectOrigin, Transform
-from exulanica.world.placed_things import UNSCALED_MILLI, ThingPlacement, named_kind
+from exulanica.world.placed_things import (
+    UNSCALED_MILLI,
+    ThingPlacement,
+    named_kind,
+    workspace_kind_reference,
+)
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.thing_looks import ThingLookRefused, look_choices
 
@@ -55,6 +63,16 @@ class ThingKindBody(BaseModel):
     #: The kind's digest as the caller read it. Left out, the shipped version's digest is stored;
     #: stated, it must be that digest.
     sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+
+class WorkspaceKindBody(BaseModel):
+    """A kind the placing workspace keeps, by the SHA-256 of its document alone, never by a key a
+    person's words made."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["workspace"]
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class ThingPoseBody(BaseModel):
@@ -73,7 +91,7 @@ class ThingPoseBody(BaseModel):
 
 class AddThingBody(EntryBoundEditBody):
     thing_id: str = Field(min_length=1, max_length=200)
-    kind: ThingKindBody
+    kind: ThingKindBody | WorkspaceKindBody
     region_id: str = Field(min_length=1, max_length=500)
     pose: ThingPoseBody
     origin_role: Literal["fictional", "personal"]
@@ -87,7 +105,7 @@ class MoveThingBody(EntryBoundEditBody):
     "/versions/{version_id}/things",
     response_model=AlternateVersionView,
     status_code=201,
-    summary="Place a thing by its shipped kind against the current version state.",
+    summary="Place a thing by its kind, shipped or its workspace's own, against the current state.",
 )
 def add_thing(
     version_id: Annotated[uuid.UUID, Path()],
@@ -99,7 +117,11 @@ def add_thing(
     def place() -> AlternateVersion:
         placement = ThingPlacement(
             thing_id=body.thing_id,
-            kind=named_kind(body.kind.kind, body.kind.version, body.kind.sha256),
+            kind=(
+                workspace_kind_reference(body.kind.sha256)
+                if isinstance(body.kind, WorkspaceKindBody)
+                else named_kind(body.kind.kind, body.kind.version, body.kind.sha256)
+            ),
             region_id=body.region_id,
             transform=body.pose.domain(),
             origin=ObjectOrigin("authored", body.origin_role),

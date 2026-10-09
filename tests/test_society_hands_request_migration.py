@@ -169,6 +169,19 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
         )
         with pg_harness.migrated_schema() as (_psycopg, admin):
             scratch = admin.execute("select current_schema()").fetchone()[0]
+            # Whether a placed thing names a shipped kind or its workspace's own (0188), and the
+            # kind erasures (0172), which the current version read names when it asks whether a
+            # thing's kind is gone. Below the hands request neither exists; every thing here is a
+            # shipped kind and none was erased, so a 'shipped' column and an empty view are facts.
+            # Both are dropped before the later migrations add them.
+            admin.execute(
+                "alter table world_alternate_thing "
+                "add column kind_source text not null default 'shipped'"
+            )
+            admin.execute(
+                "create view thing_erasure as select null::uuid as workspace_id,"
+                "null::text as sha256,null::timestamptz as erased_at where false"
+            )
             admin.commit()
             base = env_get("TEST_DATABASE_URL")
             assert base is not None
@@ -260,6 +273,8 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
                     (sorted(NEW_CHECKS),),
                 ).fetchone() == (True,)
                 assert world.replayed() is True
+                admin.execute("drop view thing_erasure")
+                admin.execute("alter table world_alternate_thing drop column kind_source")
                 for later in everything:
                     if later.version > hands.version:
                         admin.execute(later.sql)

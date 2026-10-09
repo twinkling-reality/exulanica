@@ -284,6 +284,22 @@ class ThingStore:
     def _plan_of(self, name: str) -> BodyPlan | None:
         return self.catalogs.plan(name) or self.plan(name)
 
+    def plan_document_by_digest(self, sha256: str) -> Mapping[str, Any] | None:
+        """The document of a drafted plan this workspace holds, by its digest, once its reader
+        reads it again at that digest; None otherwise. A page draws a held kind's figure on it."""
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            row = cursor.execute(
+                "select document from body_plan_version where workspace_id=%s and sha256=%s",
+                (self.workspace_id, sha256),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            plan = read_body_plan(row["document"], catalogs=self.catalogs)
+        except BodyPlanRefused:
+            return None
+        return row["document"] if plan.sha256 == sha256 else None
+
     def look(self, key: str, version: int, *, include_withdrawn: bool = False) -> KeptLook | None:
         """A look this workspace holds by key and version, read again, or None: no such row, a
         document the reader now refuses, or a withdrawn look unless ``include_withdrawn``."""

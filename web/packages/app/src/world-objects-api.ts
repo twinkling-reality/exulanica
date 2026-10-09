@@ -135,17 +135,25 @@ export interface AuthoredObject {
 }
 
 /**
- * A thing placed by its kind (version schema 5): the kind it is, by key, version and digest, and
- * where it stands. Nothing here says how it is drawn: that is a look's, read from the thing library.
+ * A thing placed by its kind (version schema 5): the kind it is, a shipped kind by key, version and
+ * digest or a kind its workspace keeps by its digest alone, and where it stands. Nothing here says
+ * how it is drawn: that is a look's, read from the thing library.
  */
 export interface PlacedThing {
   readonly thingId: string;
-  readonly kind: { readonly kind: string; readonly version: number; readonly sha256: string };
+  readonly kind:
+    | { readonly source?: 'shipped'; readonly kind: string; readonly version: number; readonly sha256: string }
+    | { readonly source: 'workspace'; readonly sha256: string };
   readonly regionId: string;
   readonly transform: ObjectTransform;
   readonly origin: { readonly kind: string; readonly role: string };
   /** True while a removal is in force. */
   readonly removed: boolean;
+  /**
+   * True for a thing of a workspace's own kind the workspace no longer holds, or erased after it was
+   * placed: the server says so as it reads the version, and the page draws it nowhere. Absent, false.
+   */
+  readonly gone?: boolean;
 }
 
 /** A placed object's own admitted asset, a person's upload, as the version read states it. */
@@ -1117,13 +1125,16 @@ export function parsePlacedThing(value: unknown): PlacedThing {
   const row = record(value, 'placed thing');
   const kind = record(row['kind'], 'placed thing kind');
   const origin = record(row['origin'], 'placed thing origin');
+  if (kind['source'] !== undefined && kind['source'] !== 'workspace') throw invalid('placed thing kind source');
   return Object.freeze({
     thingId: text(row['thing_id'], 'placed thing id'),
-    kind: Object.freeze({
-      kind: text(kind['kind'], 'placed thing kind key'),
-      version: integer(kind['version'], 'placed thing kind version'),
-      sha256: digest(kind['sha256'], 'placed thing kind digest'),
-    }),
+    kind: kind['source'] === 'workspace'
+      ? Object.freeze({ source: 'workspace' as const, sha256: digest(kind['sha256'], 'placed thing kind digest') })
+      : Object.freeze({
+        kind: text(kind['kind'], 'placed thing kind key'),
+        version: integer(kind['version'], 'placed thing kind version'),
+        sha256: digest(kind['sha256'], 'placed thing kind digest'),
+      }),
     regionId: text(row['region_id'], 'placed thing region'),
     transform: parseTransform(row['transform']),
     origin: Object.freeze({
@@ -1131,6 +1142,8 @@ export function parsePlacedThing(value: unknown): PlacedThing {
       role: text(origin['role'], 'placed thing origin role'),
     }),
     removed: flag(row['removed'], 'placed thing removal'),
+    // Only a thing whose kind is gone says so; every other reads as it always did.
+    ...(row['gone'] === undefined ? {} : { gone: flag(row['gone'], 'placed thing gone') }),
   });
 }
 

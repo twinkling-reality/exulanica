@@ -28,7 +28,7 @@ from exulanica.world import (
     truth_statement,
 )
 from exulanica.world.object_catalog import NO_ACTIVITY, world_object_catalog
-from exulanica.world.placed_things import placed_thing_document
+from exulanica.world.placed_things import PlacedThing, placed_thing_document
 from exulanica.world.society_catalogs import purposeful_routine
 
 
@@ -349,6 +349,16 @@ def workspace_asset_views(
     return views
 
 
+def _thing_view(thing: PlacedThing) -> dict[str, JsonValue]:
+    """A placed thing as the version's document states it: its stored document, and, for a thing
+    whose workspace kind is gone, ``gone``, read now and never part of the version's state, so a
+    page draws it nowhere."""
+    document = placed_thing_document(thing)
+    if thing.kind_gone:
+        document["gone"] = True
+    return document
+
+
 def alternate_version_view(
     version: AlternateVersion,
     assets: dict[str, ReviewedAssetRow],
@@ -444,7 +454,7 @@ def alternate_version_view(
             }
             for instance in version.point_map_instances
         ],
-        things=[placed_thing_document(thing) for thing in version.things],
+        things=[_thing_view(thing) for thing in version.things],
         edits=[
             VersionEditView(
                 edit_id=edit.edit_id,

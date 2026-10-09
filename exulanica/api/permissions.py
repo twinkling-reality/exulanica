@@ -623,6 +623,7 @@ _WORLD_READS: Final = _every(
     "GET /things/library/{content_sha256}",
     "GET /things/looks/{look_sha256}",
     "GET /things/looks/{look_sha256}/container",
+    "GET /things/plans/{plan_sha256}",
     "GET /workspace-assets",
     "GET /workspace-assets/{asset_id}",
     "GET /workspace-assets/{asset_id}/prepared/bytes",

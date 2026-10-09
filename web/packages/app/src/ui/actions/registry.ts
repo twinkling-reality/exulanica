@@ -225,6 +225,10 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     refusals: THING_REFUSALS,
   },
   {
+    id: 'creatures.make', label: 'Make a creature', hint: 'Describe a creature in your own words and it comes to stand in front of you',
+    icon: 'add', group: 'build', placement: ['rail', 'palette'],
+  },
+  {
     id: 'people.direct', label: 'Ask someone', hint: 'Ask one of the beings here to go to a place or use it',
     icon: 'people', group: 'people', placement: ['companion'], operation: DIRECT,
     refusals: DIRECT_REFUSALS,

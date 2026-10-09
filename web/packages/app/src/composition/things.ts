@@ -213,7 +213,8 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
     async setPlaced(things) {
       if (destroyed) return;
       placedYaw = new Map(things.map((thing) => [thing.thingId, thing.transform.yawMicroradians]));
-      await layer.setPlaced(things.map(placedThingRecord));
+      // A thing whose workspace kind is gone (its creature erased) is drawn nowhere.
+      await layer.setPlaced(things.filter((thing) => !thing.gone).map(placedThingRecord));
     },
     setSociety(state) {
       if (!destroyed) layer.setSociety(state, state === null ? null : crowdFigures, deps.walkEnded ?? (() => true), deps.leaving ?? (() => false));

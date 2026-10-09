@@ -87,13 +87,21 @@ _STAND_INS = (
     # the empty column are facts, as the placed estimates' are. Dropped with the others; 0152,
     # run below with every later migration, adds both again.
     "create view world_alternate_thing as select null::uuid as workspace_id,"
-    "null::text as world_id,null::uuid as version_id,null::text as thing_id,null::text as kind,"
+    "null::text as world_id,null::uuid as version_id,null::text as thing_id,"
+    "null::text as kind_source,null::text as kind,"
     "null::integer as kind_version,null::bytea as kind_sha256,null::text as region_id,"
     "null::bigint as x_mm,null::bigint as y_mm,null::bigint as z_mm,"
     "null::bigint as yaw_microradians,null::text as origin_kind,null::text as origin_role,"
     "null::boolean as removed,null::boolean as addition_undone,null::uuid as created_edit_id,"
     "null::uuid as last_edit_id where false",
     "alter table world_alternate_version_edit add column thing_id text",
+    # A workspace's own kinds and their erasures, which 0159 and 0172 add and the current version
+    # read names when it asks whether a placed thing's kind is gone. At 0089 no thing was placed,
+    # so empty views are facts. Dropped with the others; 0159 and 0172 add both again.
+    "create view thing_kind_version as select null::uuid as workspace_id,null::text as sha256 "
+    "where false",
+    "create view thing_erasure as select null::uuid as workspace_id,null::text as sha256,"
+    "null::timestamptz as erased_at where false",
     # The world registry 0099 adds, which the current starter creation writes before any world
     # row. It is dropped with the others, and 0099's backfill, run below with every later
     # migration, registers the same starter worlds again from the rows they hold.
@@ -384,6 +392,8 @@ def test_0090_keeps_every_reference_a_populated_0089_database_held(
             admin.execute("drop view saved_world_source_current_membership")
             admin.execute("drop view world_alternate_point_map_instance")
             admin.execute("drop view world_alternate_thing")
+            admin.execute("drop view thing_kind_version")
+            admin.execute("drop view thing_erasure")
             admin.execute("alter table world_alternate_version_edit drop column thing_id")
             admin.execute(
                 "alter table world_alternate_version_edit drop column point_map_instance_id"

@@ -1,0 +1,55 @@
+/*
+ * Make a creature (ui/creature-sheet.ts): one line of words and Make, in a panel over the world so
+ * the creature is seen arriving behind it. Brand tokens only, on the dark stage as the Look sheet.
+ */
+
+#shell section.creature-sheet {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(1.5rem, 8vh, 4rem);
+  z-index: var(--z-overlay);
+  width: min(36rem, calc(100vw - 2rem));
+  translate: -50% 0;
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  box-shadow: 0 1.5rem 3rem color-mix(in srgb, black 35%, transparent);
+}
+#shell section.creature-sheet[hidden] { display: none; }
+#shell .creature-sheet-eyebrow { margin: 0; font-size: 0.7rem; letter-spacing: 0.14em; color: var(--color-text-muted); }
+#shell .creature-sheet-title { margin: 0; font-size: 1.6rem; font-weight: 300; }
+#shell .creature-sheet-lede,
+#shell .creature-sheet-timing,
+#shell .creature-sheet-unavailable { margin: 0; color: var(--color-text-muted); }
+#shell .creature-sheet-row { display: flex; gap: 0.5rem; }
+#shell .creature-sheet-words {
+  flex: 1;
+  min-width: 0;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.6rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+#shell .creature-sheet-make,
+#shell .creature-sheet-back {
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+#shell .creature-sheet-make:not(:disabled) { background: var(--color-text); color: var(--color-surface-solid); }
+#shell .creature-sheet-make:disabled { opacity: 0.5; cursor: default; }
+#shell .creature-sheet-back { justify-self: start; }
+#shell .creature-sheet-status { margin: 0; min-height: 1.4em; }
+@media (max-width: 30rem) {
+  #shell .creature-sheet-row { flex-direction: column; }
+}

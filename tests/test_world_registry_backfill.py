@@ -108,6 +108,7 @@ def test_0099_registers_every_world_a_populated_schema_held(owner, spine_schema,
             admin.execute(
                 "create view world_alternate_thing as select null::uuid as workspace_id,"
                 "null::text as world_id,null::uuid as version_id,null::text as thing_id,"
+                "null::text as kind_source,"
                 "null::text as kind,null::integer as kind_version,null::bytea as kind_sha256,"
                 "null::text as region_id,null::bigint as x_mm,null::bigint as y_mm,"
                 "null::bigint as z_mm,null::bigint as yaw_microradians,null::text as origin_kind,"
@@ -116,6 +117,17 @@ def test_0099_registers_every_world_a_populated_schema_held(owner, spine_schema,
                 "null::uuid as last_edit_id where false"
             )
             admin.execute("alter table world_alternate_version_edit add column thing_id text")
+            # A workspace's own kinds and their erasures, which 0159 and 0172 add and the current
+            # version read names when it asks whether a placed thing's kind is gone. Before 0099
+            # no thing was placed, so empty views stand in, dropped before 0099 runs.
+            admin.execute(
+                "create view thing_kind_version as select null::uuid as workspace_id,"
+                "null::text as sha256 where false"
+            )
+            admin.execute(
+                "create view thing_erasure as select null::uuid as workspace_id,"
+                "null::text as sha256,null::timestamptz as erased_at where false"
+            )
             admin.commit()
 
             # A personal world: a composed topology, a structural snapshot and a version.
@@ -195,6 +207,8 @@ def test_0099_registers_every_world_a_populated_schema_held(owner, spine_schema,
                     )
             admin.execute("alter table world_alternate_object drop column workspace_preparation_id")
             admin.execute("drop view world_alternate_thing")
+            admin.execute("drop view thing_kind_version")
+            admin.execute("drop view thing_erasure")
             admin.execute("alter table world_alternate_version_edit drop column thing_id")
             admin.commit()
 

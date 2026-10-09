@@ -66,6 +66,7 @@ fetchVerifiedObjectAsset
 fixtureName
 footprintLineGeometry
 footprintRadiusOf
+generatedRegionName
 hostGeneratedSociety
 hostRegionSociety
 inhabitantCatalog

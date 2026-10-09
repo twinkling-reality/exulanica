@@ -60,7 +60,7 @@ from exulanica.world import (
     Transform,
     WorldObjectRepository,
 )
-from exulanica.world.errors import InvalidThingPlacement, ThingLimitReached
+from exulanica.world.errors import InvalidThingPlacement, ThingKindGone, ThingLimitReached
 from exulanica.world.kinds.worker import KindWorkWaiting
 from exulanica.world.society import SocietyPlaceWaiting, UnavailableSocietyInput
 from exulanica.world.workspace_assets import WorkspaceAssetWithdrawn
@@ -217,6 +217,8 @@ OBJECT_PROBLEMS: Final[tuple[tuple[type[Exception], int, str], ...]] = (
     (InvalidEnvironmentData, 422, "invalid_environment_data"),
     (InvalidThingPlacement, 422, "invalid_thing_placement"),
     (ThingLimitReached, 409, "thing_limit_reached"),
+    #: A thing whose workspace kind was erased is gone, as an erased asset is: nothing moves it.
+    (ThingKindGone, 410, "thing_kind_erased"),
     (InvalidEnvironmentState, 409, "invalid_environment_state"),
     (EnvironmentBindingDrift, 409, "environment_binding_drift"),
     (EnvironmentSourceWithdrawn, 410, "withdrawn"),

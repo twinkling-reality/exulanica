@@ -36,7 +36,12 @@ from exulanica.world.authored_delta import AlternateVersion, version_delta_sha25
 from exulanica.world.errors import InvalidStructuralData, InvalidThingPlacement
 from exulanica.world.object_catalog import world_object_catalog
 from exulanica.world.objects import AuthoredObject, ElementOverride, Transform
-from exulanica.world.placed_things import PlacedThing, placed_thing_document, shipped_kind
+from exulanica.world.placed_things import (
+    PlacedThing,
+    WorkspaceKindReference,
+    placed_thing_document,
+    shipped_kind,
+)
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_catalogs import (
     PurposefulRoutine,
@@ -1025,11 +1030,25 @@ def thing_activities() -> tuple[tuple[str, str], ...]:
 
 def things_in_region(version: AlternateVersion, ground: SocietyGround) -> list[PlacedThing]:
     """The version's placed things this society reads, in id order: each placed in its region,
-    removed ones included, as its input's references bind them."""
+    removed ones included, as its input's references bind them.
+
+    A thing of a kind its workspace keeps (a creature drafted from a person's words) is left out,
+    by name, whatever its region: a society reads shipped kinds alone and replays from its inputs
+    without the workspace's store, so such a thing stands where it was placed, is never one of the
+    society's, and never stops a society that runs beside it."""
     return sorted(
-        (thing for thing in version.things if thing.region_id == ground.region_id),
+        (
+            thing
+            for thing in version.things
+            if thing.region_id == ground.region_id and not _of_a_workspace_kind(thing)
+        ),
         key=lambda value: value.thing_id,
     )
+
+
+def _of_a_workspace_kind(thing: PlacedThing) -> bool:
+    """Whether ``thing`` names a kind its workspace keeps rather than a shipped kind."""
+    return isinstance(thing.kind, WorkspaceKindReference)
 
 
 def _thing_kinds(things: Sequence[PlacedThing]) -> tuple[dict[str, ThingKind], str | None]:

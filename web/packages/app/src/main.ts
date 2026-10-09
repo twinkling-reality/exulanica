@@ -83,6 +83,9 @@ import { actionSpec, availability } from './ui/actions/registry.js';
 import type { PlannedRequest } from './ui/actions/planned.js';
 import { buildPlanSheet } from './ui/companion-plan.js';
 import { CompanionActionsClient, type ActionPageContext } from './companion-actions-api.js';
+import { CreatureDraftsClient } from './creature-drafts-api.js';
+import { mountCreatureMaker, placementInGeneratedRegion } from './composition/creature-maker.js';
+import { buildCreatureSheet } from './ui/creature-sheet.js';
 import { mountCompanionPlans, type CompanionPlans } from './composition/companion-plan.js';
 import { openWorldPath } from './world-scope.js';
 import { createFirstUseGuidance, type FirstUseMode } from './ui/first-use-guidance.js';
@@ -1467,6 +1470,45 @@ async function mountWorld(): Promise<void> {
     }
     return sent;
   };
+  // Make a creature (composition/creature-maker.ts): the sheet over the world, the creature routes,
+  // and what was made placed in front of the person through the same edit path as a planned thing.
+  const creatureSheet = buildCreatureSheet({
+    onMake: (words) => { void creatureMaker.make(words); },
+    onClose: () => { creatureSheet.root.hidden = true; canvas.focus({ preventScroll: true }); },
+  });
+  // Over the world, as the Look sheet is, not in the sheet region: that region dims everything under
+  // it while it shows a panel, and this one leaves the world in view so the creature is seen arriving.
+  shell.querySelector('section.creature-sheet')?.remove();
+  shell.append(creatureSheet.root);
+  const creatureMaker = mountCreatureMaker({
+    client: new CreatureDraftsClient(currentCredentials),
+    sheet: creatureSheet,
+    version: () => {
+      const active = state.activeWorldEntry;
+      if (active === null) return null;
+      const entry = activeEntryWriteBinding();
+      return {
+        versionId: active.authoredVersionId,
+        stateSha256: active.authoredStateSha256,
+        savedEntry: {
+          entry_id: entry.entryId,
+          base_revision: entry.revision,
+          authored_state_sha256: entry.authoredStateSha256,
+          authored_edit_seq: entry.authoredEditSeq,
+        },
+      };
+    },
+    // Where the objects panel would put a thing; in a saved world drawn from a recipe or a world
+    // kind, where that panel places nothing, the same distance ahead in the region drawn here.
+    placement: () => objects.selectionContext().placement ?? placementInGeneratedRegion(
+      state.activeWorldEntry?.generatedGround ?? state.activeWorldEntry?.generatedSite,
+      state.atlas?.binding.authoredSociety?.root.parent?.name,
+      state.atlas?.binding.playerPose(),
+    ),
+    place: (versionId, body) => sendPlanned({
+      actionId: 'things.place', stepIndex: 0, method: 'POST', path: `/world/versions/${versionId}/things`, body,
+    }),
+  });
   actions = mountActions({
     layout,
     credentials: currentCredentials,
@@ -1477,6 +1519,15 @@ async function mountWorld(): Promise<void> {
     clockSlot: worldIdentity?.root.querySelector<HTMLElement>('.world-add-object') ?? null,
     searchSlot: worldIdentity?.root.querySelector<HTMLElement>('.world-open-menu') ?? null,
     bindings: {
+      'creatures.make': {
+        run: () => {
+          companion.dismiss();
+          dispatchShell({ type: 'show-world' });
+          void creatureMaker.open();
+        },
+        offered: () => state.activeWorldEntry !== null,
+        active: () => !creatureSheet.root.hidden,
+      },
       'objects.open': {
         run: () => {
           companion.dismiss();

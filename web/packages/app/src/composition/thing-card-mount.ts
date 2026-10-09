@@ -547,7 +547,10 @@ export function mountThingCard(options: {
             const societyId = thing.societyThingId ?? null;
             const route = societyId === null ? Promise.resolve() : readRoute(thing.worldId, thing.versionId, societyId);
             const things = await openLibrary();
-            const named = { key: thing.placed.kind.kind, version: thing.placed.kind.version, sha256: thing.placed.kind.sha256 };
+            const placedKind = thing.placed.kind;
+            const named = placedKind.source === 'workspace'
+              ? { source: 'workspace' as const, sha256: placedKind.sha256 }
+              : { key: placedKind.kind, version: placedKind.version, sha256: placedKind.sha256 };
             const kind = readKindFacts(await things.kindDocument(named));
             const worn = (await readLooks(thing.worldId, thing.versionId)).get(thing.placed.thingId);
             const lookNamed = worn ?? kind.firstLook;

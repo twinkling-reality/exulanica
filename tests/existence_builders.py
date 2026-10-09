@@ -1343,6 +1343,11 @@ def creature_draft(owner) -> str:
     return str(made.draft_id)
 
 
+def held_plan(owner) -> str:
+    """The drafted body plan of a creature the owner's workspace holds, by its document's digest."""
+    return _held_creature(owner).plan.sha256
+
+
 def district_version(owner) -> uuid.UUID:
     """A version whose district the host registered over two admitted city sources (domain).
 

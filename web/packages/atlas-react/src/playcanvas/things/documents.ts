@@ -17,6 +17,8 @@ import type { BodyPlanEntry, PlanBone, PlanSocket } from './skeleton.js';
 export const THING_LIBRARY_PROFILE = 'exulanica.thing-library/v1';
 export const LOOK_PROFILE = 'exulanica.look/v1';
 export const THING_KIND_PROFILE = 'exulanica.thing-kind/v1';
+/** A drafted body plan's document, which a workspace's own kind names by its digest. */
+export const BODY_PLAN_PROFILE = 'exulanica.body-plan/v1';
 
 export type ThingDocumentRefusal =
   | 'thing_library_invalid'
@@ -89,6 +91,8 @@ export interface KindDrawing {
   readonly label: string;
   readonly class: 'being' | 'object';
   readonly bodyPlan: string;
+  /** The digest of a drafted body plan the kind names (a workspace's own), or null for a shipped plan. */
+  readonly bodyPlanSha256: string | null;
   readonly heightMm: { readonly from: number; readonly to: number } | null;
   readonly radiusMm: number | null;
   readonly boxMm: { readonly width: number; readonly depth: number; readonly height: number } | null;
@@ -199,6 +203,7 @@ export function readKindDrawing(value: unknown): KindDrawing {
   if (kindClass !== 'being' && kindClass !== 'object') r.fail('class', 'is neither being nor object');
   const bodyRow = r.object(body['body'], 'body');
   const plan = r.text(bodyRow['plan'], 'body.plan', PLAN);
+  const planSha256 = bodyRow['plan_sha256'] === undefined ? null : r.text(bodyRow['plan_sha256'], 'body.plan_sha256', HEX64);
   const heightRow = bodyRow['height_mm'];
   const boxRow = bodyRow['box_mm'];
   const height = heightRow === undefined ? null : (() => {
@@ -234,6 +239,7 @@ export function readKindDrawing(value: unknown): KindDrawing {
     label: r.text(body['label'], 'label'),
     class: kindClass as 'being' | 'object',
     bodyPlan: plan,
+    bodyPlanSha256: planSha256,
     heightMm: height,
     radiusMm: radius,
     boxMm: box,
@@ -296,32 +302,48 @@ export function readBodyPlans(value: unknown): ReadonlyMap<string, BodyPlanEntry
   if (body['catalog_id'] !== 'body-plans') r.fail('catalog_id', 'is not body-plans');
   const plans = new Map<string, BodyPlanEntry>();
   for (const [i, entry] of r.list(body['entries'], 'entries').entries()) {
-    const row = r.object(entry, `entries[${i}]`);
-    const key = r.text(row['key'], `entries[${i}].key`, KEY);
-    const version = r.whole(row['version'], `entries[${i}].version`, 1);
-    const bones = r.list(row['bones'], `entries[${i}].bones`).map((bone, j): PlanBone => {
-      const b = r.object(bone, `entries[${i}].bones[${j}]`);
-      const parent = b['parent'] === null ? null : r.text(b['parent'], `entries[${i}].bones[${j}].parent`);
-      if (typeof b['required'] !== 'boolean') r.fail(`entries[${i}].bones[${j}].required`, 'is not true or false');
-      return Object.freeze({ name: r.text(b['name'], `entries[${i}].bones[${j}].name`), parent, required: b['required'] as boolean });
-    });
-    const sockets = r.list(row['sockets'], `entries[${i}].sockets`).map((socket, j): PlanSocket => {
-      const s = r.object(socket, `entries[${i}].sockets[${j}]`);
-      return Object.freeze({
-        key: r.text(s['key'], `entries[${i}].sockets[${j}].key`),
-        bone: s['bone'] === null ? null : r.text(s['bone'], `entries[${i}].sockets[${j}].bone`),
-        holds: r.whole(s['holds'], `entries[${i}].sockets[${j}].holds`, 1),
-        length_mm_maximum: r.whole(s['length_mm_maximum'], `entries[${i}].sockets[${j}].length_mm_maximum`, 1),
-        grip_section_mm_maximum: s['grip_section_mm_maximum'] === null ? null : r.whole(s['grip_section_mm_maximum'], `entries[${i}].sockets[${j}].grip_section_mm_maximum`, 1),
-      });
-    });
-    const names = new Set(bones.map((b) => b.name));
-    if (names.size !== bones.length) r.fail(`entries[${i}].bones`, 'names a bone twice');
-    for (const [j, b] of bones.entries()) if (b.parent !== null && !names.has(b.parent)) r.fail(`entries[${i}].bones[${j}].parent`, `names no bone of ${key}/v${version}`);
-    for (const [j, s] of sockets.entries()) if (s.bone !== null && !names.has(s.bone)) r.fail(`entries[${i}].sockets[${j}].bone`, `names no bone of ${key}/v${version}`);
-    plans.set(`${key}/v${version}`, Object.freeze({ key, version, bones: Object.freeze(bones), sockets: Object.freeze(sockets) }));
+    const plan = planEntry(r, entry, `entries[${i}]`);
+    plans.set(`${plan.key}/v${plan.version}`, plan);
   }
   return plans;
+}
+
+/**
+ * Read a body plan document (`exulanica.body-plan/v1`, a plan drafted for a workspace's own kind) into
+ * the entry the skeleton reads, by the same rules as a catalog entry's.
+ */
+export function readBodyPlanDocument(value: unknown): BodyPlanEntry {
+  const r = reader('body_plans_invalid');
+  const body = r.object(value, 'plan');
+  if (body['profile'] !== BODY_PLAN_PROFILE) r.fail('profile', `is not ${BODY_PLAN_PROFILE}`);
+  return planEntry(r, body, 'plan');
+}
+
+function planEntry(r: ReturnType<typeof reader>, entry: unknown, at: string): BodyPlanEntry {
+  const row = r.object(entry, at);
+  const key = r.text(row['key'], `${at}.key`, KEY);
+  const version = r.whole(row['version'], `${at}.version`, 1);
+  const bones = r.list(row['bones'], `${at}.bones`).map((bone, j): PlanBone => {
+    const b = r.object(bone, `${at}.bones[${j}]`);
+    const parent = b['parent'] === null ? null : r.text(b['parent'], `${at}.bones[${j}].parent`);
+    if (typeof b['required'] !== 'boolean') r.fail(`${at}.bones[${j}].required`, 'is not true or false');
+    return Object.freeze({ name: r.text(b['name'], `${at}.bones[${j}].name`), parent, required: b['required'] as boolean });
+  });
+  const sockets = r.list(row['sockets'], `${at}.sockets`).map((socket, j): PlanSocket => {
+    const s = r.object(socket, `${at}.sockets[${j}]`);
+    return Object.freeze({
+      key: r.text(s['key'], `${at}.sockets[${j}].key`),
+      bone: s['bone'] === null ? null : r.text(s['bone'], `${at}.sockets[${j}].bone`),
+      holds: r.whole(s['holds'], `${at}.sockets[${j}].holds`, 1),
+      length_mm_maximum: r.whole(s['length_mm_maximum'], `${at}.sockets[${j}].length_mm_maximum`, 1),
+      grip_section_mm_maximum: s['grip_section_mm_maximum'] === null ? null : r.whole(s['grip_section_mm_maximum'], `${at}.sockets[${j}].grip_section_mm_maximum`, 1),
+    });
+  });
+  const names = new Set(bones.map((b) => b.name));
+  if (names.size !== bones.length) r.fail(`${at}.bones`, 'names a bone twice');
+  for (const [j, b] of bones.entries()) if (b.parent !== null && !names.has(b.parent)) r.fail(`${at}.bones[${j}].parent`, `names no bone of ${key}/v${version}`);
+  for (const [j, s] of sockets.entries()) if (s.bone !== null && !names.has(s.bone)) r.fail(`${at}.sockets[${j}].bone`, `names no bone of ${key}/v${version}`);
+  return Object.freeze({ key, version, bones: Object.freeze(bones), sockets: Object.freeze(sockets) });
 }
 
 /**

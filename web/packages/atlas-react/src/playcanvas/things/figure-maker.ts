@@ -5,7 +5,9 @@
  * One maker serves every figure of a page (a version's placed things and a society's things), so a
  * container is fetched, held to its digest and read by the engine once a digest, and each figure is
  * an instance of it. A thing with no look (its kind lists none) is drawn as nothing and keeps its
- * place. Anything that cannot be made is refused by name, for the caller to report.
+ * place. A kind its workspace keeps (named by digest alone) is drawn on the drafted body plan its
+ * document names, read from the workspace by that plan's digest. Anything that cannot be made is
+ * refused by name, for the caller to report.
  */
 
 import * as pc from 'playcanvas';
@@ -13,7 +15,7 @@ import { createObjectContainerAsset } from '../scene-objects.js';
 import type { KindDrawing, LookDrawing } from './documents.js';
 import { makeFigure, type InstancedContainer } from './dispatch.js';
 import type { ThingFigure } from './figures.js';
-import type { Named, ThingLibrary } from './library.js';
+import type { Named, ThingLibrary, WorkspaceNamed } from './library.js';
 
 export interface FigureMade {
   readonly figure: ThingFigure;
@@ -61,14 +63,17 @@ export class ThingFigureMaker {
    */
   async make(
     parent: pc.Entity,
-    request: { readonly name: string; readonly thingId: string; readonly kind: Named; readonly look: Named | null },
+    request: { readonly name: string; readonly thingId: string; readonly kind: Named | WorkspaceNamed; readonly look: Named | null },
     stale: () => boolean = () => false,
   ): Promise<FigureMade | null> {
     const library = this.options.library;
     const kind = await library.kind(request.kind);
     const chosen = request.look ?? kind.looks[0] ?? null;
     const look = chosen === null ? null : await library.look(chosen);
-    const plan = look === null ? null : (await library.bodyPlans()).get(look.bodyPlan) ?? null;
+    const plan = look === null
+      ? null
+      : (await library.bodyPlans()).get(look.bodyPlan)
+        ?? (kind.bodyPlanSha256 === null ? null : await library.heldPlan(kind.bodyPlanSha256, look.bodyPlan));
     const container = look?.container == null ? null : await (this.options.instantiate ?? ((one: LookDrawing) => this.instance(one)))(look);
     if (stale() || this.destroyed) {
       container?.model.destroy();

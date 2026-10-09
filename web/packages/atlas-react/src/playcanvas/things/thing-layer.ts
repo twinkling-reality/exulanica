@@ -41,9 +41,17 @@ import type { Named, ThingLibrary } from './library.js';
 import { PickRing, rayMeets, ringRadius } from './ring.js';
 
 /** A placed thing as the version document lists it, in this page's words. */
+/**
+ * The kind a placed thing names: a shipped kind by key, version and digest, or a kind its workspace
+ * keeps by its document's digest alone (a creature drafted from a person's words).
+ */
+export type PlacedKind =
+  | { readonly source?: 'shipped'; readonly kind: string; readonly version: number; readonly sha256: string }
+  | { readonly source: 'workspace'; readonly sha256: string };
+
 export interface PlacedThingRecord {
   readonly thingId: string;
-  readonly kind: { readonly kind: string; readonly version: number; readonly sha256: string };
+  readonly kind: PlacedKind;
   readonly regionId: string;
   readonly transform: {
     readonly xMm: number;
@@ -323,7 +331,8 @@ export class ThingLayer {
 
   private keyOf(record: PlacedThingRecord): string {
     const look = this.lookChoices.get(record.thingId);
-    return [record.kind.kind, record.kind.version, record.kind.sha256, record.regionId, look ? `${look.key}/${look.version}/${look.sha256}` : '-'].join('|');
+    const kind = record.kind.source === 'workspace' ? ['workspace', record.kind.sha256] : [record.kind.kind, record.kind.version, record.kind.sha256];
+    return [...kind, record.regionId, look ? `${look.key}/${look.version}/${look.sha256}` : '-'].join('|');
   }
 
   private drop(id: string, entry: Entry): void {
@@ -351,7 +360,14 @@ export class ThingLayer {
     try {
       const made = await this.maker.make(
         parent,
-        { name: `thing:${id}`, thingId: id, kind: { key: record.kind.kind, version: record.kind.version, sha256: record.kind.sha256 }, look: this.lookChoices.get(id) ?? null },
+        {
+          name: `thing:${id}`,
+          thingId: id,
+          kind: record.kind.source === 'workspace'
+            ? { source: 'workspace', sha256: record.kind.sha256 }
+            : { key: record.kind.kind, version: record.kind.version, sha256: record.kind.sha256 },
+          look: this.lookChoices.get(id) ?? null,
+        },
         stale,
       );
       if (made === null) return;
