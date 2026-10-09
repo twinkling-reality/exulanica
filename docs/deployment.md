@@ -1445,7 +1445,9 @@ scene is laid (the entry names none, or the host does not offer its engine), the
 society is made instead, as `POST /world/versions/{version_id}/society` makes one, on the engine
 the entry's optional `society_engine` names (`exulanica-society/v5` when absent; only a creatable
 living engine over a saved world is accepted), so a visitor never opens on an empty town; a
-refusal is named as the step `society`.
+refusal is named as the step `society`. A copy that already lives on another engine (made while
+the host did not offer the scene's, then dressed once it does) keeps that society: nothing of the
+scene is placed and the step is `scene` with `society_already_living`.
 
 **Built and not built.**
 - Built: the composition, `deploy/public/public.sh`, the tile worker and the arrival worlds, and the

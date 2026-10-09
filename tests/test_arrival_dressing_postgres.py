@@ -155,6 +155,25 @@ def test_a_host_that_does_not_offer_the_engine_places_nothing_and_the_town_lives
     assert _society(api, arrival).json()["society_id"] == before
 
 
+def test_a_copy_already_living_on_another_engine_keeps_its_society_and_nothing_is_placed(
+    made, baked
+):
+    """A copy made while the host did not offer the scene's engine lives on v5; dressed again once
+    the host offers it, it keeps that society (one version holds one society on one engine), the
+    step is named, and none of the scene's things is placed beside its people."""
+    api = made
+    _offer(api, offered=False)
+    (world, *_) = load_arrival_worlds()
+    arrival, _ = _enter_arrival(api)
+    before = _society(api, arrival).json()["society_id"]
+    _offer(api)
+    again, dressing = _enter_arrival(api)
+    assert again == arrival
+    assert dressing == [{"step": "scene", "code": "society_already_living"}]
+    _lives_on_its_own(api, arrival, world.society_engine)
+    assert _society(api, arrival).json()["society_id"] == before
+
+
 def test_an_arrival_world_naming_no_scene_lives_on_its_living_engine(made, baked, monkeypatch):
     api = made
     _offer(api)

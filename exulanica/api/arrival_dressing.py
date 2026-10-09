@@ -23,6 +23,9 @@ What did not happen is answered as the guest entry's ``incomplete`` steps (``{"s
     copy lives on its living engine instead;
 *   a living society refused comes back as ``{"step": "society", "code": ...}``, by the code the
     society routes answer with;
+*   a copy that already lives on another engine (made while the host did not offer the scene's,
+    and now dressed on a host that does) keeps the society it has: one version holds one society
+    on one engine, so nothing is placed and the step is ``society_already_living``;
 *   a refusal of the dressing itself comes back by its code (``scene_ground_mismatch``,
     ``thing_limit_reached``, ...), with what was placed before it kept;
 *   a society refused after the things are placed comes back by its code, the things kept;
@@ -52,19 +55,27 @@ import uuid
 from collections.abc import Sequence
 from typing import Any, Final
 
+from psycopg import pq
+
 from exulanica.api.scene_dressing import dress_saved_world
 from exulanica.api.society_making import (
     SOCIETY_ENGINE_NOT_OFFERED,
     SocietyHooks,
     make_society,
     society_refusal,
+    society_repository,
 )
 from exulanica.world.arrival_worlds import ArrivalWorld
 from exulanica.world.saved_entries import SavedWorldEntryRepository
 from exulanica.world.scenes import SceneRefused, scene_arrival
+from exulanica.world.society import StaleSocietyState
 from exulanica.world.society_engines import society_engine
 
-__all__ = ["INSTALLATION_ACTOR", "dress_arrival", "main"]
+__all__ = ["INSTALLATION_ACTOR", "SOCIETY_ALREADY_LIVING", "dress_arrival", "main"]
+
+#: A copy already living on another engine than its scene's keeps that society, and nothing of the
+#: scene is placed in it.
+SOCIETY_ALREADY_LIVING: Final = "society_already_living"
 
 _LOG = logging.getLogger(__name__)
 
@@ -91,6 +102,8 @@ def dress_arrival(
             {"step": "scene", "code": SOCIETY_ENGINE_NOT_OFFERED},
             *_live(hooks, connection, session, entry_id, world),
         ]
+    if _lives_on_another_engine(hooks, connection, session, entry_id, scene.document["engine"]):
+        return [{"step": "scene", "code": SOCIETY_ALREADY_LIVING}]
     try:
         dressed = dress_saved_world(hooks, connection, session, entry_id, scene)
     except SceneRefused as refused:
@@ -105,6 +118,25 @@ def dress_arrival(
         if mind["refused"] is not None
     )
     return problems
+
+
+def _lives_on_another_engine(
+    hooks: SocietyHooks, connection: Any, session: Any, entry_id: uuid.UUID, engine: str
+) -> bool:
+    """Whether the arrival version already holds a society on another engine than ``engine``,
+    read with nothing composed or written."""
+    entry = SavedWorldEntryRepository(connection, session.workspace_id, hooks.services.store).entry(
+        entry_id
+    )
+    repository = society_repository(connection, session, hooks, entry.world_id)
+    try:
+        repository.held(entry.authored_version_id, profile=engine, region_id=None)
+    except StaleSocietyState:
+        return True
+    finally:
+        if connection.info.transaction_status != pq.TransactionStatus.IDLE:
+            connection.rollback()
+    return False
 
 
 def _live(
