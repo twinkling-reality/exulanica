@@ -250,6 +250,29 @@ def test_lines_that_nearly_repeat_are_reported_never_weighed():
     assert varied["activities"] == same["activities"]
 
 
+def test_a_served_result_states_what_each_run_and_each_arm_reported():
+    """What a run reports beside its terms is served with it, never weighed, and summed over an
+    arm's completed runs; under a score that reports none, both are null."""
+    from exulanica.world.society_comparison_result import _reported_document, _reported_total
+
+    _, varied = _terms("model")
+    _, same = _terms("model", _Choosing(("The sword is here.",)))
+    first, second = _reported_document(varied), _reported_document(same)
+    assert first == {
+        "acts": varied["acts"],
+        "lines": varied["lines"],
+        "hands_missed": varied["hands_missed"],
+    }
+    total = _reported_total([first, second])
+    assert total is not None
+    assert total["acts"] == {kind: varied["acts"][kind] + same["acts"][kind] for kind in ACT_KINDS}
+    assert total["lines"] == {
+        key: varied["lines"][key] + same["lines"][key] for key in ("said", "near_repeats")
+    }
+    earlier = {k: v for k, v in varied.items() if k not in ("acts", "lines", "hands_missed")}
+    assert _reported_document(earlier) is None and _reported_total([]) is None
+
+
 def test_stored_terms_that_do_not_report_acts_are_refused():
     _, document = _terms("routine")
     validate_terms(document)

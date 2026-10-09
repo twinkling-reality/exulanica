@@ -242,6 +242,9 @@ def test_a_held_out_comparison_scored_under_its_own_code_is_judged():
     assert result["summaries"]["routine"]["mean_score"] == "1.0000"
     assert result["summaries"]["wait"]["mean_score"] == "0.0000"
     assert result["control_bound"] == "0.0000"
+    # A score before the sixth reports no acts, lines or hands acts: each run and arm says null.
+    assert {run["reported"] for seed in result["seeds"] for run in seed["runs"].values()} == {None}
+    assert {summary["reported"] for summary in result["summaries"].values()} == {None}
 
 
 def test_a_model_arm_is_named_by_the_manifest_and_an_anchor_names_no_model():

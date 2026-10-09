@@ -387,9 +387,10 @@ DATA_KEYED = frozenset({"minutes_by_activity", "reasons"})
 #: class each left a turn in.
 KEYED_BY_DATA_WITHIN = frozenset({"reasons_by_class"})
 #: Objects a served document holds as null where its run carries no score (a seed excluded by name,
-#: which depends on what the run's people did): their shape is being an object or null, and the
-#: score's own tests hold their keys (tests/test_society_score_v3.py).
-NULLABLE_OBJECTS = frozenset({"parts"})
+#: which depends on what the run's people did), or where its score reports no acts, lines or hands
+#: acts (every score before the sixth): their shape is being an object or null, and the score's own
+#: tests hold their keys (tests/test_society_score_v3.py, tests/test_society_things_comparison.py).
+NULLABLE_OBJECTS = frozenset({"parts", "reported"})
 _OBJECT_OR_NULL = "object or null"
 
 

@@ -290,6 +290,7 @@
               },
               "turns": 97
             },
+            "reported": null,
             "run_id": "ac39bfcd-60dc-58c8-a52b-5a20625a8d5a",
             "score": "0.9511",
             "status": "completed",
@@ -383,6 +384,7 @@
               },
               "turns": 97
             },
+            "reported": null,
             "run_id": "fd008c3c-9007-5d51-b65c-a0def5b74d0d",
             "score": "0.9511",
             "status": "completed",
@@ -450,6 +452,7 @@
               "shares": null,
               "turns": 0
             },
+            "reported": null,
             "run_id": "528614f1-1c48-5a48-9ff5-7e1894bfe819",
             "score": "1.0000",
             "status": "completed",
@@ -512,6 +515,7 @@
               "shares": null,
               "turns": 0
             },
+            "reported": null,
             "run_id": "3a024536-3091-5879-ae80-3ae038d80dfc",
             "score": "0.0000",
             "status": "completed",
@@ -602,6 +606,7 @@
               },
               "turns": 93
             },
+            "reported": null,
             "run_id": "d1e0862f-09d5-55c1-95cf-2c00d0e88cfc",
             "score": "0.9167",
             "status": "completed",
@@ -695,6 +700,7 @@
               },
               "turns": 93
             },
+            "reported": null,
             "run_id": "47ec0032-5a02-5aae-b018-4f2b0c0ce895",
             "score": "0.9167",
             "status": "completed",
@@ -762,6 +768,7 @@
               "shares": null,
               "turns": 0
             },
+            "reported": null,
             "run_id": "d97d4643-ca47-5e19-bbba-29358a12edd9",
             "score": "1.0000",
             "status": "completed",
@@ -824,6 +831,7 @@
               "shares": null,
               "turns": 0
             },
+            "reported": null,
             "run_id": "c12c1a0d-f41c-5d13-93a0-d8d35a4d41f7",
             "score": "0.0000",
             "status": "completed",
@@ -921,7 +929,8 @@
             "refused": "0.0000"
           },
           "turns": 190
-        }
+        },
+        "reported": null
       },
       "model_b": {
         "cost_known": true,
@@ -983,7 +992,8 @@
             "refused": "0.0000"
           },
           "turns": 190
-        }
+        },
+        "reported": null
       },
       "routine": {
         "cost_known": true,
@@ -1028,7 +1038,8 @@
           "routine_choice_points": null,
           "shares": null,
           "turns": 0
-        }
+        },
+        "reported": null
       },
       "wait": {
         "cost_known": true,
@@ -1068,7 +1079,8 @@
           "routine_choice_points": null,
           "shares": null,
           "turns": 0
-        }
+        },
+        "reported": null
       }
     },
     "verdict": {

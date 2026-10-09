@@ -845,6 +845,7 @@ def comparison_result(
         by_seed.setdefault(run["seed_digest"], {})[run["arm"]] = run
     calls_of: dict[str, list[Mapping[str, Any]]] = {arm: [] for arm in arms}
     others_of: dict[str, list[Mapping[str, Any]]] = {arm: [] for arm in arms}
+    reported_of: dict[str, list[dict[str, Any]]] = {arm: [] for arm in arms}
     seeds_out = []
     for seed in definition["seeds"]:
         held = by_seed[seed]
@@ -863,6 +864,9 @@ def comparison_result(
                 others_of[arm].append(others_calls)
             value = reading.scores[arm][seed]
             counts = reading.counts[arm][seed]
+            reported = None if outcome is None else _reported_document(outcome["terms"])
+            if reported is not None:
+                reported_of[arm].append(reported)
             runs_out[arm] = {
                 "run_id": None if found is None else str(found["run_id"]),
                 "status": status,
@@ -872,6 +876,7 @@ def comparison_result(
                 "score": None if value is None else decimal_text(value),
                 "parts": _parts_document(reading.parts.get(arm, {}).get(seed)),
                 "terms": None if outcome is None else _terms_document(outcome["terms"]),
+                "reported": reported,
                 "reliability": None if counts is None else _reliability_document(counts),
                 "calls": _calls_document(calls),
                 "others_calls": _calls_document(others_calls),
@@ -920,6 +925,7 @@ def comparison_result(
                 "first_answers_refused": _first_refused(calls),
                 **_mean_measures(reading.measures[arm], _MEASURES),
             },
+            "reported": _reported_total(reported_of[arm]),
         }
     claim = definition["claim"]
     assembled = reading.assembled
@@ -996,6 +1002,38 @@ def _terms_document(terms: Mapping[str, Any]) -> dict[str, Any]:
         if key in terms:
             served[key] = terms[key]
     return served
+
+
+def _reported_document(terms: Mapping[str, Any]) -> dict[str, Any] | None:
+    """What a score that reports a run's acts, lines and dropped hands acts says of it, never
+    weighed: each act its scored people did, the lines they said and how many nearly repeat an
+    earlier one, and the hands acts they dropped by reason; None under a score that reports none
+    (every score before the sixth)."""
+    if "acts" not in terms:
+        return None
+    return {
+        "acts": dict(terms["acts"]),
+        "lines": dict(terms["lines"]),
+        "hands_missed": dict(terms[society_score_v6.HANDS_MISSED]),
+    }
+
+
+def _reported_total(reported: Sequence[Mapping[str, Any]]) -> dict[str, Any] | None:
+    """What an arm's completed runs reported, summed; None where none reported anything."""
+    if not reported:
+        return None
+    acts: Counter[str] = Counter()
+    lines: Counter[str] = Counter()
+    missed: Counter[str] = Counter()
+    for found in reported:
+        acts.update(found["acts"])
+        lines.update(found["lines"])
+        missed.update(found["hands_missed"])
+    return {
+        "acts": {kind: acts[kind] for kind in reported[0]["acts"]},
+        "lines": {key: lines[key] for key in reported[0]["lines"]},
+        "hands_missed": dict(sorted(missed.items())),
+    }
 
 
 def _hourly_cost(calls: Sequence[Mapping[str, Any]], definition: Mapping[str, Any]) -> str | None:

@@ -318,6 +318,7 @@
               },
               "turns": 25
             },
+            "reported": null,
             "run_id": "f17091da-fe4b-502a-a1be-9a7b33cb0b42",
             "score": "0.8750",
             "status": "completed",
@@ -411,6 +412,7 @@
               },
               "turns": 25
             },
+            "reported": null,
             "run_id": "84f2d5a1-5ec4-5921-be5e-8b3d6e14cdba",
             "score": "0.8750",
             "status": "completed",
@@ -483,6 +485,7 @@
               "shares": null,
               "turns": 0
             },
+            "reported": null,
             "run_id": "8b282a95-8da5-575d-b81b-a024c1a2f240",
             "score": "1.0000",
             "status": "completed",
@@ -554,6 +557,7 @@
               "shares": null,
               "turns": 0
             },
+            "reported": null,
             "run_id": "20815573-f114-5b58-9982-e9ec191eb326",
             "score": "0.0000",
             "status": "completed",
@@ -642,7 +646,8 @@
             "refused": "0.0000"
           },
           "turns": 25
-        }
+        },
+        "reported": null
       },
       "model_b": {
         "cost_known": true,
@@ -695,7 +700,8 @@
             "refused": "0.0000"
           },
           "turns": 25
-        }
+        },
+        "reported": null
       },
       "routine": {
         "cost_known": true,
@@ -737,7 +743,8 @@
           "routine_choice_points": null,
           "shares": null,
           "turns": 0
-        }
+        },
+        "reported": null
       },
       "wait": {
         "cost_known": true,
@@ -774,7 +781,8 @@
           "routine_choice_points": null,
           "shares": null,
           "turns": 0
-        }
+        },
+        "reported": null
       }
     },
     "verdict": {

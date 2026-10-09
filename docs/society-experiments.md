@@ -146,7 +146,10 @@ terms and never weighed: how many of each act the group did, how many lines it s
 them nearly repeat an earlier one (a token-set Jaccard of at least a half with a line the speaker
 said earlier in the run or with the line it answers, the last said to it or to everyone near it
 that it heard before it spoke), and the hands acts dropped, by reason
-([`tests/test_society_things_comparison.py`](../tests/test_society_things_comparison.py)). A run of
+([`tests/test_society_things_comparison.py`](../tests/test_society_things_comparison.py)). A served
+result states them for each run (`seeds[].runs[arm].reported`: `acts`, `lines` with `said` and
+`near_repeats`, `hands_missed` by reason) and summed over each arm's completed runs
+(`summaries[arm].reported`); both are null under a score that reports none. A run of
 a society of things plays as its own minutes do, its things phase after the roles' events, from
 its genesis, where no visitor has crossed in, and nobody crosses in during it: the door's stream is
 not an arm's input, so a comparison of a world with visitors compares the world's own beings. The

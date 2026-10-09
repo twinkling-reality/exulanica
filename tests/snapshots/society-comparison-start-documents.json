@@ -508,6 +508,7 @@
               },
               "turns": 89
             },
+            "reported": null,
             "run_id": "f59de7d6-5294-5c40-b9b6-e0059070e5ad",
             "score": "0.9355",
             "status": "completed",
@@ -573,6 +574,7 @@
               "shares": null,
               "turns": 0
             },
+            "reported": null,
             "run_id": "b8edba20-2a33-55c0-9df0-6e632e74f437",
             "score": "1.0000",
             "status": "completed",
@@ -635,6 +637,7 @@
               "shares": null,
               "turns": 0
             },
+            "reported": null,
             "run_id": "2d38380b-db51-5acc-8ec6-da11decdffe7",
             "score": "0.0000",
             "status": "completed",
@@ -736,7 +739,8 @@
             "refused": "0.0000"
           },
           "turns": 89
-        }
+        },
+        "reported": null
       },
       "routine": {
         "cost_known": true,
@@ -778,7 +782,8 @@
           "routine_choice_points": null,
           "shares": null,
           "turns": 0
-        }
+        },
+        "reported": null
       },
       "wait": {
         "cost_known": true,
@@ -815,7 +820,8 @@
           "routine_choice_points": null,
           "shares": null,
           "turns": 0
-        }
+        },
+        "reported": null
       }
     },
     "verdict": {
