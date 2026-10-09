@@ -703,7 +703,12 @@ class ReferenceWorker:
         steps.set("read", "running")
         self._check(claimed, steps, started)
         try:
-            read = drafting.read_notes(client, leads, deadline_s=self._remaining(started))
+            read = drafting.read_notes(
+                client,
+                leads,
+                deadline_s=self._remaining(started),
+                pictures=claimed.request.purpose not in drafting.WITHOUT_PICTURE_DESCRIPTIONS,
+            )
         except (ModelError, SpendingRefused, ExulanicaError) as failure:
             read = drafting.Drafted(refused=_reason(failure))
         if read.call is not None:

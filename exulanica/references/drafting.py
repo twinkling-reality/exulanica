@@ -39,6 +39,7 @@ from exulanica.references.notes import MAX_NOTE_CHARACTERS, DraftedNote
 __all__ = [
     "DRAFTING_ROLE",
     "PROMPT_PATH",
+    "WITHOUT_PICTURE_DESCRIPTIONS",
     "Drafted",
     "ReferencePrompts",
     "plan_subjects",
@@ -53,6 +54,10 @@ _PROFILE: Final = "exulanica.reference-prompts/v1"
 #: they answer (the manifest's min_max_tokens), and three short subjects fit well within it.
 PLAN_MAX_TOKENS: Final = 640
 READ_MAX_TOKENS: Final = 1024
+#: The purposes whose reader is shown no source's description of a web picture, only its page
+#: excerpts: the describe-a-town drafter is handed no description of any picture, a web picture's
+#: included, while reading pictures for it is not offered.
+WITHOUT_PICTURE_DESCRIPTIONS: Final = frozenset({"world_draft"})
 #: How the drafting purposes are told to the planner.
 PURPOSES: Final[Mapping[str, str]] = {
     "world_draft": "a town's values and its look",
@@ -210,14 +215,16 @@ def plan_subjects(
     )
 
 
-def _material(leads: Sequence[Leads], maximum: int) -> str:
-    """The leads as one bounded block: each search's subject, its excerpts and descriptions."""
+def _material(leads: Sequence[Leads], maximum: int, *, pictures: bool = True) -> str:
+    """The leads as one bounded block: each search's subject, its excerpts and, unless
+    ``pictures`` is false, its descriptions of pictures."""
     blocks: list[str] = []
     used = 0
     for lead in leads:
         lines = [f"Search: {lead.query.text} ({lead.query.aspect})"]
         lines += [f"Excerpt: {passage}" for passage in lead.passages]
-        lines += [f"Picture: {description}" for description in lead.picture_descriptions]
+        if pictures:
+            lines += [f"Picture: {description}" for description in lead.picture_descriptions]
         for line in lines:
             if used + len(line) > maximum:
                 break
@@ -233,15 +240,17 @@ def read_notes(
     prompts: ReferencePrompts | None = None,
     catalogs: ReferenceCatalogs | None = None,
     deadline_s: float | None = None,
+    pictures: bool = True,
 ) -> Drafted:
     """At most ``notes_maximum`` notes drafted from ``leads``, in the reader's own words, within
-    ``deadline_s`` seconds when given."""
+    ``deadline_s`` seconds when given; from the leads' page excerpts alone when ``pictures`` is
+    false."""
     prompts = prompts if prompts is not None else reference_prompts()
     catalogs = catalogs if catalogs is not None else load_reference_catalogs()
     _plan, reading = _schemas(
         tuple(catalogs.aspects), prompts.subjects_maximum, prompts.notes_maximum
     )
-    material = _material(leads, prompts.material_characters_maximum)
+    material = _material(leads, prompts.material_characters_maximum, pictures=pictures)
     if not material:
         return Drafted(refused="nothing_to_read")
     messages = [

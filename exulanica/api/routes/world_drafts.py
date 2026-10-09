@@ -15,9 +15,10 @@ proposal document, the same for the page and for an agent calling the API:
     (``purpose`` ``world_draft``), ``references``: whether its web notes were handed to the drafter,
     how many, and what names them (the request, its bundle's digest, the notes' basis), or why not.
     The notes go after the words as one quoted block that says it describes and never instructs
-    (:mod:`exulanica.selection.world_drafting`). Any id that is not such a request, another
-    workspace's or another person's included, is answered exactly as an id nobody made, and the
-    draft is drafted from the words alone;
+    (:mod:`exulanica.selection.world_drafting`). Any id that is not a request of the caller's own,
+    another workspace's or another person's included, is answered exactly as an id nobody made; a
+    request of the caller's own that is unfinished, withdrawn or made for another draft is answered
+    with its own code; either way the draft is drafted from the words alone;
 *   the specification, prompt and model it was drafted with, and what the drafting cost;
 *   for a draft that is not refused, ``look_offer``: which of the library's looks the words ask
     for, if any, chosen by a short step of its own after the draft
@@ -193,8 +194,8 @@ class ReferencesView(BaseModel):
     ``used``: the drafter saw ``notes`` web notes from the request ``reference_id``, whose bundle
     ``bundle_sha256`` names them (their text stays with the request), with ``basis`` the notes'
     bases. ``not_used``: the draft was drafted from the words alone, and ``code`` and ``detail``
-    say why; an id that is not a finished request of the caller's own is ``reference_unknown``
-    whoever made it, so the answer tells nobody whether another's id exists.
+    say why; an id that is not a request of the caller's own is ``reference_unknown`` whoever made
+    it, so the answer tells nobody whether another's id exists.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -295,8 +296,15 @@ def _notes(
     if reference_id is None:
         return None, None
     try:
+        # Web notes alone: a picture note would need its picture declared to the request policy,
+        # and the drafter is offered none.
         found = notes_for_draft(
-            connection, session.workspace_id, session.actor, reference_id, purpose="world_draft"
+            connection,
+            session.workspace_id,
+            session.actor,
+            reference_id,
+            purpose="world_draft",
+            bases=("web_description",),
         )
     except NotesRefused as refused:
         return None, ReferencesView(

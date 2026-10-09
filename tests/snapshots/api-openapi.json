@@ -35174,7 +35174,7 @@
      "basis"
     ],
     "title": "ReferencesView",
-    "description": "Whether a reference request's notes were handed to the drafter.\n\n``used``: the drafter saw ``notes`` web notes from the request ``reference_id``, whose bundle\n``bundle_sha256`` names them (their text stays with the request), with ``basis`` the notes'\nbases. ``not_used``: the draft was drafted from the words alone, and ``code`` and ``detail``\nsay why; an id that is not a finished request of the caller's own is ``reference_unknown``\nwhoever made it, so the answer tells nobody whether another's id exists."
+    "description": "Whether a reference request's notes were handed to the drafter.\n\n``used``: the drafter saw ``notes`` web notes from the request ``reference_id``, whose bundle\n``bundle_sha256`` names them (their text stays with the request), with ``basis`` the notes'\nbases. ``not_used``: the draft was drafted from the words alone, and ``code`` and ``detail``\nsay why; an id that is not a request of the caller's own is ``reference_unknown`` whoever made\nit, so the answer tells nobody whether another's id exists."
    },
    "RefusalView": {
     "properties": {

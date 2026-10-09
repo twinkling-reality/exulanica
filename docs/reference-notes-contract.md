@@ -245,8 +245,8 @@ words win. Saved names in the notes are replaced under the labels the words gave
 the same as without notes, and a phrase the drafter reports as not on the form must be copied from
 the person's words, never from a note. The answer's `references` says whether the notes were used,
 how many, and the request, bundle digest and bases that name them, or the code above when they were
-not; any id that is not the caller's own finished request is answered `reference_unknown`, whoever
-made it, and the draft is drafted from the words alone. A draft naming no reference asks with
+not; any id that is not a request of the caller's own is answered `reference_unknown`, whoever made
+it, and the draft is drafted from the words alone. A draft naming no reference asks with
 version 2, byte for byte, and its `references` is null.
 
 ## 10. Notes from a person's own pictures

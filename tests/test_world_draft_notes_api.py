@@ -89,6 +89,7 @@ def test_a_note_that_says_what_to_do_changes_nothing_the_words_alone_would_not(d
         BundleNote("buildings", "low whitewashed houses with blue doors", "web_description", None),
         BundleNote("buildings", _INJECTION, "web_description", None),
         BundleNote("landscape_and_plants", "a quay like Lantern House", "web_description", None),
+        BundleNote("buildings", "a cottage where Maria Estrada lives", "web_description", None),
     )
     reference_id, bundle = _finished(repository, notes, actor=_actor())
     description = "A fishing village with low buildings, a harbour like lantern house"
@@ -119,7 +120,10 @@ def test_a_note_that_says_what_to_do_changes_nothing_the_words_alone_would_not(d
     assert f"- Buildings: {_INJECTION}" in block
     # The saved place in a note is sent under the label the words gave it, and never by name.
     assert "a quay like [place A]" in block
-    assert "lantern" not in json.dumps(first["payload"]).lower()
+    # A saved person named in a note alone gets a label of its own.
+    assert "a cottage where [person A] lives" in block
+    for name in ("lantern", "maria", "estrada"):
+        assert name not in json.dumps(first["payload"]).lower()
     # The same form as a draft without notes: nothing in a note can add a field or a value.
     assert first["payload"]["response_format"] == plain["payload"]["response_format"]
     # The phrase copied from a note was refused as not the person's words, and repaired.
@@ -130,7 +134,7 @@ def test_a_note_that_says_what_to_do_changes_nothing_the_words_alone_would_not(d
         "reference_id": str(reference_id),
         "code": None,
         "detail": None,
-        "notes": 3,
+        "notes": 4,
         "bundle_sha256": bundle.digest,
         "basis": ["web_description"],
     }

@@ -178,13 +178,13 @@ def scene(repository, monkeypatch):
         arguments.update(changes)
         return ReferenceWorker(_Database(repository), **arguments)
 
-    def request(web: bool = True):
+    def request(web: bool = True, purpose: str = "kind"):
         made, _ = store.create_request(
             connection,
             workspace_id,
             offered_to=(workspace_id,),
             owner_actor_id=ACTOR,
-            purpose="kind",
+            purpose=purpose,
             web=web,
             description="a harbour town with whitewashed houses and blue doors",
             withheld_words=["Rosalind", "Teague"],
@@ -239,6 +239,21 @@ def test_a_web_request_becomes_a_bundle_of_notes_and_keeps_nothing_it_found(scen
     # The reader was shown the excerpt, in memory only, and that is all it was.
     assert PLANTED_EXCERPT in json.dumps(models.requests[1]["payload"])
     assert [step["state"] for step in finished.steps] == ["done", "done", "done", "done"]
+
+
+@pytest.mark.parametrize(("purpose", "shown"), [("world_draft", False), ("kind", True)])
+def test_a_town_draft_s_reader_is_shown_no_description_of_a_web_picture(scene, purpose, shown):
+    """For a town draft the reader is shown the pages' excerpts alone: the source's description of
+    a picture it found ("White walls, blue doors") never reaches the model; for a kind it does."""
+    _connection, workspace_id, models, tavily, _gate, worker, request = scene
+    request(purpose=purpose)
+    models.responses = [_structured(PLAN), _structured(READING)]
+    tavily.responses = [_tavily_answer(), _tavily_answer()]
+    assert worker().run_once(workspace_id) == "complete"
+    reading = json.dumps(models.requests[1]["payload"])
+    assert PLANTED_EXCERPT in reading
+    assert ("White walls, blue doors" in reading) is shown
+    assert ("Picture:" in reading) is shown
 
 
 def test_a_request_without_web_notes_asks_nobody(scene) -> None:

@@ -639,7 +639,8 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /worlds/references": {
         "json": {"purpose": "kind", "description": "a harbour town", "web": True}
     },
-    # A reference id nobody made: the draft is answered as with no notes, never 403 or 404.
+    # A realistic body with a reference id nobody made. The sweeps run without a model, so they stop
+    # at 503 before the notes are read; tests/test_world_draft_notes_api.py holds the id's answer.
     "POST /worlds/specification/drafts": {
         "json": {
             "description": "a quiet town",
