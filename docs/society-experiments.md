@@ -695,7 +695,15 @@ An authenticated saved world exposes **Compare** from the World menu and the too
 the version's comparisons and opens the newest. It leads with the server's verdict in words, large,
 with the primary pair's answered shares in the sentence under it; who each arm decides for and what
 decides for everybody else, with what a model outside the group means for the score where there is
-one, sits behind "Who it decides for". The seed and the two arms shown are chosen next. Every number
+one, sits behind "Who it decides for". A comparison of a society of things (the sixth score) then says,
+in its own quieter section under the verdict, "Words and hands: reported, not judged", what each
+model's people said and did with their hands over its seeds: lines said and how many nearly repeat an
+earlier line (the rule said once under "How lines are compared"), things handed to someone, taken
+from someone, picked up and put down, and hand moves that did not happen with each reason in the
+catalog's words; the routine's column says in words that it never spoke or used its hands where its
+own record shows none, and its numbers otherwise, and a
+row nobody did is left out. None of it enters the verdict, and the lines themselves are read only in
+a person's hour. The seed and the two arms shown are chosen next. Every number
 is behind one disclosure, "Every number from this comparison": each arm's score with its interval
 and, beside it, its model's share of turns answered, refused and left to the routine, the same per
 choice point of the routine's own run where the comparison recorded one or, for a first-version
@@ -703,7 +711,10 @@ comparison, in words, that it did not; its cost for the hour and its answer time
 differences; and every seed's scores, each with what its run's model answered. For the chosen seed
 each side says how its group fared, what its model answered, and what the group did: each kind of
 minute (walking, waiting, or an activity the routine names, one row for the same words) and how
-many of the group spent any minute in it, counted from the run's replay. Under it, both runs share
+many of the group spent any minute in it, counted from the run's replay, and in a society of things each
+act the sixth score weighs (said something, picked something up, put something down, gave something
+away, took something) with how many of the group did it, from the run's events; under it, one quiet
+line gives the seed's lines, near repeats and things handed over, reported and not judged. Under it, both runs share
 one clock (play, pause, speed and a minute scrubber) for what each person did minute by minute on
 each side with a mark where the two hours went differently, the inspector on a person of either
 side, saying who decided their latest turn and why, and for a person outside the group, that they

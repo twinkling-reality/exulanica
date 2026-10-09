@@ -109,6 +109,11 @@ export function outcomeWords(code: string): string | undefined {
   return TABLES.outcome[code];
 }
 
+/** An event's reason in the catalog's words, or undefined where it has none. */
+export function eventReasonWords(code: string): string | undefined {
+  return TABLES.event_reason[code];
+}
+
 /** Why, for any code a state or an event records, or the named sentence for one with no words. */
 export function reasonWords(code: string): string {
   return TABLES.reason[code] ?? TABLES.event_reason[code] ?? fill(words('phrase', 'reason_unknown'), { code });

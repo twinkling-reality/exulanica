@@ -202,6 +202,25 @@ export interface SeedRun {
   readonly calls: RunCalls | null;
   /** What asking everybody outside the group took, or null where no model decides for them. */
   readonly othersCalls: RunCalls | null;
+  /**
+   * What the group said and did with their hands, reported and never weighed (score version 6);
+   * null for a run not completed, absent under any earlier score.
+   */
+  readonly reported?: ReportedCounts | null;
+}
+
+/** The acts a society of things records for a person, as the sixth score counts them. */
+export const REPORTED_ACTS = ['said', 'picked_up', 'put_down', 'gave', 'took'] as const;
+export type ReportedAct = (typeof REPORTED_ACTS)[number];
+
+/**
+ * A run's or an arm's reported counts: how many of each act, how many lines and how many of them
+ * nearly repeat an earlier one, and the hands moves that did not happen, by the reason recorded.
+ */
+export interface ReportedCounts {
+  readonly acts: Readonly<Record<ReportedAct, number>>;
+  readonly lines: { readonly said: number; readonly nearRepeats: number };
+  readonly handsMissed: Readonly<Record<string, number>>;
 }
 
 export interface ComparisonSeed {
@@ -225,6 +244,8 @@ export interface ArmSummary {
   readonly heldOut: Readonly<Record<string, Decimal | null>>;
   /** The group's person-minutes by what they were doing, or null where a run did not record it. */
   readonly minutesByActivity: Readonly<Record<string, Decimal>> | null;
+  /** The arm's reported counts summed over its completed runs (score version 6), or null; absent before. */
+  readonly reported?: ReportedCounts | null;
 }
 
 export interface ComparisonDifference {
@@ -509,6 +530,23 @@ function seedRun(value: unknown): SeedRun {
     reliability: maybe(found['reliability'], reliability),
     calls: maybe(found['calls'], calls),
     othersCalls: maybe(found['others_calls'], calls),
+    ...('reported' in found ? { reported: maybe(found['reported'], reportedCounts) } : {}),
+  };
+}
+
+/** Reported counts as the server states them; any other shape is refused. */
+function reportedCounts(value: unknown): ReportedCounts {
+  const held = object(value);
+  const acts = object(held['acts']);
+  const lines = object(held['lines']);
+  if (Object.keys(acts).length !== REPORTED_ACTS.length) invalid();
+  const said = count(lines['said']);
+  const nearRepeats = count(lines['near_repeats']);
+  if (nearRepeats > said) invalid();
+  return {
+    acts: Object.fromEntries(REPORTED_ACTS.map((act) => [act, count(acts[act])])) as Record<ReportedAct, number>,
+    lines: { said, nearRepeats },
+    handsMissed: Object.fromEntries(Object.entries(object(held['hands_missed'])).map(([reason, n]) => [text(reason), count(n)])),
   };
 }
 
@@ -530,6 +568,7 @@ function summary(value: unknown): ArmSummary {
       .map(([name, measure]) => [name, maybe(measure, decimal)])),
     minutesByActivity: maybe(object(held['held_out'])[MINUTES_BY_ACTIVITY], (found) =>
       Object.fromEntries(Object.entries(object(found)).map(([kind, share]) => [text(kind), decimal(share)]))),
+    ...('reported' in held ? { reported: maybe(held['reported'], reportedCounts) } : {}),
   };
 }
 

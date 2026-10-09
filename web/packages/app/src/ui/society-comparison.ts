@@ -24,10 +24,12 @@ import type {
   OtherPerson,
   Reliability,
   RunDecision,
+  ReportedCounts,
   RunReplay,
   VerdictCode,
 } from '../society-comparison-api.js';
-import { DECISION_WORDS, livingNeedLabel } from '../society-inhabitant-words.js';
+import { REPORTED_ACTS } from '../society-comparison-api.js';
+import { DECISION_WORDS, eventReasonWords, livingNeedLabel, optionalPhrase, outcomeWords } from '../society-inhabitant-words.js';
 import { el, replace } from './dom.js';
 import { createLivingWorldInspector } from './living-world-inspector.js';
 import { buildComparisonPlan, classWords, minuteAt, minuteClass, type MinuteClass } from './society-comparison-plan.js';
@@ -448,15 +450,132 @@ function differencesList(result: ComparisonResult): HTMLElement {
   ])));
 }
 
+/**
+ * The acts a society of things records (a line said, a thing picked up, put down, given or taken),
+ * each counted once per person of the group who did it, from the run's own events. They are kinds of
+ * things people did, as the sixth score weighs them; each takes the palette's next colour after the
+ * run's own activities, and its words are the catalog's outcome words.
+ */
+export function groupActs(run: RunReplay): readonly { readonly act: string; readonly words: string; readonly people: number; readonly minuteClass: MinuteClass }[] {
+  const inGroup = new Set(run.people.filter((person) => person.inGroup).map((person) => person.id));
+  return REPORTED_ACTS.flatMap((act, index) => {
+    const people = new Set(run.events.filter((event) => event.kind === act && inGroup.has(event.subjectId)).map((event) => event.subjectId));
+    const words = outcomeWords(act);
+    return people.size === 0 || words === undefined ? [] : [{
+      act, words, people: people.size, minuteClass: `activity-${run.activities.length + index}` as MinuteClass,
+    }];
+  });
+}
+
 /** What the group did in one run, as a list a person reads down: each kind, and how many did it. */
 function didList(run: RunReplay): HTMLElement {
   const { group, kinds } = groupActivity(run);
+  const capital = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
   return el('div', { class: 'comparison-side-did' }, [
     el('p', { class: 'comparison-side-did-head', text: `What the group of ${group} did` }),
-    el('ul', {}, kinds.map((kind) => el('li', { 'data-class': kind.minuteClass }, [
-      el('span', { class: 'comparison-side-did-kind', text: `${kind.words.charAt(0).toUpperCase()}${kind.words.slice(1)}` }),
-      el('span', { class: 'comparison-side-did-count', text: `${kind.people} of ${group}` }),
-    ]))),
+    el('ul', {}, [
+      ...kinds.map((kind) => el('li', { 'data-class': kind.minuteClass }, [
+        el('span', { class: 'comparison-side-did-kind', text: capital(kind.words) }),
+        el('span', { class: 'comparison-side-did-count', text: `${kind.people} of ${group}` }),
+      ])),
+      ...groupActs(run).map((kind) => el('li', { 'data-class': kind.minuteClass, 'data-act': kind.act }, [
+        el('span', { class: 'comparison-side-did-kind', text: capital(kind.words) }),
+        el('span', { class: 'comparison-side-did-count', text: `${kind.people} of ${group}` }),
+      ])),
+    ]),
+  ]);
+}
+
+/** How lines are compared, said once under the reported section. */
+export const NEAR_REPEAT_WORDS = 'A line counts as nearly the same as an earlier line when at least half of the different words the '
+  + 'two lines use between them are in both: compared with every line the same person said earlier in the hour, and with '
+  + 'the line they were answering, the last one said to them or to everyone near them that they heard before they spoke.';
+
+/** One seed's reported counts for one side, in a quiet line; null where the run reports none. */
+export function seedReportedWords(reported: ReportedCounts | null | undefined): string | null {
+  if (reported == null) return null;
+  const { said, nearRepeats } = reported.lines;
+  const lines = said === 0 ? 'no lines said'
+    : `${said} ${said === 1 ? 'line' : 'lines'} said, ${nearRepeats} nearly the same as an earlier line`;
+  const gave = reported.acts.gave;
+  const handed = gave === 0 ? 'nothing handed over' : `${gave} ${gave === 1 ? 'thing' : 'things'} handed over`;
+  return `On this seed: ${lines}; ${handed}. Reported, not judged.`;
+}
+
+/** A hand move that did not happen, as a row reads it: the catalog's row words, else its event reason's words. */
+function handMoveWords(reason: string): string {
+  return optionalPhrase(`hand_move_${reason}`) ?? eventReasonWords(reason) ?? 'for a reason not recorded in words';
+}
+
+/**
+ * What each model's people said and did with their hands, over the comparison's seeds: reported,
+ * never weighed, in its own quieter section under the verdict. One column for each arm a model
+ * decides, and the routine's from its own recorded counts: in a group where all of them are 0 it
+ * says so in words ("The routine never speaks"), and where it has none recorded its column is left
+ * out. A row whose count is 0 for every column is left out. Null for a comparison that reports none.
+ */
+export function reportedSection(result: ComparisonResult): HTMLElement | null {
+  const asked = result.arms.filter((arm) => arm.role === 'candidate' || arm.role === 'control');
+  const counts = asked.map((arm) => result.summaries[arm.key]?.reported ?? null);
+  if (counts.every((held) => held === null)) return null;
+  const one = result.arms.find((arm) => arm.role === 'one') ?? null;
+  const routineCounts = one === null ? null : result.summaries[one.key]?.reported ?? null;
+  const routine = routineCounts === null ? null : one;
+  const zero = (held: ReportedCounts | null): ReportedCounts => held ?? {
+    acts: { said: 0, picked_up: 0, put_down: 0, gave: 0, took: 0 }, lines: { said: 0, nearRepeats: 0 }, handsMissed: {},
+  };
+  const all = counts.map(zero);
+  const everyColumn = routineCounts === null ? all : [...all, routineCounts];
+  const reasons = [...new Set(everyColumn.flatMap((held) => Object.keys(held.handsMissed)))]
+    .sort((a, b) => everyColumn.reduce((n, held) => n + (held.handsMissed[b] ?? 0), 0)
+      - everyColumn.reduce((n, held) => n + (held.handsMissed[a] ?? 0), 0));
+  type Row = { readonly words: string; readonly sub: boolean; readonly value: (held: ReportedCounts) => number };
+  const lineRows: Row[] = [
+    { words: 'Lines said', sub: false, value: (held) => held.lines.said },
+    { words: 'nearly the same as an earlier line', sub: true, value: (held) => held.lines.nearRepeats },
+  ];
+  const handRows: Row[] = [
+    { words: 'Things handed to someone', sub: false, value: (held) => held.acts.gave },
+    { words: 'Things taken from someone', sub: false, value: (held) => held.acts.took },
+    { words: 'Things picked up', sub: false, value: (held) => held.acts.picked_up },
+    { words: 'Things put down', sub: false, value: (held) => held.acts.put_down },
+    { words: 'Hand moves that did not happen', sub: false, value: (held) => Object.values(held.handsMissed).reduce((n, v) => n + v, 0) },
+    ...reasons.map((reason) => ({ words: handMoveWords(reason), sub: true, value: (held: ReportedCounts) => held.handsMissed[reason] ?? 0 })),
+  ];
+  const shown = (rows: Row[]) => rows.filter((row) => everyColumn.some((held) => row.value(held) > 0));
+  // The routine's words for a group are said only where its own record has 0 in every row of it.
+  const groups = [
+    { rows: shown(lineRows), never: 'The routine never speaks' },
+    { rows: shown(handRows), never: 'The routine never uses its hands' },
+  ].filter((group) => group.rows.length > 0)
+    .map((group) => ({ ...group, routineSaysNever: routineCounts !== null && group.rows.every((row) => row.value(routineCounts) === 0) }));
+  const seeds = result.seeds.length;
+  return el('section', { class: 'comparison-reported' }, [
+    el('h4', { class: 'comparison-reported-head', text: 'Words and hands: reported, not judged' }),
+    el('p', {
+      class: 'comparison-reported-why',
+      text: `What each model's people said and did with their hands, over ${seeds === 1 ? 'the seed' : `all ${seeds} seeds`}. `
+        + 'None of this decides who fared better. Lines are counted here, not read: open a person\'s hour below to read what they said.',
+    }),
+    el('details', { class: 'comparison-reported-rule' }, [
+      el('summary', { text: 'How lines are compared' }),
+      el('p', { text: NEAR_REPEAT_WORDS }),
+    ]),
+    el('table', { class: 'comparison-reported-table' }, [
+      el('thead', {}, [el('tr', {}, [
+        el('th', { scope: 'col' }, [el('span', { class: 'comparison-reported-hidden', text: 'What was counted' })]),
+        ...asked.map((arm) => el('th', { scope: 'col', text: armName(arm) })),
+        ...(routine === null ? [] : [el('th', { scope: 'col', text: armName(routine) })]),
+      ])]),
+      el('tbody', {}, groups.flatMap((group) => group.rows.map((row, index) => el('tr', { 'data-sub': String(row.sub) }, [
+        el('th', { scope: 'row', text: row.words }),
+        ...all.map((held) => el('td', { text: String(row.value(held)) })),
+        ...(routineCounts === null ? []
+          : group.routineSaysNever
+            ? (index > 0 ? [] : [el('td', { class: 'comparison-reported-routine', rowspan: String(group.rows.length), text: group.never })])
+            : [el('td', { text: String(row.value(routineCounts)) })]),
+      ])))),
+    ]),
   ]);
 }
 
@@ -568,6 +687,7 @@ export function buildSocietyComparisonView(handlers: {
             text: `Registered before it ran: ${result.preregistration.record}`,
           })]),
         ]),
+        ...[reportedSection(result)].filter((section): section is HTMLElement => section !== null),
         el('div', { class: 'comparison-choose' }, [
           el('label', {}, [el('span', { text: 'Seed' }), seedSelect]),
           el('label', {}, [el('span', { text: 'Left' }), choose('left')]),
@@ -710,6 +830,8 @@ export function buildSocietyComparisonView(handlers: {
               }),
             ]),
             didList(sides[side]!.run!),
+            ...[seedReportedWords(seed?.runs[sides[side]!.arm.key]?.reported)].filter((line): line is string => line !== null)
+              .map((line) => el('p', { class: 'comparison-side-reported', text: line })),
             el('details', { class: 'comparison-from-above' }, [
               el('summary', { text: 'See them from above' }),
               plans[side]!.root,

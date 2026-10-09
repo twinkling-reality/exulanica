@@ -366,6 +366,34 @@
       "reason": "Authored: a town place of one use class said in its own words where the generic 'the {label}' reads wrong; the page looks for place_named_<use class> and place_named_at_<use class> and falls back to place_named and place_named_at, so no code names a use class."
     },
     {
+      "key": "phrase.hand_move_out_of_reach",
+      "kind": "phrase",
+      "code": "hand_move_out_of_reach",
+      "words": "the thing was out of reach",
+      "reason": "Authored: the row words for a hands move that did not happen, by the hands_missed event's reason, in a comparison's reported counts (a row under 'Hand moves that did not happen'); a reason with none falls back to its event_reason words."
+    },
+    {
+      "key": "phrase.hand_move_thing_gone",
+      "kind": "phrase",
+      "code": "hand_move_thing_gone",
+      "words": "the thing was gone",
+      "reason": "Authored: the row words for a hands move that did not happen, by the hands_missed event's reason, in a comparison's reported counts (a row under 'Hand moves that did not happen'); a reason with none falls back to its event_reason words."
+    },
+    {
+      "key": "phrase.hand_move_chose_otherwise",
+      "kind": "phrase",
+      "code": "hand_move_chose_otherwise",
+      "words": "they chose something else first",
+      "reason": "Authored: the row words for a hands move that did not happen, by the hands_missed event's reason, in a comparison's reported counts (a row under 'Hand moves that did not happen'); a reason with none falls back to its event_reason words."
+    },
+    {
+      "key": "phrase.hand_move_asked_otherwise",
+      "kind": "phrase",
+      "code": "hand_move_asked_otherwise",
+      "words": "they were asked to do something else",
+      "reason": "Authored: the row words for a hands move that did not happen, by the hands_missed event's reason, in a comparison's reported counts (a row under 'Hand moves that did not happen'); a reason with none falls back to its event_reason words."
+    },
+    {
       "key": "phrase.place_listed",
       "kind": "phrase",
       "code": "place_listed",
