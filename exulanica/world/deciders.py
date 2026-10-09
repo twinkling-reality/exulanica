@@ -94,7 +94,9 @@ EXTERNAL_RECORD: Final = frozenset(
 #: Why an outside program gave no usable answer, beside the reasons every role records: its door
 #: had no live connection for the grant, it did not answer in time, its grant was revoked or had
 #: expired when the minute asked, or nobody there acted for the subject, so it passed at once and
-#: the routine decides that turn (a pass is the program's presence, never a quiet minute).
+#: the routine decides that turn (a pass is the program's presence, never a quiet minute); or the
+#: host did not ask it, since a name the account holder saved is among the words its request
+#: would send, which no right releases to a program outside the policy boundary.
 EXTERNAL_REASONS: Final = frozenset(
     {
         "decider_disconnected",
@@ -102,6 +104,7 @@ EXTERNAL_REASONS: Final = frozenset(
         "grant_revoked",
         "grant_expired",
         "decider_passed",
+        "saved_name_withheld",
     }
 )
 #: The longest an outside program may be given to answer, in milliseconds: the playback lease's 30

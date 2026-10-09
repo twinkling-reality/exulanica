@@ -21,9 +21,11 @@ replay through the replay route. What is shown:
     it recorded, and nobody who came from outside can be given a model or the routine by the
     world's owner;
 *   a request a stopped host left open closes in the program's own terms, and a request any text
-    of which would carry a saved name is undone, not sent;
+    of which would carry a saved name is kept and answered at once, never sent
+    (``saved_name_withheld``);
 *   in a society of things, a visitor is decided for by its own program from its arrival, and a
-    grant names only beings whose kind allows an outside program (``decider_not_allowed``).
+    grant names only beings whose kind allows an outside program (``decider_not_allowed``); a
+    visitor whose program a saved name keeps unasked goes home after its kind's quiet minutes.
 """
 
 from __future__ import annotations
@@ -41,6 +43,8 @@ import pytest
 from exulanica.api import decision_host as host_module
 from exulanica.api.decision_host import DecisionHost, world_hour
 from exulanica.canonical import canonical_json
+from exulanica.epistemics.assertions import AssertionWriter
+from exulanica.identity import IdentityRepository, rename_entity
 from exulanica.world.crossings import register_crossing_stream
 from exulanica.world.society_controls import LEASE_SECONDS
 from exulanica.world.society_decision_contract import (
@@ -476,7 +480,10 @@ def test_a_request_a_stopped_host_left_open_closes_in_the_program_s_own_terms(ap
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_a_request_that_would_carry_a_saved_name_is_undone_and_not_sent(app, monkeypatch):
+def test_a_request_that_would_carry_a_saved_name_is_answered_at_once_and_not_sent(app, monkeypatch):
+    """Every reserved request is screened in full; one any text of which would carry a saved name
+    is kept, answered at once as ``saved_name_withheld`` and never sent, so the world's records
+    count the minute as the program's silence and the routine decides."""
     world, client = app
     services = _services(client)
     snapshot = stays._inhabited(world, client)
@@ -491,14 +498,23 @@ def test_a_request_that_would_carry_a_saved_name_is_undone_and_not_sent(app, mon
         return False
 
     monkeypatch.setattr(host_module, "outside_context_sendable", carries_a_name)
-    for _ in range(12):
-        assert host.before_minute(_claim(world, snapshot), time.monotonic() + LEASE_SECONDS)
-        snapshot = stays._step(world, client, snapshot)
-    # Every reserved request was screened in full, undone, and never sent.
+    snapshot = _asked_until_decided(world, client, services, host, snapshot)
+    [receipt] = _decisions(services, world, snapshot)
+    assert (receipt["status"], receipt["reason"]) == ("unavailable", "saved_name_withheld")
+    assert receipt["provider"] is None and receipt["proposal"] is None
     assert screened and door.configured
     assert door.asked == []
-    assert _requests(services, world, snapshot) == 0
-    assert _decisions(services, world, snapshot) == []
+    assert _requests(services, world, snapshot) == 1
+    after = stays._step(world, client, snapshot)
+    [applied] = [
+        event
+        for event in _events(client, world, "decision_applied")
+        if event["tick"] == after["current_tick"]
+    ]
+    assert (applied["document"]["origin"], applied["document"]["disposition"]) == (
+        "external",
+        "unavailable",
+    )
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
@@ -596,6 +612,65 @@ def test_a_visitor_s_own_program_decides_for_it_from_its_arrival_with_no_choice_
                 == {}
             )
         stays._step(world, client, snapshot)
+        scope, _, society = routes(world)
+        replayed = client.get(society + "/replay", headers=OWNER, params=scope)
+        assert replayed.status_code == 200, replayed.text
+        assert replayed.json()["replay_verified"] is True
+    finally:
+        register_crossing_stream(None)
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_visitor_whose_program_a_saved_name_keeps_unasked_goes_home_after_its_quiet_minutes(app):
+    """A name the account holder saved is a word of the question a visitor's program would be sent:
+    nothing is sent, each minute's request is answered at once as ``saved_name_withheld``, and after
+    as many such minutes as its kind waits (a visitor of visitor version 1: five) the visitor goes
+    home, ``decider_lost``, as one whose program never answers does."""
+    world, client = app
+    _offering_societies_of_things(client)
+    services = _services(client)
+    stream = things_support.MemoryCrossings()
+    register_crossing_stream(stream)
+    try:
+        things_api._place(client, world, "well", "well", 2, -4_000, 2_000)
+        things_api._place(client, world, "gate", "gate", 1, 0, 6_000)
+        snapshot = things_api._make_society(client, world)
+        stream.hand(uuid.UUID(snapshot["society_id"]), things_support.arrival(1, grant_id=GRANT))
+        snapshot = stays._step(world, client, snapshot)
+        [visitor] = [p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "crossed"]
+        door = _Door()
+        host = _doorkeeping_host(world, services, door)
+        # The positive control: with no name saved, its program is asked.
+        assert host.before_minute(_claim(world, snapshot), time.monotonic() + LEASE_SECONDS)
+        assert [request["subject_id"] for request in door.asked] == [visitor["id"]]
+        snapshot = stays._step(world, client, snapshot)
+        # The account holder saves a name one of whose parts is a word of the question.
+        connection = world["connection"]
+        identity = IdentityRepository(connection, world["workspace"])
+        rename_entity(
+            identity,
+            AssertionWriter(connection, world["workspace"]),
+            entity_id=identity.entities.create(entity_class="person"),
+            display_name="Ada Line",
+            actor=world["session"].actor,
+        )
+        connection.commit()
+        door.asked.clear()
+        before = len(_decisions(services, world, snapshot))
+        for _ in range(8):
+            if visitor["id"] not in {p["id"] for p in snapshot["state"]["inhabitants"]}:
+                break
+            assert host.before_minute(_claim(world, snapshot), time.monotonic() + LEASE_SECONDS)
+            snapshot = stays._step(world, client, snapshot)
+        else:
+            raise AssertionError("the visitor stayed")
+        assert door.asked == []
+        withheld = _decisions(services, world, snapshot)[before:]
+        assert [(r["subject_id"], r["status"], r["reason"]) for r in withheld] == [
+            (visitor["id"], "unavailable", "saved_name_withheld")
+        ] * 5
+        [left] = _events(client, world, "thing_departed")
+        assert (left["subject_id"], left["document"]["reason"]) == (visitor["id"], "decider_lost")
         scope, _, society = routes(world)
         replayed = client.get(society + "/replay", headers=OWNER, params=scope)
         assert replayed.status_code == 200, replayed.text

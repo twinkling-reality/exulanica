@@ -183,11 +183,18 @@ THING_OUTCOMES: Final = (
     "not_done",
 )
 #: The reasons an outside program's request ends with for a visitor, counted as a quiet minute: it
-#: had no live connection, it did not answer in time, or the grant it came under was revoked or
-#: has expired, so a visitor goes home even when no grant_ended crossing follows. A program that
-#: passed answered.
+#: had no live connection, it did not answer in time, the grant it came under was revoked or has
+#: expired, so a visitor goes home even when no grant_ended crossing follows, or it could not be
+#: asked, since a name the account holder saved is among the words its request would send. A
+#: program that passed answered.
 QUIET_REASONS: Final = frozenset(
-    {"decider_disconnected", "no_answer_in_time", "grant_revoked", "grant_expired"}
+    {
+        "decider_disconnected",
+        "no_answer_in_time",
+        "grant_revoked",
+        "grant_expired",
+        "saved_name_withheld",
+    }
 )
 #: The kinds of a decision whose minute the things phase carries out: a line said, or leaving.
 _SPOKEN_KINDS: Final = frozenset({"say_to", "say_all"})

@@ -1269,6 +1269,13 @@
       "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
     },
     {
+      "key": "decision_reason.saved_name_withheld",
+      "kind": "decision_reason",
+      "code": "saved_name_withheld",
+      "words": "a name you saved is among the words the program that decides for them would be sent, so it was not asked",
+      "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
       "key": "decision_reason.line_out_of_bounds",
       "kind": "decision_reason",
       "code": "line_out_of_bounds",

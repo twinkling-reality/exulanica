@@ -286,10 +286,11 @@ with no model client asks no model.
   the contract's, raises or comes late leaves its own subject unasked that minute, and the routine
   decides for them. The host reserves the request as it reserves a model's, over the options the
   account holder's saved names leave sendable (no right releases a name to an outside program, so
-  any saved name keeps a label out, and one in the role's description asks nobody). A request any
-  text of which, in any field, would carry a saved name is undone and not sent. A refused subject's
-  request is answered at once as `unavailable` for its reason, so a world counts an outside
-  program's silence from its own records. The rest are asked through `answer`, from the host's
+  any saved name keeps a label out). Where a saved name is a word of the role's description, or of
+  any text, in any field, of a subject's own request, nothing is sent: the request is kept and
+  answered at once as `unavailable`, `saved_name_withheld`. A refused subject's request is answered
+  at once as `unavailable` for its reason too, so a world counts an outside program's silence from
+  its own records. The rest are asked through `answer`, from the host's
   pool beside the model asks and with no connection held, each by the sooner of the door's deadline
   from the moment it is asked and the end the lease leaves the minute. The host stops waiting then
   and never waits for a door that ignores its deadline: an answer that comes later is recorded as
@@ -306,12 +307,13 @@ with no model client asks no model.
   bridge, grant, grant revision and mapping file it was asked under, and an accepted one always
   carries the program's record. An answer that fails is recorded as `decider_disconnected`, for its
   own subject alone. A request the program did not answer ends for one of the outside reasons
-  `decider_disconnected`, `no_answer_in_time`, `grant_revoked`, `grant_expired` or
-  `decider_passed`, whatever else changed before it was recorded, and one a stopped host left open
-  closes as `no_answer_in_time`, so its receipt and its minute's event always say an outside
-  program was asked; the routine decides that turn. A program passes (`decider_passed`) when
-  nobody there acts for its subject: the answer is recorded at once, with or without the program's
-  record of the pass, and counts as the program's presence, never as a quiet minute. What a program
+  `decider_disconnected`, `no_answer_in_time`, `grant_revoked`, `grant_expired`,
+  `decider_passed` or `saved_name_withheld`, whatever else changed before it was recorded, and one
+  a stopped host left open closes as `no_answer_in_time`, so its receipt and its minute's event
+  always name an outside program as the one deciding; the routine decides that turn. A program
+  passes (`decider_passed`) when nobody there acts for its subject: the answer is recorded at once,
+  with or without the program's record of the pass, and counts as the program's presence, never as
+  a quiet minute. What a program
   answers when it has nothing to say is the role's idle option, `DecisionRole.idle_label(context)`:
   the label of the offered option of the adapter's idle kind (waiting a minute, for a person), read
   from the request's own context.
@@ -690,7 +692,7 @@ stored request the loop does not rebuild stops it by name.
 | Part | Source | Tests |
 | --- | --- | --- |
 | Registry and adapters | `assets/catalogs/roles/decision-roles.v<N>.json`, `exulanica/world/decision_roles.py`, `exulanica/world/role_catalogs.py`, `exulanica/world/roles/` | `tests/test_decision_roles.py`, with the test role in `tests/decision_role_fixtures/` |
-| Deciders and outside programs | `exulanica/world/deciders.py`, `exulanica/api/external_asking.py`, the host's outside path in `exulanica/api/decision_host.py`, migration 0146 | `tests/test_outside_deciders.py` (each answer and statement a door may give, late, failing or malformed, costing its own subject alone; a context carrying a saved name in any field), `tests/test_outside_deciders_postgres.py` (a request left open by a stopped host; a request carrying a saved name undone and not sent; a released grant's retry) |
+| Deciders and outside programs | `exulanica/world/deciders.py`, `exulanica/api/external_asking.py`, the host's outside path in `exulanica/api/decision_host.py`, migration 0146 | `tests/test_outside_deciders.py` (each answer and statement a door may give, late, failing or malformed, costing its own subject alone; a context carrying a saved name in any field), `tests/test_outside_deciders_postgres.py` (a request left open by a stopped host; a request carrying a saved name kept, answered at once as `saved_name_withheld` and not sent; a visitor whose program a saved name keeps unasked going home after its quiet minutes; a released grant's retry) |
 | Requests, receipts, the minute loop and replay | `exulanica/world/role_decisions.py` | `tests/test_decision_roles.py` |
 | The person's contract and minute | `exulanica/world/society_decision_contract.py`, `exulanica/world/society_model_decisions.py`, `assets/catalogs/society/society-decision-action.v2.json`, `assets/catalogs/society/society-decision-policy.v2.json`, `assets/catalogs/society/society-decision-action.v3.json`, `assets/catalogs/society/society-decision-policy.v3.json` | `tests/test_society_person_decisions.py`, `tests/test_society_model_actions.py`, `tests/test_person_role_goldens.py`, `tests/test_society_lines.py`, `tests/test_society_lines_postgres.py` |
 | One choice among labels | `exulanica/models/choice.py` | `tests/test_model_choice.py` |

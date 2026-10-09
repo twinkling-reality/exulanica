@@ -135,6 +135,10 @@ _DOOR_STATES: Final = frozenset(
 _ANSWER_KEYS: Final = frozenset({"status", "reason", "proposal", "provider"})
 #: The statuses a door may answer with; ``stale`` is the host's to record, never a program's.
 _ANSWER_STATUSES: Final = frozenset({"accepted", "rejected", "unavailable"})
+#: Why an outside program was not asked for a subject: a name the account holder saved is a word of
+#: the question it would be sent or of the request's own observation. The request is kept and
+#: answered at once, so the world's records count the minute as the program's silence.
+_SAVED_NAME_WITHHELD: Final = "saved_name_withheld"
 
 
 def _error_class(exc: BaseException) -> str:
@@ -507,10 +511,6 @@ def _door_statement(
     if refusal is not None and refusal not in REFUSALS_BEFORE_ASKING:
         raise ValueError("a door refused an ask for a reason it may not give")
     return dict(config), None if refusal is None else str(refusal)
-
-
-class _NotSendable(Exception):
-    """A reserved request whose context would carry a saved name: undone, and nobody asked."""
 
 
 def _only(labels: frozenset[str]) -> Callable[[Sequence[RoleOption]], list[RoleOption]]:
@@ -1063,10 +1063,11 @@ class DecisionHost:
         """``role``'s requests of outside programs for this minute: each due subject's request,
         reserved over the options the account holder's saved names leave sendable, with what its
         door states about the program; a subject its door refuses before asking is answered at
-        once with that refusal, and the rest are asked. Nothing is reserved for a question a saved
-        name would change, and a subject is left unasked this minute, the routine deciding, when
-        its door's statement is malformed or comes after its role's asks must end, or when any
-        text of its request would carry a saved name."""
+        once with that refusal, and the rest are asked. A request is answered at once as
+        ``saved_name_withheld``, never sent, where a saved name is a word of the question every
+        subject is asked or of any text its own request would carry, so the minute counts as the
+        program's silence. A subject is left unasked this minute, the routine deciding, when its
+        door's statement is malformed or comes after its role's asks must end."""
         names = saved_names(connection, claim.workspace_id)
         latest = society._chain(row)
         document = society._inputs(row, [latest])[latest]
@@ -1080,8 +1081,11 @@ class DecisionHost:
             }
         )
         sendable = outside_sendable_labels(names, role, labels, row["engine_version"])
+        # A saved name in the question itself: every request is reserved over the labels that
+        # carry none, and answered at once, unsent.
+        withheld = sendable is None
         if sendable is None:
-            return [], []
+            sendable = frozenset(label for label in labels if not recognised_spans(label, names))
         stated = self._stated(
             claim, role, contract, due, outside, self._ends_at(contract, lease_ends)
         )
@@ -1095,7 +1099,7 @@ class DecisionHost:
                         continue
                     config, refusal = stated[subject]
                     try:
-                        # A savepoint: a request that would carry a saved name is undone alone.
+                        # A savepoint: a request that fails its own check is undone alone.
                         with connection.transaction():
                             reserved, fresh = decisions.prepare_role(
                                 role,
@@ -1113,15 +1117,6 @@ class DecisionHost:
                                 withhold=without_named_lines(names),
                             )
                             request = reserved["request"]
-                            if (
-                                fresh
-                                and request is not None
-                                and refusal is None
-                                and not outside_context_sendable(names, request["context"])
-                            ):
-                                raise _NotSendable
-                    except _NotSendable:
-                        continue
                     except ValueError as exc:
                         # A request that fails its own check is undone alone; the rest are asked.
                         _LOG.error(
@@ -1133,6 +1128,9 @@ class DecisionHost:
                     request_id = uuid.UUID(request["request_id"])
                     if refusal is not None:
                         refused.append((request_id, _refused(refusal)))
+                        continue
+                    if withheld or not outside_context_sendable(names, request["context"]):
+                        refused.append((request_id, _refused(_SAVED_NAME_WITHHELD)))
                         continue
                     asks.append(
                         OutsideAsk(

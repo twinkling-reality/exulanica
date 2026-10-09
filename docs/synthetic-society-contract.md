@@ -1623,8 +1623,10 @@ first, unchanged, and every event they record names v7; then the things phase:
   the person's catalogs, `LINES_CONTRACT`), never from whatever terms the registry states later, so
   every stored minute replays as it ran. A visitor that chose to leave departs (`thing_departed`,
   `chose_to_leave`), taking what it carries home as every departing visitor does. A visitor whose
-  program had no live connection, gave no answer in time or whose grant was revoked or has expired
-  counts that minute as quiet, and any other answer or a pass ends the count; one quiet for as many minutes
+  program had no live connection, gave no answer in time, whose grant was revoked or has expired, or
+  that was not asked because a name the account holder saved is among the words its request would
+  send (`saved_name_withheld`), counts that minute as quiet, and any other answer or a pass ends the
+  count; one quiet for as many minutes
   in a row as its kind's leave ability waits (a visitor of `visitor` version 1: five) departs
   (`thing_departed`, `decider_lost`), taking what it carries home to the program that sent it. A
   program's answer refused for its line (`line_out_of_bounds`) is an answer, never a quiet minute;

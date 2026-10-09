@@ -170,12 +170,14 @@ GENERIC_REASONS: Final = frozenset(
         # An outside program asked for a subject under its grant gave no usable answer: its door
         # had no live connection, it did not answer by the deadline, the grant was revoked or had
         # expired, or nobody was there to act for the subject, so it passed and the routine
-        # decides at once (exulanica.world.deciders.EXTERNAL_REASONS).
+        # decides at once (exulanica.world.deciders.EXTERNAL_REASONS); or it was not asked, since
+        # a name the account holder saved is among the words its request would send.
         "decider_disconnected",
         "no_answer_in_time",
         "grant_revoked",
         "grant_expired",
         "decider_passed",
+        "saved_name_withheld",
     }
 )
 #: The shape of each profile a role's documents carry, the shapes migration 0117 admits by the
