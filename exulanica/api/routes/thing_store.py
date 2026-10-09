@@ -18,8 +18,20 @@ any byte is sent, so another workspace's thing, a withdrawn look and an absent o
     every cache.
 *   ``GET /things/kinds/{kind_sha256}`` answers the kind the workspace holds at that digest, read
     again with its looks and its plan resolved in the store, never cached.
+*   ``DELETE /things/kinds/{kind_sha256}`` erases a creature the workspace drafted from a
+    person's words, whole and at once (:meth:`ThingStore.erase_creature`): its kind and, with its
+    drafted plan, the plan, its recipe and every look drawn on it, whose containers the purge
+    worker then destroys. Answered 204; a kind the workspace does not hold answers 404
+    ``unknown_reference``, as a read does. It needs ``world.write`` and ``deletion.write``, and
+    only the person who drafted the creature or an owner of the workspace erases it: an owner by
+    the membership record (a browser session held in the ``owner`` role), anyone else only a
+    creature their own actor drafted, so a guest, or a bearer token, which holds no membership,
+    erases only its own; anyone else's ask is 403 ``kind_not_yours``. A row the database refuses
+    is 409 ``kind_changed``, an installation sealed for a restore 409 ``restore_sealed``, and a
+    workspace another transaction holds 409 ``busy`` with ``Retry-After``, as every route answers
+    it.
 
-Each needs a session (``world.read``), as the library does.
+Each read needs a session (``world.read``), as the library does.
 """
 
 from __future__ import annotations
@@ -29,12 +41,20 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Path, Request
 from fastapi.responses import JSONResponse, Response
 
-from exulanica.api.dependencies import CurrentSession, ReadOnlySessions, get_services
+from exulanica.api.account_repository import AccountRejected, AccountUnavailable
+from exulanica.api.authorisation import TokenNotAccepted
+from exulanica.api.dependencies import (
+    CurrentSession,
+    ReadOnlySessions,
+    ScopedConnection,
+    get_services,
+)
 from exulanica.api.routes.tiles import _revalidates
 from exulanica.canonical import canonical_json
 from exulanica.evidence.blob import BlobId
+from exulanica.selection.validation import Session
 from exulanica.world.committed_content import DIGEST
-from exulanica.world.thing_store import ThingStore
+from exulanica.world.thing_store import ThingStore, ThingStoreRefused
 
 __all__ = ["router"]
 
@@ -126,3 +146,44 @@ def held_kind(
     if held is None:
         return _absent()
     return _document(held.document)
+
+
+@router.delete(
+    "/kinds/{kind_sha256}",
+    summary="Erase a creature this workspace drafted, whole, by the SHA-256 of its kind.",
+    status_code=204,
+)
+def erase_kind(
+    kind_sha256: Annotated[str, Path(pattern=f"^{DIGEST.pattern}$")],
+    request: Request,
+    connection: ScopedConnection,
+    session: CurrentSession,
+) -> Response:
+    try:
+        ThingStore(connection, session.workspace_id, None).erase_creature(
+            kind_sha256, erased_by=session.actor, by_owner=_owns_workspace(request, session)
+        )
+    except ThingStoreRefused as refused:
+        if refused.code == "kind_unknown":
+            return _absent()
+        return JSONResponse(
+            status_code=403 if refused.code == "kind_not_yours" else 409,
+            content={"code": refused.code, "detail": refused.detail},
+            headers=_DOCUMENT_HEADERS,
+        )
+    return Response(status_code=204)
+
+
+def _owns_workspace(request: Request, session: Session) -> bool:
+    """Whether the caller owns this workspace by its membership record (0058's ``owner``): a
+    browser session held in that role for this workspace. A bearer token is the operator's grant
+    to a program and holds no membership, so it answers no; it erases only what its actor drafted.
+    The account tables are the account role's alone, so the account runtime reads the role."""
+    accounts = get_services(request).accounts
+    if accounts is None or request.headers.get("authorization") is not None:
+        return False
+    try:
+        account = accounts.browser_session(request)
+    except (AccountRejected, AccountUnavailable, TokenNotAccepted):
+        return False
+    return account.role == "owner" and account.session.workspace_id == session.workspace_id

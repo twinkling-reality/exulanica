@@ -22,7 +22,9 @@ with it for a checkpoint of profile ``exulanica.restore-tombstone-checkpoint/v2`
   the installation makes what it ends again after a restore (the catalogs job publishes from the
   image), so its withdrawal row is written whether or not the end is held.
 * :func:`stale_withdrawals` names a withdrawal the restored database holds that the checkpoint
-  does not, which means the checkpoint is older than the backup.
+  does not, which means the checkpoint is older than the backup, unless what the checkpoint
+  itself carries deletes that row when it is replayed: a kind's ``removed_by`` names those
+  removals (:data:`REMOVALS`), as an erased creature's look withdrawals are deleted with it.
 
 The catalog is data with an identity (:data:`CATALOG_IDENTITY`); a checkpoint records it, and a
 replay under another catalog refuses.
@@ -32,7 +34,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, Literal
@@ -48,6 +50,7 @@ __all__ = [
     "CATALOG_IDENTITY",
     "CATALOG_PATH",
     "EXCLUSIONS",
+    "REMOVALS",
     "WRITER_KEYS",
     "Carried",
     "CarryRefused",
@@ -136,6 +139,8 @@ class WithdrawalKind:
     #: Whether the withdrawal row is written when the restored database holds nothing it ends,
     #: because the installation makes that end again after a restore (``"absent": "carry"``).
     carry_absent: bool = False
+    #: The carried removals whose replay deletes rows of this table (:data:`REMOVALS`), by name.
+    removed_by: tuple[str, ...] = ()
 
     def carried(self, alias: str) -> sql.Composable:
         """The rows a checkpoint carries: withdrawn, and whatever else the catalog requires."""
@@ -185,6 +190,36 @@ def _condition(value: dict[str, Any]) -> Condition:
 Writer = Callable[[psycopg.Connection[Any], Mapping[str, Any]], None]
 
 
+#: Each removal a catalog entry may name in ``removed_by``: the table it is written for, and the
+#: condition, over that table's row ``t``, under which replaying the checkpoint's own tombstones
+#: (``%(tombstones)s``) and carried erasures (``%(erasures)s``) deletes the row. A restored row the
+#: checkpoint lacks is then no sign of an older checkpoint: the source deleted it, and the replay
+#: deletes it again.
+REMOVALS: Final[Mapping[str, tuple[str, sql.Composable]]] = {
+    # A workspace tombstone erases every creature and look of its workspace (migration 0172).
+    "workspace_tombstone": (
+        "look_withdrawal",
+        sql.SQL(
+            "t.workspace_id in (select (r->>'workspace_id')::uuid "
+            "from jsonb_array_elements(%(tombstones)s) r where r->>'scope' = 'workspace')"
+        ),
+    ),
+    # A creature's erasure deletes the looks drawn on its drafted plan with their withdrawals,
+    # when no other kind names the plan; a look on the plan of an erased kind is passed by either
+    # way, which can only spare a withdrawal the replay then keeps.
+    "thing_erasure_of_its_plan": (
+        "look_withdrawal",
+        sql.SQL(
+            "exists (select 1 from look_version l join thing_kind_version k "
+            "on k.workspace_id = l.workspace_id and k.plan_sha256 = l.plan_sha256 "
+            "join jsonb_array_elements(%(erasures)s) e "
+            "on (e->>'workspace_id')::uuid = k.workspace_id and e->>'sha256' = k.sha256 "
+            "where l.workspace_id = t.workspace_id and l.key = t.key and l.version = t.version)"
+        ),
+    ),
+}
+
+
 def _absent(entry: Mapping[str, Any]) -> bool:
     value = entry.get("absent")
     if value not in (None, "carry"):
@@ -216,6 +251,7 @@ def _load(path: Path) -> tuple[tuple[WithdrawalKind, ...], tuple[Exclusion, ...]
                 writer=entry.get("writer"),
                 continues=entry.get("continues"),
                 carry_absent=_absent(entry),
+                removed_by=tuple(entry.get("removed_by", ())),
             )
         )
     names = [kind.kind for kind in kinds]
@@ -237,6 +273,9 @@ def _load(path: Path) -> tuple[tuple[WithdrawalKind, ...], tuple[Exclusion, ...]
                 f"{kind.kind}: only an event kind that ends rows of another table carries its "
                 "row when the end is absent"
             )
+        for removal in kind.removed_by:
+            if removal not in REMOVALS or REMOVALS[removal][0] != kind.table:
+                raise ValueError(f"{kind.kind}: {removal!r} is no removal of {kind.table}")
     exclusions = tuple(Exclusion(e["table"], e["reason"]) for e in document["excluded"])
     return tuple(kinds), exclusions, document
 
@@ -571,14 +610,24 @@ def open_withdrawals(
 
 
 def stale_withdrawals(
-    connection: psycopg.Connection[Any], carried: list[Carried]
+    connection: psycopg.Connection[Any],
+    carried: list[Carried],
+    *,
+    tombstones: Iterable[Mapping[str, Any]] = (),
 ) -> list[tuple[str, dict[str, Any]]]:
     """Every withdrawal this database holds that the checkpoint does not carry exactly.
 
     A checkpoint is sealed from the source after every backup of it, and a withdrawal is written
     once and never undone, so each withdrawal a restored database holds is in a current
-    checkpoint. One that is not says the checkpoint is older than the backup.
+    checkpoint. One that is not says the checkpoint is older than the backup, unless the
+    checkpoint's own ``tombstones`` or carried erasures delete it when they are replayed, as its
+    kind's ``removed_by`` names: the source deleted it after the backup, so no current checkpoint
+    holds it.
     """
+    removals = {
+        "tombstones": Jsonb([dict(tombstone) for tombstone in tombstones]),
+        "erasures": Jsonb([item.row for item in carried if item.kind == "thing_erasure"]),
+    }
     stale = []
     for kind in CATALOG:
         rows = [item.row for item in carried if item.kind == kind.kind]
@@ -587,17 +636,22 @@ def stale_withdrawals(
             if kind.shape == "event"
             else _matches((*kind.identity, *kind.columns), "c", "t")
         )
+        removed = sql.SQL("").join(
+            sql.SQL(" and not ({})").format(REMOVALS[removal][1]) for removal in kind.removed_by
+        )
         found = connection.execute(
             sql.SQL(
-                "select {projection} as row from {table} t where {carried} and not exists ("
-                "select 1 from jsonb_populate_recordset(null::{table}, %(rows)s) c where {same})"
+                "select {projection} as row from {table} t where {carried}{removed} and not "
+                "exists (select 1 from jsonb_populate_recordset(null::{table}, %(rows)s) c "
+                "where {same})"
             ).format(
                 projection=_projection(kind, "t"),
                 table=sql.Identifier(kind.table),
                 carried=kind.carried("t"),
+                removed=removed,
                 same=same,
             ),
-            {"rows": Jsonb(rows)},
+            {"rows": Jsonb(rows), **removals},
         ).fetchall()
         stale.extend((kind.kind, row["row"]) for row in found)
     return stale

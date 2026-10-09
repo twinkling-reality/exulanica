@@ -1354,7 +1354,8 @@ writing the old column, drop in a **later** release).
 ```sql
 create type tombstone_scope as enum
   ('capture','interval','entity','assertion','workspace');
--- widened by `alter type ... add value`: 'scene_training' (0082) and 'caption_search' (0104)
+-- widened by `alter type ... add value`: 'scene_training' (0082), 'caption_search' (0104) and
+-- 'creature' (0172)
 
 create table tombstone (
   tombstone_id       uuid primary key default uuidv7(),
@@ -1397,6 +1398,15 @@ change that is not erasure goes in its own table, as migrations 0024, 0038 and 0
 artefact needs its own destroy question, because `purge_releases_bytes` answers false for a scene
 artefact while none of its members is deleted (section 6.4), so a `scene_training` tombstone asks
 `scene_training_withdrawal_releases_artifact` instead.
+
+**DECISION (del-1c): a creature's erasure is a tombstone.** A `creature` tombstone (migration 0172)
+is written with a `thing_erasure` row when a person erases a creature drafted from their words
+([things-contract.md](things-contract.md#a-workspaces-own-things)): the row names the kind by its
+document's digest and the tombstone, which has no subject column. The row's trigger deletes the
+creature's rows and enqueues the containers of the looks it deleted on the tombstone, and the purge
+destroys a container only while no look the workspace still holds names it. No capture, interval,
+entity or workspace test matches the scope, so it deletes nothing else, and every destroyed byte
+still traces to a tombstone.
 
 ### 6.3 The gate is a trigger, in the writing transaction
 

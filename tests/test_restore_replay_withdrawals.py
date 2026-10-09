@@ -28,12 +28,14 @@ from exulanica.canonical import canonical_json
 from exulanica.consent.training import TrainingTerms
 from exulanica.deletion.restore import RestoreRefused, verify_restore
 from exulanica.deletion.withdrawals import CATALOG, read_withdrawals
+from exulanica.evidence.blob import BlobId
 from exulanica.identity import rename_entity
 from exulanica.ingest.person_review import create_subject, record_consent
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.training_rights import grant_training_right, withdraw_training_right
 from exulanica.models.manifest import Role
 from exulanica.orchestration.restore import main as restore_command
+from exulanica.store.configured import local_content_stores
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.things.creatures import assemble_creature
 from exulanica.world.character_catalog_publication import (
@@ -376,6 +378,144 @@ def test_notes_from_a_picture_deleted_after_the_backup_are_withdrawn_again(
         current=lambda: pictured.request(read).status == "complete",
     )
     assert pictured.request(read).bundle is None
+
+
+def _kept_creature(purged, tmp_path, label: str):
+    """A creature kept in the looks namespace the restore command's own stores read."""
+    creature = assemble_creature(_form(_recipe("ten_legs"), label=label), by=BY)
+    actor = uuid.uuid4()
+    looks = local_content_stores(tmp_path).looks.for_workspace(purged.workspace_id)
+    with purged.database().session(purged.workspace_id) as connection:
+        ThingStore(connection, purged.workspace_id, looks).keep_creature(creature, created_by=actor)
+    return creature, actor, looks
+
+
+def _creature_held(purged, creature) -> bool:
+    """Whether the workspace holds the creature, whole: it is held whole or not at all."""
+    with purged.database().session(purged.workspace_id) as connection:
+        store = ThingStore(connection, purged.workspace_id, None)
+        [row] = connection.execute(
+            "select (select count(*) from body_recipe_version where sha256 = %s) "
+            "+ (select count(*) from body_plan_version where sha256 = %s) "
+            "+ (select count(*) from thing_kind_version where sha256 = %s) "
+            "+ (select count(*) from look_version where sha256 = %s) as held",
+            (
+                creature.recipe_sha256,
+                creature.plan.sha256,
+                creature.kind.sha256,
+                creature.sketch.sha256,
+            ),
+        ).fetchall()
+        assert row["held"] in (0, 4), "a creature is held whole or not at all"
+        readable = store.look_by_digest(creature.sketch.sha256, include_withdrawn=True)
+        assert (readable is not None) is (row["held"] == 4)
+    return row["held"] == 4
+
+
+def _erase(purged, creature, actor) -> None:
+    with purged.database().session(purged.workspace_id) as connection:
+        ThingStore(connection, purged.workspace_id, None).erase_creature(
+            creature.kind.sha256, erased_by=actor
+        )
+
+
+def test_a_creature_erased_after_the_backup_stays_erased(purged, commands, tmp_path):
+    """A workspace's erasure of a creature drafted from a person's words (migration 0172) is carried
+    by a restore: the backup holds the creature, the replayed erasure deletes its kind, plan,
+    recipe and sketch again, and the replayed creature tombstone purges its container from the
+    looks namespace, which a restore does not roll back."""
+    creature, actor, looks = _kept_creature(purged, tmp_path, "restored ten legs")
+    assert not _through_a_restore(
+        purged,
+        tmp_path,
+        withdraw=lambda: _erase(purged, creature, actor),
+        current=lambda: _creature_held(purged, creature),
+    )
+    container = creature.sketch.document["container"]["sha256"]
+    assert not looks.exists(BlobId.from_hex(container)), "the replay purged the container"
+    [row] = purged.rows(
+        "select count(*) filter (where scope::text = 'creature') as tombstones, "
+        "(select count(*) from thing_erasure) as erasures from tombstone"
+    )
+    # The checkpoint's tombstone and its replay copy, and the one erasure the restore carried.
+    assert (row["tombstones"], row["erasures"]) == (2, 1)
+
+
+def test_a_restore_of_a_creature_erased_and_kept_again_leaves_its_file_held(
+    purged, commands, tmp_path
+):
+    """A backup taken after a creature was erased and kept again from the same document holds the
+    look again, naming the file the erasure enqueued. The replayed creature tombstone's job waits
+    unclaimed as the original's does, so the replay completes and names the container left open,
+    held by that look, rather than refusing; the file and the creature stay."""
+    creature, actor, looks = _kept_creature(purged, tmp_path, "kept again ten legs")
+    container = creature.sketch.document["container"]["sha256"]
+    _erase(purged, creature, actor)
+    with purged.database().session(purged.workspace_id) as connection:
+        ThingStore(connection, purged.workspace_id, looks).keep_creature(creature, created_by=actor)
+    assert _creature_held(purged, creature), "the positive control: kept again before the backup"
+    dump, blobs = _backup(purged, tmp_path)
+    source, marker = _seal(tmp_path)
+    _restore(purged, dump, blobs)
+    _replay(source, marker)
+    verify_restore(purged.database(), marker)
+    assert _creature_held(purged, creature)
+    assert looks.exists(BlobId.from_hex(container))
+    [anchor] = purged.rows("select tombstone_id from thing_erasure")
+    assert json.loads(marker.read_text())["left_open"] == {
+        str(anchor["tombstone_id"]): [f"look:{container}"]
+    }
+    # The original's job and its replay copy's, both waiting on the file the look holds.
+    jobs = purged.rows(
+        "select pj.state, pj.target_ref from purge_job pj join tombstone t "
+        "on t.tombstone_id = pj.tombstone_id where t.scope::text = 'creature'"
+    )
+    assert [(job["state"], job["target_ref"]) for job in jobs] == [("queued", container)] * 2
+
+
+def test_a_creature_erased_after_a_backup_holding_its_withdrawn_sketch_stays_erased(
+    purged, commands, tmp_path
+):
+    """A sketch withdrawn before the backup is deleted by the creature's later erasure, so no
+    checkpoint sealed after it carries that withdrawal; the restored database holds it, and the
+    stale check passes it by because the checkpoint's own erasure deletes it on replay."""
+    creature, actor, _looks = _kept_creature(purged, tmp_path, "withdrawn ten legs")
+    with purged.database().session(purged.workspace_id) as connection:
+        ThingStore(connection, purged.workspace_id, None).withdraw_look(
+            creature.sketch.look, creature.sketch.version, "no longer worn", withdrawn_by=actor
+        )
+    assert not _through_a_restore(
+        purged,
+        tmp_path,
+        withdraw=lambda: _erase(purged, creature, actor),
+        current=lambda: _creature_held(purged, creature),
+    )
+    assert not purged.rows("select 1 from look_withdrawal")
+
+
+def test_a_workspace_erased_after_a_backup_holding_a_withdrawn_look_is_restored(
+    purged, commands, tmp_path
+):
+    """The same for a workspace's own erasure: its tombstone deletes the withdrawal the backup
+    holds, and the restore replays the tombstone rather than refusing the checkpoint."""
+    creature, actor, _looks = _kept_creature(purged, tmp_path, "withdrawn ten legs")
+    with purged.database().session(purged.workspace_id) as connection:
+        ThingStore(connection, purged.workspace_id, None).withdraw_look(
+            creature.sketch.look, creature.sketch.version, "no longer worn", withdrawn_by=actor
+        )
+
+    def erase_the_workspace() -> None:
+        purged.repository.insert_tombstone(
+            scope="workspace", requested_by=actor, reason="the person left"
+        )
+
+    assert not _through_a_restore(
+        purged,
+        tmp_path,
+        withdraw=erase_the_workspace,
+        current=lambda: _creature_held(purged, creature),
+    )
+    assert not purged.rows("select 1 from look_withdrawal")
 
 
 def test_a_character_catalog_withdrawn_after_the_backup_stays_withdrawn(purged, commands, tmp_path):

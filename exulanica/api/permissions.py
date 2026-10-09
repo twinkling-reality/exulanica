@@ -774,6 +774,15 @@ _WORLD_READS_READING_ADMISSION: Final = _every(
     "GET /worlds/personal-source",
 )
 
+#: Erasing a creature a workspace drafted from a person's words: a change to its things, so
+#: ``world.write``, and the destruction of a person's content, so ``deletion.write`` as every other
+#: deletion asks. Both browser roles hold both; a token granted ``world.write`` alone erases
+#: nothing.
+_WORLD_ERASURES: Final = _every(
+    _requires(_P.WORLD_WRITE, _P.DELETION_WRITE),
+    "DELETE /things/kinds/{kind_sha256}",
+)
+
 #: Issuing, opening and revoking a door grant, and sending its visitors home: a change to who may
 #: decide or stand in a world, so ``world.write``, and isolated by name as ``door.grant``.
 _DOOR_GRANTS: Final = _every(
@@ -844,6 +853,7 @@ ROUTE_RULE_SECTIONS: Final[
     _WORLD_WRITES,
     _WORLD_WRITES_READING_ADMISSION,
     _WORLD_READS_READING_ADMISSION,
+    _WORLD_ERASURES,
     _DOOR_GRANTS,
     _BRIDGE_CHANNEL,
     _GRANT_CHANNEL,

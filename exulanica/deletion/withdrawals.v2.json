@@ -188,6 +188,18 @@
       "withdrawn": {"column": "withdrawn_at", "is": "not null"},
       "workspace": "workspace_id",
       "ends": {"table": "look_version", "columns": ["workspace_id", "key", "version"]},
+      "order": null,
+      "removed_by": ["workspace_tombstone", "thing_erasure_of_its_plan"]
+    },
+    {
+      "kind": "thing_erasure",
+      "table": "thing_erasure",
+      "shape": "event",
+      "note": "A workspace erasing a creature drafted from a person's words (exulanica/world/thing_store.py), beside the creature tombstone it names: its trigger deletes the creature's kind and, with its drafted plan, the plan, its recipe and every look drawn on it with their withdrawals, so a restore from an older backup loses them again, and the tombstone replayed after it purges those looks' containers. The row names the kind by its document's digest only. A look withdrawal it deletes is one the checkpoint lacks, so the look kind names it among the removals the stale check passes by.",
+      "identity": ["workspace_id", "erasure_id"],
+      "withdrawn": {"column": "erased_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "thing_kind_version", "columns": ["workspace_id", "sha256"]},
       "order": null
     },
     {

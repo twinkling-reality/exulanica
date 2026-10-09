@@ -11024,6 +11024,56 @@
       }
      }
     }
+   },
+   "delete": {
+    "tags": [
+     "things"
+    ],
+    "summary": "Erase a creature this workspace drafted, whole, by the SHA-256 of its kind.",
+    "operationId": "erase_kind_things_kinds__kind_sha256__delete",
+    "parameters": [
+     {
+      "name": "kind_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Kind Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/world/behaviours": {

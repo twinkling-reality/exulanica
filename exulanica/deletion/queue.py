@@ -50,6 +50,7 @@ import psycopg
 from exulanica.db.roles import PURGE_CROSS_WORKSPACE_TABLES
 from exulanica.store.namespaces import (
     BLOB_NAMESPACE,
+    LOOK_NAMESPACE,
     MATERIAL_NAMESPACE,
     WORKSPACE_ASSET_NAMESPACE,
     WORKSPACE_NAMESPACES,
@@ -107,8 +108,16 @@ MAX_ATTEMPTS: Final = 8
 #: a worker given no material namespaces leaves them queued, so their tombstone stays incomplete
 #: and says so rather than completing over bytes nobody destroyed. Workspace asset targets name an
 #: admitted or prepared object's hash in the workspace's own asset namespace (migration 0126), on
-#: the same terms.
-DESTROYABLE_KINDS: Final = ("blob", "artifact", "embedding", "material_bake", "workspace_asset")
+#: the same terms. Look targets name a container's hash in the workspace's own looks namespace
+#: (migration 0172), on the same terms again.
+DESTROYABLE_KINDS: Final = (
+    "blob",
+    "artifact",
+    "embedding",
+    "material_bake",
+    "workspace_asset",
+    "look",
+)
 
 #: The namespace each stored kind's bytes live in (:mod:`exulanica.store.namespaces`); in a
 #: per-workspace namespace, the target's own workspace. A kind is stored by adding it here with its
@@ -120,6 +129,7 @@ STORED_KIND_NAMESPACES: Final[Mapping[str, str]] = MappingProxyType(
         "artifact": BLOB_NAMESPACE,
         "material_bake": MATERIAL_NAMESPACE,
         "workspace_asset": WORKSPACE_ASSET_NAMESPACE,
+        "look": LOOK_NAMESPACE,
     }
 )
 
@@ -261,6 +271,10 @@ def claim_purge(
     """
     if not set(kinds) <= set(DESTROYABLE_KINDS):
         raise ValueError(f"cannot claim purge jobs of kinds {sorted(set(kinds))}")
+    if "look" in kinds and not _has_look_question(connection):
+        # A database one migration behind the code holds no look job and no look question, and a
+        # statement naming a function it lacks would fail every claim, not only a look's.
+        kinds = tuple(kind for kind in kinds if kind != "look")
     # The bake arm is written only for a worker that may claim bakes. The function it calls
     # arrives in migration 0066, and a worker with no material namespaces also runs against a
     # schema from before it, as an upgrade does.
@@ -279,6 +293,13 @@ def claim_purge(
         if "workspace_asset" in kinds
         else ""
     )
+    # And for a workspace's looks, whose function arrives in migration 0172.
+    looks = (
+        "     and (pj.target_kind <> 'look' or "
+        "       look_purge_is_authorized(pj.workspace_id, pj.tombstone_id, pj.target_ref)) "
+        if "look" in kinds
+        else ""
+    )
     row = connection.execute(
         "update purge_job set state = 'running', attempts = attempts + 1, "
         "  attempted_at = now(), last_error = null "
@@ -291,6 +312,7 @@ def claim_purge(
         "                                          pj.target_ref::uuid)) "
         + bakes
         + assets
+        + looks
         + "     and pj.attempts < %s "
         "     and (pj.state = 'queued' "
         "          or (pj.state in ('skipped', 'failed', 'running') "
@@ -322,6 +344,14 @@ def claim_purge(
         reason=tombstone["reason"],
         scope=tombstone["scope"],
     )
+
+
+def _has_look_question(connection: psycopg.Connection) -> bool:
+    """Whether the schema holds ``look_purge_is_authorized`` (migration 0172)."""
+    row = connection.execute(
+        "select to_regprocedure('look_purge_is_authorized(uuid,uuid,text)') is not null as present"
+    ).fetchone()
+    return bool(row and row["present"])
 
 
 def finish_purge(
@@ -388,6 +418,13 @@ def mark_purged(connection: psycopg.Connection, target: PurgeTarget) -> None:
     if target.target_kind == "workspace_asset":
         connection.execute(
             "update workspace_asset_blob set purged_at = now() "
+            "where workspace_id = %s and content_sha256 = %s and purged_at is null",
+            (target.workspace_id, target.target_ref),
+        )
+        return
+    if target.target_kind == "look":
+        connection.execute(
+            "update look_object set purged_at = now() "
             "where workspace_id = %s and content_sha256 = %s and purged_at is null",
             (target.workspace_id, target.target_ref),
         )

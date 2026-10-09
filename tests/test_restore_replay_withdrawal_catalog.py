@@ -11,12 +11,15 @@ and every kind's statements run against it. The real restores are in
 
 from __future__ import annotations
 
+import json
 import re
 import uuid
 
 import pytest
+from exulanica.deletion import withdrawals
 from exulanica.deletion.withdrawals import (
     CATALOG,
+    CATALOG_PATH,
     EXCLUSIONS,
     Carried,
     CarryRefused,
@@ -282,6 +285,25 @@ def test_every_kinds_statements_run_against_the_schema(repository, spine_schema)
         with connection.transaction(force_rollback=True):
             written = "carried" if kind.carry_absent else "absent"
             assert reapply(connection, Carried(kind.kind, row), WRITERS) == written, kind.kind
+
+
+def test_a_removal_a_kind_names_is_one_written_for_its_table(tmp_path):
+    """The removals a kind's ``removed_by`` may name are a closed list, each written for one table:
+    a name nobody wrote, or one written for another table, refuses the catalog."""
+    document = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+    kinds = {entry["kind"]: entry for entry in document["kinds"]}
+    assert kinds["look"]["removed_by"] == ["workspace_tombstone", "thing_erasure_of_its_plan"]
+    path = tmp_path / "catalog.json"
+    for kind, removal in (
+        ("look", "a_removal_nobody_wrote"),
+        ("thing_erasure", "workspace_tombstone"),
+    ):
+        changed = json.loads(json.dumps(document))
+        [entry] = [entry for entry in changed["kinds"] if entry["kind"] == kind]
+        entry["removed_by"] = [removal]
+        path.write_text(json.dumps(changed), encoding="utf-8")
+        with pytest.raises(ValueError, match=f"{removal!r} is no removal of {entry['table']}"):
+            withdrawals._load(path)
 
 
 # -- one write's branches ---------------------------------------------------------------------

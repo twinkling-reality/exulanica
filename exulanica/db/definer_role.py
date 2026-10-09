@@ -166,6 +166,25 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
         tables={"reference_lookup": frozenset({"SELECT"})},
         columns={"reference_lookup": {"query": frozenset({"UPDATE"})}},
     ),
+    # tg_thing_erasure_erases and tg_thing_store_erases_on_tombstone (0172) delete a drafted
+    # creature's rows, and every creature's of an erased workspace, and the erasure enqueues its
+    # looks' containers on its creature tombstone (INSERT alone: no conflict target). The erasure
+    # and look_purge_is_authorized read tombstone under 0161's grant.
+    "0172": DefinerGrants(
+        tables={
+            **{
+                name: frozenset(("SELECT", "DELETE"))
+                for name in (
+                    "body_plan_version",
+                    "body_recipe_version",
+                    "look_version",
+                    "look_withdrawal",
+                    "thing_kind_version",
+                )
+            },
+            "purge_job": frozenset(("INSERT",)),
+        }
+    ),
 }
 
 

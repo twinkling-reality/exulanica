@@ -44,6 +44,7 @@ __all__ = [
     "WORKSPACE_NAMESPACES",
     "LocalWorkspaceStores",
     "WorkspaceStores",
+    "look_lock_key",
     "material_stores",
     "tile_store",
     "workspace_asset_lock_key",
@@ -136,6 +137,15 @@ def workspace_asset_lock_key(workspace_id: uuid.UUID, digest: str) -> str:
     another. Admission, preparation, delivery and the purger all take this key.
     """
     return f"workspace-asset:{workspace_id}:{digest}"
+
+
+def look_lock_key(workspace_id: uuid.UUID, digest: str) -> str:
+    """The advisory lock key of one container in one workspace's looks namespace.
+
+    Keyed as an asset object is, by workspace and digest. The store holds it from recording a
+    container until the rows naming it commit, and the purger takes it before destroying one.
+    """
+    return f"look:{workspace_id}:{digest}"
 
 
 def tile_store(data_dir: str | os.PathLike[str]) -> LocalContentAddressedStore:

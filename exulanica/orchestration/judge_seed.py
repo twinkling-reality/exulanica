@@ -872,21 +872,32 @@ def _refuse_held_things(connection: psycopg.Connection, workspace_id: uuid.UUID)
     may be private, restricted or share-alike, which a seed handed to somebody else would carry
     with no rights check; a drafted kind holds words drafted from a person's. Their rows alone
     would restore as looks whose bytes are missing, so the export refuses, as it does for a
-    workspace's own admitted assets.
+    workspace's own admitted assets; and so it does while the looks namespace still holds a
+    container the purge has not destroyed (migration 0172's inventory, ``look_object``).
     """
-    present = connection.execute("select to_regclass('look_version') is not null as present")
-    if not present.fetchone()["present"]:
+    present = connection.execute(
+        "select to_regclass('look_version') is not null as looks, "
+        "to_regclass('look_object') is not null as objects"
+    ).fetchone()
+    if not present["looks"]:
         return
+    # A schema between the store and its inventory holds looks and no inventory to count.
+    objects = (
+        "(select count(*) from look_object where workspace_id = %(w)s and purged_at is null)"
+        if present["objects"]
+        else "0"
+    )
     held = connection.execute(
         "select (select count(*) from look_version where workspace_id = %(w)s) as looks, "
-        "(select count(*) from thing_kind_version where workspace_id = %(w)s) as kinds",
+        "(select count(*) from thing_kind_version where workspace_id = %(w)s) as kinds, "
+        f"{objects} as objects",
         {"w": workspace_id},
     ).fetchone()
-    if held["looks"] or held["kinds"]:
+    if held["looks"] or held["kinds"] or held["objects"]:
         raise SeedRefused(
-            f"workspace {workspace_id} holds {held['looks']} look(s) and {held['kinds']} thing "
-            "kind(s) of its own, kept only in that workspace with the containers its own looks "
-            "namespace holds; a seed cannot carry them"
+            f"workspace {workspace_id} holds {held['looks']} look(s), {held['kinds']} thing "
+            f"kind(s) and {held['objects']} looks container(s) of its own, kept only in that "
+            "workspace with the containers its own looks namespace holds; a seed cannot carry them"
         )
 
 

@@ -174,11 +174,15 @@ def test_a_drafted_creature_is_kept_whole_and_read_back_as_the_runtime_role(
         assert kept.container_sha256 == hashlib.sha256(creature.sketch_container).hexdigest()
         assert store.look_by_digest(creature.sketch.sha256) == kept
         row = connection.execute(
-            "select r.words_sha256, l.admission, l.spdx, l.share_alike, l.origin_class, "
-            "k.plan_sha256 from body_recipe_version r, look_version l, thing_kind_version k"
+            "select to_jsonb(r) as recipe, k.document->'origin'->'by' as by, l.admission, l.spdx, "
+            "l.share_alike, l.origin_class, k.plan_sha256 "
+            "from body_recipe_version r, look_version l, thing_kind_version k"
         ).fetchone()
-        # The words are held only as the digest the drafter's provenance names.
-        assert row["words_sha256"] == BY["words_sha256"]
+        # The words are held only as the digest the drafter's provenance names, in the kind's and
+        # the plan's origin; the recipe, which two creatures may share, holds none (as of
+        # migration 0172).
+        assert row["by"]["words_sha256"] == BY["words_sha256"]
+        assert row["recipe"]["words_sha256"] is None
         assert row["admission"]["reader"] == "exulanica.world.static_glb.inspect_static_glb"
         assert row["admission"]["counts"]["meshes"] > 0
         assert (row["spdx"], row["share_alike"], row["origin_class"]) == (

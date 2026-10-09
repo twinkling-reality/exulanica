@@ -327,6 +327,11 @@ _HELD = {
             },
         },
     ),
+    # A container the looks namespace still holds unpurged, an erased creature's until the purge.
+    "look_object": (
+        "insert into look_object (workspace_id, content_sha256, byte_size) values (%s, %s, 1)",
+        None,
+    ),
     "thing_kind_version": (
         "insert into thing_kind_version (workspace_id, key, version, sha256, document, plan, "
         "created_by) values (%s, 'held', 1, %s, %s, 'rigid/v1', %s)",
@@ -343,7 +348,8 @@ _HELD = {
 @pytest.mark.parametrize("table", sorted(_HELD))
 def test_a_workspace_holding_its_own_looks_or_kinds_is_refused(seeded, store, tmp_path, table):
     """A workspace's own looks keep their containers in its own looks namespace, which a seed
-    does not copy, and its kinds hold words drafted from a person's: either refuses the export.
+    does not copy, its kinds hold words drafted from a person's, and a container stays in that
+    namespace until the purge destroys it: any of them refuses the export.
 
     The rows cannot be deleted, so each is written for a new workspace inside a savepoint that is
     rolled back, and the shared schema keeps none of them.
@@ -353,7 +359,10 @@ def test_a_workspace_holding_its_own_looks_or_kinds_is_refused(seeded, store, tm
     admin = seeded.connection
     with admin.transaction():
         admin.execute("select set_config('exulanica.workspace_id', %s, true)", (str(holder),))
-        admin.execute(statement, (holder, "d" * 64, Jsonb(document), holder))
+        values = (
+            (holder, "d" * 64) if document is None else (holder, "d" * 64, Jsonb(document), holder)
+        )
+        admin.execute(statement, values)
         with pytest.raises(SeedRefused, match="of its own"):
             export_seed(
                 admin,
@@ -365,6 +374,29 @@ def test_a_workspace_holding_its_own_looks_or_kinds_is_refused(seeded, store, tm
         assert not (tmp_path / "refused").exists()
         raise psycopg.Rollback()
     assert not admin.execute(f"select 1 from {table} where workspace_id = %s", (holder,)).fetchall()
+
+
+def test_a_schema_with_looks_and_no_inventory_is_read_without_one(seeded, store, tmp_path):
+    """A database between the thing store and the looks namespace's inventory holds looks and no
+    ``look_object``: the seed's check counts the looks and kinds it holds, and still refuses a
+    workspace holding a look. The table is renamed inside a transaction that is rolled back."""
+    statement, document = _HELD["look_version"]
+    holder = uuid.uuid4()
+    admin = seeded.connection
+    with admin.transaction():
+        admin.execute("alter table look_object rename to look_object_not_yet")
+        admin.execute("select set_config('exulanica.workspace_id', %s, true)", (str(holder),))
+        admin.execute(statement, (holder, "d" * 64, Jsonb(document), holder))
+        with pytest.raises(SeedRefused, match=r"1 look\(s\), 0 thing kind\(s\) and 0 looks"):
+            export_seed(
+                admin,
+                store,
+                workspace_id=holder,
+                destination=tmp_path / "refused",
+                created_at=_CREATED_AT,
+            )
+        raise psycopg.Rollback()
+    assert admin.execute("select to_regclass('look_object') is not null as held").fetchone()["held"]
 
 
 # -- the archive verifies against its own manifest ---------------------------------------------

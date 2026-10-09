@@ -51,13 +51,20 @@ MIGRATION = next(
 TABLE_PRIVILEGES = {
     "baked_tile": {"SELECT", "INSERT", "UPDATE"},
     "baked_tile_stage": {"SELECT"},
+    # tg_thing_erasure_erases (0172) deletes a drafted creature's rows.
+    "body_plan_version": {"SELECT", "DELETE"},
+    "body_recipe_version": {"SELECT", "DELETE"},
     "door_redemption_refusal": {"SELECT", "DELETE"},
     "door_secret": {"SELECT", "DELETE"},
     "embedding": {"SELECT"},
+    "look_version": {"SELECT", "DELETE"},
+    "look_withdrawal": {"SELECT", "DELETE"},
     "material_bake": {"SELECT"},
     "material_recipe": {"SELECT"},
     "material_recipe_source": {"SELECT"},
     "person_derivative_dependency": {"SELECT"},
+    # The erasure (0172) enqueues an erased creature's containers on its creature tombstone.
+    "purge_job": {"INSERT"},
     "restore_control": {"SELECT"},
     "saved_world_source_attachment_operation": {"SELECT"},
     "saved_world_source_current_membership": {"SELECT", "INSERT", "UPDATE"},
@@ -72,6 +79,7 @@ TABLE_PRIVILEGES = {
     "spending_guest_policy": {"SELECT", "UPDATE"},
     "spending_guest_policy_day": {"SELECT", "INSERT", "UPDATE"},
     "spending_reservation": {"SELECT", "INSERT", "UPDATE"},
+    "thing_kind_version": {"SELECT", "DELETE"},
     "tombstone": {"SELECT"},
     "tombstone_embedding_target": {"SELECT"},
     "world_project": {"SELECT", "UPDATE"},
@@ -101,6 +109,7 @@ DEFINERS = {
         "pg_catalog, {schema}, pg_temp": (
             "caption_vector_purge_is_authorized(uuid,uuid,uuid)",
             "caption_vector_purge_is_complete(uuid,uuid)",
+            "look_purge_is_authorized(uuid,uuid,text)",
             "material_bake_purge_is_authorized(uuid,uuid,bytea)",
             "reference_lookup_clear_queries(uuid)",
             "spending_admit(uuid,uuid,text,uuid,text,text,text,numeric,text,jsonb)",
@@ -117,6 +126,8 @@ DEFINERS = {
             "tg_saved_world_source_detach_moves_membership()",
             "tg_sealed_checkpoint_refuses_withdrawals()",
             "tg_spending_event_ends_guest_policies()",
+            "tg_thing_erasure_erases()",
+            "tg_thing_store_erases_on_tombstone()",
             "tg_tombstone_withdraws_project_context()",
             "tg_world_project_item_erases_on_withdrawal()",
             "tg_world_project_withdraws_its_items()",
@@ -177,7 +188,8 @@ def test_every_definer_belongs_to_the_login_less_owner_and_the_check_passes(admi
     definers = _definers(admin)
     # 0044, 0066, 0090, 0107, 0124, 0126, 0127, 0139, 0144, 0149 (door_prune, whose body 0157
     # replaced), 0155 and the search query retention migration (reference_lookup_clear_queries)
-    # define these 23. A create or replace that drops SECURITY DEFINER leaves this set, so it fails
+    # define 23, and the migration that erases a drafted creature whole three more: these 26. A
+    # create or replace that drops SECURITY DEFINER leaves this set, so it fails
     # here.
     assert set(definers) == set(DEFINERS), definers
     assert {owner for owner in definers.values()} == {DEFINER_ROLE}, definers

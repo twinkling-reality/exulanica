@@ -231,14 +231,19 @@ def _refuse_a_stale_checkpoint(connection: psycopg.Connection, record: dict[str,
     Both are written once and never removed, and a checkpoint is sealed from the source after
     every backup of it, so a current checkpoint holds everything its restored database holds. One
     it lacks says the checkpoint is older than the backup, and the deletions and withdrawals made
-    between the two are in neither. Asked once, before the attempt writes anything: afterwards the
-    database also holds this attempt's own replay copies and the tombstones its withdrawals wrote.
+    between the two are in neither. A withdrawal the checkpoint's own tombstones or erasures delete
+    on replay is the exception (:func:`stale_withdrawals`): the source deleted it after the backup.
+    Asked once, before the attempt writes anything: afterwards the database also holds this
+    attempt's own replay copies and the tombstones its withdrawals wrote.
     """
     known = [item["tombstone"]["tombstone_id"] for item in record["tombstones"]]
     unknown = connection.execute(
         "select 1 from tombstone where tombstone_id <> all(%s::uuid[]) limit 1", (known,)
     ).fetchone()
-    if unknown is not None or stale_withdrawals(connection, _withdrawals(record)):
+    tombstones = [item["tombstone"] for item in record["tombstones"]]
+    if unknown is not None or stale_withdrawals(
+        connection, _withdrawals(record), tombstones=tombstones
+    ):
         raise RestoreRefused(
             "the restored database holds a deletion or withdrawal the checkpoint does not: "
             "the checkpoint is older than the backup; seal a fresh one from the source"
@@ -281,7 +286,8 @@ def _held_open(
 ) -> list[str] | None:
     """The targets an incomplete tombstone has left because a live record here still holds their
     bytes, or None when it has left anything else: a job failed or not run, a skip for another
-    reason, bytes nothing holds any more, or caption vectors not yet erased."""
+    reason, bytes nothing holds any more, or caption vectors not yet erased. A look's container a
+    look here still names is held: the same creature kept again after its erasure."""
     cursor = connection.cursor(row_factory=dict_row)
     captions = cursor.execute(
         "select caption_vector_purge_is_complete(%s, %s) as complete", (workspace_id, tombstone_id)
@@ -300,7 +306,12 @@ def _held_open(
     for row in rows:
         if row["state"] == "done":
             continue
-        if row["state"] != "skipped" or row["last_error"] != HELD_BY_A_LIVE_RECORD:
+        # A look job waits unclaimed while a look this database holds names its bytes, because the
+        # question its claim asks refuses it (migration 0172), so it is held open as a skip is.
+        waiting = row["target_kind"] == "look" and row["state"] == "queued"
+        if not waiting and (
+            row["state"] != "skipped" or row["last_error"] != HELD_BY_A_LIVE_RECORD
+        ):
             return None
         target = PurgeTarget(
             purge_id=row["purge_id"],
@@ -999,7 +1010,8 @@ def replay(
 
     ``materials`` holds each workspace's material bakes (migration 0066). A checkpoint that names
     a bake is refused without it, before anything is replayed, because the purge could not reach
-    those bytes and the receipt would then be withheld only after the replay had begun.
+    those bytes and the receipt would then be withheld only after the replay had begun. So is a
+    checkpoint naming a look's container without ``stores``, the only way to its looks namespace.
 
     ``stores``, an installation's purging stores, replaces ``store`` and ``materials``: the purge
     reaches every namespace through them and each stored target is looked for where its kind's
@@ -1020,6 +1032,13 @@ def replay(
         for target in item["targets"]
     ):
         raise RestoreRefused("the checkpoint names material bakes and no material store was given")
+    # A look's container lives in its workspace's looks namespace, which only ``stores`` reaches.
+    if stores is None and any(
+        target["target_kind"] == "look"
+        for item in record["tombstones"]
+        for target in item["targets"]
+    ):
+        raise RestoreRefused("the checkpoint names looks' containers and no looks store was given")
     marker = _marker(marker_path)
     if (
         marker.get("checkpoint_id") != record["checkpoint_id"]

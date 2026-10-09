@@ -310,6 +310,11 @@ INSERT_ONLY_TABLES: Final = (
     "door_manifest",
     "door_delivery",
     "door_visitor_gone",
+    # Migration 0172 appends a workspace's erasure of a drafted creature, whose trigger deletes the
+    # creature's rows as the definer owner, and the looks namespace's inventory, whose purge only
+    # the purger writes; each refuses every update the runtime could make.
+    "thing_erasure",
+    "look_object",
 )
 
 #: Tables the runtime may change only in the named columns: provisioning takes the table's UPDATE
@@ -474,19 +479,26 @@ _PURGE_WRITES: Final = {
 _PURGE_WORKSPACE_READS: Final = {
     "material_bake": ("workspace_id", "content_sha256", "purged_at"),
     "workspace_asset_blob": ("workspace_id", "content_sha256", "purged_at"),
+    "look_object": ("workspace_id", "content_sha256", "purged_at"),
+    # Whether a look the workspace still holds names a container a creature's erasure enqueued:
+    # the same creature kept again holds the same file, and its job is skipped (worker.py).
+    "look_version": ("workspace_id", "container_sha256"),
     "scene_training_artifact": ("workspace_id", "artifact_id", "right_id"),
     "scene_training_right": ("workspace_id", "right_id", "withdrawn_at"),
 }
 _PURGE_WORKSPACE_WRITES: Final = {
     "material_bake": ("purged_at",),
     "workspace_asset_blob": ("purged_at",),
+    "look_object": ("purged_at",),
 }
 #: The destroy questions this role may ask, each revoked from PUBLIC by the migration that added
-#: it: a bake's in 0066, a withdrawn training right's in 0082, a workspace asset object's in 0126.
+#: it: a bake's in 0066, a withdrawn training right's in 0082, a workspace asset object's in 0126,
+#: a looks object's in 0172.
 _PURGE_FUNCTIONS: Final = (
     ("material_bake_purge_is_authorized", "uuid,uuid,bytea"),
     ("scene_training_withdrawal_releases_artifact", "uuid,bytea"),
     ("workspace_asset_purge_is_authorized", "uuid,uuid,text"),
+    ("look_purge_is_authorized", "uuid,uuid,text"),
 )
 
 #: What the purger may write on the queue and on the tombstone. Exactly the columns the worker

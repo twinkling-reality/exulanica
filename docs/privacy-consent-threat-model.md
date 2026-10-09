@@ -392,9 +392,9 @@ deleted vector is absent from the index's own files before any deletion claim is
 
 The `tombstone` table (migration 0001) is workspace-scoped and holds no content, only identifiers:
 its scope (`capture`, `interval`, `entity`, `assertion`, `workspace`, and the later
-`scene_training` and `caption_search`), its subject, who asked, when it takes effect, and when the
-purge completed. Migration 0074 makes a tombstone written once: every change but
-`purge_completed_at` is refused.
+`scene_training`, `caption_search` and `creature`, whose subject is the erasure row beside it), its
+subject, who asked, when it takes effect, and when the purge completed. Migration 0074 makes a
+tombstone written once: every change but `purge_completed_at` is refused.
 
 Rules:
 
