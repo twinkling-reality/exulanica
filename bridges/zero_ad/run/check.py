@@ -35,11 +35,13 @@ as expected:
     ``--lives-s`` seconds, unless its mind leads it home first; once the soldier is back in the
     match, revokes the grant, and stops once the adapter reads that the grant ended.
 5.  Reads the world's records: the visitor arrived and departed, wears the look the mapping names
-    (the version's look read), was decided for by the world, and its society replays with no game
-    running; and the match's: the soldier left it at the gate and a hoplite of its owner stands on
-    the gate again. Writes the run's summary and every exchange with the door and the game (no
-    credential, no token) into ``.exulanica/zero-ad-checks/<time>/`` and brings the stack down
-    (``--keep-stack`` leaves it up for a look in the browser).
+    (the version's look read), its crossing kept a manifest of what came across and what stayed
+    behind (read by its arrival, as its card reads it), it was decided for by the world, and its
+    society replays with no game running; and the match's: the soldier left it at the gate and a
+    hoplite of its owner stands on the gate again. Writes the run's summary and every exchange
+    with the door and the game (no credential, no token) into the run's own folder,
+    ``.exulanica/zero-ad-checks/<time>/``, and brings the stack down (``--keep-stack`` leaves it
+    up for a look in the browser).
 
 ``--declare OUT`` writes the bridge into the door bridge declarations a stack someone else starts
 reads (``launch.py up --door-bridges OUT``) and stops: beside the bridges OUT already declares, so
@@ -676,6 +678,31 @@ def main(argv: list[str] | None = None) -> int:
             "the visitor wore the mapping's look",
             bool(worn) and worn[0]["look"] == looks[arguments.look],
             worn=summary["look_worn"],
+        )
+        # What its card shows came across and stayed behind: the manifest the door kept for the
+        # arrival, read by the arrival's id in the world, in the mapping's own words.
+        arrival_id = next(
+            (mark.get("arrival_id") for mark in marks if mark["mark"] == "frame_arrived"), None
+        )
+        read = api(
+            "GET",
+            f"/door/crossings/{arrival_id}/manifest",
+            params=world["scope"],
+            expected=(200, 404),
+        )
+        kept = read.get("manifest") or {}
+        summary["manifest"] = {
+            "manifest_sha256": read.get("manifest_sha256"),
+            "fields": [
+                {key: field.get(key) for key in ("path", "disposition", "words", "reason")}
+                for field in kept.get("fields", [])
+            ],
+        }
+        check(
+            "the crossing kept a manifest of what came across and what stayed behind",
+            bool(kept.get("fields"))
+            and sha256_of_canonical(kept).hex() == read.get("manifest_sha256"),
+            manifest_sha256=read.get("manifest_sha256"),
         )
         summary["character_decisions"] = luanti.character_decisions(api, world, {str(thing_id)})
         decided = summary["character_decisions"]["counts"]

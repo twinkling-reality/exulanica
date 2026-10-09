@@ -60,8 +60,9 @@ Athenians, whose starting units include the hoplite the mapping names.
 its loopback address: it starts the stack on a port slot with this bridge declared, builds the demo's
 scene and grants one hoplite, stands the standard where a hoplite of the match stood and walks it back
 onto it, runs the adapter's loop, sends the visitor home as the world's owner after `--lives-s`
-seconds unless its mind leads it home first, and reads the world's records (the look worn, who
-decided, the replay). It writes the run's summary and every exchange, with no credential, into
+seconds unless its mind leads it home first, and reads the world's records (the look worn, the
+crossing's manifest of what came across and what stayed behind, who decided, the replay). It writes
+the run's summary and every exchange, with no credential, into
 `.exulanica/zero-ad-checks/` and brings the stack down. With `--scripted-model run/plans/<plan>.json
 --traveller-mind` a scripted model is the soldier's mind, so no provider is called:
 `soldier-leaves.json` leaves when it may, `soldier-waits.json` waits until it is sent home.
