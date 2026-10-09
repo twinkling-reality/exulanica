@@ -1,6 +1,6 @@
 """A module that asks what a society engine can do asks the engine table, never an engine's name.
 
-``exulanica/world/society-engines.v2.json`` states each engine's capabilities once. A comparison
+``exulanica/world/society-engines.v3.json`` states each engine's capabilities once. A comparison
 of an engine's identity (``row["engine_version"] == PURPOSEFUL_PROFILE``, or the profile text
 itself) where a capability decides is a second statement of that capability, and it silently
 leaves out the next engine that has it: the model choices a world's owner makes were decided by

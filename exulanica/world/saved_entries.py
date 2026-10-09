@@ -236,6 +236,11 @@ class SavedWorldEntry:
     #: snapshot's composer states (:func:`~exulanica.world.society_grounds.created_engine`); None
     #: for a world no ground is stated for.
     society_engine: str | None = None
+    #: The engine a society over this world is created with on a host that offers societies of
+    #: things: the table's engine for a world holding things where its version holds a thing its
+    #: author placed and its ground is one the table names for it, else :attr:`society_engine`.
+    #: Read when the entry is read, so a thing placed since counts.
+    society_engine_holding_things: str | None = None
 
 
 class SavedWorldEntryRepository:
@@ -1578,6 +1583,7 @@ class SavedWorldEntryRepository:
             states_site,
             unreadable_reason,
         )
+        from exulanica.world.object_repository import version_holds_things
         from exulanica.world.society_authored_ground import declared_floor
         from exulanica.world.society_grounds import (
             UnknownSocietyGround,
@@ -1613,11 +1619,20 @@ class SavedWorldEntryRepository:
                 unreadable = unreadable_reason(exc)
         unavailable = source_invalidated or authored_changed or unreadable is not None
         try:
-            society_engine: str | None = created_engine(
-                society_ground_for_composer(str(row["composer_key"]))
-            )
+            society_ground = society_ground_for_composer(str(row["composer_key"]))
         except UnknownSocietyGround:
-            society_engine = None
+            society_engine = holding_things = None
+        else:
+            society_engine = created_engine(society_ground)
+            holding_things = created_engine(
+                society_ground,
+                holding_things=version_holds_things(
+                    self.connection,
+                    self.workspace_id,
+                    str(row["world_id"]),
+                    row["authored_version_id"],
+                ),
+            )
         source_kind = row["source_kind"]
         if source_kind not in {"personal", "authored", "generated"}:
             raise ValueError("unknown saved world source kind")
@@ -1643,6 +1658,7 @@ class SavedWorldEntryRepository:
             generated_ground=ground,
             generated_site=site,
             society_engine=society_engine,
+            society_engine_holding_things=holding_things,
             authored_version_id=row["authored_version_id"],
             authored_state_sha256=row["authored_state_sha256"],
             authored_edit_seq=row["authored_edit_seq"],

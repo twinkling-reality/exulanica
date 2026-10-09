@@ -94,7 +94,15 @@ its records coming out otherwise make it unavailable, with the reasons above
 Every entry states `society_engine`: the engine a society over its world is created with, the
 engine table's for the ground its snapshot's composer states
 (`exulanica.world.society_grounds.created_engine`), or null for a world no ground is stated for.
-A page names it when it brings people in and derives none of its own.
+On a host that offers societies of things (`EXULANICA_SOCIETY_OF_THINGS`), an entry whose version
+holds a thing its author placed, on a ground the table's `creates_holding_things` names (a starter,
+a world made from photographs, a generated town), states the society of things,
+`exulanica-society/v7`, so the beings placed there live with the ground's own people; a world made
+from a world kind keeps the living society, which alone lives in it. It is read with the entry, so a
+thing placed after the world opened counts on the next read; nothing stored changes, and a society
+a version already holds keeps its engine. A page names it when it brings people in and derives none
+of its own; a new society of another engine for such a world is refused by name
+(`409 society_engine_differs`).
 
 Every entry states `takes_photographs`, its world kind's own rule
 ([`WORLD_KINDS`](../exulanica/world/worlds.py)): false for a world generated from a recipe, whose

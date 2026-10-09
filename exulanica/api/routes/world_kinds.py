@@ -841,7 +841,7 @@ def create_kind_world(
         return _problem(503, exc.code, str(exc), headers={"Retry-After": str(exc.retry_seconds)})
     except (GeneratedWorldRefused, UnknownWorldComposer, WorldLimitReached) as exc:
         return _problem(409, exc.code, str(exc))
-    return _view(created)
+    return _view(created, societies_of_things=services.societies_of_things)
 
 
 @site_router.get(

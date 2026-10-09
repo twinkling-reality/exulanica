@@ -135,6 +135,7 @@ __all__ = [
     "StayReason",
     "UndoCandidate",
     "WorldObjectRepository",
+    "version_holds_things",
 ]
 
 #: Every subject id column of the edit log, in the order the table declares them.
@@ -3034,6 +3035,21 @@ class WorldObjectRepository:
 
     def _lock_workspace(self) -> None:
         lock_workspace(self.connection, self.workspace_id)
+
+
+def version_holds_things(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, version_id: uuid.UUID
+) -> bool:
+    """Whether a version of the world holds a thing its author placed and has not removed (an
+    undone placement is a removed one): what decides, with its ground and the host, whether a new
+    society over a saved world is a society of things
+    (:func:`~exulanica.world.society_grounds.created_engine`)."""
+    row = connection.execute(
+        "select exists(select 1 from world_alternate_thing where workspace_id=%s "
+        "and world_id=%s and version_id=%s and not removed) as held",
+        (workspace_id, world_id, version_id),
+    ).fetchone()
+    return bool(row["held"])
 
 
 def _override_from_document(document: Mapping[str, Any]) -> ElementOverride:

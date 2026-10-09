@@ -196,7 +196,7 @@ def create_generated_world(
     # Refused as busy, the world stays as made, naming no pack: a page draws it in the default.
     with contextlib.suppress(StyleWriteBusy):
         created = name_creation_look(entries, created, pack, session.actor)
-    return _view(created)
+    return _view(created, societies_of_things=services.societies_of_things)
 
 
 @tiles_router.get(

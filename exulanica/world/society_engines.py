@@ -1,12 +1,14 @@
 """The society engines and what each can do, stated once, as data.
 
-``society-engines.v2.json`` beside this module is the one statement of which engine profiles
+``society-engines.v3.json`` beside this module is the one statement of which engine profiles
 exist and which capabilities each has: whether a society may still be created with it, whether it
 consumes authorised inputs, whether the playback worker may play it, whether it takes directed
 actions, model decisions or experiments, whether the world's owner may choose a model for one of
 its people, whether a comparison of the models that decide for its people may run it, whether it
 can stand on a saved world's own ground, which state shape it writes and how many people it may
-hold. It also states which engine a new society over each kind of ground is created with.
+hold. It also states which engine a new society over each kind of ground is created with, and,
+from its third version, which engine a saved world takes instead where its version holds a thing
+its author placed and the host offers societies of things (``creates_holding_things``).
 Everything that used to restate a list of engines derives it from here: the runtime's edit hook,
 the repositories, the routes, the selection query's bound parameters and, through a generated
 module, the browser's parser. Where a copy cannot derive, because a migration's CHECK or trigger
@@ -14,8 +16,10 @@ body is fixed SQL, a test reads the live schema and compares it with this table.
 asks what an engine can do asks the table; ``tests/test_society_engine_capabilities.py`` fails a
 module that compares an engine's identity where a capability decides.
 
-``society-engines.v1.json``, the table's first shape, stays beside it because evaluation records
-name it; a test holds it to this one's rows.
+``society-engines.v1.json``, the table's first shape, and ``society-engines.v2.json``, its second,
+stay beside it because evaluation records and the comparison drawing of their day name them;
+tests hold each to this one's rows, and :func:`load_engine_table` reads the second as it reads
+this one.
 
 An engine that is not in the table is refused by name everywhere it is looked up, never guessed
 to behave like one that is.
@@ -24,6 +28,7 @@ to behave like one that is.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,6 +41,7 @@ __all__ = [
     "COMPARISON_ENGINES",
     "CREATABLE_ENGINES",
     "CREATES",
+    "CREATES_HOLDING_THINGS",
     "DECISION_ENGINES",
     "DEFAULT_ENGINE",
     "ENGINES",
@@ -48,6 +54,7 @@ __all__ = [
     "PRESENCE_ENGINES",
     "SAVED_WORLD_ENGINES",
     "GroundKind",
+    "HoldingThings",
     "RetiredSocietyEngine",
     "SocietyEngine",
     "UnknownSocietyEngine",
@@ -55,8 +62,10 @@ __all__ = [
     "society_engine",
 ]
 
-ENGINES_PATH: Final = Path(__file__).with_name("society-engines.v2.json")
-TABLE_PROFILE: Final = "exulanica.society-engines/v2"
+ENGINES_PATH: Final = Path(__file__).with_name("society-engines.v3.json")
+TABLE_PROFILE: Final = "exulanica.society-engines/v3"
+#: The profiles this module reads: the second, which states no ``creates_holding_things``, and this.
+_PROFILES: Final = ("exulanica.society-engines/v2", TABLE_PROFILE)
 StateFamily = Literal["legacy", "purposeful", "living", "things"]
 _STATE_FAMILIES: Final = ("legacy", "purposeful", "living", "things")
 #: The kinds of ground a new society is created over, each with the engine the table names for it:
@@ -80,6 +89,8 @@ _CAPABILITIES: Final = (
 )
 #: The largest population any engine may state: the living society's bound since migration 0075.
 _POPULATION_CEILING: Final = 65_536
+#: A society ground's key, as the society ground catalog states one.
+_GROUND_KEY: Final = re.compile(r"[a-z][a-z0-9_]*")
 
 
 class UnknownSocietyEngine(SocietyError, ValueError):
@@ -192,20 +203,65 @@ def _creates(document: Any, engines: Mapping[str, SocietyEngine]) -> dict[Ground
     return created
 
 
-def load_engine_table(
-    path: Path = ENGINES_PATH,
-) -> tuple[tuple[SocietyEngine, ...], str, Mapping[GroundKind, str]]:
-    """Read and check the table: every engine once, in order, a default that exists and may be
-    created with, and an engine for each kind of ground a new society is created over."""
-    document = json.loads(path.read_text(encoding="utf-8"))
+@dataclass(frozen=True, slots=True)
+class HoldingThings:
+    """The engine a saved world's new society takes instead of its ground's where its version holds
+    a thing its author placed and the host offers societies of things, over the society grounds
+    named here (the society ground catalog's keys): the ones a society of things stands on."""
+
+    engine: str
+    grounds: tuple[str, ...]
+
+
+def _holding_things(document: Any, engines: Mapping[str, SocietyEngine]) -> HoldingThings:
+    """The table's ``creates_holding_things``: a creatable engine of things that stands on a saved
+    world, the grounds it is created over (lowercase keys, each once, in order) and a reason."""
     if (
         not isinstance(document, dict)
-        or set(document) != {"profile", "creates", "default_engine", "engines"}
-        or document["profile"] != TABLE_PROFILE
+        or set(document) != {"engine", "grounds", "reason"}
+        or not isinstance(document["reason"], str)
+        or not document["reason"].strip()
+    ):
+        raise ValueError("creates_holding_things states an engine, its grounds and a reason")
+    engine = engines.get(document["engine"])
+    if (
+        engine is None
+        or not engine.creatable
+        or not engine.saved_world
+        or engine.state_family != "things"
+    ):
+        raise ValueError(
+            "creates_holding_things names a creatable engine of things that stands on a saved world"
+        )
+    grounds = document["grounds"]
+    if (
+        not isinstance(grounds, list)
+        or not grounds
+        or not all(isinstance(key, str) and _GROUND_KEY.fullmatch(key) for key in grounds)
+        or grounds != sorted(set(grounds))
+    ):
+        raise ValueError("creates_holding_things names its grounds once each, in order")
+    return HoldingThings(engine=engine.engine, grounds=tuple(grounds))
+
+
+def load_engine_table(
+    path: Path = ENGINES_PATH,
+) -> tuple[tuple[SocietyEngine, ...], str, Mapping[GroundKind, str], HoldingThings | None]:
+    """Read and check the table: every engine once, in order, a default that exists and may be
+    created with, an engine for each kind of ground a new society is created over and, where the
+    table states it (its third version may), the engine a saved world holding things takes."""
+    document = json.loads(path.read_text(encoding="utf-8"))
+    keys = {"profile", "creates", "default_engine", "engines"}
+    if (
+        not isinstance(document, dict)
+        or document.get("profile") not in _PROFILES
+        or not keys <= set(document)
+        or not set(document) - keys
+        <= ({"creates_holding_things"} if document["profile"] == TABLE_PROFILE else set())
         or not isinstance(document["engines"], list)
         or not document["engines"]
     ):
-        raise ValueError(f"{path.name} is not a {TABLE_PROFILE} table")
+        raise ValueError(f"{path.name} is not a society engine table of {_PROFILES}")
     engines = tuple(_engine(row) for row in document["engines"])
     names = [engine.engine for engine in engines]
     if names != sorted(set(names)):
@@ -214,10 +270,16 @@ def load_engine_table(
     default = by_name.get(document["default_engine"])
     if default is None or not default.creatable:
         raise ValueError("the default society engine is not in the table or is retired")
-    return engines, default.engine, _creates(document["creates"], by_name)
+    holding = document.get("creates_holding_things")
+    return (
+        engines,
+        default.engine,
+        _creates(document["creates"], by_name),
+        None if holding is None else _holding_things(holding, by_name),
+    )
 
 
-ENGINES, DEFAULT_ENGINE, CREATES = load_engine_table()
+ENGINES, DEFAULT_ENGINE, CREATES, CREATES_HOLDING_THINGS = load_engine_table()
 _BY_NAME: Final[Mapping[str, SocietyEngine]] = {engine.engine: engine for engine in ENGINES}
 
 

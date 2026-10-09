@@ -85,7 +85,7 @@ owner's workspace and each guest's while the guest is there
 Implementation:
 
 - shared identity, draws, events and digests: `exulanica/world/society.py`;
-- which engines exist and what each can do: `exulanica/world/society-engines.v2.json`, read by
+- which engines exist and what each can do: `exulanica/world/society-engines.v3.json`, read by
   `exulanica/world/society_engines.py`;
 - the grounds a society stands on, with what people walk, the population rule, lattice and
   declared area of each, the dependency its input names its place under, the kinds of the
@@ -127,7 +127,7 @@ Implementation:
 
 ## Engines and what each can do
 
-`exulanica/world/society-engines.v2.json` states which engine profiles exist and, for each,
+`exulanica/world/society-engines.v3.json` states which engine profiles exist and, for each,
 whether a society may still be created with it, whether it consumes authorised inputs, whether the
 playback worker may play it (and the refusal it gives when not), whether it takes directed actions,
 model decisions or experiments, whether the world's owner may choose a model that decides for one
@@ -137,7 +137,13 @@ stand on a saved world's own ground, which state shape it writes and how many pe
 with a reason per row. It also states which engine a new society over each kind of ground is
 created with (`creates`: a district's, a saved world's, and a town's, a saved world whose own
 records state its walking surfaces and homes), which the browser reads rather than naming an
-engine. `model_decisions` means the engine's history may hold validated model decisions,
+engine, and, from its third version, the engine a saved world takes instead where its version holds
+a thing its author placed and the host offers societies of things (`creates_holding_things`: the
+society of things, over the society grounds it names, the ones a society of things stands on; a
+world made from a world kind is lived in by the living society alone, so it is not named). A saved
+world's entry and its version's capability read state that engine while the version holds no
+society; a society already held keeps its engine; and a creation naming another engine for such a
+world is refused by name (`409 society_engine_differs`). `model_decisions` means the engine's history may hold validated model decisions,
 which the schema's decision triggers admit; `owner_model_choice` requires it, and a comparison
 requires `owner_model_choice`. `exulanica/world/society_engines.py` reads and checks it, and every
 list of engines derives from it: the runtime's edit hook, the repositories' dispatch and population
@@ -148,8 +154,9 @@ engines that host each role and so where the owner's model choices are recorded 
 `tests/test_decision_roles.py` holds them equal to the engines whose `owner_model_choice` the table
 states. An engine the table does not state is refused by name wherever it is looked up, and a
 retired one is refused by name when a creation asks for it (`409 society_engine_retired`). The
-table's first shape, `society-engines.v1.json`, stays beside it because evaluation records name it,
-held to this one's rows by a test.
+table's first shape, `society-engines.v1.json`, and its second, `society-engines.v2.json`, stay
+beside it because evaluation records and the comparison drawing of their day name them, each held
+to this one's rows by a test; the loader and the browser read the second as they read the third.
 
 | Engine | Created | Inputs | Playback | Directed actions | Model decisions | Owner chooses models | Compared | Experiments | Sent away | Saved world | Population |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

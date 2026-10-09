@@ -22,7 +22,9 @@ from typing import Any, Final
 from fastapi.responses import JSONResponse
 
 from exulanica.api.services import Services
+from exulanica.world.errors import UnknownWorldResource
 from exulanica.world.kinds.worker import KindWorkWaiting
+from exulanica.world.object_repository import WorldObjectRepository, version_holds_things
 from exulanica.world.society import (
     SocietyLivesElsewhere,
     SocietyPlaceWaiting,
@@ -30,14 +32,21 @@ from exulanica.world.society import (
     served_snapshot,
 )
 from exulanica.world.society_engines import RetiredSocietyEngine, creatable_engine, society_engine
-from exulanica.world.society_grounds import SocietyPopulationRefused
+from exulanica.world.society_grounds import (
+    SocietyPopulationRefused,
+    UnknownSocietyGround,
+    created_engine,
+    society_ground_for_composer,
+)
 from exulanica.world.society_planner import SocietyStartRefused
 from exulanica.world.society_repository import InvalidEventCursor, SocietyRepository
 from exulanica.world.world_clock import ClockRefused
 from exulanica.world.worlds import require_world
 
 __all__ = [
+    "SOCIETY_ENGINE_DIFFERS",
     "SOCIETY_ENGINE_NOT_OFFERED",
+    "SocietyEngineDiffers",
     "SocietyEngineNotOffered",
     "SocietyHooks",
     "SocietyRefusal",
@@ -59,6 +68,56 @@ class SocietyEngineNotOffered(Exception):
     def __init__(self, profile: str) -> None:
         self.detail = f"this host makes no society with {profile} through its routes"
         super().__init__(self.detail)
+
+
+#: Why a society is not made with the engine asked for: on this host the engine table gives the
+#: world a society of things, since its version holds a thing its author placed.
+SOCIETY_ENGINE_DIFFERS: Final = "society_engine_differs"
+
+
+class SocietyEngineDiffers(Exception):
+    """A new society of another engine asked for a saved world the engine table gives a society of
+    things (its version holds a thing its author placed, on a ground the table names, and the host
+    offers societies of things), refused by name before anything is composed: made with the other
+    engine, the beings placed there would never live. The detail names the engine to ask for."""
+
+    code = SOCIETY_ENGINE_DIFFERS
+
+    def __init__(self, profile: str, engine: str) -> None:
+        self.engine = engine
+        self.detail = (
+            f"this world holds things its author placed, so its society is made with {engine}, "
+            f"not {profile}"
+        )
+        super().__init__(self.detail)
+
+
+def engine_holding_things(
+    connection: Any,
+    session: Any,
+    services: Services,
+    world_id: str,
+    version_id: uuid.UUID,
+) -> str | None:
+    """The engine of things the engine table gives this version's new society on this host, or
+    None: where the host offers societies of things, the version holds a thing its author placed and
+    its ground is one the table names for it. A district's version, a ground the table does not
+    name, and a version holding no placed thing answer None, as an unknown version does here (its
+    own refusal comes from the creation)."""
+    if not services.societies_of_things:
+        return None
+    try:
+        source = WorldObjectRepository(
+            connection, session.workspace_id, world_id=world_id, store=services.store
+        ).source_facts(version_id)
+        ground = society_ground_for_composer(source.composer_key)
+    except (UnknownSocietyGround, UnknownWorldResource):
+        return None
+    engine = created_engine(ground, holding_things=True)
+    if society_engine(engine).state_family != "things":
+        return None
+    held = version_holds_things(connection, session.workspace_id, world_id, version_id)
+    return engine if held else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,7 +172,7 @@ def society_refusal(exc: Exception, *, invalid_status: int = 422) -> SocietyRefu
     state (``invalid_status``)."""
     if isinstance(exc, KindWorkWaiting | SocietyPlaceWaiting):
         return SocietyRefusal(503, exc.code, str(exc), exc.retry_seconds)
-    if isinstance(exc, SocietyEngineNotOffered):
+    if isinstance(exc, SocietyEngineNotOffered | SocietyEngineDiffers):
         return SocietyRefusal(409, exc.code, exc.detail)
     if isinstance(exc, UnavailableSocietyInput):
         return SocietyRefusal(424, "unavailable_society_input", str(exc))
@@ -167,14 +226,23 @@ def make_society(
     served, or answer the one the version already holds there.
 
     A society of things is made only where the host offers it (:class:`SocietyEngineNotOffered`
-    otherwise, before anything is read). A saved world's place, its first input and its society are
-    made in one transaction or not at all, so a refusal such as nothing reachable leaves nothing
-    behind; every refusal is raised for the caller to answer (:func:`society_refusal`).
+    otherwise, before anything is read), and there a new society of another engine over a world the
+    engine table gives a society of things, since its version holds a thing its author placed, is
+    refused before anything is composed (:class:`SocietyEngineDiffers`). A saved world's place,
+    its first input and its society are made in one transaction or not at all, so a refusal such
+    as nothing reachable leaves nothing behind; every refusal is raised for the caller to answer
+    (:func:`society_refusal`).
     """
     services = hooks.services
     if society_engine(profile).state_family == "things" and not services.societies_of_things:
         raise SocietyEngineNotOffered(profile)
     repo = society_repository(connection, session, hooks, world_id)
+    if society_engine(profile).state_family != "things":
+        # A new society that would leave the beings placed in the world without life is refused;
+        # the one a version already holds is read back as it always is.
+        engine = engine_holding_things(connection, session, services, world_id, version_id)
+        if engine is not None and repo.held(version_id, profile=profile, region_id=None) is None:
+            raise SocietyEngineDiffers(profile, engine)
     runtime = services.society_runtime
     if (
         runtime is not None

@@ -1,15 +1,16 @@
 /**
  * The society engines the server states, read from the backend engine table.
  *
- * `society-engines.generated.ts` carries `exulanica/world/society-engines.v2.json` byte for byte,
+ * `society-engines.generated.ts` carries `exulanica/world/society-engines.v3.json` byte for byte,
  * with the union of its engine profiles, so the browser never restates which engines exist, what
- * each can do, how many people it may hold or which engine a new society over each kind of ground
- * is created with. This module reads that text once, checks its shape, and answers questions
+ * each can do, how many people it may hold, which engine a new society over each kind of ground
+ * is created with, or which one a saved world holding a thing its author placed takes on a host
+ * that offers societies of things (the server states that one on each world entry). This module reads that text once, checks its shape, and answers questions
  * about one engine. An engine the table does not state is refused by name, never read as one it
  * resembles.
  */
 
-import { SOCIETY_ENGINES_V2_JSON, type SocietyEngineProfile } from './society-engines.generated.js';
+import { SOCIETY_ENGINES_V3_JSON, type SocietyEngineProfile } from './society-engines.generated.js';
 
 export type { SocietyEngineProfile };
 
@@ -79,15 +80,42 @@ function row(value: unknown): SocietyEngine {
   });
 }
 
-interface EngineTable {
+/**
+ * The engine a saved world's new society takes instead of its ground's where its version holds a
+ * thing its author placed and the host offers societies of things, over the society grounds named
+ * (the society ground catalog's keys). The table's third version states it; the second does not.
+ */
+export interface HoldingThings {
+  readonly engine: SocietyEngineProfile;
+  readonly grounds: readonly string[];
+}
+
+export interface EngineTable {
   readonly engines: readonly SocietyEngine[];
   readonly defaultEngine: SocietyEngineProfile;
   readonly creates: Readonly<Record<SocietyGroundKind, SocietyEngineProfile>>;
+  readonly holdingThings: HoldingThings | null;
 }
 
-function table(text: string): EngineTable {
+const PROFILES = ['exulanica.society-engines/v2', 'exulanica.society-engines/v3'];
+
+function holdingThings(value: unknown, engines: readonly SocietyEngine[]): HoldingThings {
+  const held = value as Readonly<Record<string, unknown>> | null;
+  const engine = engines.find((row) => row.engine === held?.['engine']);
+  const grounds = held?.['grounds'];
+  if (held === null || typeof held !== 'object' || engine === undefined || !engine.creatable ||
+      !engine.savedWorld || engine.stateFamily !== 'things' || !Array.isArray(grounds) ||
+      grounds.length === 0 || !grounds.every((ground) => typeof ground === 'string') ||
+      grounds.join() !== [...new Set(grounds as string[])].sort().join()) {
+    throw new Error('Invalid society engine table creates_holding_things');
+  }
+  return Object.freeze({ engine: engine.engine, grounds: Object.freeze([...(grounds as string[])]) });
+}
+
+/** Read one version of the engine table, the second or the third, as this module reads its own. */
+export function readEngineTable(text: string): EngineTable {
   const document = JSON.parse(text) as Readonly<Record<string, unknown>>;
-  if (document['profile'] !== 'exulanica.society-engines/v2' || !Array.isArray(document['engines'])) {
+  if (!PROFILES.includes(document['profile'] as string) || !Array.isArray(document['engines'])) {
     throw new Error('Invalid society engine table');
   }
   const engines = Object.freeze(document['engines'].map(row));
@@ -106,10 +134,19 @@ function table(text: string): EngineTable {
     }
     return [ground, engine.engine];
   })) as Record<SocietyGroundKind, SocietyEngineProfile>;
-  return { engines, defaultEngine: document['default_engine'] as SocietyEngineProfile, creates: Object.freeze(creates) };
+  const holding = document['creates_holding_things'];
+  if (holding !== undefined && document['profile'] !== 'exulanica.society-engines/v3') {
+    throw new Error('Invalid society engine table creates_holding_things');
+  }
+  return {
+    engines,
+    defaultEngine: document['default_engine'] as SocietyEngineProfile,
+    creates: Object.freeze(creates),
+    holdingThings: holding === undefined ? null : holdingThings(holding, engines),
+  };
 }
 
-const TABLE = table(SOCIETY_ENGINES_V2_JSON);
+const TABLE = readEngineTable(SOCIETY_ENGINES_V3_JSON);
 
 /** Every engine, in the table's order. */
 export const SOCIETY_ENGINES: readonly SocietyEngine[] = TABLE.engines;

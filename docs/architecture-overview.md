@@ -109,7 +109,7 @@ The contract in `pyproject.toml` owns the exact order.
 
 | Responsibility | Entry points |
 | --- | --- |
-| Society engines, chosen by what each can do | `exulanica/world/society_engines.py`, reading the engine table [`society-engines.v2.json`](../exulanica/world/society-engines.v2.json); the purposeful planner `exulanica/world/society_planner.py` |
+| Society engines, chosen by what each can do | `exulanica/world/society_engines.py`, reading the engine table [`society-engines.v3.json`](../exulanica/world/society-engines.v3.json); the purposeful planner `exulanica/world/society_planner.py` |
 | The ground a society stands on | [`society-ground.v2.json`](../assets/catalogs/society-ground/society-ground.v2.json), read by `exulanica/world/society_grounds.py` |
 | Composing and serving a society | `exulanica/api/society_runtime.py` and the routes in `exulanica/api/routes/society.py` |
 | Playback | `exulanica/api/society_control_worker.py` |

@@ -120,7 +120,7 @@ from exulanica.world.arrangements import version_refusal
 from exulanica.world.composition_preview import SOURCE_INVALIDATED
 from exulanica.world.errors import InvalidatedSourceVersion, InvalidStructuralData
 from exulanica.world.generated_worlds import unreadable_reason
-from exulanica.world.object_repository import WorldObjectRepository
+from exulanica.world.object_repository import WorldObjectRepository, version_holds_things
 from exulanica.world.personal_composition import personal_world_plan
 from exulanica.world.saved_entries import SavedWorldEntryRepository
 from exulanica.world.society_action_repository import ENGINE_TAKES_NO_DIRECTED_ACTIONS
@@ -706,7 +706,12 @@ def version_context(
     if held_society is not None:
         engine = society_engine(held_society["engine_version"])
     elif ground is not None:
-        engine = society_engine(created_engine(ground))
+        # On a host that offers societies of things, a version holding a thing its author placed
+        # is brought to life as one where the engine table says so, as its entry states.
+        holding = services.societies_of_things and version_holds_things(
+            connection, session.workspace_id, world_id, version_id
+        )
+        engine = society_engine(created_engine(ground, holding_things=holding))
     else:
         engine = None
     return VersionContext(

@@ -1,6 +1,6 @@
 """The society engine table is the one statement of which engines exist and what each can do.
 
-Everything that used to restate a list of engines derives it from ``society-engines.v2.json``.
+Everything that used to restate a list of engines derives it from ``society-engines.v3.json``.
 These tests hold the places that cannot derive, because they are fixed text, to the table: the
 implemented engine modules, the live schema's checks, triggers and indexes, a SQL literal in a
 file another lane is restructuring, and the browser's generated copy. Each one fails when the
@@ -22,6 +22,7 @@ from exulanica.world.society_engines import (
     COMPARISON_ENGINES,
     CREATABLE_ENGINES,
     CREATES,
+    CREATES_HOLDING_THINGS,
     DECISION_ENGINES,
     DEFAULT_ENGINE,
     ENGINES,
@@ -138,6 +139,15 @@ def test_an_engine_the_table_does_not_state_is_refused_by_name():
         (lambda d: d["creates"]["saved_world"].update(engine="exulanica-society/v3"), "creates"),
         (lambda d: d["creates"]["saved_world"].update(engine="exulanica-society/v4"), "saved"),
         (lambda d: d["creates"].pop("district"), "creates names exactly"),
+        (
+            lambda d: d["creates_holding_things"].update(engine="exulanica-society/v2"),
+            "engine of things",
+        ),
+        (lambda d: d["creates_holding_things"]["grounds"].reverse(), "grounds once each"),
+        (
+            lambda d: d.update(profile="exulanica.society-engines/v2"),
+            "not a society engine table",
+        ),
     ],
     ids=[
         "unordered",
@@ -152,6 +162,9 @@ def test_an_engine_the_table_does_not_state_is_refused_by_name():
         "creates-a-retired-engine",
         "saved-world-engine-off-saved-worlds",
         "creates-no-district-engine",
+        "holding-things-not-of-things",
+        "holding-things-grounds-unordered",
+        "holding-things-in-the-second-profile",
     ],
 )
 def test_a_malformed_table_is_refused(tmp_path, change, message):
@@ -275,12 +288,42 @@ def test_the_first_table_is_this_one_without_its_new_columns():
     ]
 
 
+def test_the_second_table_is_this_one_without_its_engine_for_a_world_holding_things():
+    """``society-engines.v2.json`` stays beside this one, read by the same loader: its engines,
+    default and grounds are this one's, and it states no engine for a world holding things."""
+    second = ENGINES_PATH.with_name("society-engines.v2.json")
+    engines, default, creates, holding = load_engine_table(second)
+    assert (engines, default, dict(creates)) == (ENGINES, DEFAULT_ENGINE, dict(CREATES))
+    assert holding is None
+    current = json.loads(ENGINES_PATH.read_text(encoding="utf-8"))
+    current.pop("creates_holding_things")
+    current["profile"] = "exulanica.society-engines/v2"
+    assert json.loads(second.read_text(encoding="utf-8")) == current
+
+
+def test_a_world_holding_things_is_a_society_of_things_only_over_grounds_one_stands_on():
+    """The grounds the table names for a world holding things are society grounds the catalog
+    states, and none is a world made from a world kind, which the living society alone lives in."""
+    from exulanica.world.generated_worlds import KIND_COMPOSERS
+    from exulanica.world.society_grounds import created_engine, society_grounds
+
+    assert CREATES_HOLDING_THINGS is not None
+    assert society_engine(CREATES_HOLDING_THINGS.engine).state_family == "things"
+    grounds = {ground.key: ground for ground in society_grounds()}
+    assert set(CREATES_HOLDING_THINGS.grounds) <= set(grounds)
+    for key, ground in grounds.items():
+        named = key in CREATES_HOLDING_THINGS.grounds
+        assert named != (ground.composer_key in KIND_COMPOSERS), key
+        expected = CREATES_HOLDING_THINGS.engine if named else created_engine(ground)
+        assert created_engine(ground, holding_things=True) == expected, key
+
+
 def test_the_browser_copy_is_generated_from_the_table():
     generated = (
         ROOT / "web" / "packages" / "app" / "src" / "society-engines.generated.ts"
     ).read_text(encoding="utf-8")
     text = ENGINES_PATH.read_text(encoding="utf-8")
-    assert f"export const SOCIETY_ENGINES_V2_JSON = String.raw`{text}`;" in generated
+    assert f"export const SOCIETY_ENGINES_V3_JSON = String.raw`{text}`;" in generated
     names = " | ".join(f"'{engine.engine}'" for engine in ENGINES)
     assert f"export type SocietyEngineProfile = {names};" in generated
 

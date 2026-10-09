@@ -37,7 +37,7 @@ from typing import Any, Final
 from exulanica.grammar.catalogs import CatalogSchema, integer_field, load_catalog, text_field
 from exulanica.grammar.errors import CatalogError
 from exulanica.world.society_composition import REVIEWED_REACH_MM
-from exulanica.world.society_engines import CREATES, society_engine
+from exulanica.world.society_engines import CREATES, CREATES_HOLDING_THINGS, society_engine
 from exulanica.world.society_input_policy import UNREACHABLE
 from exulanica.world.society_planner import CLEARANCE_MM
 
@@ -459,13 +459,20 @@ def placed_affordance_refusal(ground: SocietyGroundKind) -> str | None:
     return UNREACHABLE if ground.navigation == "walking_surfaces" else None
 
 
-def created_engine(ground: SocietyGroundKind) -> str:
+def created_engine(ground: SocietyGroundKind, *, holding_things: bool = False) -> str:
     """The engine the engine table creates a new society with over a saved world on this ground.
 
     The table states one engine for a saved world whose own records state its walking surfaces
     and homes (``town``), and one for a saved world whose people walk a lattice (``saved_world``).
-    A creation still names its engine; this is the one the table says a person's own world takes.
+    ``holding_things`` says the world's version holds a thing its author placed and the host offers
+    societies of things: over a ground the table's ``creates_holding_things`` names, the society is
+    that engine instead, so the beings placed there live with the ground's own people; any other
+    ground keeps its engine. A creation still names its engine; this is the one the table says a
+    person's own world takes.
     """
+    holding = CREATES_HOLDING_THINGS
+    if holding_things and holding is not None and ground.key in holding.grounds:
+        return holding.engine
     return CREATES["town" if ground.navigation == "walking_surfaces" else "saved_world"]
 
 

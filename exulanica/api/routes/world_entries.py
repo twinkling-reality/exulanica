@@ -188,8 +188,10 @@ class SavedWorldEntryView(BaseModel):
     #: Set for a world made from a world kind: its kind, region and where a person arrives.
     generated_site: GeneratedSiteView | None = None
     #: The engine a society over this world is created with, the engine table's for its ground
-    #: (``POST /world/versions/{version_id}/society`` names it as its ``profile``); null for a
-    #: world no society ground is stated for. A page reads it here rather than deriving it.
+    #: (``POST /world/versions/{version_id}/society`` names it as its ``profile``); on a host that
+    #: offers societies of things, the table's engine for a world holding things where its version
+    #: holds a thing its author placed on a ground the table names for it; null for a world no
+    #: society ground is stated for. A page reads it here rather than deriving it.
     society_engine: str | None = None
     authored_version_id: uuid.UUID
     authored_state_sha256: str
@@ -359,12 +361,17 @@ class SavedWorldCandidateView(BaseModel):
     styles: list[SavedWorldStyleCandidateView]
 
 
-def _view(entry: SavedWorldEntry) -> SavedWorldEntryView:
+def _view(entry: SavedWorldEntry, *, societies_of_things: bool) -> SavedWorldEntryView:
+    """The entry as served. On a host that offers societies of things its society engine is the one
+    a world holding a thing its author placed takes (the engine table's ``creates_holding_things``),
+    read with the entry, so a page creating with it brings the placed beings to life."""
     values = {
         field: getattr(entry, field)
         for field in SavedWorldEntryView.model_fields
         if hasattr(entry, field)
     }
+    if societies_of_things:
+        values["society_engine"] = entry.society_engine_holding_things
     if isinstance(entry.authored_scene, AuthoredStarterScene):
         values["authored_scene"] = AuthoredStarterSceneView.model_validate(entry.authored_scene)
     if entry.declared_floor is not None:
@@ -404,7 +411,7 @@ def entries(
     services: Annotated[Services, Depends(get_services)],
 ) -> list[SavedWorldEntryView]:
     return [
-        _view(entry)
+        _view(entry, societies_of_things=services.societies_of_things)
         for entry in SavedWorldEntryRepository(
             connection, session.workspace_id, services.store
         ).entries()
@@ -444,7 +451,7 @@ def create_starter_entry(
             status_code=409,
             content={"code": SAVED_WORLD_CONFLICT, "detail": str(exc)},
         )
-    return _view(created)
+    return _view(created, societies_of_things=services.societies_of_things)
 
 
 @router.post("", response_model=SavedWorldEntryView, status_code=201)
@@ -469,7 +476,7 @@ def create_entry(
             status_code=409,
             content={"code": SAVED_WORLD_CONFLICT, "detail": str(exc)},
         )
-    return _view(created)
+    return _view(created, societies_of_things=services.societies_of_things)
 
 
 @router.get("/{entry_id}", response_model=SavedWorldEntryView)
@@ -482,7 +489,7 @@ def entry(
     saved = SavedWorldEntryRepository(connection, session.workspace_id, services.store).entry(
         entry_id
     )
-    view = _view(saved)
+    view = _view(saved, societies_of_things=services.societies_of_things)
     if saved.source_kind != "personal":
         return view
     row = connection.execute(
@@ -636,7 +643,7 @@ def update_entry(
             content={"code": "invalid_saved_world_entry", "detail": str(exc)},
         )
     # Read after the write's own transaction has committed: the read checks viewer images.
-    return _view(entries.entry(entry_id))
+    return _view(entries.entry(entry_id), societies_of_things=services.societies_of_things)
 
 
 @router.post("/{entry_id}/source-attachments", response_model=SavedWorldEntryView)
@@ -689,7 +696,7 @@ def attach_sources(
             status_code=422,
             content={"code": "invalid_source_attachment", "detail": str(exc)},
         )
-    return _view(attached)
+    return _view(attached, societies_of_things=services.societies_of_things)
 
 
 def _membership_refusal(exc: Exception) -> JSONResponse:
@@ -740,7 +747,7 @@ def detach_sources(
         ValueError,
     ) as exc:
         return _membership_refusal(exc)
-    return _view(detached)
+    return _view(detached, societies_of_things=services.societies_of_things)
 
 
 @router.post("/{entry_id}/source-rebinds", response_model=SavedWorldEntryView)
@@ -779,4 +786,4 @@ def rebind_sources(
         ValueError,
     ) as exc:
         return _membership_refusal(exc)
-    return _view(rebound)
+    return _view(rebound, societies_of_things=services.societies_of_things)

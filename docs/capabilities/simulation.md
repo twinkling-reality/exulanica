@@ -23,10 +23,13 @@ world made from photographs holds one society, in one region. The owned district
 open data runs a larger living society of its own and appears only in the development preview.
 
 Which engine runs a society is data. The engine table
-[`society-engines.v2.json`](../../exulanica/world/society-engines.v2.json) states what each engine
+[`society-engines.v3.json`](../../exulanica/world/society-engines.v3.json) states what each engine
 can do. A starter or a world made from photographs is given the purposeful engine,
 `exulanica-society/v2`, and a generated town the living town, `exulanica-society/v5`; both let an
-owner hand people to a model and a comparison run them. A world's capability read names the engine
+owner hand people to a model and a comparison run them. On a host that offers societies of things,
+such a world holding a thing its author placed is given the society of things,
+`exulanica-society/v7`, instead, where its beings live on their routines until a person picks a mind
+for one; a world made from a world kind keeps the living society. A world's capability read names the engine
 ([World API](world-api.md#discovering-what-a-world-supports)).
 The server gives every world its own seed.
 
