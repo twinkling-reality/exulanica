@@ -243,6 +243,21 @@
       "status": "built",
       "refusal": null,
       "reason": "What a being a model or a program decides for remembers: written last in each minute's things phase from that minute's events alone, never by a model, and kept bounded in its state; shown to its decider as what happened here, not instructions. A being the routine alone decides for keeps none."
+    },
+    {
+      "module": "exulanica-ability/purposeful/v2",
+      "abilities": [
+        "wait",
+        "stand",
+        "talk",
+        "rest",
+        "visit"
+      ],
+      "parameters": [],
+      "events": [],
+      "status": "built",
+      "refusal": null,
+      "reason": "The purposeful planner's choices as version 1 makes them, for the beings whose kinds list them: the routine plans, and a decider is offered, only the activities among stand, talk, rest and visit that a being's kind lists, and a talk only between two beings whose kinds both list talk; waiting is everybody's, and a being whose kind does not rest is never tired, since only resting relieves it. A society of things records it in its first input once it is built, and one that recorded version 1 runs version 1 for its whole life."
     }
   ]
 }

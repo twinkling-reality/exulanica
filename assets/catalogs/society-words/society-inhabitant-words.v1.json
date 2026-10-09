@@ -275,6 +275,13 @@
       "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
     },
     {
+      "key": "reason.nothing_its_kind_does",
+      "kind": "reason",
+      "code": "nothing_its_kind_does",
+      "words": "their kind does none of what there is to do here",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
       "key": "reason.input_unavailable",
       "kind": "reason",
       "code": "input_unavailable",

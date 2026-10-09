@@ -40,6 +40,7 @@ __all__ = [
     "MODULES_PATH",
     "NOTICE",
     "PURPOSEFUL",
+    "PURPOSEFUL_BY_KIND",
     "REMEMBER",
     "SAY",
     "AbilityError",
@@ -60,6 +61,8 @@ MODULES_PATH: Final = Path(__file__).with_name("ability-modules.v1.json")
 TABLE_PROFILE: Final = "exulanica.ability-modules/v1"
 #: The module identities the engine's own code names. Each is a row of the table.
 PURPOSEFUL: Final = "exulanica-ability/purposeful/v1"
+#: The planner's choices gated by kind: a being does only the routine's activities its kind lists.
+PURPOSEFUL_BY_KIND: Final = "exulanica-ability/purposeful/v2"
 SAY: Final = "exulanica-ability/say/v1"
 CROSSING: Final = "exulanica-ability/crossing/v1"
 HANDS: Final = "exulanica-ability/hands/v1"

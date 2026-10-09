@@ -19,7 +19,7 @@ from typing import Any, Final
 
 import psycopg
 
-from exulanica.abilities.registry import HANDS, recorded_modules
+from exulanica.abilities.registry import HANDS, ability_module, recorded_modules, recorded_row
 from exulanica.api.services import Services
 from exulanica.models.manifest import load_manifest
 from exulanica.things.catalogs import CATALOG_DIRECTORY, thing_catalogs
@@ -208,14 +208,23 @@ def choose_look(
     return {**card, "look": _look_entry(connection, workspace_id, chosen, kind, owner=True)}
 
 
+def _running(module: str, runs: Sequence[str]) -> str | None:
+    """The version of ``module``'s module this society runs, or None where it runs none. The
+    abilities catalog names each ability's module at one version; a society runs the version its
+    first input recorded, and every version of a module serves the same abilities."""
+    row = recorded_row(runs, ability_module(module).name)
+    return None if row is None else row.module
+
+
 def _abilities(kind: Any, runs: Sequence[str]) -> list[dict[str, str]]:
     """The kind's abilities a module this society runs serves, in the kind's order."""
     catalog = thing_catalogs().abilities
     found = []
     for ability in kind.document["abilities"]:
         entry = catalog.get(ability["key"])
-        if entry is not None and entry.module in runs:
-            found.append({"key": entry.key, "words": entry.words, "module": entry.module})
+        module = None if entry is None else _running(entry.module, runs)
+        if entry is not None and module is not None:
+            found.append({"key": entry.key, "words": entry.words, "module": module})
     return found
 
 
@@ -231,8 +240,9 @@ def _offers(kind: Any, runs: Sequence[str]) -> list[dict[str, str]]:
     words = {key: offer.words for key, offer in catalogs.offers.items()}
     found = []
     for offer in kind.document.get("offers", ()):
-        module = reads.get(offer["key"])
-        if module is not None and module in runs:
+        read_by = reads.get(offer["key"])
+        module = None if read_by is None else _running(read_by, runs)
+        if module is not None:
             found.append({"key": offer["key"], "words": words[offer["key"]], "module": module})
     return found
 

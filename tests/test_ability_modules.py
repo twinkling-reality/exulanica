@@ -2,11 +2,12 @@
 
 What is shown here, with no database:
 
-*   every module the abilities catalog names is a row, and each row serves exactly the abilities
-    naming it; every module keeps each of its versions from 1;
+*   every module the abilities catalog names is a row, and each of its versions serves exactly the
+    abilities naming it; every module keeps each of its versions from 1;
 *   a module's figures that a request is also asked under are the same figures in both places;
-*   what a society records, and what it runs where it recorded nothing;
-*   a table that breaks a rule is refused by name.
+*   what a society records, and what it runs where it recorded nothing: a new society records each
+    built module at its newest version, and every version a stored society names stays readable;
+*   a table that breaks a rule is refused by name, and every row keeps its bytes.
 """
 
 from __future__ import annotations
@@ -20,15 +21,19 @@ from exulanica.abilities.registry import (
     BEFORE_RECORDED,
     CROSSING,
     MODULES_PATH,
+    PURPOSEFUL,
+    PURPOSEFUL_BY_KIND,
     SAY,
     AbilityError,
     AbilityModuleNotConnected,
     UnknownAbilityModule,
     ability_module,
     ability_modules,
+    built_module,
     current_modules,
     load_ability_modules,
     recorded_modules,
+    recorded_row,
 )
 from exulanica.canonical import canonical_json
 from exulanica.things.catalogs import thing_catalogs
@@ -41,14 +46,13 @@ def test_every_module_the_abilities_catalog_names_is_a_row_serving_exactly_its_a
     named: dict[str, set[str]] = {}
     for ability in catalogs.abilities.values():
         named.setdefault(ability.module, set()).add(ability.key)
-    rows = ability_modules()
-    newest = {}
-    for row in rows.values():
-        if row.name not in newest or row.version > newest[row.name].version:
-            newest[row.name] = row
-    assert {row.module for row in newest.values()} >= set(named)
     for module, abilities in named.items():
         assert set(ability_module(module).abilities) == abilities, module
+        # A later version of a module changes how it serves its abilities, never which: the
+        # catalog naming one version names what every version serves.
+        name = ability_module(module).name
+        versions = [row for row in ability_modules().values() if row.name == name]
+        assert all(set(row.abilities) == abilities for row in versions), module
 
 
 def test_a_module_s_figures_are_the_ones_its_requests_are_asked_under():
@@ -67,12 +71,35 @@ def test_a_module_s_figures_are_the_ones_its_requests_are_asked_under():
 def test_a_society_runs_what_its_first_input_records_or_what_every_society_ran_before():
     assert recorded_modules({}) == BEFORE_RECORDED
     assert recorded_modules({"modules": list(current_modules())}) == current_modules()
-    assert set(BEFORE_RECORDED) <= set(current_modules())
     with pytest.raises(UnknownAbilityModule):
         recorded_modules({"modules": ["exulanica-ability/juggling/v1"]})
     with pytest.raises(AbilityModuleNotConnected) as refused:
         recorded_modules({"modules": ["exulanica-ability/follow/v1"]})
     assert refused.value.code == "follow_not_built"
+
+
+def test_a_new_society_records_each_module_at_its_newest_built_version_and_older_ones_read():
+    """A new society records the routine held to each being's kind; the first version, which every
+    society made before it runs, stays a built row every reader reads
+    (tests/test_society_kind_gates.py reads a stored society of it through the planner, the
+    options, a request and the card)."""
+    newest = current_modules()
+    assert PURPOSEFUL_BY_KIND in newest and PURPOSEFUL not in newest
+    for module in newest:
+        row = ability_module(module)
+        built = [
+            other.version
+            for other in ability_modules().values()
+            if other.name == row.name and other.status == "built"
+        ]
+        assert recorded_row(newest, row.name) == row and row.version == max(built), module
+    # The version a stored society recorded, by the table, by what it runs and by its row.
+    assert built_module(PURPOSEFUL).abilities == built_module(PURPOSEFUL_BY_KIND).abilities
+    assert recorded_modules({"modules": list(BEFORE_RECORDED)}) == BEFORE_RECORDED
+    assert recorded_row(recorded_modules({}), "purposeful") == built_module(PURPOSEFUL)
+    assert recorded_row(newest, "follow") is None
+    with pytest.raises(AbilityError, match="one version of the purposeful module"):
+        recorded_row([PURPOSEFUL, PURPOSEFUL_BY_KIND], "purposeful")
 
 
 def _table(tmp_path: Path, change) -> Path:
@@ -93,7 +120,7 @@ def _table(tmp_path: Path, change) -> Path:
         (lambda d: d["modules"].append(dict(d["modules"][0])), "twice"),
         (
             lambda d: d["modules"].append(
-                {**d["modules"][0], "module": "exulanica-ability/purposeful/v3"}
+                {**d["modules"][0], "module": "exulanica-ability/purposeful/v99"}
             ),
             "every version from 1",
         ),
@@ -133,6 +160,9 @@ ROWS_SHA256 = {
     ),
     "exulanica-ability/purposeful/v1": (
         "1602c6b84373e041535ae6c4dd3ee7136ce18e51cb0887270c8d532f5ecf7903"
+    ),
+    "exulanica-ability/purposeful/v2": (
+        "6b0441b5bc9b980070864ea1368d6c1d4595116131289752d02d73ffd06102be"
     ),
     "exulanica-ability/remember/v1": (
         "b81b95345ce5f21521cc1f93cdf9c0f080bfe90aad9ee95cb75d0c1d7f01b1af"

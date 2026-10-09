@@ -85,6 +85,7 @@ from exulanica.world.society_planner import (
     input_memo,
     need_this_minute,
     routine_of,
+    routine_withheld,
     same_destination,
     stand_spots,
     standing_to_talk,
@@ -589,7 +590,11 @@ def _partners(
     (:func:`recheck_talk`).
     """
     talk = _off_place(routine, document, "pair")
-    if talk is None or person["location"]["edge"] is not None:
+    if (
+        talk is None
+        or person["location"]["edge"] is not None
+        or talk.key in routine_withheld(state, person)
+    ):
         return []
     graph = _input_graph(document)
     crowded = _crowded(document)
@@ -598,6 +603,8 @@ def _partners(
     found = []
     for other in people:
         if other is person or other["location"]["node_id"] not in paths:
+            continue
+        if talk.key in routine_withheld(state, other):
             continue
         standing = standing_to_talk(other, routine, graph, ())
         if not (standing or free_to_talk(other, routine, graph, (), need=need_this_minute(other))):
@@ -653,9 +660,12 @@ def choice_options(
         standing_at = next(
             (t["target_id"] for t in document["targets"] if here in t["place_node_ids"]), None
         )
+    withheld = routine_withheld(state, person)
     found = []
     for target in document["targets"]:
         if not target["enabled"] or target["node_id"] not in paths:
+            continue
+        if target["affordance"] in withheld:
             continue
         if places and (
             target["target_id"] == standing_at or _free_place(target, paths, held, here) is None
@@ -666,7 +676,9 @@ def choice_options(
         _partners(state, document, person, routine, paths) if "talk" in contract.words else []
     )
     stand = _off_place(routine, document, "open") if "stand" in contract.words else None
-    if stand is not None and not places_to_stand(state, document, subject_id):
+    if stand is not None and (
+        stand.key in withheld or not places_to_stand(state, document, subject_id)
+    ):
         stand = None
     # Places and people by the walk to each, a place before a person at the same walk, then by id:
     # as many as the options left beside waiting, standing and the things a society offers, and

@@ -10,7 +10,10 @@ What is shown, as the world's owner through the real routes:
     send it anywhere is refused by name, it leaves when its program calls it back, every crossing is
     bound once to its own event, and the society replays from what was stored and bound, refusing
     by name a binding that no longer says what its minute did or names a minute never run;
-*   the society a version holds is found by its version, for a door.
+*   the society a version holds is found by its version, for a door;
+*   a society made now records the routine held to each being's kind: a lantern spirit placed
+    beside a bench never rests, visits, stands or talks over an hour while others use the bench,
+    and a request to send it there is refused by name.
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ import dataclasses
 import uuid
 
 import pytest
+from exulanica.abilities.registry import PURPOSEFUL_BY_KIND
 from exulanica.world.crossings import (
     CROSSINGS_PER_MINUTE,
     BoundCrossing,
@@ -162,6 +166,57 @@ def test_a_society_of_things_lives_in_a_saved_world_with_what_its_author_placed(
             "Knight",
             "Knight 2",
         }
+        assert _replayed(client, world)
+
+
+def test_a_spirit_in_a_society_made_now_never_does_what_its_kind_does_not_list(world_app):
+    world, make_app, _, _ = world_app
+    with TestClient(make_app()) as client:
+        _place(client, world, "bench", "bench", 1, -4_000, 2_000)
+        _place(client, world, "spirit", "lantern_spirit", 1, -3_000, 3_000)
+        _place(client, world, "knight", "knight", 1, 3_000, 3_000)
+        society = _make_society(client, world)
+        stored = (
+            world["connection"]
+            .execute(
+                "select document->'modules' as modules from world_society_input "
+                "where workspace_id=%s and input_seq=1",
+                (world["workspace"],),
+            )
+            .fetchone()
+        )
+        world["connection"].commit()
+        assert PURPOSEFUL_BY_KIND in stored["modules"]
+        [spirit] = [p for p in society["state"]["inhabitants"] if p["placed_id"] == "spirit"]
+        # Asked to send the spirit to the bench, the society refuses by name.
+        scope, _, society_route = routes(world)
+        places = client.get(
+            society_route, headers=OWNER, params={**scope, "places": "true"}
+        ).json()["places"]
+        [bench] = [t for t in places["targets"] if t["origin"] == "thing"]
+        asked = client.post(
+            society_route + "/actions",
+            headers=OWNER,
+            params=scope,
+            json={
+                "idempotency_key": str(uuid.uuid4()),
+                "base_tick": society["current_tick"],
+                "base_state_sha256": society["state_sha256"],
+                "subject_id": spirit["id"],
+                "intent": {"kind": "go_to", "target_id": bench["target_id"]},
+            },
+        )
+        assert asked.status_code == 409, asked.text
+        assert asked.json() == {"code": "invalid_society_action", "detail": "activity_not_offered"}
+        used = set()
+        for _ in range(60):
+            society = _step(client, world, society)
+            people = society["state"]["inhabitants"]
+            [held] = [p for p in people if p["id"] == spirit["id"]]
+            assert (held["goal"], held["action"]["kind"]) == (None, "idle"), held["action"]
+            used |= {p["action"]["kind"] for p in people if p["id"] != spirit["id"]}
+        # The positive control: others rested and talked beside it over the same hour.
+        assert {"rest", "talk"} <= used, used
         assert _replayed(client, world)
 
 

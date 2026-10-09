@@ -68,7 +68,10 @@ from exulanica.world.society_engines import society_engine
 from exulanica.world.society_input_policy import THING_INPUTS
 from exulanica.world.society_planner import (
     initial_purposeful_society,
+    never_tired,
     open_node_near,
+    routine_of,
+    routine_withheld,
     validate_society_input,
 )
 from exulanica.world.society_thing_inputs import (
@@ -361,6 +364,7 @@ def _moved_things(state: Mapping[str, Any], document: Mapping[str, Any]) -> list
 def _newcomer(
     state: dict[str, Any],
     seed: str,
+    document: Mapping[str, Any],
     *,
     identity: str,
     label: str,
@@ -375,6 +379,10 @@ def _newcomer(
     """A person new to the society, at ``node_id``, with nothing to do yet."""
     ordinal = state["next_ordinal"]
     state["next_ordinal"] = ordinal + 1
+    # Where its society holds it to its kind, a being whose kind does not list what tiredness sends
+    # it to is never tired.
+    withheld = routine_withheld(state, {"kind": kind})
+    tireless = bool(withheld) and never_tired(routine_of(document), withheld)
     return {
         "id": identity,
         "ordinal": ordinal,
@@ -388,7 +396,7 @@ def _newcomer(
         "position_mm": list(point),
         "destination": None,
         # How tired they are begins as the purposeful genesis draws it for an ordinal.
-        "need_milli": 500 + _number(seed, "need", ordinal) % 401,
+        "need_milli": 0 if tireless else 500 + _number(seed, "need", ordinal) % 401,
         "memory": [],
         "goal": None,
         "route": None,
@@ -665,6 +673,7 @@ def _place_beings(minute: _Minute, *, record: bool, before_population: bool = Fa
         person = _newcomer(
             state,
             minute.seed,
+            minute.document,
             identity=identity,
             label=_label(entry["kind"]),
             kind=_reference(entry["kind"]),
@@ -843,6 +852,7 @@ def _arrive(minute: _Minute, crossing: Crossing, document: Mapping[str, Any]) ->
     person = _newcomer(
         state,
         minute.seed,
+        minute.document,
         identity=identity,
         label=_label(kind),
         kind=kind.reference(),

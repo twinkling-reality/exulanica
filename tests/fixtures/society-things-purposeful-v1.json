@@ -1,0 +1,195 @@
+{
+  "input_sha256": "2843fb235d3f9c9eb35fc1ac4a18e4c72581f4c5567ce9dbee3d830d9f74f013",
+  "minutes": [
+    {
+      "events_sha256": "861d041e6d6b2579f0ee035b0b14c591e563fc6d3c4ddf72ab52867b83c830af",
+      "spirit_action": "rest",
+      "state_sha256": "520f25a0573402a4606a785a7ddab204fdb5dccf1b4a62248b01fbeb63acf7c2",
+      "tick": 1
+    },
+    {
+      "events_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "spirit_action": "rest",
+      "state_sha256": "692584a90dc3800c545c0d2c209966af205ce9e7fb7b3714ed2a4c338d77408b",
+      "tick": 2
+    },
+    {
+      "events_sha256": "827bbfd397424a4d1965e693a769415ecdd26552a2fa37db64937fc22c512d9a",
+      "spirit_action": "rest",
+      "state_sha256": "8bf64cb24a569b800fe7486c1532cdae4785e9afba89351549061780865677da",
+      "tick": 3
+    },
+    {
+      "events_sha256": "59dd42e65e91d71f47b039619a181cabee089be2a2c4d9132194c8a90078959c",
+      "spirit_action": "rest",
+      "state_sha256": "669752bcdbc4f9f3ac0ce6ca495928772781dfa0a9f740cc353b3b60e3b8c174",
+      "tick": 4
+    },
+    {
+      "events_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "spirit_action": "rest",
+      "state_sha256": "c6f922634a94f77f65307b12e390b279bd4029004de846cbb49b3cbd554893bd",
+      "tick": 5
+    },
+    {
+      "events_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "spirit_action": "rest",
+      "state_sha256": "cc9277aad04ab1793742a4ae836faec88e653ceea7a1c084937c6ba776c1eb4e",
+      "tick": 6
+    },
+    {
+      "events_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "spirit_action": "rest",
+      "state_sha256": "36f744bc495adb4cdfdfd842c5c34c36f6e84ff6f9f888868de6f76f52c89319",
+      "tick": 7
+    },
+    {
+      "events_sha256": "f0758111694ef58d3a34018d7536ee6a93431870df300be22cdc156b429857e0",
+      "spirit_action": "rest",
+      "state_sha256": "91a20cabe5812a2a801293a73ea376dee4b9024366a8dc88b75b4dbb69133d72",
+      "tick": 8
+    },
+    {
+      "events_sha256": "074c5e9c94d350a01db64782fb457c7b87851cb4858a2663a98f99c7d9769517",
+      "spirit_action": "rest",
+      "state_sha256": "c2595b6af6d5169a92e4a86f64c628e76dc1eb8555173cd686754f3b81e56e32",
+      "tick": 9
+    },
+    {
+      "events_sha256": "f22cbbc99404909c2fb96e5fca74b6e3e836731599161fb75dc322749bc09e2b",
+      "spirit_action": "rest",
+      "state_sha256": "6d582088f65597e8a626975e2c21e8f8fc30f7a921b80b48cf1268ab54d6834a",
+      "tick": 10
+    },
+    {
+      "events_sha256": "02bfcdfa985205d24e395060d1863ec4fc7d86193fb7ae70229faf46a7b209dc",
+      "spirit_action": "rest",
+      "state_sha256": "aa44f2012c488aa4b47e378f26e75648ccd7a75d18e35f4a1ab247bc475e78a8",
+      "tick": 11
+    },
+    {
+      "events_sha256": "7650839a88c8bef43f026b8b25d009d8bdf5ced25cfe5b0805bb6ea9cdb9e711",
+      "spirit_action": "rest",
+      "state_sha256": "67a4f216354b64654dfd382a02696440671cb1cf56a5218039baf141bc9f8124",
+      "tick": 12
+    },
+    {
+      "events_sha256": "3956bb17ba0f6d475dff203f188c91063f700f9edf506cbf9390f4d50a309b17",
+      "spirit_action": "rest",
+      "state_sha256": "2dcbe767a50228668d062969ea830b1f5b115fb8adafcafae6b1391caea5ea0f",
+      "tick": 13
+    },
+    {
+      "events_sha256": "c8a44bccba37cc2d6a9b9ec80290048c4a837335e8690d77c8ac4308db20a6d4",
+      "spirit_action": "rest",
+      "state_sha256": "4064f3de5f22056a81f7f4fc56af2d3320c1fb99d57946d6378e43450fdc912b",
+      "tick": 14
+    },
+    {
+      "events_sha256": "9c8470a6a5033867cfcc15bebb884083958409baa067aadd3fdba7062a66dbce",
+      "spirit_action": "rest",
+      "state_sha256": "9d866b74846b824d8fdf62e09a0ee6029033851855e30db44f929793a4af0e69",
+      "tick": 15
+    },
+    {
+      "events_sha256": "d66e2fee9114804ac6eb66c6d0d90c953ffd5769712233dfaa9b19bc084b688c",
+      "spirit_action": "rest",
+      "state_sha256": "5250733b7c64c29fff3ef68bb2b0e9e3b180922fb2af0fd2fe3ad23d7ab7b07b",
+      "tick": 16
+    },
+    {
+      "events_sha256": "f547fc8546157a08cf3ec56d63b7dfb68e60a241588571d5a15495961c23a485",
+      "spirit_action": "rest",
+      "state_sha256": "b929bfa3e864860438b80cea9da87d62a01b32c621d3e5cbc9a450173a11dda0",
+      "tick": 17
+    },
+    {
+      "events_sha256": "7eb5db38c4110ef9d901d1fb85ed90c650933397da1d641a1553bd6bbde787ae",
+      "spirit_action": "stand",
+      "state_sha256": "9170fc99d714384417aebc36e023eeab9626e5b6867d97f8f9c77f1e58d827db",
+      "tick": 18
+    },
+    {
+      "events_sha256": "e49e9bc509a1f377452ddb5782562768c3535c2b78524634c2b2542f2eab3252",
+      "spirit_action": "stand",
+      "state_sha256": "7339fab1e0079942cc7471d6ad8407539da2af908e3e2c960d27058a4439177f",
+      "tick": 19
+    },
+    {
+      "events_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "spirit_action": "stand",
+      "state_sha256": "1e067f1a571fdf4a298acb487404b30ca9bdb2bb7010eb36aad6df94fb75031f",
+      "tick": 20
+    },
+    {
+      "events_sha256": "01a9e9915e0a8ba50f92f32571169797b4e7c390ad0bce69f5c833d4bf6d95d0",
+      "spirit_action": "stand",
+      "state_sha256": "cee6dca4d73e71756f87f924e411a2f5e09514debc0b91b75deb19d9c0ca94d8",
+      "tick": 21
+    },
+    {
+      "events_sha256": "e6e81d95a8882790c28e053a87df2d6d472cd15a55fd8eb50749d1ac1fe35f55",
+      "spirit_action": "stand",
+      "state_sha256": "61f5772e03ec591a39133930e1fef95490f4f41b2e8794e84cffa1c1bc1e6a29",
+      "tick": 22
+    },
+    {
+      "events_sha256": "85168090896e918976da18c9863c143675bf28cdc954d2792be7f42e54514ed9",
+      "spirit_action": "visit",
+      "state_sha256": "cd94bd16298eae5e794aacd32a5fa78f07093daf08ac0996bf4271a2fec1b629",
+      "tick": 23
+    },
+    {
+      "events_sha256": "686fd0d65c0079514fdbb8fd1acd2d94deea36ed7ffb57f37b3472dd6fd375ea",
+      "spirit_action": "visit",
+      "state_sha256": "0ffc58f56b831cf6f0b5f404f13d6c69f8730e491a94822f9c7abd3ce697ea4b",
+      "tick": 24
+    },
+    {
+      "events_sha256": "56c8cee4978548df02ff713b6fe02ffffe9a55bdfc6d1772afb8a17a5365b657",
+      "spirit_action": "visit",
+      "state_sha256": "de1922f51257305619e4851bf88cd1102dcbcaf428525d3bea8031cd16619930",
+      "tick": 25
+    },
+    {
+      "events_sha256": "52b15ab2d05f6a66b698b4a3e8839a92d65bedb8f387dce544f73523cf6f9348",
+      "spirit_action": "visit",
+      "state_sha256": "41f3ef82bc8e11adb294890e6000aaeadf4f2434a107b8853245af350dec8836",
+      "tick": 26
+    },
+    {
+      "events_sha256": "17e9235e93a3fec0f884619377aa88c6871556ff8a7abadce95f29a4c3052192",
+      "spirit_action": "visit",
+      "state_sha256": "387c3090d55a75779966cb6e52b5889b9c0df2d6277f7d9a9eef944595a6bd81",
+      "tick": 27
+    },
+    {
+      "events_sha256": "3b7c5eb34c34cb331f8bc78fe8bab99f50fe36714eed1d087ad324aec0e74427",
+      "spirit_action": "talk",
+      "state_sha256": "6590734b24a05af376136ef396db9860d6e08d022179c2a620a474aa5534db90",
+      "tick": 28
+    },
+    {
+      "events_sha256": "88edb4efee1d73221872cf42041fab38a1a4c8a239a4235237a7220bb4797688",
+      "spirit_action": "talk",
+      "state_sha256": "77ba4029bcf0ae9ed5e31d87f6b4e041f2552e7d2460b81d7d6469eca49d631e",
+      "tick": 29
+    },
+    {
+      "events_sha256": "d6abbfea6d11ccf1984ac3afd9ec9573f6a4a0ba090c7eca489c03cd80e5606b",
+      "spirit_action": "talk",
+      "state_sha256": "ab603f163fa29a0ed8acf6e42200a8a7b4ca6d1352375b5928a5ceca86b0fd61",
+      "tick": 30
+    }
+  ],
+  "modules": [
+    "exulanica-ability/crossing/v1",
+    "exulanica-ability/hands/v1",
+    "exulanica-ability/purposeful/v1",
+    "exulanica-ability/say/v1"
+  ],
+  "population": 4,
+  "recorded_by": "THINGS kind gates: the code before purposeful/v2, a society recording purposeful/v1; recorded at e2277719 (tree 591c23f1ce343aec5dd7e45d5d6500536d0ce6f2), the same minutes as at 5b9224ca (tree c6783864937dfcaba4b76abfce5e90441e0761c2)",
+  "seed": "7777777777777777777777777777777777777777777777777777777777777777",
+  "society_id": "dae453f0-82b4-583c-b056-7150f5217e08"
+}

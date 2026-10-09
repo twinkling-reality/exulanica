@@ -28,6 +28,7 @@ from exulanica.world.society_planner import (
     held_nodes,
     input_graph,
     routine_of,
+    routine_withheld,
     supports,
     validate_society_input,
 )
@@ -86,6 +87,7 @@ class ActionDisposition:
 ACTION_REFUSALS: Final = frozenset(
     {
         "action_context_changed",
+        "activity_not_offered",
         "canonical_target_changed",
         "destination_full",
         "decided_from_outside",
@@ -313,6 +315,9 @@ def _request_reason(
     target = _target(document, request["intent"]["target_id"])
     if target is None or not target["enabled"] or target != request["target"]:
         return "stale", "canonical_target_changed"
+    if target["affordance"] in routine_withheld(state, person):
+        # A being whose kind does not list the activity never does it, asked or not.
+        return "rejected", "activity_not_offered"
     if not _reachable(person, document, target):
         return "rejected", "target_unreachable"
     if document["profile"] in PLACE_INPUTS and all(

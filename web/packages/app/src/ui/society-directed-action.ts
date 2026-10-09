@@ -77,6 +77,7 @@ export function describeSocietyActionRecord(record: SocietyActionRecord): string
  */
 export const REFUSAL_WORDS: Readonly<Record<string, string>> = {
   action_context_changed: 'The world changed since you asked. Look again, then ask again.',
+  activity_not_offered: 'That is not something their kind does, so they cannot be asked to.',
   canonical_target_changed: 'That place changed since you chose it. Choose it again.',
   decided_from_outside: 'This visitor came from another program, which decides what it does; it cannot be sent anywhere from here.',
   destination_full: 'Every place there is taken. Ask again when someone leaves.',

@@ -834,7 +834,9 @@ request for that inhabitant at the same state. The database's request binding ho
 request to the same rule about the person (`society_person_may_be_directed`, migration 0108), and
 `tests/test_society_request_rule_parity.py` holds the two equal. A request to go where the person
 already is, part way through a stay there, is refused `inhabitant_already_there`, which the page
-says in words: ending the stay would only begin it again. Exact retries return the existing
+says in words: ending the stay would only begin it again. In a society of things that runs the
+second purposeful module, a request for an activity the person's kind does not list is refused
+`activity_not_offered`. Exact retries return the existing
 envelope; changed reuse or stale bases fail without another write.
 
 A hands request is recorded as `exulanica.society-action-request/v2`, read beside v1: v1's fields
@@ -1527,15 +1529,31 @@ for its whole life and may move on to a later things composition, never back.
 (`modules`: sorted, each once, each a built row of
 [`ability-modules.v1.json`](../exulanica/abilities/ability-modules.v1.json)), and its minutes run
 exactly those for its whole life, whatever a later table adds; no later input states them. A new
-society records every built module at its newest version: today purposeful, say, crossing, hands
-(`exulanica-ability/hands/v1`), notice (`exulanica-ability/notice/v1`) and memory
-(`exulanica-ability/remember/v1`), the last two as the [minds contract](minds-contract.md) states.
+society records every built module at its newest version: today purposeful
+(`exulanica-ability/purposeful/v2`, below), say, crossing, hands (`exulanica-ability/hands/v1`),
+notice (`exulanica-ability/notice/v1`) and memory (`exulanica-ability/remember/v1`), the last two as
+the [minds contract](minds-contract.md) states.
 A society whose first input names none, made before modules were
 recorded, runs purposeful, say and crossing (`BEFORE_RECORDED`), so its people never use their
 hands and its things never move, and records every minute as it did then: a line's event and its
 hearers keep no model and no speaker's name, and nobody keeps what it said. Its stored minutes
 replay byte for byte (`tests/test_society_things_before_modules.py`, a history recorded before
 modules were).
+
+**The routine held to each kind.** Under the purposeful module's second version
+(`exulanica-ability/purposeful/v2`), a being does only the routine's activities its kind lists. The
+routine never sets out for it to rest, visit, stand or talk where its kind does not list that
+activity, and the options its decider is asked with leave the same out. A talk takes two beings
+whose kinds both list talk, so a villager never stops to talk with a lantern spirit. A request
+sending a being to an activity its kind does not list is refused `activity_not_offered`. Waiting is
+everybody's: a being whose kind lists none of the four, as a lantern spirit's does, waits where it
+is (`nothing_its_kind_does`) and does what its decider chooses of its other abilities, walking where
+one needs it, as to a thing out of reach it chose to pick up. Only resting relieves tiredness, so a
+being whose kind does not list rest is never tired: its need is 0 from the minute it comes and stays
+so, and a visitor, whose kind talks but does not rest, stays free to talk. A society that recorded
+the first version runs it for its whole life, every being doing all five as before, and its stored
+minutes replay byte for byte (`tests/test_society_kind_gates.py`, a history the code before the
+second version recorded, a spirit resting, standing, visiting and talking in it).
 
 **On a town's ground.** A society of things over a generated town reads
 `exulanica.society-input/walking-surfaces-v3` (migration 0169): the town's walking-surfaces-v1

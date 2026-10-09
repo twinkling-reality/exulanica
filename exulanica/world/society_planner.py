@@ -164,6 +164,7 @@ REASON_CODES: Final = AFFORDANCE_REASON_CODES | frozenset(
         "no_reachable_affordance",
         "no_room_at_destination",
         "no_room_to_wait",
+        "nothing_its_kind_does",
         "partner_left",
         "place_moved",
         "remembered_target_selected",
@@ -1386,6 +1387,45 @@ def drawn_stand_spot(seed: str, tick: int, person: dict, spots: list[str]) -> st
     return spots[_draw(seed, "stand", tick, person["ordinal"], len(spots))]
 
 
+def kind_gated_activities() -> frozenset[str]:
+    """The routine's activities a being's kind may leave out, where its society records the
+    planner's choices gated by kind (:data:`~exulanica.abilities.registry.PURPOSEFUL_BY_KIND`):
+    every activity of that module but waiting, which is everybody's."""
+    from exulanica.abilities.registry import PURPOSEFUL_BY_KIND, built_module
+
+    return frozenset(built_module(PURPOSEFUL_BY_KIND).abilities) - {"wait"}
+
+
+def never_tired(routine: PurposefulRoutine, withheld: Container[str]) -> bool:
+    """Whether a being is never tired, its need kept 0: every activity the routine sends a tired
+    being to (:func:`_preferred`) is one of ``withheld``, the activities its kind does not list
+    (:func:`routine_withheld`). Only such an activity relieves tiredness by enough to matter, so a
+    being that may never do one would be tired for ever, and a tired being is never free to talk."""
+    tiring = [
+        activity.affordance
+        for activity in routine.activities.values()
+        if activity.object_kind == ANY_KIND and activity.preferred_at_need > 0
+    ]
+    return bool(tiring) and all(affordance in withheld for affordance in tiring)
+
+
+def routine_withheld(state: Mapping[str, Any], person: Mapping[str, Any]) -> frozenset[str]:
+    """The routine's activities a being never does: where its society records the planner's
+    choices gated by kind, each of :func:`kind_gated_activities` the being's kind does not list;
+    none where the society records the first version, or its people state no kind, whose routine
+    plans every activity for everybody, as it always did. The planner and the options a decider
+    is offered both leave them out, and a request for one is refused."""
+    from exulanica.abilities.registry import PURPOSEFUL_BY_KIND
+
+    if PURPOSEFUL_BY_KIND not in state.get("modules", ()) or "kind" not in person:
+        return frozenset()
+    from exulanica.world.placed_things import ThingKindReference, shipped_kind
+
+    kind = shipped_kind(ThingKindReference(**person["kind"]))
+    listed = {ability["key"] for ability in kind.document["abilities"]}
+    return kind_gated_activities() - listed
+
+
 def free_to_talk(
     person: dict,
     routine: PurposefulRoutine,
@@ -1571,6 +1611,7 @@ def _talk_pairs(
     tick: int,
     *,
     chosen: dict[str, dict[str, Any]] | None = None,
+    talking: Container[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Who stops to talk with whom this minute, and where each stands, before anybody chooses.
 
@@ -1584,7 +1625,9 @@ def _talk_pairs(
 
     ``chosen`` holds the conversations models chose before the minute (:func:`_chosen_talks`),
     promised as a place is: they come first, nobody in one is paired again, and neither of their
-    spots, nor any other spot a policy promised, is taken by the routine's own pairs.
+    spots, nor any other spot a policy promised, is taken by the routine's own pairs. Where
+    ``talking`` is given, only the beings it names talk (:func:`routine_withheld`): nobody else
+    looks for somebody to talk to or is found to talk.
     """
     weights = [(a.key, a.weight) for a in routine.activities.values() if a.weight]
     pairs: dict[str, dict[str, Any]] = dict(chosen or {})
@@ -1594,6 +1637,8 @@ def _talk_pairs(
     for person in sorted(people, key=lambda held: held["ordinal"]):
         if person["id"] in pairs or not free_to_talk(person, routine, graph, policies):
             continue
+        if talking is not None and person["id"] not in talking:
+            continue
         if _weighted(seed, "seek", tick, person["ordinal"], weights) != talk.key:
             continue
         near = sorted(
@@ -1601,6 +1646,7 @@ def _talk_pairs(
             for other in people
             if other is not person
             and other["id"] not in pairs
+            and (talking is None or other["id"] in talking)
             and (
                 free_to_talk(other, routine, graph, policies)
                 or standing_to_talk(other, routine, graph, policies)
@@ -1856,9 +1902,13 @@ def advance_purposeful_society(
     if places_mode:
         place_target = {node: t["target_id"] for t in targets for node in t["place_node_ids"]}
         crowded = _crowded(doc)
+    # The routine's activities each being never does, where its kind gates them (none otherwise).
+    withheld = {person["id"]: routine_withheld(result, person) for person in result["inhabitants"]}
     # Everybody's need grows before anybody chooses; each person chooses by their own need alone.
+    # A being whose kind does not list what tiredness sends it to is never tired.
     for person in result["inhabitants"]:
-        person["need_milli"] = need_this_minute(person)
+        tireless = never_tired(routine, withheld[person["id"]])
+        person["need_milli"] = 0 if tireless else need_this_minute(person)
     unavailable = doc["unavailable_reason"] or doc["navigation"]["unavailable_reason"]
     available = doc["availability"] == "available" and not unavailable
     stand = routine.in_setting("open") if drawn else None
@@ -1885,6 +1935,11 @@ def advance_purposeful_society(
                 person["goal"] = None
                 person["target"] = None
                 person["route"] = None
+    talking = (
+        {subject for subject, held in withheld.items() if "talk" not in held}
+        if any(withheld.values())
+        else None
+    )
     pairs: dict[str, dict[str, Any]] = {}
     if talk is not None and places_mode and available:
         pairs = _talk_pairs(
@@ -1904,6 +1959,7 @@ def advance_purposeful_society(
                 (nodes, adjacent, edges),
                 paths_from,
             ),
+            talking=talking,
         )
     # Talking goes on while both people were at it when the minute began, and both still mean to.
     before = {person["id"]: person for person in state["inhabitants"]}
@@ -1963,7 +2019,11 @@ def advance_purposeful_society(
             loc = person["location"]
             start = loc["node_id"] if loc["edge"] is None else loc["edge"]["to_node_id"]
             paths = paths_from(start)
-            candidates = [t for t in targets if t["node_id"] in paths]
+            candidates = [
+                t
+                for t in targets
+                if t["node_id"] in paths and t["affordance"] not in withheld[person["id"]]
+            ]
             if policy is not None:
                 candidates = [
                     t for t in candidates if t["target_id"] in policy["allowed_target_ids"]
@@ -2045,7 +2105,7 @@ def advance_purposeful_society(
                     for affordance in routine.affordances
                 }
                 spot = None
-                if stand is not None and places_mode:
+                if stand is not None and places_mode and stand.key not in withheld[person["id"]]:
                     spots = stand_spots(
                         (nodes, adjacent, edges), crowded, held, paths, person, stand
                     )
@@ -2144,6 +2204,9 @@ def advance_purposeful_society(
                     reason = "no_known_reachable_affordance"
                 if places_mode and reachable:
                     reason = "no_room_at_destination"
+                if withheld[person["id"]] and withheld[person["id"]] == kind_gated_activities():
+                    # Its kind lists none of the routine's activities but waiting, so it waits.
+                    reason = "nothing_its_kind_does"
                 block(person, reason, doc)
                 continue
             path = list(paths[destination][1])

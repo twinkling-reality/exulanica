@@ -88,6 +88,27 @@
       }
     },
     {
+      "case": "a being whose kind does none of the routine's activities waits for that reason",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "action": {
+          "kind": "idle",
+          "status": "blocked",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "nothing_its_kind_does"
+        },
+        "goal": null
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Waiting.",
+        "why": "Because their kind does none of what there is to do here."
+      }
+    },
+    {
       "case": "walking to stand",
       "person": {
         "display_name": "Ari Ash 1",
