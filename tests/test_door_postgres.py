@@ -1466,6 +1466,29 @@ def test_an_invite_needs_room_for_the_credential_it_opens(door):
     assert (refused.status_code, refused.json()["code"]) == (409, "too_many_secrets")
 
 
+def test_a_world_s_grants_are_read_a_page_at_a_time(door):
+    issued = [
+        _issue(door, f"paged-grant-{n:04d}", opened=n == 0).json()["grant"]["grant_id"]
+        for n in range(3)
+    ]
+    newest_first = issued[::-1]
+
+    def read(**params: Any) -> Any:
+        return door["client"].get(
+            "/door/grants", headers=OWNER, params={"world_id": _world_id(door), **params}
+        )
+
+    first = read(limit=2).json()
+    assert [grant["grant_id"] for grant in first["grants"]] == newest_first[:2]
+    rest = read(limit=2, before=first["next"]).json()
+    assert [grant["grant_id"] for grant in rest["grants"]] == newest_first[2:]
+    assert rest["next"] is None
+    whole = read().json()
+    assert ([grant["grant_id"] for grant in whole["grants"]], whole["next"]) == (newest_first, None)
+    refused = read(before="not-a-page")
+    assert (refused.status_code, refused.json()["code"]) == (422, "invalid_page")
+
+
 def test_a_workspace_issues_at_most_fifty_grants_a_day(door):
     for index in range(50):
         issued = _issue(door, key=f"daily-grant-{index:04d}")

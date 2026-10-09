@@ -35,7 +35,10 @@ The route validates and delegates: grants, secrets, the channel and the protocol
 
 from __future__ import annotations
 
+import base64
+import binascii
 import dataclasses
+import datetime as dt
 import time
 import uuid
 from collections.abc import Callable
@@ -70,6 +73,7 @@ from exulanica.door.channel import (
 )
 from exulanica.door.crossings import CARRIED_UNITS_MAXIMUM, Visits
 from exulanica.door.grants import (
+    GRANTS_LISTED_MAXIMUM,
     MINUTES_DEFAULT,
     MINUTES_MAXIMUM,
     SETTLED_ON_READ_MAXIMUM,
@@ -350,22 +354,51 @@ def issue_grant(
     return JSONResponse(status_code=201 if issued else 200, content=content)
 
 
+def _page_after(grant: Grant) -> str:
+    """Where the page after ``grant`` starts, as a reader names it: opaque to the reader."""
+    named = f"{grant.issued_at.isoformat()}|{grant.grant_id}"
+    return base64.urlsafe_b64encode(named.encode()).decode().rstrip("=")
+
+
+def _page_start(named: str) -> tuple[dt.datetime, uuid.UUID] | None:
+    """The issue time and grant id a page's name holds, or None for a name this door did not
+    write."""
+    try:
+        at, grant_id = base64.urlsafe_b64decode(named + "=" * (-len(named) % 4)).decode().split("|")
+        issued = dt.datetime.fromisoformat(at)
+        return None if issued.tzinfo is None else (issued, uuid.UUID(grant_id))
+    except (ValueError, UnicodeDecodeError, binascii.Error):
+        return None
+
+
 @router.get("/grants")
 def world_grants(
-    request: Request, session: CurrentSession, connection: ScopedConnection, world_id: WorldId
+    request: Request,
+    session: CurrentSession,
+    connection: ScopedConnection,
+    world_id: WorldId,
+    limit: Annotated[int, Query(ge=1, le=GRANTS_LISTED_MAXIMUM)] = GRANTS_LISTED_MAXIMUM,
+    before: Annotated[str | None, Query(max_length=200)] = None,
 ) -> Any:
-    """Every grant issued in one world, newest first, each as it stands now. Reading them settles
-    the first of those that ran out with something left to settle."""
+    """The grants issued in one world, newest first, at most ``limit``, each as it stands now,
+    and ``next``, the ``before`` that reads the page after them (null after the last): the first
+    page holds every grant that may still stand. Reading a page settles the first of its grants
+    that ran out with something left to settle."""
+    start = None if before is None else _page_start(before)
+    if before is not None and start is None:
+        return _problem(422, "invalid_page", "this page was not named by this door")
     grants = GrantRepository(connection, session.workspace_id, session.actor)
-    listed = [grant.grant_id for grant in grants.in_world(world_id)]
+    page = grants.in_world(world_id, limit=limit + 1, before=start)
+    listed = [grant.grant_id for grant in page[:limit]]
     for grant_id in grants.unsettled(listed, limit=SETTLED_ON_READ_MAXIMUM):
         grants.settle(grant_id)
     directory = _bridges_of(request)
+    shown = grants.in_world(world_id, limit=limit, before=start)
     return {
         "grants": [
-            _grant_view(grant, connection, session.workspace_id, directory)
-            for grant in grants.in_world(world_id)
-        ]
+            _grant_view(grant, connection, session.workspace_id, directory) for grant in shown
+        ],
+        "next": _page_after(shown[-1]) if len(page) > limit and shown else None,
     }
 
 

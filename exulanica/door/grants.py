@@ -115,6 +115,7 @@ from exulanica.world.society_model_choice_repository import (
 )
 
 __all__ = [
+    "GRANTS_LISTED_MAXIMUM",
     "GRANTS_PER_DAY_MAXIMUM",
     "GRANT_PROFILE",
     "INVITE_LIFETIME",
@@ -164,6 +165,10 @@ WORLD_WORDS_MAXIMUM: Final = 80
 #: The most grants that ran out an owner's read of a world's grants settles; the maintenance pass
 #: settles the rest.
 SETTLED_ON_READ_MAXIMUM: Final = 4
+#: The most grants one read of a world's grants holds. A grant lasts at most a day and a workspace
+#: issues at most :data:`GRANTS_PER_DAY_MAXIMUM` in any 24 hours, so the newest this many hold every
+#: grant of the world that may still stand.
+GRANTS_LISTED_MAXIMUM: Final = 2 * GRANTS_PER_DAY_MAXIMUM
 #: How long after its end a grant that ran out is still looked at to be settled. Settling takes a
 #: pass or a read; one still unsettled this long after its end is reported by the sweep while it is
 #: looked at, never read again after, so no read grows with every grant ever issued.
@@ -473,16 +478,35 @@ class GrantRepository:
         ).fetchone()
         return None if row is None else self._grant(grant_id, row)
 
-    def in_world(self, world_id: str) -> list[Grant]:
-        """Every grant issued in one world, newest first, each as it now stands."""
+    def in_world(
+        self,
+        world_id: str,
+        *,
+        limit: int | None = None,
+        before: tuple[dt.datetime, uuid.UUID] | None = None,
+    ) -> list[Grant]:
+        """The grants issued in one world, newest first, each as it now stands: at most ``limit``
+        of them where it is given, and only those issued before ``before`` (an issue time and
+        grant id, the last of a page read already) where it is given, so a reader pages back."""
         rows = self._connection.execute(
-            "select distinct on (g.grant_id) g.grant_id, g.world_id, g.bridge, g.issued_at, "
+            "with page as (select g.workspace_id, g.grant_id, g.world_id, g.bridge, g.issued_at "
+            "  from door_grant g where g.workspace_id = %(w)s and g.world_id = %(world)s "
+            "    and (%(at)s::timestamptz is null or (g.issued_at, g.grant_id) < (%(at)s, %(id)s)) "
+            "  order by g.issued_at desc, g.grant_id desc limit %(limit)s) "
+            "select distinct on (p.grant_id) p.grant_id, p.world_id, p.bridge, p.issued_at, "
             "r.grant_seq, r.document, v.revoked_at is not null as revoked "
-            "from door_grant g join door_grant_revision r using (workspace_id, grant_id) "
-            "left join door_grant_revocation v using (workspace_id, grant_id) "
-            "where g.workspace_id = %s and g.world_id = %s "
-            "order by g.grant_id, r.grant_seq desc",
-            (self._workspace_id, world_id),
+            "from page p join door_grant_revision r "
+            "  on r.workspace_id = p.workspace_id and r.grant_id = p.grant_id "
+            "left join door_grant_revocation v "
+            "  on v.workspace_id = p.workspace_id and v.grant_id = p.grant_id "
+            "order by p.grant_id, r.grant_seq desc",
+            {
+                "w": self._workspace_id,
+                "world": world_id,
+                "at": None if before is None else before[0],
+                "id": None if before is None else before[1],
+                "limit": limit,
+            },
         ).fetchall()
         grants = [self._grant(row["grant_id"], row) for row in rows]
         return sorted(

@@ -19986,7 +19986,7 @@
      "door"
     ],
     "summary": "World Grants",
-    "description": "Every grant issued in one world, newest first, each as it stands now. Reading them settles\nthe first of those that ran out with something left to settle.",
+    "description": "The grants issued in one world, newest first, at most ``limit``, each as it stands now,\nand ``next``, the ``before`` that reads the page after them (null after the last): the first\npage holds every grant that may still stand. Reading a page settles the first of its grants\nthat ran out with something left to settle.",
     "operationId": "world_grants_door_grants_get",
     "parameters": [
      {
@@ -19998,6 +19998,35 @@
        "minLength": 1,
        "maxLength": 200,
        "title": "World Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 1,
+       "default": 100,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "before",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 200
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Before"
       }
      },
      {

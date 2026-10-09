@@ -115,7 +115,7 @@ traveller mind stops costing the workspace its model calls at its `ends_at`, the
 | --- | --- | --- |
 | `GET /door/bridges` | `world.read` | The bridges this deployment offers the workspace, in words, with who runs each and whether it is an AI |
 | `POST /door/grants?world_id=` | `world.write`, `door.grant` (and `model.invoke` to name a `traveller`) | Issue a grant: 201 with it, or 200 with the grant an earlier issue under the same `idempotency_key` made, for the same world, bridge, scope (its kinds and things in any order) and `traveller`; a key reused for another grant is 409 `idempotency_key_reused`; with `channel_credential` true, also its channel credential, shown once, so an issue answered 200 carries none and the first stays live (an owner whose program lost the first answer asks `POST /door/grants/{grant_id}/channel-credentials` for another, which ends the first); a grant for visitors only in a version holding a society of things (409 `world_not_open_to_visitors`, see Crossings) |
-| `GET /door/grants?world_id=` | `world.read` | Every grant in a world, newest first, each with its bridge's label, who runs it, whether it is an AI, whether it is connected, what its program declared itself to be and whether its lines are closed (`lines_closed`: a line its program sent carried a name the account holder saved, so every later line is refused, and the program learnt only that one of its lines of one minute carried one; see Answers); settles grants that ran out |
+| `GET /door/grants?world_id=` | `world.read` | A world's grants, newest first, at most `limit` (1 to 100, 100 unless asked; a grant lasts at most a day and a workspace issues at most 50 a day, so the first page holds every grant that may still stand) and `next`, the `before` that reads the page after them (null after the last; a `before` this door did not write is 422 `invalid_page`), each with its bridge's label, who runs it, whether it is an AI, whether it is connected, what its program declared itself to be and whether its lines are closed (`lines_closed`: a line its program sent carried a name the account holder saved, so every later line is refused, and the program learnt only that one of its lines of one minute carried one; see Answers); settles grants that ran out |
 | `GET /door/grants/{grant_id}` | `world.read` | One grant as it stands, in the same view; settles it if it ran out |
 | `POST /door/grants/{grant_id}/revoke` | `world.write`, `door.grant` | End it now; revoking twice changes nothing |
 | `POST /door/grants/{grant_id}/credentials/revoke` | `world.write`, `door.grant` | End every live invite and channel credential of the grant now, without ending the grant, as after a credential leaked |
@@ -501,7 +501,10 @@ but no line said before it. Lines are read from the grant's own society's record
 arrival on, after the place the bridge was told up to (a minute and an order within it), and up to
 the minute its last visitor departed once every one has: the place moves past each line told, and
 past the last minute the society completed when a read found no more, so no read scans a minute
-twice and none counts past what it was told.
+twice and none counts past what it was told. A poll tells departures and lines together in the order
+the society recorded them: it reads departures with the minute the society had reached, lines only
+up to the end of that minute, and tells both by their place, so even when more wait than one poll
+holds, no departure is told ahead of a line said before it.
 
 Migration 0163 holds the crossings (`door_crossing`), their bindings, manifests, delivery reports
 (`door_delivery`) and the word that a visitor's player left (`door_visitor_gone`), each appended and

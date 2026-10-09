@@ -41,6 +41,8 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import heapq
+import itertools
 import logging
 import uuid
 from collections.abc import Callable, Mapping
@@ -211,8 +213,10 @@ _DEPARTURES: Final = (
 #: How many places one minute holds: a line's place is its minute times this, then its order within
 #: the minute (a minute records far fewer events than this).
 PLACES_A_MINUTE: Final = 1048576
-#: A line's place in its society's record as one number a cursor holds.
-_SAID_PLACE: Final = "(e.tick * 1048576 + (e.document->>'order')::bigint)"
+#: An event's place in its society's record as one number: its minute, then its order in it. A
+#: line's is the one a cursor holds.
+_PLACE: Final = "(e.tick * 1048576 + (e.document->>'order')::bigint)"
+_SAID_PLACE: Final = _PLACE
 #: The last minute completed by the society the grant's visitors arrive in (``%(g)s``).
 _REACHED: Final = (
     "select max(w.current_tick) from world_society w join door_grant g "
@@ -724,19 +728,28 @@ class ChannelRepository:
                             arrival_id=document["arrival_id"], reason=row["reason"]
                         )
                     )
-        # Departures are read before lines: a visitor's lines all come before its departure, so a
-        # departure this poll tells never goes ahead of a line of its last minute the poll missed,
-        # and the end, which waits for every departure, never goes before one.
+        # Departures and lines are told in their society's order. Departures are read first, with
+        # the minute their society had reached then, and lines only up to the end of that minute: a
+        # minute's lines and departures commit together, so no line told can come after a departure
+        # this read could not see, and the end, which waits for every departure, never goes before
+        # one. The two are merged by place, and what the poll has no room for waits for the next.
         room = FRAMES_PER_POLL - len(frames)
-        departed = self.departures(after=cursor.departed, limit=room) if room > 0 else []
-        room = FRAMES_PER_POLL - len(frames) - len(departed)
         if room > 0:
-            said, position["said"] = self.said(
-                after=cursor.said, limit=room, world_id=grant.world_id
+            departed, reached = self.departures(after=cursor.departed, limit=room)
+            said, said_place = self.said(
+                after=cursor.said,
+                limit=room,
+                world_id=grant.world_id,
+                until=None if reached is None else (reached + 1) * PLACES_A_MINUTE - 1,
             )
-            frames.extend(said)
-        frames.extend(departed)
-        position["departed"] += len(departed)
+            told = list(itertools.islice(heapq.merge(departed, said, key=_place_of), room))
+            frames.extend(frame for _place, frame in told)
+            position["departed"] += sum(frame["kind"] == "departed" for _place, frame in told)
+            lines = [place for place, frame in told if frame["kind"] == "said"]
+            if len(lines) == len(said):
+                position["said"] = said_place  # every line read was told
+            elif lines:
+                position["said"] = lines[-1]
         ended = grant.ended(now)
         # The end goes last. A poll that read any ask carries no end, since that ask's outcome is
         # yet to be told (the outcome rule below), and a poll with no room left read none; so the
@@ -782,14 +795,17 @@ class ChannelRepository:
         ).fetchone()
         return 0 if row is None else (int(row["current_tick"]) + 1) * PLACES_A_MINUTE - 1
 
-    def said(self, *, after: int, limit: int, world_id: str) -> tuple[list[dict[str, Any]], int]:
-        """The said frames of lines this grant's visitors said or heard after the place ``after``,
-        at most ``limit``, and the place the next read starts after: the last line's, or, when
-        fewer than ``limit`` were found, the end of the last minute its society completed, read in
-        the same statement (a minute's lines commit with it), so no later read scans those minutes
-        again. Each frame names who said the line, by kind and number in words and by who decided
-        it (the receipt the minute applied for them: a model by its name, a program by its
-        bridge), whom to, and the line, and is screened against the names the account holder
+    def said(
+        self, *, after: int, limit: int, world_id: str, until: int | None = None
+    ) -> tuple[list[tuple[int, dict[str, Any]]], int]:
+        """The said frames of lines this grant's visitors said or heard after the place ``after``
+        and at most at ``until`` where one is given, at most ``limit``, each with its place, and
+        the place the next read starts after: the last line's, or, when fewer than ``limit`` were
+        found, the end of the last minute its society completed, read in the same statement (a
+        minute's lines commit with it), or ``until`` if sooner, so no later read scans those
+        minutes again. Each frame names who said the line, by kind and number in words and by who
+        decided it (the receipt the minute applied for them: a model by its name, a program by
+        its bridge), whom to, and the line, and is screened against the names the account holder
         saved as it is sent, since nothing reaches a program outside the policy boundary carrying
         one: a field that would carry one is sent as None."""
         found = self._connection.execute(
@@ -798,6 +814,9 @@ class ChannelRepository:
             + _SAID_PLACE
             + " as place "
             + _SAID
+            + "and (%(until)s::bigint is null or "
+            + _SAID_PLACE
+            + " <= %(until)s) "
             + "order by e.tick, (e.document->>'order')::bigint limit %(limit)s), "
             "reached as (select max(w.current_tick) as tick from world_society w "
             "  where w.workspace_id = %(w)s and w.world_id = %(world)s "
@@ -805,12 +824,13 @@ class ChannelRepository:
             "    from door_crossing c where c.workspace_id = %(w)s and c.grant_id = %(g)s)) "
             "select l.*, r.tick as reached from reached r left join lines l on true "
             "order by l.tick, l.place",
-            {**self._ids, "said": after, "limit": limit, "world": world_id},
+            {**self._ids, "said": after, "limit": limit, "world": world_id, "until": until},
         ).fetchall()
         rows = [row for row in found if row["place"] is not None]
         reached = found[0]["reached"] if found else None
         if len(rows) < limit and reached is not None:
-            place = max(after, (int(reached) + 1) * PLACES_A_MINUTE - 1)
+            end = (int(reached) + 1) * PLACES_A_MINUTE - 1
+            place = max(after, end if until is None else min(end, until))
         else:
             place = int(rows[-1]["place"]) if rows else after
         if not rows:
@@ -825,16 +845,19 @@ class ChannelRepository:
             speaker = _person_words(details.get("from_kind"), details.get("from_number"))
             addressee = _person_words(details.get("to_kind"), details.get("to_number"))
             frames.append(
-                said_frame(
-                    tick=row["tick"],
-                    speaker={
-                        "id": str(row["subject_id"]),
-                        "label": unnamed(speaker),
-                        "mind": {"ai": mind["ai"], "words": unnamed(mind["words"])},
-                    },
-                    to=to,
-                    to_label=None if to is None else unnamed(addressee),
-                    line=unnamed(details.get("line")),
+                (
+                    int(row["place"]),
+                    said_frame(
+                        tick=row["tick"],
+                        speaker={
+                            "id": str(row["subject_id"]),
+                            "label": unnamed(speaker),
+                            "mind": {"ai": mind["ai"], "words": unnamed(mind["words"])},
+                        },
+                        to=to,
+                        to_label=None if to is None else unnamed(addressee),
+                        line=unnamed(details.get("line")),
+                    ),
                 )
             )
         return frames, place
@@ -879,20 +902,30 @@ class ChannelRepository:
                 }
         return minds
 
-    def departures(self, *, after: int, limit: int) -> list[dict[str, Any]]:
+    def departures(
+        self, *, after: int, limit: int
+    ) -> tuple[list[tuple[int, dict[str, Any]]], int | None]:
         """The departed frames of this grant's visitors after the first ``after``, at most
-        ``limit``. A thing a visitor brought in goes home as the game item it came in as; a thing
-        of the world it holds becomes the one item the mapping lets travel out for its kind only
-        where its arrival recorded that it may carry things out, and otherwise none."""
-        rows = self._connection.execute(
-            "select e.event_id, e.subject_id, e.document, c.game_items, "
-            "coalesce((c.document->>'may_carry_out')::boolean, false) as may_carry_out "
+        ``limit``, each with its place in its society's record, and the last minute that society
+        had completed when they were read, in the same statement (None where none is known). A
+        thing a visitor brought in goes home as the game item it came in as; a thing of the world
+        it holds becomes the one item the mapping lets travel out for its kind only where its
+        arrival recorded that it may carry things out, and otherwise none."""
+        found = self._connection.execute(
+            "with d as (select e.event_id, e.subject_id, e.document, c.game_items, "
+            "coalesce((c.document->>'may_carry_out')::boolean, false) as may_carry_out, "
+            + _PLACE
+            + " as place "
             + _DEPARTURES
-            + "order by e.tick, (e.document->>'order')::int offset %(after)s limit %(limit)s",
+            + "order by e.tick, (e.document->>'order')::int offset %(after)s limit %(limit)s) "
+            "select d.*, (" + _REACHED + ") as reached from (select 1) one left join d on true "
+            "order by d.place",
             {**self._ids, "after": after, "limit": limit},
         ).fetchall()
+        reached = None if found[0]["reached"] is None else int(found[0]["reached"])
+        rows = [row for row in found if row["place"] is not None]
         if not rows:
-            return []
+            return [], reached
         # The mapping is read only where a visitor may carry a thing of the world out.
         outbound = self._outbound() if any(row["may_carry_out"] for row in rows) else {}
         frames = []
@@ -900,20 +933,23 @@ class ChannelRepository:
             details = row["document"]["thing"]
             came_as = {held["thing_id"]: held["game_item"] for held in row["game_items"] or []}
             frames.append(
-                departed_frame(
-                    departure_id=details.get("crossing_id") or str(row["event_id"]),
-                    thing_id=str(row["subject_id"]),
-                    why=row["document"]["reason"],
-                    carried=carried_home(
-                        details.get("carried", []),
-                        came_as,
-                        outbound,
-                        # The visitor's own right, fixed at its arrival, never the grant's now.
-                        may_carry_out=row["may_carry_out"],
+                (
+                    int(row["place"]),
+                    departed_frame(
+                        departure_id=details.get("crossing_id") or str(row["event_id"]),
+                        thing_id=str(row["subject_id"]),
+                        why=row["document"]["reason"],
+                        carried=carried_home(
+                            details.get("carried", []),
+                            came_as,
+                            outbound,
+                            # The visitor's own right, fixed at its arrival, never the grant's now.
+                            may_carry_out=row["may_carry_out"],
+                        ),
                     ),
                 )
             )
-        return frames
+        return frames, reached
 
     def _delivered_before(self) -> int:
         """How many of this grant's departures come before the first one that carried something
@@ -1312,6 +1348,11 @@ def _texts(value: object) -> list[str]:
     if isinstance(value, list | tuple):
         return [text for held in value for text in _texts(held)]
     return []
+
+
+def _place_of(told: tuple[int, dict[str, Any]]) -> int:
+    """A told frame's place in its society's record."""
+    return told[0]
 
 
 def _bare(text: str) -> str:

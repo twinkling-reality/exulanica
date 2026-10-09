@@ -10,7 +10,9 @@ Through the real routes, as a world's owner and as a bridge with a channel crede
     passed the check for it at the same moment;
 *   end to end, a traveller crossing in under a world grant that lets things be carried out picks
     up the world's sword (its gate's mind, a scripted model, chooses so), its player calls it home,
-    it takes the sword, and its bridge reads the sword as the game's own item.
+    it takes the sword, and its bridge reads the sword as the game's own item; one its owner sends
+    away first leaves the sword in the world, and its player's call home after that finds the one
+    departure.
 """
 
 from __future__ import annotations
@@ -170,3 +172,51 @@ def test_a_traveller_its_player_calls_home_takes_the_world_s_sword_to_its_game(
     assert frame["carried"] == [
         {"thing_id": sword["id"], "kind": sword["kind"], "game_item": "test:sword"}
     ]
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_traveller_its_owner_sends_away_leaves_the_world_s_sword_behind(
+    door, crossings, monkeypatch
+):
+    """The owner sends away a traveller holding the world's sword; its player's call home after it
+    finds that departure, recorded false; and the traveller leaves without the sword, which stays in
+    the world: an owner's send-away never carries a thing of the world out."""
+    world, client = door["world"], door["client"]
+    choose_society_seed(client.app, hands.NEAR)
+    _place(client, world, "well", "well", 2, -4_000, 2_000)
+    _place(client, world, "gate", "gate", 1, 0, 6_000)
+    _place(client, world, "sword", "sword", 2, 1_000, 4_000)
+    society = _make_society(client, world)
+    with _application(door, monkeypatch) as (bridge, traveller):
+        grant_id, channel = _opened(
+            bridge, door, "sword-stays", traveller=traveller, may_carry_out=True
+        )
+        cursor = _hello_cursor(bridge, channel)
+        visitor = _arrive(bridge, channel, str(uuid.uuid4()), carried=[]).json()["thing_id"]
+        host, _manifest, _model_id = _host(door, hands._Hands())
+        for _ in range(20):
+            society = _minute(door, host, world, society)
+            if (_sword(society) or {}).get("held_by") == visitor:
+                break
+        else:
+            raise AssertionError("the traveller never picked the sword up in twenty minutes")
+        away = bridge.post(
+            f"/door/grants/{grant_id}/send-away", headers=OWNER, json={"thing_id": visitor}
+        )
+        assert away.status_code == 202, away.text
+        home = bridge.post("/door/channel/home", headers=channel, json={"thing_id": visitor})
+        assert (home.status_code, home.json()["recorded"]) == (202, False)
+        society = _step(client, world, society)
+        assert (_sword(society) or {}).get("held_by") != visitor
+        assert _sword(society) is not None
+        departed = []
+        for _ in range(10):
+            frames, cursor = _read_from(bridge, channel, cursor)
+            departed += [f for f in frames if f["kind"] == "departed" and f["thing_id"] == visitor]
+            if departed:
+                break
+        else:
+            raise AssertionError("the bridge never read its traveller's departure")
+    [frame] = departed
+    assert (frame["why"], frame["carried"]) == ("sent_home", [])
+    assert "called_by" not in _stored(world, visitor, "departure")

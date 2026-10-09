@@ -17,9 +17,11 @@ for a knight placed beside the gate and the door for a visitor:
     refused while the grant acts on, and its owner reads that its lines are closed; every line the
     grant's program answered in that minute is refused with it, so the program cannot tell which
     carried the name; a line holding a placeholder-shaped token is refused;
-*   more lines than one poll holds are each told once, in order, read again from an old cursor; a
-    poll with nothing to tell moves its line place past the minutes it read, and reads a grant's
-    departures before its lines; one whose read moves nothing at all is held for its whole hold;
+*   more lines than one poll holds are each told once, in order, read again from an old cursor, and
+    a departure after them is told after them; a grant's lines end at its last visitor's departure,
+    not its first; a poll with nothing to tell moves its line place past the minutes it read, and
+    reads a grant's departures before its lines; one whose read moves nothing at all is held for its
+    whole hold;
 *   a visitor that chooses to leave departs, and one whose player left goes home after its kind's
     quiet minutes; its bridge reads why, in the society's own words.
 """
@@ -27,6 +29,7 @@ for a knight placed beside the gate and the door for a visitor:
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 import uuid
@@ -36,6 +39,7 @@ from typing import Any
 
 import pytest
 from exulanica.api.decision_host import DecisionHost
+from exulanica.door import channel as channel_module
 from exulanica.door.channel import PLACES_A_MINUTE, ChannelRepository
 from exulanica.door.protocol import Cursor
 from exulanica.epistemics.assertions import AssertionWriter
@@ -705,6 +709,33 @@ def test_a_grant_s_lines_of_the_minute_a_saved_name_is_refused_are_refused_toget
     assert outcomes(bridge) == {probe["named"]: refused, probe["clean"]: refused}
 
 
+def test_an_ask_whose_words_carry_a_name_saved_after_it_was_made_is_not_sent(door):
+    """The host wrote an ask; the account holder then saves a name its words carry, before the
+    bridge reads it. Read from the same cursor, the ask that was sent before is now passed over:
+    nothing of it is sent, and the cursor moves past it."""
+    request, person = _person_request(door)
+    grant_id = _grant_for(door, person)
+    channel = _credential(door, grant_id)
+    start = _hello(door, channel).json()["cursor"]
+    external = _store_external(door, request, grant_id)
+    door["runtime"].asker()._write_ask(
+        door["world"]["workspace"], grant_id, uuid.UUID(external["request_id"])
+    )
+
+    def asked(read: dict[str, Any]) -> list[dict[str, Any]]:
+        return [frame for frame in read["frames"] if frame["kind"] == "asked"]
+
+    before = _frames(door, channel, start).json()
+    [shown] = asked(before)
+    assert shown["request_id"] == external["request_id"]
+    words = (option["label"] for option in shown["context"]["options"])
+    name = next(word for label in words for word in re.findall(r"[a-z]{4,}", label))
+    _save_name(door["world"], name.title())
+    after = _frames(door, channel, start).json()
+    assert asked(after) == []
+    assert Cursor.decode(after["cursor"]).ask == Cursor.decode(before["cursor"]).ask
+
+
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_more_lines_than_a_poll_holds_are_each_told_once_and_in_order(door, crossings):
     world, society = _world_with_a_knight(door)
@@ -745,6 +776,104 @@ def test_more_lines_than_a_poll_holds_are_each_told_once_and_in_order(door, cros
     replayed = own(_read_all(door, channel, start))
     assert each_once_in_order(told) and each_once_in_order(replayed)
     assert replayed[: len(told)] == told and len(replayed) > 32
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_departure_is_told_after_the_lines_before_it_when_they_overflow_a_poll(
+    door, crossings, monkeypatch
+):
+    """A visitor says several lines and is then sent away; read again from the start, four frames
+    a poll, its departure is told after every line, though a poll reads departures first."""
+    choose_society_seed(door["client"].app, SAID_FRAMES_SEED)
+    world, society = _world_with_a_knight(door)
+    client = door["client"]
+    host, _manifest, _model_id = _host(door, _Knight())
+    grant_id, channel = _grant(door, may_carry_in=False, may_carry_out=False)
+    start = _hello(door, channel).json()["cursor"]
+    visitor = _arrive(client, channel, str(uuid.uuid4()), carried=[]).json()["thing_id"]
+    society = _step(client, world, society)
+    numbers = iter(range(1, 1000))
+
+    def choose(frame: dict[str, Any]) -> dict[str, Any]:
+        says = frame["line_labels"]
+        if says:
+            return {"label": says[0], "line": f"Line {next(numbers)}."}
+        return {"label": frame["idle_label"]}
+
+    with _Bridge(client, channel, start, choose) as bridge:
+        for _ in range(40):
+            society = _minute(door, host, world, society)
+            if len(_said(bridge.frames)) >= 6:
+                break
+            time.sleep(1.2)
+        else:
+            raise AssertionError("fewer than six lines were said in forty minutes")
+    away = client.post(
+        f"/door/grants/{grant_id}/send-away", headers=OWNER, json={"thing_id": visitor}
+    )
+    assert away.status_code == 202, away.text
+    society = _step(client, world, society)
+    monkeypatch.setattr(channel_module, "FRAMES_PER_POLL", 4)
+    told: list[str] = []
+    cursor = start
+    for _ in range(80):
+        read = _frames(door, channel, cursor).json()
+        told += [f["kind"] for f in read["frames"] if f["kind"] in ("said", "departed")]
+        if read["cursor"] == cursor:
+            break
+        cursor = read["cursor"]
+    else:
+        raise AssertionError("a channel kept reading frames after eighty polls")
+    assert told.count("said") >= 6 and told[-1:] == ["departed"], told
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_lines_after_a_grant_s_first_visitor_left_reach_it_until_its_last_leaves(door, crossings):
+    """Two visitors of one grant; the first is sent away, the second goes on speaking and is then
+    sent away too: read again from the start, the second's lines after the first left are told,
+    since a grant's lines end at its last visitor's departure, not its first."""
+    choose_society_seed(door["client"].app, SAID_FRAMES_SEED)
+    world, society = _world_with_a_knight(door)
+    client = door["client"]
+    host, _manifest, _model_id = _host(door, _Knight())
+    grant_id, channel = _grant(door, may_carry_in=False, may_carry_out=False, visitors_maximum=2)
+    start = _hello(door, channel).json()["cursor"]
+    first = _arrive(client, channel, str(uuid.uuid4()), carried=[]).json()["thing_id"]
+    second = _arrive(client, channel, str(uuid.uuid4()), carried=[]).json()["thing_id"]
+    society = _step(client, world, society)
+    gone: list[str] = []
+    numbers = iter(range(1, 1000))
+
+    def choose(frame: dict[str, Any]) -> dict[str, Any]:
+        says = frame["line_labels"]
+        if says and frame["subject_id"] == second:
+            words = "After" if gone else "Before"
+            return {"label": says[0], "line": f"{words} {next(numbers)}."}
+        return {"label": frame["idle_label"]}
+
+    def later(frames: list[dict[str, Any]]) -> list[str]:
+        return [f["line"] for f in _said(frames) if (f["line"] or "").startswith("After")]
+
+    def send_away(thing_id: str) -> None:
+        away = client.post(
+            f"/door/grants/{grant_id}/send-away", headers=OWNER, json={"thing_id": thing_id}
+        )
+        assert away.status_code == 202, away.text
+
+    with _Bridge(client, channel, start, choose) as bridge:
+        send_away(first)
+        gone.append(first)
+        society = _step(client, world, society)
+        for _ in range(40):
+            society = _minute(door, host, world, society)
+            if later(bridge.frames):
+                break
+            time.sleep(1.2)
+        else:
+            raise AssertionError("the second visitor said nothing after the first left")
+    send_away(second)
+    society = _step(client, world, society)
+    assert later(_read_all(door, channel, start)) == later(bridge.frames)
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
