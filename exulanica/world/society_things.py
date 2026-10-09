@@ -424,7 +424,7 @@ class _Minute:
         self.seed = seed
         self.document = document
         self.events = list(events)
-        self.previous_digest = society_state_sha256(dict(previous))
+        self.previous_digest = society_state_sha256(previous)
         self.maximum = society_engine(state["profile"]).population_maximum
 
     def emit(

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -171,8 +171,50 @@ def _inhabitant_id(society_id: uuid.UUID, ordinal: int) -> uuid.UUID:
     return uuid.uuid5(SOCIETY_NAMESPACE, f"{society_id}:inhabitant:{ordinal}")
 
 
-def society_state_sha256(state: dict[str, Any]) -> str:
+#: The state a run of minutes is in, with its digest, while the run holds it
+#: (:func:`holding_states`).
+_HELD: ContextVar[dict[int, tuple[Mapping[str, Any], str]] | None] = ContextVar(
+    "society_held_state", default=None
+)
+
+
+def society_state_sha256(state: Any) -> str:
+    """The SHA-256 of ``state``'s canonical JSON: of the state itself where a run of minutes holds
+    it (:func:`holding_states`), digested once when it was held."""
+    held = _HELD.get()
+    if held is not None:
+        found = held.get(id(state))
+        if found is not None and found[0] is state:
+            return found[1]
     return hashlib.sha256(canonical_json(state)).hexdigest()
+
+
+@contextmanager
+def holding_states() -> Iterator[Callable[[Mapping[str, Any]], str]]:
+    """While the block runs, the state handed to the function it yields is digested once.
+
+    A run of minutes hands over each minute's state as the minute begins and each state a minute
+    ends in, and never changes one after handing it over: the minute's requests, its decisions'
+    checks, its events and the things phase each name the state the minute began from by its
+    digest, and the run records the digest of every state it ends a minute in, so each is taken
+    once rather than wherever it is named. The function answers the state's digest. Only the last
+    state handed over is held, known by the object itself, and nothing is held after the block."""
+    held: dict[int, tuple[Mapping[str, Any], str]] = {}
+    token = _HELD.set(held)
+
+    def hold(state: Mapping[str, Any]) -> str:
+        found = held.get(id(state))
+        if found is not None and found[0] is state:
+            return found[1]
+        held.clear()
+        digest = society_state_sha256(state)
+        held[id(state)] = (state, digest)
+        return digest
+
+    try:
+        yield hold
+    finally:
+        _HELD.reset(token)
 
 
 def event_document_sha256(event: SocietyEvent) -> str:

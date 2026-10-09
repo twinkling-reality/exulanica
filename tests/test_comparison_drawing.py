@@ -67,9 +67,23 @@ def _played(arm: str):
     return plan, stored, outcome
 
 
+def _cold() -> None:
+    """Every reader of this package lets go of what it kept (each function's own cache), so the
+    trace that follows runs the code a process that read nothing yet runs: a catalog, kind or
+    role read once and kept would otherwise hide its reader from the trace."""
+    for name, module in list(sys.modules.items()):
+        if name != PACKAGE.name and not name.startswith(f"{PACKAGE.name}."):
+            continue
+        for value in list(vars(module).values()):
+            clear = getattr(value, "cache_clear", None)
+            if callable(clear) and getattr(value, "__module__", None) == name:
+                clear()
+
+
 @pytest.mark.parametrize("arm", ["model", "group", "routine"])
 def test_the_digest_covers_every_module_a_verified_replay_and_its_drawing_execute(arm):
     plan, stored, outcome = _played(arm)
+    _cold()
     executed: set[str] = set()
 
     def traced(frame, event, _arg):
@@ -92,6 +106,7 @@ def test_the_digest_covers_every_module_a_verified_replay_and_its_drawing_execut
 @pytest.mark.parametrize("family", ["living", "things"])
 def test_a_family_s_drawing_trace_is_covered_by_its_digest(family):
     plan, stored, outcome = _living_played() if family == "living" else _things_played()
+    _cold()
     executed: set[str] = set()
 
     def traced(frame, event, _arg):
@@ -112,6 +127,9 @@ def test_a_family_s_drawing_trace_is_covered_by_its_digest(family):
         else "exulanica.society-comparison-run-replay/v2"
     )
     assert executed <= set(DRAWING_MODULES), sorted(executed - set(DRAWING_MODULES))
+    if family == "things":
+        # The readers of the thing catalogs and kinds a society of things' replay reads.
+        assert {"exulanica.things.catalogs", "exulanica.things.kinds"} <= executed
 
 
 def test_the_digest_covers_the_data_a_replay_reads_as_well_as_its_code():

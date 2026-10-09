@@ -151,9 +151,20 @@ a society of things plays as its own minutes do, its things phase after the role
 its genesis, where no visitor has crossed in, and nobody crosses in during it: the door's stream is
 not an arm's input, so a comparison of a world with visitors compares the world's own beings. The
 plan lists only those beings, and a group naming a visitor is refused by name (`group_visitor`,
-422). It
-asks the society's people under the terms its engine asks them under, with lines and hands among
-the options. A purposeful
+422). A run's genesis is built over the society's first input, and its first minute consumes every
+input up to the frozen one, so a being its author placed in a later edit arrives a minute after the
+run starts. The run holds it, and asks for it where everybody is decided for or where its owner chose
+a model for it, but a group decided for from the first minute may not name it: the plan lists only
+the beings genesis holds, and a group naming another is refused by name at the plan, the start and
+the definition (`group_person_not_in_run`, 422). Such a comparison is priced, bounded and read by
+every being its runs hold: the society's people, the beings genesis places and every being the
+frozen input places, at most what the engine holds. The definition records that count as `beings`
+beside `population`, which genesis still reads, and a host prices and admits the comparison's seeds
+by it. It asks the society's people under the terms its engine asks them under, with lines and
+hands among the options, and its models' requests record that engine's prompt version, which each
+run is held to before it asks (`provider_configuration_changed`). Catalogs whose score is another
+family's are refused by name when the comparison is defined (`score_engine_mismatch`), before
+anything is asked. A purposeful
 society is defined under the third score, declared in
 `assets/catalogs/society/society-person-score.v3.json` and computed by
 [`exulanica/world/society_score_v3.py`](../exulanica/world/society_score_v3.py): half need relief,
@@ -407,7 +418,10 @@ Lightning) and $0.00132 (Nemotron 3 Nano 30B). The deployed server reads these f
 each source file's digest and extraction method. A plan reads its own ground's figures where they
 cover every model it asks. For an unmeasured ground or model combination, including the living
 town, it uses that model's greatest measured cost and answer time across the catalog's grounds,
-names the conservative fallback and does not claim a town measurement. Since every ask is held at
+names the conservative fallback and does not claim a town measurement. A society of things asks its
+people under the third instruction, with hands options and the lines they heard, which none of
+these measurements' runs did, so a plan of one states no typical cost or answer time, and a host
+admits its seeds by what their runs can hold reserved (`held_usd`). Since every ask is held at
 its model's most until its cost is known, a
 bound near the typical figure stops the runs part way (`comparison_bound_spent`), so the plan also
 serves the most the runs played at once can hold reserved together (`held_usd`) and, beside it,
@@ -620,7 +634,9 @@ it under the start's live lease, since a host records each run it starts (migrat
 cancelled day's run keeps the hours it sealed, which stay readable.
 
 **Stored drawings.** A host draws a completed run once, when it records the run's outcome, under
-the digest of the drawing code and the data that code reads (migration 0121). A server whose drawing
+the digest of the drawing code and the data that code reads (migration 0121). The code is every
+module a replay runs in a process that has read nothing yet, the readers of the catalogs, kinds and
+roles it reads among them, so a change to how one is read is a new digest too. A server whose drawing
 code or data differ finds no drawing under its own digest and replays the run on each read instead,
 held to the run's record. Nothing draws stored runs again, so every run drawn before such a change
 is served by replay; the rows drawn under the earlier digest are kept. The seeds catalog is not

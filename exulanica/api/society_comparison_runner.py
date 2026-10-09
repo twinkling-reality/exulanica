@@ -547,7 +547,9 @@ class SocietyComparisonRunner:
             "mechanism": mechanism.value,
             "choice_seq": choice_seq,
             "manifest_sha256": self.manifest_sha256,
-            "prompt_version": role.prompt_version,
+            # The prompt the society's engine asks under, which is the role's own for every engine
+            # that states no terms of its own.
+            "prompt_version": role.terms(self.engine).prompt_version,
             "contract": contract.binding(),
             "deadline_ms": contract.value("decision_deadline_ms"),
         }
@@ -1288,7 +1290,7 @@ class SocietyComparisonRunner:
                 spec.provider != config["provider"]
                 or mechanism is None
                 or mechanism.value != config["mechanism"]
-                or config["prompt_version"] != role.prompt_version
+                or config["prompt_version"] != role.terms(plan.engine_profile).prompt_version
                 or (held is not None and plan.contract.answering(spec) != dict(held))
             ):
                 raise _RunStoppedBeforeStart("provider_configuration_changed")

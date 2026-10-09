@@ -38,6 +38,7 @@ from psycopg.types.json import Jsonb
 from exulanica.canonical import canonical_json
 from exulanica.world.decision_roles import DecisionContract, DecisionRole
 from exulanica.world.society import (
+    SEED_FIELD,
     UnavailableSocietyInput,
     UnknownSociety,
     inputs_ahead,
@@ -51,7 +52,7 @@ from exulanica.world.society_catalogs import (
     ComparisonCatalogs,
     load_comparison_catalogs,
 )
-from exulanica.world.society_comparison import RunPlan, compared_people
+from exulanica.world.society_comparison import RunPeople, RunPlan, compared_people, run_people
 from exulanica.world.society_comparison_drawing import StoredDrawing
 from exulanica.world.society_comparison_reading import WINDOW_NOT_OFFERED, reading_refusal
 from exulanica.world.society_comparison_result import (
@@ -60,6 +61,7 @@ from exulanica.world.society_comparison_result import (
     check_definition_body,
     definition_role,
     definition_version,
+    score_fits_family,
     scoring_binding,
 )
 from exulanica.world.society_engines import society_engine
@@ -75,6 +77,7 @@ __all__ = [
     "UnknownComparison",
     "run_id_for",
     "seed_digest",
+    "society_run_people",
 ]
 
 #: The profile a comparison is defined under: the second, which scores a group.
@@ -92,6 +95,22 @@ class ComparisonConflict(ValueError):
     world of the workspace, whose rows this world's reads do not see."""
 
 
+def society_run_people(
+    row: Mapping[str, Any], first: dict[str, Any], frozen: Mapping[str, Any]
+) -> RunPeople | None:
+    """Who the runs of a comparison of the stored society ``row`` frozen at the input ``frozen``
+    hold, over the genesis its ``first`` input makes, where its engine's runs hold beings an author
+    placed (:func:`~exulanica.world.society_comparison.run_people`); None for any other."""
+    return run_people(
+        uuid.UUID(str(row["society_id"])),
+        str(row["state"][SEED_FIELD]),
+        first,
+        frozen,
+        population=int(row["population_size"]),
+        engine_profile=str(row["engine_version"]),
+    )
+
+
 def run_id_for(comparison_id: uuid.UUID, arm: str, seed_digest: str) -> uuid.UUID:
     """One run per arm and seed of a comparison, so reserving it again finds the same run."""
     return uuid.uuid5(_RUN_NAMESPACE, f"{comparison_id}:{arm}:{seed_digest}")
@@ -107,13 +126,14 @@ def _held_asking(
     others: Sequence[Mapping[str, Any]],
     contract: DecisionContract,
     role: DecisionRole,
+    engine: str | None = None,
 ) -> None:
     """Every model a definition asks, an arm's or a person's outside the group, is asked under the
     terms the definition records: the contract it is defined under with that contract's deadline,
-    the prompt the role asks with, one manifest digest across them all, and one mechanism for each
-    model, one the contract accepts. A person outside the group asks as the owner's choice it
-    names, which :meth:`SocietyComparisonRepository._people` holds; an arm's model is no owner's
-    choice."""
+    the prompt the role asks a society on ``engine`` with (its own, where none is named), one
+    manifest digest across them all, and one mechanism for each model, one the contract accepts.
+    A person outside the group asks as the owner's choice it names, which
+    :meth:`SocietyComparisonRepository._people` holds; an arm's model is no owner's choice."""
     configs = [
         (f"arm {key}", arm["provider_config"], None)
         for key, arm in sorted(body["arms"].items())
@@ -131,7 +151,7 @@ def _held_asking(
         if (
             config["contract"] != contract.binding()
             or config["deadline_ms"] != contract.value("decision_deadline_ms")
-            or config["prompt_version"] != role.prompt_version
+            or config["prompt_version"] != role.terms(engine).prompt_version
             or config["mechanism"] not in accepted
             or (choice is None) != (config["choice_seq"] is None)
         ):
@@ -212,6 +232,13 @@ class SocietyComparisonRepository:
             raise ComparisonRefused(
                 WINDOW_NOT_OFFERED, f"a {family} society keeps no day to compare over"
             )
+        # Catalogs that score another family's runs are refused here, before anything is asked,
+        # rather than by every run's outcome after it asked.
+        if not score_fits_family(family, int(catalogs.versions[PERSON_SCORE_CATALOG])):
+            raise ComparisonRefused(
+                "score_engine_mismatch",
+                f"a {family} society's runs are not scored under these catalogs' score",
+            )
         check_definition_body(body, catalogs)
         if not society_engine(row["engine_version"]).comparisons:
             raise ComparisonRefused(
@@ -222,22 +249,27 @@ class SocietyComparisonRepository:
             raise ComparisonRefused(
                 "role_not_hosted", f"{row['engine_version']} hosts no {role.key} decisions"
             )
-        refused = reading_refusal(catalogs, int(row["population_size"]), body)
-        if refused is not None:
-            raise ComparisonRefused(*refused)
         latest = self.society._chain(row)
         chosen = latest if input_seq is None else input_seq
         if not 1 <= chosen <= latest:
             raise ComparisonRefused(
                 "input_not_in_society", f"this society holds inputs 1 to {latest}"
             )
-        frozen = self.society._inputs(row, [chosen])[chosen]
+        read = self.society._inputs(row, sorted({1, chosen}))
+        frozen = read[chosen]
+        held = society_run_people(row, read[1], frozen)
+        # A society of things' runs hold the beings its author placed beside its population: a
+        # comparison of one is bounded and read by every being its runs hold.
+        population = int(row["population_size"]) if held is None else held.most
+        refused = reading_refusal(catalogs, population, body, family=family)
+        if refused is not None:
+            raise ComparisonRefused(*refused)
         # One input alone: its own stored bytes are read before the lock its authorization takes.
         self.society._authorize(frozen)
         # Asked under the contract the society's engine asks its people under.
         contract = role.contract_for(row["engine_version"])
-        group, others = self._people(version_id, row, body, role)
-        _held_asking(body, others, contract, role)
+        group, others = self._people(version_id, row, body, role, held)
+        _held_asking(body, others, contract, role, str(row["engine_version"]))
         document = _sealed(
             {
                 "profile": COMPARISON_PROFILE,
@@ -245,6 +277,8 @@ class SocietyComparisonRepository:
                 "version_id": str(version_id),
                 "society_id": str(row["society_id"]),
                 "population": int(row["population_size"]),
+                # How many beings a run holds at most, where it holds more than its population.
+                **({} if held is None else {"beings": held.most}),
                 "input": {"input_seq": chosen, "document_sha256": frozen["document_sha256"]},
                 "window_ticks": body["window_ticks"],
                 "phase": body["phase"],
@@ -299,10 +333,12 @@ class SocietyComparisonRepository:
         row: Mapping[str, Any],
         body: Mapping[str, Any],
         role: DecisionRole,
+        held: RunPeople | None = None,
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """The group and everybody else as a definition records them, held to the world's
         records: each person one of the society's, named as its state names them; a group from an
-        owner's choice exactly that choice's people; and each other person's decider exactly what
+        owner's choice exactly that choice's people, and in a society of things only beings every
+        run holds from its first minute (``held``); and each other person's decider exactly what
         the owner's latest choice for them names, or their routine where none does."""
         compared = set(compared_people(row["state"]))
         names = {
@@ -319,6 +355,12 @@ class SocietyComparisonRepository:
             )
         if not set(people) <= set(names):
             raise ComparisonRefused("group_person_unknown", "the group names somebody not here")
+        if group is not None and held is not None and not set(people) <= held.named:
+            raise ComparisonRefused(
+                "group_person_not_in_run",
+                "the group names a being placed after the society's first input, which a run "
+                "holds only from its second minute",
+            )
         choices = SocietyModelChoiceRepository(
             self.connection, self.workspace_id, world_id=self.world_id
         ).history(version_id, role)

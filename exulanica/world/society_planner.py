@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import math
 import uuid
-from collections.abc import Container
+from collections import OrderedDict
+from collections.abc import Callable, Container, Hashable, Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from copy import deepcopy
 from itertools import pairwise
 from typing import Any, Final
@@ -697,10 +700,17 @@ def _admitted_navigation(profile: str) -> tuple[str, ...]:
 
 
 def validate_society_input(document: dict[str, Any]) -> None:
+    """Refuse an input that is not a valid society input. While a run of minutes over frozen
+    inputs holds :func:`input_memo`, each input object it reads is checked once."""
+    memo = _MEMO.get()
+    if memo is not None and memo.checked(document):
+        return
     try:
         _validate_society_input(document)
     except (KeyError, TypeError, AttributeError) as exc:
         raise ValueError("malformed society input") from exc
+    if memo is not None:
+        memo.check(document)
 
 
 def validate_input_successor(previous: dict[str, Any], current: dict[str, Any]) -> None:
@@ -946,6 +956,96 @@ def standing_exclusions(document: dict[str, Any]) -> frozenset[str]:
     return frozenset(excluded)
 
 
+class _InputMemo:
+    """What depends on one input alone, built once per input object: at most ``most`` inputs at a
+    time, the one least recently read dropped first. An input's values are known by its
+    navigation and targets objects themselves, and that it was checked by the input object
+    itself, each held here, so an object freed and its identity reused is never taken for the
+    input it replaced."""
+
+    def __init__(self, most: int) -> None:
+        self.most = most
+        self._held: OrderedDict[tuple[int, int], tuple[Any, Any, dict[Hashable, Any]]] = (
+            OrderedDict()
+        )
+        self._checked: OrderedDict[int, Mapping[str, Any]] = OrderedDict()
+
+    def value(self, document: Mapping[str, Any], name: Hashable, build: Callable[[], Any]) -> Any:
+        navigation, targets = document["navigation"], document["targets"]
+        key = (id(navigation), id(targets))
+        held = self._held.get(key)
+        if held is None or held[0] is not navigation or held[1] is not targets:
+            held = (navigation, targets, {})
+            self._held[key] = held
+            while len(self._held) > self.most:
+                self._held.popitem(last=False)
+        self._held.move_to_end(key)
+        values = held[2]
+        if name not in values:
+            values[name] = build()
+        return values[name]
+
+    def checked(self, document: Mapping[str, Any]) -> bool:
+        if self._checked.get(id(document)) is not document:
+            return False
+        self._checked.move_to_end(id(document))
+        return True
+
+    def check(self, document: Mapping[str, Any]) -> None:
+        self._checked[id(document)] = document
+        self._checked.move_to_end(id(document))
+        while len(self._checked) > self.most:
+            self._checked.popitem(last=False)
+
+
+_MEMO: ContextVar[_InputMemo | None] = ContextVar("society_decision_input_memo", default=None)
+
+
+@contextmanager
+def input_memo(inputs: int) -> Iterator[None]:
+    """While the block runs, check each of at most ``inputs`` inputs once, and build each one's
+    digest of its navigation, walking graph, routes and standing exclusions once, for this context
+    alone: a run of minutes over frozen inputs, whose minutes and options read the same input
+    every minute. Nothing is kept after the block."""
+    token = _MEMO.set(_InputMemo(max(1, inputs)))
+    try:
+        yield
+    finally:
+        _MEMO.reset(token)
+
+
+def _input_value(document: Mapping[str, Any], name: Hashable, build: Callable[[], Any]) -> Any:
+    """What ``build`` makes of ``document`` alone: once per input while :func:`input_memo` holds,
+    and where it is read otherwise."""
+    memo = _MEMO.get()
+    if memo is None:
+        return build()
+    return memo.value(document, name, build)
+
+
+def _input_graph(document: Mapping[str, Any]) -> tuple[dict, dict, dict]:
+    """The input's walking graph, as the planner reads it (read, never changed, by its callers)."""
+    return _input_value(document, "graph", lambda: _graph(dict(document)))
+
+
+def _crowded(document: Mapping[str, Any]) -> frozenset[str]:
+    """The nodes nobody waits or starts at in the input (:func:`standing_exclusions`)."""
+    return _input_value(document, "crowded", lambda: standing_exclusions(dict(document)))
+
+
+def _input_routes(document: Mapping[str, Any], start: str, adjacent: Mapping[str, Any]) -> dict:
+    """The routes from ``start`` over ``adjacent``, the input's own walking graph's neighbours
+    (read, never changed, by its callers)."""
+    return _input_value(document, ("routes", start), lambda: _paths(start, adjacent))
+
+
+def _navigation_sha256(document: Mapping[str, Any]) -> str:
+    """The digest of the input's navigation, which a route records it was planned over."""
+    return _input_value(
+        document, "navigation_sha256", lambda: society_state_sha256(document["navigation"])
+    )
+
+
 def input_graph(document: dict[str, Any]) -> tuple[dict, dict]:
     """The nodes and edges an input's navigation states, keyed as the planner walks them."""
     nodes, _, edges = _graph(document)
@@ -1019,14 +1119,14 @@ def open_node_near(
     """
     if document["availability"] != "available" or document["navigation"]["unavailable_reason"]:
         return None
-    graph = _graph(document)
+    graph = _input_graph(document)
     places_here = document["profile"] in PLACE_INPUTS
     places = (
         frozenset(n for t in document["targets"] for n in t["place_node_ids"])
         if places_here
         else frozenset()
     )
-    crowded = standing_exclusions(document) if places_here else frozenset()
+    crowded = _crowded(document) if places_here else frozenset()
     return _step_aside({"position_mm": list(point)}, people, graph, places, crowded)
 
 
@@ -1620,7 +1720,7 @@ def advance_purposeful_society(
         person["motion_path_mm"] = [list(person["position_mm"])]
     # Validate every accepted edit, including a move followed by undo before any time passes.
     for prior, doc in pairwise(inputs):
-        graph = _graph(doc)
+        graph = _input_graph(doc)
         nodes, _, edges = graph
         targets = {t["target_id"]: t for t in doc["targets"]}
         local_failures = {
@@ -1639,7 +1739,7 @@ def advance_purposeful_society(
         was_place: frozenset[str] = frozenset()
         if places_here:
             places = frozenset(n for t in doc["targets"] for n in t["place_node_ids"])
-            crowded = standing_exclusions(doc)
+            crowded = _crowded(doc)
             was_place = frozenset(n for t in prior["targets"] for n in t.get("place_node_ids", ()))
         for person in result["inhabitants"]:
             reason = None
@@ -1677,11 +1777,11 @@ def advance_purposeful_society(
                         continue
             elif places_here and (kept := _performing_at(person, targets)) is not None:
                 person["target"] = deepcopy(kept)
-                person["route_geometry_sha256"] = society_state_sha256(doc["navigation"])
+                person["route_geometry_sha256"] = _navigation_sha256(doc)
                 person["route"]["input_sha256"] = doc["document_sha256"]
                 continue
             elif places_here and _keeps_standing(person, read_under, graph[1], crowded):
-                person["route_geometry_sha256"] = society_state_sha256(doc["navigation"])
+                person["route_geometry_sha256"] = _navigation_sha256(doc)
                 person["route"]["input_sha256"] = doc["document_sha256"]
                 continue
             elif person["target"] is not None:
@@ -1694,7 +1794,7 @@ def advance_purposeful_society(
                     reason = "target_changed"
                 elif not _route_valid(person, nodes, edges) or person[
                     "route_geometry_sha256"
-                ] != society_state_sha256(doc["navigation"]):
+                ] != _navigation_sha256(doc):
                     reason = "route_invalidated"
                 else:
                     # The same place, held as the input now read states it, so arriving there
@@ -1702,7 +1802,7 @@ def advance_purposeful_society(
                     person["target"] = deepcopy(target)
             elif person["goal"] is not None and (
                 not _route_valid(person, nodes, edges)
-                or person["route_geometry_sha256"] != society_state_sha256(doc["navigation"])
+                or person["route_geometry_sha256"] != _navigation_sha256(doc)
             ):
                 # Only a walk to make room has a goal and no target, and only a place-stating
                 # input starts one: it holds to a changed graph no more than a goal does.
@@ -1727,13 +1827,13 @@ def advance_purposeful_society(
     # the society was released with, and it runs exactly as it always has.
     routine = routine_of(doc)
     drawn = routine.choice == "drawn"
-    nodes, adjacent, edges = _graph(doc)
+    nodes, adjacent, edges = _input_graph(doc)
     targets = [t for t in doc["targets"] if t["enabled"]]
     paths_cache: dict[str, dict] = {}
 
     def paths_from(start: str) -> dict:
         if start not in paths_cache:
-            paths_cache[start] = _paths(start, adjacent)
+            paths_cache[start] = _input_routes(doc, start, adjacent)
         return paths_cache[start]
 
     # An input that states where each activity's occupants stand keeps every place to one person
@@ -1743,7 +1843,7 @@ def advance_purposeful_society(
     crowded: frozenset[str] = frozenset()
     if places_mode:
         place_target = {node: t["target_id"] for t in targets for node in t["place_node_ids"]}
-        crowded = standing_exclusions(doc)
+        crowded = _crowded(doc)
     # Everybody's need grows before anybody chooses; each person chooses by their own need alone.
     for person in result["inhabitants"]:
         person["need_milli"] = need_this_minute(person)
@@ -2015,7 +2115,7 @@ def advance_purposeful_society(
             if loc["edge"]:
                 path.insert(0, loc["edge"]["from_node_id"])
                 progress = loc["edge"]["progress_mm"]
-            person["route_geometry_sha256"] = society_state_sha256(doc["navigation"])
+            person["route_geometry_sha256"] = _navigation_sha256(doc)
             person["goal"] = goal
             person["target"] = deepcopy(target)
             person["route"] = {

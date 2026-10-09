@@ -91,7 +91,8 @@ from exulanica.world.society_planner import (
     initial_purposeful_society,
     ordered_events_document,
 )
-from exulanica.world.society_things import advance_things, initial_things_society
+from exulanica.world.society_thing_inputs import placed_beings
+from exulanica.world.society_things import _thing_id, advance_things, initial_things_society
 
 __all__ = [
     "DECIDER_KINDS",
@@ -102,6 +103,7 @@ __all__ = [
     "HourStart",
     "PlayedRun",
     "ReplayMismatch",
+    "RunPeople",
     "RunPlan",
     "compared_people",
     "first_hour",
@@ -113,6 +115,7 @@ __all__ = [
     "replay_hour",
     "request_id",
     "resume_hour",
+    "run_people",
 ]
 
 #: Who decides for the people of a run: their routine, nobody (they wait), or a model.
@@ -203,6 +206,49 @@ def compared_people(state: Mapping[str, Any]) -> list[str]:
     return sorted(
         person["id"] for person in state["inhabitants"] if person.get("came_by") != "crossed"
     )
+
+
+@dataclass(frozen=True, slots=True)
+class RunPeople:
+    """Who the runs of a comparison of a society of things hold: ``named``, everybody a group may
+    name, whom every run holds from its first minute; and ``most``, how many beings a run holds at
+    most, by which the comparison is priced, bounded and read."""
+
+    named: frozenset[str]
+    most: int
+
+
+def run_people(
+    society_id: uuid.UUID,
+    seed: str,
+    first: dict[str, Any],
+    frozen: Mapping[str, Any],
+    *,
+    population: int,
+    engine_profile: str,
+) -> RunPeople | None:
+    """Who the runs of a comparison of a society of things frozen at the input ``frozen`` hold,
+    over the genesis every run builds from the society's ``first`` input; None for a society of
+    any other engine, whose runs hold its population, all of it from genesis.
+
+    A run starts at the society's genesis and consumes every input up to the frozen one in its
+    first minute, so a being an author placed after the first input arrives a minute after the run
+    starts. A group may not name it, since a run decides for its group from its first minute, but
+    the run holds it: where everybody is decided for, or where its owner chose a model for it, it
+    is asked once it arrives. A run holds at most everybody its genesis holds and every being the
+    frozen input places, never more than the engine holds. Which beings a genesis holds does not
+    depend on the seed it is built with: the people are drawn by ordinal and the beings stand
+    where they were placed, before the people step aside."""
+    if society_engine(engine_profile).state_family != "things":
+        return None
+    start = initial_things_society(society_id, seed, first, population=population)
+    named = frozenset(compared_people(start))
+    placed = {
+        _thing_id(str(frozen["world_id"]), str(entry["placed_id"]))
+        for entry in placed_beings(frozen)
+    }
+    most = min(society_engine(engine_profile).population_maximum, len(named | placed))
+    return RunPeople(named=named, most=most)
 
 
 def plan_role(plan: RunPlan) -> DecisionRole:
@@ -323,9 +369,9 @@ def _purposeful_step(
     consumed: list[Mapping[str, Any]],
     policies: Any,
 ) -> tuple[Any, tuple[Any, ...]]:
-    return advance_purposeful_society(
-        dict(state), seed, [dict(document) for document in consumed], goal_policy=policies
-    )
+    # The minute's own state and inputs, never copies: the minute only reads them, and its state
+    # is known by the object itself where the run holds its digest.
+    return advance_purposeful_society(state, seed, list(consumed), goal_policy=policies)  # type: ignore[arg-type]
 
 
 def _living_step(

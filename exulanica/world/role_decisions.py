@@ -48,7 +48,7 @@ from exulanica.world.decision_roles import (
     DecisionRole,
     RoleOption,
 )
-from exulanica.world.society import society_state_sha256
+from exulanica.world.society import holding_states, society_state_sha256
 from exulanica.world.society_planner import input_sha256
 
 __all__ = [
@@ -297,6 +297,7 @@ def role_request(
     provider_config: Mapping[str, Any],
     offer: Callable[[Sequence[RoleOption]], Sequence[RoleOption]] | None = None,
     withhold: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    options: Sequence[RoleOption] | None = None,
 ) -> tuple[dict | None, str]:
     """A subject's sealed request over the options they have in ``state``, asked over ``source``.
 
@@ -306,9 +307,12 @@ def role_request(
     program is never shown a heard line carrying a saved name), before it is sealed. ``(None,
     "nothing_to_choose")`` when fewer than the fewest options are left or nothing but the role's
     idle action, and ``(None, "context_limit_exceeded")`` when the observation is larger than the
-    contract's bound; otherwise the request and ``"in_progress"``.
+    contract's bound; otherwise the request and ``"in_progress"``. ``options``, where given, are
+    the subject's options in ``state`` as the role's adapter built them for these same arguments,
+    so a run of minutes that built them to ask what may be offered builds them once.
     """
-    options = role.adapter.options(role, state, source, subject_id, contract, seed=seed)
+    if options is None:
+        options = role.adapter.options(role, state, source, subject_id, contract, seed=seed)
     if offer is not None and options:
         options = tuple(offer(options))
     if len(options) < FEWEST_OPTIONS or all(
@@ -327,7 +331,7 @@ def role_request(
             "subject_id": subject_id,
             "branch_id": state["branch_id"],
             "base_tick": state["tick"],
-            "base_state_sha256": society_state_sha256(dict(state)),
+            "base_state_sha256": society_state_sha256(state),
             "input_seq": source["input_seq"],
             "input_sha256": source["document_sha256"],
             "context": context,
@@ -542,16 +546,20 @@ Finish = Callable[
 @dataclass(slots=True)
 class PlayedMinutes:
     """What a run did: every minute's state after it, its events, requests and receipts, and how
-    many minutes each subject began at a choice point."""
+    many minutes each subject began at a choice point. ``digests`` are the states' digests, each
+    taken when its minute ended, which the run never changes after."""
 
     states: list[dict[str, Any]] = field(default_factory=list)
     events: list[Any] = field(default_factory=list)
     requests: list[dict[str, Any]] = field(default_factory=list)
     receipts: list[dict[str, Any]] = field(default_factory=list)
     choice_points: Counter[str] = field(default_factory=Counter)
+    digests: list[str] = field(default_factory=list)
 
     @property
     def minute_digests(self) -> list[str]:
+        if len(self.digests) == len(self.states):
+            return list(self.digests)
         return [society_state_sha256(state) for state in self.states]
 
 
@@ -594,13 +602,57 @@ def play_minutes(
     ``start``, from which the receipts of minutes played on from a later state are numbered.
     ``finish``, where an engine has a phase after the roles' events (a society of things'), ends
     each minute as the engine's own minute does.
+
+    Each minute's state is digested once, as the minute begins, wherever the minute names it
+    (:func:`~exulanica.world.society.holding_states`), and each subject's options are built once
+    a minute, for the ask and its request alike.
     """
-    contract = contract or role.contract()
+    with holding_states() as hold:
+        return _play_minutes(
+            roles,
+            role,
+            hold,
+            start=start,
+            sources=sources,
+            seed=seed,
+            ticks=ticks,
+            step=step,
+            config_for=config_for,
+            request_id_for=request_id_for,
+            asking=asking,
+            seam=seam,
+            contract=contract or role.contract(),
+            on_minute=on_minute,
+            first_sequence=first_sequence,
+            finish=finish,
+        )
+
+
+def _play_minutes(
+    roles: Sequence[DecisionRole],
+    role: DecisionRole,
+    hold: Callable[[Mapping[str, Any]], str],
+    *,
+    start: dict[str, Any],
+    sources: Sequence[Mapping[str, Any]],
+    seed: str,
+    ticks: int,
+    step: Step,
+    config_for: Callable[[str], Mapping[str, Any] | None],
+    request_id_for: Callable[[str, int], uuid.UUID],
+    asking: Asking,
+    seam: Callable[[Mapping[str, Any], Sequence[str]], Any],
+    contract: DecisionContract,
+    on_minute: Callable[[int, Sequence[dict[str, Any]], Sequence[dict[str, Any]]], None] | None,
+    first_sequence: int,
+    finish: Finish | None,
+) -> PlayedMinutes:
     state = start
     played = PlayedMinutes()
     latest = sources[-1]
     sequence = first_sequence
     for _minute in range(ticks):
+        hold(state)
         consumed = list(sources) if state["tick"] == 0 else [latest]
         due = [s for s in sorted(role.adapter.subjects(state)) if role.adapter.due(state, s)]
         played.choice_points.update(due)
@@ -624,6 +676,7 @@ def play_minutes(
                 seed=seed,
                 provider_config=dict(config_for(subject) or {}),
                 offer=_only(kept.get(subject, frozenset())),
+                options=asked[subject],
             )
             if request is not None:
                 requests.append(request)
@@ -646,6 +699,7 @@ def play_minutes(
                 state, after, latest, events, consumed_receipts(receipts, decided)
             )
         played.states.append(after)
+        played.digests.append(hold(after))
         played.events.extend(events)
         played.requests.extend(requests)
         played.receipts.extend(receipts)

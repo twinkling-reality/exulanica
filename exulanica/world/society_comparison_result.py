@@ -111,6 +111,8 @@ __all__ = [
     "replay_document",
     "replay_profile",
     "run_outcome",
+    "run_population",
+    "score_fits_family",
     "scoring_binding",
     "verified_replay",
 ]
@@ -130,6 +132,22 @@ FAILURE_PROFILE: Final = "exulanica.society-comparison-failure/v1"
 LISTING_PROFILE: Final = "exulanica.society-comparisons/v2"
 RESULT_PROFILE: Final = "exulanica.society-comparison-result/v2"
 REPLAY_PROFILE: Final = "exulanica.society-comparison-run-replay/v2"
+
+
+def score_fits_family(family: str, version: int) -> bool:
+    """Whether the runs of a society of ``family`` are scored under score ``version``: a living
+    town's under the fourth or, over a day, the fifth, a society of things' under the sixth, and
+    every other family's under any other."""
+    return (family == "living") == (version in _LIVING_SCORES) and (family == "things") == (
+        version in _THINGS_SCORES
+    )
+
+
+def run_population(definition: Mapping[str, Any]) -> int:
+    """How many people one run of a stored comparison holds at most, by which it is priced and
+    bounded: the beings a society of things' runs hold, where its definition records them
+    (``beings``: its people and every being its frozen input places), else its population."""
+    return int(definition.get("beings", definition["population"]))
 
 
 def replay_profile(plan: RunPlan) -> str:
@@ -565,9 +583,7 @@ def run_outcome(
     version = definition_version(definition)
     score_version_now = score_version(catalogs)
     family = society_engine(plan.engine_profile).state_family
-    if (family == "living") != (score_version_now in _LIVING_SCORES) or (family == "things") != (
-        score_version_now in _THINGS_SCORES
-    ):
+    if not score_fits_family(family, score_version_now):
         raise ComparisonRefused(
             "score_engine_mismatch",
             "a living run uses the fourth score or, over a day, the fifth, a society of things' "

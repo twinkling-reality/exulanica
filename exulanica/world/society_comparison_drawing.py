@@ -19,8 +19,9 @@ The seeds catalog is not among them: a drawing names no seed and its replay read
 catalog, so which seeds a new comparison draws from
 (:mod:`~exulanica.world.society_comparison_seeds`) changes no stored drawing.
 Any change to them is a new digest, under which nothing is stored until a host draws the run
-again; ``tests/test_comparison_drawing.py`` traces a verified replay and fails on a module it runs
-that the list leaves out.
+again; ``tests/test_comparison_drawing.py`` traces a verified replay after every reader of this
+package has let go of what it kept, as in a process that read nothing yet, and fails on a module it
+runs that the list leaves out.
 
 **What is not stored.** A model's name is the manifest's (``Manifest.model_name``), which may name
 a model differently later, so a stored drawing names each model by its id alone and a read fills
@@ -64,18 +65,30 @@ __all__ = [
 ]
 
 #: Every module of this package whose code a verified replay and its drawing execute, found by
-#: tracing one, with the builder of the plan they replay: a change to any of them may change what
-#: is drawn, so each is covered by :func:`drawing_sha256`.
+#: tracing one in a process that has read no catalog yet, with the builder of the plan they
+#: replay: a change to any of them may change what is drawn, so each is covered by
+#: :func:`drawing_sha256`. The readers of the catalogs, kinds and roles a replay reads are among
+#: them: a process that read them before replays from what it kept, but one that starts cold reads
+#: them through this code.
 DRAWING_MODULES: Final = (
     "exulanica.abilities.registry",
     "exulanica.canonical",
+    "exulanica.grammar.catalogs",
+    "exulanica.grammar.documents",
+    "exulanica.materials.workspace",
+    "exulanica.models.choice",
+    "exulanica.models.manifest",
     "exulanica.movement.registry",
     "exulanica.movement.steps",
     "exulanica.movement.walking",
+    "exulanica.things.catalogs",
+    "exulanica.things.kinds",
     "exulanica.things.lines",
+    "exulanica.things.origin",
     "exulanica.world.deciders",
     "exulanica.world.placed_things",
     "exulanica.world.decision_roles",
+    "exulanica.world.role_catalogs",
     "exulanica.world.role_decisions",
     "exulanica.world.roles.person",
     "exulanica.world.society",

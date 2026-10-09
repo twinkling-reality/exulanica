@@ -99,12 +99,13 @@ from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Manifest
 from exulanica.spending import DurableSpending
 from exulanica.world.comparison_facts import ComparisonFacts
-from exulanica.world.society_comparison_result import definition_role
+from exulanica.world.society_comparison_result import definition_role, run_population
 from exulanica.world.society_comparison_start_repository import (
     ComparisonClaim,
     SocietyComparisonStarts,
 )
 from exulanica.world.society_comparison_verdict import protocol_value
+from exulanica.world.society_engines import society_engine
 
 __all__ = ["CANCELLED_REASON", "CLOSED_REASONS", "SocietyComparisonWorker"]
 
@@ -280,7 +281,7 @@ class SocietyComparisonWorker:
         budget = None if self.client is None else self.client.budget
         cost = comparison_cost(
             definition,
-            int(definition["population"]),
+            run_population(definition),
             role,
             budget if budget is not None else _ESTIMATOR,
             self.manifest,
@@ -339,6 +340,7 @@ class SocietyComparisonWorker:
             repository = runner._repository(connection)
             society = repository.society._row(uuid.UUID(definition["version_id"]))
             navigation = None if society is None else repository.navigation_profile(society)
+        family = None if society is None else society_engine(society["engine_version"]).state_family
 
         def admit(runs: Sequence[uuid.UUID]) -> bool:
             """Whether what is left of the bound, and of this process's calls, holds one seed's
@@ -355,7 +357,7 @@ class SocietyComparisonWorker:
                 )
             seed = comparison_cost(
                 definition,
-                int(definition["population"]),
+                run_population(definition),
                 role,
                 budget if budget is not None else _ESTIMATOR,
                 self.manifest,
@@ -363,6 +365,7 @@ class SocietyComparisonWorker:
                 navigation_profile=navigation,
                 runs_left=[(row["arm"], row["seed_digest"]) for row in left_runs],
                 dearest_elsewhere=True,
+                family=family,
             )
             needed = seed.suggested_usd
             if needed is None:

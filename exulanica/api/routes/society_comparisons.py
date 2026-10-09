@@ -89,6 +89,7 @@ from exulanica.api.society_comparison_start import (
     START_REFUSALS,
     TYPICAL_FALLBACK,
     TYPICAL_RECORDS,
+    UNMEASURED_FAMILIES,
     ComparisonCost,
     ComparisonSelection,
     StartRefused,
@@ -115,6 +116,7 @@ from exulanica.world.society_comparison import (
     HOUR_TICKS,
     HourStart,
     ReplayMismatch,
+    RunPeople,
     compared_people,
     first_hour,
     hours_of,
@@ -142,6 +144,7 @@ from exulanica.world.society_comparison_reading import (
 from exulanica.world.society_comparison_repository import (
     ComparisonConflict,
     SocietyComparisonRepository,
+    society_run_people,
 )
 from exulanica.world.society_comparison_result import (
     ComparisonRefused,
@@ -345,13 +348,19 @@ def plan_society_comparison(
     population = int(society["population_size"])
     # A run is read by the line measured on its engine's state family, over its window.
     family = society_engine(engine).state_family
-    windows = _windows(services, engine, population, family)
+    # A society of things' runs hold the beings its author placed beside its population, and only
+    # those its first input placed from their first minute.
+    holding = _held(connection, session, world_id, society, input_seq) if compared else None
+    beings = population if holding is None else holding.most
+    windows = _windows(services, engine, beings, family)
     chosen = next(held for held in windows if held["window"] == window)
     try:
         catalogs = window_catalogs(services.comparison_catalogs, window, engine)
     except StartRefused:
         catalogs = None
     comparable = set(compared_people(society["state"]))
+    if holding is not None:
+        comparable &= holding.named
     document: dict[str, Any] = {
         "profile": PLAN_PROFILE,
         "refusal": refused,
@@ -369,7 +378,8 @@ def plan_society_comparison(
         "decided_most": chosen["decided_most"],
         # Everybody a named group may be chosen from, by id and name, as the society's state
         # names them: a group of more people than one owner's choice holds is chosen from these.
-        # A visitor is never one of them: no run holds it.
+        # A visitor is never one of them: no run holds it; nor a being placed after the society's
+        # first input, which a run holds only from its second minute.
         "people": sorted(
             (
                 {"id": person["id"], "name": person_label(person)}
@@ -411,6 +421,7 @@ def plan_society_comparison(
             navigation=navigation,
             input_seq=input_seq,
             window=window,
+            held=holding,
         )
     except StartRefused as exc:
         document["plan_refusal"] = {"code": exc.code, "detail": exc.detail}
@@ -434,7 +445,7 @@ def plan_society_comparison(
     document["plan"] = {
         **prepared.cost.document(),
         "input_seq": prepared.input_seq,
-        "minutes": _minutes(prepared, population, navigation),
+        "minutes": _minutes(prepared, prepared.population, navigation),
         # The durable bound a start opens of each provider it asks holds the stated bound and
         # every call the comparison can make, under that provider's grant.
         "providers": [
@@ -502,6 +513,7 @@ def _minutes(prepared: _Prepared, population: int, navigation: str | None) -> li
             navigation_profile=navigation,
             runs_left=[(key, seed)],
             engine=prepared.runner.engine,
+            family=prepared.family,
         )
         found.append(
             {
@@ -509,7 +521,9 @@ def _minutes(prepared: _Prepared, population: int, navigation: str | None) -> li
                 "model_id": spec.model_id,
                 "name": manifest.model_name(spec.model_id),
                 "decided": decided[key],
-                "answers_per_minute": answers_per_minute(contract, spec.model_id, navigation),
+                "answers_per_minute": answers_per_minute(
+                    contract, spec.model_id, navigation, prepared.family
+                ),
                 # What one ask of the arm's model holds reserved until its usage is recorded, and
                 # the most one run of the arm can reserve, every person it asks asked every minute.
                 "ask_bound_usd": format(
@@ -823,6 +837,10 @@ def _society(comparisons: SocietyComparisonRepository, version_id: uuid.UUID) ->
     return row
 
 
+#: That who a selection's runs hold was not read before its preparation.
+_UNREAD: Final = object()
+
+
 class _Prepared:
     """A selection held to this server and the world's records, and what it would define."""
 
@@ -834,10 +852,16 @@ class _Prepared:
         body: dict[str, Any],
         cost: ComparisonCost,
         input_seq: int,
+        population: int,
     ) -> None:
         self.runner, self.role, self.seeds, self.body, self.cost = runner, role, seeds, body, cost
         #: The society's input a start of it freezes.
         self.input_seq = input_seq
+        #: How many people one of its runs holds at most: a society of things' beings, else its
+        #: population.
+        self.population = population
+        #: The state family of the society's engine.
+        self.family = society_engine(runner.engine).state_family
 
 
 def _prepare(
@@ -856,9 +880,11 @@ def _prepare(
     navigation: str | None,
     input_seq: int | None = None,
     window: str = "hour",
+    held: RunPeople | object | None = _UNREAD,
 ) -> _Prepared:
     """What a start of this selection would define over ``window``, through the one definition
-    path, or the refusal it would meet (:class:`StartRefused`); reads only."""
+    path, or the refusal it would meet (:class:`StartRefused`); reads only. ``held`` is who its
+    runs hold (:func:`_held`), where the caller read it already."""
     refusal = services.comparison_refusal(session.workspace_id)
     if refusal is not None:
         raise StartRefused(refusal, _HOST_DETAIL[refusal])
@@ -880,7 +906,15 @@ def _prepare(
         catalogs=window_catalogs(services.comparison_catalogs, window, engine),
         engine=engine,
     )
-    population = int(society["population_size"])
+    newest = SocietyRepository(connection, session.workspace_id, world_id=world_id)._chain(society)
+    if input_seq is not None and not 1 <= input_seq <= newest:
+        raise StartRefused("input_not_in_society", f"this society holds inputs 1 to {newest}")
+    if held is _UNREAD:
+        held = _held(connection, session, world_id, society, input_seq)
+    assert held is None or isinstance(held, RunPeople)
+    # A society of things' runs hold the beings its author placed beside its population: one is
+    # priced, bounded and read by every being its runs hold.
+    population = int(society["population_size"]) if held is None else held.most
     family = society_engine(engine).state_family
     try:
         refused = reading_refusal(runner.catalogs, population, family=family)
@@ -912,9 +946,6 @@ def _prepare(
             "seeds_out_of_range",
             f"this server holds {len(services.comparison_seeds)} development seeds",
         )
-    newest = SocietyRepository(connection, session.workspace_id, world_id=world_id)._chain(society)
-    if input_seq is not None and not 1 <= input_seq <= newest:
-        raise StartRefused("input_not_in_society", f"this society holds inputs 1 to {newest}")
     here = {person["id"] for person in society["state"]["inhabitants"]}
     people: tuple[str, ...] | None = None
     if group.kind == "named":
@@ -942,6 +973,13 @@ def _prepare(
         if exc.code in START_REFUSALS:
             raise StartRefused(exc.code, str(exc)) from exc
         raise
+    grouped = body["group"]["people"]
+    if held is not None and grouped is not None and not set(grouped) <= held.named:
+        raise StartRefused(
+            "group_person_not_in_run",
+            "the group names a being placed after the society's first input, which a run holds "
+            "only from its second minute",
+        )
     refused = reading_refusal(runner.catalogs, population, body, family=family)
     if refused is not None:
         raise StartRefused(*refused)
@@ -955,8 +993,33 @@ def _prepare(
         at_once=protocol_value(runner.catalogs, "runs_at_once"),
         navigation_profile=navigation,
         engine=engine,
+        family=family,
     )
-    return _Prepared(runner, role, seeds, body, cost, newest if input_seq is None else input_seq)
+    return _Prepared(
+        runner, role, seeds, body, cost, newest if input_seq is None else input_seq, population
+    )
+
+
+def _held(
+    connection: ScopedConnection,
+    session: CurrentSession,
+    world_id: str,
+    society: dict[str, Any],
+    input_seq: int | None,
+) -> RunPeople | None:
+    """Who the runs of a comparison of ``society`` frozen at ``input_seq`` (its newest input where
+    None) hold, where its engine's runs hold beings an author placed
+    (:func:`~exulanica.world.society_comparison_repository.society_run_people`); None for any
+    other engine, and for an input the society does not hold, which a start refuses by name."""
+    if society_engine(str(society["engine_version"])).state_family != "things":
+        return None
+    societies = SocietyRepository(connection, session.workspace_id, world_id=world_id)
+    newest = societies._chain(society)
+    chosen = newest if input_seq is None else input_seq
+    if not 1 <= chosen <= newest:
+        return None
+    read = societies._inputs(society, sorted({1, chosen}))
+    return society_run_people(society, read[1], read[chosen])
 
 
 def _choices(
@@ -974,7 +1037,12 @@ def _choices(
     and what it typically cost, on the society's kind of ground where that was measured."""
     manifest = load_manifest()
     names = {person["id"]: person_label(person) for person in society["state"]["inhabitants"]}
-    typical = typical_per_person_hour(navigation)
+    # A society of a family no measurement's runs were of has no typical cost.
+    typical = (
+        {}
+        if society_engine(str(society["engine_version"])).state_family in UNMEASURED_FAMILIES
+        else typical_per_person_hour(navigation)
+    )
     roles = []
     for role in decision_roles().hosted_by(str(society["engine_version"])):
         history = SocietyModelChoiceRepository(

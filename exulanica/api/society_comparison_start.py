@@ -62,6 +62,7 @@ from exulanica.world.society_comparison_result import (
     MINUTES_PER_HOUR,
     definition_role,
     protocol_value,
+    run_population,
 )
 
 __all__ = [
@@ -74,6 +75,7 @@ __all__ = [
     "TYPICAL_NAVIGATION",
     "TYPICAL_RECORD",
     "TYPICAL_RECORDS",
+    "UNMEASURED_FAMILIES",
     "WAIT_ARM",
     "ComparisonCost",
     "ComparisonSelection",
@@ -123,6 +125,11 @@ if (
     or _TYPICAL_DOCUMENT.get("catalog_version") != 1
 ):
     raise ValueError("invalid comparison typical-cost catalog")
+#: The state families none of those measurements' runs were of, whose asks are not like theirs: a
+#: society of things asks its people under the third instruction, with hands options and the lines
+#: they heard. A comparison of one has no typical cost or answer time until one is measured, and a
+#: host admits its seeds by what their runs can hold reserved.
+UNMEASURED_FAMILIES: Final = ("things",)
 #: The shipped catalog owns each ground's source and extraction form.
 TYPICAL_RECORDS: Final = {
     entry["navigation"]: (entry["source"], entry["extraction"])
@@ -171,6 +178,9 @@ START_REFUSALS: Final = {
     "group_person_unknown": 422,
     # A named group holding a visitor, whom no run holds.
     "group_visitor": 422,
+    # A group holding a being an author placed after the society's first input, which a run holds
+    # only from its second minute (exulanica/world/society_comparison.py, run_people).
+    "group_person_not_in_run": 422,
     "seeds_out_of_range": 422,
     # The input it freezes: a sequence the society holds no input at.
     "input_not_in_society": 422,
@@ -480,12 +490,18 @@ def typical_latency_ms(navigation: str | None = TYPICAL_NAVIGATION) -> dict[str,
 
 
 def answers_per_minute(
-    contract: DecisionContract, model_id: str, navigation: str | None = TYPICAL_NAVIGATION
+    contract: DecisionContract,
+    model_id: str,
+    navigation: str | None = TYPICAL_NAVIGATION,
+    family: str | None = None,
 ) -> int | None:
     """How many asks one run's minute can have answered by ``model_id``: the contract's concurrent
     calls, each answering one ask after another at the model's measured answer time on the
     society's ground (:func:`typical_latency_ms`), within the one deadline the minute's asks share.
-    Asks past it are left to the routine. None for a model with no measured answer time."""
+    Asks past it are left to the routine. None for a model with no measured answer time, and for a
+    society of a family none was measured on (:data:`UNMEASURED_FAMILIES`)."""
+    if family in UNMEASURED_FAMILIES:
+        return None
     latency = typical_latency_ms(navigation).get(model_id)
     if latency is None or latency < 1:
         return None
@@ -632,6 +648,7 @@ def comparison_cost(
     runs_left: Sequence[tuple[str, str]] | None = None,
     dearest_elsewhere: bool = False,
     engine: str | None = None,
+    family: str | None = None,
 ) -> ComparisonCost:
     """What the comparison ``body`` states can cost at most, over a society of ``population``
     people, asking ``role``: every run's asks at their bound. ``at_once`` is how many runs are
@@ -643,7 +660,9 @@ def comparison_cost(
     each model is taken at the dearest figure any ground has for it rather than the small
     square's, which a town's people are asked more often than: what a host admits a seed by. A
     stored definition is costed under the contract it recorded; a body not yet defined under the
-    one a society on ``engine`` asks its people under."""
+    one a society on ``engine`` asks its people under. A comparison of a society of ``family``,
+    where no measurement's runs were of that family (:data:`UNMEASURED_FAMILIES`), has no typical
+    figure."""
     contract = (
         role.contract(body["contract"]["catalog_versions"])
         if "contract" in body
@@ -692,6 +711,8 @@ def comparison_cost(
     typical = dict((figures or _NONE).per_person_hour)
     if dearest_elsewhere and not matches:
         typical = dearest_per_person_hour()
+    if family in UNMEASURED_FAMILIES:
+        typical, matches = {}, False
     asks = 0
     most = Decimal(0)
     per_hour = Decimal(0)
@@ -767,7 +788,7 @@ def stopped_host_usd(
     at_once = protocol_value(catalogs, "runs_at_once")
     cost = comparison_cost(
         definition,
-        int(definition["population"]),
+        run_population(definition),
         definition_role(definition),
         budget if budget is not None else _PRICES,
         manifest,

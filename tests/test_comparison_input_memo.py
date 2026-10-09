@@ -1,11 +1,12 @@
-"""A run's options build each input's graph and standing exclusions once, and nothing moves.
+"""A run checks each input once and builds what depends on it alone once, and nothing moves.
 
-A comparison's run and its replay build every due person's options from the run's frozen input,
-minute after minute; while a run of minutes holds :func:`input_memo`, the input's walking graph and
-the spots nobody stands at are built once per input object, known by its navigation and targets
-objects themselves, at most as many inputs as the run holds, and dropped when the run ends. Two
-inputs that differ in either are never taken for one another, and a run played with the memo
-records exactly what it records without it.
+A comparison's run and its replay read the run's frozen inputs minute after minute; while a run of
+minutes holds :func:`input_memo`, each input object is checked once, and the input's walking
+graph, the routes over it, the spots nobody stands at and the digest of its navigation are built
+once per input, known by its navigation and targets objects themselves, at most as many inputs as
+the run holds, and dropped when the run ends. Two inputs that differ in either are never taken for
+one another, an input object never checked is checked where it is read, and a run played with the
+memo records exactly what it records without it.
 """
 
 from __future__ import annotations
@@ -15,19 +16,23 @@ import uuid
 from contextlib import nullcontext
 
 import pytest
-from exulanica.world import society_comparison, society_decision_contract
+from exulanica.world import society_comparison, society_planner
 from exulanica.world.society_comparison import play
 from exulanica.world.society_comparison_result import replay_document, verified_replay
-from exulanica.world.society_decision_contract import (
+from exulanica.world.society_decision_contract import _crowded, _input_graph, input_memo
+from exulanica.world.society_planner import (
     _MEMO,
-    _crowded,
-    _input_graph,
-    input_memo,
+    _graph,
+    _input_routes,
+    _navigation_sha256,
+    _paths,
+    standing_exclusions,
+    validate_society_input,
 )
-from exulanica.world.society_planner import _graph, standing_exclusions
 
 import living_square_support as square
 import test_comparison_play_goldens as goldens
+import test_society_things_comparison as things
 
 DOCUMENT = square.compose(square.square_objects())
 
@@ -58,13 +63,13 @@ def test_inputs_that_differ_in_targets_or_navigation_are_never_taken_for_one_ano
 
 def test_each_input_is_built_once_within_its_bound_and_again_past_it(monkeypatch):
     built: list[int] = []
-    real = society_decision_contract.standing_exclusions
+    real = society_planner.standing_exclusions
 
     def counted(document):
         built.append(id(document["targets"]))
         return real(document)
 
-    monkeypatch.setattr(society_decision_contract, "standing_exclusions", counted)
+    monkeypatch.setattr(society_planner, "standing_exclusions", counted)
     other = _fewer_targets(DOCUMENT)
     with input_memo(2):
         for document in (DOCUMENT, other, DOCUMENT, other):
@@ -81,11 +86,70 @@ def test_each_input_is_built_once_within_its_bound_and_again_past_it(monkeypatch
     assert len(built) == 2, "outside a run each is built where it is read"
 
 
-@pytest.mark.parametrize("arm", ["model", "group", "routine"])
+def test_an_input_is_checked_once_while_a_run_holds_the_memo(monkeypatch):
+    checked: list[int] = []
+    real = society_planner._validate_society_input
+
+    def counted(document):
+        checked.append(id(document))
+        return real(document)
+
+    monkeypatch.setattr(society_planner, "_validate_society_input", counted)
+    other = _fewer_targets(DOCUMENT)
+    other["document_sha256"] = society_planner.input_sha256(other)
+    with input_memo(2):
+        for document in (DOCUMENT, other, DOCUMENT, other):
+            validate_society_input(document)
+        assert checked == [id(DOCUMENT), id(other)]
+        # An object never checked is checked where it is read, and refused when it is not valid,
+        # however much of a checked input it shares.
+        broken = {**DOCUMENT, "input_seq": "1"}
+        with pytest.raises(ValueError):
+            validate_society_input(broken)
+        with pytest.raises(ValueError):
+            validate_society_input(broken)
+    assert checked.count(id(broken)) == 2, "a refused input is never taken for checked"
+    checked.clear()
+    for _ in range(2):
+        validate_society_input(DOCUMENT)
+    assert checked == [id(DOCUMENT)] * 2, "outside a run each is checked where it is read"
+
+
+def test_routes_and_the_navigation_digest_are_built_once_per_input(monkeypatch):
+    walked: list[str] = []
+    real = society_planner._paths
+
+    def counted(start, adjacent):
+        walked.append(start)
+        return real(start, adjacent)
+
+    monkeypatch.setattr(society_planner, "_paths", counted)
+    fewer_edges = _fewer_edges(DOCUMENT)
+    starts = sorted(_graph(dict(DOCUMENT))[0])[:3]
+    with input_memo(2):
+        for document in (DOCUMENT, fewer_edges, DOCUMENT, fewer_edges):
+            adjacent = _input_graph(document)[1]
+            for start in starts:
+                assert _input_routes(document, start, adjacent) == _paths(start, adjacent)
+            assert _navigation_sha256(document) == society_planner.society_state_sha256(
+                document["navigation"]
+            )
+    # Each start walked once per graph inside the run.
+    assert len(walked) == 2 * len(starts)
+    assert _MEMO.get() is None
+
+
+@pytest.mark.parametrize("arm", ["model", "group", "routine", "things"])
 def test_a_run_played_with_the_memo_records_what_it_records_without_it(monkeypatch, arm):
-    plan = goldens._plans()[arm]
-    scripted = goldens._Scripted(held_back=None)
+    if arm == "things":
+        plan = things._plan("model", group=things._knights(), ticks=20)
+        scripted = things._Choosing()
+    else:
+        plan = goldens._plans()[arm]
+        scripted = goldens._Scripted(held_back=None)
     with_memo = play(plan, scripted)
+    if arm == "things":
+        scripted = things._Choosing()
     with monkeypatch.context() as patch:
         patch.setattr(society_comparison, "input_memo", lambda _inputs: nullcontext())
         without = play(plan, scripted)

@@ -40,11 +40,11 @@ with and how far the walk to them is, or let a model decide for anybody but the 
 conversation it chooses happens only with somebody nobody, their own model included, decided for
 in that minute.
 
-Every option is built from the input the minute reads, whose walking graph and the spots nobody
-stands at depend on that input alone. A run of minutes over frozen inputs builds each once per
-input while :func:`input_memo` holds (a comparison's run and its replay do), keyed by the identity
-of the input's own navigation and targets and dropped when the run ends; anywhere else each is
-built where it is read, as before.
+Every option is built from the input the minute reads, whose walking graph, the routes over it
+and the spots nobody stands at depend on that input alone. A run of minutes over frozen inputs
+builds each once per input while :func:`input_memo` holds (a comparison's run and its replay do),
+keyed by the identity of the input's own navigation and targets and dropped when the run ends;
+anywhere else each is built where it is read, as before.
 """
 
 from __future__ import annotations
@@ -52,10 +52,7 @@ from __future__ import annotations
 import json
 import math
 import random
-from collections import OrderedDict
-from collections.abc import Callable, Container, Iterator, Mapping, Sequence
-from contextlib import contextmanager
-from contextvars import ContextVar
+from collections.abc import Container, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -75,18 +72,19 @@ from exulanica.world.society_catalogs import PurposefulActivity, PurposefulRouti
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_planner import (
     PLACE_INPUTS,
+    _crowded,
     _free_place,
-    _graph,
+    _input_graph,
+    _input_routes,
     _location_valid,
-    _paths,
     drawn_stand_spot,
     free_to_talk,
     held_nodes,
+    input_memo,
     need_this_minute,
     routine_of,
     same_destination,
     stand_spots,
-    standing_exclusions,
     standing_to_talk,
     talk_span,
     talk_spots,
@@ -523,63 +521,6 @@ def _activity_label(routine: PurposefulRoutine, target: Mapping[str, Any]) -> tu
     return activity.key, activity.label
 
 
-class _InputMemo:
-    """What options are built from that depends on one input alone, built once per input object:
-    at most ``most`` inputs at a time, the one least recently read dropped first. An input is
-    known by its navigation and targets objects themselves, held here, so an object freed and its
-    identity reused is never taken for the input it replaced."""
-
-    def __init__(self, most: int) -> None:
-        self.most = most
-        self._held: OrderedDict[tuple[int, int], tuple[Any, Any, dict[str, Any]]] = OrderedDict()
-
-    def value(self, document: Mapping[str, Any], name: str, build: Callable[[], Any]) -> Any:
-        navigation, targets = document["navigation"], document["targets"]
-        key = (id(navigation), id(targets))
-        held = self._held.get(key)
-        if held is None or held[0] is not navigation or held[1] is not targets:
-            held = (navigation, targets, {})
-            self._held[key] = held
-            while len(self._held) > self.most:
-                self._held.popitem(last=False)
-        self._held.move_to_end(key)
-        values = held[2]
-        if name not in values:
-            values[name] = build()
-        return values[name]
-
-
-_MEMO: ContextVar[_InputMemo | None] = ContextVar("society_decision_input_memo", default=None)
-
-
-@contextmanager
-def input_memo(inputs: int) -> Iterator[None]:
-    """While the block runs, build each of at most ``inputs`` inputs' walking graph and standing
-    exclusions once, for this context alone: a run of minutes over frozen inputs, whose options
-    read the same input every minute. Nothing is kept after the block."""
-    token = _MEMO.set(_InputMemo(max(1, inputs)))
-    try:
-        yield
-    finally:
-        _MEMO.reset(token)
-
-
-def _input_graph(document: Mapping[str, Any]) -> tuple[dict, dict, dict]:
-    """The input's walking graph, as the planner reads it (read, never changed, by its callers)."""
-    memo = _MEMO.get()
-    if memo is None:
-        return _graph(dict(document))
-    return memo.value(document, "graph", lambda: _graph(dict(document)))
-
-
-def _crowded(document: Mapping[str, Any]) -> frozenset[str]:
-    """The nodes nobody waits or starts at in the input (:func:`standing_exclusions`)."""
-    memo = _MEMO.get()
-    if memo is None:
-        return standing_exclusions(dict(document))
-    return memo.value(document, "crowded", lambda: standing_exclusions(dict(document)))
-
-
 def _reachable(
     state: Mapping[str, Any], document: Mapping[str, Any], person: dict[str, Any]
 ) -> tuple[dict, dict, set[str], str | None]:
@@ -591,7 +532,7 @@ def _reachable(
     nodes, adjacent, edges = _input_graph(document)
     location = person["location"]
     start = location["node_id"] if location["edge"] is None else location["edge"]["to_node_id"]
-    paths = _paths(start, adjacent)
+    paths = _input_routes(document, start, adjacent)
     held = held_nodes(list(state["inhabitants"]), person, graph=(nodes, edges))
     here = location["node_id"] if location["edge"] is None else None
     return nodes, paths, held, here
@@ -613,13 +554,13 @@ def _off_place(
     return routine.in_setting(setting)
 
 
-def _paths_from(adjacent: Mapping[str, Any]) -> Any:
-    """Walking distances from a node, each start walked once."""
+def _paths_from(document: Mapping[str, Any], adjacent: Mapping[str, Any]) -> Any:
+    """Walking distances from a node over the input's graph, each start walked once."""
     walked: dict[str, dict] = {}
 
     def paths_of(start: str) -> dict:
         if start not in walked:
-            walked[start] = _paths(start, dict(adjacent))
+            walked[start] = _input_routes(document, start, adjacent)
         return walked[start]
 
     return paths_of
@@ -645,7 +586,7 @@ def _partners(
         return []
     graph = _input_graph(document)
     crowded = _crowded(document)
-    paths_of = _paths_from(graph[1])
+    paths_of = _paths_from(document, graph[1])
     people = list(state["inhabitants"])
     found = []
     for other in people:
@@ -1173,7 +1114,7 @@ def recheck_talk(
         graph,
         _crowded(document),
         promised,
-        _paths_from(graph[1]),
+        _paths_from(document, graph[1]),
         talk,
         standing=standing,
     )

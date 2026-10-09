@@ -14,11 +14,27 @@ of one is refused by name.
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from typing import Any
 
 import pytest
-from exulanica.world.society_catalogs import comparison_catalogs_for_engine
-from exulanica.world.society_comparison import RunPlan, play, replay
+from exulanica.api.decision_host import ask_bound_usd
+from exulanica.api.society_comparison_start import comparison_cost
+from exulanica.models.budget import BudgetGuard
+from exulanica.models.manifest import load_manifest
+from exulanica.world.society_catalogs import (
+    COMPARISON_PROTOCOL_CATALOG,
+    COMPARISON_VERSIONS,
+    comparison_catalogs_for_engine,
+    load_comparison_catalogs,
+)
+from exulanica.world.society_comparison import (
+    RunPlan,
+    compared_people,
+    play,
+    replay,
+    run_people,
+)
 from exulanica.world.society_comparison_reading import (
     NO_READING_LINE,
     measured_line,
@@ -28,11 +44,14 @@ from exulanica.world.society_comparison_reading import (
 from exulanica.world.society_comparison_result import (
     check_definition_body,
     run_outcome,
+    run_population,
+    score_fits_family,
     scoring_binding,
 )
 from exulanica.world.society_comparison_verdict import ComparisonRefused
 from exulanica.world.society_decision_contract import person_role
 from exulanica.world.society_engines import society_engine
+from exulanica.world.society_planner import PURPOSEFUL_PROFILE
 from exulanica.world.society_score import _minute_class
 from exulanica.world.society_score_v2 import RunTerms
 from exulanica.world.society_score_v3 import seed_score
@@ -305,3 +324,134 @@ def test_a_judged_comparison_of_a_society_of_things_waits_for_its_own_held_out_s
         if entry["phase"] == "development"
     )
     check_definition_body({**body, "seeds": development[:2]}, catalogs)
+
+
+#: A knight its author placed after the society's first input.
+LATER = thing("knight-3", "knight", 1, 6_000, 1_000)
+#: What prices asks by the manifest's prices alone, as a plan with no budget of its own does.
+_ESTIMATOR = BudgetGuard(ceiling_usd=Decimal(0), max_calls=0)
+
+
+def _later_plan(group: frozenset[str] | None) -> tuple[RunPlan, dict[str, Any]]:
+    """A run frozen at a second input that places a third knight: its genesis is the first
+    input's."""
+    first = SOURCE
+    later = compose(
+        (
+            thing("gate", "gate", 1, 0, 9_000, yaw=3_141_593),
+            thing("knight", "knight", 1, 3_000, 3_000),
+            thing("knight-2", "knight", 1, 5_000, 3_000),
+            thing("sword", "sword", 2, 2_400, 2_600),
+            LATER,
+        ),
+        input_seq=2,
+        edit_seq=first["authored_state"]["edit_seq"] + 1,
+    )
+    plan = RunPlan(
+        **{
+            **{name: getattr(_plan("model"), name) for name in RunPlan.__slots__},
+            "inputs": (first, later),
+            "ticks": 2,
+            "group": group,
+        }
+    )
+    return plan, later
+
+
+def test_a_being_placed_after_the_first_input_is_held_by_a_run_but_named_in_no_group():
+    plan, later = _later_plan(None)
+    played = play(plan, _Choosing())
+    held = run_people(
+        plan.society_id, plan.seed, SOURCE, later, population=6, engine_profile=THINGS_PROFILE
+    )
+    assert held is not None
+    # Who a group may name is everybody the run's genesis holds, built as every run builds it.
+    assert held.named == frozenset(compared_people(played.start))
+    [third] = [p["id"] for p in played.states[0]["inhabitants"] if p.get("placed_id") == "knight-3"]
+    assert third not in held.named, "the later knight arrives in the run's first minute"
+    assert held.most == len(held.named) + 1
+    # The same beings whatever seed a genesis is built with.
+    again = run_people(
+        plan.society_id, "0" * 64, SOURCE, later, population=6, engine_profile=THINGS_PROFILE
+    )
+    assert again == held
+    # A group naming it fails every run before it asks: what the plan and the definition refuse.
+    named, _ = _later_plan(frozenset({third}))
+    with pytest.raises(ValueError, match="group_person_not_in_run"):
+        play(named, _Choosing())
+    # Another engine's runs hold its population, every one of them from genesis.
+    assert (
+        run_people(
+            plan.society_id,
+            plan.seed,
+            SOURCE,
+            later,
+            population=6,
+            engine_profile=PURPOSEFUL_PROFILE,
+        )
+        is None
+    )
+
+
+def test_a_definition_records_the_beings_its_runs_hold_and_is_priced_by_them():
+    assert run_population({"population": 4, "beings": 7}) == 7
+    assert run_population({"population": 4}) == 4, "a definition before beings were recorded"
+    catalogs = comparison_catalogs_for_engine(THINGS_PROFILE)
+    body = development_body(catalogs)
+    manifest = load_manifest()
+    window = int(body["window_ticks"])
+    priced = comparison_cost(
+        body,
+        7,
+        ROLE,
+        _ESTIMATOR,
+        manifest,
+        at_once=1,
+        navigation_profile=None,
+        engine=THINGS_PROFILE,
+        family="things",
+    )
+    runs = len(body["seeds"])
+    assert priced.asks == window * 7 * runs, "everybody is every being a run holds"
+
+
+def test_a_society_of_things_has_no_typical_cost_and_is_priced_under_its_engine_s_terms():
+    catalogs = comparison_catalogs_for_engine(THINGS_PROFILE)
+    body = development_body(catalogs)
+    manifest = load_manifest()
+    common = {"at_once": 1, "navigation_profile": None, "engine": THINGS_PROFILE}
+    things_cost = comparison_cost(body, 6, ROLE, _ESTIMATOR, manifest, family="things", **common)
+    measured = comparison_cost(body, 6, ROLE, _ESTIMATOR, manifest, **common)
+    # Without a family, the measured figures price it: the positive control.
+    assert measured.typical_usd is not None
+    assert things_cost.typical_usd is None and things_cost.suggested_usd is None
+    assert not things_cost.typical_matches
+    # An ask is bounded under the terms the society's engine asks under, not the role's own.
+    [spec] = manifest.offered_models(ROLE.chosen)[:1]
+    window, people = int(body["window_ticks"]), 6
+    expected = (
+        len(body["seeds"]) * window * people * ask_bound_usd(ROLE, _ESTIMATOR, spec, CONTRACT)
+    )
+    assert things_cost.most_usd == expected
+    assert ask_bound_usd(ROLE, _ESTIMATOR, spec, CONTRACT) != ask_bound_usd(
+        ROLE, _ESTIMATOR, spec, ROLE.contract()
+    )
+
+
+def test_a_family_with_no_line_is_refused_before_an_earlier_protocol_s_figures():
+    earlier = load_comparison_catalogs(
+        versions={**COMPARISON_VERSIONS, COMPARISON_PROTOCOL_CATALOG: 2}
+    )
+    with pytest.raises(ComparisonRefused) as refused:
+        reading_bound(earlier, family="things")
+    assert refused.value.code == NO_READING_LINE
+    # The protocol's own family reads its population maximum, as before.
+    assert reading_bound(earlier, family="purposeful") is None
+    assert population_maximum(earlier, "purposeful") > 0
+
+
+def test_a_score_is_the_family_s_own_or_refused():
+    assert score_fits_family("things", 6) and score_fits_family("living", 4)
+    assert score_fits_family("living", 5) and score_fits_family("purposeful", 3)
+    assert not score_fits_family("things", 4) and not score_fits_family("things", 3)
+    assert not score_fits_family("living", 6) and not score_fits_family("purposeful", 6)

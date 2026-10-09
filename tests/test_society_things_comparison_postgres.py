@@ -7,7 +7,8 @@ line in the reading catalog (a test's), a development comparison of the knights 
 the sixth score and the terms the society of things asks its people under, run through the
 product's client against a scripted model, and read: the routine scores one, waiting zero, the
 model's runs record the acts its knights did, and a run is read by replaying what it stored with
-no model call.
+no model call. A knight placed after the society was made is held by every run from its second
+minute: no group names it, and a comparison of everybody is priced by every being its runs hold.
 """
 
 from __future__ import annotations
@@ -20,16 +21,19 @@ from typing import Any
 
 import pytest
 from exulanica.api.society_comparison_runner import ComparisonArm
+from exulanica.db.session import set_workspace
 from exulanica.models.manifest import load_manifest
 from exulanica.orchestration.compare import comparison_body
 from exulanica.world import society_comparison_reading as reading
 from exulanica.world.crossings import register_crossing_stream
+from exulanica.world.society_catalogs import comparison_catalogs_for_engine
 from exulanica.world.society_comparison_verdict import ComparisonRefused
 from exulanica.world.society_decision_contract import person_role
 from exulanica.world.society_things import THINGS_PROFILE
 
 import test_outside_deciders_postgres as outside
 import test_society_comparison_postgres as compared
+import test_society_comparison_start_postgres as starting
 import test_society_stay_requests_api as stays
 import test_society_things_postgres as things_api
 import things_society_support as things_support
@@ -39,6 +43,7 @@ from test_society_saved_world_api import OWNER
 
 saved_world = stays.saved_world
 app = stays.app
+started = starting.started
 pytestmark = pytest.mark.postgres
 
 
@@ -230,3 +235,109 @@ def test_a_visitor_is_never_in_a_comparison(app, monkeypatch, tmp_path):
             ),
         )
     assert refused.value.code == "group_visitor"
+
+
+def _stored(world: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every comparison definition the world's workspace holds, read as its owner."""
+    connection = world["connection"]
+    set_workspace(connection, world["workspace"])
+    return [
+        row["document"]
+        for row in connection.execute(
+            "select document from society_comparison where workspace_id=%s and world_id=%s",
+            (world["workspace"], world["binding"].world_id),
+        ).fetchall()
+    ]
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_knight_placed_later_is_in_no_group_and_every_being_is_priced(
+    started, monkeypatch, tmp_path
+):
+    """Every run starts at the genesis of the society's first input, so a knight placed after the
+    society was made arrives in its first minute. The plan lists it nowhere a group is chosen
+    from, and a group naming it is refused by name at the plan, the start and the definition. A
+    comparison of everybody is priced by every being its runs hold, recorded beside the society's
+    population; it states no typical cost, and its model is asked under the society of things' own
+    prompt."""
+    world, client = started["world"], started["client"]
+    monkeypatch.setattr(reading, "READING_CATALOG", _things_line(tmp_path))
+    knights = _knights(client, world)
+    scope = compared._scope(world)
+    version_id = world["binding"].version_id
+    things_api._place(client, world, "knight-3", "knight", 1, 6_000, 1_000)
+    listed = client.get(f"/world/versions/{version_id}/society", headers=OWNER, params=scope)
+    snapshot = stays._step(world, client, listed.json())
+    [later] = [
+        p["id"] for p in snapshot["state"]["inhabitants"] if p.get("placed_id") == "knight-3"
+    ]
+    model = f"{starting.MODEL.provider}/{starting.MODEL.model_id}"
+    asked = {**scope, "role": person_role().key, "model": model}
+    plan = client.get(
+        compared._route(world, "/plan"),
+        headers=OWNER,
+        params={**asked, "group": "named", "person": [later]},
+    )
+    assert plan.status_code == 200, plan.text
+    document = plan.json()
+    people = {person["id"] for person in document["people"]}
+    assert set(knights) <= people and later not in people
+    assert document["plan_refusal"]["code"] == "group_person_not_in_run"
+    before = starting._counts(world)
+    refused = starting._start(started, starting._body(group={"kind": "named", "people": [later]}))
+    assert (refused.status_code, refused.json()["code"]) == (422, "group_person_not_in_run")
+    assert starting._counts(world) == before
+    runner = _runner(world, client, _Handing())
+    with pytest.raises(ComparisonRefused) as defined:
+        runner.define(
+            version_id,
+            comparison_id=uuid.uuid4(),
+            body=comparison_body(
+                runner,
+                [_model()],
+                SEEDS[:1],
+                control=False,
+                group=_group([later]),
+                others=runner.others_for(version_id, [later]),
+            ),
+        )
+    assert defined.value.code == "group_person_not_in_run"
+    # Everybody: the society's people, the two knights genesis places and the third, each asked
+    # once a minute in the model's run of the one seed.
+    everyone = client.get(
+        compared._route(world, "/plan"), headers=OWNER, params={**asked, "group": "everyone"}
+    )
+    assert everyone.status_code == 200, everyone.text
+    planned = everyone.json()
+    assert planned["plan_refusal"] is None, planned["plan_refusal"]
+    beings = planned["population"] + 3
+    assert planned["plan"]["asks_most"] == planned["window_ticks"] * beings
+    assert planned["plan"]["typical_usd"] is None
+    started_one = starting._start(started, starting._body())
+    assert started_one.status_code == 201, started_one.text
+    [stored] = _stored(world)
+    assert (stored["population"], stored["beings"]) == (planned["population"], beings)
+    config = stored["arms"]["model_a"]["provider_config"]
+    role = person_role()
+    assert config["prompt_version"] == role.terms(THINGS_PROFILE).prompt_version
+    assert config["prompt_version"] != role.prompt_version
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_catalogs_of_another_family_s_score_are_refused_when_defined(app, monkeypatch, tmp_path):
+    world, client = app
+    monkeypatch.setattr(reading, "READING_CATALOG", _things_line(tmp_path))
+    knights = _knights(client, world)
+    runner = dataclasses.replace(
+        _runner(world, client, _Handing()),
+        catalogs=comparison_catalogs_for_engine("exulanica-society/v5"),
+    )
+    with pytest.raises(ComparisonRefused) as refused:
+        runner.define(
+            world["binding"].version_id,
+            comparison_id=uuid.uuid4(),
+            body=comparison_body(
+                runner, [_model()], SEEDS[:1], control=False, group=_group(knights)
+            ),
+        )
+    assert refused.value.code == "score_engine_mismatch"

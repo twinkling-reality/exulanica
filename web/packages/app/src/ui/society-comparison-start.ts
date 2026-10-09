@@ -49,6 +49,7 @@ export const START_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   group_empty: 'The group names nobody.',
   group_person_unknown: 'Someone in the group is no longer in this world. Choose again.',
   group_visitor: 'A visitor cannot be in a comparison: every run starts before anybody crossed in. Choose again.',
+  group_person_not_in_run: 'Someone in the group was placed after this world\'s people began, so a run would not hold them from its start. Choose again.',
   seeds_out_of_range: 'This server holds fewer seeds than that.',
   bound_out_of_range: 'State a bound above $0 and at most the most the comparison can cost.',
   bound_over_budget: 'This server\'s model budget has too little left for that bound.',

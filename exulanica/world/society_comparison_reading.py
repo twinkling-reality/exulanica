@@ -237,11 +237,11 @@ def reading_bound(catalogs: ComparisonCatalogs, family: str | None = None) -> Re
     hour is read by its family's line over that window alone, and one the catalog states none for
     is refused by name (``window_not_offered``)."""
     values = protocol_values(catalogs)
-    if "pair_replay_budget_ms" not in values:
-        return None
     window = values["window_ticks"]
     named = family_of(catalogs) if family is None else family
     measured = measured_line(named, window)
+    # A family's own line is asked for before the protocol's figures are: an earlier protocol's
+    # population maximum was measured on the protocol's family as its line was.
     if window > _HOUR_TICKS and measured is None:
         raise ComparisonRefused(
             WINDOW_NOT_OFFERED,
@@ -254,6 +254,8 @@ def reading_bound(catalogs: ComparisonCatalogs, family: str | None = None) -> Re
             f"no line has been measured for reading a {named} society's runs, so how many of its "
             "people a comparison can run is not known",
         )
+    if "pair_replay_budget_ms" not in values:
+        return None
     line = values if measured is None else measured
     if (
         line["replay_per_person_us"] < 1

@@ -97,7 +97,7 @@ def model_goal_policies(
     promised = {
         policy["place_node_id"] for policy in directed.values() if "place_node_id" in policy
     }
-    prior = society_state_sha256(dict(state))
+    prior = society_state_sha256(state)
     # Everybody decided for this minute: a direct request, an applied choice, or a conversation.
     applied: set[str] = set()
     sequences = [receipt["decision_seq"] for receipt in receipts]
@@ -221,7 +221,7 @@ def append_decision_events(
     if len(receipts) != len(dispositions):
         raise ValueError("every consumed person decision has one disposition")
     people = {person["id"]: person for person in next_state["inhabitants"]}
-    previous_digest = society_state_sha256(dict(previous_state))
+    previous_digest = society_state_sha256(previous_state)
     result = list(events)
     for receipt, disposition in zip(receipts, dispositions, strict=True):
         if disposition.disposition not in _DISPOSITIONS:
