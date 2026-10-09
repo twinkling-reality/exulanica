@@ -22,7 +22,12 @@ from exulanica.grammar.grammars.city.massing import MassingRecord
 from exulanica.world.authored_delta import version_delta_sha256
 from exulanica.world.generated_worlds import compose_generated_world
 from exulanica.world.objects import ObjectOrigin, Transform
-from exulanica.world.placed_things import PlacedThing, named_kind, shipped_kind
+from exulanica.world.placed_things import (
+    PlacedThing,
+    named_kind,
+    shipped_kind,
+    workspace_kind_reference,
+)
 from exulanica.world.scenes import SceneArrival
 from exulanica.world.society_authored_ground import StandingPolicy, authored_ground_from_snapshot
 from exulanica.world.society_catalogs import purposeful_routine
@@ -494,6 +499,21 @@ def test_a_removed_thing_gives_the_town_back_its_surfaces():
     assert removed["navigation"]["nodes"] == _bare()["navigation"]["nodes"]
     assert removed["navigation"]["edges"] == _bare()["navigation"]["edges"]
     assert _unnamed(removed["targets"]) == _bare()["targets"] and removed["things"] == []
+
+
+def test_a_creature_its_workspace_keeps_is_left_out_of_a_town_s_v3_input():
+    # No society reads a thing of its workspace's own kind yet: placed on a footway, a drafted
+    # creature neither blocks it nor offers anything, nor makes the input unavailable as a kind
+    # the input does not know.
+    street = _node(lambda node: node["subject_id"].startswith("footway"))
+    creature = dataclasses.replace(
+        _thing("creature:5d1e9a07", "well", 2, street["position_mm"]),
+        kind=workspace_kind_reference("ab" * 32),
+    )
+    placed, bare = _compose(creature), _compose()
+    assert placed["availability"] == bare["availability"] == "available"
+    assert placed["navigation"] == bare["navigation"]
+    assert placed["targets"] == bare["targets"] and placed["things"] == bare["things"] == []
 
 
 def test_a_society_of_things_reads_no_living_place_and_needs_a_blocking_test():

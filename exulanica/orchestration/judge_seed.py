@@ -995,11 +995,10 @@ def _refuse_unfinished_creature_drafts(
     another server, where a worker could play it. An ended draft holds no word, and is carried as it
     is.
     """
-    present = connection.execute("select to_regclass('creature_draft') is not null as present")
-    if not present.fetchone()["present"]:
-        return
+    # The words live in the job, so the job is asked: a creature job queued or running.
     open_drafts = connection.execute(
-        "select count(*) as n from creature_draft where workspace_id = %s and finished_at is null",
+        "select count(*) as n from job where workspace_id = %s and kind = 'creature_draft' "
+        "and state in ('queued', 'running')",
         (workspace_id,),
     ).fetchone()
     if open_drafts["n"]:

@@ -1125,7 +1125,10 @@ export function parsePlacedThing(value: unknown): PlacedThing {
   const row = record(value, 'placed thing');
   const kind = record(row['kind'], 'placed thing kind');
   const origin = record(row['origin'], 'placed thing origin');
-  if (kind['source'] !== undefined && kind['source'] !== 'workspace') throw invalid('placed thing kind source');
+  // A shipped kind's document names no source; 'shipped' is read as the same, as the type admits.
+  if (kind['source'] !== undefined && kind['source'] !== 'workspace' && kind['source'] !== 'shipped') {
+    throw invalid('placed thing kind source');
+  }
   return Object.freeze({
     thingId: text(row['thing_id'], 'placed thing id'),
     kind: kind['source'] === 'workspace'

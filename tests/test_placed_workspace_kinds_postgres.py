@@ -13,6 +13,10 @@ What is shown, against PostgreSQL, through the routes a person's page calls:
     move is refused by name (410 ``thing_kind_erased``) and a removal still stands; keeping the same
     creature again does not bring that thing back, while a thing placed after it was kept again is
     there;
+*   a thing is gone by its kind's row alone, with no erasure recorded; undoing a gone thing's
+    removal keeps it gone, and undoing its placing takes it out; a branch holds a gone thing gone
+    after its creature is kept again;
+*   a world holding only a creature is not made a world of things;
 *   ``GET /things/plans/{plan_sha256}`` answers the drafted plan its workspace holds as the bytes
     of that digest, and another workspace's plan and an invented digest 404 alike;
 *   a shipped thing stored before the migration reads after it as the document it always was.
@@ -32,6 +36,7 @@ from exulanica.env import env_get
 from exulanica.migrations import migrations
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world import WorldObjectRepository
+from exulanica.world.object_repository import version_holds_things
 from exulanica.world.placed_things import ThingKindReference, placed_thing_document
 from exulanica.world.starter import AUTHORED_STARTER_REGION_ID, create_starter_authorities
 from psycopg.conninfo import make_conninfo
@@ -45,6 +50,10 @@ from thing_fixtures import kind_body, placeable_kind
 pytestmark = pytest.mark.postgres
 
 POSE = {"x_mm": 2_000, "y_mm": 0, "z_mm": 1_000, "yaw_microradians": 0}
+#: A placed creature's id, opaque as the page makes it (``creature:`` and the first eight of its
+#: draft's id): never made from the creature's label, whose words would outlive its erasure.
+WALKER = "creature:5d1e9a07"
+AGAIN = "creature:c03b7f21"
 #: The migration this file holds, by its title: its number is assigned at landing.
 TITLE = "_a_placed_thing_may_name_its_workspace_s_own_kind.sql"
 
@@ -103,7 +112,7 @@ def test_a_thing_is_placed_by_the_digest_of_a_kind_its_workspace_keeps(
     placed = _place(
         objects_api,
         version,
-        "thing:walker",
+        WALKER,
         {"source": "workspace", "sha256": creature.kind.sha256},
     )
     assert placed.status_code == 201, placed.text
@@ -112,8 +121,8 @@ def test_a_thing_is_placed_by_the_digest_of_a_kind_its_workspace_keeps(
     assert "gone" not in thing
     row = repository.connection.execute(
         "select kind_source,kind,kind_version,encode(kind_sha256,'hex') as sha256 "
-        "from world_alternate_thing where workspace_id=%s and thing_id='thing:walker'",
-        (repository.workspace_id,),
+        "from world_alternate_thing where workspace_id=%s and thing_id=%s",
+        (repository.workspace_id, WALKER),
     ).fetchone()
     assert row == {
         "kind_source": "workspace",
@@ -131,7 +140,7 @@ def test_a_digest_the_workspace_does_not_hold_is_refused_alike_with_nothing_writ
     )
     version = objects_api.version("Not ours")
     answers = [
-        _place(objects_api, version, "thing:walker", {"source": "workspace", "sha256": digest})
+        _place(objects_api, version, WALKER, {"source": "workspace", "sha256": digest})
         for digest in (elsewhere.kind.sha256, uuid.uuid4().hex * 2)
     ]
     assert {(answer.status_code, json.dumps(answer.json())) for answer in answers} == {
@@ -206,7 +215,7 @@ def test_an_erased_creature_s_thing_is_gone_and_keeping_it_again_does_not_bring_
     placed = _place(
         objects_api,
         version,
-        "thing:walker",
+        WALKER,
         {"source": "workspace", "sha256": creature.kind.sha256},
     )
     assert placed.status_code == 201, placed.text
@@ -215,7 +224,7 @@ def test_an_erased_creature_s_thing_is_gone_and_keeping_it_again_does_not_bring_
     assert thing["gone"] is True
     state = placed.json()["state_sha256"]
     moved = objects_api.post(
-        objects_api.in_world(f"{root}/thing:walker/move"),
+        objects_api.in_world(f"{root}/{WALKER}/move"),
         {"base_state_sha256": state, "pose": {**POSE, "x_mm": 0}},
     )
     assert (moved.status_code, moved.json()["code"]) == (410, "thing_kind_erased")
@@ -225,22 +234,134 @@ def test_an_erased_creature_s_thing_is_gone_and_keeping_it_again_does_not_bring_
     again = _place(
         objects_api,
         {**version, "state_sha256": state},
-        "thing:walker-again",
+        AGAIN,
         {"source": "workspace", "sha256": creature.kind.sha256},
     )
     assert again.status_code == 201, again.text
     things = {one["thing_id"]: one for one in _read(objects_api, version)["things"]}
-    assert things["thing:walker"]["gone"] is True
-    assert "gone" not in things["thing:walker-again"]
+    assert things[WALKER]["gone"] is True
+    assert "gone" not in things[AGAIN]
     removed = objects_api.post(
-        objects_api.in_world(f"{root}/thing:walker/remove"),
+        objects_api.in_world(f"{root}/{WALKER}/remove"),
         {"base_state_sha256": again.json()["state_sha256"]},
     )
     assert removed.status_code == 200, removed.text
     assert {one["thing_id"]: one["removed"] for one in removed.json()["things"]} == {
-        "thing:walker": True,
-        "thing:walker-again": False,
+        WALKER: True,
+        AGAIN: False,
     }
+
+
+def test_a_world_holding_only_a_creature_is_not_made_a_world_of_things(
+    objects_api, repository, writer, tmp_path
+):
+    # No society reads a thing of its workspace's own kind yet, so it never decides which society
+    # a saved world gets; a shipped thing beside it does.
+    creature = _kept(writer, repository.workspace_id, tmp_path / "looks", "lone walker")
+    version = objects_api.version("Only a creature")
+    placed = _place(
+        objects_api, version, WALKER, {"source": "workspace", "sha256": creature.kind.sha256}
+    )
+    assert placed.status_code == 201, placed.text
+
+    def holds(answer) -> bool:
+        return version_holds_things(
+            repository.connection,
+            repository.workspace_id,
+            objects_api.world_id,
+            uuid.UUID(answer["version_id"]),
+        )
+
+    assert holds(placed.json()) is False
+    shipped = _place(objects_api, placed.json(), "thing:shipped", kind_body(placeable_kind()))
+    assert shipped.status_code == 201, shipped.text
+    assert holds(shipped.json()) is True
+
+
+def test_a_thing_whose_kind_its_workspace_no_longer_holds_is_gone_with_no_erasure_recorded(
+    objects_api, repository, writer, tmp_path
+):
+    # The kind row deleted with no erasure recorded, as a workspace's tombstone purge deletes it:
+    # the absence alone makes the thing gone.
+    creature = _kept(writer, repository.workspace_id, tmp_path / "looks", "purged walker")
+    version = objects_api.version("Purged")
+    placed = _place(
+        objects_api, version, WALKER, {"source": "workspace", "sha256": creature.kind.sha256}
+    )
+    assert placed.status_code == 201, placed.text
+    connection = repository.connection
+    # Only the purge's definer deletes from the store (0172's append-only trigger), so the owner
+    # deletes as that role, with no erasure written, as a tombstone's purge does.
+    connection.commit()
+    with connection.transaction():
+        connection.execute("set local role exulanica_definer")
+        deleted = connection.execute(
+            "delete from thing_kind_version where workspace_id=%s and sha256=%s",
+            (repository.workspace_id, creature.kind.sha256),
+        )
+        assert deleted.rowcount == 1
+    erasures = connection.execute(
+        "select count(*) as count from thing_erasure where workspace_id=%s",
+        (repository.workspace_id,),
+    ).fetchone()
+    assert erasures["count"] == 0
+    [thing] = _read(objects_api, version)["things"]
+    assert thing["gone"] is True
+
+
+def test_undoing_a_gone_thing_s_removal_keeps_it_gone_and_undoing_its_placing_takes_it_out(
+    objects_api, repository, writer, tmp_path
+):
+    looks = tmp_path / "looks"
+    creature = _kept(writer, repository.workspace_id, looks, "undone walker")
+    version = objects_api.version("Undone")
+    root = f"/world/versions/{version['version_id']}/things"
+    placed = _place(
+        objects_api, version, WALKER, {"source": "workspace", "sha256": creature.kind.sha256}
+    )
+    assert placed.status_code == 201, placed.text
+    removed = objects_api.post(
+        objects_api.in_world(f"{root}/{WALKER}/remove"),
+        {"base_state_sha256": placed.json()["state_sha256"]},
+    )
+    assert removed.status_code == 200, removed.text
+    _erase(writer, repository.workspace_id, creature, looks)
+    back = objects_api.post(
+        objects_api.in_world(f"{root}/undo"), {"base_state_sha256": removed.json()["state_sha256"]}
+    )
+    assert back.status_code == 200, back.text
+    [thing] = back.json()["things"]
+    assert (thing["removed"], thing["gone"]) == (False, True)
+    out = objects_api.post(
+        objects_api.in_world(f"{root}/undo"), {"base_state_sha256": back.json()["state_sha256"]}
+    )
+    assert out.status_code == 200, out.text
+    assert out.json()["things"] == []
+
+
+def test_a_branch_holds_a_gone_thing_gone_after_its_creature_is_kept_again(
+    objects_api, repository, writer, tmp_path
+):
+    # The copy keeps its placing edit's time, so the erasure after it still makes it gone, and
+    # keeping the same creature again brings back neither the original nor the copy.
+    looks = tmp_path / "looks"
+    creature = _kept(writer, repository.workspace_id, looks, "branched walker")
+    version = objects_api.version("Before a branch")
+    placed = _place(
+        objects_api, version, WALKER, {"source": "workspace", "sha256": creature.kind.sha256}
+    )
+    assert placed.status_code == 201, placed.text
+    _erase(writer, repository.workspace_id, creature, looks)
+    _kept(writer, repository.workspace_id, looks, "branched walker")
+    branch = objects_api.post(
+        objects_api.in_world("/world/versions"),
+        {"title": "A branch", "parent_version_id": version["version_id"]},
+    )
+    assert branch.status_code == 201, branch.text
+    [thing] = branch.json()["things"]
+    assert (thing["thing_id"], thing["gone"]) == (WALKER, True)
+    [original] = _read(objects_api, version)["things"]
+    assert original["gone"] is True
 
 
 def test_the_plans_route_serves_a_held_plan_and_answers_404_alike(

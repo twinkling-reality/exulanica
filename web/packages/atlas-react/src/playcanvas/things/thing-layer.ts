@@ -40,7 +40,6 @@ import { PresenceFigure, facingOfYaw, type ThingFigure } from './figures.js';
 import type { Named, ThingLibrary } from './library.js';
 import { PickRing, rayMeets, ringRadius } from './ring.js';
 
-/** A placed thing as the version document lists it, in this page's words. */
 /**
  * The kind a placed thing names: a shipped kind by key, version and digest, or a kind its workspace
  * keeps by its document's digest alone (a creature drafted from a person's words).
@@ -49,6 +48,7 @@ export type PlacedKind =
   | { readonly source?: 'shipped'; readonly kind: string; readonly version: number; readonly sha256: string }
   | { readonly source: 'workspace'; readonly sha256: string };
 
+/** A placed thing as the version document lists it, in this page's words. */
 export interface PlacedThingRecord {
   readonly thingId: string;
   readonly kind: PlacedKind;

@@ -489,9 +489,9 @@ _WORLD_READS_WITH_A_MODEL: Final = _every(
 #: compared, within the bound its owner stated. Cancelling a comparison takes the same grants as
 #: starting one, so nobody else ends an owner's paid run. Asking for a creature from words commits
 #: the workspace to the creature drafter's calls and keeps what passes in its own store. A
-#: reference request commits the workspace
-#: to a planning and a reading call and to web searches against its credits; stopping one takes
-#: the same grants. A piece request commits the workspace to GPU time against its allowance.
+#: reference request commits the workspace to a planning and a reading call and to web searches
+#: against its credits; stopping one takes the same grants. A piece request commits the workspace
+#: to GPU time against its allowance.
 _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE),
     "POST /things/creatures",

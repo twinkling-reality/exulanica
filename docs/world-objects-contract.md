@@ -964,7 +964,8 @@ origin, and a move keeps its region, so a move changes its pose alone. `add_thin
 and `remove_thing` append to the version's edit log under the same compare-and-swap as every edit,
 naming the thing in the log's `thing_id`, and undo restores the stored document; an undone addition
 is a retained, removed row, and the same id may be placed again. A branched or carried version keeps
-its placed things as they are, since a shipped kind's version never changes.
+its placed things as they are: a shipped kind's version never changes, and a copied thing keeps its
+placing edit's time, so a workspace kind erased after that leaves the copy gone as well.
 
 A thing may instead name a kind its workspace keeps ([a workspace's own
 things](things-contract.md#a-workspaces-own-things), such as a creature drafted from words) by the
@@ -977,10 +978,18 @@ the workspace still holds the kind is read whenever the thing is read and never 
 workspace no longer holds it, or erased it after the thing was placed (so the same creature kept
 again does not bring that thing back), the thing is gone. The version document then marks it
 `"gone": true`, which is no part of the version's state or digest; nothing draws it, a move is
-refused as `410 thing_kind_erased`, and a removal or an undo still stands. A society of things
-leaves such a thing out of its input by name, whatever its region: a society reads shipped kinds
-alone and replays without the workspace's store, so the thing stands where it was placed and stops
-no society.
+refused as `410 thing_kind_erased`, and a removal or an undo still stands. Gone asks only whether
+the workspace holds the kind's row: a kind the drawing later cannot read stays present and is
+drawn as a miss. A society of things leaves such a thing out of its input by name, whatever its
+region: a society reads shipped kinds alone and replays without the workspace's store, so the thing
+stands where it was placed, stops no society and blocks no one (its beings walk through it), and
+whether a new society over a saved world is a society of things counts shipped kinds alone.
+
+A placed thing's id is the author's own text, and it stays in the row, the edit log and the state
+digest after its kind is erased, so a creature's id is never made from its label or the person's
+words: the page names a creature it places `creature:` and the first eight characters of its
+draft's id. A version holding a workspace kind keeps `schema_version` 5, so a page from before
+workspace kinds refuses that version until it reloads; the web and the API ship together.
 
 The version's delta gains a `things` section, sorted by `thing_id`, written only when the version
 holds a placed thing, which selects schema version 4; the version document then reads with

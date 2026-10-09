@@ -26,7 +26,6 @@ from exulanica.db.roles import RUNTIME_ROLE, provision_runtime_role
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role, load_manifest
-from exulanica.selection import creature_drafts as drafts
 from exulanica.store.configured import local_content_stores
 from exulanica.store.local import LocalContentAddressedStore
 from fastapi.testclient import TestClient
@@ -154,6 +153,35 @@ def test_a_kept_draft_reads_as_erased_once_its_creature_is_erased(served):
     )
 
 
+def test_a_kept_draft_reads_as_erased_once_nothing_holds_its_kind(served, repository):
+    # A workspace tombstone's purge deletes the kind and writes no erasure: the draft still reads
+    # erased, because nothing holds its digest.
+    client, database, workspace_id, stores = served
+    path = f"/things/creatures/drafts/{_ask(client, 'a gentle horse').json()['draft_id']}"
+    worker = _worker(
+        database, workspace_id, stores, _transport(form_of("horse", label="hill walker"))
+    )
+    assert worker.run_once(workspace_id) == "kept"
+    kind = _get(client, path).json()["kind"]
+    connection = repository.connection
+    connection.commit()
+    # Only the purge's definer deletes from the store (0172's append-only trigger).
+    with connection.transaction():
+        connection.execute("set local role exulanica_definer")
+        deleted = connection.execute(
+            "delete from thing_kind_version where workspace_id=%s and sha256=%s",
+            (workspace_id, kind["sha256"]),
+        )
+        assert deleted.rowcount == 1
+    after = _get(client, path).json()
+    assert (after["status"], after["kind"], after["look"], after["label"]) == (
+        "erased",
+        None,
+        None,
+        None,
+    )
+
+
 def test_a_refused_draft_answers_its_code_field_and_fixed_sentence(served):
     client, database, workspace_id, stores = served
     path = f"/things/creatures/drafts/{_ask(client, 'a red dragon').json()['draft_id']}"
@@ -206,16 +234,24 @@ def test_the_offer_says_whether_a_workspace_may_ask_and_how_long_drafts_take(ser
         True,
         None,
     )
-    # The timing is the role's own measured basis, rounded up to whole seconds.
+    # The timing is the role's own measured basis (17,439 and 24,898 ms), rounded up to whole
+    # seconds, and its timeout.
     assert offer["timing"] == {
         "record": binding.timeout_basis["record"],
-        "call_p50_seconds": -(-int(binding.timeout_basis["p50_ms"]) // 1000),
-        "call_longest_seconds": -(-int(binding.timeout_basis["longest_ms"]) // 1000),
-        "call_timeout_seconds": binding.timeout_seconds,
+        "call_p50_seconds": 18,
+        "call_longest_seconds": 25,
+        "call_timeout_seconds": 50,
     }
     assert "creature_movement_unbuilt" in offer["codes"]["refused"]
     assert "creature_not_drafted" in offer["codes"]["refused"]
-    assert offer["codes"]["failed"] == list(drafts.FAILURE_CODES)
+    assert offer["codes"]["failed"] == [
+        "drafter_unavailable",
+        "expired",
+        "not_served",
+        "request_refused",
+        "spending_refused",
+        "stranded",
+    ]
     assert offer["codes"]["cancelled"] == ["workspace_deleted"]
     elsewhere = _get(client, "/things/creatures/offered", _ELSEWHERE).json()
     assert (elsewhere["offered"], elsewhere["code"]) == (False, "creatures_not_run_here")

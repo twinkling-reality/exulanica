@@ -245,7 +245,9 @@ class AlternateVersionView(BaseModel):
     #: ending is not an edit, and a token that moved with one would refuse unrelated changes.
     point_map_instances: list[dict[str, JsonValue]]
     #: Things placed by their kind (``exulanica.world.placed_things``): each names a shipped thing
-    #: kind by key, version and digest. Nothing here says how one is drawn.
+    #: kind by key, version and digest, or a kind its workspace keeps by its digest alone with
+    #: ``source`` ``workspace``; ``gone`` marks one whose workspace kind is gone, read, never
+    #: stored. Nothing here says how one is drawn.
     things: list[dict[str, JsonValue]]
     edits: list[VersionEditView]
 

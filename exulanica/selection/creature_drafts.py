@@ -103,7 +103,6 @@ __all__ = [
     "end_unserved",
     "expire_unclaimed",
     "finish",
-    "kind_erased",
     "list_drafts",
     "plays_creatures_here",
     "read_draft",
@@ -122,7 +121,11 @@ JOB_KIND: Final = "creature_draft"
 LEASE_SECONDS: Final = 900
 MAXIMUM_CLAIMS: Final = 2
 #: A queued draft no worker has taken in this long is ended as failed (``expired``): a worker polls
-#: every second, so ten minutes untaken means none is coming.
+#: every second, so ten minutes untaken means none is coming. One worker thread plays one draft at
+#: a time across every listed workspace, each up to about 100 seconds (a call and its repair at the
+#: drafter's timeout), so a queue of more than about six such drafts can end its last ones as
+#: expired while the worker is still on its way; one open draft per requester bounds the queue by
+#: the number of people asking.
 QUEUED_EXPIRY_SECONDS: Final = 600
 #: A person's words for one creature: a line, as the drafter's form states its own.
 MAX_WORDS_CHARACTERS: Final = 400
@@ -285,17 +288,6 @@ class CreatureDraft:
 
 def _draft(row: Mapping[str, Any]) -> CreatureDraft:
     return CreatureDraft(**{name: row[name] for name in CreatureDraft.__slots__})
-
-
-def kind_erased(connection: psycopg.Connection, workspace_id: uuid.UUID, kind_sha256: str) -> bool:
-    """Whether the workspace erased the creature whose kind has this digest (``thing_erasure``)."""
-    with connection.cursor(row_factory=dict_row) as cursor:
-        row = cursor.execute(
-            "select exists (select 1 from thing_erasure where workspace_id=%s and sha256=%s) "
-            "as erased",
-            (workspace_id, kind_sha256),
-        ).fetchone()
-    return bool(row and row["erased"])
 
 
 def read_draft(

@@ -76,7 +76,9 @@ def _view(connection: Any, workspace_id: uuid.UUID, draft: drafts.CreatureDraft)
             kind = held.reference()
             look = dict(held.looks[0]) if held.looks else None
             label = held.label
-        elif drafts.kind_erased(connection, workspace_id, draft.kind_sha256):
+        else:
+            # Nothing holds the digest: the creature was erased, or went with its workspace's
+            # tombstone, whose purge deletes the kind and writes no erasure. Either way it is gone.
             status = "erased"
     model = None
     if draft.model_id is not None:

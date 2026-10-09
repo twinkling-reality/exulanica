@@ -179,6 +179,8 @@ def placeable_by_author(kind: ThingKind) -> ThingKind:
     routine (a visitor, decided for only by the program that sends it) is never placed."""
     deciders = kind.document["deciders"]
     if kind.klass == "being" and (deciders is None or "routine" not in deciders["allowed"]):
+        # Only a shipped kind reaches this: a drafted kind always allows the routine
+        # (exulanica.things.creatures), so the key named here is never one a person's words made.
         raise InvalidThingPlacement(
             f"a {kind.kind} is decided for only from outside, so an author does not place one"
         )

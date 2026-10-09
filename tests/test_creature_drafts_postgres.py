@@ -28,14 +28,18 @@ import re
 import threading
 import time
 import uuid
+from types import SimpleNamespace
 
 import psycopg
 import pytest
+from exulanica.api.services import Services
 from exulanica.db.roles import RUNTIME_ROLE, provision_runtime_role
 from exulanica.errors import TombstonedError
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role, load_manifest
+from exulanica.models.policy import HostedRequestRefused
+from exulanica.models.spending import SpendingRefused
 from exulanica.models.transport import HttpResponse
 from exulanica.selection import creature_drafts as drafts
 from exulanica.selection.creature_drafting import CHECK_SENTENCES, NOT_DRAFTED_SENTENCE
@@ -81,7 +85,7 @@ def _transport(form: dict | None = None) -> FakeTransport:
     return transport
 
 
-def _worker(database, workspace_id, stores, transport) -> drafts.CreatureDraftWorker:
+def _worker(database, workspace_id, stores, transport, policy=None) -> drafts.CreatureDraftWorker:
     client = ModelClient(
         api_key="test-key-not-real",
         manifest=load_manifest(),
@@ -92,7 +96,7 @@ def _worker(database, workspace_id, stores, transport) -> drafts.CreatureDraftWo
     return drafts.CreatureDraftWorker(
         database,
         client=client,
-        policy_for=lambda _workspace: RecordingPolicy(),
+        policy_for=lambda _workspace: RecordingPolicy() if policy is None else policy,
         looks_for=stores.looks.for_workspace,
         workspaces=lambda: [workspace_id],
     )
@@ -270,6 +274,105 @@ def test_drafts_no_worker_will_take_end_as_failed_with_their_words_blanked(serve
             assert ended is not None and (ended.status, ended.failure) == ("failed", failure)
             assert _payload(connection, draft) == {"draft_id": str(draft.draft_id)}
             assert _words_held(_kept_of(connection, draft), WORDS) == set()
+
+
+class _Refuses:
+    """The workspace's rules refusing the drafter's request as it leaves, with ``refusal``: a
+    request the rules refuse, or the spending authority's refusal raised where it leaves."""
+
+    def __init__(self, refusal: Exception) -> None:
+        self.refusal = refusal
+
+    def admit(self, _request):
+        raise self.refusal
+
+
+def _by_the_worker(transport, policy=None):
+    def end(served, _repository, _draft) -> None:
+        database, workspace_id, stores = served
+        worker = _worker(database, workspace_id, stores, transport, policy)
+        assert worker.run_once(workspace_id) == "failed"
+
+    return end
+
+
+def _stranded(served, repository, draft) -> None:
+    # Claimed as often as it may be, and its lease run out each time.
+    repository.connection.execute(
+        "update job set state='running', attempts=%s, claim_token=gen_random_uuid(), "
+        "lease_expires_at=now() - interval '1 second' where job_id=%s",
+        (drafts.MAXIMUM_CLAIMS, draft.job_id),
+    )
+    repository.connection.commit()
+    database, workspace_id, _stores = served
+    with database.session(workspace_id) as connection:
+        assert drafts.abandon_stranded(connection, workspace_id) == 1
+
+
+def _swept_at_startup(served, _repository, _draft) -> None:
+    # A process that knows the workspace by its tokens and serves it no creatures.
+    database, workspace_id, _stores = served
+    process = SimpleNamespace(
+        creature_workspaces=(),
+        tokens=SimpleNamespace(workspaces=(workspace_id,)),
+        accounts=None,
+        database=database,
+        serves_creatures_to=lambda _workspace: False,
+    )
+    assert Services.sweep_creatures(process) == 1
+
+
+def _orphaned(served, repository, draft) -> None:
+    # A job whose payload lost its words names no draft the worker can play: it is failed by name.
+    repository.connection.execute(
+        "update job set payload = payload - 'sent' where job_id=%s", (draft.job_id,)
+    )
+    repository.connection.commit()
+    database, workspace_id, stores = served
+    assert _worker(database, workspace_id, stores, _transport()).run_once(workspace_id) is None
+
+
+@pytest.mark.parametrize(
+    ("end", "failure"),
+    [
+        (_by_the_worker(_transport()), "drafter_unavailable"),
+        (
+            _by_the_worker(
+                _transport(form_of("horse", label="hill walker")),
+                _Refuses(SpendingRefused("spending_not_granted")),
+            ),
+            "spending_refused",
+        ),
+        (
+            _by_the_worker(
+                _transport(form_of("horse", label="hill walker")),
+                _Refuses(HostedRequestRefused("the workspace's rules refused the request")),
+            ),
+            "request_refused",
+        ),
+        (_stranded, "stranded"),
+        (_swept_at_startup, "not_served"),
+        (_orphaned, None),
+    ],
+    ids=["unavailable", "spending", "request", "stranded", "swept", "orphaned"],
+)
+def test_every_end_without_a_creature_blanks_its_job_s_words(served, repository, end, failure):
+    database, workspace_id, _stores = served
+    with database.session(workspace_id) as connection:
+        draft = _queue(connection, workspace_id, uuid.uuid4())
+    end(served, repository, draft)
+    with database.session(workspace_id) as connection:
+        assert _payload(connection, draft) == {"draft_id": str(draft.draft_id)}
+        assert _words_held(_kept_of(connection, draft), WORDS) == set()
+        ended = drafts.read_draft(connection, workspace_id, draft.draft_id)
+        assert ended is not None
+        if failure is None:
+            job = connection.execute(
+                "select state, failure_class from job where job_id=%s", (draft.job_id,)
+            ).fetchone()
+            assert (job["state"], job["failure_class"]) == ("failed", "creature_draft_missing")
+        else:
+            assert (ended.status, ended.failure) == ("failed", failure)
 
 
 def test_a_worker_that_lost_its_claim_ends_nothing(served):

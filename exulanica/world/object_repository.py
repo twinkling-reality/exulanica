@@ -670,8 +670,9 @@ class WorldObjectRepository:
         return CarryOutcome.CARRIED, None
 
     def _thing_carries(self, thing: PlacedThing) -> tuple[CarryOutcome, StayReason | None]:
-        # A placed thing names a shipped kind by its digest, and a shipped version never changes:
-        # it carries as it is.
+        # A placed thing names a shipped kind by its digest, and a shipped version never changes,
+        # or a kind its workspace keeps by its digest alone: it carries as it is. One whose
+        # workspace kind is gone stays gone in the copy, which keeps its placing edit's time.
         return CarryOutcome.CARRIED, None
 
     def _carry_edits(
@@ -2488,12 +2489,12 @@ class WorldObjectRepository:
         ).fetchone()
         if present is not None:
             raise InvalidObjectState(f"{placement.thing_id} already exists in this version")
-        held = self.connection.execute(
+        in_version = self.connection.execute(
             "select count(*) as n from world_alternate_thing where workspace_id=%s "
             "and world_id=%s and version_id=%s and not addition_undone",
             (self.workspace_id, self.world_id, row["version_id"]),
         ).fetchone()["n"]
-        if held >= PLACED_THINGS_MAXIMUM:
+        if in_version >= PLACED_THINGS_MAXIMUM:
             raise ThingLimitReached(
                 f"a version holds at most {PLACED_THINGS_MAXIMUM} placed things, removed ones "
                 "included; undo a placement to make room, or place it in another version"
@@ -2509,12 +2510,12 @@ class WorldObjectRepository:
             region_ids=self._source_region_ids(row["source_snapshot_id"]),
         )
         if isinstance(placement.kind, WorkspaceKindReference):
-            held = ThingStore(self.connection, self.workspace_id, None).kind_by_digest(
+            kept = ThingStore(self.connection, self.workspace_id, None).kind_by_digest(
                 placement.kind.sha256
             )
-            if held is None:
+            if kept is None:
                 raise InvalidThingPlacement("this workspace holds no thing kind at that digest")
-            placeable_by_author(held)
+            placeable_by_author(kept)
         else:
             placeable_by_author(shipped_kind(placement.kind))
         return placed
@@ -2572,7 +2573,11 @@ class WorldObjectRepository:
 
     def _things(self, version_id: uuid.UUID) -> tuple[PlacedThing, ...]:
         # A workspace kind is gone when the workspace no longer holds it, or erased it after the
-        # thing was placed (so the same document kept again never brings the thing back).
+        # thing was placed (so the same document kept again never brings the thing back). Gone asks
+        # only whether the kind's row is there: a kind the drawing later cannot read stays present
+        # and is drawn as a miss. Placing and erasing are ordered because both writers take the
+        # workspace's lock first (an edit in _begin_edit, an erasure in erase_creature), so an
+        # erasure is either before a placing edit, which then refuses the kind, or after it.
         rows = self.connection.execute(
             "select t.thing_id,t.kind_source,t.kind,t.kind_version,t.kind_sha256,t.region_id,"
             "t.x_mm,t.y_mm,t.z_mm,t.yaw_microradians,t.origin_kind,t.origin_role,t.removed,"
@@ -3070,13 +3075,16 @@ class WorldObjectRepository:
 def version_holds_things(
     connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, version_id: uuid.UUID
 ) -> bool:
-    """Whether a version of the world holds a thing its author placed and has not removed (an
-    undone placement is a removed one): what decides, with its ground and the host, whether a new
-    society over a saved world is a society of things
-    (:func:`~exulanica.world.society_grounds.created_engine`)."""
+    """Whether a version of the world holds a thing of a shipped kind its author placed and has not
+    removed (an undone placement is a removed one): what decides, with its ground and the host,
+    whether a new society over a saved world is a society of things
+    (:func:`~exulanica.world.society_grounds.created_engine`). A thing of a kind its workspace
+    keeps, a drafted creature, is not counted: no society reads such a thing yet
+    (:mod:`exulanica.world.society_authored_ground` leaves it out), so a world holding only one
+    keeps the society it would have had without it."""
     row = connection.execute(
         "select exists(select 1 from world_alternate_thing where workspace_id=%s "
-        "and world_id=%s and version_id=%s and not removed) as held",
+        "and world_id=%s and version_id=%s and not removed and kind_source='shipped') as held",
         (workspace_id, world_id, version_id),
     ).fetchone()
     return bool(row["held"])
