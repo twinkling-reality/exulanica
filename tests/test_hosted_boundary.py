@@ -802,7 +802,7 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "vision": (run_vision, "Describe this photograph"),
     "role decision": (run_person, "wait here a minute"),
     "action classifier": (run_actions, "put a bench"),
-    "world-edit drafter": (run_actions, "KINDS THAT CAN BE PLACED"),
+    "world-edit drafter": (run_actions, "KINDS OF OBJECT THAT CAN BE PLACED"),
     "simulation drafter": (run_actions, "LISTED SPEEDS"),
     "reference planner": (run_reference_planning, "a harbour town"),
     "reference reader": (run_reference_reading, "Whitewashed houses"),
