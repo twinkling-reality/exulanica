@@ -789,8 +789,9 @@ conversation (`tests/test_companion_action_policy_boundary.py`). Scripted tests 
 two measurements of a live model reading held-out requests into these plans, before and after
 each step's options moved last under a 640-token ceiling, are in
 [evidence and limits](#evidence-and-limits). The later binds the prompt `action-plan-5`; the
-current prompt, `action-plan-7`, adds things and beings and a being's hands acts, and is measured by
-neither.
+current prompt, `action-plan-8`, adds things and beings and a being's hands acts, asks each step's
+options to name what a thing goes beside or where a being goes as well as what is added or asked,
+and is measured by neither.
 
 ### Things and beings
 
@@ -800,7 +801,12 @@ newest shipped version and by its digest, an id minted when the plan is made
 (`companion:<kind>:<12 hex digits>`, carried in the typed step so a later step of the same request
 can name it before it exists), a pose and the person's origin role. The drafter names the kind and
 what it goes beside: a listed thing, object or being, or the kind of thing an earlier step of the
-request adds. A kind whose first look draws a reviewed object's own container is offered as that
+request adds. Of two kinds named in one step, where no earlier step adds either and exactly one
+already stands in the world, that one is what the other goes beside (a knight by the well, where a
+well stands); two things or beings of that kind are asked about by name. A later step drafted with
+the same options as an earlier one means the same again: two lanterns by the well are two lanterns
+beside the well, not a well beside the first lantern. A kind whose first look
+draws a reviewed object's own container is offered as that
 object (`place_object`), so a request for a bench takes the measured object path. Where it stands
 is laid out without the model ([action_things.py](../exulanica/selection/action_things.py)):
 beside what is named, on its side toward the person first, then its right, its left and behind it,
@@ -813,7 +819,11 @@ authority when the step is sent.
 
 One of a world's own beings is asked as `direct_thing`, the request
 `POST /world/versions/{version_id}/society/actions` takes: to go to a place the society's consumed
-input lists (`go_to`), or to use it (`perform` its activity). The request is built by the function
+input lists (`go_to`), or to use it (`perform` its activity). A place a thing provides belongs to
+that thing, so a step that names the thing rather than its place (the well, not the well's place to
+visit) goes to that thing's place, and a thing with several places is asked about by name. A kind
+named in such a step (the knight, the well) stands for the beings and things of that kind in the
+world, one of them taken and several asked about by name. The request is built by the function
 the route builds it with, on the society's state and the input a request would be made against now,
 so a step is offered only where the route would take it, and a refusal is the route's own name
 (`decided_from_outside` for a visitor its program decides for, `target_unreachable`,

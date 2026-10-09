@@ -186,6 +186,8 @@ class BeingRead:
     look_label: str | None
     came_by: str | None
     footprint: Footprint
+    #: Its kind's key, for a step naming a kind of thing to find the beings of that kind.
+    kind: str | None = None
 
     @property
     def from_outside(self) -> bool:
@@ -199,6 +201,9 @@ class PlaceRead:
     target_id: str
     title: str
     affordance: str
+    #: The placed id of the thing the place belongs to (a well's place to visit), or None for a
+    #: place an author laid out.
+    thing_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -500,6 +505,7 @@ def _society(
                     look_label=None,
                     came_by=came_by,
                     footprint=footprint,
+                    kind=None if kind is None else kind.kind,
                 )
             )
             continue
@@ -512,6 +518,7 @@ def _society(
                 look_label=_look_label(looks.get(person["id"])) or _look_label(first),
                 came_by=came_by,
                 footprint=footprint,
+                kind=None if kind is None else kind.kind,
             )
         )
     beings.sort(key=lambda being: (_near(being.footprint, viewer), being.id))
@@ -526,6 +533,7 @@ def _society(
                 title=_town_name(target)
                 or titles.get((origin, str(target.get("object_id"))), "a place"),
                 affordance=str(target["affordance"]),
+                thing_id=str(target.get("object_id")) if origin == "thing" else None,
             )
         )
     return SocietyRead(

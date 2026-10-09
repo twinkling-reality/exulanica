@@ -175,6 +175,7 @@ def _being(being_id: str, name: str, *, crossed: bool = False) -> things.BeingRe
         look_label=None if crossed else "blocky traveller",
         came_by="crossed" if crossed else "placed",
         footprint=things.Footprint(3_000, -3_000, BEING),
+        kind="visitor" if crossed else "traveller",
     )
 
 
@@ -194,7 +195,7 @@ def _read(**changes) -> things.ThingsRead:
             _being(str(uuid.UUID(int=3)), "Visitor", crossed=True),
         ),
         places=(
-            things.PlaceRead("thing:well:visit", "well", "visit"),
+            things.PlaceRead("thing:well:visit", "well", "visit", thing_id="well"),
             things.PlaceRead("authored:x:bench:rest", "bench", "rest"),
         ),
     )
@@ -208,6 +209,7 @@ def _read(**changes) -> things.ThingsRead:
                 "region:starter",
                 Transform(0, 0, -3_500, 0, 1000),
                 WELL,
+                kind="well",
             ),
         ),
         "society": society,
@@ -329,6 +331,68 @@ def test_two_kinds_neither_added_before_are_asked_about():
     assert verdict.clarification["actions"][0]["kind"] is None
 
 
+def test_a_kind_that_already_stands_names_what_a_thing_goes_beside():
+    """A drafter may name the well by its kind: of two kinds, the one standing in the world is what
+    the other goes beside, in either order; two standing of that kind are asked about by name."""
+    for options in (("knight", "well"), ("well", "knight")):
+        verdict = _draft(("place_thing", *options))
+        assert verdict.refusal is None and verdict.clarification is None
+        [action] = verdict.actions
+        assert (action.kind, action.near) == ("knight", "thing:well")
+    [both] = _draft(("place_thing", "knight", "well", "thing-1")).actions
+    assert (both.kind, both.near) == ("knight", "thing:well")
+    with_travellers = _world(
+        _read(kinds=tuple(_kind(key) for key in ("knight", "lantern", "traveller", "well")))
+    )
+    verdict = plan._typed_from_draft(
+        [{"operation": "place_thing", "options": ["lantern", "traveller"]}], with_travellers
+    )
+    assert verdict.clarification["code"] == "anchor_ambiguous"
+    assert [c["value"] for c in verdict.clarification["candidates"]] == [
+        f"being:{uuid.UUID(int=1)}",
+        f"being:{uuid.UUID(int=2)}",
+    ]
+
+
+def test_a_step_drafted_again_with_the_same_options_means_the_same_again():
+    """Two lanterns by the well, as a drafter writes it: the same options twice are two lanterns
+    beside the well, not a well beside the first lantern."""
+    first, second = _draft(
+        ("place_thing", "lantern", "well"), ("place_thing", "lantern", "well")
+    ).actions
+    assert [(a.kind, a.near) for a in (first, second)] == [("lantern", "thing:well")] * 2
+    assert first.thing_id != second.thing_id
+
+
+def test_a_walk_names_a_being_and_a_place_by_their_kinds_when_one_of_each_stands():
+    """A lantern by the knight, then the knight sent to the well, as a drafter writes it with kinds:
+    the one knight that stands, and the well's place."""
+    knight = things.BeingRead(
+        id=str(uuid.UUID(int=5)),
+        display_name="Knight",
+        kind_label="knight",
+        look_label="blocky knight",
+        came_by="placed",
+        footprint=things.Footprint(3_000, -3_000, BEING),
+        kind="knight",
+    )
+    read = _read()
+    world = _world(
+        dataclasses.replace(read, society=dataclasses.replace(read.society, beings=(knight,)))
+    )
+    verdict = plan._typed_from_draft(
+        [
+            {"operation": "place_thing", "options": ["knight", "lantern"]},
+            {"operation": "send_to", "options": ["knight", "well"]},
+        ],
+        world,
+    )
+    assert verdict.refusal is None and verdict.clarification is None
+    lantern, walk = verdict.actions
+    assert (lantern.kind, lantern.near) == ("lantern", f"being:{knight.id}")
+    assert (walk.act, walk.subject_id, walk.target_id) == ("go_to", knight.id, "thing:well:visit")
+
+
 def test_two_things_it_could_go_beside_are_asked_about_by_name():
     verdict = _draft(("place_thing", "lantern", "being-1", "being-2"))
     assert verdict.clarification["code"] == "anchor_ambiguous"
@@ -357,6 +421,33 @@ def test_a_being_is_asked_to_go_to_or_use_one_place():
     )
     verdict = _draft(("use", "being-1", "place-1", "place-2"))
     assert verdict.clarification["code"] == "place_ambiguous"
+
+
+def test_a_walk_or_a_use_that_names_a_thing_goes_to_that_thing_s_place():
+    """A drafter may name the well itself rather than its place: the well is gone to at the place
+    the society lists for it, and a thing with two places is asked about by name."""
+    [go] = _draft(("send_to", "being-1", "thing-1")).actions
+    assert (go.act, go.subject_id, go.target_id) == (
+        "go_to",
+        str(uuid.UUID(int=1)),
+        "thing:well:visit",
+    )
+    [use] = _draft(("use", "being-1", "thing-1")).actions
+    assert (use.act, use.target_id) == ("use", "thing:well:visit")
+    read = _read()
+    two = dataclasses.replace(
+        read.society,
+        places=(*read.society.places, things.PlaceRead("thing:well:draw", "well", "draw", "well")),
+    )
+    verdict = plan._typed_from_draft(
+        [{"operation": "use", "options": ["being-1", "thing-1"]}],
+        _world(dataclasses.replace(read, society=two)),
+    )
+    assert verdict.clarification["code"] == "place_ambiguous"
+    assert {c["value"] for c in verdict.clarification["candidates"]} == {
+        "thing:well:visit",
+        "thing:well:draw",
+    }
 
 
 @pytest.mark.parametrize(
