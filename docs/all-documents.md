@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**110 documents** in the public catalog.
+**111 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -167,6 +167,7 @@ Define acceptance methods and locate bounded execution evidence.
 | Document | Role | Owns |
 | --- | --- | --- |
 | [Evaluation methodology](evaluation-methodology.md) | reference | How the project measures, where each evaluation lives, and the photograph and Companion metrics |
+| [Corrections and negative results in the evaluation records](evaluation-corrections.md) | reference | Corrections, negative results and stated limits across the evaluation records, with the counts that summarize them |
 | [Evaluation corpus contract](evaluation-corpus-contract.md) | contract | Evaluation bundles, split access, clean replay and run archives for exulanica-eval |
 | [Visual gate targets](visual-gate-targets.md) | contract | Visual-gate targets, authentication conditions, record bindings, halts and key limits |
 | [Visual gate rubric: readsAsInhabitedStreet](visual-gate-rubric.md) | contract | Human visual judgement procedure and evidence rules; a frozen input bound by digest |
