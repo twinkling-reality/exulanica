@@ -134,6 +134,8 @@ interface Entry {
   parent: pc.Entity | null;
   /** Who holds it now and in which socket, while a society's state says one does. */
   heldBy: { readonly subjectId: string; readonly socket: string } | null;
+  /** The figure holding it: when its holder's figure is another (made again), that one holds it. */
+  heldIn: ThingFigure | null;
 }
 
 const ANIMATED_LOOK_KINDS: ReadonlySet<string> = new Set(['rigid_on_bones', 'skinned', 'light', 'catalog_person']);
@@ -190,7 +192,7 @@ export class ThingLayer {
       if (entry !== undefined) this.drop(id, entry);
       const fresh: Entry = {
         record, key, figure: null, look: null, generation: (entry?.generation ?? 0) + 1,
-        grip: null, parent: null, heldBy: null,
+        grip: null, parent: null, heldBy: null, heldIn: null,
       };
       this.entries.set(id, fresh);
       loads.push(this.build(id, fresh));
@@ -472,15 +474,17 @@ export class ThingLayer {
       const holder = thing?.held_by == null || thing.socket == null ? null : { subjectId: thing.held_by, socket: thing.socket };
       const holderFigure = holder === null ? null : society?.figures?.figureOf(holder.subjectId) ?? null;
       const holding = holder !== null && holderFigure?.hold !== undefined && entry.grip !== null;
-      // Out of a hand it no longer is in: back where it stands.
-      if (entry.heldBy !== null && (!holding || entry.heldBy.subjectId !== holder!.subjectId || entry.heldBy.socket !== holder!.socket)) {
-        const was = society?.figures?.figureOf(entry.heldBy.subjectId);
-        was?.release?.(entry.heldBy.socket);
+      // Out of a hand it no longer is in, or out of a figure made again since (a changed look's,
+      // which let it go): back where it stands until the holder's figure holds it.
+      if (entry.heldBy !== null && (!holding || entry.heldIn !== holderFigure
+        || entry.heldBy.subjectId !== holder!.subjectId || entry.heldBy.socket !== holder!.socket)) {
+        if (entry.heldIn !== null && figure.root.parent === entry.heldIn.root) entry.heldIn.release?.(entry.heldBy.socket);
         if (figure.root.parent !== entry.parent && entry.parent !== null) {
           figure.root.parent?.removeChild(figure.root);
           entry.parent.addChild(figure.root);
         }
         entry.heldBy = null;
+        entry.heldIn = null;
       }
       if (society === null) {
         figure.setVisible(true);
@@ -496,6 +500,7 @@ export class ThingLayer {
         if (holding && entry.heldBy === null) {
           holderFigure!.hold!(holder.socket, figure.root, entry.grip!);
           entry.heldBy = holder;
+          entry.heldIn = holderFigure;
         }
         // Held by someone not drawn now, or whose look holds nothing: not drawn either.
         figure.setVisible(holding);

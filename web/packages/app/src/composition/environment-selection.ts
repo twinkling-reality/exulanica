@@ -94,7 +94,7 @@ import { pointerRay, type SeatingLayout } from '@exulanica/atlas-react/playcanva
 import type { SocietyPlaces } from '../society-api.js';
 import { engineCreatedOver, societyEngine } from '../society-engines.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
-import { LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings, THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type MountedThings, type ThingLookChosenDetail, type ThingPickDetail, type ThingPickVia, type ThingsDependencies } from './things.js';
+import { LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings, THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type MountedThings, type ThingLookChosenDetail, type ThingPickDetail, type ThingPickVia, type ThingsDependencies, visitorsOf } from './things.js';
 import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
 import { mountPlayThisOne, type MountedPlayThisOne } from './play-this-one.js';
 import { SocietyPlayClient } from '../society-play-api.js';
@@ -587,6 +587,9 @@ export function mountEnvironmentSelection(
   /** Whether a looks read is under way, and whether a look chosen meanwhile asks for one after it. */
   let looksReading = false;
   let looksAgain = false;
+  /** The visitors the last drawn minute holds, and those it held when the looks were last asked for. */
+  let drawnVisitors: ReadonlySet<string> = new Set();
+  let looksAskedVisitors: ReadonlySet<string> = new Set();
   let bridgesReading = false;
   /** Which of a society's events are new, and the bridge each visitor crossed through. */
   const visitorWatch = new VisitorNoticeWatch();
@@ -2129,20 +2132,22 @@ export function mountEnvironmentSelection(
    * minute while it is drawn, playing or paused (`looksReadDue`): a choice made elsewhere arrives and
    * one the store no longer lists (a withdrawn look's) leaves; then draw them
    * (`MountedThings.setLooks`) and ask the crowd again, which makes again only a thing whose look changed.
-   * A look chosen on the page (`THING_LOOK_CHOSEN_EVENT`) is read at once, outside the minute; looks
-   * chosen while a read is under way are read once more after it, so the read that draws them starts
-   * after every one of them was recorded.
+   * A look chosen on the page (`THING_LOOK_CHOSEN_EVENT`) is read at once, outside the minute, and so
+   * is a drawn minute that brings in a visitor the last read was not asked with (`visitorsOf`), whose
+   * crossing's look is already recorded; looks chosen or visitors arriving while a read is under way
+   * are read once more after it, so the read that draws them starts after every one was recorded.
    */
-  function readLooks(reason: 'minute' | 'chosen' = 'minute'): void {
+  function readLooks(reason: 'minute' | 'chosen' | 'arrived' = 'minute'): void {
     const world = savedWorld;
     if (things === null || world === null) return;
     if (looksReading) {
-      if (reason === 'chosen') looksAgain = true;
+      if (reason !== 'minute') looksAgain = true;
       return;
     }
     const now = performance.now();
     if (reason === 'minute' && !looksReadDue(looksAskedAt, now)) return;
     looksAskedAt = now;
+    looksAskedVisitors = drawnVisitors;
     looksReading = true;
     stopLooksTimer();
     const client = deps.thingLooksClient ?? new ThingLooksClient({ ...deps.credentials, worldId: world.worldId });
@@ -2401,7 +2406,9 @@ export function mountEnvironmentSelection(
     reflectSeatingMisses(runtime);
     // The state just drawn: `renderedSnapshot` names it only once this returns.
     refreshMarks(next.state);
-    if (next.state.things !== undefined) readLooks();
+    drawnVisitors = visitorsOf(next.state);
+    const arrived = [...drawnVisitors].some((id) => !looksAskedVisitors.has(id));
+    if (next.state.things !== undefined) readLooks(arrived ? 'arrived' : 'minute');
     // A new minute drawn: the played being's options are read again.
     if (next.state.tick !== renderedSnapshot?.state.tick) playThisOne?.minuteMoved();
     moved = [...named.values()];
@@ -2901,6 +2908,8 @@ export function mountEnvironmentSelection(
       grants = null;
       grantsAskedAt = Number.NEGATIVE_INFINITY;
       looksAskedAt = Number.NEGATIVE_INFINITY;
+      drawnVisitors = new Set();
+      looksAskedVisitors = new Set();
       stopLooksTimer();
       visitorWatch.reset();
       lineWatch.reset();

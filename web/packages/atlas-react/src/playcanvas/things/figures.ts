@@ -51,7 +51,11 @@ export interface ThingFigure {
   pose(pose: ThingPose): void;
   /** After the engine's animation step, for a look whose clips play there. */
   afterAnimation?(): void;
-  /** Hold `entity` (a figure's root, given over) in `socket`, gripped at `grip`. */
+  /**
+   * Hold `entity` (a figure's root, lent by the layer that drew it) in `socket`, gripped at `grip`.
+   * The figure lets it go, never destroys it: when it holds another there, and when it is destroyed
+   * itself (a person made again in another look), so the layer can hold it in the new figure.
+   */
   hold?(socket: string, entity: pc.Entity, grip: Grip): void;
   release?(socket: string): pc.Entity | null;
   /** Where the mark and a line's bubble hang, in the world. */
@@ -333,7 +337,7 @@ export class PresenceFigure implements ThingFigure {
   }
 
   hold(socket: string, entity: pc.Entity, grip: Grip): void {
-    this.release(socket)?.destroy();
+    this.release(socket);
     this.root.addChild(entity);
     this.held.set(socket, { entity, grip });
   }
@@ -355,7 +359,7 @@ export class PresenceFigure implements ThingFigure {
   }
 
   destroy(): void {
-    for (const { entity } of this.held.values()) entity.destroy();
+    for (const socket of [...this.held.keys()]) this.release(socket);
     this.root.destroy();
     for (const material of this.materials) material.destroy();
     this.texture.destroy();

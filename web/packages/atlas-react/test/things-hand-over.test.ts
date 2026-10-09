@@ -60,15 +60,24 @@ async function setup() {
   await layer.setPlaced([{ thingId: 'sword-1', kind: served.kindRef('sword', 1), regionId: 'r', transform: at(2000, 0), removed: false } satisfies PlacedThingRecord]);
   const figures = new ThingCrowdFigures({ maker: layer.maker });
   // Two people of the knight's kind, the giver at x 1 m and the taker at x -1 m.
+  const people = new Map<string, ThingCrowdRenderable>();
   const person = (id: string, x: number) => {
     const made = figures.figureFor({ id, synthetic: true, position_mm: [x * 1000, 0], kind: served.kindRef('knight', 1) })!
       .factory(device, region, identity(id), 'near') as ThingCrowdRenderable;
     made.pose({ position: [x, 0, 0], deltaSeconds: 1 / 60, yaw: 0 } as never);
+    people.set(id, made);
     return made;
   };
-  const giver = person('giver', 1);
-  const taker = person('taker', -1);
+  person('giver', 1);
+  person('taker', -1);
   for (let i = 0; i < 8; i += 1) await settle();
+  /** The crowd makes a person again where they stand (as a changed look does): the old figure goes. */
+  const remake = async (id: string, x: number) => {
+    people.get(id)!.destroy();
+    const made = person(id, x);
+    for (let i = 0; i < 8; i += 1) await settle();
+    return made;
+  };
   const ended = new Map<string, boolean>();
   const walkEnded = (id: string) => ended.get(id) ?? true;
   const step = () => (layer as unknown as { step(dt: number): void }).step(1 / 60);
@@ -78,7 +87,7 @@ async function setup() {
   /** Whose right hand the sword's grip is in, or null when it is in neither. */
   const inHandOf = (): string | null => {
     const point = sword.root.getWorldTransform().transformPoint(new pc.Vec3(0, grip, 0), new pc.Vec3());
-    for (const [id, renderable] of [['giver', giver], ['taker', taker]] as const) {
+    for (const [id, renderable] of people) {
       const hand = (renderable.figure as RigidOnBonesFigure).socketPosition('hand.right')!;
       if (point.distance(hand) < 1e-6) return id;
     }
@@ -92,7 +101,7 @@ async function setup() {
       ...{ socket: heldBy === null ? null : 'hand.right' },
     }],
   });
-  return { layer, figures, sword, ended, walkEnded, step, inHandOf, state, region };
+  return { layer, figures, sword, ended, walkEnded, step, inHandOf, state, region, remake };
 }
 
 describe('a thing changing hands, as the people walk to it', () => {
@@ -132,6 +141,20 @@ describe('a thing changing hands, as the people walk to it', () => {
     walking = false;
     step();
     expect(sword.root.enabled).toBe(false);
+  });
+
+  it('keeps it in hand when its holder is made again, as a changed look makes them', async () => {
+    const { layer, figures, walkEnded, step, inHandOf, state, sword, remake } = await setup();
+    layer.setSociety(state('giver'), figures, walkEnded);
+    step();
+    expect(inHandOf()).toBe('giver');
+    const again = await remake('giver', 1);
+    step();
+    // The sword is the layer's own drawing, lent to the hand: whole, and in the new figure's hand.
+    expect(sword.root.children.length).toBeGreaterThan(0);
+    expect(sword.root.parent).toBe(again.figure!.root);
+    expect(inHandOf()).toBe('giver');
+    expect(sword.root.enabled).toBe(true);
   });
 
   it('waits for the giver too when the taker arrives first', async () => {

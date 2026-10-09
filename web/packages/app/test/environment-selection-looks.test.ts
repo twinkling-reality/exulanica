@@ -81,7 +81,7 @@ const thingsSociety = (): SocietySnapshot => parseSociety({
   },
 });
 
-function mount(withSociety: boolean, looksClient: { read: (versionId: string) => Promise<ReadonlyMap<string, ThingLookChoice>> }) {
+function mount(withSociety: boolean, looksClient: { read: (versionId: string) => Promise<ReadonlyMap<string, ThingLookChoice>> }, society: () => SocietySnapshot = thingsSociety) {
   const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
   const regionEntity = { name: 'authored-region:region:starter' };
   const crowd = {
@@ -102,7 +102,7 @@ function mount(withSociety: boolean, looksClient: { read: (versionId: string) =>
     memoryLayerVisible: false, onMemoryLayerChange: null,
   };
   const societyClient = {
-    read: vi.fn(async () => { if (!withSociety) throw missing(); return thingsSociety(); }),
+    read: vi.fn(async () => { if (!withSociety) throw missing(); return society(); }),
     create: vi.fn(), connect: vi.fn(), advance: vi.fn(), events: vi.fn(async () => []),
   };
   const control = () => parseSocietyControl({
@@ -135,6 +135,25 @@ function mount(withSociety: boolean, looksClient: { read: (versionId: string) =>
   document.body.append(mounted.root);
   return { mounted, crowd, controls, canvas, shell, regionEntity };
 }
+
+/** The society at a later minute, when a visitor has crossed in beside the knight. */
+const withVisitor = (tick: number): SocietySnapshot => {
+  const before = thingsSociety();
+  const knight = before.state.inhabitants[0]!;
+  return parseSociety({
+    society_id: 'society', version_id: 'version', branch_id: 'version', place_id: 'derived-place',
+    population_size: 2, current_tick: tick, state_sha256: String(tick).repeat(64), input_seq: 1, input_sha256: 'b'.repeat(64),
+    state: { profile: 'exulanica-society/v7', society_id: 'society', branch_id: 'version', tick, input_seq: 1,
+      input_sha256: 'b'.repeat(64),
+      inhabitants: [knight, { ...knight, id: 'visitor-1', display_name: 'Traveller', came_by: 'crossed', placed_id: null }],
+      things: before.state.things },
+    places: {
+      input_seq: 1, input_sha256: 'b'.repeat(64), availability: 'available', unavailable_reason: null,
+      walkable_area: { source: 'declared', centre_mm: [0, 0], half_width_mm: 12000, half_depth_mm: 12000 },
+      clearance_mm: 450, targets: [], unavailable_affordances: [],
+    },
+  });
+};
 
 const LOOK = { key: 'stone-well', version: 1, sha256: 'd'.repeat(64) };
 const MANNEQUIN = { key: 'kaykit-mannequin', version: 1, sha256: 'e'.repeat(64) };
@@ -192,6 +211,38 @@ describe('the looks chosen for a society of things\' things', () => {
       mounted.dispose();
       await vi.advanceTimersByTimeAsync(120_000);
       expect(looksClient.read).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads them at once when a drawn minute brings in a visitor, so it arrives in the look its crossing chose', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      let snapshot = thingsSociety();
+      let choices = new Map<string, ThingLookChoice>();
+      const looksClient = { read: vi.fn(async (_versionId: string) => choices as ReadonlyMap<string, ThingLookChoice>) };
+      const { mounted, crowd } = mount(true, looksClient, () => snapshot);
+      const refresh = async () => {
+        [...mounted.root.querySelectorAll('button')].find((button) => button.textContent === 'Refresh persisted society')!.click();
+        await vi.advanceTimersByTimeAsync(10);
+      };
+      await mounted.begin();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(looksClient.read).toHaveBeenCalledTimes(1);
+      // Five seconds on, the next minute brings in a visitor, whose crossing chose the mannequin.
+      await vi.advanceTimersByTimeAsync(5_000);
+      choices = new Map([['visitor-1', { thingId: 'visitor-1', placedId: null, look: MANNEQUIN, chosenBy: 'crossing', chosenAt: '2026-10-09T14:02:00.000000Z' }]]);
+      snapshot = withVisitor(4);
+      await refresh();
+      expect(looksClient.read).toHaveBeenCalledTimes(2);
+      const figures = crowd.setFigures.mock.calls[0]![0] as { figureFor(person: unknown): { key: string } | null };
+      expect(figures.figureFor(snapshot.state.inhabitants[1]!)!.key).toContain(`|kaykit-mannequin/1/${'e'.repeat(64)}`);
+      // The minute after holds the same visitor and nobody new: nothing more is read inside the minute.
+      snapshot = withVisitor(5);
+      await refresh();
+      expect(looksClient.read).toHaveBeenCalledTimes(2);
+      mounted.dispose();
     } finally {
       vi.useRealTimers();
     }

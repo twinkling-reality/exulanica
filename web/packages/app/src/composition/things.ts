@@ -144,10 +144,20 @@ export const LOOKS_READ_INTERVAL_MS = 60_000;
 /**
  * Whether the looks chosen for a society's things are to be read now: once a minute while a society
  * of things is drawn, the first time at once, and never within `LOOKS_READ_INTERVAL_MS` of the last
- * ask. A visitor's look is recorded in the minute that brings it in, so it is read within a minute.
+ * ask, but for a minute that brings in a visitor (`visitorsOf`).
  */
 export function looksReadDue(askedAt: number, now: number): boolean {
   return now - askedAt >= LOOKS_READ_INTERVAL_MS;
+}
+
+/**
+ * The visitors a society's minute holds, by id. A visitor's look is recorded in the minute that
+ * brings it in, so a drawn minute holding one the last looks read was not asked with reads the looks
+ * at once, outside the minute: the visitor arrives in the look its crossing chose, not in its kind's
+ * first until the next minute's read.
+ */
+export function visitorsOf(state: OwnedSocietyState): ReadonlySet<string> {
+  return new Set(state.inhabitants.filter((person) => person.came_by === 'crossed').map((person) => person.id));
 }
 
 export function placedThingRecord(thing: PlacedThing): PlacedThingRecord {

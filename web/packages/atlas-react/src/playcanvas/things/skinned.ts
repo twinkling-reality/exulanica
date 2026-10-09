@@ -262,7 +262,7 @@ export class SkinnedFigure implements ThingFigure {
   }
 
   hold(socket: string, entity: pc.Entity, grip: Grip): void {
-    this.release(socket)?.destroy();
+    this.release(socket);
     this.root.addChild(entity);
     this.held.set(socket, { entity, grip });
   }
@@ -284,7 +284,8 @@ export class SkinnedFigure implements ThingFigure {
   }
 
   destroy(): void {
-    for (const { entity } of this.held.values()) entity.destroy();
+    // What it holds is lent (`ThingFigure.hold`): let go, never destroyed.
+    for (const socket of [...this.held.keys()]) this.release(socket);
     this.root.destroy();
   }
 

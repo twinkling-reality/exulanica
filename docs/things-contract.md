@@ -900,19 +900,22 @@ its gate, or one whose arrival the page never read, appears and goes where it st
 under reduced motion.
 
 A thing wears the look chosen for it where one is, from the looks chosen for its version's society
-(`GET /world/versions/{version_id}/thing-looks`): a person in the crowd, a placed thing in the layer; a
-thing with none wears its kind's first look. The choices are read when a society of things is first
+(`GET /world/versions/{version_id}/thing-looks`): a person in the crowd, a placed thing in the layer;
+a thing with none wears its kind's first look. The choices are read when a society of things is first
 drawn and then once a minute while it is drawn, playing or paused: one private read a minute for each
 open world page. A look chosen on the page is read at once: once its look route answers, the chooser
 raises `exulanica:thing-look-chosen` on the shell, naming the thing by its id in the society, and the
 page reads the choices outside the minute (looks chosen while a read is under way are read once more
-after it) and draws what the read lists, not what was sent. A visitor whose look its crossing chose
-is dressed within a minute of arriving, a choice made in another browser arrives, and a choice the
-read no longer lists (one naming a look the
-workspace withdrew) leaves, the thing returning to its kind's first look. A thing wearing a look its
-workspace keeps is listed apart (`workspace_looks`) by the look's digest alone; its key and version
-are its own document's, read by that digest and held to it, and one no longer held is left out. A
-person whose look changes is made again where they stand, and nobody else is.
+after it) and draws what the read lists, not what was sent. A drawn minute that brings in a visitor
+the last read was not asked with is read at once too: the crossing recorded the visitor's look before
+that minute, so the visitor arrives in the look its crossing chose, never in its kind's first until
+the next minute's read. The minute's read brings a choice made in another browser, and a choice the
+read no longer lists (one naming a look the workspace withdrew) leaves, the thing returning to its
+kind's first look. A thing wearing a look its workspace keeps is listed apart (`workspace_looks`) by
+the look's digest alone; its key and version are its own document's, read by that digest and held to
+it, and one no longer held is left out. A person whose look changes is made again where they stand,
+and nobody else is; what they hold stays in their hand, the old figure letting it go and the new one
+taking it.
 
 A kind or look the shipped library does not hold at the digest named is asked of the workspace's
 own store (`GET /things/kinds/{sha256}`, `GET /things/looks/{sha256}` and its `/container`), only
