@@ -16,7 +16,10 @@ What is shown:
     replay carries it;
 *   the Companion's answers that cited the society's world version are withdrawn, their text kept;
 *   a society of another version of the same world, and another workspace's, keep every row at
-    both entry points, and an erasure written in another workspace's name is refused.
+    both entry points, and an erasure written in another workspace's name is refused;
+*   a society whose being a model decides for, whose other being a bridge's program decides for
+    through the door, and which a development comparison compared, is erased with every row of
+    the door's asks and answers, the model's choices and decisions and the comparison's records.
 """
 
 from __future__ import annotations
@@ -31,7 +34,9 @@ import pytest
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
 from exulanica.db.session import set_workspace
 from exulanica.migrations import migrations
+from exulanica.orchestration.compare import comparison_body
 from exulanica.selection.validation import Session
+from exulanica.world import society_comparison_reading as reading
 from exulanica.world.companion_memory import CompanionMemoryRepository, SimulationCitation
 from exulanica.world.repository import WorldStyleRepository
 from exulanica.world.society_controls import LEASE_SECONDS
@@ -42,10 +47,17 @@ from psycopg import sql
 import pg_harness
 import test_outside_deciders_postgres as outside
 import test_society_authored_world_postgres as authored
+import test_society_person_decisions_postgres as decisions
 import test_society_play_postgres as play
 import test_society_stay_requests_api as stays
+import test_society_things_comparison_postgres as things_comparison
 import test_society_things_postgres as things_api
+from comparison_support import SEEDS
 from test_companion_memory import _answer
+from test_door_crossings_postgres import crossings as crossings
+from test_door_lines_postgres import _Bridge, _host, _Knight, _minute, _person
+from test_door_postgres import _credential, _hello
+from test_door_postgres import door as door
 from test_society_person_decisions_postgres import _claim, _services
 from test_society_saved_world_api import OWNER, routes
 
@@ -387,8 +399,9 @@ def _erased_tables(connection) -> list[str]:
     return sorted(set(re.findall(r"delete from (\w+)", body)))
 
 
-def _workspace_rows(connection, workspace) -> dict[str, int]:
-    """How many rows of each table the erasure deletes from ``workspace`` holds."""
+def _workspace_rows(connection, workspace, also=frozenset()) -> dict[str, int]:
+    """How many rows of each table the erasure deletes from ``workspace`` holds, and of each table
+    named in ``also``, which a test names from its own scenario rather than the erasure's body."""
     counts = {
         table: connection.execute(
             sql.SQL("select count(*) as n from {} where workspace_id = %s").format(
@@ -396,7 +409,7 @@ def _workspace_rows(connection, workspace) -> dict[str, int]:
             ),
             (workspace,),
         ).fetchone()["n"]
-        for table in _erased_tables(connection)
+        for table in sorted(set(_erased_tables(connection)) | set(also))
     }
     connection.commit()
     return counts
@@ -715,3 +728,100 @@ def test_a_held_erasure_names_a_society_its_workspace_holds_at_its_own_version(a
         with pytest.raises(psycopg.errors.CheckViolation, match="a society its workspace holds"):
             erase(society, version)
     assert _society_rows(world["connection"], society_id) == before
+
+
+#: The tables a society's door asks, model decisions and comparisons write, each holding a row of
+#: the played scenario below before the erasure: the door's asks and its program's answers, the
+#: model the owner chose and its decisions, and a development comparison's definition, runs and
+#: decisions. (An hour comparison's start, written by the start route, is the lock test's.)
+WRITTEN_BESIDE_THE_PLAY = frozenset(
+    {
+        "door_ask",
+        "door_answer",
+        "world_society_model_choice",
+        "world_society_decision",
+        "society_comparison",
+        "society_comparison_run",
+        "society_comparison_decision",
+    }
+)
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_an_erasure_takes_the_society_s_door_asks_model_decisions_and_comparisons_with_it(
+    door, crossings, monkeypatch, tmp_path
+):
+    """The scenario the catalog test alone stood for: a knight a model decides for, a squire a
+    bridge's program decides for through the door, and a development comparison of the society,
+    each through the product's own path. Every table those write holds a row of this workspace,
+    which holds no other society; after the route, no table the erasure deletes from holds one."""
+    world, client = door["world"], door["client"]
+    services = client.app.state.services
+    things_api._place(client, world, "well", "well", 2, -4_000, 2_000)
+    things_api._place(client, world, "knight", "knight", 1, 3_000, 3_000)
+    things_api._place(client, world, "squire", "knight", 1, -3_000, 3_000)
+    society = things_api._make_society(client, world)
+    knight = _person(society, placed="knight")["id"]
+    squire = _person(society, placed="squire")["id"]
+    host, manifest, model_id = _host(door, _Knight())
+    model = {"provider": manifest.spec(model_id).provider, "model_id": model_id}
+    decisions._choose(services, world, [knight], model, manifest=manifest)
+    issued = client.post(
+        "/door/grants",
+        headers=OWNER,
+        params={"world_id": world["binding"].world_id},
+        json={
+            "idempotency_key": "erasure-squire",
+            "bridge": "test-bridge",
+            "things": [squire],
+            "version_id": str(world["binding"].version_id),
+        },
+    )
+    assert issued.status_code == 201, issued.text
+    channel = _credential(door, issued.json()["grant"]["grant_id"])
+    hello = _hello(door, channel)
+    assert hello.status_code == 200, hello.text
+    connection = world["connection"]
+
+    def decided() -> set[str]:
+        """Who answered an accepted request: the door (an outside program) or a model."""
+        return {
+            "external" if receipt["provider"].get("kind") == "external" else "model"
+            for receipt in decisions._decisions(services, world, society)
+            if receipt["status"] == "accepted" and receipt["provider"] is not None
+        }
+
+    with _Bridge(client, channel, hello.json()["cursor"], lambda f: {"label": f["idle_label"]}):
+        for _ in range(10):
+            society = _minute(door, host, world, society)
+            if {"external", "model"} <= decided():
+                break
+        else:
+            raise AssertionError(f"the knight and the squire were not both decided: {decided()}")
+
+    monkeypatch.setattr(reading, "READING_CATALOG", things_comparison._things_line(tmp_path))
+    runner = things_comparison._runner(world, client, things_comparison._Handing())
+    comparison_id = uuid.uuid4()
+    version_id = world["binding"].version_id
+    runner.define(
+        version_id,
+        comparison_id=comparison_id,
+        body=comparison_body(
+            runner,
+            [things_comparison._model()],
+            SEEDS[:1],
+            control=False,
+            group=things_comparison._group([knight]),
+            others=runner.others_for(version_id, [knight]),
+        ),
+    )
+    runner.run_all(comparison_id, runner.reserve_all(comparison_id, SEEDS[:1]))
+
+    before = _workspace_rows(connection, world["workspace"], WRITTEN_BESIDE_THE_PLAY)
+    held = {table for table, count in before.items() if count}
+    assert held >= WRITTEN_BESIDE_THE_PLAY, sorted(WRITTEN_BESIDE_THE_PLAY - held)
+    scope, _, path = routes(world)
+    erased = client.delete(path, headers=OWNER, params=scope)
+    assert erased.status_code == 204, erased.text
+    after = _workspace_rows(connection, world["workspace"], WRITTEN_BESIDE_THE_PLAY)
+    assert {table: count for table, count in after.items() if count} == {}
