@@ -104,8 +104,15 @@ Nebius Token Factory as `structured_extraction` and is offered for no place-name
 personal model right, so no right granted for another role reaches a web lookup
 ([model selection](model-and-service-selection.md)).
 
-The job ends within 30 seconds: each model call is given what is left of that as its own deadline,
-and past it the job ends partial with what it has, so a person is never left waiting on a source.
+Each step has its own share of the job's time, each from a measured latency by the model
+manifest's timeout rule (the longest measured, times two, rounded up to five seconds): the planner
+and the reader the `reference_drafting` role's timeout, a picture the `reference_vision` role's, and
+the searches, which are sent at once, their own basis (`SEARCH_LONGEST_MS` in
+`exulanica/references/worker.py`, the longest of nine searches measured on 2026-10-09). The job's
+deadline is the sum of its steps' shares, so slow searches never take the reader's time. Each model
+call is given its share, or what is left of the deadline when that is less; a call cut by it is
+recorded with the reason `deadline`. Past the deadline the job ends partial with what it has, so a
+person is never left waiting on a source.
 At shutdown a running job ends partial at its next step. A source not configured, credits spent, or
 a reported cost other than the catalog's stop the searches and leave the bundle partial with the
 reason; a cost change is recorded at the credits the source reported and stops that source for the

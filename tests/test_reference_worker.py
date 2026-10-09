@@ -32,7 +32,7 @@ from exulanica.references import store
 from exulanica.references.adapters.base import ReferenceSourceUnavailable
 from exulanica.references.adapters.tavily import TavilySearch
 from exulanica.references.bundle import read_bundle
-from exulanica.references.worker import PROCESS_RESERVE_PERCENT, ReferenceWorker
+from exulanica.references.worker import PROCESS_RESERVE_PERCENT, ReferenceWorker, stage_seconds
 from psycopg.rows import tuple_row
 
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
@@ -311,8 +311,9 @@ def test_past_the_deadline_the_request_ends_partial_with_what_it_has(scene) -> N
     made = request()
     models.responses = [_structured(PLAN)]
     tavily.responses = [_tavily_answer()]
-    ticks = iter([0.0, 0.0, 0.0, 0.0, 31.0, 31.0, 31.0, 31.0])
-    late = worker(clock=lambda: next(ticks, 31.0))
+    past = stage_seconds(load_manifest()).total(pictures=0, web=True) + 1.0
+    ticks = iter([0.0, 0.0, 0.0, 0.0, past, past, past, past])
+    late = worker(clock=lambda: next(ticks, past))
     assert late.run_once(workspace_id) == "partial"
     finished = store.read_request(connection, workspace_id, made.reference_id)
     assert "deadline" in json.dumps(finished.steps)
@@ -339,20 +340,24 @@ def test_a_cost_change_is_recorded_as_reported_and_stops_the_source_in_this_proc
     models.responses = [_structured(PLAN)]
     costly = json.loads(_tavily_answer().text)
     costly["usage"]["credits"] = 3
-    tavily.responses = [HttpResponse(200, json.dumps(costly))]
+    tavily.responses = [
+        HttpResponse(200, json.dumps(costly)),
+        HttpResponse(200, json.dumps(costly)),
+    ]
     playing = worker()
     assert playing.run_once(workspace_id) == "partial"
     credits = connection.cursor(row_factory=tuple_row).execute(
         "select outcome, credits from reference_lookup where reference_id=%s",
         (first.reference_id,),
     )
-    assert credits.fetchall() == [("reference_cost_changed", 3)]
+    # The request's two searches were in flight together, and each is recorded as reported.
+    assert credits.fetchall() == [("reference_cost_changed", 3)] * 2
     # The next request sends nothing and asks no model: the source is stopped here.
     asked = len(models.requests)
     assert playing.run_once(workspace_id) == "partial"
     later = store.read_request(connection, workspace_id, second.reference_id)
     assert later.steps[1]["reason"] == "reference_cost_changed"
-    assert len(tavily.requests) == 1 and len(models.requests) == asked
+    assert len(tavily.requests) == 2 and len(models.requests) == asked
 
 
 def test_a_job_taken_again_after_a_crash_does_not_search_again(scene) -> None:
@@ -379,9 +384,10 @@ def test_a_job_taken_again_after_a_crash_does_not_search_again(scene) -> None:
         (made.job_id,),
     )
     assert worker(adapter_for=lambda source: crashing).run_once(workspace_id) == "partial"
-    assert crashing.sent == 1
-    keys = [admitted.key for admitted in gate.admitted]
-    assert keys == [f"reference:{made.job_id}:search:0"]
+    # Both of the request's searches had left together before the crash; neither leaves again.
+    assert crashing.sent == 2
+    keys = sorted(admitted.key for admitted in gate.admitted)
+    assert keys == [f"reference:{made.job_id}:search:{index}" for index in (0, 1)]
     finished = store.read_request(connection, workspace_id, made.reference_id)
     assert finished.steps[1]["reason"] == "duplicate_request_settled"
 
@@ -392,7 +398,8 @@ def test_a_refused_dispatch_releases_its_ticket_and_sends_nothing(scene) -> None
     models.responses = [_structured(PLAN)]
     gate = _Gate(refuse_dispatch=True)
     assert worker(spending=_Spending(gate)).run_once(workspace_id) == "partial"
-    assert len(gate.released) == 1 and tavily.requests == []
+    # Each admitted search's ticket is released, and nothing is sent.
+    assert len(gate.released) == 2 and tavily.requests == []
 
 
 def test_a_settlement_the_ledger_cannot_take_never_ends_the_job(scene) -> None:
@@ -489,3 +496,90 @@ def test_a_spent_rate_is_known_before_the_planner_is_paid(scene, monkeypatch) ->
     later = store.read_request(connection, workspace_id, second.reference_id)
     assert later.steps[1]["reason"] == "reference_source_rate_limited_here"
     assert len(models.requests) == asked
+
+
+# -- each step's share of the job's time, searches at once, and a cut call named as one ------------
+
+
+def test_each_step_has_its_measured_share_and_the_job_their_sum() -> None:
+    """The drafting role's timeout for the planner and the reader (25 s, from its manifest basis),
+    and the nine searches measured on 2026-10-09 (longest 9,657 ms, times 2, up to 5 s: 20 s)."""
+    stages = stage_seconds(load_manifest())
+    assert (stages.plan, stages.search, stages.read) == (25.0, 20.0, 25.0)
+    assert stages.total(pictures=0, web=True) == 70.0
+    assert stages.total(pictures=2, web=False) == 2 * stages.picture
+
+
+def test_one_request_s_searches_are_sent_at_once(scene) -> None:
+    """Both searches the plan admits are in flight together: each waits at a barrier for the
+    other, which only a concurrent sending passes."""
+    import threading
+
+    _connection, workspace_id, models, _tavily, _gate, worker, request = scene
+    request()
+    models.responses = [_structured(PLAN), _structured(READING)]
+    barrier = threading.Barrier(2, timeout=10)
+
+    class Together(FakeTransport):
+        def post_json(self, url, *, headers, payload, timeout):
+            barrier.wait()
+            return super().post_json(url, headers=headers, payload=payload, timeout=timeout)
+
+    together = Together([_tavily_answer(), _tavily_answer()])
+    playing = worker(
+        adapter_for=lambda source: TavilySearch(source, transport=together, credential="tvly-test")
+    )
+    assert playing.run_once(workspace_id) == "complete"
+    assert len(together.requests) == 2 and not barrier.broken
+
+
+def test_the_reader_keeps_its_share_after_slow_searches(scene, monkeypatch) -> None:
+    """Searches that take their whole share leave the reader its own: it is handed the read
+    share, not what a single deadline would have left."""
+    from exulanica.references import drafting
+
+    _connection, workspace_id, models, _tavily, _gate, worker, request = scene
+    request()
+    stages = stage_seconds(load_manifest())
+    models.responses = [_structured(PLAN), _structured(READING)]
+    now = [0.0]
+
+    class Slow(FakeTransport):
+        def post_json(self, url, *, headers, payload, timeout):
+            now[0] = stages.plan + stages.search
+            return super().post_json(url, headers=headers, payload=payload, timeout=timeout)
+
+    slow = Slow([_tavily_answer(), _tavily_answer()])
+    handed: list[float] = []
+    real = drafting.read_notes
+
+    def reading(client, leads, **keywords):
+        handed.append(keywords["deadline_s"])
+        return real(client, leads, **keywords)
+
+    monkeypatch.setattr(drafting, "read_notes", reading)
+    playing = worker(
+        clock=lambda: now[0],
+        adapter_for=lambda source: TavilySearch(source, transport=slow, credential="tvly-test"),
+    )
+    assert playing.run_once(workspace_id) == "complete"
+    assert handed == [stages.read]
+
+
+def test_a_call_cut_by_its_deadline_is_recorded_as_deadline(scene, monkeypatch) -> None:
+    from exulanica.models.errors import TransportError
+    from exulanica.references import drafting
+
+    connection, workspace_id, models, tavily, _gate, worker, request = scene
+    made = request()
+    models.responses = [_structured(PLAN)]
+    tavily.responses = [_tavily_answer(), _tavily_answer()]
+
+    def cut(client, leads, **keywords):
+        raise TransportError("the deadline ended the wait", deadline_ended=True)
+
+    monkeypatch.setattr(drafting, "read_notes", cut)
+    assert worker().run_once(workspace_id) == "partial"
+    steps = store.read_request(connection, workspace_id, made.reference_id).steps
+    (read,) = [step for step in steps if step["step"] == "read"]
+    assert (read["state"], read["reason"]) == ("missed", "deadline")

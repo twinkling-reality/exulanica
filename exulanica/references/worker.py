@@ -22,11 +22,13 @@ One job, in steps the page reads as they happen:
 5.  **bundle**: the notes become a reference bundle, complete or partial with the steps it missed.
 
 A request that did not ask for web notes skips plan, search and read; one that names no picture has
-no picture step. Every step checks the deadline,
-whether the person asked to stop and whether the process is shutting down; each model call is given
-what is left of the deadline as its own. Past the deadline, or at shutdown, the job ends partial
-with what it has, so the person is never left waiting on a source. What the searches returned lives
-only in this function's locals and is gone when it returns.
+no picture step. Each step has its own share of the job's time (:func:`stage_seconds`), each from a
+measured latency by the manifest's timeout rule, and the job's deadline is their sum, so a slow
+search never eats the reader's share; one request's searches are sent at once. Every step checks
+the deadline, whether the person asked to stop and whether the process is shutting down; each model
+call is given its share, or what is left of the deadline when that is less. Past the deadline, or at
+shutdown, the job ends partial with what it has, so the person is never left waiting on a source.
+What the searches returned lives only in this function's locals and is gone when it returns.
 
 Spending is keyed by the job alone, so a job taken again after a crash is admitted under the same
 keys and the authority refuses what already happened rather than paying for it twice. A source whose
@@ -41,6 +43,7 @@ bundle with its provider, tokens and USD.
 from __future__ import annotations
 
 import collections
+import concurrent.futures
 import dataclasses
 import logging
 import threading
@@ -57,7 +60,8 @@ import psycopg
 from exulanica.epistemics.saved_names import SavedName, saved_names
 from exulanica.errors import ExulanicaError
 from exulanica.models.client import ModelClient
-from exulanica.models.errors import ModelError
+from exulanica.models.errors import ModelError, TransportError
+from exulanica.models.manifest import Manifest
 from exulanica.models.policy import HostedRequest, HostedRequestPolicy, HostedRequestRefused
 from exulanica.models.results import ChatResult
 from exulanica.models.spending import (
@@ -95,12 +99,14 @@ from exulanica.references.pictures import (
 )
 
 __all__ = [
-    "DEADLINE_SECONDS",
     "PROCESS_RESERVE_PERCENT",
     "QUERY_CLEAR_RETRY_SECONDS",
     "QUERY_CLEAR_SECONDS",
+    "SEARCH_LONGEST_MS",
     "STEPS",
     "ReferenceWorker",
+    "StageSeconds",
+    "stage_seconds",
 ]
 
 _LOG = logging.getLogger(__name__)
@@ -111,7 +117,38 @@ QUERY_CLEAR_SECONDS: Final = 3600.0
 #: refused statement each second while the failure lasts.
 QUERY_CLEAR_RETRY_SECONDS: Final = 60.0
 #: The longest a request runs before it ends partial with what it has.
-DEADLINE_SECONDS: Final = 30.0
+#: The longest of the nine searches the LOOKUP live check sent through Tavily on 2026-10-09 (main
+#: 7eef51d1; the spending ledger's dispatch to settle times, 3.2 to 9.7 s): the measured basis of a
+#: search's share of a job, by the manifest's timeout rule.
+SEARCH_LONGEST_MS: Final = 9657
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class StageSeconds:
+    """How long each step of a reference job may take: the planner and the reader the drafting
+    role's timeout, a picture the picture role's, the searches (sent at once) their measured basis
+    by the same rule. A job's deadline is the sum of its steps', so each keeps its own share."""
+
+    plan: float
+    picture: float
+    search: float
+    read: float
+
+    def total(self, *, pictures: int, web: bool) -> float:
+        return pictures * self.picture + (self.plan + self.search + self.read if web else 0.0)
+
+
+def stage_seconds(manifest: Manifest) -> StageSeconds:
+    """Each step's share of a job's time, from ``manifest`` (:class:`StageSeconds`)."""
+    drafting_seconds = float(manifest[drafting.DRAFTING_ROLE].timeout_seconds)
+    return StageSeconds(
+        plan=drafting_seconds,
+        picture=float(manifest[PICTURE_ROLE].timeout_seconds),
+        search=float(manifest.timeout_rule.timeout_for(SEARCH_LONGEST_MS)),
+        read=drafting_seconds,
+    )
+
+
 STEPS: Final = ("plan", "search", "read", "bundle")
 #: A picture step's name: one per picture a request names, each with its capture id.
 PICTURE_STEP: Final = "read_picture"
@@ -249,6 +286,10 @@ def _reason(failure: BaseException) -> str:
         return failure.reason
     if isinstance(failure, HostedRequestRefused):
         return "policy_refused"
+    if isinstance(failure, TransportError) and (failure.deadline_ended or failure.timed_out):
+        # Cut by the step's share of the job's time, or by the role's own timeout: the model was
+        # there, the time was not.
+        return "deadline"
     if isinstance(failure, ModelError):
         return "model_unavailable"
     return "failed"
@@ -297,7 +338,7 @@ class ReferenceWorker:
         picture_source: Callable[[uuid.UUID, uuid.UUID, uuid.UUID, datetime], ReferencePicture]
         | None = None,
         worker: str = "references",
-        deadline_seconds: float = DEADLINE_SECONDS,
+        deadline_seconds: float | None = None,
         clock: Callable[[], float] = time.monotonic,
         clear_clock: Callable[[], float] = time.monotonic,
         stop: threading.Event | None = None,
@@ -312,7 +353,11 @@ class ReferenceWorker:
         #: picture is read in this process.
         self._picture_source = picture_source
         self._worker = worker
-        self._deadline_seconds = deadline_seconds
+        #: A fixed deadline for every job, where the caller states one; otherwise each job's is the
+        #: sum of its steps' shares (:func:`stage_seconds`).
+        self._fixed_deadline = deadline_seconds
+        self._stages = stage_seconds(client.manifest)
+        self._deadline_seconds = 0.0
         self._clock = clock
         #: The clock the hourly query clear is timed on, apart from a job's deadline clock.
         self._clear_clock = clear_clock
@@ -375,6 +420,10 @@ class ReferenceWorker:
     def _remaining(self, started: float) -> float:
         return self._deadline_seconds - (self._clock() - started)
 
+    def _share(self, seconds: float, started: float) -> float:
+        """A step's share of the job's time, or what is left of the deadline when that is less."""
+        return min(seconds, self._remaining(started))
+
     def _check(self, claimed: store.ClaimedRequest, steps: _Steps, started: float) -> None:
         if self._stop.is_set():
             raise _Stopped("shutdown")
@@ -389,6 +438,11 @@ class ReferenceWorker:
     def _play(self, claimed: store.ClaimedRequest) -> str:
         started = self._clock()
         request = claimed.request
+        self._deadline_seconds = (
+            self._fixed_deadline
+            if self._fixed_deadline is not None
+            else self._stages.total(pictures=len(claimed.pictures), web=request.web)
+        )
         steps = _Steps(request.web, claimed.pictures)
         calls: list[BundleCall] = []
         notes: list[BundleNote] = []
@@ -473,7 +527,10 @@ class ReferenceWorker:
         client = self._client.with_policy(policy)
         try:
             read = read_picture(
-                client, picture.image, capture_id=capture_id, deadline_s=self._remaining(started)
+                client,
+                picture.image,
+                capture_id=capture_id,
+                deadline_s=self._share(self._stages.picture, started),
             )
         except PictureUnavailable as unavailable:
             # Refused as it was being sent: nothing went, so the bundle does not name it.
@@ -634,7 +691,7 @@ class ReferenceWorker:
                 client,
                 claimed.description,
                 purpose=claimed.request.purpose,
-                deadline_s=self._remaining(started),
+                deadline_s=self._share(self._stages.plan, started),
             )
         except (ModelError, SpendingRefused, ExulanicaError) as failure:
             planned = drafting.Drafted(refused=_reason(failure))
@@ -664,15 +721,13 @@ class ReferenceWorker:
         steps.set("search", "running", sent=0, of=len(queries), withheld=refused)
         leads: list[Leads] = []
         unavailable: str | None = None
-        for index, query in enumerate(queries):
-            self._check(claimed, steps, started)
-            reserved = pending.pop() if index == 0 and pending else None
-            outcome, credits, count, provider_id, lead = self._search(
-                claimed, source, adapter, query, index, reserved
-            )
+        self._check(claimed, steps, started)
+        for query, (outcome, credits, count, provider_id, lead) in zip(
+            queries, self._search_all(claimed, source, adapter, queries, pending), strict=True
+        ):
             if outcome in _NOT_SENT:
                 unavailable = outcome
-                break
+                continue
             with self._database.session(claimed.workspace_id) as connection:
                 lookups.append(
                     store.record_lookup(
@@ -691,8 +746,6 @@ class ReferenceWorker:
                 leads.append(lead)
             else:
                 unavailable = outcome
-                if outcome == "reference_cost_changed":
-                    break
             steps.set("search", "running", sent=len(lookups), of=len(queries), withheld=refused)
         if not leads:
             steps.set("search", "missed", reason=unavailable or "nothing_admitted", of=len(queries))
@@ -706,7 +759,7 @@ class ReferenceWorker:
             read = drafting.read_notes(
                 client,
                 leads,
-                deadline_s=self._remaining(started),
+                deadline_s=self._share(self._stages.read, started),
                 pictures=claimed.request.purpose not in drafting.WITHOUT_PICTURE_DESCRIPTIONS,
             )
         except (ModelError, SpendingRefused, ExulanicaError) as failure:
@@ -773,6 +826,45 @@ class ReferenceWorker:
                 "the release of a reference search's reservation failed",
                 extra={"failure": type(failure).__name__},
             )
+
+    def _search_all(
+        self,
+        claimed: store.ClaimedRequest,
+        source: ReferenceSource,
+        adapter: ReferenceAdapter,
+        queries: Sequence[AdmittedQuery],
+        pending: list[_Reserved],
+    ) -> list[tuple[str, int, int, str | None, Leads | None]]:
+        """Every query's search, in the plan's order. Each is admitted here first, one after another
+        under the source's per-minute rate and the workspace's grant, and those admitted are sent
+        at once, so the searches take about as long as the slowest of them; one not admitted is
+        answered with why and never sent."""
+        results: list[tuple[str, int, int, str | None, Leads | None] | None] = []
+        admitted: list[tuple[int, _Reserved]] = []
+        for index in range(len(queries)):
+            reserved, refusal = (
+                (pending.pop(), None)
+                if index == 0 and pending
+                else self._reserve(claimed, source, index)
+            )
+            if reserved is None:
+                results.append((refusal or "reference_budget_unavailable", 0, 0, None, None))
+            else:
+                results.append(None)
+                admitted.append((index, reserved))
+        if admitted:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=len(admitted), thread_name_prefix="reference-search"
+            ) as pool:
+                sent = {
+                    index: pool.submit(
+                        self._search, claimed, source, adapter, queries[index], index, reserved
+                    )
+                    for index, reserved in admitted
+                }
+                for index, future in sent.items():
+                    results[index] = future.result()
+        return [result for result in results if result is not None]
 
     def _search(
         self,
