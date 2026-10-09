@@ -1065,3 +1065,33 @@ def test_reference_pictures_serve_references_to_the_first_workspace_with_picture
         .parse_args(["up", "--worktree", ".", "--reference-pictures"])
         .reference_pictures
     )
+
+
+def test_references_reach_the_api_only_when_asked_and_name_the_runs_workspaces_alone():
+    # A web source's key in the caller's shell never reaches the API without --references.
+    key = "tvly-not-a-real-key-for-this-test"
+    shell = {
+        "TAVILY_API_KEY": key,
+        "EXULANICA_REFERENCE_WORKSPACES": '["00000000-0000-0000-0000-000000000001"]',
+        "EXULANICA_EGRESS_ALLOWLIST": '["https://model.example", "https://api.tavily.com"]',
+    }
+    without = _api_environment(False, shell)
+    assert "TAVILY_API_KEY" not in without and "EXULANICA_REFERENCE_WORKSPACES" not in without
+    assert LAUNCH.references_environment(None, shell) == {}
+
+    workspaces = ["11111111-2222-3333-4444-555555555555", "66666666-7777-8888-9999-000000000000"]
+    assert LAUNCH.references_environment(workspaces, shell) == {
+        "TAVILY_API_KEY": key,
+        "EXULANICA_REFERENCE_WORKSPACES": json.dumps(workspaces),
+    }
+    for environ, expected in (
+        ({**shell, "TAVILY_API_KEY": " "}, "references-key-missing"),
+        (
+            {**shell, "EXULANICA_EGRESS_ALLOWLIST": '["https://model.example"]'},
+            "references-origin-missing",
+        ),
+    ):
+        with pytest.raises(LAUNCH.Refused) as refused:
+            LAUNCH.references_environment(workspaces, environ)
+        assert refused.value.name == expected
+        assert key not in str(refused.value)

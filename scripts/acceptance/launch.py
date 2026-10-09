@@ -80,6 +80,11 @@ starts exactly what it always did:
 - ``--reference-pictures`` serves references to the first workspace with a person's own pictures
   turned on, so ``GET /worlds/references`` states the consent a picture's reading right is granted
   against.
+- ``--references`` (with ``--model``) lets the run's synthetic workspaces ask for web notes: the API
+  is given ``TAVILY_API_KEY`` from this process's environment and ``EXULANICA_REFERENCE_WORKSPACES``
+  naming those workspaces alone, and refuses to start unless the egress allowlist ``--model`` passes
+  names the web source's origin. Pictures stay off. Without it no web source's credential reaches
+  the API, whatever the caller's shell holds.
 - ``--society-of-things`` offers the society of things on the slot's API
   (``EXULANICA_SOCIETY_OF_THINGS=on``), so a rehearsal can start a society over placed things. It
   is set for the API process alone, after the scrub of the shell's ``EXULANICA_`` variables, and
@@ -225,9 +230,24 @@ MODEL_VARIABLES = {
     "EXULANICA_SPENDING": "spending-mode-missing",
 }
 
+#: What ``--references`` passes from this process's environment to the API: the web source's
+#: credential, named by its catalog entry (assets/catalogs/reference-sources), and the origin the
+#: egress allowlist must name for it.
+REFERENCE_CREDENTIAL = "TAVILY_API_KEY"
+REFERENCE_ORIGIN = "https://api.tavily.com"
+
 #: Environment prefixes dropped from every process this starts, so nothing in the caller's shell
-#: can redirect a database, a model, a store, a token or a build.
-SCRUBBED_PREFIXES = ("EXULANICA_", "PG", "NEBIUS_", "VITE_", "GOOGLE_", "OPENAI_", "ANTHROPIC_")
+#: can redirect a database, a model, a store, a token or a build, or hand the API a source's key.
+SCRUBBED_PREFIXES = (
+    "EXULANICA_",
+    "PG",
+    "NEBIUS_",
+    "VITE_",
+    "GOOGLE_",
+    "OPENAI_",
+    "ANTHROPIC_",
+    "TAVILY_",
+)
 
 #: How long each service may take to answer before the run is refused.
 API_START_SECONDS = 90
@@ -290,6 +310,9 @@ REFUSALS = {
     "pg-ctl-missing": "the checkout is gone and the recorded pg_ctl cannot stop its server",
     "command-failed": "a command the run needs exited non-zero",
     "society-interval-without-playback": "--society-tick-interval-ms needs --society-playback",
+    "references-without-model": "--references needs --model",
+    "references-key-missing": "--references needs TAVILY_API_KEY in this environment",
+    "references-origin-missing": "--references needs https://api.tavily.com in EXULANICA_EGRESS_ALLOWLIST",
     "society-playback-not-running": "the API's readiness does not report playback of the workspace",
     "port-base-out-of-range": "--port-base puts a port of the slot outside the unprivileged range",
     "workspaces-out-of-range": "--workspaces is outside 1 to WORKSPACES_MAXIMUM",
@@ -472,6 +495,31 @@ def model_environment(environ: Mapping[str, str] | None = None) -> dict[str, str
             refuse(refusal, REFUSALS[refusal])
         passed[name] = value
     return passed
+
+
+def references_environment(
+    workspace_ids: Sequence[str] | None, environ: Mapping[str, str] | None = None
+) -> dict[str, str]:
+    """What ``--references`` hands the API: the web source's credential from this environment and
+    the run's synthetic workspaces as the only ones that may ask for web notes; nothing without
+    workspaces. Refused, naming no value, when the credential is absent or the egress allowlist
+    does not name the source's origin."""
+    if workspace_ids is None:
+        return {}
+    source = os.environ if environ is None else environ
+    credential = source.get(REFERENCE_CREDENTIAL, "").strip()
+    if not credential:
+        refuse("references-key-missing", REFUSALS["references-key-missing"])
+    try:
+        origins = json.loads(source.get("EXULANICA_EGRESS_ALLOWLIST", "") or "[]")
+    except json.JSONDecodeError:
+        origins = []
+    if not isinstance(origins, list) or REFERENCE_ORIGIN not in origins:
+        refuse("references-origin-missing", REFUSALS["references-origin-missing"])
+    return {
+        REFERENCE_CREDENTIAL: credential,
+        "EXULANICA_REFERENCE_WORKSPACES": json.dumps(list(workspace_ids)),
+    }
 
 
 def society_playback_environment(
@@ -771,6 +819,7 @@ def api_environment(
     accounts: Mapping[str, str] | None = None,
     reference_pictures: Sequence[str] | None = None,
     environ: Mapping[str, str] | None = None,
+    references: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     environment = clean_environment(environ)
     if model:
@@ -799,6 +848,8 @@ def api_environment(
         environment["EXULANICA_REFERENCE_PICTURES"] = "on"
     if accounts is not None:
         environment.update(accounts)
+    if references:
+        environment.update(references)
     return environment
 
 
@@ -1433,6 +1484,10 @@ def up(arguments: argparse.Namespace) -> None:
             refuse("scripted-plan-missing", str(arguments.scripted_model))
     if arguments.model:
         model_environment()  # refuse before anything starts, not after the database has
+    if arguments.references:
+        if not arguments.model:
+            refuse("references-without-model", REFUSALS["references-without-model"])
+        references_environment([])  # likewise
     if not arguments.society_playback:
         society_playback_environment(None, arguments.society_tick_interval_ms)  # likewise
     if arguments.door_bridges is not None:
@@ -1653,6 +1708,9 @@ def up(arguments: argparse.Namespace) -> None:
         state["society_of_things"] = True
     if arguments.reference_pictures:
         state["reference_pictures"] = [workspace_id]
+    if arguments.references:
+        # The workspaces only: the credential is read from the environment at each start.
+        state["references"] = [workspace_id, *(other["workspace_id"] for other in others)]
 
     accounts = None
     if arguments.accounts_guest_code:
@@ -1708,6 +1766,7 @@ def up(arguments: argparse.Namespace) -> None:
         society_of_things=arguments.society_of_things,
         accounts=accounts,
         reference_pictures=state.get("reference_pictures"),
+        references=references_environment(state.get("references")),
     )
     environment.update(model_witness_environment(environment, run_dir))
     plan = None
@@ -2028,6 +2087,7 @@ def restart_api(arguments: argparse.Namespace) -> None:
         society_of_things=bool(state.get("society_of_things")),
         accounts=(state.get("accounts") or {}).get("environment"),
         reference_pictures=state.get("reference_pictures"),
+        references=references_environment(state.get("references")),
     )
     environment.update(model_witness_environment(environment, run_dir))
     scripted = state.get("scripted_model")
@@ -2236,6 +2296,13 @@ def build_parser() -> argparse.ArgumentParser:
                 help="serve references to the first workspace with a person's own pictures on "
                 "(EXULANICA_REFERENCE_WORKSPACES, EXULANICA_REFERENCE_PICTURES=on), so the list "
                 "states the consent a picture's reading right is granted against (default: off)",
+            )
+            command.add_argument(
+                "--references",
+                action="store_true",
+                help="with --model, let the run's synthetic workspaces ask for web notes "
+                "(TAVILY_API_KEY from this environment; EXULANICA_REFERENCE_WORKSPACES) "
+                "(default: no web source)",
             )
             command.add_argument(
                 "--society-of-things",
