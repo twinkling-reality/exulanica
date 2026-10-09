@@ -60,7 +60,7 @@ from exulanica.selection.calls import CallLog
 from exulanica.selection.validation import Session
 from exulanica.spending.status import SpendingRefusals
 from exulanica.things.lines import LineRefused, check_line
-from exulanica.world.deciders import arrival_deciders, check_external_config
+from exulanica.world.deciders import arrival_deciders, check_external_config, is_played
 from exulanica.world.decision_roles import (
     GENERIC_REASONS,
     DecisionContract,
@@ -72,7 +72,10 @@ from exulanica.world.role_decisions import check_role_result, names_its_listener
 from exulanica.world.society import asked_again_after_a_race, society_state_sha256
 from exulanica.world.society_controls import LEASE_SECONDS, ControlClaim
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
-from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
+from exulanica.world.society_model_choice_repository import (
+    SocietyModelChoiceRepository,
+)
+from exulanica.world.society_play import answer_played
 from exulanica.world.society_repository import SocietyRepository
 
 __all__ = [
@@ -867,12 +870,15 @@ class DecisionHost:
         the claim advances one minute and no later choice point of theirs passes unasked. False
         when it asks for nobody here (an unlisted workspace, no chosen subject, or a host
         refusal): the claim advances as it would with no model. A subject an outside program
-        decides for is asked through ``external``, beside the models, with no model client.
+        decides for is asked through ``external``, beside the models, with no model client. A
+        being a person plays is answered from what its person posted before anything else, in
+        every workspace (:func:`~exulanica.world.society_play.answer_played`): that asks nobody
+        and spends nothing, and the host returns True whenever a present being is played.
         """
         if claim.workspace_id not in self.workspaces and (
             self.discovered is None or claim.workspace_id not in self.discovered()
         ):
-            return False
+            return self._answer_played(claim)
         session = Session(workspace_id=claim.workspace_id, actor=claim.actor)
         with self.database.session(claim.workspace_id) as connection:
             society = SocietyRepository(
@@ -895,6 +901,8 @@ class DecisionHost:
                 contract = role.contract(terms.versions)
                 choices = choice_repository.deciding(claim.version_id, role, contract)
                 chosen = {subject: c for subject, c in choices.items() if c["model"]}
+                # A being a person plays is answered from what its person posted, never asked.
+                played = {subject: c for subject, c in choices.items() if is_played(c["decider"])}
                 outside = {
                     subject: c
                     for subject, c in choices.items()
@@ -908,12 +916,12 @@ class DecisionHost:
                     for subject, described in arrival_deciders(row["state"]).items():
                         if subject in subjects:
                             outside.setdefault(subject, {"decider": described, "model": None})
-                if chosen or outside:
-                    chosen_roles.append((role, contract, chosen, outside))
+                if chosen or outside or played:
+                    chosen_roles.append((role, contract, chosen, outside, played))
             if not chosen_roles:
                 return False
             decisions = SocietyDecisionRepository(society)
-            for role, _contract, _chosen, _outside in chosen_roles:
+            for role, _contract, _chosen, _outside, _played in chosen_roles:
                 for request_id in decisions.unanswered_requests(role, claim.version_id):
 
                     def close(request_id: uuid.UUID = request_id) -> None:
@@ -921,21 +929,25 @@ class DecisionHost:
                             decisions.close_unanswered(claim.version_id, request_id)
 
                     _once_more_after_a_race(close)
+            # The beings people play are answered first, with nothing to wait for.
+            any_played = any(played for *_rest, played in chosen_roles) and answer_played(
+                connection, society, version_id=claim.version_id, actor=claim.actor
+            )
             client = self.client
             asking_roles = [
                 (role, contract, chosen)
-                for role, contract, chosen, _outside in chosen_roles
+                for role, contract, chosen, _outside, _played in chosen_roles
                 if chosen
                 and client is not None
                 and host_refusal(role, client, self.manifest, contract) is None
             ]
             outside_roles = [
                 (role, contract, outside)
-                for role, contract, _chosen, outside in chosen_roles
+                for role, contract, _chosen, outside, _played in chosen_roles
                 if outside
             ]
             if not asking_roles and not outside_roles:
-                return False
+                return any_played
             planned = []
             spent, available = (
                 self._spent_providers(connection, claim.workspace_id)
@@ -1089,6 +1101,21 @@ class DecisionHost:
                 # for the next role.
                 _LOG.error("A decision recording failed with %s", _error_class(exc))
         return True
+
+    def _answer_played(self, claim: ControlClaim) -> bool:
+        """The beings people play in a workspace this host asks no model for, answered from what
+        their people posted (:func:`~exulanica.world.society_play.answer_played`)."""
+        session = Session(workspace_id=claim.workspace_id, actor=claim.actor)
+        with self.database.session(claim.workspace_id) as connection:
+            society = SocietyRepository(
+                connection,
+                claim.workspace_id,
+                world_id=claim.world_id,
+                input_authorizer=lambda doc: self.runtime.authorize(connection, session, doc),
+            )
+            return answer_played(
+                connection, society, version_id=claim.version_id, actor=claim.actor
+            )
 
     def _outside_reserved(
         self,

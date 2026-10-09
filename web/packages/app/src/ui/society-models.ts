@@ -60,6 +60,9 @@ export const CHOICE_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   decided_from_outside: 'Someone you chose is decided for from outside this world, by a program a door grant lets in, so no model can be chosen for them until that grant ends.',
   decider_not_allowed: 'Someone you chose is a kind of being that this kind of decider may not decide for.',
   engine_takes_no_traveller_choice: 'Only a society of things takes visitors, so only it takes a mind for a gate\'s travellers.',
+  being_played: 'Someone is playing this being now. Choose again once they give it back.',
+  engine_takes_no_play: 'Only the beings of a society of things can be played.',
+  not_played: 'You are not playing this being.',
 };
 
 const decisionWords = (code: string): string =>

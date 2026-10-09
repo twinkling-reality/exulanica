@@ -356,11 +356,13 @@ class SocietyControlRepository:
                 raise ValueError("pause_before_manual_step")
             if control is None:
                 self.configure(version_id, actor=actor, base_revision=0, mode="paused", speed=1)
+            # A being a person plays takes its person's answer first (SocietyRepository.advance).
             after = self._society(actor).advance(
                 version_id,
                 base_tick=base_tick,
                 base_state_sha256=base_state_sha256,
                 base_clock_revision=base_clock_revision,
+                actor=actor,
             )
             receipt = self._event(
                 society,
@@ -560,6 +562,7 @@ class SocietyControlRepository:
                                     claim.version_id,
                                     base_tick=current["current_tick"],
                                     base_state_sha256=current["state_sha256"],
+                                    actor=claim.actor,
                                 )
                             except ClockLeadExhausted:
                                 # The count above keeps inside the lead, so this is a guard: stop

@@ -39,7 +39,7 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from typing import Any, Final
 
-from exulanica.world.deciders import receipt_from_outside
+from exulanica.world.deciders import receipt_decider
 from exulanica.world.role_decisions import DecisionDisposition
 from exulanica.world.society import SOCIETY_NAMESPACE, SocietyEvent, society_state_sha256
 from exulanica.world.society_decision_contract import (
@@ -66,6 +66,9 @@ __all__ = [
 DECISION_EVENT_KIND: Final = "decision_applied"
 #: The dispositions a consumed receipt may have, the ones migration 0055 binds a transition to.
 _DISPOSITIONS: Final = ("applied", "rejected", "unavailable", "stale", "superseded")
+
+#: Who a decision's minute names as deciding, in the words its event summary says.
+_DECIDED_WORDS: Final = {"model": "model", "external": "outside program", "person": "player"}
 
 
 def _checked(receipt: Mapping[str, Any], profile: str) -> None:
@@ -231,11 +234,12 @@ def append_decision_events(
         person = people.get(disposition.subject_id)
         who = "Someone no longer here" if person is None else person["display_name"]
         provider = receipt["provider"]
-        outside = receipt_from_outside(receipt)
+        # Who decided: a model, an outside program, or a person playing the being.
+        decided = receipt_decider(receipt)
         order = len(result)
         event_document = {
             "summary": (
-                f"{who} (simulated): the {'outside program' if outside else 'model'}'s "
+                f"{who} (simulated): the {_DECIDED_WORDS[decided]}'s "
                 f"decision was "
                 f"{disposition.disposition}; {disposition.reason.replace('_', ' ')}."
             ),
@@ -256,14 +260,14 @@ def append_decision_events(
             "motion_path_mm": None if person is None else deepcopy(person["motion_path_mm"]),
             "previous_state_sha256": previous_digest,
             "seed_sha256": previous_state["seed_sha256"],
-            "origin": "external" if outside else "model",
+            "origin": decided,
             "decision_seq": disposition.decision_seq,
             "request_id": disposition.request_id,
             "decision_sha256": disposition.decision_sha256,
             "disposition": disposition.disposition,
             "model": (
                 None
-                if provider is None or outside
+                if provider is None or decided != "model"
                 else {"provider": provider["provider"], "model_id": provider["model_id"]}
             ),
             "chose": None if receipt["proposal"] is None else receipt["proposal"]["label"],

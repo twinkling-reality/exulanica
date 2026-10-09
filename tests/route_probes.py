@@ -584,6 +584,18 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "model": None,
         },
     },
+    "POST /world/versions/{version_id}/society/play": {
+        **_IN_WORLD,
+        "json": {"idempotency_key": str(uuid.uuid4()), "subject_id": str(uuid.uuid4())},
+    },
+    "POST /world/versions/{version_id}/society/play/{subject_id}/answer": {
+        **_IN_WORLD,
+        "json": {"base_tick": 0, "label": "wait here a minute"},
+    },
+    "POST /world/versions/{version_id}/society/play/{subject_id}/give-back": {
+        **_IN_WORLD,
+        "json": {"idempotency_key": str(uuid.uuid4())},
+    },
     "POST /world/versions/{version_id}/society/presence": {
         **_IN_WORLD,
         "json": {
@@ -907,6 +919,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/world/versions/{version_id}/society/inputs/{input_seq}": Owned(
         build.society_input_seq, build.invented_input_seq
     ),
+    "/world/versions/{version_id}/society/play/{subject_id}": Owned(build.society_thing),
     "/world/versions/{version_id}/society/things/{thing_id}": Owned(build.society_thing),
     "/world/versions/{version_id}/things/{thing_id}": Owned(
         build.placed_thing, build.invented_thing

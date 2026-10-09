@@ -23,7 +23,7 @@ from exulanica.abilities.registry import HANDS, ability_module, recorded_modules
 from exulanica.api.services import Services
 from exulanica.models.manifest import load_manifest
 from exulanica.things.catalogs import CATALOG_DIRECTORY, thing_catalogs
-from exulanica.world.deciders import decided_from_outside
+from exulanica.world.deciders import decided_from_outside, is_played
 from exulanica.world.errors import UnknownWorldResource
 from exulanica.world.placed_things import ThingKindReference, shipped_kind
 from exulanica.world.society_decision_contract import person_role
@@ -60,9 +60,11 @@ def thing_card(
     world_id: str,
     version_id: uuid.UUID,
     thing_id: uuid.UUID,
+    reader: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """The card of the society thing or being ``thing_id`` of the version's society of things, or
-    :class:`UnknownWorldResource` where the version's society is not one or holds no such thing."""
+    :class:`UnknownWorldResource` where the version's society is not one or holds no such thing.
+    ``reader`` is who reads it, so a being a person plays says whether the reader is that person."""
     card, _held = _card(
         connection,
         services,
@@ -71,6 +73,7 @@ def thing_card(
         world_id=world_id,
         version_id=version_id,
         thing_id=thing_id,
+        reader=reader,
     )
     return card
 
@@ -84,6 +87,7 @@ def _card(
     world_id: str,
     version_id: uuid.UUID,
     thing_id: uuid.UUID,
+    reader: uuid.UUID | None = None,
 ) -> tuple[dict[str, Any], Mapping[str, Any]]:
     """The card, and the thing or being it was read from in the same snapshot."""
     snapshot, said, left_out = society.snapshot_and_lines(version_id, thing_id, limit=LINES_SHOWN)
@@ -125,7 +129,9 @@ def _card(
         "holding": _holding(state, wanted) if person is not None and hands else None,
         "decider": None
         if person is None
-        else _decider(connection, services, workspace_id, world_id, version_id, state, person),
+        else _decider(
+            connection, services, workspace_id, world_id, version_id, state, person, reader
+        ),
         "look": worn,
         "looks": _looks(connection, workspace_id, kind),
         "kind_origin": kind.document["origin"],
@@ -167,6 +173,7 @@ def choose_look(
         world_id=world_id,
         version_id=version_id,
         thing_id=thing_id,
+        reader=actor,
     )
     chosen = check_crossing_look(
         {key: card["kind"][key] for key in ("kind", "version", "sha256")},
@@ -287,10 +294,12 @@ def _decider(
     version_id: uuid.UUID,
     state: Mapping[str, Any],
     person: Mapping[str, Any],
+    reader: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Who decides for ``person``: its program where it came from outside and its program decides,
-    else the choice that decides for it (its own or its gate's), else the routine; with whether the
-    world's owner may change it and why a chosen model is not asked here."""
+    else a person playing it (by whether that is the ``reader``, never by account), else the choice
+    that decides for it (its own or its gate's), else the routine; with whether the world's owner
+    may change it and why a chosen model is not asked here."""
     subject = person["id"]
     if decided_from_outside(state, subject):
         crossing = person["crossing"]
@@ -306,6 +315,15 @@ def _decider(
     contract = role.contract(role.terms(state["profile"]).versions)
     repository = SocietyModelChoiceRepository(connection, workspace_id, world_id=world_id)
     choice = repository.deciding(version_id, role, contract).get(subject)
+    if choice is not None and is_played(choice["decider"]):
+        # While a person plays it, only giving it back changes who decides.
+        return {
+            "kind": "person",
+            "played_by_you": reader is not None and choice["decider"]["account_id"] == str(reader),
+            "from": choice["from"],
+            "may_change": False,
+            "refusal": "being_played",
+        }
     may_change = kind_allows(state, subject, "model")
     if choice is None or choice["model"] is None:
         return {

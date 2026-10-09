@@ -9,6 +9,9 @@ is a small closed document every choice of the second shape records under ``deci
 *   ``{"kind": "model", "provider": ..., "model_id": ...}``: a model the manifest declares;
 *   ``{"kind": "person"}``: the world's owner, through direct requests, which supersede any bound
     decider's answer in their minute and are never a binding of their own;
+*   ``{"kind": "person", "account_id": ...}``: one person playing one being ("Play this one"), by
+    the account the play route recorded; chosen only through that route, and never shown to anybody
+    but as whether the reader is the one playing;
 *   ``{"kind": "external", "bridge": ..., "grant_id": ...}``: an outside program, by the key of the
     bridge it reaches the world through and the grant its owner issued it. Which game, which
     adapter version and which mapping are the grant's and each receipt's, never the descriptor's.
@@ -19,7 +22,9 @@ A request records whoever it asked in its ``provider_config`` and a receipt whoe
 stored request and receipt reads as it was written. An outside program's are this module's
 :data:`EXTERNAL_CONFIG` and :data:`EXTERNAL_RECORD`, each naming its kind. An outside answer spends
 nothing, so its record carries no cost; and it carries no free text from the program: a
-correlation the program needs rides as :data:`SHA256` hex or not at all, so no name can.
+correlation the program needs rides as :data:`SHA256` hex or not at all, so no name can. A person
+playing a being is :data:`PERSON_CONFIG` and :data:`PERSON_RECORD`: no account, no cost, and the
+digest of the answer the person posted, or none where they posted none.
 
 Nothing here reads a database or asks anybody.
 """
@@ -41,16 +46,24 @@ __all__ = [
     "EXTERNAL_RECORD",
     "KINDS",
     "OWNER_CHOOSES",
+    "PERSON_CONFIG",
+    "PERSON_REASONS",
+    "PERSON_RECORD",
     "DeciderRefused",
     "arrival_deciders",
     "check_external_config",
     "check_external_record",
+    "check_person_config",
+    "check_person_record",
     "decided_by_world",
     "decided_from_outside",
     "decider",
     "is_external",
+    "is_person_ask",
+    "is_played",
     "model_of",
     "of_model",
+    "receipt_decider",
     "receipt_from_outside",
 ]
 
@@ -107,6 +120,14 @@ EXTERNAL_REASONS: Final = frozenset(
         "saved_name_withheld",
     }
 )
+#: What a request records about the person playing its subject: only that a person is asked, and the
+#: contract; never which account.
+PERSON_CONFIG: Final = frozenset({"kind", "contract"})
+#: What a receipt records about a person's answer: the digest of the answer they posted, or none
+#: where they posted none and the subject carried on (:data:`PERSON_REASONS`). No account, no cost.
+PERSON_RECORD: Final = frozenset({"kind", "answer_sha256"})
+#: Why a played subject's receipt took the idle option: the person posted no answer for the minute.
+PERSON_REASONS: Final = frozenset({"person_no_answer"})
 #: The longest an outside program may be given to answer, in milliseconds: the playback lease's 30
 #: seconds, which no role's contract deadline may outlast either.
 _DEADLINE_CEILING_MS: Final = 30_000
@@ -143,12 +164,15 @@ def decider(value: object) -> dict[str, Any]:
     kind = value["kind"]
     fields = {
         "routine": {"kind"},
-        "person": {"kind"},
+        # The owner's direct requests, or one account playing the being.
+        "person": {"kind", "account_id"} if "account_id" in value else {"kind"},
         "model": {"kind", "provider", "model_id"},
         "external": {"kind", "bridge", "grant_id"},
     }[kind]
     if set(value) != fields:
         raise DeciderRefused(f"a {kind} decider states exactly {sorted(fields)}")
+    if "account_id" in fields and not _grant(value["account_id"]):
+        raise DeciderRefused("a person playing a being is named by their account's id")
     if kind == "model" and not (
         isinstance(value["provider"], str)
         and value["provider"]
@@ -180,6 +204,47 @@ def is_external(record: object) -> bool:
     """Whether a request's ``provider_config`` or a receipt's ``provider`` names an outside
     program; a model's never names a kind."""
     return isinstance(record, Mapping) and record.get("kind") == "external"
+
+
+def is_person_ask(record: object) -> bool:
+    """Whether a request's ``provider_config`` or a receipt's ``provider`` names a person playing
+    the subject; a model's never names a kind."""
+    return isinstance(record, Mapping) and record.get("kind") == "person"
+
+
+def receipt_decider(receipt: Mapping[str, Any]) -> str:
+    """Who a receipt's minute says decided: ``person`` for a person playing the being, ``external``
+    for an outside program (:func:`receipt_from_outside`), else ``model``."""
+    if is_person_ask(receipt.get("provider")):
+        return "person"
+    return "external" if receipt_from_outside(receipt) else "model"
+
+
+def is_played(described: Mapping[str, Any]) -> bool:
+    """Whether a descriptor names one person playing the being, by account."""
+    return described.get("kind") == "person" and "account_id" in described
+
+
+def check_person_config(config: object) -> None:
+    """A request's record of the person playing its subject: exactly :data:`PERSON_CONFIG`."""
+    if not isinstance(config, Mapping) or set(config) != PERSON_CONFIG:
+        raise DeciderRefused(f"a played being's request states exactly {sorted(PERSON_CONFIG)}")
+    if config["kind"] != "person":
+        raise DeciderRefused("a played being's request names its kind, person")
+    contract = config["contract"]
+    if not isinstance(contract, Mapping) or set(contract) != {"catalog_versions", "sha256"}:
+        raise DeciderRefused("a played being's request names the contract it was asked under")
+
+
+def check_person_record(record: object) -> None:
+    """A receipt's record of a person's answer: exactly :data:`PERSON_RECORD`."""
+    if not isinstance(record, Mapping) or set(record) != PERSON_RECORD:
+        raise DeciderRefused(f"a person's answer's record states exactly {sorted(PERSON_RECORD)}")
+    if record["kind"] != "person":
+        raise DeciderRefused("a person's answer's record names its kind, person")
+    digest = record["answer_sha256"]
+    if digest is not None and not _matches(SHA256, digest):
+        raise DeciderRefused("a person's answer's record names its answer by digest, or none")
 
 
 def receipt_from_outside(receipt: Mapping[str, Any]) -> bool:

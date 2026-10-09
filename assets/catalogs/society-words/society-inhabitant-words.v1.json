@@ -1304,6 +1304,13 @@
       "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
     },
     {
+      "key": "decision_reason.person_no_answer",
+      "kind": "decision_reason",
+      "code": "person_no_answer",
+      "words": "the person playing them chose nothing that minute, so they carried on",
+      "reason": "Authored: why a person's decider was or was not followed when a person plays them, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
       "key": "decision_reason.line_out_of_bounds",
       "kind": "decision_reason",
       "code": "line_out_of_bounds",

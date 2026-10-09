@@ -14,6 +14,15 @@ read of a choice gives its ``decider`` and the ``model`` it names, which is none
 for an outside program, so every reader that asks which model runs somebody reads the answer it
 always did, and an outside program spends nothing.
 
+A person may play one being of a society of things ("Play this one"): a choice naming it with the
+decider ``{"kind": "person", "account_id": ...}``, recorded only through the play route
+(:meth:`SocietyModelChoiceRepository.record_play`), and refused by name while another account plays
+it (``being_played``). Giving it back records a choice naming the same person with ``ended``
+(``given_back``, or ``player_left`` when the host gives back a being its player stopped answering
+for): the being is decided for again as it was before the play began, by its own earlier choice, or,
+where it had none, by its gate's group or its routine, so no decider is copied and nothing outlives
+a gate's release. While a being is played, no other choice may name it.
+
 A choice of the second profile may name a group instead of subjects (``group``, with no subjects;
 the migration "a choice may name a gate's visitors"): ``arrivals_under_grant``, every visitor that
 arrives under one grant and whose arrival said the world decides for it, which is how the world's
@@ -48,6 +57,7 @@ from exulanica.world.deciders import (
     decided_by_world,
     decided_from_outside,
     decider,
+    is_played,
     model_of,
     of_model,
 )
@@ -59,6 +69,7 @@ from exulanica.world.society_things import kind_allows
 
 __all__ = [
     "CHOICE_REFUSALS",
+    "ENDED",
     "GROUPS",
     "ModelChoiceRefused",
     "SocietyModelChoiceRepository",
@@ -71,6 +82,9 @@ _ENDS_AT: Final = "%Y-%m-%dT%H:%M:%SZ"
 #: The groups a choice may name instead of subjects: every visitor that arrives under one grant and
 #: whose arrival said the world decides for it.
 GROUPS: Final = ("arrivals_under_grant",)
+#: Why a person stopped playing a being: they gave it back, or they stopped answering for it and the
+#: host gave it back for them.
+ENDED: Final = ("given_back", "player_left")
 
 #: Why a choice is refused, by the code the route answers with, and the detail.
 CHOICE_REFUSALS: Final = {
@@ -106,6 +120,11 @@ CHOICE_REFUSALS: Final = {
     "decider_not_allowed": (
         "somebody this choice names is a kind of thing that kind of decider may not decide for"
     ),
+    "engine_takes_no_play": "only a society of things' beings may be played",
+    "being_played": (
+        "somebody else is playing this being now; it can be chosen for again once it is given back"
+    ),
+    "not_played": "nobody here is playing this being",
 }
 
 
@@ -245,17 +264,32 @@ class SocietyModelChoiceRepository:
     def _current(
         role: DecisionRole, rows: Sequence[Mapping[str, Any]]
     ) -> dict[str, dict[str, Any]]:
+        """Each subject's own latest choice of ``role``, by subject id. A choice ending a person's
+        play (``ended``) restores what the subject had before the play began: its own earlier
+        choice, or none."""
         current: dict[str, dict[str, Any]] = {}
+        before: dict[str, dict[str, Any] | None] = {}
         for row in SocietyModelChoiceRepository._of(role, rows):
             document = row["document"]
             described = decider_of(document)
             for subject in document[role.choice_subjects]:
+                if "ended" in document:
+                    held = before.pop(subject, None)
+                    if held is None:
+                        current.pop(subject, None)
+                    else:
+                        current[subject] = held
+                    continue
+                if is_played(described):
+                    before[subject] = current.get(subject)
                 current[subject] = {
                     "decider": described,
                     "model": model_of(described),
                     "choice_seq": document["choice_seq"],
                     "chosen_by": document["chosen_by"],
                     "recorded_at": row["recorded_at"],
+                    # The minute a person's play began, from which their quiet minutes count.
+                    **({"since_tick": document["since_tick"]} if "since_tick" in document else {}),
                 }
         return current
 
@@ -480,6 +514,95 @@ class SocietyModelChoiceRepository:
         assert recorded is not None
         return recorded
 
+    def record_play(
+        self,
+        version_id: uuid.UUID,
+        role: DecisionRole,
+        *,
+        request_id: uuid.UUID,
+        subject: str,
+        account_id: uuid.UUID,
+        contract: DecisionContract,
+    ) -> dict[str, Any]:
+        """Record that the person ``account_id`` plays ``subject``: called by the play route alone.
+        Refused by name where the engine is not a society of things' (``engine_takes_no_play``),
+        where another account plays the being (``being_played``), where its own program decides for
+        it (``decided_from_outside``) or where its kind lets no person decide for it
+        (``decider_not_allowed``). A person already playing it is answered with that play."""
+        played = decider({"kind": "person", "account_id": str(account_id)})
+        with self.connection.transaction():
+            society = self._society(version_id, lock=True)
+            if society_engine(str(society["engine_version"])).state_family != "things":
+                raise ModelChoiceRefused("engine_takes_no_play")
+            held = self._current(role, self._rows(society["society_id"])).get(subject)
+            if held is not None and held["decider"] == played:
+                return {"subject_id": subject, **held}
+            recorded = self._record(
+                version_id,
+                role,
+                request_id=request_id,
+                subjects=[subject],
+                asked=played,
+                described=lambda: played,
+                chosen_by=account_id,
+                contract=contract,
+                granted_away=True,
+                fields={"since_tick": int(society["state"]["tick"])},
+            )
+        assert recorded is not None
+        return recorded
+
+    def give_back(
+        self,
+        version_id: uuid.UUID,
+        role: DecisionRole,
+        *,
+        request_id: uuid.UUID,
+        subject: str,
+        account_id: uuid.UUID,
+        chosen_by: uuid.UUID,
+        contract: DecisionContract,
+        ended: str,
+    ) -> dict[str, Any]:
+        """End the play of ``subject`` by ``account_id``, for ``ended`` (:data:`ENDED`): the being
+        is decided for again as it was before the play began. ``chosen_by`` is the player giving
+        it back, or the host's actor for ``player_left``. Refused ``not_played`` where that person
+        does not play it; a retry of this key returns the choice it recorded."""
+        if ended not in ENDED:
+            raise ValueError(f"a play ends {ENDED}, not {ended!r}")
+        played = decider({"kind": "person", "account_id": str(account_id)})
+        with self.connection.transaction():
+            society = self._society(version_id, lock=True)
+            rows = self._rows(society["society_id"])
+            existing = next((row for row in rows if row["request_id"] == request_id), None)
+            if existing is not None:
+                document = existing["document"]
+                if (
+                    document.get("ended") != ended
+                    or decider_of(document) != played
+                    or document[role.choice_subjects] != [subject]
+                    or document["chosen_by"] != str(chosen_by)
+                ):
+                    raise ModelChoiceRefused("choice_key_reused")
+                return _view(document, existing["recorded_at"])
+            held = self._current(role, rows).get(subject)
+            if held is None or held["decider"] != played:
+                raise ModelChoiceRefused("not_played")
+            sequence = (rows[-1]["choice_seq"] if rows else 0) + 1
+            document: dict[str, Any] = {
+                "profile": role.choice_profile,
+                "choice_seq": sequence,
+                "request_id": str(request_id),
+                "society_id": str(society["society_id"]),
+                role.choice_subjects: [subject],
+                "decider": played,
+                "ended": ended,
+                "contract": contract.binding(),
+                "chosen_by": str(chosen_by),
+            }
+            document["document_sha256"] = input_sha256(document)
+            return self._insert(society["society_id"], sequence, request_id, document, chosen_by)
+
     def record_traveller_choice(
         self,
         version_id: uuid.UUID,
@@ -691,6 +814,7 @@ class SocietyModelChoiceRepository:
         contract: DecisionContract,
         granted_away: bool = False,
         handing_back: bool = False,
+        fields: Mapping[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         """Record one choice of ``role`` naming ``asked``, checked as ``described()`` checks it,
         or return the one this idempotency key already recorded. ``subjects`` may be read from
@@ -746,13 +870,15 @@ class SocietyModelChoiceRepository:
                 # A visitor is never handed to another outside program: its own program, or the
                 # world, decides for it.
                 raise ModelChoiceRefused("decided_from_outside")
-            if granted_away:
-                held = self._current(role, rows)
-                if any(
-                    held.get(subject, {}).get("decider", {}).get("kind") == "external"
-                    for subject in chosen
-                ):
-                    raise ModelChoiceRefused("decided_from_outside")
+            held = self._current(role, rows)
+            if any(is_played(held.get(subject, {}).get("decider", {})) for subject in chosen):
+                # While a person plays a being, only giving it back names it.
+                raise ModelChoiceRefused("being_played")
+            if granted_away and any(
+                held.get(subject, {}).get("decider", {}).get("kind") == "external"
+                for subject in chosen
+            ):
+                raise ModelChoiceRefused("decided_from_outside")
             state = society["state"]
             if not all(kind_allows(state, subject, record["kind"]) for subject in here):
                 raise ModelChoiceRefused("decider_not_allowed")
@@ -795,6 +921,7 @@ class SocietyModelChoiceRepository:
                 "decider": record,
                 "contract": contract.binding(),
                 "chosen_by": str(chosen_by),
+                **(fields or {}),
             }
             document["document_sha256"] = input_sha256(document)
             return self._insert(society["society_id"], sequence, request_id, document, chosen_by)

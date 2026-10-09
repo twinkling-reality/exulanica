@@ -685,7 +685,17 @@ class SocietyRepository:
         base_tick: int,
         base_state_sha256: str,
         base_clock_revision: int | None = None,
+        actor: uuid.UUID | None = None,
     ) -> dict[str, Any]:
+        """Play the society's next minute from ``base_tick``. A being a person plays takes its
+        person's answer for the minute first, whichever way the minute is stepped: the playback
+        claim, a control's manual step or the step route, never its routine
+        (:func:`~exulanica.world.society_play.answer_played`; ``actor`` gives back a being whose
+        person stopped answering). Where the decision host answered it already, its request is
+        taken and nothing more is done."""
+        from exulanica.world.society_play import answer_played
+
+        answer_played(self.connection, self, version_id=version_id, actor=actor)
         with self.connection.transaction(), ExitStack() as ahead:
             self._lock()
             row = self._row(version_id, lock=True)

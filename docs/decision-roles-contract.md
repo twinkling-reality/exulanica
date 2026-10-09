@@ -174,7 +174,7 @@ What a role in a world also needs:
 ## Who decides: deciders and the owner's choice
 
 A **decider** is what chooses a subject's next action. Its descriptor, `exulanica.decider/v1`
-(`exulanica/world/deciders.py`), is one of four closed shapes:
+(`exulanica/world/deciders.py`), is one of five closed shapes:
 
 | Descriptor | Who decides |
 | --- | --- |
@@ -182,6 +182,7 @@ A **decider** is what chooses a subject's next action. Its descriptor, `exulanic
 | `{"kind": "model", "provider", "model_id"}` | an open model the manifest declares |
 | `{"kind": "person"}` | the world's owner, through a direct request (a place to go to or use, or in a society running the hands module a hands act), which supersedes any bound decider's answer in its minute and is never a binding of its own |
 | `{"kind": "external", "bridge", "grant_id"}` | an outside program, by its bridge's key, under a grant the world's owner issued; which game, adapter version and mapping file it answers with are the grant's and each receipt's |
+| `{"kind": "person", "account_id"}` | one person playing one being of a society of things ("Play this one", [below](#a-person-playing-a-being)), by the account the play route recorded, which no read shows |
 
 A subject's decider is the latest choice naming it, and a society with no choice is run by its
 rules alone. Choices are appended in order to `world_society_model_choice` (migration 0110), each
@@ -266,6 +267,55 @@ program left without a usable answer reads as its receipt does, such as `unavail
 In a saved world the People panel offers the choice for one person or for everyone and shows this
 read (`web/packages/app/src/composition/society-models-mount.ts`). Where the host cannot ask a
 person's model, the page says the person follows their own routine for now, and why.
+
+## A person playing a being
+
+A person holding `world.write` may play one being of a society of things whose kind lets a person
+decide for it (`/world/versions/{version_id}/society/play?world_id=W`,
+`exulanica/api/routes/society_play.py`). Starting records a choice naming the being with the
+decider `{"kind": "person", "account_id"}`, the session's account, through this route only, and
+the minute it began (`since_tick`). It is refused by name: `engine_takes_no_play` for any engine but
+v7's, `being_played` where another account plays the being, `decided_from_outside` for a visitor its
+own program decides for or a being under a grant, and `decider_not_allowed` for a kind that lets no
+person decide (409, the last 422). While a being is played no other choice may name it
+(`being_played`). Giving it back (`POST .../{subject_id}/give-back`, `not_played` where the reader
+does not play it) records a choice naming the same person with `ended: given_back`; the being is
+then decided for as it was before the play began, by its own earlier choice or, with none, by its
+gate's group or its routine, so nothing is copied and nothing outlives a gate's release (migration
+"a person plays one being" admits the person and `ended` beside it alone).
+
+Each minute the being is due. `GET .../{subject_id}/turn` reads what it is offered in the minute to
+come, from the stored state, as its request will offer it: each option's label, kind, the place or
+being it names and whether it takes a line; the line's bound; `played_by_you`; how many quiet
+minutes are left; and, where the society plays, when the minute is due and how long a minute is.
+`POST .../{subject_id}/answer` takes `{base_tick, label, line}` for that minute (202): an offered
+label, a line exactly where the option says something, held to the line rule, and no name the
+account holder saved in the line (`line_refused_by_rules`); a minute already played is refused
+`minute_passed` (409, with `current_tick`), and more than 12 answers from one account for one
+minute `too_many_answers` (429). Answers are kept in `world_society_person_answer`, appended under
+the workspace's row security, each naming the account that posted it, which no read shows. Only the
+person playing the being answers for it or gives it back (`not_played` for anybody else, with
+nothing kept), and a minute takes only that person's answer, never one another person posted
+before they took the being. An answer for a being that left the world is not found (404). A line a
+person types lives in their answer, the receipt's proposal, the said event and the society's state
+(each hearer's heard lines and the speaker's said lines), and no tombstone reaches those records
+yet: a workspace's erasure leaves them, as it leaves every society record, until a society-wide
+erasure lands, which it must before any installation but a rehearsal turns societies of things on.
+
+Before the minute the host reserves the being's request as for any decider, with the provider
+record `{kind: person, contract}`, and answers it at once from the latest answer for that minute
+(`answer_played` in `exulanica/world/society_play.py`): before it asks any model, and in a workspace
+it asks no model for as well. Every minute stepped answers it first, however it is stepped (the
+playback claim, a control's manual step or the step route all advance through
+`SocietyRepository.advance`), and a being the host answered already is left as it is, so a played
+being's minute never falls to its routine. Its receipt is an accepted one with `{kind: person,
+answer_sha256}`, or, where none was posted, its idle option (carrying on, else waiting),
+`person_no_answer`, with no digest; never the routine and never a model. A line carrying a name saved since it was posted is not said. Five such minutes in a row
+(`QUIET_MINUTES`) and the host gives the being back, `ended: player_left`. The minute applies the
+receipt as any decider's: its `decision_applied` event's `origin` and a line's `said` event's
+`decider` read `person`. The models read shows a played being's choice as `{"kind": "person"}` with
+`played_by_you` and no `chosen_by`, and the thing card's decider as `{kind: person, played_by_you,
+may_change: false, refusal: being_played}`. Replay reads the receipts and needs no player.
 
 ## An outside program deciding
 
@@ -565,7 +615,7 @@ In order:
 
 The claim then advances one minute, so no later choice point of a person a model runs passes
 unasked. The page never asks a model, and a manual step asks nothing: it takes only receipts already
-recorded.
+recorded, besides the answers of the beings people play, which every step records first.
 
 ## Spend
 

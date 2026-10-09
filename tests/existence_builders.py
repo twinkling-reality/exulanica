@@ -382,9 +382,12 @@ def society_thing(owner) -> dict[str, Any]:
         200,
     )
     [thing] = [t for t in society["state"]["things"] if t["placed_id"] == "existence-thing"]
+    # A being of the same society, by the id the play routes take.
+    being = society["state"]["inhabitants"][0]["id"]
     return {
         "/world/versions/{version_id}": version_id,
         "/world/versions/{version_id}/society/things/{thing_id}": thing["id"],
+        "/world/versions/{version_id}/society/play/{subject_id}": being,
     }
 
 

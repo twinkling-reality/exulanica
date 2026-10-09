@@ -36,6 +36,7 @@ from exulanica.api.world_scope import WorldId
 from exulanica.door.outside import outside_deciders
 from exulanica.models.manifest import load_manifest
 from exulanica.models.usage import usd_string
+from exulanica.world.deciders import is_played
 from exulanica.world.decision_roles import (
     DecisionContract,
     DecisionRole,
@@ -211,6 +212,16 @@ def _with_latest(
     ]
 
 
+def _played(choice: dict[str, Any], session: CurrentSession) -> dict[str, Any]:
+    """What a read says of a person playing a being: that a person plays it, and whether it is
+    the reader (``played_by_you``); never which account, nor who chose."""
+    return {
+        "decider": {"kind": "person"},
+        "chosen_by": None,
+        "played_by_you": choice["decider"]["account_id"] == str(session.actor),
+    }
+
+
 @router.get("")
 def society_models(
     version_id: uuid.UUID,
@@ -337,6 +348,7 @@ def society_models_view(
                 else {**choice["model"], "name": manifest.model_name(choice["model"]["model_id"])},
                 "refusal": None if choice["model"] is None else refusal(choice["model"]),
             }
+            | (_played(choice, session) if is_played(choice["decider"]) else {})
             for subject, choice in sorted(choices.items())
         ],
         # The mind each gate's travellers get when their arrival says the world decides for them.

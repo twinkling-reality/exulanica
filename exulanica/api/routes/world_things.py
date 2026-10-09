@@ -252,6 +252,7 @@ def thing_card_read(
             world_id=world_id,
             version_id=version_id,
             thing_id=thing_id,
+            reader=session.actor,
         )
     except UnavailableSocietyInput as exc:
         return _unavailable(exc)

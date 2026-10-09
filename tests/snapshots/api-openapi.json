@@ -3557,6 +3557,350 @@
     }
    }
   },
+  "/world/versions/{version_id}/society/play": {
+   "post": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Start Playing",
+    "description": "Start playing one being: a choice naming it with the person who plays, the session's\naccount. Refused by name where the society is not a society of things\n(``engine_takes_no_play``), another person plays it (``being_played``), its own program\ndecides for it (``decided_from_outside``) or its kind lets no person decide for it\n(``decider_not_allowed``).",
+    "operationId": "start_playing_world_versions__version_id__society_play_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PlayBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Start Playing World Versions  Version Id  Society Play Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/society/play/{subject_id}/give-back": {
+   "post": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Give Back",
+    "description": "Give the being back: it is decided for again as it was before the play began. Refused\n``not_played`` where the reader does not play it.",
+    "operationId": "give_back_world_versions__version_id__society_play__subject_id__give_back_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "subject_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Subject Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GiveBackBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Give Back World Versions  Version Id  Society Play  Subject Id  Give Back Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/society/play/{subject_id}/turn": {
+   "get": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Turn",
+    "description": "What the being is offered in the minute to come, read from the society's stored state as\nits request will offer it: each option's label, kind, the place or being it names and whether\nit takes a line; the line's bound; whether the reader plays it; how many quiet minutes are\nleft before the being is given back; and when the minute is due.",
+    "operationId": "turn_world_versions__version_id__society_play__subject_id__turn_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "subject_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Subject Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Turn World Versions  Version Id  Society Play  Subject Id  Turn Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/society/play/{subject_id}/answer": {
+   "post": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Answer",
+    "description": "The reader's answer for the being they play, for the minute ``base_tick``: one option the\nminute offers, by its label, and its line where it says something. Checked as any decider's\nanswer is, and kept as the latest for that minute; the minute takes the latest. Refused\n``minute_passed`` (409, with the current minute) where that minute has been played,\n``not_played`` where the reader does not play the being, and by the check that fails.",
+    "operationId": "answer_world_versions__version_id__society_play__subject_id__answer_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "subject_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Subject Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PlayAnswerBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Answer World Versions  Version Id  Society Play  Subject Id  Answer Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/society/district": {
    "get": {
     "tags": [
@@ -27710,6 +28054,21 @@
     "title": "GeometryView",
     "description": "One capture's geometry. No rung: see :mod:`exulanica.graph.geometry` for why not."
    },
+   "GiveBackBody": {
+    "properties": {
+     "idempotency_key": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Idempotency Key"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "idempotency_key"
+    ],
+    "title": "GiveBackBody"
+   },
    "GoToIntent": {
     "properties": {
      "kind": {
@@ -32240,6 +32599,62 @@
     ],
     "title": "PlacementContextBody",
     "description": "Where the person is pointing: the region and the region-local transform, as supplied."
+   },
+   "PlayAnswerBody": {
+    "properties": {
+     "base_tick": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Base Tick"
+     },
+     "label": {
+      "type": "string",
+      "maxLength": 400,
+      "minLength": 1,
+      "title": "Label"
+     },
+     "line": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Line"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_tick",
+     "label"
+    ],
+    "title": "PlayAnswerBody"
+   },
+   "PlayBody": {
+    "properties": {
+     "idempotency_key": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Idempotency Key"
+     },
+     "subject_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Subject Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "idempotency_key",
+     "subject_id"
+    ],
+    "title": "PlayBody"
    },
    "PointMapArrivalPin": {
     "properties": {

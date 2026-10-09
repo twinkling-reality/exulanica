@@ -1499,7 +1499,8 @@ world made from a world kind is lived in by the living society only, and refuses
 one only on a host that sets `EXULANICA_SOCIETY_OF_THINGS` on, and refuses it by name elsewhere
 (`society_engine_not_offered`). Its people walk, choose, stay and talk by the purposeful planner's
 rules, use their hands where a decider chooses or the world's owner asks (below) and follow nobody
-yet. Each of them names its kind by key, version and digest, and how it came: `populated` (the
+yet; a person may play one of them ([decision roles](decision-roles-contract.md#a-person-playing-a-being)).
+Each of them names its kind by key, version and digest, and how it came: `populated` (the
 people its ground's population brings, the purposeful genesis's own people with the same names and
 draws, of the kind the ground's catalog entry names, `population_kind`), `placed` (a being the
 world's author placed in the version) or `crossed` (a visitor from an outside program). At genesis

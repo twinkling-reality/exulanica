@@ -40,7 +40,10 @@ from exulanica.world.deciders import (
     DeciderRefused,
     check_external_config,
     check_external_record,
+    check_person_config,
+    check_person_record,
     is_external,
+    is_person_ask,
 )
 from exulanica.world.decision_roles import (
     FEWEST_OPTIONS,
@@ -368,6 +371,13 @@ def check_role_request(role: DecisionRole, document: Mapping[str, Any]) -> None:
             raise ValueError(
                 f"a {role.key} decision request names the program it asked: {exc}"
             ) from exc
+    elif is_person_ask(config):
+        try:
+            check_person_config(config)
+        except DeciderRefused as exc:
+            raise ValueError(
+                f"a {role.key} decision request names the person playing: {exc}"
+            ) from exc
     elif not isinstance(config, dict) or set(config) != PROVIDER_CONFIG:
         raise ValueError(f"a {role.key} decision request names the model it asked, and how")
 
@@ -382,7 +392,7 @@ def names_its_listener(
     and one asked under terms that state no such rule, an earlier prompt's among them, never does.
     """
     config = request["provider_config"]
-    if is_external(config):
+    if is_external(config) or is_person_ask(config):
         return False
     terms = role.terms_with_prompt(config.get("prompt_version"))
     listener_of = getattr(role.adapter, "line_listener", None)
@@ -429,6 +439,25 @@ def check_role_result(
     if (result["status"] == "accepted") != (proposal is not None):
         raise ValueError(f"exactly an accepted {role.key} decision carries a proposal")
     provider = result["provider"]
+    if is_person_ask(request["provider_config"]):
+        # A person playing the being answers: their answer, or, where they posted none, the idle
+        # option, recorded in its own fields with no account and no cost. A minute that could not
+        # take it records why, as for any decider.
+        if provider is None:
+            if result["status"] == "accepted":
+                raise ValueError(f"an accepted {role.key} decision records the person's answer")
+            return
+        try:
+            check_person_record(provider)
+        except DeciderRefused as exc:
+            raise ValueError(f"a {role.key} decision records the person's answer: {exc}") from exc
+        if result["status"] == "accepted" and (result["reason"] == "person_no_answer") != (
+            provider["answer_sha256"] is None
+        ):
+            raise ValueError(
+                f"a {role.key} decision for a played being takes the person's answer, or carries on"
+            )
+        return
     if is_external(request["provider_config"]):
         if provider is None:
             # A request an outside program never answered ends for a reason only an outside ask

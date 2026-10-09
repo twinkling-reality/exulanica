@@ -1193,7 +1193,7 @@ def _decided(
     visitor's quiet minutes are counted, an applied line is said where the speaker stood as the
     minute began and heard by every being then within reach that hears, and an applied leaving
     sends the visitor home; then every visitor whose program stayed quiet long enough leaves."""
-    from exulanica.world.deciders import receipt_from_outside
+    from exulanica.world.deciders import receipt_decider
     from exulanica.world.society_decision_contract import hearers
 
     if not decisions:
@@ -1267,7 +1267,8 @@ def _decided(
                     "from_kind": dict(person["kind"]),
                     "from_number": person["ordinal"] + 1,
                     "heard_by": heard_by,
-                    "decider": "external" if receipt_from_outside(receipt) else "model",
+                    # Who chose the line: a model, an outside program, or a person playing.
+                    "decider": receipt_decider(receipt),
                     # The model a line's decider asked, where a model decided it.
                     **({"model": said_by} if said_by is not None else {}),
                 },

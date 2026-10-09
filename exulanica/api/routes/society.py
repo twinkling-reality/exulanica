@@ -218,6 +218,7 @@ def advance_society(
                 base_tick=body.base_tick,
                 base_state_sha256=body.base_state_sha256,
                 base_clock_revision=body.base_clock_revision,
+                actor=session.actor,
             )
         ),
         invalid_status=409,

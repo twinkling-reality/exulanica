@@ -17,7 +17,7 @@ from typing import Any, Final
 
 from psycopg.types.json import Jsonb
 
-from exulanica.world.deciders import EXTERNAL_REASONS, is_external
+from exulanica.world.deciders import EXTERNAL_REASONS, is_external, is_person_ask
 from exulanica.world.decision_roles import (
     DecisionContract,
     DecisionRole,
@@ -47,6 +47,8 @@ _ROLE_PROVENANCE = ("provider", "model_id", "mechanism", "prompt_version")
 #: What a receipt of an outside program's answer must say to match its request: the door, and the
 #: grant and mapping file it was asked under.
 _OUTSIDE_PROVENANCE = ("kind", "bridge", "grant_id", "grant_seq", "mapping_sha256")
+#: A person's answer names only its kind: no account, model or program.
+_PERSON_PROVENANCE = ("kind",)
 
 
 #: How many minutes back a claim looks for a role's request its host never answered: the
@@ -186,14 +188,16 @@ class SocietyDecisionRepository:
             asked, provider = request["provider_config"], receipt["provider"]
             call = provider or {}
             outside = is_external(asked)
+            played = is_person_ask(asked)
             decisions.append(
                 {
                     "decision_seq": receipt["decision_seq"],
                     "subject_id": receipt["subject_id"],
                     "base_tick": receipt["base_tick"],
                     "consumed_tick": value["tick"],
-                    # Who was asked: a model, or an outside program under its grant, which no
-                    # model's name, mechanism or cost describes.
+                    # Who was asked: a model, an outside program under its grant, or a person
+                    # playing the being (never which account), which no model's name, mechanism
+                    # or cost describes.
                     "decider": (
                         {
                             "kind": "external",
@@ -201,21 +205,23 @@ class SocietyDecisionRepository:
                             "grant_id": asked["grant_id"],
                         }
                         if outside
+                        else {"kind": "person"}
+                        if played
                         else {
                             "kind": "model",
                             "provider": asked["provider"],
                             "model_id": asked["model_id"],
                         }
                     ),
-                    "provider": None if outside else asked["provider"],
-                    "model_id": None if outside else asked["model_id"],
-                    "mechanism": None if outside else asked["mechanism"],
+                    "provider": None if outside or played else asked["provider"],
+                    "model_id": None if outside or played else asked["model_id"],
+                    "mechanism": None if outside or played else asked["mechanism"],
                     "status": receipt["status"],
                     "reason": receipt["reason"],
                     "disposition": value["disposition"],
                     "disposition_reason": value["disposition_reason"],
                     "chose": None if receipt["proposal"] is None else receipt["proposal"]["label"],
-                    "asked_model": provider is not None,
+                    "asked_model": provider is not None and not played,
                     "answers_asked": call.get("answers_asked"),
                     "latency_ms": call.get("latency_ms"),
                     "cost_usd": call.get("cost_usd"),
@@ -365,9 +371,12 @@ class SocietyDecisionRepository:
             ):
                 result = {**result, "status": "stale", "reason": "decision_context_changed"}
             elif result["status"] == "accepted":
+                played = is_person_ask(request["provider_config"])
                 provenance = (
                     _OUTSIDE_PROVENANCE
                     if is_external(request["provider_config"])
+                    else _PERSON_PROVENANCE
+                    if played
                     else _ROLE_PROVENANCE
                 )
                 if result["provider"] is None or any(
@@ -380,7 +389,8 @@ class SocietyDecisionRepository:
                         "reason": "provider_configuration_changed",
                         "proposal": None,
                     }
-                else:
+                elif not (played and result["reason"] == "person_no_answer"):
+                    # A played being that carried on, its person posting nothing, says so.
                     result = {**result, "reason": "validated_choice"}
         if result["status"] != "accepted":
             # Only an accepted answer is kept as a proposal; the rest record why none applies.

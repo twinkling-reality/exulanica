@@ -303,9 +303,11 @@ answers 424 `unavailable_society_input`, as the society read does. The card stat
   list it, so a lantern spirit's card offers no talk);
 - where it is (`where`: on the ground, held by whom and in which socket) and, for a being of a
   society running hands, what it holds (`holding`, null where hands are not run);
-- who decides for a being (`decider`): its own program where it came from outside, else the model
-  or the routine a choice names (its own, or its gate's), with whether the owner may change it and
-  why a chosen model is not asked here; null for an object;
+- who decides for a being (`decider`): its own program where it came from outside, else a person
+  playing it (`person`, with `played_by_you`, never which account;
+  [decision roles](decision-roles-contract.md#a-person-playing-a-being)), else the model or the
+  routine a choice names (its own, or its gate's), with whether the owner may change it and why a
+  chosen model is not asked here; null for an object;
 - how it is drawn (`look`: the newest look chosen for it that it may still wear, else its kind's
   first, with its label, its look kind's words, whether the owner chose it and its origin) and what
   else it may be drawn as (`looks`: every shipped look made for its body and, for a body with bones,

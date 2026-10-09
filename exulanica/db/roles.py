@@ -335,6 +335,9 @@ INSERT_ONLY_TABLES: Final = (
     "workspace_style_pack_withdrawal",
     "workspace_style_pack_blob",
     "workspace_style_pack_publish_request",
+    # Migration 0177 appends each answer a person posts for the being they play and refuses
+    # every update and delete of one.
+    "world_society_person_answer",
 )
 
 #: Tables the runtime may read and never write (migration 0173): the style pack attempt counters

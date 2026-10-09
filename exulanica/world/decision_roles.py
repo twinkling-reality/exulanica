@@ -178,6 +178,9 @@ GENERIC_REASONS: Final = frozenset(
         "grant_expired",
         "decider_passed",
         "saved_name_withheld",
+        # A person playing the subject posted no answer for the minute, so it carried on, or waited
+        # at a choice point: never the routine, never a model.
+        "person_no_answer",
     }
 )
 #: The shape of each profile a role's documents carry, the shapes migration 0117 admits by the

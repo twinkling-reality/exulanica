@@ -93,6 +93,10 @@ the tick and state digest they were made against, and a stale base is refused.
 | `GET /world/versions/{version_id}/models` | Every registered decision role (a person, a junction signal): its subjects, offered models, choices and host refusal, with the same declared semantics on each role |
 | `POST /world/versions/{version_id}/models/{role_key}` | Choose a model for some subjects of one role, or none; needs `model.invoke` beside `world.write` |
 | `GET /world/versions/{version_id}/society/models` | The offered models, each person's choice and each model's decisions |
+| `POST /world/versions/{version_id}/society/play` | Start playing one being of a society of things |
+| `GET /world/versions/{version_id}/society/play/{subject_id}/turn` | What the played being is offered in the minute to come |
+| `POST /world/versions/{version_id}/society/play/{subject_id}/answer` | The player's answer for the minute to come |
+| `POST /world/versions/{version_id}/society/play/{subject_id}/give-back` | Give the being back to what decided for it before |
 | `POST /world/versions/{version_id}/society/models` | Choose a model for some people, or their routine, as the route above does for the person role; needs `model.invoke` beside `world.write` |
 | `GET /world/versions/{version_id}/traffic` | A town's vehicles, second by second, from the roads its own records state |
 | `GET /world/versions/{version_id}/society/decisions/{request_id}` | One stored decision: what the model was asked and what it answered |
