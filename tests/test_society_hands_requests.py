@@ -801,8 +801,9 @@ def test_a_second_being_asked_for_the_same_far_thing_finds_its_place_taken():
 
 
 #: A v2 minute pinned: the knight asked (request 0x61) to pick up the sword it must walk to, the
-#: minute as _minute composes it. The digests were recorded from this package's code; the knight's
-#: events and their reasons are the spec's, written out by hand.
+#: minute as _minute composes it, over the modules of the history test's record. The digests were
+#: recorded from this package's code; the knight's events and their reasons are the spec's,
+#: written out by hand.
 PINNED_V2_MINUTE = {
     "tick": 1,
     "state_sha256": "b4c4a29df1372f1f3bc3baeab324360f05ab50cd76f6a6545e4bb2cd8df53d06",
@@ -817,9 +818,12 @@ PINNED_V2_MINUTE = {
 
 
 def test_a_minute_with_a_walking_hands_request_keeps_its_pinned_bytes():
+    from test_society_hands_history_before_requests import recorded
     from test_society_things_before_modules import _events_sha256
 
-    state, document = _society(GATE, KNIGHT, FAR_SWORD)
+    # The modules the pin was recorded with, so a module added since leaves the minute as it was.
+    document = recorded(compose((GATE, KNIGHT, FAR_SWORD)))
+    state = initial_things_society(SOCIETY, SEED, document, population=POPULATION)
     knight, sword = _knight(state), _thing(state, "sword")
     request = build_action_request(
         state,

@@ -28,7 +28,7 @@ from exulanica.world.role_decisions import (
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_actions import action_goal_policies, append_action_events
 from exulanica.world.society_engines import society_engine
-from exulanica.world.society_planner import advance_purposeful_society
+from exulanica.world.society_planner import advance_purposeful_society, input_sha256
 from exulanica.world.society_things import advance_things, initial_things_society
 
 from test_society_things_before_modules import _events_sha256
@@ -41,9 +41,28 @@ KNIGHT = thing("knight", "knight", 1, 3_000, 3_000)
 SWORD = thing("sword", "sword", 2, -3_000, 2_600)
 
 
+#: The ability modules the history was recorded with. A society runs the modules its first input
+#: records, so modules added since (a newer current_modules()) leave this history as it ran; the
+#: input names these four, as it did when it was recorded.
+RECORDED_MODULES = (
+    "exulanica-ability/crossing/v1",
+    "exulanica-ability/hands/v1",
+    "exulanica-ability/purposeful/v1",
+    "exulanica-ability/say/v1",
+)
+
+
+def recorded(document: dict[str, Any]) -> dict[str, Any]:
+    """``document`` naming the modules the history was recorded with, sealed again."""
+    document = {**document, "modules": list(RECORDED_MODULES)}
+    document.pop("document_sha256")
+    document["document_sha256"] = input_sha256(document)
+    return document
+
+
 def scene() -> dict[str, Any]:
     """The input every minute of the history reads."""
-    return compose((GATE, KNIGHT, SWORD))
+    return recorded(compose((GATE, KNIGHT, SWORD)))
 
 
 def minute(
