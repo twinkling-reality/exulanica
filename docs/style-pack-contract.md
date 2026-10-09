@@ -12,9 +12,9 @@ reading of a palette piece, drawing a generated town in a pack (section 7), thre
 (section 8), the committed library the host serves (section 9) and a world's appearance naming its
 pack (section 10) are built, as are a creator's own packs in their workspace: kept, uploaded,
 checked, served, downloaded as an archive, offered for publication and withdrawn (section 11), and
-looks made of generated pieces, recorded, checked and served (section 11.2). Wearing a workspace
-pack in a world, publishing one to the library, the page's upload control, and drafting a pack with
-a model are planned and not built.
+looks made of generated pieces, recorded, checked, served and worn by the world they were made for
+(sections 10 and 11.2). A person choosing their own workspace pack for a world, publishing one to
+the library, the page's upload control, and drafting a pack with a model are planned and not built.
 
 ## 1. In plain words
 
@@ -301,6 +301,23 @@ and Apply. `listedVersion` (`web/packages/app/src/world-look.ts`) places a diges
 current version or an earlier one. A pack states no structure, so naming one never moves the world's topology. A world
 package exported from a world does not yet carry the pack its appearance names.
 
+A world may also wear a version of its workspace's own pack (section 11): its style version then
+states `style_pack_source` `workspace` beside the id, version and digest (one migration,
+`a_world_wears_its_own_look_of_generated_pieces`; every version written before it, and every one
+naming a library pack, states `library`, and reads exactly as it did). Such a version is named only
+while `workspace_style_pack_wearable` says it may be worn, asked under the asset read lock as the
+last question of the write, and the schema holds the same at insert, so a rollback to a version
+naming one that was since withdrawn is refused. The appearance routes name library packs only; the
+generation worker names a look made of a world's generated pieces
+([generated pieces](generated-pieces-contract.md#54-a-worlds-look-taking-its-pieces-in-and-back)).
+A version naming the workspace's own pack is answered with `source` `workspace`, the library version
+it is drawn on (`base`) and whether it may still be worn (`wearable`); a library pack's answer states
+none of the three. The page fetches such a pack's manifest from `GET /workspace-style-packs/{sha256}`
+and its own pieces from that version's file route, held to their digests, and its base from the
+library, and resolves the two as one chain. A world whose own look was withdrawn after it was named
+still opens: its version keeps naming it, its read carries a warning, and the page draws it in that
+base.
+
 A world made by `POST /worlds/generated` is made wearing a look: the pack its `style_pack` names
 (`{pack_id, version, manifest_sha256}`, a version the library holds at exactly that digest, else
 422 `invalid_style_data` and nothing made), or the library's default when it names none
@@ -355,8 +372,9 @@ other words or a larger library. The page does not show the offer yet.
 
 A creator's own pack is kept in their workspace and never becomes a library pack. One migration
 (`a_workspace_keeps_its_own_style_packs`) holds it; `exulanica/world/workspace_style_packs.py`
-records and reads it; section 11.1 is how one arrives and is served. Wearing one in a world and the
-command that publishes one are planned and not built.
+records and reads it; section 11.1 is how one arrives and is served. A world wears one through its
+appearance (section 10), which the appearance routes do not yet offer a person; the command that
+publishes one is planned and not built.
 
 | Part | What it holds |
 | --- | --- |

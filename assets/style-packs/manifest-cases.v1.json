@@ -462,7 +462,7 @@
    "name": "a generated pack drawn on a base, stating only its new pieces",
    "manifest": {
     "profile": "exulanica.style-pack/v1",
-    "pack_id": "exulanica.case-town.own",
+    "pack_id": "generated.case-town",
     "version": 1,
     "title": "Case town, with new pieces",
     "description": "Case town with generated pieces for 2 parts in place of its own.",
@@ -571,7 +571,7 @@
     ]
    },
    "expect": {
-    "sha256": "98a532757fbaddefc0ac2684617d33a222a05d9750fac085ae1d0ef52d25e09c"
+    "sha256": "b028b40b918168f8b96f67043a67c1f4431d2f6f08c118b51128314c51f7e2c7"
    }
   },
   {
@@ -3313,7 +3313,7 @@
    "name": "a generated pack naming no receipt",
    "manifest": {
     "profile": "exulanica.style-pack/v1",
-    "pack_id": "exulanica.case-town.own",
+    "pack_id": "generated.case-town",
     "version": 1,
     "title": "Case town, with new pieces",
     "description": "Case town with generated pieces for 2 parts in place of its own.",

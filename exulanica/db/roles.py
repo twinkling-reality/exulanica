@@ -301,6 +301,9 @@ INSERT_ONLY_TABLES: Final = (
     # The piece batch migration appends each item a request was answered with and refuses every
     # update of one; only its tombstone trigger, as the definer owner, deletes.
     "piece_output",
+    # The migration of a world wearing its own look appends each step of its look taking a
+    # request's pieces in or back and refuses every update of one; nothing deletes one.
+    "piece_look_step",
     # The piece batch migration's installation-wide index of the generated pieces kept: catalog
     # content, appended once, never changed or removed (no workspace's deletion reaches it).
     "generated_piece",

@@ -749,6 +749,7 @@ _WORLD_WRITES: Final = _every(
     "POST /world/interactions/previews/{preview_id}/apply",
     "POST /world/interactions/rollback",
     "DELETE /world/piece-requests/{piece_request_id}",
+    "POST /world/piece-requests/{piece_request_id}/take-back",
     "POST /world/projects",
     "PUT /world/projects/{project_id}",
     "POST /world/projects/{project_id}/items",

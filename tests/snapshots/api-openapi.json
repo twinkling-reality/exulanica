@@ -20420,6 +20420,64 @@
     }
    }
   },
+  "/world/piece-requests/{piece_request_id}/take-back": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Take Back Pieces",
+    "description": "Ask for a request's pieces to leave its world's look. Answers 202 with the request; one\nwhose pieces its world never took in is answered 409 with where it stands.",
+    "operationId": "take_back_pieces_world_piece_requests__piece_request_id__take_back_post",
+    "parameters": [
+     {
+      "name": "piece_request_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Piece Request Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/worlds/specification/drafts": {
    "post": {
     "tags": [
@@ -40280,6 +40338,30 @@
     "title": "StepSocietyBody",
     "description": "A minute, against the state the person was shown and, when pinned, the world clock's\nrevision (``GET .../clock``): another revision is refused, 409 ``stale_clock_revision``."
    },
+   "StylePackBaseView": {
+    "properties": {
+     "pack_id": {
+      "type": "string",
+      "title": "Pack Id"
+     },
+     "version": {
+      "type": "integer",
+      "title": "Version"
+     },
+     "manifest_sha256": {
+      "type": "string",
+      "title": "Manifest Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "pack_id",
+     "version",
+     "manifest_sha256"
+    ],
+    "title": "StylePackBaseView"
+   },
    "StylePackBody": {
     "properties": {
      "pack_id": {
@@ -40322,6 +40404,39 @@
      "manifest_sha256": {
       "type": "string",
       "title": "Manifest Sha256"
+     },
+     "source": {
+      "anyOf": [
+       {
+        "type": "string",
+        "const": "workspace"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source"
+     },
+     "base": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/StylePackBaseView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "wearable": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Wearable"
      }
     },
     "additionalProperties": false,
@@ -40331,7 +40446,8 @@
      "version",
      "manifest_sha256"
     ],
-    "title": "StylePackView"
+    "title": "StylePackView",
+    "description": "A pack a version names. A library pack states its id, version and digest alone, as every\nversion did before a world could wear its workspace's own pack; a version of the workspace's\nown pack adds ``source`` ``workspace``, the library version it is drawn on (``base``) and\nwhether it may still be worn: a page draws a world whose own look may not be worn in that\nbase, or in the default look when it has none."
    },
    "StyleProposalView": {
     "properties": {

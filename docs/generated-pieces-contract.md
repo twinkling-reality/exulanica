@@ -18,7 +18,7 @@ does to its requests. How a piece is generated, post-processed and checked belon
 | Answering a request from the pieces already kept, with no GPU run and no charge | Implemented |
 | A session refusing to run an entry script other than the one its start command pinned | Built, not yet verified on Nebius |
 | The operator's purge of stored pieces no row names | Planned |
-| Passed pieces taken into the world's look as they arrive, each taken back on request | Planned |
+| Passed pieces taken into the world's look as they arrive, each taken back on request | Implemented |
 | The page's waiting line and per-thing list, and the Companion's offer of new pieces | Planned |
 | A person's own words for a piece | Not built |
 
@@ -37,9 +37,9 @@ minutes. Section 6 gives the figures and their records.
 ## 2. What a request is built from
 
 An ask names a world, a committed look the pieces are made in (a style pack version this server
-serves: its id, version and manifest digest) and 1 to 16 shipped thing kind versions. Taking passed
-pieces into the world's own look, and so which look that is, belongs to the planned step that
-applies them. Each kind becomes one request
+serves: its id, version and manifest digest) and 1 to 16 shipped thing kind versions. The look a
+request names is the base its passed pieces are taken into (section 5.4). Each kind becomes one
+request
 (`exulanica.generated-asset-request/v2`), built by `exulanica.generation.requests.plan_requests`
 from:
 
@@ -84,9 +84,12 @@ keyed on the workspace.
 | `GET /world/piece-requests?world_id=` | A world's requests, newest first. |
 | `GET /world/piece-requests/{piece_request_id}` | One request and where it stands. |
 | `DELETE /world/piece-requests/{piece_request_id}` | Cancels a request no session has taken. |
+| `POST /world/piece-requests/{piece_request_id}/take-back` | Asks for a request's pieces to leave its world's look (section 5.4). `202` with the request; asked again, `202` as it stands. |
 
-Asking needs `world.write` and `model.invoke`; reading needs `world.read`; cancelling needs
-`world.write`. Refusals use the API's problem shape:
+Every answer naming a request carries its latest step in its world's look (`look_step`: its
+`kind`, `reason`, the look's `manifest_sha256` and the appearance's `style_version_id`, or null
+before any). Asking needs `world.write` and `model.invoke`; reading needs `world.read`; cancelling
+and taking back need `world.write`. Refusals use the API's problem shape:
 
 | Status | Code | When |
 | --- | --- | --- |
@@ -95,6 +98,8 @@ Asking needs `world.write` and `model.invoke`; reading needs `world.read`; cance
 | 409 | `generation_session_off` | A guest asks while no session is running. |
 | 409 | `idempotency_key_reused` | The key names an earlier ask with another body. |
 | 409 | `piece_request_not_cancellable` | The request was taken or has ended; the body states its state. |
+| 409 | `piece_not_taken_in` | Taking back a request whose pieces its world never took in; the body's `step` states where it stands. |
+| 409 | `look_limit` | The workspace holds as many live looks of generated pieces as it may (section 5.4). |
 | 410 | `tombstoned` | The workspace has been deleted. |
 | 429 | `budget_exceeded` | Admission would refuse the workspace's next `nebius_ai_cloud_gpu` attempt, or its allowance, less what its open requests can still cost, cannot cover the worst case of the requests the ask would make (pieces already waiting are not weighed again); the `spending` member states admission's reason and scope. |
 | 429 | `piece_quota_exceeded` | The workspace has made as many requests as a day allows, or holds as many open (section 7). |
@@ -249,6 +254,63 @@ piece that would take it past the bound is refused. A piece refused at the bound
 these reasons, is neither kept nor recorded as an output, and the worker logs its code; a request
 none of whose pieces was kept ends `refused`, its GPU time still settled. Removing stored pieces no row names is the operator's, by a command not yet built.
 
+### 5.4 A world's look taking its pieces in, and back
+
+Every pass, whether or not a session is warm, the worker moves the look of each world with a made
+request not yet taken in, or a take-back asked and not yet done, one step
+(`exulanica/generation/apply.py`):
+
+1. **What the world wears.** The pack its current appearance names: a library pack (its base, with
+   no generated piece), or its own look of generated pieces drawn on a library pack (that base,
+   with the pieces its modules list). A world naming no pack wears the library's default. A world
+   whose own look may no longer be worn (withdrawn) wears its base. A world wearing a creator's own
+   pack takes nothing in.
+2. **What it should wear.** Each made request drawn on that same base sets its look role to its
+   passed pieces, at most eight in variant order; a newer request for the same role replaces an
+   older one (`replaced`). Each take-back asked removes the role while the world still wears that
+   request's pieces, and is done with nothing written (`not_worn`) when it does not.
+3. **The look.** With no generated piece left, the library pack itself. Otherwise a version of the
+   workspace's own pack of origin `generated`, `generated.` and the base's id after `exulanica.`
+   ([style pack contract](style-pack-contract.md#112-looks-made-of-generated-pieces)): the version
+   already made of the same pieces on the same base when the workspace holds one, else a new one,
+   whose check reads every piece again before any world wears it; after a check that was
+   interrupted (which may be asked again) the same pieces take the next version. While a check
+   runs, or the workspace's four checks are all waiting, the step waits for a later pass. A check
+   that ends failed ends it (`look_refused`, `look_check_failed`), as does a version withdrawn
+   before it was worn (`look_withdrawn`), a workspace at its limit of 64 live generated looks
+   (`look_limit`), a look that could not be recorded (`look_not_recorded`), a base the reader
+   refuses (`base_unreadable`) or not in the library (`base_not_library`), and a refusal of the
+   look's builder by its own code (such as `look_chain_full`).
+4. **The write.** The world's next appearance version names that look through the same preview and
+   Apply a person's change takes: origin `user`, the asker as actor, the reference
+   `generated-pieces:<request>`, and every saved entry resting on the replaced version moved to
+   the new one in the same write, so the person's next change is not refused as stale. A write
+   refused as busy or stale is tried on the next pass, for at most a day (`look_write_busy`).
+   Whatever ends an Apply, its preview is closed (as stale after a saved entry moved, as discarded
+   otherwise), so the page never offers it to the person as a change of their own.
+5. **The record.** One step per request (table `piece_look_step`, appended once, never changed):
+   `applied`, naming the look's manifest digest (none for the library pack) and the appearance
+   version; `not_applied` with its reason (`look_changed` when the request was drawn on another
+   base than the world wears, `no_piece_within`, `replaced`, or the reasons above); and for a
+   take-back, `take_back_asked` by whom, then `taken_back` (naming the look written, or with
+   `not_worn` when the world no longer wore the request's pieces) or `not_taken_back` with the
+   permanent reason its look could not be made. A take-back whose look waits, or whose write is
+   busy, stays asked and is tried on every pass until it is done.
+6. **A look that may no longer be worn.** A world whose current appearance names its own look after
+   that look was withdrawn is drawn in the look's library base, and a change that names no pack
+   keeps that base. On its next pass the step writes the base (or no pack, when the library no
+   longer holds it) as the world's next version and records `fell_back` (`look_withdrawn`) for the
+   request whose pieces the look held.
+
+Taking back writes a new appearance version and deletes no piece, request or look; the world's
+appearance history rolls back as it always does. A request is applied or not once, asked back once,
+taken back or not once, and falls back once. An ask is refused `409` `look_limit` while the
+workspace holds 64 live generated looks (the limit the style pack contract states), before anything
+is spent, since its pieces could not be taken into a look. A request's pieces arrive with its
+batch's done marker (section 6 gives the time an item takes), each new look is checked in the next
+asset preparation pass, and the world wears it on the worker's next pass after that. While a look
+waits, the world is alive in what it wore.
+
 ## 6. The cost and time figures
 
 The [piece compute catalog](../assets/catalogs/generation/piece-compute.v1.json) states, for each
@@ -289,6 +351,12 @@ which may only read and delete those two tables). Its settlements are kept, sinc
 ids, a basis and an amount and its reservations must still be settled: a request the tombstone
 cancelled while queued is settled `unknown`, or released when its reservation was only admitted.
 A stored piece and its index row stay, because they hold nothing of the workspace's (section 5.3).
+A request's look steps are kept with it after the tombstone, which refuses every new step: they
+hold ids, digests, instants and catalog codes, and no person's text. The workspace's own looks are
+erased with it ([style pack contract](style-pack-contract.md) section 11.2); its worlds'
+appearance versions, which name a look by id, version and digest, are not deleted, and nothing of
+the deleted workspace is served again.
+
 The judge's seed export refuses a workspace that holds an open request and copies only ended
 requests and batches, so a seed never carries one into another database, even one asked while the
 export runs; settlements, as money rows, never travel in a seed.
@@ -315,3 +383,4 @@ once (migration 0137) and, sent again after the ask, cancels the request that as
 | The shared store's boundary and bound | `exulanica/generation/pieces.py` | `tests/test_generated_piece_store.py` |
 | Deletion of batches and outputs | the second migration's definer trigger | `tests/test_piece_request_erasure_postgres.py` |
 | The index held to its receipts, one registration per session, and the output trigger's erased-workspace and kept-receipt checks | the migration `a_kept_piece_is_its_receipt` (after the one that creates batches) | `tests/test_piece_requests_postgres.py`, `tests/test_generation_session_commands_postgres.py` |
+| A world's look taking its pieces in and back, its steps, and a world wearing its own look | `exulanica/generation/apply.py`, `exulanica/generation/looks.py`, the migration `a_world_wears_its_own_look_of_generated_pieces` | `tests/test_piece_look_steps_postgres.py`, `tests/test_generated_looks.py` |

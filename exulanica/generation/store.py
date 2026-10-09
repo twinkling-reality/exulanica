@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Final
@@ -50,12 +50,15 @@ __all__ = [
     "OPEN_STATES",
     "PieceAllowanceRefused",
     "PieceAskKeyReused",
+    "PieceNotTakenIn",
     "PieceQuotaExceeded",
     "PieceRequestNotCancellable",
     "PieceRequestRecord",
     "answer_for_key",
+    "ask_take_back",
     "cancel_piece_request",
     "create_piece_requests",
+    "generated_looks_full",
     "list_piece_requests",
     "open_worst_case",
     "read_piece_request",
@@ -95,6 +98,14 @@ class PieceQuotaExceeded(ExulanicaError):
     """The workspace has made as many requests in a day, or holds as many open, as it may."""
 
 
+class PieceNotTakenIn(ExulanicaError):
+    """Only pieces a world's look took in are given back; ``step`` is where the request stands."""
+
+    def __init__(self, step: str) -> None:
+        super().__init__(f"the request's pieces are not in its world's look ({step})")
+        self.step = step
+
+
 class PieceRequestNotCancellable(ExulanicaError):
     """Only a request still waiting to be taken may be cancelled."""
 
@@ -126,6 +137,8 @@ class PieceRequestRecord:
     requested_at: datetime
     queued_at: datetime | None
     finished_at: datetime | None
+    #: The request's latest step in its world's look (``piece_look_step``), or None before any.
+    look_step: Mapping[str, Any] | None = None
 
     def document(self) -> dict[str, Any]:
         def instant(value: datetime | None) -> str | None:
@@ -154,11 +167,48 @@ class PieceRequestRecord:
             "requested_at": instant(self.requested_at),
             "queued_at": instant(self.queued_at),
             "finished_at": instant(self.finished_at),
+            "look_step": (
+                None
+                if self.look_step is None
+                else {
+                    "kind": self.look_step["kind"],
+                    "reason": self.look_step["reason"],
+                    "manifest_sha256": self.look_step["manifest_sha256"],
+                    "style_version_id": (
+                        None
+                        if self.look_step["style_version_id"] is None
+                        else str(self.look_step["style_version_id"])
+                    ),
+                    "recorded_at": instant(self.look_step["recorded_at"]),
+                }
+            ),
         }
 
 
 def _record(row: Mapping[str, Any]) -> PieceRequestRecord:
     return PieceRequestRecord(**row)
+
+
+def _with_steps(
+    cursor: Any, workspace_id: uuid.UUID, records: list[PieceRequestRecord]
+) -> list[PieceRequestRecord]:
+    """``records`` each with its latest look step: a take-back asked after it was applied, taken
+    back after that."""
+    if not records:
+        return records
+    steps = {
+        row["piece_request_id"]: row
+        for row in cursor.execute(
+            "select distinct on (piece_request_id) piece_request_id, kind, reason, "
+            "  manifest_sha256, style_version_id, recorded_at "
+            "from piece_look_step where workspace_id = %s and piece_request_id = any(%s) "
+            "order by piece_request_id, recorded_at desc, "
+            "  array_position(array['fell_back', 'taken_back', 'not_taken_back', "
+            "                       'take_back_asked', 'applied', 'not_applied'], kind)",
+            (workspace_id, [record.piece_request_id for record in records]),
+        ).fetchall()
+    }
+    return [replace(record, look_step=steps.get(record.piece_request_id)) for record in records]
 
 
 def answer_for_key(
@@ -375,7 +425,7 @@ def list_piece_requests(
             "order by requested_at desc, piece_request_id desc limit %s",
             (workspace_id, world_id, LIST_LIMIT),
         ).fetchall()
-    return [_record(row) for row in rows]
+        return _with_steps(cursor, workspace_id, [_record(row) for row in rows])
 
 
 def read_piece_request(
@@ -388,7 +438,66 @@ def read_piece_request(
             "and piece_request_id = %s",
             (workspace_id, piece_request_id),
         ).fetchone()
-    return None if row is None else _record(row)
+        return None if row is None else _with_steps(cursor, workspace_id, [_record(row)])[0]
+
+
+def generated_looks_full(connection: psycopg.Connection, workspace_id: uuid.UUID) -> bool:
+    """Whether the workspace holds as many live looks of generated pieces as it may
+    (``workspace_style_pack_generated_limit``, counted as its version guard counts them: not
+    withdrawn, and not finally failed). Pieces asked then could never be taken into a look, so an
+    ask is refused by name before anything is spent."""
+    row = connection.execute(
+        "select count(*) >= workspace_style_pack_generated_limit() as full "
+        "from workspace_style_pack_version v "
+        "where v.workspace_id = %s and v.origin = 'generated' "
+        "  and not exists (select 1 from workspace_style_pack_withdrawal w "
+        "                   where w.workspace_id = v.workspace_id "
+        "                     and w.manifest_sha256 = v.manifest_sha256) "
+        "  and not exists (select 1 from workspace_style_pack_preparation p "
+        "                   where p.workspace_id = v.workspace_id "
+        "                     and p.manifest_sha256 = v.manifest_sha256 "
+        "                     and p.state in ('failed', 'cancelled') "
+        "                     and p.failure_class is distinct from 'interrupted')",
+        (workspace_id,),
+    ).fetchone()
+    return bool(row is not None and (row["full"] if isinstance(row, Mapping) else row[0]))
+
+
+def ask_take_back(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    piece_request_id: uuid.UUID,
+    asked_by: uuid.UUID,
+) -> PieceRequestRecord | None:
+    """Ask for a request's pieces to leave its world's look; None for an unknown id. The generation
+    worker writes the world's next appearance version on its next pass. Asked again, it answers as
+    it stands. A request whose pieces its world never took in is :class:`PieceNotTakenIn`."""
+    with (
+        terminal_if_tombstoned(),
+        connection.transaction(),
+        connection.cursor(row_factory=dict_row) as cursor,
+    ):
+        lock_workspace(connection, workspace_id)
+        _refuse_if_tombstoned(cursor, workspace_id)
+        row = cursor.execute(
+            f"select {_COLUMNS} from piece_request where workspace_id = %s "
+            "and piece_request_id = %s for update",
+            (workspace_id, piece_request_id),
+        ).fetchone()
+        if row is None:
+            return None
+        record = _with_steps(cursor, workspace_id, [_record(row)])[0]
+        step = None if record.look_step is None else record.look_step["kind"]
+        if step in ("take_back_asked", "taken_back", "not_taken_back"):
+            return record
+        if step != "applied":
+            raise PieceNotTakenIn(step or record.state)
+        cursor.execute(
+            "insert into piece_look_step (workspace_id, piece_request_id, world_id, kind, "
+            "  asked_by) values (%s, %s, %s, 'take_back_asked', %s)",
+            (workspace_id, piece_request_id, record.world_id, asked_by),
+        )
+        return _with_steps(cursor, workspace_id, [record])[0]
 
 
 def cancel_piece_request(

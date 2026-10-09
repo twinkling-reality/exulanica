@@ -117,8 +117,21 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
     " [society_experiment_definition]": _BY_EXPERIMENT,
     **{
         f"exulanica/generation/store.py::{name} [piece_request]": _BY_PIECE_REQUEST
-        for name in ("answer_for_key", "cancel_piece_request", "read_piece_request")
+        for name in (
+            "answer_for_key",
+            "ask_take_back",
+            "cancel_piece_request",
+            "read_piece_request",
+        )
     },
+    "exulanica/generation/store.py::_with_steps [piece_look_step]": (
+        "a request's look steps are found by the request ids already read, each request and step "
+        "naming its own world"
+    ),
+    "exulanica/generation/apply.py::_waiting [piece_look_step, piece_request]": (
+        "the generation worker steps a workspace's looks across every world it holds; each request "
+        "and step row names its own world, by which the step is made world by world"
+    ),
     **{
         f"exulanica/generation/batches.py::{name} [piece_request]": (
             "the generation worker serves a workspace's queue across every world it holds; each "

@@ -181,6 +181,25 @@ def test_a_world_s_requests_are_read_and_cancelled_by_their_workspace_only(api) 
     )
 
 
+def test_pieces_are_taken_back_only_by_their_workspace_and_only_once_taken_in(api) -> None:
+    client = api()
+    one = _ask(client).json()["piece_requests"][0]["piece_request_id"]
+    path = f"/world/piece-requests/{one}/take-back"
+    # Another workspace's request and one that never existed answer alike.
+    stranger = _call(client, "POST", path, STRANGER_TOKEN)
+    invented = _call(client, "POST", f"/world/piece-requests/{uuid.uuid4()}/take-back")
+    assert (stranger.status_code, stranger.json()) == (invented.status_code, invented.json())
+    assert (stranger.status_code, stranger.json()["code"]) == (404, "unknown_piece_request")
+    # A request whose pieces its world never took in says where it stands.
+    waiting = _call(client, "POST", path)
+    assert (waiting.status_code, waiting.json()["code"], waiting.json()["step"]) == (
+        409,
+        "piece_not_taken_in",
+        "requested",
+    )
+    assert _call(client, "GET", f"/world/piece-requests/{one}").json()["look_step"] is None
+
+
 @pytest.mark.parametrize(
     ("changes", "status", "code"),
     [

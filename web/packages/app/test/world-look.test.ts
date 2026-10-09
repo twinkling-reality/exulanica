@@ -103,6 +103,20 @@ describe('the look a generated world opens in', () => {
     expect(worldLookChoice('?look=constructor', null)).toEqual({ packId: DEFAULT_WORLD_LOOK, manifestSha256: null, source: 'default' });
   });
 
+  it('is the world\'s own look drawn on its base while it may be worn, else that base, else the default', () => {
+    const base = { packId: 'exulanica.cozy-town', version: 3, manifestSha256: 'b'.repeat(64) };
+    const own = { packId: 'generated.cozy-town', version: 2, manifestSha256: 'c'.repeat(64) };
+    expect(worldLookChoice('', { ...own, own: { base, wearable: true } }))
+      .toEqual({ packId: 'generated.cozy-town', manifestSha256: 'c'.repeat(64), source: 'world', ownBase: base });
+    expect(worldLookChoice('', { ...own, own: { base, wearable: false } }))
+      .toEqual({ packId: 'exulanica.cozy-town', manifestSha256: 'b'.repeat(64), source: 'world' });
+    expect(worldLookChoice('', { ...own, own: { base: null, wearable: false } }))
+      .toEqual({ packId: DEFAULT_WORLD_LOOK, manifestSha256: null, source: 'default' });
+    // The address still wins, as for every world.
+    expect(worldLookChoice('?look=toon', { ...own, own: { base, wearable: true } }))
+      .toEqual({ packId: 'exulanica.toon-town', manifestSha256: null, source: 'address' });
+  });
+
   it('names only packs the committed library holds, the default among them', () => {
     expect(Object.values(WORLD_LOOKS).sort()).toEqual(readdirSync(PACKS).sort());
     expect(readdirSync(PACKS)).toContain(DEFAULT_WORLD_LOOK);
@@ -211,6 +225,97 @@ describe('a pack the host serves, prepared for a world', () => {
     swapped.set(pieceDigest, new Uint8Array(readFileSync(`${PACKS}/exulanica.toon-town/pieces/fence.glb`)));
     vi.stubGlobal('fetch', host({ ...served, content: swapped }, []));
     await expect(prepareWorldLook(ACCESS, 'exulanica.toon-town', TEXTURES, [])).rejects.toThrow('not the ones its digest names');
+  });
+});
+
+/**
+ * A look of the workspace's own made of one generated piece on the committed cozy town, as the
+ * generation worker's builder writes one: the piece stands in for the town's trees. The piece is the
+ * cozy town's own tree file, so its colours are the base's.
+ */
+function ownLook(served: Served): { digest: string; view: unknown; piece: Uint8Array<ArrayBuffer>; base: { packId: string; version: number; manifestSha256: string } } {
+  const cozy = (served.list as { packs: { pack_id: string; version: number; manifest_sha256: string }[] }).packs
+    .find((pack) => pack.pack_id === 'exulanica.cozy-town')!;
+  const piece = new Uint8Array(readFileSync(`${PACKS}/exulanica.cozy-town/pieces/tree.glb`));
+  const path = `generated/${sha256(piece)}.glb`;
+  const manifest = {
+    profile: 'exulanica.style-pack/v1',
+    pack_id: 'generated.cozy-town',
+    version: 1,
+    title: 'Cozy town, with new pieces',
+    description: 'Cozy town with generated pieces for 1 part in place of its own.',
+    tags: [],
+    origin: 'generated',
+    provenance: { kind: 'generated', receipts: ['f'.repeat(64)] },
+    licence: { id: 'CC0-1.0', attribution: null },
+    authors: ['TRELLIS-image-large'],
+    preview: null,
+    base: { pack_id: cozy.pack_id, version: cozy.version, manifest_sha256: cozy.manifest_sha256 },
+    light: null,
+    shading: null,
+    edge: null,
+    palette: { encoding: 'exulanica.srgb8-linear16/v1', swatches: [] },
+    surfaces: {},
+    modules: { 'plant.default': { variants: [{ file: path, lod1: null, size_mm: [3000, 3000, 5500], stretch_mm: [null, null, null] }] } },
+    files: [{ path, sha256: sha256(piece), bytes: piece.length, media_type: 'model/gltf-binary' }],
+  };
+  const digest = 'd'.repeat(64);
+  return {
+    digest,
+    view: { manifest_sha256: digest, pack_id: 'generated.cozy-town', ready: true, manifest },
+    piece,
+    base: { packId: cozy.pack_id, version: cozy.version, manifestSha256: cozy.manifest_sha256 },
+  };
+}
+
+/** A host serving the committed library and one version of the workspace's own pack. */
+function hostWithOwn(served: Served, own: ReturnType<typeof ownLook>, asked: { url: string; authorization: string | null }[]) {
+  const library = host(served, asked);
+  return vi.fn(async (input: string, init?: RequestInit): Promise<Response> => {
+    const path = input.slice(ACCESS.baseUrl.length);
+    if (path === `/workspace-style-packs/${own.digest}`) {
+      asked.push({ url: input, authorization: new Headers(init?.headers).get('Authorization') });
+      return new Response(JSON.stringify(own.view), { status: 200 });
+    }
+    if (path === `/workspace-style-packs/${own.digest}/files/${sha256(own.piece)}`) {
+      asked.push({ url: input, authorization: new Headers(init?.headers).get('Authorization') });
+      return new Response(own.piece, { status: 200 });
+    }
+    if (path.startsWith('/workspace-style-packs/')) return new Response('{"code":"unknown_style_pack"}', { status: 404 });
+    return library(input, init);
+  });
+}
+
+describe('a world\'s own look, prepared', () => {
+  it('reads its own manifest and pieces from the workspace and its base from the library, as one chain', async () => {
+    const served = committedLibrary();
+    const own = ownLook(served);
+    const asked: { url: string; authorization: string | null }[] = [];
+    vi.stubGlobal('fetch', hostWithOwn(served, own, asked));
+    const prepared = await prepareWorldLook(ACCESS, 'generated.cozy-town', TEXTURES, [], own.digest, own.base);
+    expect(prepared.pack.chain.map((manifest) => manifest.pack_id)).toEqual(['generated.cozy-town', 'exulanica.cozy-town']);
+    // The trees are the own look's piece; everything else is the base's.
+    expect(prepared.pack.modules['plant.default']!.stated).toBe(0);
+    expect(prepared.pack.modules['vehicle.sedan']!.stated).toBe(1);
+    expect(prepared.pack.light).not.toBeNull();
+    expect(asked.map((request) => request.url)).toContain(`${ACCESS.baseUrl}/workspace-style-packs/${own.digest}/files/${sha256(own.piece)}`);
+    expect(asked.map((request) => request.url)).toContain(`${ACCESS.baseUrl}/world/style-packs/${own.base.manifestSha256}`);
+    expect(asked.some((request) => request.url === `${ACCESS.baseUrl}/world/style-packs/${sha256(own.piece)}`)).toBe(false);
+    for (const request of asked) expect(request.authorization).toBe(`Bearer ${ACCESS.token}`);
+  });
+
+  it('is refused when the workspace does not serve it ready, or it is drawn on another base', async () => {
+    const served = committedLibrary();
+    const own = ownLook(served);
+    vi.stubGlobal('fetch', hostWithOwn(served, { ...own, view: { ...(own.view as object), ready: false } }, []));
+    await expect(prepareWorldLook(ACCESS, 'generated.cozy-town', TEXTURES, [], own.digest, own.base))
+      .rejects.toThrow('not the ready version');
+    vi.stubGlobal('fetch', hostWithOwn(served, own, []));
+    const toon = (served.list as { packs: { pack_id: string; version: number; manifest_sha256: string }[] }).packs
+      .find((pack) => pack.pack_id === 'exulanica.toon-town')!;
+    await expect(prepareWorldLook(ACCESS, 'generated.cozy-town', TEXTURES, [], own.digest, {
+      packId: toon.pack_id, version: toon.version, manifestSha256: toon.manifest_sha256,
+    })).rejects.toThrow('is not drawn on');
   });
 });
 

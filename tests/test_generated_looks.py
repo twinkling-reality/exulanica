@@ -88,7 +88,7 @@ def test_a_derived_look_is_drawn_on_the_library_pack_and_states_only_its_new_pie
         "version": served.version,
         "manifest_sha256": served.manifest_sha256,
     }
-    assert manifest["pack_id"] == "exulanica.cozy-town.own"
+    assert manifest["pack_id"] == "generated.cozy-town"
     assert (manifest["origin"], manifest["provenance"]["kind"]) == ("generated", "generated")
     assert manifest["licence"] == {"id": "CC0-1.0", "attribution": None}
     assert (manifest["light"], manifest["shading"], manifest["edge"]) == (None, None, None)
@@ -212,11 +212,12 @@ def test_a_role_the_family_catalog_does_not_dress_with_pieces_is_refused_by_the_
     assert "modules.wall.brick" in refused.value.detail
 
 
-def test_a_base_id_of_four_segments_has_no_derived_id() -> None:
-    assert looks.derived_pack_id("exulanica.cozy-town.own") == "exulanica.cozy-town.own.own"
+def test_a_derived_id_is_its_library_base_s_in_the_generated_namespace() -> None:
+    assert looks.derived_pack_id("exulanica.cozy-town") == "generated.cozy-town"
+    assert looks.derived_pack_id("exulanica.a.b.c") == "generated.a.b.c"
     with pytest.raises(looks.DerivedLookRefused) as refused:
-        looks.derived_pack_id("a.b.c.d")
-    assert refused.value.code == "look_id_full"
+        looks.derived_pack_id("creator.own-town")
+    assert refused.value.code == "base_not_library"
 
 
 def test_the_shared_generated_case_is_what_the_builder_writes_on_its_base() -> None:

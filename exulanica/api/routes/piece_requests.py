@@ -18,7 +18,14 @@ the GPU measured.
 
 ``GET /world/piece-requests?world_id=`` lists a world's requests, newest first;
 ``GET /world/piece-requests/{piece_request_id}`` reads one; ``DELETE`` cancels one no session has
-taken.
+taken. Each answers with the request's latest step in its world's look (``look_step``): applied,
+not applied and why, a take-back asked, or taken back.
+
+``POST /world/piece-requests/{piece_request_id}/take-back`` asks for a request's pieces to leave
+its world's look: ``202`` with the request, its step ``take_back_asked``, and the generation worker
+writes the world's next appearance version on its next pass. Asked again, it answers ``202`` as the
+request stands; a request whose pieces its world never took in answers ``409``
+``piece_not_taken_in`` with where it stands. Taking back deletes no piece and no request.
 """
 
 from __future__ import annotations
@@ -172,6 +179,13 @@ def ask_for_pieces(
         return _refusal(422, refused.code, refused.detail)
     compute = generation_catalogs().compute.for_provider(GPU_PROVIDER)
     worst_cases = [compute.worst_case_usd(plan.variants) for plan in planned]
+    if store.generated_looks_full(connection, session.workspace_id):
+        return _refusal(
+            409,
+            "look_limit",
+            "this workspace holds as many looks of generated pieces as it may; no new pieces can "
+            "be taken into a look",
+        )
     if _is_guest(request, services):
         return _refusal(
             409,
@@ -232,6 +246,23 @@ def read_piece_request(
     if found is None:
         return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
     return JSONResponse(found.document())
+
+
+@router.post("/piece-requests/{piece_request_id}/take-back", status_code=202)
+def take_back_pieces(
+    piece_request_id: uuid.UUID, connection: ScopedConnection, session: CurrentSession
+) -> JSONResponse:
+    """Ask for a request's pieces to leave its world's look. Answers 202 with the request; one
+    whose pieces its world never took in is answered 409 with where it stands."""
+    try:
+        found = store.ask_take_back(
+            connection, session.workspace_id, piece_request_id, session.actor
+        )
+    except store.PieceNotTakenIn as not_in:
+        return _refusal(409, "piece_not_taken_in", str(not_in), {"step": not_in.step})
+    if found is None:
+        return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
+    return JSONResponse(found.document(), status_code=202)
 
 
 @router.delete("/piece-requests/{piece_request_id}")

@@ -249,12 +249,34 @@ class ProvenanceView(BaseModel):
     origin_reference: str | None
 
 
-class StylePackView(BaseModel):
+def _absent(value: object) -> bool:
+    return value is None
+
+
+class StylePackBaseView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     pack_id: str
     version: int
     manifest_sha256: str
+
+
+class StylePackView(BaseModel):
+    """A pack a version names. A library pack states its id, version and digest alone, as every
+    version did before a world could wear its workspace's own pack; a version of the workspace's
+    own pack adds ``source`` ``workspace``, the library version it is drawn on (``base``) and
+    whether it may still be worn: a page draws a world whose own look may not be worn in that
+    base, or in the default look when it has none."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pack_id: str
+    version: int
+    manifest_sha256: str
+    # Left out of a library pack's answer, so it reads byte for byte as before.
+    source: Literal["workspace"] | None = Field(default=None, exclude_if=_absent)
+    base: StylePackBaseView | None = Field(default=None, exclude_if=_absent)
+    wearable: bool | None = Field(default=None, exclude_if=_absent)
 
 
 class StyleReferenceView(BaseModel):
@@ -767,8 +789,27 @@ def _style_pack(body: StylePackBody | None) -> StylePackBinding | None:
 def _style_pack_view(binding: StylePackBinding | None) -> StylePackView | None:
     if binding is None:
         return None
+    if binding.source == "library":
+        return StylePackView(
+            pack_id=binding.pack_id,
+            version=binding.version,
+            manifest_sha256=binding.manifest_sha256,
+        )
     return StylePackView(
-        pack_id=binding.pack_id, version=binding.version, manifest_sha256=binding.manifest_sha256
+        pack_id=binding.pack_id,
+        version=binding.version,
+        manifest_sha256=binding.manifest_sha256,
+        source="workspace",
+        base=(
+            None
+            if binding.base is None
+            else StylePackBaseView(
+                pack_id=binding.base.pack_id,
+                version=binding.base.version,
+                manifest_sha256=binding.base.manifest_sha256,
+            )
+        ),
+        wearable=bool(binding.wearable),
     )
 
 

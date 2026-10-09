@@ -259,6 +259,7 @@ export async function loadGeneratedWorld(
       ? Promise.resolve(null)
       : worldLook.prepareWorldLook(
         access, choice.packId, library.textureManifest, containers.map((one) => one.bytes), choice.manifestSha256,
+        choice.ownBase ?? null,
       )
   );
   /** The world's tiles in a prepared pack's light and dressed by it, or in the tile look. */

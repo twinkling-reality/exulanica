@@ -19,7 +19,7 @@ import psycopg
 from psycopg.pq import TransactionStatus
 from psycopg.types.json import Jsonb
 
-from exulanica.db.read_check import ConnectionNotIdle
+from exulanica.db.read_check import ConnectionNotIdle, lock_asset_reads_until_commit
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence import BlobId
 from exulanica.store.base import ContentAddressedStore
@@ -617,7 +617,7 @@ class WorldStyleRepository:
                 # The library may have changed since the preview, as the registry may: new state
                 # never takes a pack this host does not hold.
                 if candidate.style_pack is not None:
-                    self._require_library_pack(candidate.style_pack)
+                    self._require_pack(candidate.style_pack)
                 current = self._version_by_id(state["current_style_version_id"])
                 version_id = uuid.uuid4()
                 basis = preview.get("appearance_basis")
@@ -783,7 +783,7 @@ class WorldStyleRepository:
             # The version rolled back to names a pack this host must still hold: a rollback is
             # new state, and new state never takes a stand-in.
             if target.style_pack is not None:
-                self._require_library_pack(target.style_pack)
+                self._require_pack(target.style_pack)
             pack_columns, pack_values = _style_pack_columns(target.style_pack)
             version_id = uuid.uuid4()
             row = self.connection.execute(
@@ -974,6 +974,8 @@ class WorldStyleRepository:
                 ProposalOrigin(row["origin"]), row["actor"], row["origin_reference"]
             )
         # Absent from a read that names its columns and from a row written before 0141: no pack.
+        # Absent from one written before a world could wear its own look, or naming the library: a
+        # library pack.
         style_pack = (
             None
             if row.get("style_pack_id") is None
@@ -981,9 +983,22 @@ class WorldStyleRepository:
                 row["style_pack_id"],
                 row["style_pack_version"],
                 row["style_pack_manifest_sha256"],
+                row.get("style_pack_source") or "library",
             )
         )
-        if resolve and style_pack is not None and not self._library_holds(style_pack):
+        if style_pack is not None and style_pack.source == "workspace":
+            style_pack = self._own_pack(style_pack, resolve=resolve)
+            if resolve and not style_pack.wearable:
+                warnings.append(
+                    f"The world's own look {style_pack.pack_id} version {style_pack.version} may "
+                    "no longer be worn; the world is drawn in "
+                    + (
+                        "the look it was drawn on."
+                        if style_pack.base is not None
+                        else "the default look."
+                    )
+                )
+        elif resolve and style_pack is not None and not self._library_holds(style_pack):
             warnings.append(
                 f"Style pack {style_pack.pack_id} version {style_pack.version} is not in this "
                 "host's library; the world is drawn without it."
@@ -1062,7 +1077,11 @@ class WorldStyleRepository:
             appearance_basis=proposal.appearance_basis,
             # A proposal that names no pack keeps its base's: the base is the current version,
             # checked under the state lock this preview holds.
-            style_pack=proposal.style_pack if proposal.style_pack_stated else current.style_pack,
+            style_pack=(
+                proposal.style_pack
+                if proposal.style_pack_stated
+                else _inherited(current.style_pack)
+            ),
         )
 
     def _candidate_from_document(self, value: Mapping[str, Any]) -> StyleVersion:
@@ -1301,6 +1320,69 @@ class WorldStyleRepository:
                 f"{binding.manifest_sha256} is not a pack of this host's library"
             )
 
+    def _require_pack(self, binding: StylePackBinding) -> None:
+        """A pack new state may name: the library's at exactly that version and digest, or a version
+        of this workspace's own pack, by its own id, version and digest, while it may be worn (the
+        schema holds the same at insert). Which callers may name a workspace's own version is
+        theirs: the appearance routes build only library bindings."""
+        if binding.source == "library":
+            self._require_library_pack(binding)
+            return
+        if binding.source == "workspace":
+            # The last question before the write: no withdrawal commits between it and the commit.
+            lock_asset_reads_until_commit(
+                self.connection, outside="a world names its own look only inside its write"
+            )
+        if binding.source != "workspace" or not self._own_pack(binding, resolve=True).wearable:
+            raise InvalidStyleData(
+                f"style pack {binding.pack_id} version {binding.version} with manifest "
+                f"{binding.manifest_sha256} is not a version of this workspace's own pack that "
+                "may be worn"
+            )
+
+    def _own_pack(self, binding: StylePackBinding, *, resolve: bool) -> StylePackBinding:
+        """``binding``, a version of this workspace's own pack, with the library version it is drawn
+        on and, when ``resolve``, whether it may be worn now. A version drawn on another of the
+        workspace's own versions states the library version at the end of its chain."""
+        row = self.connection.execute(
+            "select v.pack_id, v.version, b.base_pack_id, b.base_version, b.base_manifest_sha256, "
+            "  case when %s then workspace_style_pack_wearable(v.workspace_id, v.manifest_sha256) "
+            "  end as wearable "
+            "from workspace_style_pack_version v "
+            "left join lateral (select c.base_pack_id, c.base_version, c.base_manifest_sha256 "
+            "  from workspace_style_pack_chain(v.workspace_id, v.manifest_sha256) w "
+            "  join workspace_style_pack_version c on c.workspace_id = v.workspace_id "
+            "   and c.manifest_sha256 = w.manifest_sha256 "
+            "  where c.base_source = 'library' limit 1) b on true "
+            "where v.workspace_id = %s and v.manifest_sha256 = %s and v.erased_at is null",
+            (resolve, self.workspace_id, binding.manifest_sha256),
+        ).fetchone()
+        if row is None or (row["pack_id"], row["version"]) != (binding.pack_id, binding.version):
+            return StylePackBinding(
+                binding.pack_id,
+                binding.version,
+                binding.manifest_sha256,
+                binding.source,
+                wearable=False if resolve else None,
+            )
+        base = (
+            None
+            if row["base_pack_id"] is None
+            else StylePackBinding(
+                row["base_pack_id"], row["base_version"], row["base_manifest_sha256"]
+            )
+        )
+        if base is not None and not self._library_holds(base):
+            base = None
+        return StylePackBinding(
+            binding.pack_id,
+            binding.version,
+            binding.manifest_sha256,
+            binding.source,
+            base=base,
+            wearable=None if not resolve else bool(row["wearable"]),
+        )
+
     def _validate_proposal_style_pack(self, proposal: StyleProposal) -> None:
         """A proposal names a pack for the whole world, and only a pack the library holds."""
         if not proposal.style_pack_stated:
@@ -1310,7 +1392,7 @@ class WorldStyleRepository:
                 "a style pack dresses the whole world; a regional proposal names none"
             )
         if proposal.style_pack is not None:
-            self._require_library_pack(proposal.style_pack)
+            self._require_pack(proposal.style_pack)
 
     def _validate_scope(self, proposal: StyleProposal, topology_digest: str) -> None:
         if proposal.scope.kind == "global":
@@ -1943,13 +2025,27 @@ def _version_document(value: StyleVersion) -> dict[str, Any]:
     }
 
 
+def _inherited(pack: StylePackBinding | None) -> StylePackBinding | None:
+    """The pack a proposal that names none keeps: the current one, unless it is the world's own
+    look and may no longer be worn, when its library base (or no pack, when the library no longer
+    holds that base) is what the world is drawn in and what the next version names."""
+    if pack is None or pack.source == "library" or pack.wearable is not False:
+        return pack
+    base = pack.base
+    return (
+        None if base is None else StylePackBinding(base.pack_id, base.version, base.manifest_sha256)
+    )
+
+
 def _style_pack_document(value: StylePackBinding | None) -> dict[str, Any] | None:
     if value is None:
         return None
+    # A library pack's document is as it was before a world could wear its workspace's own pack.
     return {
         "pack_id": value.pack_id,
         "version": value.version,
         "manifest_sha256": value.manifest_sha256,
+        **({} if value.source == "library" else {"source": value.source}),
     }
 
 
@@ -1957,7 +2053,10 @@ def _style_pack_from_document(value: Mapping[str, Any] | None) -> StylePackBindi
     if value is None:
         return None
     return StylePackBinding(
-        str(value["pack_id"]), int(value["version"]), str(value["manifest_sha256"])
+        str(value["pack_id"]),
+        int(value["version"]),
+        str(value["manifest_sha256"]),
+        str(value.get("source", "library")),
     )
 
 
@@ -1972,9 +2071,14 @@ def _style_pack_columns(value: StylePackBinding | None) -> tuple[str, tuple[obje
     """The columns and values naming a version's pack: none for a version that names no pack."""
     if value is None:
         return "", ()
+    if value.source == "library":
+        return (
+            ",style_pack_id,style_pack_version,style_pack_manifest_sha256",
+            (value.pack_id, value.version, value.manifest_sha256),
+        )
     return (
-        ",style_pack_id,style_pack_version,style_pack_manifest_sha256",
-        (value.pack_id, value.version, value.manifest_sha256),
+        ",style_pack_id,style_pack_version,style_pack_manifest_sha256,style_pack_source",
+        (value.pack_id, value.version, value.manifest_sha256, value.source),
     )
 
 

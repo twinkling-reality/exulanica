@@ -1024,6 +1024,30 @@ describe('the style pack a world is drawn in', () => {
     expect(history).toEqual([null, { packId: 'exulanica.cozy-town', version: 1, manifestSha256: 'c'.repeat(64) }]);
   });
 
+  it('is the workspace\'s own look with its base and whether it may be worn, and refused with an unknown source', async () => {
+    const own = {
+      pack_id: 'generated.cozy-town', version: 2, manifest_sha256: 'd'.repeat(64), source: 'workspace', base: pack, wearable: false,
+    };
+    const opened = await new WorldStyleClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private', worldId: TEST_WORLD,
+      fetch: connectedFetch((url) => {
+        if (url.pathname.endsWith('/world/styles/current')) return json({ ...state('v1', 1), current: { ...version('v1', 1), style_pack: own } });
+        if (url.pathname.endsWith('/world/styles/versions')) return json([{ ...version('v1', 1), style_pack: own }]);
+        return undefined;
+      }),
+    }).connect('v1');
+    expect(opened.state.current.stylePack).toEqual({
+      packId: 'generated.cozy-town', version: 2, manifestSha256: 'd'.repeat(64),
+      own: { base: { packId: 'exulanica.cozy-town', version: 1, manifestSha256: 'c'.repeat(64) }, wearable: false },
+    });
+    const refused = new WorldStyleClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private', worldId: TEST_WORLD,
+      fetch: connectedFetch((url) => (url.pathname.endsWith('/world/styles/current')
+        ? json({ ...state('v1', 1), current: { ...version('v1', 1), style_pack: { ...own, source: 'elsewhere' } } }) : undefined)),
+    });
+    await expect(refused.connect('v1')).rejects.toMatchObject({ code: 'invalid_style_pack' });
+  });
+
   it('is refused when the server names it by anything but a SHA-256', async () => {
     const fetch = connectedFetch((url) => {
       if (url.pathname.endsWith('/world/styles/current')) {

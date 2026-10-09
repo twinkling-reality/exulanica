@@ -57,15 +57,24 @@ class StyleReference:
 
 @dataclass(frozen=True, slots=True)
 class StylePackBinding:
-    """The style pack a world's appearance names: a pack of the host's committed library, exactly.
+    """The style pack a world's appearance names, exactly: a pack of the host's committed library,
+    or (``source`` ``workspace``) a version of the world's workspace's own pack (the migration
+    ``a_world_wears_its_own_look_of_generated_pieces``), such as the
+    look the generation worker makes of a world's generated pieces.
 
     The manifest's SHA-256 names the very bytes the pack was when it was chosen, so a world is
     drawn in what it was given and a pack changed under it is refused rather than reinterpreted.
+    ``base`` and ``wearable`` are read beside a workspace version and are not part of what the
+    appearance names: the library version it is drawn on, and whether it may still be worn. A world
+    whose own version may no longer be worn is drawn in that base.
     """
 
     pack_id: str
     version: int
     manifest_sha256: str
+    source: str = "library"
+    base: StylePackBinding | None = field(default=None, compare=False)
+    wearable: bool | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,10 +1,12 @@
 """``exulanica-piece-generation``: the process that serves generation sessions.
 
 It owns no HTTP surface. Each pass (:class:`exulanica.generation.worker.PieceGenerationWorker`)
-follows every batch in flight and, while the operator's session is warm, queues the served
-workspaces' waiting piece requests into it. Workspaces are deployment configuration, as for the
-asset preparation worker: ``EXULANICA_WORKSPACE_IDS`` and ``--workspace``, and, when
-``EXULANICA_ACCOUNT_DATABASE_URL`` is set, the workspaces active accounts own, read fresh each pass.
+follows every batch in flight, takes each made request's passed pieces into its world's look (and
+back on request: :mod:`exulanica.generation.apply`) and, while the operator's session is warm,
+queues the served workspaces' waiting piece requests into it. Workspaces are deployment
+configuration, as for the asset preparation worker: ``EXULANICA_WORKSPACE_IDS`` and
+``--workspace``, and, when ``EXULANICA_ACCOUNT_DATABASE_URL`` is set, the workspaces active accounts
+own, read fresh each pass.
 
 It holds two credentials, both from the operator's environment and read in this process only: the
 runtime database role (``EXULANICA_DATABASE_URL``; it refuses an owner or a superuser) and the
@@ -27,6 +29,7 @@ import sys
 import threading
 import uuid
 from collections.abc import Callable, Iterable, Mapping
+from pathlib import Path
 from typing import Any, Final
 
 from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV, AccountWorkspaceSource
@@ -34,6 +37,7 @@ from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
 from exulanica.db.session import Database
 from exulanica.env import env_get, env_name
+from exulanica.generation.apply import LookStepper
 from exulanica.generation.bucket import KEY_FILE_VARIABLE, bucket_from_environment
 from exulanica.generation.pieces import max_bytes
 from exulanica.generation.requests import generation_catalogs
@@ -42,10 +46,13 @@ from exulanica.spending.config import durable_spending_from_env
 from exulanica.store.configured import content_stores
 from exulanica.things.kinds import shipped_thing_kinds
 from exulanica.world.style_pack_library import style_pack_library
+from exulanica.world.style_packs import load_context
 
 __all__ = ["WORKSPACES_ENV", "main"]
 
 WORKSPACES_ENV: Final = env_name("WORKSPACE_IDS")
+#: The repository's root, where the look families and texture manifest are committed.
+_TREE: Final = Path(__file__).resolve().parents[2]
 
 
 def _emit(stream: Any, event: str, **fields: Any) -> None:
@@ -94,16 +101,24 @@ def build(args: argparse.Namespace, environ: Mapping[str, str]) -> PieceGenerati
             f"no workspace was configured. Set {WORKSPACES_ENV}, pass --workspace, or set "
             f"{ACCOUNT_DATABASE_URL_ENV}; a worker that silently serves nothing is not healthy."
         )
+    stores = content_stores(environ)
+    library = style_pack_library()
     return PieceGenerationWorker(
         database=database,
         bucket=bucket,
-        pieces_store=content_stores(environ).generated_pieces,
+        pieces_store=stores.generated_pieces,
         spending=durable_spending_from_env(environ, database, label="piece-generation"),
         catalogs=generation_catalogs(),
-        library=style_pack_library(),
+        library=library,
         shipped=shipped_thing_kinds(),
         workspaces=_workspaces(configured, source),
         store_bound=max_bytes(environ),
+        looks=LookStepper(
+            library=library,
+            context=load_context(_TREE),
+            stores=stores.workspace_style_packs,
+            generated_pieces=stores.generated_pieces,
+        ),
     )
 
 

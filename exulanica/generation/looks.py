@@ -34,8 +34,10 @@ from exulanica.world.style_packs import (
     manifest_sha256,
     read_manifest,
 )
+from exulanica.world.workspace_style_packs import GENERATED_PREFIX
 
 __all__ = [
+    "LIBRARY_PREFIX",
     "MAX_CHAIN",
     "DerivedLook",
     "DerivedLookRefused",
@@ -49,10 +51,10 @@ __all__ = [
 #: A pack resolves through one to four manifests (style pack contract section 2, and the browser's
 #: ``resolveStylePack``), so a derived look's base chain holds at most three.
 MAX_CHAIN: Final = 4
-#: A derived look's id is its base's with this segment appended.
-OWN_SEGMENT: Final = "own"
-#: A pack id has two to four segments, so a base of four has no derived id.
-_MAX_ID_SEGMENTS: Final = 4
+#: A library pack's id begins so, and a derived look's id replaces it with
+#: :data:`~exulanica.world.workspace_style_packs.GENERATED_PREFIX`, which the schema keeps for
+#: looks of generated pieces (style pack contract section 11.2).
+LIBRARY_PREFIX: Final = "exulanica."
 _CONTENT_PROFILE: Final = "exulanica.derived-look-content/v1"
 _GLB: Final = "model/gltf-binary"
 _TITLE_MAX: Final = 80
@@ -91,12 +93,14 @@ class DerivedLook:
 
 
 def derived_pack_id(base_pack_id: str) -> str:
-    """The id of every derived look drawn on ``base_pack_id``."""
-    if base_pack_id.count(".") + 1 >= _MAX_ID_SEGMENTS:
+    """The id of every derived look drawn on the library pack ``base_pack_id``: ``generated.``
+    and the base's id after ``exulanica.``, so it has as many segments as its base."""
+    if not base_pack_id.startswith(LIBRARY_PREFIX):
         raise DerivedLookRefused(
-            "look_id_full", f"{base_pack_id} has four segments, so no id can be drawn on it"
+            "base_not_library",
+            f"{base_pack_id} is not a library pack's id, so no look is drawn on it",
         )
-    return f"{base_pack_id}.{OWN_SEGMENT}"
+    return GENERATED_PREFIX + base_pack_id.removeprefix(LIBRARY_PREFIX)
 
 
 def piece_path(piece_sha256: str) -> str:

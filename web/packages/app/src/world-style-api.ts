@@ -81,11 +81,24 @@ export interface WorldStyleRecipeBinding {
   readonly capabilityMapping: Readonly<Record<string, string>>;
 }
 
-/** A style pack of the host's library, named exactly: what a version is drawn in. */
+/**
+ * The style pack a version is drawn in, named exactly: a pack of the host's library, or (`own`) a
+ * version of the workspace's own pack, such as the look made of the world's generated pieces.
+ */
 export interface WorldStylePackBinding {
   readonly packId: string;
   readonly version: number;
   readonly manifestSha256: string;
+  /** Present only for the workspace's own pack: the library version it is drawn on, and whether it may still be worn. */
+  readonly own?: WorldOwnLook;
+}
+
+/** A version of the workspace's own pack, as a world's appearance names it. */
+export interface WorldOwnLook {
+  /** The library version it is drawn on, or null when the host no longer serves it. */
+  readonly base: { readonly packId: string; readonly version: number; readonly manifestSha256: string } | null;
+  /** Whether it may still be worn; one that may not is drawn as its base. */
+  readonly wearable: boolean;
 }
 
 export interface WorldStyleVersionRecord {
@@ -1051,10 +1064,26 @@ function parseStylePack(value: unknown): WorldStylePackBinding | null {
   if (!/^[0-9a-f]{64}$/.test(manifestSha256)) {
     throw new WorldStyleContractError('invalid_style_pack', 'A style pack is not named by a SHA-256.');
   }
-  return Object.freeze({
+  const named = {
     packId: text(pack['pack_id'], 'style pack ID'),
     version: positiveInteger(pack['version'], 'style pack version'),
     manifestSha256,
+  };
+  if (pack['source'] === undefined) return Object.freeze(named);
+  if (pack['source'] !== 'workspace') {
+    throw new WorldStyleContractError('invalid_style_pack', 'A style pack names an unknown source.');
+  }
+  const wearable = pack['wearable'];
+  if (typeof wearable !== 'boolean') {
+    throw new WorldStyleContractError('invalid_style_pack', 'A workspace style pack does not say whether it may be worn.');
+  }
+  const base = pack['base'] === undefined || pack['base'] === null ? null : parseStylePack(pack['base']);
+  return Object.freeze({
+    ...named,
+    own: Object.freeze({
+      base: base === null ? null : Object.freeze({ packId: base.packId, version: base.version, manifestSha256: base.manifestSha256 }),
+      wearable,
+    }),
   });
 }
 

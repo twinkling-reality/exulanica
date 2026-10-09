@@ -27,7 +27,10 @@ One pass (:meth:`PieceGenerationWorker.run_once`), each workspace on its own, so
    workspace was deleted while it was queued. Each decided settlement
    is then taken by the spending authority and marked settled, and retried on every pass until it
    is.
-4. **Answering and queueing**, only while the session is warm, and only for a workspace with no
+4. **Looks**, whether or not a session is warm: each made request's passed pieces are taken into
+   its world's look, and each take-back asked is done
+   (:class:`~exulanica.generation.apply.LookStepper`).
+5. **Answering and queueing**, only while the session is warm, and only for a workspace with no
    batch in flight. A waiting request every variant of which the installation already keeps
    (``generated_piece``, under the request's digest, the session's models and the post-process
    version) is answered from it at once, with no GPU run and no charge. A waiting request that no
@@ -67,6 +70,7 @@ from exulanica_pieces.records import (
 
 from exulanica.db.session import Database
 from exulanica.generation import batches, entries
+from exulanica.generation.apply import LookStepper
 from exulanica.generation.bucket import GenerationBucket
 from exulanica.generation.entries import CLOCK_ALLOWANCE, EntryRefused
 from exulanica.generation.pieces import PieceRefused, store_piece, stored_bytes
@@ -114,6 +118,9 @@ class PieceGenerationWorker:
     workspaces: Callable[[], Iterable[uuid.UUID]]
     store_bound: int
     now: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
+    #: Takes each made request's passed pieces into its world's look, and back on request; None
+    #: leaves every world's look as it is.
+    looks: LookStepper | None = None
 
     def run_once(self) -> dict[str, Any]:
         """One pass; returns what it did, by workspace, for the worker's log."""
@@ -169,6 +176,8 @@ class PieceGenerationWorker:
         batches.decide_cancelled(connection, workspace_id)
         ended = self._follow(connection, workspace_id, now)
         settled = self._settle_decided(connection, workspace_id, now)
+        # Looks move whether or not a session is warm: applying a piece runs no GPU.
+        stepped = [] if self.looks is None else self.looks.run(connection, workspace_id, now)
         answered: list[str] = []
         queued = None
         if state == "warm" and session is not None and beat is not None:
@@ -178,6 +187,7 @@ class PieceGenerationWorker:
             for key, value in (
                 ("ended", ended),
                 ("settled", settled),
+                ("looks", stepped),
                 ("answered", answered),
                 ("queued", queued),
             )
