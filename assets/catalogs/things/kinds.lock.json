@@ -8,9 +8,19 @@
       "sha256": "ab8651c56415b812a5d5670fd98c8e12de97703b119b85aa3e92f69df6df3d8c"
     },
     {
+      "kind": "bench",
+      "version": 2,
+      "sha256": "6f2df36bc18a6b96dfc2d136703d71993c091639860f44a0f5e01b51204e45a9"
+    },
+    {
       "kind": "cafe_table",
       "version": 1,
       "sha256": "bffd7159cd2c8a518c31ba2e32798373b427c629496c7b724a3744432ea1c393"
+    },
+    {
+      "kind": "cafe_table",
+      "version": 2,
+      "sha256": "2466e6aa9ae71b97075d9cfa8ce258cfa0112ea313bfc6bba7904b31db57a45f"
     },
     {
       "kind": "gate",
@@ -33,6 +43,11 @@
       "sha256": "0404e448839bfdea242691cdb81d5c528a3259e945bc9a6348eeec9eea023bde"
     },
     {
+      "kind": "lamp_post",
+      "version": 2,
+      "sha256": "76aa7991996910e79ec5682f2f41897335674cc066266f17a058d9c8d6f90850"
+    },
+    {
       "kind": "lantern",
       "version": 1,
       "sha256": "5cb77297b677cdf10b67eb20fd4e7845c3f1f9f0dbd1f26fd57066c4bcf973a9"
@@ -48,14 +63,29 @@
       "sha256": "9e9d4273f63105cd019a7db2bc1f724ddc963dd45741d3d48ce5115ff3e98f63"
     },
     {
+      "kind": "market_stall",
+      "version": 2,
+      "sha256": "bac65ecab0e73d35d740af8dc6907f7f1b70b12106668e0b32289008875b82d0"
+    },
+    {
       "kind": "planter_tree",
       "version": 1,
       "sha256": "945ba33280f6d67550c8497a6294a2ba228955c32f9032af31083b23ff20152a"
     },
     {
+      "kind": "planter_tree",
+      "version": 2,
+      "sha256": "6dd011a0373ee29ca760f90feaec8a362d9f5311dd1c6c4f315ad0eb3c3288f8"
+    },
+    {
       "kind": "seating_planter",
       "version": 1,
       "sha256": "2b6c788a82ef5210050705e8f210f346655463cee60729a114d9a91ac0c321e6"
+    },
+    {
+      "kind": "seating_planter",
+      "version": 2,
+      "sha256": "2496798b3d7f3110ae91504a98ce82bd20d7e261067baa7219ad9d2b135c75ce"
     },
     {
       "kind": "sword",

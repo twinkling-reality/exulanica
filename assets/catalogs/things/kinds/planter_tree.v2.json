@@ -1,0 +1,140 @@
+{
+  "profile": "exulanica.thing-kind/v1",
+  "kind": "planter_tree",
+  "version": 2,
+  "label": "tree in a planter",
+  "summary": "A young tree growing in a planter.",
+  "class": "object",
+  "body": {
+    "plan": "rigid/v1",
+    "box_mm": {
+      "width": 3200,
+      "depth": 3200,
+      "height": 5650
+    },
+    "blocks_walking": true
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  },
+  "moves": [],
+  "abilities": [],
+  "offers": [
+    {
+      "key": "visit",
+      "parameters": {
+        "places": [
+          {
+            "x_mm": 0,
+            "y_mm": 1390,
+            "faces": "-y",
+            "seat": null
+          },
+          {
+            "x_mm": 1390,
+            "y_mm": 0,
+            "faces": "-x",
+            "seat": null
+          },
+          {
+            "x_mm": 0,
+            "y_mm": -1390,
+            "faces": "+y",
+            "seat": null
+          },
+          {
+            "x_mm": -1390,
+            "y_mm": 0,
+            "faces": "+x",
+            "seat": null
+          }
+        ]
+      }
+    },
+    {
+      "key": "perch",
+      "parameters": {
+        "perches": [
+          {
+            "position_mm": [
+              0,
+              0,
+              5650
+            ],
+            "span_mm": 600
+          },
+          {
+            "position_mm": [
+              700,
+              0,
+              5499
+            ],
+            "span_mm": 600
+          },
+          {
+            "position_mm": [
+              0,
+              700,
+              5499
+            ],
+            "span_mm": 600
+          },
+          {
+            "position_mm": [
+              -700,
+              0,
+              5499
+            ],
+            "span_mm": 600
+          },
+          {
+            "position_mm": [
+              0,
+              -700,
+              5499
+            ],
+            "span_mm": 600
+          }
+        ]
+      }
+    },
+    {
+      "key": "host",
+      "parameters": {
+        "flyers": {
+          "small_bird": 3
+        }
+      }
+    }
+  ],
+  "routine": null,
+  "deciders": null,
+  "looks": [
+    {
+      "look": "planter-tree",
+      "version": 1,
+      "sha256": "61be0edffb459bd29a4cd42f7a1569576d45dc41f0e5c9a75d59d80c778e31b2"
+    }
+  ],
+  "ext": {}
+}

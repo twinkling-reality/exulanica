@@ -1,0 +1,94 @@
+{
+  "profile": "exulanica.thing-kind/v1",
+  "kind": "bench",
+  "version": 2,
+  "label": "bench",
+  "summary": "A wooden bench people sit on.",
+  "class": "object",
+  "body": {
+    "plan": "rigid/v1",
+    "box_mm": {
+      "width": 1800,
+      "depth": 455,
+      "height": 900
+    },
+    "blocks_walking": true
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  },
+  "moves": [],
+  "abilities": [],
+  "offers": [
+    {
+      "key": "rest_at",
+      "parameters": {
+        "places": [
+          {
+            "x_mm": -702,
+            "y_mm": 1020,
+            "faces": "-y",
+            "seat": {
+              "x_mm": -702,
+              "y_mm": 20,
+              "z_mm": 480,
+              "faces": "+y"
+            }
+          },
+          {
+            "x_mm": 0,
+            "y_mm": 1020,
+            "faces": "-y",
+            "seat": {
+              "x_mm": 0,
+              "y_mm": 20,
+              "z_mm": 480,
+              "faces": "+y"
+            }
+          },
+          {
+            "x_mm": 702,
+            "y_mm": 1020,
+            "faces": "-y",
+            "seat": {
+              "x_mm": 702,
+              "y_mm": 20,
+              "z_mm": 480,
+              "faces": "+y"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "routine": null,
+  "deciders": null,
+  "looks": [
+    {
+      "look": "bench",
+      "version": 1,
+      "sha256": "75b2f3b51b9d6c4c2ec7d8c17bd1008c321de38779bca3d55cf7cf8215b11ac0"
+    }
+  ],
+  "ext": {}
+}

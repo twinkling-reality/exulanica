@@ -1,0 +1,69 @@
+{
+  "profile": "exulanica.thing-kind/v1",
+  "kind": "lamp_post",
+  "version": 2,
+  "label": "lamp post",
+  "summary": "A street lamp on a post that lights the way.",
+  "class": "object",
+  "body": {
+    "plan": "rigid/v1",
+    "box_mm": {
+      "width": 1425,
+      "depth": 870,
+      "height": 6000
+    },
+    "blocks_walking": true
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  },
+  "moves": [],
+  "abilities": [],
+  "offers": [
+    {
+      "key": "perch",
+      "parameters": {
+        "perches": [
+          {
+            "position_mm": [
+              1275,
+              0,
+              5800
+            ],
+            "span_mm": 300
+          }
+        ]
+      }
+    }
+  ],
+  "routine": null,
+  "deciders": null,
+  "looks": [
+    {
+      "look": "lamp-post",
+      "version": 1,
+      "sha256": "d0dda673506a532fa3b6370bbf275f95a67a30744ec213f9000020accb01da0b"
+    }
+  ],
+  "ext": {}
+}
