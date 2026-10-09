@@ -667,6 +667,10 @@ this check stops the deployment rather than a request. Every process that serves
 check at start once 0161 is recorded, a local restore runs it before offering the copy, and each
 maintenance pass reports a drift as `definer_role_unsafe`.
 
+The migration that erases a drafted creature whole holds `tombstone` exclusively until it commits,
+so every read of that table waits for it: run it, as the `migrate` jobs do, before any process
+serves.
+
 Every path that creates or upgrades a serving database then runs
 `exulanica-character-catalog publish --apply`. It uses the same owner connection and the data
 directory, or object-store settings, that the API serves its store from.
@@ -860,6 +864,10 @@ its own role. The [local database](local-database.md) guide owns its steps.
 - `TAVILY_API_KEY`, `EXULANICA_REFERENCE_WORKER`, `EXULANICA_REFERENCE_WORKSPACES` and
   `EXULANICA_REFERENCE_PICTURES` configure reference notes, owned by the [reference notes contract](reference-notes-contract.md#7-configuration).
   Web notes need `https://api.tavily.com` in `EXULANICA_EGRESS_ALLOWLIST`.
+- `EXULANICA_CREATURE_WORKER` and `EXULANICA_CREATURE_WORKSPACES` configure creatures drafted from
+  words, owned by the [things contract](things-contract.md#drafting-a-creature-from-words): the
+  worker runs in the API process unless set off, for the JSON array of workspace ids listed (none
+  when absent).
 - The test suite's settings, such as `EXULANICA_TEST_DATABASE_URL`, `EXULANICA_TEST_POSTGRES`,
   `EXULANICA_TEST_DATABASE_URLS`, `EXULANICA_REQUIRE_POSTGRES` and
   `EXULANICA_REFERENCE_DATABASE_URL`, are in [development setup](development-setup.md).

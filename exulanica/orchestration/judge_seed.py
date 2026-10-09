@@ -976,6 +976,31 @@ def _refuse_open_piece_requests(connection: psycopg.Connection, workspace_id: uu
         )
 
 
+def _refuse_unfinished_creature_drafts(
+    connection: psycopg.Connection, workspace_id: uuid.UUID
+) -> None:
+    """A workspace with a creature draft still queued or running cannot be seeded.
+
+    Until a draft ends, its job holds the person's words
+    (:mod:`exulanica.selection.creature_drafts`), and a seed would carry them, and the job, to
+    another server, where a worker could play it. An ended draft holds no word, and is carried as it
+    is.
+    """
+    present = connection.execute("select to_regclass('creature_draft') is not null as present")
+    if not present.fetchone()["present"]:
+        return
+    open_drafts = connection.execute(
+        "select count(*) as n from creature_draft where workspace_id = %s and finished_at is null",
+        (workspace_id,),
+    ).fetchone()
+    if open_drafts["n"]:
+        raise SeedRefused(
+            f"workspace {workspace_id} has {open_drafts['n']} creature draft(s) still queued or "
+            "running, whose jobs hold the words they were asked with; a seed cannot carry them, so "
+            "let them end first"
+        )
+
+
 def export_seed(
     connection: psycopg.Connection,
     store: ContentAddressedStore,
@@ -1013,6 +1038,7 @@ def export_seed(
     _refuse_held_things(connection, workspace_id)
     _refuse_private_workspace_style_packs(connection, workspace_id)
     _refuse_open_piece_requests(connection, workspace_id)
+    _refuse_unfinished_creature_drafts(connection, workspace_id)
 
     buckets = classify_tables(connection)
     exported = list(buckets["workspace"]) + list(buckets["reached"])

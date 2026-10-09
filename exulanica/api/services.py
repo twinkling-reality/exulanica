@@ -108,6 +108,12 @@ from exulanica.references.settings import (
     reference_workspaces,
 )
 from exulanica.references.worker import ReferenceWorker
+from exulanica.selection import creature_drafts
+from exulanica.selection.creature_drafts import (
+    CreatureDraftWorker,
+    creature_workspaces,
+    plays_creatures_here,
+)
 from exulanica.spending import (
     DURABLE,
     PROCESS,
@@ -399,6 +405,11 @@ class Services:
     #: (``EXULANICA_REFERENCE_WORKER``, on unless set off); off for a hand-constructed Services, as
     #: the derivative worker is.
     runs_reference_worker: bool = False
+    #: Whether this process plays creature drafts (``EXULANICA_CREATURE_WORKER``), and for which
+    #: workspaces (``EXULANICA_CREATURE_WORKSPACES``): none when absent, as each draft spends model
+    #: calls.
+    runs_creature_worker: bool = False
+    creature_workspaces: tuple[uuid.UUID, ...] = ()
     #: The workspaces that may ask for web notes (``EXULANICA_REFERENCE_WORKSPACES``); none when
     #: absent. A source offered to the operator only is offered to these alone.
     reference_workspaces: tuple[uuid.UUID, ...] = ()
@@ -739,6 +750,73 @@ class Services:
                         extra={"failure": cleared.failure},
                     )
         return ended
+
+    def serves_creatures_to(self, workspace_id: uuid.UUID) -> bool:
+        """Whether a worker here drafts this workspace's creatures: drafts are played here, a model
+        client and the looks namespace exist, and the workspace is listed."""
+        return (
+            self.runs_creature_worker
+            and self.model_client is not None
+            and self.content_stores is not None
+            and workspace_id in self.creature_workspaces
+        )
+
+    def creature_offer_refusal(self, workspace_id: uuid.UUID) -> str | None:
+        """Why this workspace may not ask for a creature here, by code, or None when it may: this
+        process has no model client, or no worker here drafts the workspace's creatures."""
+        if self.serves_creatures_to(workspace_id):
+            return None
+        not_run_here, no_models = creature_drafts.OFFER_REFUSALS
+        return no_models if self.model_client is None else not_run_here
+
+    def sweep_creatures(self) -> int:
+        """End the creature drafts no worker here will take, for every workspace this process knows,
+        blanking their words; expire the stale queued ones of those it serves. Run at startup.
+        Returns how many."""
+        known = set(self.creature_workspaces)
+        if self.tokens is not None:
+            known |= set(self.tokens.workspaces)
+        if self.accounts is not None:
+            known |= set(self.accounts.active_owned_workspaces())
+        ended = 0
+        for workspace_id in sorted(known):
+            with self.database.session(workspace_id) as connection:
+                if self.serves_creatures_to(workspace_id):
+                    ended += creature_drafts.expire_unclaimed(connection, workspace_id)
+                else:
+                    ended += creature_drafts.end_unserved(connection, workspace_id)
+        return ended
+
+    def build_creature_worker(self) -> CreatureDraftWorker | None:
+        """What drafts the creatures of the listed workspaces, or None where this process has no
+        model client, no looks namespace or no such workspace. Each draft's requests carry the
+        workspace's rules, with no place's name released: a creature is not a use a place-name
+        right offers."""
+        if (
+            self.model_client is None
+            or self.content_stores is None
+            or not self.creature_workspaces
+            or not self.runs_creature_worker
+        ):
+            return None
+        readonly = self.readonly_database
+        looks = self.content_stores.looks
+        workspaces = self.creature_workspaces
+
+        def policy_for(workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
+            return self.request_policy(
+                workspace_id,
+                lambda: readonly.session(workspace_id),
+                released_places=no_place_released,
+            )
+
+        return CreatureDraftWorker(
+            self.database,
+            client=self.model_client,
+            policy_for=policy_for,
+            looks_for=looks.for_workspace,
+            workspaces=lambda: workspaces,
+        )
 
     def build_reference_worker(self) -> ReferenceWorker | None:
         """What plays the reference jobs of the workspaces that may ask for web notes, or None
@@ -1268,6 +1346,8 @@ def build_services(
         runs_reference_worker=plays_references_here(env_get("REFERENCE_WORKER", environ)),
         reference_workspaces=reference_workspaces(env_get("REFERENCE_WORKSPACES", environ)),
         reference_pictures=reads_pictures_here(env_get("REFERENCE_PICTURES", environ)),
+        runs_creature_worker=plays_creatures_here(env_get("CREATURE_WORKER", environ)),
+        creature_workspaces=creature_workspaces(env_get("CREATURE_WORKSPACES", environ)),
         reference_adapter_for=lambda source: configured_adapter(source, environ),
         # A declared installation's marker is its profile's; otherwise the setting, if any.
         restore_state_path=installation.restore_state_path,

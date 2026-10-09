@@ -126,6 +126,7 @@ from exulanica.api.routes import (
     society_play,
     spending,
     style_packs,
+    thing_creatures,
     thing_store,
     things,
     tiles,
@@ -354,6 +355,26 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.reference_worker = reference_worker
     app.state.reference_thread = reference_thread
+    # Creature drafts (a person's words drafted into a creature kept in the workspace's own store)
+    # are played here for the workspaces EXULANICA_CREATURE_WORKSPACES lists, unless
+    # EXULANICA_CREATURE_WORKER sets them off.
+    creature_worker = services.build_creature_worker()
+    creature_thread = (
+        threading.Thread(
+            target=creature_worker.run, args=(society_stop,), name="creatures", daemon=True
+        )
+        if creature_worker is not None
+        else None
+    )
+    app.state.creature_worker = creature_worker
+    if services.runs_creature_worker or services.creature_workspaces:
+        # Drafts no worker here will take are ended, and their words blanked, at every start.
+        try:
+            services.sweep_creatures()
+        except Exception as failure:
+            _LOG.warning(
+                "the creature sweep at startup failed", extra={"failure": type(failure).__name__}
+            )
     if services.reference_adapter_for is not None:
         # Reference jobs no worker here will take are ended, and their words blanked, at every
         # start, whether or not the worker runs.
@@ -374,6 +395,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             comparison_thread.start()
         if reference_thread is not None:
             reference_thread.start()
+        if creature_thread is not None:
+            creature_thread.start()
         if services.playback_player != "process":
             traffic_signals.start()
         # What startup made lives as long as the server. A full garbage collection walks every
@@ -398,6 +421,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             await asyncio.to_thread(comparison_thread.join)
         if reference_thread is not None:
             await asyncio.to_thread(reference_thread.join)
+        if creature_thread is not None:
+            await asyncio.to_thread(creature_thread.join)
         await asyncio.to_thread(traffic_signals.close)
         if worker is not None:
             worker.stop()
@@ -498,6 +523,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(style_packs.router)
     app.include_router(things.router)
     app.include_router(thing_store.router)
+    app.include_router(thing_creatures.router)
     app.include_router(world_behaviours.router)
     app.include_router(world_versions.router)
     app.include_router(world_environments.router)

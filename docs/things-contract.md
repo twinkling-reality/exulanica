@@ -668,6 +668,51 @@ creature and assembles its answer:
   that answered, the prompt's version and the digests of the instructions and the words, never the
   words.
 
+### Drafting a creature from words
+
+`POST /things/creatures` takes a person's words for one creature (one plain line of at most 400
+characters) and answers `202` at once with a draft, `exulanica.creature-draft/v1`
+([`thing_creatures.py`](../exulanica/api/routes/thing_creatures.py)). A worker in the API process
+([`creature_drafts.py`](../exulanica/selection/creature_drafts.py), migration 0184) plays it: the
+drafter is asked under the `creature_drafter` role with the words' saved names replaced, the
+creature is held to every check above, and one that passes is kept in the workspace's own store
+(below), its sketch its first look. `GET /things/creatures/drafts/{draft_id}` answers the draft as
+it goes:
+
+| Status | The draft names |
+| --- | --- |
+| `queued`, `running` | Nothing yet |
+| `kept` | The kind made and its sketch, each by key, version and digest, its label, and the model that drafted it |
+| `erased` | Nothing: the draft was kept, and the workspace has erased the creature since |
+| `refused` | The refusing check's code, the field of the drafter's form it refused, and the code's fixed sentence, an unbuilt movement's in the grammar's own words ("This world has no flying creatures yet.") |
+| `failed` | Why, by code: `drafter_unavailable`, `spending_refused`, `request_refused`, `expired`, `stranded`, `not_served` |
+| `cancelled` | Why, by code: `workspace_deleted`, its workspace erased before the draft ended |
+
+`GET /things/creatures/offered` (`exulanica.creature-offer/v1`) says before anyone types whether
+the workspace may ask here and why not by code, how long the drafter's calls take by the record its
+timeout rests on (the median and longest call, rounded up to whole seconds, and the timeout), and
+the closed lists of codes a draft may end with: a refusal outside the list is carried as
+`creature_not_drafted`. `GET /things/creatures/drafts` lists the requester's own drafts, newest
+first, so a reload finds one still running; a draft states when it was asked, when a worker first
+took it and when it ended.
+
+A draft is a row and a job on the shared job queue, claimed with a lease and a claim token as a
+reference job is. The words live only in the job until the draft ends, and the draft keeps nothing
+of them, not even their digest: a digest of a short sentence is the sentence. A kept draft names
+its kind by the digest of the kind's document alone, with no key and no foreign key, so erasing the
+creature (below) is never held up by it; a refused draft keeps a code and a field, never a
+sentence, since a check's own sentence may quote the drafted label, and the table refuses anything
+else in those columns. Only the workspaces an installation lists draft creatures
+(`EXULANICA_CREATURE_WORKSPACES`, the worker set off by `EXULANICA_CREATURE_WORKER`); a requester
+has one draft open at a time and a bounded number an hour, reads only their own drafts, and needs
+`world.write` and `model.invoke` to ask. A workspace not listed is told `creatures_not_run_here`;
+words that are not one plain line, `words_refused`. A workspace with a draft still queued or
+running is not seeded for another server, as the draft's job holds the words. A workspace's
+tombstone ends its unfinished drafts in the tombstone's own transaction, whoever writes it, a
+restore's replay included: each job is cancelled with its words blanked, and its draft ends
+`cancelled`. A worker that drafted for a cancelled draft keeps nothing; a call it had already sent
+finishes at the provider, and its answer is discarded.
+
 ## A workspace's own things
 
 A workspace keeps the things it made or admitted as the documents they were read as
@@ -790,9 +835,12 @@ Refusals, by code: `thing_key_shipped`, `thing_version_exists`, `thing_cap_reach
 `look_container_refused` (the container profile's reader refused it), `look_text_refused` (a label
 or an origin word that is not one plain line), `look_credit_missing`, `look_not_admitted` (the
 intake's own check), `look_unknown`, `withdrawal_reason_refused`, `kind_unknown` (an erasure of a
-kind the workspace does not hold), `kind_not_yours`, `kind_changed`, `restore_sealed` and
-`workspace_erased` (keeping anything once a workspace tombstone is effective). Each refuses with no
-row written; only a keep refused after its container was recorded leaves that container, as above.
+kind the workspace does not hold), `kind_not_yours`, `kind_changed`, `restore_sealed`,
+`workspace_erased` (keeping anything once a workspace tombstone is effective), `keep_in_transaction`
+(a keep asked on a connection without autocommit or inside an open transaction, refused before
+anything is recorded) and `look_plan_gone` (a look whose creature was erased while it was kept).
+Each refuses with no row written; only a keep refused after its container was recorded leaves that
+container, as above.
 The command's own are `mapping_refused` (a file that is not a mapping) and `mapping_not_admitted`
 (no declared bridge pins it).
 
@@ -983,16 +1031,13 @@ These are material limits of the boundary above, not partial behaviour:
   model chosen for a being, a visitor's own program, or the world's owner's direct request does.
   A visitor the world decides for takes no person's direct request yet, and nobody in the app can
   take a being over and play it.
-- A workspace's own kinds and looks are kept and served, but no route keeps them (the operator's
-  command admits a look, and a route erases a drafted creature), and a placed thing names a shipped
-  kind. A thing may wear a look the workspace keeps, by its digest; nothing yet shows a picture of
-  one (`preview` is null).
+- A workspace's own kinds and looks are kept and served (a creature's by the creature route, a look
+  made elsewhere by the operator's command, and a route erases a drafted creature), and a placed
+  thing names a shipped kind. A thing may wear a look the workspace keeps, by its digest; nothing
+  yet shows a picture of one (`preview` is null).
 - A model's line names its model only where its said event records one (a society made since its
   modules are recorded keeps it) and the page has read that model; otherwise it says `an AI model`.
   A person in flight wears no pill: the flock draws them, not the crowd.
-- No route drafts a creature or keeps its documents. The drafter is measured and bound to its own
-  manifest role, `creature_drafter` (see [model and service selection](model-and-service-selection.md)),
-  and is reached by tests and the measurement only.
 - No creature flies, swims, climbs or burrows: the grammar states those movements and refuses them
   in words. A floating body therefore cannot move at all yet.
 - No creature wears a sculpted look: its sketch is its only look. The route that makes one (route C
@@ -1023,6 +1068,7 @@ These are material limits of the boundary above, not partial behaviour:
 | Creatures: recipes, plans, sketches, assembly | [`bodies.py`](../exulanica/things/bodies.py), [`sketch.py`](../exulanica/things/sketch.py), [`creatures.py`](../exulanica/things/creatures.py), [`body-grammar.v1.json`](../assets/catalogs/things/body-grammar.v1.json) | `tests/test_creature_bodies.py` (thirteen hand-written creatures: each body where its recipe says, a left limb the mirror of its right, each limb of a lying body hung from the stretch of spine beside it, the bone count the recipe's own sum, each refusal by name, the sketch read back from its bytes) |
 | The creature drafter | [`creature_drafting.py`](../exulanica/selection/creature_drafting.py), [`creature-drafting.v1.json`](../exulanica/selection/creature-drafting.v1.json) | `tests/test_creature_drafting.py` (scripted replies: a pass with its provenance, a refusal repaired with its check's sentence, two refusals, a form outside the schema, a reply cut off in blank space), `tests/test_hosted_boundary.py` (its request carries no saved name) |
 | A workspace's own things | [`thing_store.py`](../exulanica/world/thing_store.py), [`thing_store_command.py`](../exulanica/api/thing_store_command.py), the routes in [`thing_store.py`](../exulanica/api/routes/thing_store.py), migrations 0159 and 0172, the `looks` namespace and its purge in [`namespaces.py`](../exulanica/store/namespaces.py), the seed's refusal in [`judge_seed.py`](../exulanica/orchestration/judge_seed.py) | `tests/test_thing_store_admission.py` (with no database: a static and a skinned look read by their containers' readers, a broken rig refused; a look the reader refuses, a shipped key, a look that draws no file and another container each refused by name; the line rule on the label and each word of the origin, its licence's address included, the field named; a share-alike look refused without its attribution, its authors or its licence's address), `tests/test_thing_store_postgres.py` (as the deployed writer: a drafted creature kept whole and read back at its assembly's digests; no update or delete, even by the table's owner (the owner's TRUNCATE is not refused: no truncate guard like 0013's is attached); another workspace reads none of it and keeps its own; each table's row written only in its own workspace's context, even by a superuser; a shipped kind, plan or look key, another container, a held version drawn from other bytes and a full library of kinds or of looks each refused with nothing written, bytes included; a look kept only after its intake's own check, with its licence as columns; the table's own checks on a share-alike look's credit, a container profile and its look kind, a kind's plan digest and a withdrawal's digest; a withdrawn look passed by unless asked for, its kind still read, and a look the reader refuses withdrawn by its row), `tests/test_thing_erasure_postgres.py` (an erasure removes a creature's kind, plan, recipe, looks and their withdrawals at once and nothing of another creature, naming the kind by digest and its `creature` tombstone only; the rows go only through it, not by the runtime role nor the table's owner; a plan or recipe another still names stays, and a shared recipe holds no words digest; an unknown, foreign or somebody else's kind refused with nothing deleted and no tombstone; the same creature in another workspace untouched; the erasure waits for the workspace's lock; its containers, a second look's on the plan too, destroyed by the purge, which completes its tombstone; a container another creature or the same creature kept again names stays, its job waiting, or skipped when the look arrives while the purger waits for the container's lock; a creature tombstone reaching no capture, photograph, artefact or other creature, and a capture tombstone erasing no creature; a container recorded before its bytes, its purge waiting for them; a keep that dies after recording, or is refused after it, reached by the workspace's erasure; the migration's backfill recording containers kept before the inventory; a workspace tombstone purges every recorded container, an erased creature's too, completion waiting for it, a worker without the looks namespaces leaving it open, a capture tombstone not authorized; the purge command's worker destroying them; a database without the look question claiming every other kind; nothing kept after it), `tests/test_thing_store_words.py` (every string a sketch container holds, for every fixture creature and 160 recipes drawn across the grammar: names from the grammar's vocabulary, colours from its palette and nothing else but the format's own words), `tests/test_restore_replay_withdrawals.py` (a look withdrawn after a backup stays withdrawn, and a creature erased after a backup stays erased, its container purged by the replayed tombstone, through a real restore, as it does when the backup holds its withdrawn sketch or when the whole workspace is erased after it), `tests/test_thing_store_command.py` (a mapping admitted only when a declared bridge pins it and the door's check reads it; the intake's check on the entry's digest, source, SPDX identifier and share-alike mark and on the look being imported; a look document that is not JSON and a withdrawal reason that is not one line refused by the dry runs; against PostgreSQL, a dry run that writes nothing, a copy relabelled CC0 and public and an unpinned mapping refused with nothing written, the positive control, once only, a listing and a withdrawal), `tests/test_thing_store_routes.py` (as a deployment serves them: the document's bytes hash to the URL's digest; the container's bytes, tag and `no-cache`, a revalidation answered 304 with no body; a kind; another workspace's, a withdrawn, a revalidated withdrawn and an absent one all 404 alike, and missing bytes too; 503 without a look store; a writer's erasure, then 404 for its kind, look and container, a reader, a token without `deletion.write`, a stranger and an invented digest erasing nothing, nor an installation sealed for a restore; a session required), `tests/test_judge_seed.py` (a workspace holding a look, a kind or an unpurged container of its own is not seeded, and a schema without the inventory is read without it), `tests/test_existence_oracle.py` (a stranger cannot tell a held look or kind from an invented digest) |
+| Drafting a creature from words | [`creature_drafts.py`](../exulanica/selection/creature_drafts.py), [`thing_creatures.py`](../exulanica/api/routes/thing_creatures.py), migration 0184, the seed's refusal in [`judge_seed.py`](../exulanica/orchestration/judge_seed.py) | `tests/test_creature_drafts_postgres.py` (as the deployed writer, the drafter's replies scripted: a draft queued, played and kept, naming its kind by digest, with no word of the request or the label left on the draft or its job; a refusal by code and the form's field, an unbuilt movement read in the grammar's own sentence; a refusal whose check quotes the label keeping only its code and field; the table refusing a sentence in either column; a drafter that does not answer; one draft open a requester; read by its requester alone; a draft no worker takes ended with its words blanked; a lost claim ends nothing; a workspace tombstone, written by the runtime role or by the owner, cancelling the workspace's unfinished drafts with their words blanked and nothing of another workspace or of another kind of tombstone; a worker whose draft was cancelled while it drafted keeping nothing), `tests/test_thing_creatures_routes.py` (asked, read as it goes, kept and served by the look routes; erased since, naming nothing of it; refused with its code, field and fixed sentence; absent to anyone else; refused by name before anything is queued; the grants it needs), `tests/test_judge_seed.py` (a workspace with an unfinished draft is not seeded; with the draft ended, it is), `tests/test_restore_replay_withdrawals.py` (a workspace erased after a backup has its drafts cancelled and their words blanked again by the restore's replay) |
 | The skinned container | [`skinned.py`](../exulanica_pieces/skinned.py) | `tests/test_skinned_glb.py` (containers built in the test from struct packing: a positive control, then each rule broken alone and refused by name) |
 | A creature's look request and its sculpted look | [`creature_looks.py`](../exulanica/things/creature_looks.py), `ml/appearance/exulanica_appearance/creatures/` | `tests/test_creature_sculpt.py` (each development creature's sketch filled, rigged, written and read back against its plan's tree; the creature job end to end with stand-in models, a body that is not its plan's refused by the rig with its measures in the receipt), `ml/appearance/tests/test_creature_rig.py` and `test_creature_route.py` (a box figure: every check against a positive control, fused legs refused with every measure, a missing leg, a turn undone to the degree, a stretched body refused with the fit it refused; the all-at-once rasteriser equal to the loop; the camera on each plan's front left; the sketch's voxels in TRELLIS's frame), `ml/appearance/tests/test_trellis_second_stage.py` (the second stage's call order, and each refusal of a structure and of a pipeline's signatures alone); the two rig trials on Nebius AI Cloud, [first record](evaluation/2026-10-07-creature-rig-trial.json) and [second record](evaluation/2026-10-07-creature-rig-trial-2.json), each held equal to what its script builds from its evidence (`tests/test_creature_rig_trial_record.py`, `tests/test_creature_rig_trial_2_record.py`) |
 | Scenes and their dressing | [`scenes.py`](../exulanica/world/scenes.py), [`scene_dressing.py`](../exulanica/api/scene_dressing.py), [`assets/catalogs/scenes`](../assets/catalogs/scenes) | `tests/test_scenes.py` (every shipped scene locked at its digest; each refusal by name against the shipped scene; poses equal to the demo builder's, which shares no code with it, and a turned arrival's worked by hand), `tests/test_scene_dressing_postgres.py` (a starter dressed through the application: its things bound to the saved entry where the builder would place them, in the arrival's region, authored as fictional and placed by the owner, the society and each mind read back, a second dressing changing nothing, a thing placed as another kind refused, the owner's moves, removals and undos standing, a host without the engine, a society with no first input, a model the role refuses for one being alone, another workspace and a busy connection refused), `tests/test_demo_scene.py` |

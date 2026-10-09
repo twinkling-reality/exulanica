@@ -169,6 +169,8 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
     # tg_thing_erasure_erases and tg_thing_store_erases_on_tombstone (0172) delete a drafted
     # creature's rows, and every creature's of an erased workspace, and the erasure enqueues its
     # looks' containers on its creature tombstone (INSERT alone: no conflict target). The erasure
+    # reads restore_control under 0161's grant, accepting a tombstone it does not hold only while
+    # a restore replays, and the erasure
     # and look_purge_is_authorized read tombstone under 0161's grant.
     "0172": DefinerGrants(
         tables={

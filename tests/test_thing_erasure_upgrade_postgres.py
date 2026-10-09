@@ -12,9 +12,9 @@ migration first:
     words' digest; the inventory holds the creature's container, recorded by the migration's
     backfill;
 *   the creature is erased whole, and its container enqueued on the erasure's own tombstone;
-*   a workspace erased before the migration loses its store rows, its containers are enqueued on
-    its tombstone and that tombstone's purge completion is cleared, while a workspace not erased
-    keeps its creature.
+*   a workspace erased before the migration loses its store rows, a withdrawn look's among them,
+    its containers are enqueued on its tombstone and that tombstone's purge completion is cleared
+    until the purge destroys them, while a workspace not erased keeps its creature.
 """
 
 from __future__ import annotations
@@ -24,8 +24,13 @@ import uuid
 import pytest
 from exulanica.canonical import sha256_of_canonical
 from exulanica.db.local.backup import verify_backup
-from exulanica.db.session import set_workspace
+from exulanica.db.roles import PURGE_ROLE
+from exulanica.db.session import Database, set_workspace
+from exulanica.deletion.worker import PurgeWorker
+from exulanica.evidence.blob import BlobId
 from exulanica.migrations import migrations
+from exulanica.store.local import LocalContentAddressedStore
+from exulanica.store.namespaces import LocalWorkspaceStores
 from exulanica.world.thing_store import ThingStore
 from psycopg.types.json import Jsonb
 
@@ -162,9 +167,10 @@ def test_a_workspace_erased_before_the_migration_loses_its_store_rows_and_contai
     servers, module_machine, tmp_path
 ):
     """A workspace tombstone written before this migration erased none of the store's rows. The
-    migration erases them for every workspace with an effective workspace tombstone, enqueues the
-    containers their looks named on that tombstone and clears its purge completion, so it completes
-    again only once they are destroyed; a workspace not erased keeps its creature."""
+    migration erases them for every workspace with an effective workspace tombstone, a withdrawn
+    look's withdrawal before its look, enqueues the containers their looks named on that tombstone
+    and clears its purge completion, so it completes again only once the purge has destroyed them;
+    a workspace not erased keeps its creature."""
     kept, erased = _creature(), _creature("store dragon", "dragon")
     kept_in, erased_in = uuid.uuid4(), uuid.uuid4()
     after = sum(1 for migration in migrations() if migration.version >= ERASURE.version)
@@ -175,6 +181,19 @@ def test_a_workspace_erased_before_the_migration_loses_its_store_rows_and_contai
             _keep_as_before(connection, erased_in, erased)
             with connection.transaction():
                 set_workspace(connection, erased_in)
+                # A withdrawn look: its withdrawal names the look, so it must go first.
+                connection.execute(
+                    "insert into look_withdrawal (workspace_id,key,version,sha256,reason,"
+                    "withdrawn_by) values (%s,%s,%s,%s,%s,%s)",
+                    (
+                        erased_in,
+                        erased.sketch.look,
+                        erased.sketch.version,
+                        erased.sketch.sha256,
+                        "no longer wanted",
+                        ACTOR,
+                    ),
+                )
                 [tombstone] = connection.execute(
                     "insert into tombstone (workspace_id, scope, requested_by, reason) "
                     "values (%s, 'workspace', %s, 'the person left') returning tombstone_id",
@@ -186,10 +205,13 @@ def test_a_workspace_erased_before_the_migration_loses_its_store_rows_and_contai
                     (tombstone["tombstone_id"],),
                 )
             # The owner bypasses row security, so each count names its workspace.
-            [left] = connection.execute(
-                "select count(*) as n from look_version where workspace_id = %s", (erased_in,)
-            ).fetchall()
-            assert left["n"] == 1, "the positive control: the old tombstone left the look row"
+            left = [
+                connection.execute(
+                    f"select count(*) as n from {table} where workspace_id = %s", (erased_in,)
+                ).fetchall()[0]["n"]
+                for table in ("look_version", "look_withdrawal")
+            ]
+            assert left == [1, 1], "the positive control: the old tombstone left the look rows"
 
     upgraded = cli("upgrade", "--directory", database.root)
     assert upgraded.status == 0, upgraded.err
@@ -223,3 +245,26 @@ def test_a_workspace_erased_before_the_migration_loses_its_store_rows_and_contai
         assert not connection.execute(
             "select 1 from purge_job where workspace_id = %s", (kept_in,)
         ).fetchall()
+
+    # The purge command's role drains the job: the container's bytes, still in the namespace, are
+    # destroyed, and the tombstone's purge is complete, and recorded so, once more.
+    container = erased.sketch.document["container"]["sha256"]
+    looks = LocalWorkspaceStores(tmp_path / "looks")
+    looks.for_workspace(erased_in).put_bytes(erased.sketch_container)
+    port = database.cluster.running_port()
+    outcome = PurgeWorker(
+        Database(database.role_url(port, PURGE_ROLE)),
+        LocalContentAddressedStore(tmp_path / "blobs"),
+        frozenset({erased_in}),
+        look_stores=looks,
+    ).drain()
+    assert (outcome.destroyed, outcome.failed) == (1, 0), outcome
+    assert not looks.for_workspace(erased_in).exists(BlobId.from_hex(container))
+    with database.connect(port) as connection:
+        [marker] = connection.execute(
+            "select purge_completed_at, tombstone_purge_is_complete(tombstone_id) as complete "
+            "from tombstone where tombstone_id = %s",
+            (tombstone["tombstone_id"],),
+        ).fetchall()
+        assert marker["purge_completed_at"] is not None
+        assert marker["complete"] is True

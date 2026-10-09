@@ -37,6 +37,7 @@ from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.training_rights import grant_training_right, withdraw_training_right
 from exulanica.models.manifest import Role
 from exulanica.orchestration.restore import main as restore_command
+from exulanica.selection import creature_drafts
 from exulanica.store.configured import local_content_stores
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.things.creatures import assemble_creature
@@ -526,6 +527,47 @@ def test_a_workspace_erased_after_a_backup_holding_a_withdrawn_look_is_restored(
         current=lambda: _creature_held(purged, creature),
     )
     assert not purged.rows("select 1 from look_withdrawal")
+
+
+def test_a_workspace_erased_after_the_backup_has_its_creature_drafts_cancelled(
+    purged, commands, tmp_path
+):
+    """A draft queued when the backup was taken holds its words in its job. The workspace's
+    tombstone, written after the backup, is replayed by the restore as the owner, and its trigger
+    cancels the draft and blanks the words again (exulanica/selection/creature_drafts.py)."""
+    workspace = uuid.uuid4()
+    words = "a gentle horse that walks the hills"
+    with purged.database().session(workspace) as connection:
+        draft = creature_drafts.create_draft(
+            connection,
+            workspace,
+            offered_to={workspace},
+            owner_actor_id=uuid.uuid4(),
+            words=words,
+            sent=words,
+            placeholders={},
+        )
+
+    def current() -> bool:
+        [row] = purged.rows(
+            "select d.status, j.state, j.payload from creature_draft d "
+            "join job j on j.job_id = d.job_id where d.draft_id = %s",
+            draft.draft_id,
+        )
+        held = row["payload"].get("sent") == words
+        assert (row["status"] == "queued") is held and (row["state"] == "queued") is held
+        assert held or (row["status"], row["state"]) == ("cancelled", "cancelled")
+        return held
+
+    def erase() -> None:
+        with purged.database().session(workspace) as connection:
+            connection.execute(
+                "insert into tombstone (workspace_id, scope, requested_by, reason) "
+                "values (%s, 'workspace', %s, 'the person left')",
+                (workspace, uuid.uuid4()),
+            )
+
+    assert not _through_a_restore(purged, tmp_path, withdraw=erase, current=current)
 
 
 def test_a_character_catalog_withdrawn_after_the_backup_stays_withdrawn(purged, commands, tmp_path):

@@ -361,17 +361,17 @@
     "creature_drafter": {
       "primary": "nvidia/nemotron-3-super-120b-a12b",
       "fallback": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-      "timeout_seconds": 55,
+      "timeout_seconds": 50,
       "timeout_basis": {
-        "record": "docs/evaluation/2026-10-07-creature-drafter-timings.json",
+        "record": "docs/evaluation/2026-10-07-creature-drafter-timings-2.json",
         "model": "nvidia/nemotron-3-super-120b-a12b",
-        "rows": 9,
-        "p50_ms": 17229,
-        "p99_ms": 25659,
-        "longest_ms": 25659,
-        "note": "The primary's own calls in the pre-registered measurement of the creature drafter: eight held-out descriptions, one form each and one repair where a check refused the first. No retained public record measures the Qwen3 235B fallback, which serves under this timeout when the primary is withdrawn."
+        "rows": 28,
+        "p50_ms": 17439,
+        "p99_ms": 24898,
+        "longest_ms": 24898,
+        "note": "The primary's own calls in the pre-registered timing measurement of the creature drafter: 24 descriptions written for it, simple and complex bodies, each drafted once with the one repair where a check refused the first answer, under a 240 s call timeout that no call reached. No retained public record measures the Qwen3 235B fallback, which serves under this timeout when the primary is withdrawn."
       },
-      "max_tokens": {"value": 16384, "basis": "The ceiling every candidate was asked with in the measurement the timeout names, one for all so none was truncated by a choice made for another. A ceiling is not a spend; a low one costs a failed draft."},
+      "max_tokens": {"value": 16384, "basis": "The ceiling every candidate was asked with in the pre-registered measurement that chose these models, one for all so none was truncated by a choice made for another, and the one the timing measurement the timeout names asked with. A ceiling is not a spend; a low one costs a failed draft."},
       "required_use_cases": ["text"],
       "rationale": "Drafts a creature from a person's description (exulanica/selection/creature_drafting.py): a flat form of its body, colours, abilities and offers, assembled into a recipe, a body plan, a sketch and a thing kind that every reader a thing passes holds, with one repair naming the check's code, field and sentence and no fallback to another model on a refused form. Chosen by the rule pre-registered for the measurement over three licence-resolved text models with a JSON schema in this manifest: eligible at 6 of 8 valid and 5 of 8 matching the words by rule; the NVIDIA model with the shortest slowest draft within 60 s is the primary, and the next in that order the fallback. Model-unavailability errors select the fallback."
     },

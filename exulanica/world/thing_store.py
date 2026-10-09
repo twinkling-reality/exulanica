@@ -120,7 +120,7 @@ STORE_CODES: Final = {
     "restore's replay ends",
     "workspace_erased": "this workspace is being erased, and keeps nothing more",
     "keep_in_transaction": "a keep commits its container's record before it writes the bytes, so "
-    "it is never asked inside an open transaction",
+    "it is asked only on an autocommit connection outside any transaction",
     "look_plan_gone": "the creature this look is drawn for was erased while the look was kept",
 }
 _STATIC: Final = "exulanica.static-glb/v1"
@@ -454,7 +454,8 @@ class ThingStore:
         asks ``check`` and whether the workspace is being erased again, so a row never names bytes
         the store lacks. Refused by name: ``check``'s refusals, ``thing_version_exists`` for a
         version another keep wrote first, ``workspace_erased``, and ``keep_in_transaction`` when
-        the connection is inside an open transaction, before anything is recorded."""
+        the connection is not in autocommit or is inside an open transaction, before anything is
+        recorded."""
 
         def checked() -> None:
             lock_workspace(self.connection, self.workspace_id)
@@ -463,8 +464,12 @@ class ThingStore:
             check()
 
         # Inside an open transaction each block below would be a savepoint, so the record would
-        # commit only with the rows, after the bytes: nothing is recorded or written then.
-        if self.connection.info.transaction_status != psycopg.pq.TransactionStatus.IDLE:
+        # commit only with the rows, after the bytes; without autocommit the lock's own statement
+        # would open that transaction. Nothing is recorded or written then.
+        if (
+            not self.connection.autocommit
+            or self.connection.info.transaction_status != psycopg.pq.TransactionStatus.IDLE
+        ):
             raise _refuse("keep_in_transaction")
         try:
             with self._holding(container):

@@ -63,6 +63,7 @@ __all__ = [
     "CHECK_SENTENCES",
     "DRAFTER_ROLE",
     "DRAFT_ATTEMPTS",
+    "NOT_DRAFTED_SENTENCE",
     "PROMPT_PATH",
     "CreatureDraftOutcome",
     "CreatureDraftRefusal",
@@ -99,6 +100,10 @@ class CreatureDraftRefusalCode(StrEnum):
     """Why no creature was drafted: the form or the checks refused it, twice."""
 
     NOT_DRAFTED = "creature_not_drafted"
+
+
+#: What a person reads for :attr:`CreatureDraftRefusalCode.NOT_DRAFTED`.
+NOT_DRAFTED_SENTENCE: Final = "No creature was drafted from these words that this world can build."
 
 
 @dataclass(frozen=True, slots=True)
@@ -563,7 +568,7 @@ def draft_creature(
         creature=None,
         refusal=CreatureDraftRefusal(
             CreatureDraftRefusalCode.NOT_DRAFTED,
-            "No creature was drafted from these words that this world can build.",
+            NOT_DRAFTED_SENTENCE,
             refusals[-1] if refusals else None,
         ),
         model_id=None,

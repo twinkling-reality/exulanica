@@ -11924,6 +11924,218 @@
     }
    }
   },
+  "/things/creatures/offered": {
+   "get": {
+    "tags": [
+     "things"
+    ],
+    "summary": "Creature Offer",
+    "description": "Whether this workspace may ask for a creature here, why not by code, how long a draft\nusually takes by the creature drafter's measured calls, and every code a draft may end with.",
+    "operationId": "creature_offer_things_creatures_offered_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/things/creatures/drafts": {
+   "get": {
+    "tags": [
+     "things"
+    ],
+    "summary": "List Creature Drafts",
+    "description": "The requester's own drafts, newest first: a reload or a second tab finds one still\nrunning.",
+    "operationId": "list_creature_drafts_things_creatures_drafts_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/things/creatures": {
+   "post": {
+    "tags": [
+     "things"
+    ],
+    "summary": "Draft Creature",
+    "description": "Ask for a creature from the person's words; answers 202 with its draft at once.",
+    "operationId": "draft_creature_things_creatures_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CreatureBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/things/creatures/drafts/{draft_id}": {
+   "get": {
+    "tags": [
+     "things"
+    ],
+    "summary": "Read Creature Draft",
+    "description": "One creature draft: queued, running, kept with its kind and look, erased since, refused with\nthe check's code and its fixed sentence, or failed with why.",
+    "operationId": "read_creature_draft_things_creatures_drafts__draft_id__get",
+    "parameters": [
+     {
+      "name": "draft_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Draft Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/behaviours": {
    "get": {
     "tags": [
@@ -26064,6 +26276,20 @@
      "title"
     ],
     "title": "CreateVersionBody"
+   },
+   "CreatureBody": {
+    "properties": {
+     "words": {
+      "type": "string",
+      "title": "Words"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "words"
+    ],
+    "title": "CreatureBody"
    },
    "DecisionBody": {
     "properties": {

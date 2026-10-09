@@ -399,6 +399,64 @@ def test_a_schema_with_looks_and_no_inventory_is_read_without_one(seeded, store,
     assert admin.execute("select to_regclass('look_object') is not null as held").fetchone()["held"]
 
 
+def test_a_workspace_with_an_unfinished_creature_draft_is_refused(seeded, store, tmp_path):
+    """Until a creature draft ends, its job holds the words it was asked with, so the export
+    refuses the workspace; the same workspace with the draft ended and its words blanked is carried
+    (the positive control).
+
+    The rows are written for a new workspace inside a savepoint that is rolled back, and the shared
+    schema keeps none of them.
+    """
+    holder = uuid.uuid4()
+    admin = seeded.connection
+    with admin.transaction():
+        admin.execute("select set_config('exulanica.workspace_id', %s, true)", (str(holder),))
+        draft_id = uuid.uuid4()
+        job = admin.execute(
+            "insert into job (workspace_id, kind, payload) values (%s, 'creature_draft', %s) "
+            "returning job_id",
+            (
+                holder,
+                Jsonb({"draft_id": str(draft_id), "sent": "a gentle horse", "placeholders": {}}),
+            ),
+        ).fetchone()["job_id"]
+        admin.execute(
+            "insert into creature_draft (workspace_id, draft_id, owner_actor_id, job_id) "
+            "values (%s, %s, %s, %s)",
+            (holder, draft_id, holder, job),
+        )
+        with pytest.raises(SeedRefused, match="creature draft"):
+            export_seed(
+                admin,
+                store,
+                workspace_id=holder,
+                destination=tmp_path / "refused",
+                created_at=_CREATED_AT,
+            )
+        assert not (tmp_path / "refused").exists()
+        admin.execute(
+            "update job set state='failed', completed_at=now(), payload=%s where job_id=%s",
+            (Jsonb({"draft_id": str(draft_id)}), job),
+        )
+        admin.execute(
+            "update creature_draft set status='failed', failure='expired', finished_at=now() "
+            "where job_id=%s",
+            (job,),
+        )
+        export_seed(
+            admin,
+            store,
+            workspace_id=holder,
+            destination=tmp_path / "carried",
+            created_at=_CREATED_AT,
+        )
+        assert (tmp_path / "carried" / "manifest.json").exists()
+        raise psycopg.Rollback()
+    assert not admin.execute(
+        "select 1 from creature_draft where workspace_id = %s", (holder,)
+    ).fetchall()
+
+
 # -- the archive verifies against its own manifest ---------------------------------------------
 
 

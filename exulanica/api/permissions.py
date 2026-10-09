@@ -487,11 +487,14 @@ _WORLD_READS_WITH_A_MODEL: Final = _every(
 #: people commits the world's host to asking it, and a comparison started from the application,
 #: of who decides for a world's people or for a town's signals, commits it to asking the models
 #: compared, within the bound its owner stated. Cancelling a comparison takes the same grants as
-#: starting one, so nobody else ends an owner's paid run. A reference request commits the workspace
+#: starting one, so nobody else ends an owner's paid run. Asking for a creature from words commits
+#: the workspace to the creature drafter's calls and keeps what passes in its own store. A
+#: reference request commits the workspace
 #: to a planning and a reading call and to web searches against its credits; stopping one takes
 #: the same grants. A piece request commits the workspace to GPU time against its allowance.
 _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE),
+    "POST /things/creatures",
     "POST /world/piece-requests",
     "POST /world/versions/{version_id}/models/{role_key}",
     "POST /world/versions/{version_id}/society/comparisons",
@@ -611,6 +614,9 @@ _WORLD_READS: Final = _every(
     "GET /materials/recipes/{recipe_id}/bake/bytes",
     "POST /selection/actions/outcome",
     "POST /selection/actions/prepare",
+    "GET /things/creatures/drafts",
+    "GET /things/creatures/drafts/{draft_id}",
+    "GET /things/creatures/offered",
     "GET /things/kinds/{kind_sha256}",
     "GET /things/library",
     "GET /things/library/{content_sha256}",

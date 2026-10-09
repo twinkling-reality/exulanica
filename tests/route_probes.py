@@ -220,6 +220,7 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /selection/ask": {**_IN_WORLD, "json": {"question": "where was I?"}},
     "POST /selection/packet": {**_IN_WORLD, "json": {"intent": "captures"}},
     "POST /selection/plan": {"json": {"question": "where was I?"}},
+    "POST /things/creatures": {"json": {"words": "a creature a probe asks for"}},
     "GET /tiles": {"params": {"city_seed": _ZERO_DIGEST}},
     # Multipart, as the route takes it: a declaration of exactly these bytes as the caller's own
     # work. What admission does with a container is tests/test_workspace_assets_postgres.py.
@@ -844,6 +845,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/scene-geometry/{artifact_id}": Owned(build.trained_scene),
     "/scene-segments/{scene_id}": Owned(build.reconstruction_scene),
     "/selection/place-bridges/{decision_id}": Owned(build.place_bridge),
+    "/things/creatures/drafts/{draft_id}": Owned(build.creature_draft),
     "/things/kinds/{kind_sha256}": Owned(build.held_kind, build.invented_digest),
     "/things/library/{content_sha256}": Shared(
         build.thing_library_content,

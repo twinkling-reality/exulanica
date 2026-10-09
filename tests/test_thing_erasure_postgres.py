@@ -29,8 +29,8 @@ What is shown, against PostgreSQL, as the deployed writer (the runtime role) unl
     keep that dies after recording leaves a record the workspace's erasure reaches; containers
     kept before the inventory are recorded by the migration's own backfill; the table refuses a
     record once the workspace's tombstone is effective, whoever writes it; a keep asked inside an
-    open transaction is refused before it records anything, and a look admitted on a plan erased
-    meanwhile is refused by name;
+    open transaction, or on a connection without autocommit, is refused before it records
+    anything, and a look admitted on a plan erased meanwhile is refused by name;
 *   a workspace tombstone erases every creature's rows at once, and enqueues every recorded
     container, an erased creature's and an admitted look's among them, as a look purge job; the
     purge role destroys them and marks them purged, and the tombstone's purge is complete only
@@ -1045,6 +1045,28 @@ def test_a_keep_inside_an_open_transaction_records_nothing(looks):
     assert not looks.in_namespace(_container(creature))
     looks.store.keep_creature(creature, created_by=ACTOR)
     assert looks.in_namespace(_container(creature))
+
+
+def test_a_keep_on_a_connection_without_autocommit_records_nothing(looks):
+    """Without autocommit the lock's first statement opens a transaction that only the caller's
+    commit ends, so the record would commit with the rows, after the bytes. The store refuses a
+    keep on such a connection, idle as a fresh one is, before it runs a statement."""
+    creature = _creature()
+    with looks.runtime.session(looks.workspace_id) as connection:
+        connection.autocommit = False
+        store = ThingStore(
+            connection, looks.workspace_id, looks.stores.for_workspace(looks.workspace_id)
+        )
+        assert connection.info.transaction_status == psycopg.pq.TransactionStatus.IDLE
+        with pytest.raises(ThingStoreRefused) as refused:
+            store.keep_creature(creature, created_by=ACTOR)
+        assert connection.info.transaction_status == psycopg.pq.TransactionStatus.IDLE
+    assert refused.value.code == "keep_in_transaction"
+    assert not looks.rows("select 1 from look_object")
+    assert set(_counts(looks.connection).values()) == {0}
+    assert not looks.in_namespace(_container(creature))
+    looks.store.keep_creature(creature, created_by=ACTOR)
+    assert looks.in_namespace(_container(creature)), "the positive control"
 
 
 def test_a_look_admitted_on_a_plan_erased_meanwhile_is_refused_by_name(looks, monkeypatch):

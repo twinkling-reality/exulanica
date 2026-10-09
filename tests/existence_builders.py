@@ -1261,6 +1261,23 @@ def held_kind(owner) -> str:
     return _held_creature(owner).kind.sha256
 
 
+def creature_draft(owner) -> str:
+    """A creature draft the owner asked for, queued and not yet played (domain: no worker runs in
+    the sweep's application)."""
+    from exulanica.selection.creature_drafts import create_draft
+
+    made = create_draft(
+        owner.repository.connection,
+        owner.workspace_id,
+        offered_to={owner.workspace_id},
+        owner_actor_id=owner.actor,
+        words="a creature asked for by the sweep",
+        sent="a creature asked for by the sweep",
+        placeholders={},
+    )
+    return str(made.draft_id)
+
+
 def district_version(owner) -> uuid.UUID:
     """A version whose district the host registered over two admitted city sources (domain).
 
