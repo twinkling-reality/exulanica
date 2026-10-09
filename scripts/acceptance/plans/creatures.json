@@ -1,0 +1,35 @@
+{
+ "profile": "q10-scripted-model-plan/v1",
+ "bounds": {
+  "ceiling_usd": "0.50",
+  "max_calls": 40
+ },
+ "utterances": {
+  "flying": "a dragon that circles the town",
+  "walking": "a dragon that walks the streets",
+  "guarding": "a dragon that guards the square"
+ },
+ "rules": [
+  {
+   "match": {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "contains": "The description:\\n\\\"\\\"\\\"a dragon that circles the town"
+   },
+   "content": "{\"label\": \"circling dragon\", \"summary\": \"A dragon that circles high over the town on its wide wings.\", \"appearance\": \"a creature of the deep woods with a heavy body and bright eyes\", \"posture\": \"horizontal\", \"spine\": 3, \"upper_body\": \"none\", \"heads\": 1, \"neck_bones\": 5, \"jaws\": true, \"tail\": 8, \"length_mm\": 12000, \"width_mm\": 2200, \"height_mm\": 2600, \"span_mm\": 11000, \"holds_with\": \"jaws\", \"legs\": 4, \"leg_segments\": 3, \"arms\": 0, \"arm_segments\": 0, \"wings\": 2, \"wing_segments\": 3, \"fins\": 0, \"fin_segments\": 0, \"tentacles\": 0, \"tentacle_segments\": 0, \"colour_body\": \"crimson\", \"colour_belly\": \"gold\", \"colour_accent\": \"ebony\", \"colour_eyes\": \"amber\", \"moves_burrowing\": false, \"moves_climbing\": false, \"moves_flight\": true, \"moves_swimming\": false, \"moves_walking\": true, \"can_wait\": true, \"weight_wait\": 300, \"can_stand\": true, \"weight_stand\": 200, \"can_talk\": false, \"weight_talk\": 0, \"can_rest\": false, \"weight_rest\": 0, \"can_visit\": false, \"weight_visit\": 0, \"can_pick_up\": false, \"weight_pick_up\": 0, \"can_put_down\": false, \"weight_put_down\": 0, \"can_give\": false, \"weight_give\": 0, \"can_take\": false, \"weight_take\": 0, \"can_follow\": true, \"weight_follow\": 0, \"can_say\": true, \"offers_talk_to\": true, \"offers_hear\": true, \"offers_receive\": false, \"offers_let_take\": false, \"offers_be_followed\": true}"
+  },
+  {
+   "match": {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "contains": "The description:\\n\\\"\\\"\\\"a dragon that walks the streets"
+   },
+   "content": "{\"label\": \"street dragon\", \"summary\": \"A dragon that walks the town's streets, slow and watchful.\", \"appearance\": \"a creature of the deep woods with a heavy body and bright eyes\", \"posture\": \"horizontal\", \"spine\": 3, \"upper_body\": \"none\", \"heads\": 1, \"neck_bones\": 5, \"jaws\": true, \"tail\": 8, \"length_mm\": 12000, \"width_mm\": 2200, \"height_mm\": 2600, \"span_mm\": 11000, \"holds_with\": \"jaws\", \"legs\": 4, \"leg_segments\": 3, \"arms\": 0, \"arm_segments\": 0, \"wings\": 2, \"wing_segments\": 3, \"fins\": 0, \"fin_segments\": 0, \"tentacles\": 0, \"tentacle_segments\": 0, \"colour_body\": \"crimson\", \"colour_belly\": \"gold\", \"colour_accent\": \"ebony\", \"colour_eyes\": \"amber\", \"moves_burrowing\": false, \"moves_climbing\": false, \"moves_flight\": false, \"moves_swimming\": false, \"moves_walking\": true, \"can_wait\": true, \"weight_wait\": 300, \"can_stand\": true, \"weight_stand\": 200, \"can_talk\": false, \"weight_talk\": 0, \"can_rest\": false, \"weight_rest\": 0, \"can_visit\": false, \"weight_visit\": 0, \"can_pick_up\": false, \"weight_pick_up\": 0, \"can_put_down\": false, \"weight_put_down\": 0, \"can_give\": false, \"weight_give\": 0, \"can_take\": false, \"weight_take\": 0, \"can_follow\": true, \"weight_follow\": 0, \"can_say\": true, \"offers_talk_to\": true, \"offers_hear\": true, \"offers_receive\": false, \"offers_let_take\": false, \"offers_be_followed\": true}"
+  },
+  {
+   "match": {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "contains": "The description:\\n\\\"\\\"\\\"a dragon that guards the square"
+   },
+   "content": "{\"label\": \"square dragon\", \"summary\": \"A dragon that keeps watch over the square from its middle.\", \"appearance\": \"a creature of the deep woods with a heavy body and bright eyes\", \"posture\": \"horizontal\", \"spine\": 3, \"upper_body\": \"none\", \"heads\": 1, \"neck_bones\": 5, \"jaws\": true, \"tail\": 8, \"length_mm\": 12000, \"width_mm\": 2200, \"height_mm\": 2600, \"span_mm\": 11000, \"holds_with\": \"jaws\", \"legs\": 4, \"leg_segments\": 3, \"arms\": 0, \"arm_segments\": 0, \"wings\": 2, \"wing_segments\": 3, \"fins\": 0, \"fin_segments\": 0, \"tentacles\": 0, \"tentacle_segments\": 0, \"colour_body\": \"crimson\", \"colour_belly\": \"gold\", \"colour_accent\": \"ebony\", \"colour_eyes\": \"amber\", \"moves_burrowing\": false, \"moves_climbing\": false, \"moves_flight\": false, \"moves_swimming\": false, \"moves_walking\": true, \"can_wait\": true, \"weight_wait\": 300, \"can_stand\": true, \"weight_stand\": 200, \"can_talk\": false, \"weight_talk\": 0, \"can_rest\": false, \"weight_rest\": 0, \"can_visit\": false, \"weight_visit\": 0, \"can_pick_up\": false, \"weight_pick_up\": 0, \"can_put_down\": false, \"weight_put_down\": 0, \"can_give\": false, \"weight_give\": 0, \"can_take\": false, \"weight_take\": 0, \"can_follow\": true, \"weight_follow\": 0, \"can_say\": true, \"offers_talk_to\": true, \"offers_hear\": true, \"offers_receive\": false, \"offers_let_take\": false, \"offers_be_followed\": true}"
+  }
+ ]
+}

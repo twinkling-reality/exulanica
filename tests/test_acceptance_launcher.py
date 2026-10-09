@@ -1067,6 +1067,35 @@ def test_reference_pictures_serve_references_to_the_first_workspace_with_picture
     )
 
 
+def test_creatures_are_drafted_for_the_runs_workspaces_alone_and_only_when_asked():
+    # Each draft spends model calls, so only --creatures names workspaces, and only the run's own;
+    # a list in the caller's shell never reaches the API.
+    exports = {
+        "EXULANICA_DATABASE_URL": "postgresql://exulanica_app@localhost:19200/exulanica",
+        "EXULANICA_READONLY_DATABASE_URL": "postgresql://exulanica_ro@localhost:19200/exulanica",
+        "EXULANICA_PURGE_DATABASE_URL": "postgresql://exulanica_purge@localhost:19200/exulanica",
+    }
+    workspaces = ["0f3c2b1a-0000-4000-8000-000000000001", "0f3c2b1a-0000-4000-8000-000000000002"]
+    shell = {"EXULANICA_CREATURE_WORKSPACES": '["00000000-0000-0000-0000-000000000009"]'}
+
+    def environment(creatures):
+        return LAUNCH.api_environment(
+            exports=exports,
+            grant={"token": {"permissions": []}},
+            data_dir=Path("run/data"),
+            model=False,
+            derivative_worker=False,
+            society_playback={},
+            creatures=creatures,
+            environ=shell,
+        )
+
+    assert json.loads(environment(workspaces)["EXULANICA_CREATURE_WORKSPACES"]) == workspaces
+    assert "EXULANICA_CREATURE_WORKSPACES" not in environment(None)
+    assert LAUNCH.build_parser().parse_args(["up", "--worktree", ".", "--creatures"]).creatures
+    assert not LAUNCH.build_parser().parse_args(["up", "--worktree", "."]).creatures
+
+
 def test_references_reach_the_api_only_when_asked_and_name_the_runs_workspaces_alone():
     # A web source's key in the caller's shell never reaches the API without --references.
     key = "tvly-not-a-real-key-for-this-test"

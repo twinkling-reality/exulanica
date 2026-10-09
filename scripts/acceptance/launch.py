@@ -85,6 +85,10 @@ starts exactly what it always did:
   naming those workspaces alone, and refuses to start unless the egress allowlist ``--model`` passes
   names the web source's origin. Pictures stay off. Without it no web source's credential reaches
   the API, whatever the caller's shell holds.
+- ``--creatures`` lets the run's synthetic workspaces draft creatures from words: the API is given
+  ``EXULANICA_CREATURE_WORKSPACES`` naming those workspaces alone, and its creature worker runs in
+  the API process; the drafter is asked through ``--model``'s provider or ``--scripted-model``'s
+  plan. Without it no workspace drafts creatures here.
 - ``--society-of-things`` offers the society of things on the slot's API
   (``EXULANICA_SOCIETY_OF_THINGS=on``), so a rehearsal can start a society over placed things. It
   is set for the API process alone, after the scrub of the shell's ``EXULANICA_`` variables, and
@@ -820,6 +824,7 @@ def api_environment(
     reference_pictures: Sequence[str] | None = None,
     environ: Mapping[str, str] | None = None,
     references: Mapping[str, str] | None = None,
+    creatures: Sequence[str] | None = None,
 ) -> dict[str, str]:
     environment = clean_environment(environ)
     if model:
@@ -850,6 +855,9 @@ def api_environment(
         environment.update(accounts)
     if references:
         environment.update(references)
+    if creatures:
+        # The workspaces creatures are drafted for; the worker runs in the API process by default.
+        environment["EXULANICA_CREATURE_WORKSPACES"] = json.dumps(list(creatures))
     return environment
 
 
@@ -1708,6 +1716,8 @@ def up(arguments: argparse.Namespace) -> None:
         state["society_of_things"] = True
     if arguments.reference_pictures:
         state["reference_pictures"] = [workspace_id]
+    if arguments.creatures:
+        state["creatures"] = [workspace_id, *(other["workspace_id"] for other in others)]
     if arguments.references:
         # The workspaces only: the credential is read from the environment at each start.
         state["references"] = [workspace_id, *(other["workspace_id"] for other in others)]
@@ -1767,6 +1777,7 @@ def up(arguments: argparse.Namespace) -> None:
         accounts=accounts,
         reference_pictures=state.get("reference_pictures"),
         references=references_environment(state.get("references")),
+        creatures=state.get("creatures"),
     )
     environment.update(model_witness_environment(environment, run_dir))
     plan = None
@@ -2088,6 +2099,7 @@ def restart_api(arguments: argparse.Namespace) -> None:
         accounts=(state.get("accounts") or {}).get("environment"),
         reference_pictures=state.get("reference_pictures"),
         references=references_environment(state.get("references")),
+        creatures=state.get("creatures"),
     )
     environment.update(model_witness_environment(environment, run_dir))
     scripted = state.get("scripted_model")
@@ -2303,6 +2315,13 @@ def build_parser() -> argparse.ArgumentParser:
                 help="with --model, let the run's synthetic workspaces ask for web notes "
                 "(TAVILY_API_KEY from this environment; EXULANICA_REFERENCE_WORKSPACES) "
                 "(default: no web source)",
+            )
+            command.add_argument(
+                "--creatures",
+                action="store_true",
+                help="let the run's synthetic workspaces draft creatures from words "
+                "(EXULANICA_CREATURE_WORKSPACES), the drafter asked through --model or "
+                "--scripted-model (default: no creatures)",
             )
             command.add_argument(
                 "--society-of-things",
