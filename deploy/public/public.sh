@@ -63,6 +63,11 @@ postgres_source="pgvector/pgvector:0.8.6-pg18"
 postgres_digest="sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a"
 edge_source="caddy:2.11.4-alpine"
 edge_digest="sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b"
+# Each index's linux/amd64 image, as the registries listed it when the index was pinned. An image
+# already held under that digest is tagged without asking the registry, so a registry outage does
+# not stop a build whose images are all here; another platform reads the index as before.
+postgres_amd64_digest="sha256:1d50c689b0a6511b9ea0a15615281c81a59fd04a08eb35057ec8646fb3a2118a"
+edge_amd64_digest="sha256:040e9f7480b80b6d4a7e5013a21159b950a63dcbdb956e38abe2387fb28d9ec0"
 
 case "${1:-}" in
   "" | build | images | save) deploy_dir="" ;;
@@ -249,9 +254,14 @@ PY
       docker compose -p "$project" --project-directory "$root" \
       -f "$root/compose.yaml" -f "$here/public.yaml" --profile tiles build api maintenance client tile-worker
     platform="${EXULANICA_BUILD_PLATFORM:-linux/amd64}"
-    for pinned in "$postgres_image ${postgres_source%%:*}@$postgres_digest" \
-      "$edge_image ${edge_source%%:*}@$edge_digest"; do
-      name="${pinned%% *}" source="${pinned#* }"
+    for pinned in "$postgres_image ${postgres_source%%:*}@$postgres_digest $postgres_amd64_digest" \
+      "$edge_image ${edge_source%%:*}@$edge_digest $edge_amd64_digest"; do
+      name="${pinned%% *}" rest="${pinned#* }" source="${rest%% *}" amd64="${rest#* }"
+      if [ "$platform" = linux/amd64 ] \
+        && docker image inspect "${source%@*}@$amd64" >/dev/null 2>&1; then
+        docker tag "${source%@*}@$amd64" "$name"
+        continue
+      fi
       # The build platform's own manifest, read from the pinned index (content-addressed, so the
       # digest inside it is the index's) and pulled by that digest: one store cannot hold two
       # platforms' images under one index digest.

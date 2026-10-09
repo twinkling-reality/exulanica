@@ -11,7 +11,10 @@
 # Built by compose.yaml's maintenance service, which supplies the backend image as the `backend`
 # build context.
 
-FROM pgvector/pgvector:0.8.6-pg18 AS postgresql
+# Every base is its version's multi-platform index by digest, the tag kept in the name for the reader:
+# a build never resolves a moving tag, and one whose base is already held needs no registry
+# (tests/test_base_images_pinned.py).
+FROM pgvector/pgvector:0.8.6-pg18@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a AS postgresql
 RUN set -eu; \
     rm -f /usr/lib/postgresql/18/lib/llvmjit*; \
     rm -rf /usr/lib/postgresql/18/lib/bitcode; \

@@ -14,7 +14,10 @@
 #
 # Node itself is copied from the pinned official image, binary only.
 
-FROM node:22-bookworm-slim AS node
+# Every base is its version's multi-platform index by digest, the tag kept in the name for the reader:
+# a build never resolves a moving tag, and one whose base is already held needs no registry
+# (tests/test_base_images_pinned.py).
+FROM node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS node
 
 FROM backend
 

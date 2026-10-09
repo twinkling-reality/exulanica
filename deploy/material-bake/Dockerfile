@@ -33,7 +33,7 @@ COPY web/packages/loom-texture ./packages/loom-texture
 RUN pnpm install --frozen-lockfile --filter . --filter @exulanica/loom-texture \
  && node --import tsx -e "import('./packages/loom-texture/src/workspace/licence.ts')"
 
-FROM ghcr.io/astral-sh/uv:0.9.5 AS uv
+FROM ghcr.io/astral-sh/uv:0.9.5@sha256:f459f6f73a8c4ef5d69f4e6fbbdb8af751d6fa40ec34b39a1ab469acd6e289b7 AS uv
 
 FROM ${PYTHON_BASE} AS runtime
 ARG PYTHON_BASE

@@ -14,7 +14,10 @@
 # The nginx configuration is deploy/installation/client-nginx.conf, which
 # tests/test_installation_deployment.py holds equal to the reviewer image's.
 
-FROM nginx:1.29-alpine
+# Every base is its version's multi-platform index by digest, the tag kept in the name for the reader:
+# a build never resolves a moving tag, and one whose base is already held needs no registry
+# (tests/test_base_images_pinned.py).
+FROM nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
 
 ARG EXULANICA_CODE_REVISION
 ARG EXULANICA_CLIENT_TREE_SHA256

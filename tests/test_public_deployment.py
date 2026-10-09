@@ -104,11 +104,13 @@ def test_the_edge_and_the_database_are_the_published_versions_pulled_by_digest()
     """One pinned Caddy across both edges and compose.yaml's PostgreSQL, each pulled by its index
     digest on the build host and loaded on the server under a name of its own: a moving tag is a
     proxy or a database that changes under a server, and a host never resolves one."""
+    # The reviewer edge and compose.yaml name each image by the same tag and index digest the
+    # script pulls by, so the three can never drift apart.
     pinned = re.findall(r"^\s+image: (caddy:\S+)$", _directives(JUDGE_EDGE), re.M)
-    assert [_script_value("edge_source")] == pinned
-    assert re.fullmatch(r"caddy:\d+\.\d+\.\d+-alpine", pinned[0])
+    assert pinned == [f"{_script_value('edge_source')}@{_script_value('edge_digest')}"]
+    assert re.fullmatch(r"caddy:\d+\.\d+\.\d+-alpine", _script_value("edge_source"))
     database = re.findall(r"^    image: (\S+)$", BASE_SERVICES["postgres"], re.M)
-    assert [_script_value("postgres_source")] == database
+    assert database == [f"{_script_value('postgres_source')}@{_script_value('postgres_digest')}"]
     for name in ("edge_digest", "postgres_digest"):
         assert re.fullmatch(r"sha256:[0-9a-f]{64}", _script_value(name)), name
     assert re.search(r"^    image: exulanica-public-edge$", OVERLAY_SERVICES["edge"], re.M)
@@ -152,6 +154,19 @@ def test_the_server_spends_through_the_durable_authority_within_a_stated_fuse():
     # The base file gives both the witness volume, which durable spending needs.
     for name in ("api", "playback-worker"):
         assert "spending-witness:/var/lib/exulanica-spending-witness" in BASE_SERVICES[name], name
+
+
+def test_the_build_tags_a_held_amd64_image_by_its_digest_before_asking_the_registry():
+    """A registry outage must not stop a build whose two published images are already here: each
+    pinned index's linux/amd64 image is named by digest in the script and, when held, tagged
+    without a registry call; otherwise the index is read and pulled by the platform's digest."""
+    script = _directives(SCRIPT.read_text(encoding="utf-8"))
+    for name in ("postgres_amd64_digest", "edge_amd64_digest"):
+        assert re.fullmatch(r"sha256:[0-9a-f]{64}", _script_value(name)), name
+    build = script.split("\n  build)", 1)[1].split("\n    ;;", 1)[0]
+    held = build.index('docker image inspect "${source%@*}@$amd64"')
+    assert held < build.index("docker buildx imagetools inspect")
+    assert 'docker tag "${source%@*}@$amd64" "$name"' in build
 
 
 def test_every_long_running_service_keeps_bounded_logs_and_restarts():

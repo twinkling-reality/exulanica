@@ -72,7 +72,7 @@ def test_the_edge_image_is_pinned_to_an_exact_version():
     """A moving tag is a proxy that changes under a running demonstration."""
     images = re.findall(r"^\s+image:\s*(\S+)\s*$", _directives(EDGE), re.M)
     assert len(images) == 1, images
-    assert re.fullmatch(r"caddy:\d+\.\d+\.\d+(-alpine)?", images[0]), images[0]
+    assert re.fullmatch(r"caddy:\d+\.\d+\.\d+(-alpine)?@sha256:[0-9a-f]{64}", images[0]), images[0]
 
 
 def test_the_edge_proxies_to_the_web_proxy_and_never_to_the_api():

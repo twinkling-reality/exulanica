@@ -22,7 +22,10 @@
 # platform and only the nginx stage below is built for the target. Building it under emulation
 # fails outright: esbuild's install step segfaults under qemu (MEASURED 2026-09-29, a linux/amd64
 # build on an arm64 host, exit 139 in `pnpm install`).
-FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS build
+# Every base is its version's multi-platform index by digest, the tag kept in the name for the reader:
+# a build never resolves a moving tag, and one whose base is already held needs no registry
+# (tests/test_base_images_pinned.py).
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS build
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 # The version the workspace pins in `package.json`. Corepack rather than a global install, so the
@@ -54,7 +57,7 @@ COPY assets /src/assets
 COPY exulanica/world/interaction-policy-registry.v1.json /src/exulanica/world/
 RUN pnpm --filter @exulanica/app build
 
-FROM nginx:1.29-alpine AS runtime
+FROM nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de AS runtime
 COPY --from=build /src/web/packages/app/dist /usr/share/nginx/html
 
 COPY <<'CONF' /etc/nginx/conf.d/default.conf

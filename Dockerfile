@@ -9,9 +9,12 @@
 # selects the torch depth extra. Every citation still resolves to original bytes because
 # reconstruction is never evidence.
 
-FROM ghcr.io/astral-sh/uv:0.9.5 AS uv
+# Every base is its version's multi-platform index by digest, the tag kept in the name for the reader:
+# a build never resolves a moving tag, and one whose base is already held needs no registry
+# (tests/test_base_images_pinned.py).
+FROM ghcr.io/astral-sh/uv:0.9.5@sha256:f459f6f73a8c4ef5d69f4e6fbbdb8af751d6fa40ec34b39a1ab469acd6e289b7 AS uv
 
-FROM python:3.11-slim-trixie AS builder
+FROM python:3.11-slim-trixie@sha256:0dd364ba7e10242f07755449e3a3d0e35f9efd987952737b90def6709ab0c5ce AS builder
 COPY --from=uv /uv /usr/local/bin/uv
 # The locked depth extra names source repositories at exact commits. Git exists only in this
 # discarded builder stage; no package manager or Git binary reaches the runtime image.
@@ -45,7 +48,7 @@ COPY exulanica_pieces ./exulanica_pieces
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable --reinstall-package exulanica ${EXULANICA_SYNC_EXTRAS}
 
-FROM python:3.11-slim-trixie AS runtime
+FROM python:3.11-slim-trixie@sha256:0dd364ba7e10242f07755449e3a3d0e35f9efd987952737b90def6709ab0c5ce AS runtime
 LABEL org.opencontainers.image.source="https://github.com/twinkling-reality/exulanica"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 

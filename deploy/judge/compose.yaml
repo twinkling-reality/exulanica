@@ -29,7 +29,7 @@ services:
     # The same tag as the repository's `compose.yaml`, matched exactly rather than approximately.
     # `tests/test_judge_deployment.py` asserts the two agree, because a judge stack proving the
     # product on a different PostgreSQL from the one the suite verifies proves less than it looks.
-    image: pgvector/pgvector:0.8.6-pg18
+    image: pgvector/pgvector:0.8.6-pg18@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-exulanica}
       POSTGRES_USER: ${POSTGRES_USER:-exulanica}

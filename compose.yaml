@@ -33,7 +33,7 @@ services:
     # The documented target, matched exactly: PostgreSQL 18 with pgvector 0.8.6, which is what
     # `tests/pg_harness.py` refuses to run without. A different tag here means the suite is
     # verifying a schema the deployment does not run.
-    image: pgvector/pgvector:0.8.6-pg18
+    image: pgvector/pgvector:0.8.6-pg18@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-exulanica}
       POSTGRES_USER: ${POSTGRES_USER:-exulanica}

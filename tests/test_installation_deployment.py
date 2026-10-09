@@ -233,7 +233,7 @@ def test_the_client_image_fetches_nothing_and_states_its_provenance():
     text = "\n".join(instructions)
     for fetch in ("pnpm install", "npm install", "npm ci", "yarn", "curl ", "wget ", "apk add"):
         assert fetch not in text, fetch
-    assert instructions[0] == "FROM nginx:1.29-alpine"
+    assert re.fullmatch(r"FROM nginx:1\.29-alpine@sha256:[0-9a-f]{64}", instructions[0])
     for argument in (
         "EXULANICA_CODE_REVISION",
         "EXULANICA_CLIENT_TREE_SHA256",

@@ -22,7 +22,7 @@ services:
   edge:
     # An exact version, as the stack pins PostgreSQL: a moving tag is a proxy that changes under a
     # running demonstration.
-    image: caddy:2.11.4-alpine
+    image: caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
     restart: unless-stopped
     ports:
       # The bind address has no default. A public host states 0.0.0.0; a rehearsal on a laptop
