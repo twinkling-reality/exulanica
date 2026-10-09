@@ -16,11 +16,13 @@ Refused unless the picture and the game's licence file are exactly the ones this
 SHA-256 (the picture's digest is the one the mapping file names as the look's ``source_sha256``):
 no other skin is ever used.
 
-Writes, into ``OUT_DIR`` (which must be ignored by git): ``luanti-default-player.glb`` and
-``luanti-default-player.v1.json``, the look document whose origin carries the licence, its
-attribution and the change made. The look is an adaptation of the picture under CC BY-SA 3.0: it
-is admitted to a deployment's store, credited wherever it is shown, never committed, never part
-of a shipped image, and never mixed into an Apache-2.0 or CC0 file.
+Writes, into ``OUT_DIR`` (which must be ignored by git): ``luanti-default-player.glb`` and a look
+document for each version, ``luanti-default-player.v1.json`` and ``.v2.json``, whose origin carries
+the licence, its attribution and the change made. The versions are one figure under one credit and
+differ only in their label: version 2's names no game. A deployment admits the version its mapping
+names. The look is an adaptation of the picture under CC BY-SA 3.0: it is admitted to a
+deployment's store, credited wherever it is shown, never committed, never part of a shipped image,
+and never mixed into an Apache-2.0 or CC0 file.
 """
 
 from __future__ import annotations
@@ -51,6 +53,9 @@ PICTURE_SHA256 = "351626fcb8155d6285315a213ff4ae668a9607a3eda776663512dd799ec843
 LICENCE_FILE = Path("mods/player_api/license.txt")
 LICENCE_SHA256 = "3726836be696070e5e66c58cc2f00f3ad901fca07dccc651c9df6291fc00da67"
 LOOK = "luanti-default-player"
+#: Each version of the look by the label a world shows for it: version 2 says what version 1 says in
+#: words that name no game, for a deployment that would not name it.
+LABELS = {1: "a luanti player's own look", 2: "a player's own look"}
 #: Millimetres per picture pixel: 32 pixels tall make a 1,696 mm figure.
 P = 53
 
@@ -399,12 +404,12 @@ def figure(picture: Picture) -> tuple[Node, ...]:
     return tuple(nodes)
 
 
-def look_document(container: bytes, height_mm: int) -> dict[str, Any]:
+def look_document(container: bytes, height_mm: int, version: int = 1) -> dict[str, Any]:
     return {
         "profile": "exulanica.look/v1",
         "look": LOOK,
-        "version": 1,
-        "label": "a luanti player's own look",
+        "version": version,
+        "label": LABELS[version],
         "body_plan": "humanoid/v1",
         "look_kind": "rigid_on_bones",
         "container": {
@@ -455,7 +460,8 @@ def look_document(container: bytes, height_mm: int) -> dict[str, Any]:
     }
 
 
-def build(game: Path) -> tuple[bytes, dict[str, Any]]:
+def build(game: Path) -> tuple[bytes, dict[int, dict[str, Any]]]:
+    """The look's container and its document at each version, from the operator's own copy."""
     picture_bytes = (game / PICTURE).read_bytes()
     if hashlib.sha256(picture_bytes).hexdigest() != PICTURE_SHA256:
         raise Refused(f"{PICTURE} is not the picture this build pins; no other skin is used")
@@ -472,9 +478,10 @@ def build(game: Path) -> tuple[bytes, dict[str, Any]]:
         for part in node.parts
         for vertex in part.vertices_mm
     )
-    document = look_document(container, top)
-    read_look(document)
-    return container, document
+    documents = {version: look_document(container, top, version) for version in LABELS}
+    for document in documents.values():
+        read_look(document)
+    return container, documents
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -489,17 +496,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     if ignored.returncode != 0:
         raise Refused(f"{arguments.out} is not ignored by git; the look is never committed")
-    container, document = build(arguments.game)
+    container, documents = build(arguments.game)
     (arguments.out / f"{LOOK}.glb").write_bytes(container)
-    (arguments.out / f"{LOOK}.v1.json").write_text(json.dumps(document, indent=2) + "\n")
+    for version, document in documents.items():
+        path = arguments.out / f"{LOOK}.v{version}.json"
+        path.write_text(json.dumps(document, indent=2) + "\n")
     print(
         json.dumps(
             {
                 "look": LOOK,
-                "look_sha256": sha256_of_canonical(document).hex(),
-                "container_sha256": document["container"]["sha256"],
-                "container_bytes": document["container"]["bytes"],
-                "height_mm": document["height_mm"],
+                "look_sha256": {
+                    str(version): sha256_of_canonical(document).hex()
+                    for version, document in documents.items()
+                },
+                "container_sha256": hashlib.sha256(container).hexdigest(),
+                "container_bytes": len(container),
+                "height_mm": documents[1]["height_mm"],
                 "source_sha256": PICTURE_SHA256,
             },
             indent=2,

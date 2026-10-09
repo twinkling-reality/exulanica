@@ -9,7 +9,8 @@ exulanica_gate.door_url (Door address) string
 # The words the player's line uses for the world when its grant states none.
 exulanica_gate.world_words (Words for the world) string The world beyond the gate
 
-# The mapping file, in the mod's mapping folder, for the game this server runs.
+# The mapping file, in the mod's mapping folder, for the game this server runs. Version 4 says what
+# version 3 says in words that name no game.
 exulanica_gate.mapping (Mapping file) string luanti-minetest-game.v3.json
 
 # Only these players may join (names separated by commas); empty lets anyone in.

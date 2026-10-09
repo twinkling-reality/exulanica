@@ -1,13 +1,16 @@
 """Make one Luanti character cross into a running stack's world, as the gate mod does, with no game.
 
-    <checkout>/.venv/bin/python bridges/luanti/tools/cross_once.py declare OUT
+    <checkout>/.venv/bin/python bridges/luanti/tools/cross_once.py declare OUT [--label WORDS]
+        [--game WORDS] [--mapping NAME]
     <checkout>/.venv/bin/python bridges/luanti/tools/cross_once.py cross --api URL --token-file FILE
-        [--scene FILE] [--look KEY] [--carry ITEM] [--stay-s 120]
+        [--scene FILE] [--look KEY] [--carry ITEM] [--stay-s 120] [--mapping NAME]
 
 ``declare`` writes the door bridge declaration a stack is started with (``launch.py up
 --door-bridges OUT``): the bridge ``luanti``, run by a server, unlisted, offered to the stack's
-synthetic workspaces, pinning this mod's mapping file by its digest and admitting the adapter's
-version. Its own credential is random and only its digest is written.
+synthetic workspaces, pinning every published version of this mod's mapping by its digest (the one
+``--mapping`` names first) and admitting the adapter's version. Its label and game are the words a
+world shows for where a visitor came from (``--label`` and ``--game``, the owner's choice; by
+default the game's own names). Its own credential is random and only its digest is written.
 
 ``cross`` builds a scene in that stack (``scripts/demo/build_scene.py``, no minds), starts a
 society of things over it and plays it, opens the scene's gate to one traveller from Luanti with a
@@ -41,6 +44,9 @@ BRIDGE = HERE.parents[1]
 CHECKOUT = HERE.parents[3]
 MOD = BRIDGE / "mod" / "exulanica_gate"
 MAPPING_FILE = "luanti-minetest-game.v3.json"
+#: The words a declaration gives the bridge by default: the game's own names.
+LABEL = "Luanti"
+GAME = "Luanti (Minetest Game)"
 BUILD_SCENE = CHECKOUT / "scripts" / "demo" / "build_scene.py"
 #: The scene a check builds unless ``--scene`` names another: the demo's, at the newest version the
 #: scene catalog's lock names.
@@ -71,9 +77,19 @@ def newest_demo_scene() -> Path:
 SOCIETY_OF_THINGS = "exulanica-society/v7"
 
 
-def _mapping() -> tuple[str, dict[str, Any]]:
-    text = (MOD / "mapping" / MAPPING_FILE).read_text()
+def _mapping(name: str = MAPPING_FILE) -> tuple[str, dict[str, Any]]:
+    if "/" in name or not (MOD / "mapping" / name).is_file():
+        raise SystemExit(f"no published mapping file is named {name}")
+    text = (MOD / "mapping" / name).read_text()
     return text, json.loads(text)
+
+
+def _plain_words(text: str, what: str) -> str:
+    """``text`` as the door takes a bridge's label or game: one line of 1 to 80 characters."""
+    words = text.strip()
+    if not 1 <= len(words) <= 80 or any(ord(character) < 32 for character in words):
+        raise SystemExit(f"a bridge's {what} is one line of 1 to 80 characters")
+    return words
 
 
 def _adapter() -> dict[str, Any]:
@@ -87,19 +103,23 @@ def _digest(mapping: dict[str, Any]) -> str:
     return sha256_of_canonical(mapping).hex()
 
 
-def declare(out: Path) -> None:
-    """The declaration pins every published version of the mapping, the newest (the one this tool
-    crosses with) first, so a server or a check pinned to an older version is let in as well."""
-    _, mapping = _mapping()
-    older = sorted(
-        (path for path in (MOD / "mapping").glob("*.json") if path.name != MAPPING_FILE),
+def declare(
+    out: Path, *, mapping_file: str = MAPPING_FILE, label: str = LABEL, game: str = GAME
+) -> None:
+    """The declaration pins every published version of the mapping, the one ``mapping_file`` names
+    (the one a crossing says hello with) first, so a server or a check pinned to another version is
+    let in as well. ``label`` and ``game`` are the words a world shows for where its visitors came
+    from."""
+    _, mapping = _mapping(mapping_file)
+    others = sorted(
+        (path for path in (MOD / "mapping").glob("*.json") if path.name != mapping_file),
         reverse=True,
     )
-    pinned = [_digest(mapping)] + [_digest(json.loads(path.read_text())) for path in older]
+    pinned = [_digest(mapping)] + [_digest(json.loads(path.read_text())) for path in others]
     entry = {
         "bridge": "luanti",
-        "label": "Luanti",
-        "game": "Luanti (Minetest Game)",
+        "label": _plain_words(label, "label"),
+        "game": _plain_words(game, "game"),
         "run_by": "server",
         "ai": False,
         "credential_sha256": hashlib.sha256(secrets.token_bytes(32)).hexdigest(),
@@ -110,8 +130,8 @@ def declare(out: Path) -> None:
     }
     out.write_text(json.dumps([entry], indent=2) + "\n")
     print(
-        f"{out}: bridge luanti, mapping {entry['mapping_sha256'][0][:16]}..., adapter "
-        f"{entry['adapter_versions'][0]}"
+        f"{out}: bridge luanti ({entry['label']}), mapping {entry['mapping_sha256'][0][:16]}..., "
+        f"adapter {entry['adapter_versions'][0]}"
     )
 
 
@@ -232,7 +252,7 @@ def cross(arguments: argparse.Namespace) -> None:
     )
     del token
     credential = issued["channel_credential"]["credential"]
-    mapping_text, mapping = _mapping()
+    mapping_text, mapping = _mapping(arguments.mapping)
     adapter = _adapter()
     reads = list(adapter["reads"]) + [item["game_item"] for item in mapping["items"]]
     # The hello the mod sends: the mapping file's own text inside the body.
@@ -297,6 +317,19 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     declaring = commands.add_parser("declare", help="write the bridge declaration for a stack")
     declaring.add_argument("out", type=Path)
+    declaring.add_argument(
+        "--label",
+        default=LABEL,
+        help="the bridge's name as a world shows it (default: %(default)s)",
+    )
+    declaring.add_argument(
+        "--game", default=GAME, help="the game as a world shows it (default: %(default)s)"
+    )
+    declaring.add_argument(
+        "--mapping",
+        default=MAPPING_FILE,
+        help="the mapping file pinned first (default: %(default)s)",
+    )
     crossing = commands.add_parser("cross", help="make one character cross into a running stack")
     crossing.add_argument("--api", required=True, help="the stack's API, http://127.0.0.1:PORT")
     crossing.add_argument("--token-file", type=Path, required=True)
@@ -309,11 +342,21 @@ def main(argv: list[str] | None = None) -> int:
     crossing.add_argument("--look", default="cc0-traveller")
     crossing.add_argument("--carry", default="default:torch")
     crossing.add_argument("--stay-s", type=int, default=120)
+    crossing.add_argument(
+        "--mapping",
+        default=MAPPING_FILE,
+        help="the mapping file to say hello with (default: %(default)s)",
+    )
     arguments = parser.parse_args(argv)
     if arguments.command == "cross":
         arguments.scene = arguments.scene or newest_demo_scene()
     if arguments.command == "declare":
-        declare(arguments.out)
+        declare(
+            arguments.out,
+            mapping_file=arguments.mapping,
+            label=arguments.label,
+            game=arguments.game,
+        )
     else:
         cross(arguments)
     return 0

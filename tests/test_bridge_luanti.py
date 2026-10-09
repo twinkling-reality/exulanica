@@ -10,8 +10,11 @@ adapter's own code:
 *   every thing kind it names exists in the catalogs at that version and the item kinds can be held;
     a CC0 look is one the library ships, with the licence the catalog records; the share-alike look
     (a player's own picture, built at a deployment and never committed) states its credit and the
-    picture's digest the builder pins, and the builder makes a look the thing contract reads from
-    any 64 by 32 picture, putting the picture's left on the character's right;
+    picture's digest the builder pins, and is the document the builder writes for the look's
+    container at the version the mapping names; the builder makes a look the thing contract reads
+    from any 64 by 32 picture, at each version, putting the picture's left on the character's right;
+*   one mapping version names no game in anything a world shows for a visitor (labels, words and
+    the looks' labels) and is otherwise the version before it;
 *   the item builder makes a look and a kind the thing contract reads from any 16 by 16 picture,
     indexed colour included, crediting it by the game's own media file and refusing an unpinned
     picture, a picture that file does not credit and any licence but CC BY-SA 3.0; the hand-written
@@ -89,7 +92,113 @@ def test_there_is_a_mapping_for_the_game_the_demo_runs():
         "luanti-minetest-game.v1.json",
         "luanti-minetest-game.v2.json",
         "luanti-minetest-game.v3.json",
+        "luanti-minetest-game.v4.json",
     ]
+
+
+#: The game's names, as the words a world shows for a visitor would carry them.
+GAME_NAMES = re.compile(r"(?i)luanti|minetest")
+
+
+def _shown_words(value: Any) -> list[str]:
+    """Every label and every line of words a mapping holds, wherever it holds them: what a world may
+    show for a visitor and what it carries."""
+    if isinstance(value, dict):
+        return [
+            text
+            for key, item in value.items()
+            for text in (
+                [item]
+                if key in ("label", "words", "reason_words") and isinstance(item, str)
+                else _shown_words(item)
+            )
+        ]
+    if isinstance(value, list):
+        return [text for item in value for text in _shown_words(item)]
+    return []
+
+
+def test_one_mapping_version_names_no_game_in_what_a_world_shows():
+    """Version 4 says what version 3 says in words that name no game: the game's label, the
+    visitors' labels and words, and the player's own look, which it names at the look's version 2
+    (the same figure under the same credit, labelled without the game). Every kind, credit, item
+    and action is version 3's, so a world shows the same things."""
+    v3 = json.loads((MOD / "mapping" / "luanti-minetest-game.v3.json").read_text())
+    v4 = json.loads((MOD / "mapping" / "luanti-minetest-game.v4.json").read_text())
+    builder, catalogued = _builder(), _looks_by_digest()
+    looks = [look["look"] for visitor in v4["visitors"] for look in visitor["looks"]]
+    shown = _shown_words(v4) + [
+        catalogued[look["sha256"]]["label"]
+        if look["sha256"] in catalogued
+        else builder.LABELS[look["version"]]
+        for look in looks
+    ]
+    assert [text for text in shown if GAME_NAMES.search(text)] == []
+    assert v4["game"] == {"label": "an open-source block game"}
+
+    def own_look(mapping: dict[str, Any]) -> dict[str, Any]:
+        [look] = [
+            look["look"]
+            for visitor in mapping["visitors"]
+            for look in visitor["looks"]
+            if look["look_key"] == "default-skin"
+        ]
+        return look
+
+    assert (own_look(v3)["version"], own_look(v4)["version"]) == (1, 2)
+
+    def apart_from_its_words(mapping: dict[str, Any]) -> dict[str, Any]:
+        visitors = [
+            {
+                **{key: value for key, value in visitor.items() if key not in ("label", "words")},
+                "looks": [
+                    {**look, "look": look["look"]["look"]}
+                    if look["look_key"] == "default-skin"
+                    else look
+                    for look in visitor["looks"]
+                ],
+            }
+            for visitor in mapping["visitors"]
+        ]
+        kept = {key: value for key, value in mapping.items() if key not in ("version", "game")}
+        return {**kept, "visitors": visitors}
+
+    assert apart_from_its_words(v4) == apart_from_its_words(v3)
+
+
+@functools.cache
+def _cross_once() -> Any:
+    """``bridges/luanti/tools/cross_once.py``, which writes the bridge declaration a stack reads."""
+    spec = importlib.util.spec_from_file_location(
+        "luanti_cross_once", ADAPTER / "tools" / "cross_once.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_a_declaration_says_the_owners_words_and_pins_every_published_mapping(tmp_path):
+    """The owner's label and game are what a world shows for where its visitors came from, read by
+    the door's own setting reader; every published mapping is pinned, the chosen one first."""
+    from exulanica.door.bridges import load_bridge_directory
+
+    tool = _cross_once()
+    out = tmp_path / "bridges.json"
+    words = "an open-source block game"
+    tool.declare(out, mapping_file="luanti-minetest-game.v4.json", label=words, game=words)
+    [entry] = json.loads(out.read_text())
+    digests = [sha256_of_canonical(json.loads(path.read_text())).hex() for path in MAPPINGS]
+    assert entry["mapping_sha256"][0] == digests[-1]
+    assert sorted(entry["mapping_sha256"]) == sorted(digests)
+    # The launcher names the run's workspaces where the declaration says synthetic.
+    setting = json.dumps([{**entry, "workspaces": ["6f1b9a52-4d1e-4c55-9e4b-0c8f0d2b7a11"]}])
+    bridge = load_bridge_directory({"EXULANICA_DOOR_BRIDGES": setting}).bridges["luanti"]
+    assert (bridge.label, bridge.game) == (words, words)
+    tool.declare(out)
+    [entry] = json.loads(out.read_text())
+    assert (entry["label"], entry["game"]) == ("Luanti", "Luanti (Minetest Game)")
 
 
 def test_the_newest_mapping_crosses_a_character_that_can_go_home_by_itself():
@@ -187,6 +296,36 @@ def test_every_kind_and_look_the_mapping_names_is_in_the_catalogs(path):
         assert "holdable" in {offer["key"] for offer in kind["offers"]}, item["game_item"]
 
 
+#: The player's own look's container as the builder writes it from the pinned picture: its facts,
+#: never its bytes (an adaptation under CC BY-SA 3.0, built at a deployment and never committed).
+OWN_LOOK_CONTAINER = {
+    "sha256": "a0041240b2d8a0f187e8f31a60f34f8e23af052462dad902c91932b781e608dd",
+    "bytes": 151988,
+    "media_type": "model/gltf-binary",
+}
+OWN_LOOK_HEIGHT_MM = 1722
+
+
+@pytest.mark.parametrize("path", MAPPINGS, ids=lambda path: path.name)
+def test_the_mapping_names_the_own_look_the_builder_writes(path):
+    """The player's own look a mapping names is the document the builder writes for that container
+    at the version named (a v1 mapping's digest naming version 1), so a deployment that builds and
+    admits it finds the digest its mapping names."""
+    builder = _builder()
+    mapping = json.loads(path.read_text())
+    for visitor in mapping["visitors"]:
+        for look in visitor["looks"]:
+            if look["licence"]["spdx"] == "CC0-1.0":
+                continue
+            named = look["look"]
+            version = named["version"] if isinstance(named, dict) else 1
+            document = {
+                **builder.look_document(b"", OWN_LOOK_HEIGHT_MM, version),
+                "container": OWN_LOOK_CONTAINER,
+            }
+            assert _look_digest(named) == sha256_of_canonical(document).hex()
+
+
 @pytest.mark.parametrize("path", MAPPINGS, ids=lambda path: path.name)
 def test_the_adapter_names_looks_its_mapping_lists(path):
     adapter = _adapter()
@@ -272,8 +411,12 @@ def test_the_builder_makes_a_look_the_thing_contract_reads():
     assert [node.name for node in nodes] == [f"bone:{bone}" for bone in builder.JOINTS]
     container = builder.write_container(nodes)
     assert container == builder.write_container(builder.figure(_synthetic_picture(builder)))
-    document = builder.look_document(container, 1722)
-    read_look(document)
+    documents = {
+        version: builder.look_document(container, 1722, version) for version in builder.LABELS
+    }
+    for document in documents.values():
+        read_look(document)
+    document = documents[1]
     origin = read_origin(document["origin"])
     assert origin.share_alike and origin.spdx == "CC-BY-SA-3.0"
     for text in (
@@ -282,6 +425,11 @@ def test_the_builder_makes_a_look_the_thing_contract_reads():
         *document["origin"]["authors"],
     ):
         assert check_line(text, maximum=200) == text
+    # Each version is the same figure under the same credit; only its label and number differ.
+    assert sorted(documents) == list(range(1, len(documents) + 1))
+    for version, other in documents.items():
+        assert other["version"] == version and other["label"] == builder.LABELS[version]
+        assert {**other, "version": 1, "label": document["label"]} == document
 
 
 def test_the_pictures_left_is_the_characters_right():

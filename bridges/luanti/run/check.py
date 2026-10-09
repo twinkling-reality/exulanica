@@ -104,7 +104,7 @@ def newest_demo_scene() -> Path:
     raise SystemExit(f"the scene catalog's lock names no {DEMO_SCENE_KEY} that dresses a starter")
 
 
-#: The mapping file the server loads and the deployment pins: the game's newest.
+#: The mapping file the server loads and the deployment pins: the mod's default.
 MAPPING_FILE = "luanti-minetest-game.v3.json"
 SOCIETY_OF_THINGS = "exulanica-society/v7"
 
@@ -826,7 +826,7 @@ def main(argv: list[str] | None = None) -> int:
         "--mapping",
         default=MAPPING_FILE,
         help="the published mapping version the server loads and the deployment pins, by its file "
-        f"name in mod/exulanica_gate/mapping (default: {MAPPING_FILE}, the game's newest)",
+        f"name in mod/exulanica_gate/mapping (default: {MAPPING_FILE}, the mod's default)",
     )
     parser.add_argument(
         "--census",
