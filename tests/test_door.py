@@ -15,11 +15,13 @@ import json
 import uuid
 
 import pytest
+from exulanica.door import channel as channel_module
 from exulanica.door.bridges import (
     BridgeNotAccepted,
     BridgeSettingRefused,
     load_bridge_directory,
 )
+from exulanica.door.channel import ChannelRefused, carried_home, sendable
 from exulanica.door.credentials import (
     CHANNEL_CREDENTIAL_FORM,
     credential_sha256,
@@ -28,6 +30,8 @@ from exulanica.door.credentials import (
     new_invite_code,
     normalise_invite_code,
 )
+from exulanica.door.crossings import Visits
+from exulanica.door.grants import Grant, Scope
 from exulanica.door.mapping import MappingRefused, check_mapping, check_reads
 from exulanica.door.notices import ANSWERS_REMEMBERED, HeldPolls, Hellos, Notices
 from exulanica.door.protocol import Cursor, InvalidCursor, declared_fault, words_fault
@@ -191,9 +195,36 @@ def test_a_cursor_round_trips_and_a_first_poll_starts_from_nothing():
 )
 def test_a_cursor_written_before_crossings_reads_on_as_told_no_crossing(written, read):
     assert Cursor.decode(written) == read
-    # What the door writes next is the second cursor, which reads back as itself.
+    # What the door writes next is its newest cursor, which reads back as itself.
     assert read.encode() != written
     assert Cursor.decode(read.encode()) == read
+
+
+@pytest.mark.parametrize(
+    ("written", "read"),
+    [
+        # Cursors as the door wrote them before lines were sent (package 2's second version), held
+        # by a bridge across the upgrade:
+        # {"ask":7,"crossed":3,"departed":1,"ended":false,"grant":2,"outcome":6,"v":2} and an end.
+        (
+            "eyJhc2siOjcsImNyb3NzZWQiOjMsImRlcGFydGVkIjoxLCJlbmRlZCI6ZmFsc2UsImdyYW50IjoyLCJvdXRj"
+            "b21lIjo2LCJ2IjoyfQ",
+            Cursor(ask=7, outcome=6, grant=2, crossed=3, departed=1, said=0, ended=False),
+        ),
+        (
+            "eyJhc2siOjksImNyb3NzZWQiOjQsImRlcGFydGVkIjo0LCJlbmRlZCI6dHJ1ZSwiZ3JhbnQiOjMsIm91dGNv"
+            "bWUiOjksInYiOjJ9",
+            Cursor(ask=9, outcome=9, grant=3, crossed=4, departed=4, said=0, ended=True),
+        ),
+    ],
+)
+def test_a_cursor_written_before_lines_reads_on_as_told_nothing_said(written, read):
+    assert Cursor.decode(written) == read
+    assert read.encode() != written
+    assert Cursor.decode(read.encode()) == read
+    # The newest cursor counts the lines told too.
+    told = Cursor(ask=1, outcome=1, said=5)
+    assert Cursor.decode(told.encode()).said == 5
 
 
 @pytest.mark.parametrize(
@@ -221,6 +252,21 @@ def test_a_cursor_written_before_crossings_reads_on_as_told_no_crossing(written,
         base64.urlsafe_b64encode(b'{"ask":1,"ended":false,"grant":0,"outcome":0,"v":2}')
         .decode()
         .rstrip("="),  # the first cursor's fields under the second's version
+        base64.urlsafe_b64encode(
+            b'{"ask":1,"crossed":0,"departed":0,"ended":false,"grant":0,"outcome":0,"said":0,"v":2}'
+        )
+        .decode()
+        .rstrip("="),  # the third cursor's fields under the second's version
+        base64.urlsafe_b64encode(
+            b'{"ask":1,"crossed":0,"departed":0,"ended":false,"grant":0,"outcome":0,"v":3}'
+        )
+        .decode()
+        .rstrip("="),  # the second cursor's fields under the third's version
+        base64.urlsafe_b64encode(
+            b'{"ask":1,"crossed":0,"departed":0,"ended":false,"grant":0,"outcome":0,"said":0,"v":4}'
+        )
+        .decode()
+        .rstrip("="),  # a version this door never wrote
         "A" * 201,
     ],
 )
@@ -468,3 +514,136 @@ def test_a_process_remembers_a_bounded_number_of_answers():
     for _ in range(ANSWERS_REMEMBERED):
         notices.answered(uuid.uuid4())
     assert not notices.wait_for_answer(first, 0)
+
+
+def test_an_arrival_is_named_by_a_random_id_whoever_calls_the_door():
+    """The route takes only a version 4 arrival id; the crossings refuse any other by name for any
+    other caller, before anything is read or written (no connection is opened here)."""
+    grant_id = uuid.uuid4()
+    grant = Grant(
+        grant_id=grant_id,
+        world_id="world",
+        bridge="test-bridge",
+        grant_seq=1,
+        state="active",
+        scope=Scope(visitors_maximum=1, kinds=("player",), version_id=str(uuid.uuid4())),
+        mapping_sha256=(),
+        expires_at=None,  # type: ignore[arg-type]
+        issued_at=None,  # type: ignore[arg-type]
+    )
+    visits = Visits(None, uuid.uuid4(), grant, uuid.uuid4())  # type: ignore[arg-type]
+    departure = uuid.uuid5(uuid.UUID("8f1d6a52-3c47-5e09-b4a8-1e7c2d90f6b3"), f"{grant_id}:x")
+    with pytest.raises(ChannelRefused) as refused:
+        visits.arrive(
+            arrival_id=departure,
+            game_type="player",
+            look_key="otherwise",
+            carried=[],
+            presence=None,
+            mapping={},
+            reads=[],
+        )
+    assert (refused.value.code, refused.value.status) == ("arrival_id_not_random", 422)
+
+
+def test_a_thing_carried_home_leaves_as_its_own_item_and_a_world_thing_only_when_allowed():
+    sword = {"id": "s", "kind": {"kind": "sword", "version": 1, "sha256": "0" * 64}}
+    lantern = {"id": "l", "kind": {"kind": "lantern", "version": 1, "sha256": "1" * 64}}
+    came_as = {"s": "test:sword"}
+    outbound = {"sword": "test:sword", "lantern": "test:torch"}
+    allowed = carried_home([sword, lantern], came_as, outbound, may_carry_out=True)
+    held_back = carried_home([sword, lantern], came_as, outbound, may_carry_out=False)
+    assert [(each["thing_id"], each["game_item"]) for each in allowed] == [
+        ("s", "test:sword"),
+        ("l", "test:torch"),
+    ]
+    # Its own sword goes home whatever the grant says; the world's lantern becomes nothing.
+    assert [(each["thing_id"], each["game_item"]) for each in held_back] == [
+        ("s", "test:sword"),
+        ("l", None),
+    ]
+
+
+# -- what an asked frame sends, as it is sent ---------------------------------------------------
+
+
+def _context(heard: list[tuple[str, str, int]], said: list[tuple[str, str | None, int]]) -> dict:
+    """A society of things' context with lines heard ``(from, line, tick)`` and said ``(to, line,
+    minutes_ago)``, as the decision contract writes them."""
+    return {
+        "engine": "exulanica-society/v7",
+        "options": [{"label": "wait here a minute"}],
+        "heard": [
+            {"from": who, "to_you": True, "line": line, "tick": tick, "minutes_ago": 30 - tick}
+            for who, line, tick in heard
+        ],
+        "said": [{"to": to, "line": line, "minutes_ago": ago} for to, line, ago in said],
+    }
+
+
+def test_lines_from_before_a_grant_s_first_ask_are_not_sent():
+    context = _context(
+        [
+            ("the knight (person 2)", "Before.", 9),
+            ("the knight (person 2)", "That minute.", 12),
+            ("the knight (person 2)", "After.", 13),
+        ],
+        [(None, "Long ago.", 25), (None, "That minute.", 18), (None, "Lately.", 3)],
+    )
+    # Asked at minute 30, the grant's first ask made in minute 12: lines heard at 9 and 12, and
+    # lines said 25 and 18 minutes before (minutes 5 and 12), are not sent, since a line of the
+    # first ask's minute may come from before the grant; a line heard at 13 and one said at 27 are.
+    kept = channel_module._lines_since(context, 12, 30)
+    assert [line["line"] for line in kept["heard"]] == ["After."]
+    assert [line["line"] for line in kept["said"]] == ["Lately."]
+    assert channel_module._lines_since(context, None, 30) is context
+
+
+def _host_screen(names, context):
+    """The decision host's own rule for an outside request, at reservation."""
+    from exulanica.api.decision_host import outside_context_sendable, without_named_lines
+
+    withheld = without_named_lines(names)(dict(context))
+    return withheld if outside_context_sendable(names, withheld) else None
+
+
+@pytest.mark.parametrize(
+    "context",
+    [
+        _context([("the knight (person 2)", "Good day.", 3)], [(None, "Hello.", 1)]),
+        _context([("the knight (person 2)", "Is Marisol here?", 3)], [(None, "Hello.", 1)]),
+        _context([("Marisol", "Good day.", 3)], []),
+        _context([], [("Marisol", "Hello.", 1), (None, "Fine.", 2)]),
+        {**_context([], []), "options": [{"label": "say something to Marisol"}]},
+    ],
+    ids=["clean", "heard-line", "heard-from", "said-to", "option"],
+)
+def test_the_door_screens_an_asked_context_as_the_host_screened_it(context):
+    from exulanica.epistemics.saved_names import SavedName, recogniser
+
+    names = (SavedName(uuid.UUID(int=7), "person", "Marisol Vega"),)
+    spans = recogniser(names)
+
+    def carries(texts: list[str]) -> bool:
+        return any(spans(text) for text in texts)
+
+    assert sendable(context, carries) == _host_screen(names, context)
+
+
+def test_a_saved_name_written_as_a_placeholder_is_still_screened():
+    from exulanica.epistemics.saved_names import SavedName, recogniser
+
+    spans = recogniser((SavedName(uuid.UUID(int=7), "person", "Maria Vega"),))
+    # The product's own recogniser leaves a placeholder's words alone; the door opens them first.
+    assert spans("Ask [person MARIA] about it.") == []
+    assert spans(channel_module._bare("Ask [person MARIA] about it."))
+
+
+def test_a_held_poll_keeps_holding_when_nothing_or_only_its_line_place_moved():
+    from exulanica.api.routes.door import _moved_past_lines
+
+    before = Cursor(ask=3, outcome=3, said=5)
+    assert not _moved_past_lines(before, Cursor(ask=3, outcome=3, said=9))
+    assert not _moved_past_lines(before, before)
+    assert _moved_past_lines(before, Cursor(ask=4, outcome=3, said=9))
+    assert _moved_past_lines(before, Cursor(ask=3, outcome=3, said=5, ended=True))

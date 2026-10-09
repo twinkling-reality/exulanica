@@ -35,6 +35,7 @@ The route validates and delegates: grants, secrets, the channel and the protocol
 
 from __future__ import annotations
 
+import dataclasses
 import time
 import uuid
 from collections.abc import Callable
@@ -61,6 +62,7 @@ from exulanica.door.bridges import BridgeDirectory
 from exulanica.door.channel import (
     ChannelRefused,
     ChannelRepository,
+    lines_closed,
     presence_of,
     presence_window,
 )
@@ -171,6 +173,14 @@ def _refused(exc: GrantRefused) -> JSONResponse:
     return _problem(_GRANT_STATUS.get(exc.code, 422), exc.code, exc.detail, **extra)
 
 
+def _moved_past_lines(before: Cursor, after: Cursor) -> bool:
+    """Whether a read moved the cursor anywhere but its line place. Only then, or with frames, does
+    a held poll answer at once: one whose read moved nothing, or only the line place past minutes
+    with no line to tell, keeps holding with the cursor it reached and answers it when its hold
+    ends."""
+    return dataclasses.replace(after, said=before.said) != before
+
+
 def _shown_once(issued: Any) -> dict[str, Any]:
     return {
         "credential": issued.text,
@@ -227,6 +237,10 @@ def _grant_view(
         "adapter_version": None if presence is None else presence.adapter_version,
         # The program's own words about itself, as it last said hello: for a person reading a card.
         "declared": None if presence is None or presence.declared is None else presence.declared,
+        # Whether a line of its program carried a name the account holder saved: every later line
+        # of the grant is refused, and the program learnt at most one name part for each thing
+        # asked in the minute of that refusal, at most 12 (the contract's Answers).
+        "lines_closed": lines_closed(connection, workspace_id, grant.grant_id),
     }
 
 
@@ -721,8 +735,11 @@ async def frames(
             )
         except ChannelRefused as exc:
             return _channel_problem(exc)
-        if first is not None and (first[0] or first[1] != cursor):
-            return _frames(first)
+        held = cursor
+        if first is not None:
+            if first[0] or _moved_past_lines(held, first[1]):
+                return _frames(first)
+            held = first[1]
         ends = time.monotonic() + hold_seconds
         woken = door.notices.asks(channel.grant_id)
         next_head = time.monotonic() + _HEAD_EVERY_SECONDS
@@ -733,17 +750,19 @@ async def frames(
                 woken = asks
                 next_head = now + _HEAD_EVERY_SECONDS
                 if await request.is_disconnected():
-                    return {"profile": FRAME_PROFILE, "frames": [], "cursor": cursor.encode()}
+                    return {"profile": FRAME_PROFILE, "frames": [], "cursor": held.encode()}
                 try:
                     found = await _in_thread(
-                        lambda: _on_channel(request, channel, lambda r: r.read(cursor))
+                        lambda at=held: _on_channel(request, channel, lambda r: r.read(at))
                     )
                 except ChannelRefused as exc:
                     return _channel_problem(exc)
-                if found is not None and (found[0] or found[1] != cursor):
-                    return _frames(found)
+                if found is not None:
+                    if found[0] or _moved_past_lines(held, found[1]):
+                        return _frames(found)
+                    held = found[1]
             if now >= ends or not door.polls.holds(channel.grant_id, token):
-                return {"profile": FRAME_PROFILE, "frames": [], "cursor": cursor.encode()}
+                return {"profile": FRAME_PROFILE, "frames": [], "cursor": held.encode()}
             await anyio.sleep(_WAKE_EVERY_SECONDS)
     finally:
         door.polls.release(channel.grant_id, token)

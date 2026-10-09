@@ -82,6 +82,7 @@ from exulanica.door.protocol import words_fault
 from exulanica.door.retention import prune
 from exulanica.errors import ExulanicaError
 from exulanica.world.crossings import society_of_version
+from exulanica.world.placed_things import PLACED_THING_ID_PATTERN
 from exulanica.world.society_decision_contract import decision_contract, person_role
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_model_choice_repository import (
@@ -139,8 +140,8 @@ _GRANT_NAMESPACE: Final = uuid.UUID("6b0c9d2e-3f4a-5b6c-8d7e-9f0a1b2c3d4e")
 _ACTOR_NAMESPACE: Final = uuid.UUID("2a7e5c19-8b3d-5f40-9c61-d4e8f0a2b6c3")
 _KEY: Final = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
 _GAME_TYPE: Final = re.compile(r"^[A-Za-z0-9_:.-]{1,80}$")
-#: A placed thing's id, as a version's things are placed with (``exulanica.world.placed_things``).
-_PLACED_ID: Final = re.compile(r"[a-z0-9]([a-z0-9:._-]{0,198}[a-z0-9])?")
+#: A placed thing's id, as a version's things are placed with.
+_PLACED_ID: Final = re.compile(PLACED_THING_ID_PATTERN)
 
 
 class GrantRefused(ExulanicaError):
@@ -587,8 +588,9 @@ class GrantRepository:
     def _send_home(self, grant: Grant, actor: uuid.UUID) -> int:
         """A departure for every visitor of ``grant`` still present, because it ended; how many
         were written. A departure the door cannot write is said by name in the log and stops no
-        revocation: the grant ends all the same, nobody is asked under it, and its visitor's
-        quiet minutes send it home."""
+        revocation: the grant ends all the same and nobody is asked under it; every minute it is
+        asked for, its visitor's receipt names the grant's end, which the society counts among its
+        kind's quiet minutes, so those minutes send it home."""
         # Imported here: the crossings read grants, and a grant ends its own visits.
         from exulanica.door.channel import ChannelRefused
         from exulanica.door.crossings import Visits

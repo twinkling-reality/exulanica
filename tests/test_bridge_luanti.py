@@ -593,7 +593,9 @@ FRAME_FIELDS = {
 }
 #: Fields the door added to a frame kind after these fixtures were recorded. A frame grows only by
 #: optional fields, so a recorded frame may lack one, and the mod reads none of them as required.
-ADDED_SINCE_RECORDED: dict[str, set[str]] = {"asked": {"idle_label"}}
+ADDED_SINCE_RECORDED: dict[str, set[str]] = {
+    "asked": {"idle_label", "line_labels", "line_characters_maximum"}
+}
 
 
 def test_every_frame_the_mod_read_has_the_fields_the_door_writes():

@@ -72,7 +72,7 @@ grant names at least one visitor or one thing.
 | --- | --- | --- |
 | `GET /door/bridges` | `world.read` | The bridges this deployment offers the workspace, in words, with who runs each and whether it is an AI |
 | `POST /door/grants?world_id=` | `world.write`, `door.grant` | Issue a grant: 201 with it, or 200 with the grant an earlier issue under the same `idempotency_key` made, for the same world, bridge and scope (its kinds and things in any order); a key reused for another grant is 409 `idempotency_key_reused`; with `channel_credential` true, also its channel credential, shown once, so an issue answered 200 carries none and the first stays live; a grant for visitors only in a version holding a society of things (409 `world_not_open_to_visitors`, see Crossings) |
-| `GET /door/grants?world_id=` | `world.read` | Every grant in a world, newest first, each with its bridge's label, who runs it, whether it is an AI, whether it is connected and what its program declared itself to be |
+| `GET /door/grants?world_id=` | `world.read` | Every grant in a world, newest first, each with its bridge's label, who runs it, whether it is an AI, whether it is connected, what its program declared itself to be and whether its lines are closed (`lines_closed`: a line its program sent carried a name the account holder saved, so every later line is refused, and the program learnt at most 12 parts of saved names through the grant; see Answers) |
 | `GET /door/grants/{grant_id}` | `world.read` | One grant as it stands, in the same view |
 | `POST /door/grants/{grant_id}/revoke` | `world.write`, `door.grant` | End it now; revoking twice changes nothing |
 | `POST /door/grants/{grant_id}/credentials/revoke` | `world.write`, `door.grant` | End every live invite and channel credential of the grant now, without ending the grant, as after a credential leaked |
@@ -200,35 +200,45 @@ model's context. A grant takes at most six hellos a minute in one process (429 `
 bridge whose version or mapping the deployment no longer admits still reads the end.
 
 **Frames.** `GET /door/channel/frames?after=` answers with frames of `exulanica.door-frame/v1` after
-an opaque cursor, and the cursor after them; a bridge reads only response bodies. One ask is written
-for the bridge, by the decision host; every other frame is projected from records that exist anyway,
-so a frame never disagrees with the history it reports:
+an opaque cursor, and the cursor after them; a bridge reads only response bodies. A frame grows only
+by optional fields and new kinds, so a bridge reads the fields it knows and skips a kind it does
+not; a cursor an older door wrote is still read, as one told nothing that door could not tell. One
+ask is written for the bridge, by the decision host; every other frame is projected from records
+that exist anyway, so a frame never disagrees with the history it reports:
 
 | Frame | Carries |
 | --- | --- |
 | `grant` | The grant's scope, its world words and its end, first and again whenever its owner changes it |
-| `asked` | One reserved request: its id and digest, the minute it was asked at, the deadline, the role's instruction and choice description, the request's context byte for byte as a model reads it, and the same request rendered as a model is sent it: the role's own `messages` and `act`, the one function a model is forced to call, whose `action` is one of the offered labels; and `idle_label`, the label of the offered option that changes nothing (the role's own, null where it offers none), which a bridge answers when nobody in its game acts for the thing |
+| `asked` | One reserved request: its id and digest, the minute it was asked at, the deadline, the instruction and choice description of the terms it was asked under, the request's context as a model reads it, less what the door leaves out as it sends it (below), and the same context rendered as a model is sent it: the role's own `messages` and `act`, the one function a model is forced to call, whose `action` is one of the offered labels; `idle_label`, the label of the offered option that changes nothing (the role's own, null where it offers none), which a bridge answers when nobody in its game acts for the thing; and `line_labels`, the labels whose answer says a line, in offer order, with `line_characters_maximum`, how long that line may be (empty and null where no option says anything; listed whatever the grant says about speaking, so a bridge learns from the answer's refusal that it may not) |
 | `outcome` | The status and reason the host recorded for an ask, in ask order |
 | `arrived`, `arrival_refused`, `departed` | What became of the grant's visitors, in the order the society recorded it (see Crossings) |
+| `said` | A line said in the world that one of the grant's visitors said or heard: `tick`; `speaker`, with its `id`, its `label` (its kind and number in words, "the knight (person 2)") and its `mind` (`ai`, and `words` naming who decided the line: a model by its name, a program by its bridge's label, each read from the deployment as the frame is sent, so a renamed bridge or model reads by its new words and a removed one as null); `to` and `to_label`, whom it was said to (both null for everyone near); and `line`. Each field of words is screened against the names the account holder saved as the frame is sent, and one carrying such a name is sent as null |
 | `grant_ended` | That the grant was revoked or ended, once, after everything else the bridge is told |
 
-An ask whose turn was decided before the bridge read it is not sent; its outcome is. One poll's
-answer stops adding asked frames once they pass 262,144 bytes (the first always goes), and the next
-poll reads on, so an agent never renders a role's words itself and no answer grows past a bound.
-Every poll checks its grant: under a standing grant it records the poll; once the grant has ended it
-records nothing and sends the end as soon as every ask was read, every outcome reported or passed
-over and nothing else is left to tell (see Crossings for a grant's visitors), and once the bridge
-has read that end its polls and hellos are refused (410 `grant_ended`). Outcomes are reported in ask
-order; an ask whose request no receipt can close any more, past its deadline and the minutes in
-which the host closes a request a stopped process left (the unanswered window), is passed over with
-no outcome, since none was recorded, so nothing after it waits for it. A poll is held for at most
-its bridge's hold with nothing to send. While held it keeps no database connection or transaction:
-its first read records the poll and reads the head on one short connection, later reads each open a
-short connection from a limiter of four poller threads per process, and frames are built only when
-the head says something is new. Within the process that wrote an ask the poll wakes at once;
-otherwise the head is read once a second, and a poll whose client went away ends at its next read.
-One poll is held per grant, a second ending the first with nothing to send; a process holds at most
-64, a workspace at most four of them and a bridge at most half. When the process or a bridge is
+An ask whose turn was decided before the bridge read it is not sent; its outcome is. An asked
+frame's context leaves out the lines heard or said in or before the minute of the grant's first ask
+(the grant was bound by then), since a thing a grant names may have spoken with an earlier grant's
+visitors, and, screened again as it is sent by the rule the decision host applied when it made the
+request, the lines that carry a name the account holder saved; an ask any other text of which still
+carries such a name is not sent, so nobody answers it: the host records `no_answer_in_time` at its
+deadline, as for any ask left unanswered, which for a visitor counts as one of its kind's quiet
+minutes. An asked frame's digest stays the request's.
+One poll's answer stops adding asked frames once they pass 262,144 bytes (the first always goes),
+and the next poll reads on, so an agent never renders a role's words itself and no answer grows past
+a bound. Every poll checks its grant: under a standing grant it records the poll; once the grant has
+ended it records nothing and sends the end as soon as every ask was read, every outcome reported or
+passed over and nothing else is left to tell (see Crossings for a grant's visitors), and once the
+bridge has read that end its polls and hellos are refused (410 `grant_ended`). Outcomes are reported
+in ask order; an ask whose request no receipt can close any more, past its deadline and the minutes
+in which the host closes a request a stopped process left (the unanswered window), is passed over
+with no outcome, since none was recorded, so nothing after it waits for it. A poll is held for at
+most its bridge's hold with nothing to send. While held it keeps no database connection or
+transaction: its first read records the poll and reads the head on one short connection, later reads
+each open a short connection from a limiter of four poller threads per process, and frames are built
+only when the head says something is new. Within the process that wrote an ask the poll wakes at
+once; otherwise the head is read once a second, and a poll whose client went away ends at its next
+read. One poll is held per grant, a second ending the first with nothing to send; a process holds at
+most 64, a workspace at most four of them and a bridge at most half. When the process or a bridge is
 full, a poll from a workspace holding fewer takes the place of the oldest poll of the workspace
 holding the most there, if that one holds at least two more; the poll whose place is taken is
 answered at once with nothing to send. So the places are shared evenly among the workspaces that
@@ -242,14 +252,28 @@ belongs to the streams admission class.
 
 **Answers.** `POST /door/channel/answers` names one open ask of the grant (else 404
 `unknown_reference`), its request digest and one of the labels the request offered (else 422
-`answer_not_offered`). A line is accepted only with an option that says one, at most 200 code points
-on the line rule (else 422 `line_not_offered`, `line_missing` or `line_refused`). The answer is
-stored as sent, with the adapter version, mapping and declaration its own hello named, and nothing
-else happens: the host makes the receipt. A second answer is 409 `answer_already_given`, an answer
-after the turn was decided 409 `answer_too_late`, and an answer once the grant has ended 410
-`grant_ended`; none changes anything. Migration 0149 ties a stored answer to its ask by all four of
-the ask's names, and refuses one under a grant that has ended under the lock revoking takes, so a
-revocation and an answer never both commit as if the other had not.
+`answer_not_offered`). An answer naming one of the request's line labels says a line (else 422
+`line_missing`), any other answer says none (else 422 `line_not_offered`), and the line keeps the
+line rule at the request's own bound and holds no placeholder-shaped token such as `[person A]`,
+which only the policy boundary writes (else 422 `line_refused`); under a grant that does not let its
+bridge's people speak (`may_speak` false) an answer naming a line label is refused (403
+`speaking_not_allowed`), and the bridge answers another. The host then refuses a line carrying a
+name the account holder saved (`line_refused_by_rules`, read in the outcome frame), and a grant's
+first such refusal closes its lines: every later answer naming a line label is refused 403
+`speaking_not_allowed` while the grant acts on, and its view says `lines_closed`. The host records a
+minute's outside answers only once all of them are in, so every line answered in the minute of that
+first refusal is checked, and each carrying a saved name is refused by name. So a program learns at
+most this much about saved names through its grant: whether each line it sent in that one minute
+carried one, which is up to one name part for each thing asked in that minute, at most 12 for a
+grant (its four visitors and eight named things; 600 a day across a workspace's 50 grants); and,
+reading an old cursor again, that a line it was told now comes back null because the account holder
+saved a name in it since. The answer is stored as sent, with the adapter version, mapping and
+declaration its own hello named, and nothing else happens: the host makes the receipt. A second
+answer is 409 `answer_already_given`, an answer after the turn was decided 409 `answer_too_late`,
+and an answer once the grant has ended 410 `grant_ended`; none changes anything. Migration 0149 ties
+a stored answer to its ask by all four of the ask's names, and refuses one under a grant that has
+ended under the lock revoking takes, so a revocation and an answer never both commit as if the other
+had not.
 
 ## Deciding through the door
 
@@ -357,7 +381,7 @@ channel; the owner may send one home:
 | --- | --- | --- |
 | `POST /door/channel/arrivals` | channel | `{arrival_id, game_type, look_key, carried: [{game_item, count}]}`: one visitor of a type the grant admits, in a look its mapping offers, carrying game items its mapping lets travel in, under an `arrival_id` of the bridge's own that is a random version 4 UUID; 201 `{arrival_id, thing_id}`, or 200 with the same answer for the same arrival sent again |
 | `POST /door/channel/departures/{departure_id}/delivered` | channel | `{delivered: [{thing_id, game_item}], not_delivered: [{thing_id, reason}]}`, naming each thing a departed visitor carried home once: 202 `{recorded}`, true the first time; a report may follow the grant's end |
-| `POST /door/channel/gone` | channel | `{thing_id}`: the person behind a visitor left the game, so it is not asked again; 202 `{recorded}` |
+| `POST /door/channel/gone` | channel | `{thing_id}`: the person behind a visitor left the game, so it is not asked again, and the society sends it home once its kind's quiet minutes pass (`decider_lost`); 202 `{recorded}` |
 | `POST /door/grants/{grant_id}/send-away` | `world.write`, `door.grant` | `{thing_id}`: a visitor of the grant goes home at the next minute; 202 |
 
 An arrival is refused before anything is written: an arrival id that is not a random version 4
@@ -374,7 +398,11 @@ id already naming another arrival (409 `crossing_id_reused`), or no hello under 
 (409 `hello_first`). An arrival is named by the bridge's random id and a departure by one the door
 derives (version 5), so no arrival can take the id a departure will be written under; the
 crossings' migration refuses an arrival named any other way. The visitor's id and each carried thing's are derived
-from the grant and the arrival id, so an arrival sent again is the same arrival; one sent again
+from the grant and the arrival id, so an arrival sent again is the same arrival: each is a version 5
+UUID in the namespace `8f1d6a52-3c47-5e09-b4a8-1e7c2d90f6b3`, of `{grant_id}:arrival:{arrival_id}`
+for the visitor, `{grant_id}:arrival:{arrival_id}:{index}:{unit}` for each unit carried (by its
+entry's place in `carried` and its count), and `{grant_id}:departure:{thing_id}:{reason}` for a
+departure the door writes; one sent again
 after a hello with another adapter version or mapping is another arrival's document, so 409
 `crossing_id_reused`. The door writes an `exulanica.thing-arrival/v1` document ([things
 contract](things-contract.md)): the visitor's kind by the library's digest, its origin (class
@@ -396,40 +424,45 @@ The bridge reads what became of its visitors as frames, in the order the society
 `arrived` `{arrival_id, thing_id, carried: [{thing_id, game_item}]}`, `arrival_refused`
 `{arrival_id, reason}`, and `departed` `{departure_id, thing_id, why, carried: [{thing_id, kind,
 game_item}]}` for every departure of one of its visitors, those the door wrote and those the society
-decided by its own rules. `why` is the society's word for the departure: `sent_home` for the owner's
-send-away, `grant_ended`, or the society's own reasons (`chose_to_leave`, `decider_lost`). A thing a
-visitor brought in goes home as the game item it came in as; a thing of the world it holds becomes
-the one item the mapping lets travel out for its kind only under a grant that lets things be carried
-out (`may_carry_out`), else none. A visitor leaves when its owner sends it home (`sent_away`), when
-its grant ends (revoking writes a `grant_ended` departure for each visitor in the revocation's
-transaction, before the grant's named things are handed back, and a grant that ran out sends each
-visitor home the next time the host would ask it), or when the society sends it home. Until the
-minute that takes its departure a visitor is still in the world, and its program is still asked for
-it while its grant stands. The `grant_ended` frame comes only once no crossing of the grant waits
-for a minute, every visitor of it has departed and the bridge has read each departure, so a bridge
-that stops at the end has read every one. A hello's cursor tells every arrival's outcome again from
-the grant's first, and every departure from the first one carrying something whose delivery the
-bridge has not reported.
+decided: a visitor that chose to leave (`chose_to_leave`), and one its program left quiet, or whose
+player left, for its kind's quiet minutes (`decider_lost`). `why` is the society's word for the
+departure: `sent_home` for the owner's send-away, `grant_ended`, `chose_to_leave` or `decider_lost`.
+A thing a visitor brought in goes home as the game item it came in as; a thing of the world it holds
+becomes the one item the mapping lets travel out for its kind only under a grant that lets things be
+carried out (`may_carry_out`), else none. A visitor leaves when its owner sends it home
+(`sent_away`), when its grant ends (revoking writes a `grant_ended` departure for each visitor in
+the revocation's transaction, before the grant's named things are handed back, and a grant that ran
+out sends each visitor home the next time the host would ask it), or when the society sends it home.
+Until the minute that takes its departure a visitor is still in the world, and its program is still
+asked for it while its grant stands. The `grant_ended` frame comes only once no crossing of the
+grant waits for a minute, every visitor of it has departed and the bridge has read each departure,
+so a bridge that stops at the end has read every one. A hello's cursor tells every arrival's outcome
+again from the grant's first, and every departure from the first one carrying something whose
+delivery the bridge has not reported, but no line said before it. Lines are read from the grant's
+own society's record from its first arrival on, after the place the bridge was told up to (a minute
+and an order within it), and up to the minute its last visitor departed once every one has: the
+place moves past each line told, and past the last minute the society completed when a read found no
+more, so no read scans a minute twice and none counts past what it was told.
 
 Migration 0163 holds the crossings (`door_crossing`), their bindings, manifests, delivery reports
 (`door_delivery`) and the word that a visitor's player left (`door_visitor_gone`), each appended and
 never changed, kept to its workspace, and inserted by the runtime only, and indexes a society's
-departures by the thing that left, which is how the door finds a visitor's. Not built yet: the
-lines and events a visitor hears, as frames. Whether a grant's visitors may speak (`may_speak`) is
-recorded and shown; no line crosses the door yet, so nothing reads it. A visitor whose kind has
-hands may take hold of a thing of the world in a society running hands. A society of things reads
-two optional crossing fields for what may leave with it: an arrival's `may_carry_out` (present only
-as true; the society keeps it on the visitor, so a later departure never reads the grant) and a
-departure's `called_by: "player"` (beside `sent_away` only; a departure naming nobody is the
-owner's). A visitor with that right that leaves by its own choice or is called home by its player
-carries out the placed things it holds, each named in its departure's `carried` with its
-`placed_id`, at most eight for one grant in any sixty minutes; otherwise it puts a thing of the
-world down where it stood (the [synthetic society contract](synthetic-society-contract.md) states
-the rule). It takes home what it brought, from its hands or from where it lies in the world, unless a being still here holds
-it. Such a thing leaves the world when that being puts it down, undelivered: its bringer gave it
-away, a departure's frame names only what went home with that visitor, and no later frame tells the
-bringer's program of it. A departure's `carried` lists what went home with the visitor. The adapters that send visitors live in the repository's
-`bridges/` folder, outside the product, each with its own licence notes.
+departures by the thing that left, which is how the door finds a visitor's. Not built yet: the other
+events a visitor witnesses, as frames (a thing given or taken). A visitor whose kind has hands may
+take hold of a thing of the world in a society running hands. A society of things reads two optional
+crossing fields for what may leave with it: an arrival's `may_carry_out` (present only as true; the
+society keeps it on the visitor, so a later departure never reads the grant) and a departure's
+`called_by: "player"` (beside `sent_away` only; a departure naming nobody is the owner's). A visitor
+with that right that leaves by its own choice or is called home by its player carries out the placed
+things it holds, each named in its departure's `carried` with its `placed_id`, at most eight for one
+grant in any sixty minutes; otherwise it puts a thing of the world down where it stood (the
+[synthetic society contract](synthetic-society-contract.md) states the rule). It takes home what it
+brought, from its hands or from where it lies in the world, unless a being still here holds it. Such
+a thing leaves the world when that being puts it down, undelivered: its bringer gave it away, a
+departure's frame names only what went home with that visitor, and no later frame tells the
+bringer's program of it. A departure's `carried` lists what went home with the visitor. The adapters
+that send visitors live in the repository's `bridges/` folder, outside the product, each with its
+own licence notes.
 
 ## Implementation and evidence
 
@@ -445,5 +478,6 @@ bringer's program of it. A departure's `carried` lists what went home with the v
 | Running a slot's API with bridges | `scripts/acceptance/launch.py` (`--door-bridges`) | `tests/test_acceptance_launcher.py` |
 | Crossings: arrivals, looks, manifests, departures, deliveries, the end's order, replay | `exulanica/door/crossings.py`, `manifest.py`, `channel.py`, `exulanica/api/routes/door.py`, migration 0163 | `tests/test_door_crossings_postgres.py` |
 | The crossing rules: arrival ids apart from departure ids, revisions read as written, arrivals an hour, the look's licence, refusals by name, two grants in one society, the end's wait | `exulanica/door/crossings.py`, `grants.py`, `asker.py`, `exulanica/api/routes/door.py`, the crossings' migration | `tests/test_door_crossing_rules_postgres.py` |
+| Lines both ways: an ask's line labels and bound, an answer's line held to them and to the grant's word on speaking, said frames (who said each and who decided it, to whom) screened against saved names, the society's own departures | `exulanica/door/channel.py`, `protocol.py` | `tests/test_door_lines_postgres.py`, `tests/test_door.py` (the cursors) |
 
 Decision record: [ADR-0031](adr/0031-an-outside-program-decides-only-through-the-door.md).

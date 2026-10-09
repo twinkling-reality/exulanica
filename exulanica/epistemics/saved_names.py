@@ -40,7 +40,7 @@ from __future__ import annotations
 import json
 import re
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from importlib.resources import files
 from typing import Final
@@ -52,6 +52,7 @@ __all__ = [
     "Redacted",
     "SavedName",
     "recognised_spans",
+    "recogniser",
     "redact_names",
     "saved_names",
 ]
@@ -202,15 +203,28 @@ def recognised_spans(text: str, names: Iterable[SavedName]) -> list[tuple[int, i
     own words as they are while it rewrites the rest of a text, such as the Companion writing a
     simulated person's name as a placeholder (``exulanica/selection/society_question.py``).
     """
-    taken = [(match.start(), match.end()) for match in PLACEHOLDER.finditer(text)]
-    found: list[tuple[int, int, SavedName]] = []
-    for pattern, saved in _patterns(names):
-        for match in pattern.finditer(text):
-            start, end = match.start(), match.end()
-            held = (*taken, *((a, b) for a, b, _ in found))
-            if all(end <= a or start >= b for a, b in held):
-                found.append((start, end, saved))
-    return sorted(found, key=lambda span: span[:2])
+    return recogniser(names)(text)
+
+
+def recogniser(
+    names: Iterable[SavedName],
+) -> Callable[[str], list[tuple[int, int, SavedName]]]:
+    """:func:`recognised_spans` for one set of names, its patterns built once: for a caller that
+    screens many texts against the same names, such as a poll screening every frame it sends."""
+    patterns = _patterns(names)
+
+    def spans(text: str) -> list[tuple[int, int, SavedName]]:
+        taken = [(match.start(), match.end()) for match in PLACEHOLDER.finditer(text)]
+        found: list[tuple[int, int, SavedName]] = []
+        for pattern, saved in patterns:
+            for match in pattern.finditer(text):
+                start, end = match.start(), match.end()
+                held = (*taken, *((a, b) for a, b, _ in found))
+                if all(end <= a or start >= b for a, b in held):
+                    found.append((start, end, saved))
+        return sorted(found, key=lambda span: span[:2])
+
+    return spans
 
 
 def redact_names(

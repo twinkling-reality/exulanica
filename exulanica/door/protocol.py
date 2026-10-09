@@ -11,12 +11,14 @@ record that exists anyway: the receipt the host recorded for an answer (``outcom
 own revisions (``grant``, and ``grant_ended`` once it is revoked or past its end). A frame
 therefore never disagrees with the history it reports.
 
-An ``asked`` frame carries the request's context byte for byte as a model reads it, with the role's
-instruction and the description of the one choice, and the same request rendered as a model is sent
-it: the role's own messages, the one function a model is forced to call (``act``), and the world
-minute it was asked at. So an agent behind a bridge reads the same words a model does and nothing a
-model would not, and no adapter renders a role's words a second time. One poll's answer stops adding
-asked frames once it reaches :data:`ASKED_BYTES_MAXIMUM`; the next poll reads on.
+An ``asked`` frame carries the request's context as a model reads it, less the lines the door leaves
+out as it sends it (those heard or said in or before the minute of the grant's first ask, and any
+carrying a name the account holder saved), with the role's instruction and the description of the
+one choice, and that context rendered as a model is sent it: the role's own messages, the one
+function a model is forced to call (``act``), and the world minute it was asked at. So an agent
+behind a bridge reads the words a model would be sent for that context and nothing a model would
+not, and no adapter renders a role's words a second time. One poll's answer stops adding asked
+frames once it reaches :data:`ASKED_BYTES_MAXIMUM`; the next poll reads on.
 
 Bounds are declared here once and enforced where each document is read: a body's size by the
 application's body limit before it is parsed (``exulanica.api.routes.door.BODY_LIMITS``), and its
@@ -80,6 +82,7 @@ __all__ = [
     "grant_ended_frame",
     "grant_frame",
     "outcome_frame",
+    "said_frame",
     "words_fault",
 ]
 
@@ -146,12 +149,16 @@ _DECLARED_MARKS: Final = frozenset(" .,'&()_+-")
 #: they look like and no mark written before the dot hides the letter it follows.
 _HOST: Final = re.compile(r"[^\W_]\.[^\W\d_]{2,}|\d{1,3}(?:\.\d{1,3}){3}")
 
-_CURSOR_VERSION: Final = 2
-_CURSOR_FIELDS: Final = frozenset({"v", "ask", "outcome", "grant", "crossed", "departed", "ended"})
-#: The first cursor, written by a door without crossings, is read beside the second as one told no
-#: arrival's outcome and no departure, which is all such a door could tell; a bridge holding one
-#: across an upgrade reads on from where it was.
-_CURSOR_FIRST_FIELDS: Final = frozenset({"v", "ask", "outcome", "grant", "ended"})
+#: Every cursor this door has written, by version, and what each counts. An older one is read as
+#: told nothing its version did not count (the first no crossing, the first and second no line
+#: said), which is all the door that wrote it could tell, so a bridge holding one across an upgrade
+#: reads on from where it was. The door writes the newest.
+_CURSOR_VERSIONS: Final[Mapping[int, tuple[str, ...]]] = {
+    1: ("ask", "outcome", "grant", "ended"),
+    2: ("ask", "outcome", "grant", "crossed", "departed", "ended"),
+    3: ("ask", "outcome", "grant", "crossed", "departed", "said", "ended"),
+}
+_CURSOR_VERSION: Final = 3
 _CURSOR_TEXT_MAXIMUM: Final = 200
 _SEQUENCE_MAXIMUM: Final = 2**62
 
@@ -167,7 +174,9 @@ class Cursor:
     """How far a bridge has read: the last ask, the last outcome, the grant revision it was sent,
     the last of its arrivals' outcomes it was told (by the crossing's sequence in its society, so a
     poll reads on from there rather than counting past what it was told), how many of its visitors'
-    departures it was told, and whether it was told the grant ended.
+    departures it was told, the place of the last line its visitors said or heard it was told (its
+    minute and its order within the minute, as one number), and whether it was told the grant
+    ended.
 
     ``outcome`` counts asks whose receipts were reported, in ask order, so it never passes ``ask``.
     Encoded as URL-safe base64 of its canonical JSON; a bridge treats it as opaque.
@@ -178,10 +187,11 @@ class Cursor:
     grant: int = 0
     crossed: int = 0
     departed: int = 0
+    said: int = 0
     ended: bool = False
 
     def __post_init__(self) -> None:
-        for value in (self.ask, self.outcome, self.grant, self.crossed, self.departed):
+        for value in (self.ask, self.outcome, self.grant, self.crossed, self.departed, self.said):
             if type(value) is not int or not 0 <= value <= _SEQUENCE_MAXIMUM:
                 raise InvalidCursor("a cursor counts whole numbers from zero")
         if type(self.ended) is not bool:
@@ -190,16 +200,8 @@ class Cursor:
             raise InvalidCursor("a cursor reports no outcome of an ask it has not seen")
 
     def encode(self) -> str:
-        document = {
-            "v": _CURSOR_VERSION,
-            "ask": self.ask,
-            "outcome": self.outcome,
-            "grant": self.grant,
-            "crossed": self.crossed,
-            "departed": self.departed,
-            "ended": self.ended,
-        }
-        return base64.urlsafe_b64encode(canonical_json(document)).decode("ascii").rstrip("=")
+        fields = _CURSOR_VERSIONS[_CURSOR_VERSION]
+        return _cursor_text({"v": _CURSOR_VERSION, **{key: getattr(self, key) for key in fields}})
 
     @classmethod
     def decode(cls, text: str | None) -> Cursor:
@@ -215,30 +217,19 @@ class Cursor:
             raise InvalidCursor("not a cursor") from exc
         if not isinstance(document, dict) or type(document.get("v")) is not int:
             raise InvalidCursor("not a cursor")
-        if set(document) == _CURSOR_FIELDS and document["v"] == _CURSOR_VERSION:
-            cursor = cls(
-                ask=document["ask"],
-                outcome=document["outcome"],
-                grant=document["grant"],
-                crossed=document["crossed"],
-                departed=document["departed"],
-                ended=document["ended"],
-            )
-            written = cursor.encode()
-        elif set(document) == _CURSOR_FIRST_FIELDS and document["v"] == 1:
-            cursor = cls(
-                ask=document["ask"],
-                outcome=document["outcome"],
-                grant=document["grant"],
-                ended=document["ended"],
-            )
-            first = {key: document[key] for key in ("v", "ask", "outcome", "grant", "ended")}
-            written = base64.urlsafe_b64encode(canonical_json(first)).decode("ascii").rstrip("=")
-        else:
+        fields = _CURSOR_VERSIONS.get(document["v"])
+        if fields is None or set(document) != {"v", *fields}:
             raise InvalidCursor("not a cursor")
-        if written != text:
+        cursor = cls(**{key: document[key] for key in fields})
+        # Only this door's own writing of a cursor of that version is one.
+        if _cursor_text({"v": document["v"], **{key: document[key] for key in fields}}) != text:
             raise InvalidCursor("not a cursor")
         return cursor
+
+
+def _cursor_text(document: Mapping[str, Any]) -> str:
+    """A cursor's text: URL-safe base64 of its canonical JSON, without padding."""
+    return base64.urlsafe_b64encode(canonical_json(dict(document))).decode("ascii").rstrip("=")
 
 
 def words_fault(text: object, *, maximum: int) -> str | None:
@@ -290,10 +281,16 @@ def asked_frame(
     messages: list[dict[str, str]],
     act: Mapping[str, Any],
     idle_label: str | None = None,
+    line_labels: Sequence[str] = (),
+    line_characters_maximum: int | None = None,
+    context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The frame asking a bridge to choose for one thing: the request as a model is asked it, its
-    context and the role's words, the same request rendered as a model is sent it, and the label
-    of the offered option that changes nothing (the role's own, None where it offers none)."""
+    context (``context`` where the door sends less of it than the request holds, its digest still
+    the request's) and the words of the terms it was asked under, the same request rendered as a
+    model is sent it, the label of the offered option that changes nothing (the role's own, None
+    where it offers none), and which labels' answers carry a line and how long one may be (none,
+    and None, where no option says anything)."""
     return {
         "kind": "asked",
         "ask_seq": ask_seq,
@@ -304,10 +301,12 @@ def asked_frame(
         "deadline_ms": deadline_ms,
         "instruction": instruction,
         "choice_description": choice_description,
-        "context": request["context"],
+        "context": request["context"] if context is None else dict(context),
         "messages": messages,
         "act": dict(act),
         "idle_label": idle_label,
+        "line_labels": list(line_labels),
+        "line_characters_maximum": line_characters_maximum,
     }
 
 
@@ -351,6 +350,32 @@ def departed_frame(
         "thing_id": thing_id,
         "why": why,
         "carried": [dict(held) for held in carried],
+    }
+
+
+def said_frame(
+    *,
+    tick: int,
+    speaker: Mapping[str, Any],
+    to: str | None,
+    to_label: str | None,
+    line: str | None,
+) -> dict[str, Any]:
+    """A line said in the world that one of the grant's visitors said or heard: the minute, who
+    said it (its id, its kind and number in words, and who decided it), whom it was said to (an id
+    and words, both None for everyone near) and the line. A field whose words carry a name the
+    account holder saved is sent as None."""
+    return {
+        "kind": "said",
+        "tick": tick,
+        "speaker": {
+            "id": speaker["id"],
+            "label": speaker["label"],
+            "mind": dict(speaker["mind"]),
+        },
+        "to": to,
+        "to_label": to_label,
+        "line": line,
     }
 
 

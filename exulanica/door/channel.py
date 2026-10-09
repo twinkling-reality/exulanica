@@ -39,10 +39,12 @@ reads the society plane.
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any, Final
 
 import psycopg
@@ -64,7 +66,6 @@ from exulanica.door.protocol import (
     DECLARED_MIND_MAXIMUM,
     FRAME_PROFILE,
     FRAMES_PER_POLL,
-    LINE_CHARACTERS_MAXIMUM,
     QUIET_SECONDS,
     Cursor,
     answer_sha256,
@@ -76,23 +77,31 @@ from exulanica.door.protocol import (
     grant_ended_frame,
     grant_frame,
     outcome_frame,
+    said_frame,
     words_fault,
 )
 from exulanica.door.secrets import ChannelSession
+from exulanica.epistemics.saved_names import PLACEHOLDER, recogniser, saved_names
 from exulanica.errors import ExulanicaError
-from exulanica.models.manifest import AnsweringMechanism
-from exulanica.world.deciders import ADAPTER_VERSION
+from exulanica.models.manifest import AnsweringMechanism, load_manifest
+from exulanica.world.deciders import ADAPTER_VERSION, is_external
 from exulanica.world.decision_roles import decision_roles
+from exulanica.world.errors import InvalidThingPlacement
+from exulanica.world.placed_things import ThingKindReference, shipped_kind
 from exulanica.world.society_decision_repository import UNANSWERED_WINDOW_TICKS
 
 __all__ = [
+    "PLACES_A_MINUTE",
     "UNANSWERED_WINDOW",
     "ChannelRefused",
     "ChannelRepository",
     "Head",
     "Presence",
+    "carried_home",
+    "lines_closed",
     "presence_of",
     "presence_window",
+    "sendable",
 ]
 
 
@@ -185,6 +194,48 @@ _DEPARTURES: Final = (
     " and c.thing_id = e.subject_id and c.kind = 'arrival' "
     "where e.workspace_id = %(w)s and c.grant_id = %(g)s and e.event_kind = 'thing_departed' "
 )
+#: How many places one minute holds: a line's place is its minute times this, then its order within
+#: the minute (a minute records far fewer events than this).
+PLACES_A_MINUTE: Final = 1048576
+#: A line's place in its society's record as one number a cursor holds.
+_SAID_PLACE: Final = "(e.tick * 1048576 + (e.document->>'order')::bigint)"
+#: The last minute completed by the society the grant's visitors arrive in (``%(g)s``).
+_REACHED: Final = (
+    "select max(w.current_tick) from world_society w join door_grant g "
+    "  on g.workspace_id = w.workspace_id and g.world_id = w.world_id "
+    "where g.workspace_id = %(w)s and g.grant_id = %(g)s and w.society_id in ("
+    "  select c.society_id from door_crossing c "
+    "  where c.workspace_id = %(w)s and c.grant_id = %(g)s)"
+)
+#: The lines said after a place (``%(said)s``) that one of this grant's visitors said or heard, in
+#: the order the society recorded them. A visitor says and hears only while it is there, so only
+#: its own society's record is read, from its grant's first arrival, or the minute of the place if
+#: later, to the minute its last visitor departed once every one has (the said-event index serves
+#: the range), and the list is only ever appended to. A line nobody of this grant said or heard
+#: never reaches its channel.
+_SAID: Final = (
+    "from world_society_event e join ("
+    "  select c.society_id, min(b.tick) as since, "
+    "    case when bool_and(d.tick is not null) then max(d.tick) end as until "
+    "  from door_crossing c join door_crossing_binding b "
+    "    on b.workspace_id = c.workspace_id and b.society_id = c.society_id "
+    "   and b.crossing_id = c.crossing_id "
+    "  left join lateral (select x.tick from world_society_event x "
+    "    where x.workspace_id = c.workspace_id and x.society_id = c.society_id "
+    "      and x.subject_id = c.thing_id and x.event_kind = 'thing_departed' limit 1) d on true "
+    "  where c.workspace_id = %(w)s and c.grant_id = %(g)s and c.kind = 'arrival' "
+    "    and b.disposition = 'arrived' group by c.society_id) s on s.society_id = e.society_id "
+    "where e.workspace_id = %(w)s and e.tick >= greatest(s.since, %(said)s / 1048576) "
+    "  and (s.until is null or e.tick <= s.until) "
+    "  and e.event_kind = 'said' and " + _SAID_PLACE + " > %(said)s and exists ("
+    "  select 1 from door_crossing c join door_crossing_binding b "
+    "    on b.workspace_id = c.workspace_id and b.society_id = c.society_id "
+    "   and b.crossing_id = c.crossing_id "
+    "  where c.workspace_id = e.workspace_id and c.society_id = e.society_id "
+    "    and c.grant_id = %(g)s and c.kind = 'arrival' and b.disposition = 'arrived' "
+    "    and (c.thing_id = e.subject_id "
+    "      or (e.document->'thing'->'heard_by') ? c.thing_id::text)) "
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,6 +250,11 @@ class Head:
     departed: int = 0
     arrived: int = 0
     pending: int = 0
+    #: Whether a line was said after the cursor's place that the bridge has not been told.
+    lines: bool = False
+    #: Where the cursor's line place may move to when no line waits: the end of the last minute
+    #: the grant's society completed, read in the same statement as ``lines``; None where unknown.
+    said_reached: int | None = None
 
     def news(self, cursor: Cursor) -> bool:
         return (
@@ -207,6 +263,7 @@ class Head:
             or self.grant_seq > cursor.grant
             or self.crossed > cursor.crossed
             or self.departed > cursor.departed
+            or self.lines
             or (self.ended is not None and not cursor.ended and self.settled(cursor.departed))
         )
 
@@ -234,6 +291,26 @@ class ChannelRepository:
     @property
     def _ids(self) -> dict[str, uuid.UUID]:
         return {"w": self._session.workspace_id, "g": self._session.grant_id}
+
+    @cached_property
+    def _screen(self) -> Callable[[str], list[Any]]:
+        """Where a text carries a name the account holder saved, the names read and their patterns
+        built once for everything this channel sends in one request."""
+        return recogniser(saved_names(self._connection, self._session.workspace_id))
+
+    def _unnamed(self, text: str | None) -> str | None:
+        """``text``, or None where it carries a name the account holder saved, a placeholder's
+        words included."""
+        if text is None or self._screen(_bare(text)):
+            return None
+        return text
+
+    def _carries_a_name(self, texts: list[str]) -> bool:
+        return any(self._screen(_bare(text)) for text in texts)
+
+    def lines_closed(self) -> bool:
+        """Whether this grant's lines are closed (see :func:`lines_closed`)."""
+        return lines_closed(self._connection, self._session.workspace_id, self._session.grant_id)
 
     def bridge(self) -> Bridge:
         """The bridge this channel's credential opened, while the deployment still declares it and
@@ -346,17 +423,20 @@ class ChannelRepository:
                 "hello_at = statement_timestamp(), polled_at = statement_timestamp()",
                 {**self._ids, "v": adapter_version, "m": digest, "h": declared_digest},
             )
-            head = self.head(Cursor())
+            head = self.head(Cursor(), lines=False)
             departed = self._delivered_before()
+            said = self._said_place(grant)
         return {
             "profile": FRAME_PROFILE,
             "grant": grant.view(),
             "hold_seconds": bridge.hold_seconds,
-            # From here on: asks made before this hello are not sent again; the grant is, what
-            # became of each of its arrivals, and every departure from the first whose delivery
-            # the bridge has not reported, so a bridge that restarted delivers what its visitors
-            # carried home.
-            "cursor": Cursor(ask=head.asks, outcome=head.asks, departed=departed).encode(),
+            # From here on: asks made before this hello are not sent again, nor lines said before
+            # it; the grant is, what became of each of its arrivals, and every departure from the
+            # first whose delivery the bridge has not reported, so a bridge that restarted
+            # delivers what its visitors carried home.
+            "cursor": Cursor(
+                ask=head.asks, outcome=head.asks, departed=departed, said=said
+            ).encode(),
         }
 
     def open_poll(self, cursor: Cursor) -> tuple[list[dict[str, Any]], Cursor] | None:
@@ -391,13 +471,20 @@ class ChannelRepository:
         ).fetchone()
         if live is None:
             raise ChannelRefused("unauthenticated", 401, "no door credential opens anything here")
-        if not self.head(cursor).news(cursor):
+        head = self.head(cursor)
+        if not head.news(cursor):
+            if head.said_reached is not None and head.said_reached > cursor.said:
+                # Nothing to tell, but no line waits up to the minute the society reached: the
+                # line place moves there, so the next read scans none of those minutes again.
+                return [], dataclasses.replace(cursor, said=head.said_reached)
             return None
         return self.frames(cursor)
 
-    def head(self, cursor: Cursor) -> Head:
+    def head(self, cursor: Cursor, *, lines: bool = True) -> Head:
         """One read: how many asks the grant has, how many outcomes wait after the cursor, and
-        the grant's newest revision and whether it has ended."""
+        the grant's newest revision and whether it has ended. Whether a line waits after the
+        cursor's place is read only for a poll's own head (``lines``), never for a hello or the
+        end's check, which need none."""
         row = self._connection.execute(
             "select "
             "(select coalesce(max(ask_seq), 0) from door_ask "
@@ -414,14 +501,18 @@ class ChannelRepository:
             " where v.workspace_id = %(w)s and v.grant_id = %(g)s) as revoked, "
             "(select coalesce(max(c.crossing_seq), 0) " + _ARRIVALS_TAKEN + ") as crossed, "
             "(select count(*) " + _ARRIVALS_TAKEN + " and b.disposition = 'arrived') as arrived, "
-            "(select count(*) " + _DEPARTURES + ") as departed, "
-            "(select count(*) from door_crossing c left join door_crossing_binding b "
+            "(select count(*) "
+            + _DEPARTURES
+            + ") as departed, "
+            + ("exists (select 1 " + _SAID + ") as lines, " if lines else "false as lines, ")
+            + ("(" + _REACHED + ") as reached, " if lines else "null as reached, ")
+            + "(select count(*) from door_crossing c left join door_crossing_binding b "
             "   on b.workspace_id = c.workspace_id and b.society_id = c.society_id "
             "  and b.crossing_id = c.crossing_id "
             " where c.workspace_id = %(w)s and c.grant_id = %(g)s and b.crossing_id is null) "
             "  as pending, "
             "statement_timestamp() as now",
-            {**self._ids, "outcome": cursor.outcome, "ask": cursor.ask},
+            {**self._ids, "outcome": cursor.outcome, "ask": cursor.ask, "said": cursor.said},
         ).fetchone()
         assert row is not None and row["revision"] is not None
         revision = row["revision"]
@@ -439,14 +530,18 @@ class ChannelRepository:
             departed=row["departed"],
             arrived=row["arrived"],
             pending=row["pending"],
+            lines=row["lines"],
+            said_reached=None
+            if row["reached"] is None
+            else (int(row["reached"]) + 1) * PLACES_A_MINUTE - 1,
         )
 
     def frames(self, cursor: Cursor) -> tuple[list[dict[str, Any]], Cursor]:
         """Everything after ``cursor``, at most :data:`FRAMES_PER_POLL` frames, and the cursor
         after them: the grant if it changed, outcomes in ask order, open asks, what became of its
-        visitors' arrivals, their departures, then its end, once every ask was read, every outcome
-        reported, every visitor departed and each departure read, so the end is the last thing a
-        bridge reads."""
+        visitors' arrivals, the lines they said or heard, their departures, then its end, once every
+        ask was read, every outcome reported, every visitor departed and each departure and line
+        read, so the end is the last thing a bridge reads."""
         grant = self.grant()
         now = self._grants.now()
         frames: list[dict[str, Any]] = []
@@ -456,6 +551,7 @@ class ChannelRepository:
             "grant": cursor.grant,
             "crossed": cursor.crossed,
             "departed": cursor.departed,
+            "said": cursor.said,
             "ended": cursor.ended,
         }
         if grant.grant_seq > cursor.grant:
@@ -524,6 +620,7 @@ class ChannelRepository:
             ).fetchall()
             registry = decision_roles()
             asked_bytes = 0
+            first = self._first_minute() if asks else None
             for row in asks:
                 if row["recorded"] is not None:
                     position["ask"] = row["ask_seq"]
@@ -532,17 +629,35 @@ class ChannelRepository:
                 role = registry.for_request(request["profile"])
                 if role is None:
                     raise LookupError("an ask names a request no registered role writes")
+                # What it heard and said before the grant's first minute is not the grant's to
+                # send: a thing the grant names may have spoken with another grant's visitors.
+                context = sendable(
+                    _lines_since(request["context"], first, int(request["base_tick"])),
+                    self._carries_a_name,
+                )
+                if context is None:
+                    # A name the account holder saved since the request was made reached its
+                    # words: the ask is not sent, so it goes unanswered and the host records
+                    # no_answer_in_time at its deadline.
+                    position["ask"] = row["ask_seq"]
+                    continue
+                # The words of the terms the request was asked under, as a model is sent them.
+                terms = role.terms_of(context)
+                says = role.line_labels(context)
                 frame = asked_frame(
                     ask_seq=row["ask_seq"],
                     request=request,
-                    instruction=role.instruction,
-                    choice_description=role.choice_description,
+                    instruction=terms.instruction,
+                    choice_description=terms.choice_description,
                     deadline_ms=request["provider_config"]["deadline_ms"],
-                    messages=role.adapter.messages(
-                        role, request["context"], AnsweringMechanism.TOOL_CALL
+                    messages=role.adapter.messages(role, context, AnsweringMechanism.TOOL_CALL),
+                    act=role.choice(context).tool(),
+                    idle_label=role.idle_label(context),
+                    line_labels=says,
+                    line_characters_maximum=(
+                        int(context["line_characters_maximum"]) if says else None
                     ),
-                    act=role.choice(request["context"]).tool(),
-                    idle_label=role.idle_label(request["context"]),
+                    context=context,
                 )
                 size = len(canonical_json(frame))
                 if asked_bytes and asked_bytes + size > ASKED_BYTES_MAXIMUM:
@@ -574,11 +689,19 @@ class ChannelRepository:
                             arrival_id=document["arrival_id"], reason=row["reason"]
                         )
                     )
+        # Departures are read before lines: a visitor's lines all come before its departure, so a
+        # departure this poll tells never goes ahead of a line of its last minute the poll missed,
+        # and the end, which waits for every departure, never goes before one.
         room = FRAMES_PER_POLL - len(frames)
+        departed = self.departures(after=cursor.departed, limit=room) if room > 0 else []
+        room = FRAMES_PER_POLL - len(frames) - len(departed)
         if room > 0:
-            departed = self.departures(after=cursor.departed, limit=room)
-            frames.extend(departed)
-            position["departed"] += len(departed)
+            said, position["said"] = self.said(
+                after=cursor.said, limit=room, world_id=grant.world_id
+            )
+            frames.extend(said)
+        frames.extend(departed)
+        position["departed"] += len(departed)
         ended = grant.ended(now)
         # The end goes last. A poll that read any ask carries no end, since that ask's outcome is
         # yet to be told (the outcome rule below), and a poll with no room left read none; so the
@@ -588,7 +711,7 @@ class ChannelRepository:
             and not cursor.ended
             and len(frames) < FRAMES_PER_POLL
             and position["outcome"] >= position["ask"]
-            and self.head(Cursor()).settled(position["departed"])
+            and self.head(Cursor(), lines=False).settled(position["departed"])
         ):
             frames.append(
                 grant_ended_frame(
@@ -597,6 +720,129 @@ class ChannelRepository:
             )
             position["ended"] = True
         return frames, Cursor(**position)
+
+    def _first_minute(self) -> int | None:
+        """The society's minute when the grant's first ask was made (its request's base minute),
+        or None before any."""
+        row = self._connection.execute(
+            "select r.base_tick from door_ask a join world_society_decision_request r "
+            "  on r.workspace_id = a.workspace_id and r.society_id = a.society_id "
+            " and r.request_id = a.request_id "
+            "where a.workspace_id = %(w)s and a.grant_id = %(g)s order by a.ask_seq limit 1",
+            self._ids,
+        ).fetchone()
+        return None if row is None else int(row["base_tick"])
+
+    def _said_place(self, grant: Grant) -> int:
+        """The place after every line said so far in the society the grant's visitors arrive in:
+        the end of the minute it has reached, since a minute's lines commit with it; 0 where its
+        version holds no society. A hello starts here, so no line said before it is sent, and no
+        line is scanned to find it."""
+        if grant.scope.version_id is None:
+            return 0
+        row = self._connection.execute(
+            "select current_tick from world_society "
+            "where workspace_id = %(w)s and world_id = %(world)s and version_id = %(v)s",
+            {**self._ids, "world": grant.world_id, "v": grant.scope.version_id},
+        ).fetchone()
+        return 0 if row is None else (int(row["current_tick"]) + 1) * PLACES_A_MINUTE - 1
+
+    def said(self, *, after: int, limit: int, world_id: str) -> tuple[list[dict[str, Any]], int]:
+        """The said frames of lines this grant's visitors said or heard after the place ``after``,
+        at most ``limit``, and the place the next read starts after: the last line's, or, when
+        fewer than ``limit`` were found, the end of the last minute its society completed, read in
+        the same statement (a minute's lines commit with it), so no later read scans those minutes
+        again. Each frame names who said the line, by kind and number in words and by who decided
+        it (the receipt the minute applied for them: a model by its name, a program by its
+        bridge), whom to, and the line, and is screened against the names the account holder
+        saved as it is sent, since nothing reaches a program outside the policy boundary carrying
+        one: a field that would carry one is sent as None."""
+        found = self._connection.execute(
+            "with lines as (select e.society_id, e.tick, e.subject_id, "
+            "e.document->'thing' as details, "
+            + _SAID_PLACE
+            + " as place "
+            + _SAID
+            + "order by e.tick, (e.document->>'order')::bigint limit %(limit)s), "
+            "reached as (select max(w.current_tick) as tick from world_society w "
+            "  where w.workspace_id = %(w)s and w.world_id = %(world)s "
+            "    and w.society_id in (select c.society_id "
+            "    from door_crossing c where c.workspace_id = %(w)s and c.grant_id = %(g)s)) "
+            "select l.*, r.tick as reached from reached r left join lines l on true "
+            "order by l.tick, l.place",
+            {**self._ids, "said": after, "limit": limit, "world": world_id},
+        ).fetchall()
+        rows = [row for row in found if row["place"] is not None]
+        reached = found[0]["reached"] if found else None
+        if len(rows) < limit and reached is not None:
+            place = max(after, (int(reached) + 1) * PLACES_A_MINUTE - 1)
+        else:
+            place = int(rows[-1]["place"]) if rows else after
+        if not rows:
+            return [], place
+        unnamed = self._unnamed
+        minds = self._minds(rows)
+        frames = []
+        for row in rows:
+            details = row["details"]
+            to = details.get("to")
+            mind = minds.get((row["society_id"], row["tick"], row["subject_id"]), _UNKNOWN_MIND)
+            speaker = _person_words(details.get("from_kind"), details.get("from_number"))
+            addressee = _person_words(details.get("to_kind"), details.get("to_number"))
+            frames.append(
+                said_frame(
+                    tick=row["tick"],
+                    speaker={
+                        "id": str(row["subject_id"]),
+                        "label": unnamed(speaker),
+                        "mind": {"ai": mind["ai"], "words": unnamed(mind["words"])},
+                    },
+                    to=to,
+                    to_label=None if to is None else unnamed(addressee),
+                    line=unnamed(details.get("line")),
+                )
+            )
+        return frames, place
+
+    def _minds(
+        self, rows: list[dict[str, Any]]
+    ) -> dict[tuple[uuid.UUID, int, uuid.UUID], dict[str, Any]]:
+        """Who decided each line: the provider of the receipt the minute that said it applied for
+        its speaker, a model by the name a person reads for it and a program by its bridge's label
+        and whether the bridge declares its choices an AI's."""
+        found = self._connection.execute(
+            "select t.society_id, t.tick, r.subject_id, d.document->'provider' as provider "
+            "from world_society_transition_decision t "
+            "join world_society_decision d on d.workspace_id = t.workspace_id "
+            " and d.society_id = t.society_id and d.decision_seq = t.decision_seq "
+            "join world_society_decision_request r on r.workspace_id = d.workspace_id "
+            " and r.society_id = d.society_id and r.request_id = d.request_id "
+            "where t.workspace_id = %(w)s and t.disposition = 'applied' "
+            "  and (t.society_id, t.tick, r.subject_id) in (select * from "
+            "    unnest(%(societies)s::uuid[], %(ticks)s::bigint[], %(subjects)s::uuid[]))",
+            {
+                "w": self._session.workspace_id,
+                "societies": [row["society_id"] for row in rows],
+                "ticks": [row["tick"] for row in rows],
+                "subjects": [row["subject_id"] for row in rows],
+            },
+        ).fetchall()
+        manifest = load_manifest()
+        minds: dict[tuple[uuid.UUID, int, uuid.UUID], dict[str, Any]] = {}
+        for row in found:
+            key = (row["society_id"], row["tick"], row["subject_id"])
+            provider = row["provider"]
+            if is_external(provider):
+                bridge = self._bridges.get(str(provider.get("bridge")))
+                minds[key] = (
+                    _UNKNOWN_MIND if bridge is None else {"ai": bridge.ai, "words": bridge.label}
+                )
+            elif isinstance(provider, Mapping) and isinstance(provider.get("model_id"), str):
+                minds[key] = {
+                    "ai": True,
+                    "words": manifest.model_name(provider["model_id"]),
+                }
+        return minds
 
     def departures(self, *, after: int, limit: int) -> list[dict[str, Any]]:
         """The departed frames of this grant's visitors after the first ``after``, at most
@@ -611,7 +857,9 @@ class ChannelRepository:
         ).fetchall()
         if not rows:
             return []
-        outbound = self._outbound() if self.grant().scope.may_carry_out else {}
+        may_carry_out = self.grant().scope.may_carry_out
+        # The mapping is read only where a thing of the world may travel out.
+        outbound = self._outbound() if may_carry_out else {}
         frames = []
         for row in rows:
             details = row["document"]["thing"]
@@ -621,15 +869,12 @@ class ChannelRepository:
                     departure_id=details.get("crossing_id") or str(row["event_id"]),
                     thing_id=str(row["subject_id"]),
                     why=row["document"]["reason"],
-                    carried=[
-                        {
-                            "thing_id": held["id"],
-                            "kind": held["kind"],
-                            "game_item": came_as.get(held["id"])
-                            or outbound.get(held["kind"]["kind"]),
-                        }
-                        for held in details.get("carried", [])
-                    ],
+                    carried=carried_home(
+                        details.get("carried", []),
+                        came_as,
+                        outbound,
+                        may_carry_out=may_carry_out,
+                    ),
                 )
             )
         return frames
@@ -790,7 +1035,7 @@ class ChannelRepository:
     def _answer(self, body: Mapping[str, Any]) -> str:
         request_id = body["request_id"]
         self._live()
-        self._standing()
+        grant = self._standing()
         presence = self._presence(self.bridge(), "answering")
         row = self._connection.execute(
             "select a.ask_seq, r.document as request, d.request_id as recorded, "
@@ -829,15 +1074,30 @@ class ChannelRepository:
         option = offered.get(body["label"])
         if option is None:
             raise ChannelRefused("answer_not_offered", 422, "that label is not one offered")
+        # The labels whose answer says a line, and how long one may be, are the request's own.
+        context = request["context"]
         line = body.get("line")
-        if line is not None and "line_characters_maximum" not in option:
-            raise ChannelRefused("line_not_offered", 422, "that option says nothing")
-        if "line_characters_maximum" in option and line is None:
-            raise ChannelRefused("line_missing", 422, "that option says a line")
-        if line is not None:
-            fault = words_fault(line, maximum=LINE_CHARACTERS_MAXIMUM)
+        if body["label"] in role.line_labels(context):
+            if not grant.scope.may_speak:
+                raise ChannelRefused(
+                    "speaking_not_allowed", 403, "this grant does not let its bridge's people speak"
+                )
+            if self.lines_closed():
+                raise ChannelRefused(
+                    "speaking_not_allowed",
+                    403,
+                    "this grant's lines are closed: one carried a name the account holder saved",
+                )
+            if line is None:
+                raise ChannelRefused("line_missing", 422, "that option says a line")
+            fault = words_fault(line, maximum=int(context["line_characters_maximum"]))
+            if fault is None and PLACEHOLDER.search(line):
+                # Only the policy boundary writes placeholders; a program's line never holds one.
+                fault = "a line holds no bracketed placeholder"
             if fault is not None:
                 raise ChannelRefused("line_refused", 422, fault)
+        elif line is not None:
+            raise ChannelRefused("line_not_offered", 422, "that option says nothing")
         document = {key: body[key] for key in ("request_id", "request_sha256", "label")}
         if line is not None:
             document["line"] = line
@@ -858,6 +1118,128 @@ class ChannelRepository:
             },
         )
         return digest
+
+
+def lines_closed(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, grant_id: uuid.UUID
+) -> bool:
+    """Whether a line of the grant's program was refused for carrying a name the account holder
+    saved (``line_refused_by_rules``): its first such refusal closes the grant's lines, every
+    later one refused 403 ``speaking_not_allowed`` while the grant acts on, so a program learns at
+    most one such answer a grant."""
+    row = connection.execute(
+        "select exists (select 1 from world_society_decision d join door_ask a "
+        "  on a.workspace_id = d.workspace_id and a.society_id = d.society_id "
+        " and a.request_id = d.request_id "
+        " where d.workspace_id = %(w)s and d.document->>'reason' = 'line_refused_by_rules' "
+        "   and a.grant_id = %(g)s) as closed",
+        {"w": workspace_id, "g": grant_id},
+    ).fetchone()
+    assert row is not None
+    return bool(row["closed"])
+
+
+def carried_home(
+    carried: list[Mapping[str, Any]],
+    came_as: Mapping[str, str],
+    outbound: Mapping[str, str],
+    *,
+    may_carry_out: bool,
+) -> list[dict[str, Any]]:
+    """Each thing a departing visitor holds, with the game item it becomes: one it brought in
+    goes home as the item it came in as; a thing of the world it holds becomes the one item the
+    mapping lets travel out for its kind (``outbound``) only under a grant that lets things be
+    carried out, and otherwise none."""
+    return [
+        {
+            "thing_id": held["id"],
+            "kind": held["kind"],
+            "game_item": came_as.get(held["id"])
+            or (outbound.get(held["kind"]["kind"]) if may_carry_out else None),
+        }
+        for held in carried
+    ]
+
+
+#: Who decided a line when its receipt is not found: nothing is claimed.
+_UNKNOWN_MIND: Final[Mapping[str, Any]] = {"ai": None, "words": None}
+
+
+def _person_words(kind: object, number: object) -> str | None:
+    """A person as a said frame names them, whatever names their society keeps: their kind's label
+    and the number their simulated name ends with, "the knight (person 2)"; None where the event
+    names neither."""
+    if not isinstance(kind, Mapping) or type(number) is not int:
+        return None
+    try:
+        found = shipped_kind(ThingKindReference(**kind))
+    except (InvalidThingPlacement, TypeError):
+        return None
+    return f"the {found.document['label']} (person {number})"
+
+
+def _lines_since(context: Mapping[str, Any], first: int | None, minute: int) -> Mapping[str, Any]:
+    """``context`` with only the lines heard or said in minutes after ``first``, the minute the
+    grant's first ask was made in: a line of that minute or an earlier one may come from before the
+    grant, which was bound by then. A heard line goes by its minute, a said one by how many minutes
+    before ``minute``, the request's own, it was said. Unchanged where it names no lines or no first
+    minute is known."""
+    if first is None or not ({"heard", "said"} & set(context)):
+        return context
+    kept = dict(context)
+    if "heard" in context:
+        kept["heard"] = [line for line in context["heard"] if int(line["tick"]) > first]
+    if "said" in context:
+        kept["said"] = [
+            line for line in context["said"] if minute - int(line["minutes_ago"]) > first
+        ]
+    return kept
+
+
+def sendable(
+    context: Mapping[str, Any], carries: Callable[[list[str]], bool]
+) -> Mapping[str, Any] | None:
+    """``context`` as the door may send it to a program now, screened again as it is sent by the
+    rule the decision host screened it by when it reserved the request
+    (``without_named_lines`` and ``outside_context_sendable``, ``exulanica/api/decision_host.py``):
+    the lines heard that carry a saved name, in the line or in who said it, and the lines said that
+    carry one, in the line or in whom it was said to, are left out; then a context any of whose
+    texts, keys included, still carries one is not sent (None). ``carries`` says whether any of
+    some texts carries a saved name."""
+    kept = dict(context)
+    if "heard" in context:
+        kept["heard"] = [
+            line for line in context["heard"] if not carries([line["line"], line["from"]])
+        ]
+    if "said" in context:
+        own = [
+            line
+            for line in context["said"]
+            if not carries([line["line"], *([] if line["to"] is None else [line["to"]])])
+        ]
+        if own:
+            kept["said"] = own
+        else:
+            kept.pop("said")
+    return None if carries(list(_texts(kept))) else kept
+
+
+def _texts(value: object) -> list[str]:
+    """Every text a JSON value states, its objects' keys included."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, Mapping):
+        return [text for key, held in value.items() for text in (str(key), *_texts(held))]
+    if isinstance(value, list | tuple):
+        return [text for held in value for text in _texts(held)]
+    return []
+
+
+def _bare(text: str) -> str:
+    """``text`` with each placeholder-shaped token opened to its words, so a saved name written
+    inside one is screened like any other: only the policy boundary writes placeholders, and none
+    reaches a program as one."""
+    return PLACEHOLDER.sub(lambda match: " " + match.group(0)[1:-1] + " ", text)
 
 
 def _declaration(declared: Mapping[str, str]) -> dict[str, str]:
