@@ -75,7 +75,7 @@ KNIGHT_LINE = "Well met, traveller from afar."
 VISITOR_LINE = "Good day to you, sir."
 #: What a second visitor says after a first one has gone home.
 STAYING_LINE = "Is anyone about?"
-#: The society seed the said-frames test starts from (sha256 of "door-lines-said-frames-0").
+#: The society seed every world with a knight starts from (sha256 of "door-lines-said-frames-0").
 SAID_FRAMES_SEED = "98a2a4b551518b4988311a477926d116497ed1c2e0d6d1a4a6ac18628372bab0"
 
 
@@ -220,8 +220,12 @@ def _host(door, transport) -> tuple[DecisionHost, Any, str]:
 
 
 def _world_with_a_knight(door) -> tuple[dict[str, Any], dict[str, Any]]:
-    """A society of things with a gate and a knight within hearing of where visitors arrive."""
+    """A society of things with a gate and a knight within hearing of where visitors arrive,
+    started from a chosen seed: the one a saved world derives from its world id changes each run,
+    and under some the knight's day keeps it out of the visitor's hearing for as long as a test
+    waits for the two to speak."""
     world, client = door["world"], door["client"]
+    choose_society_seed(client.app, SAID_FRAMES_SEED)
     _place(client, world, "well", "well", 2, -4_000, 2_000)
     _place(client, world, "gate", "gate", 1, 0, 6_000)
     _place(client, world, "knight", "knight", 1, 3_000, 3_000)
@@ -263,11 +267,8 @@ def _read_all(door, channel, cursor) -> list[dict[str, Any]]:
 # On the endless ground: the bounded ground's villagers may stand nearer the knight than the visitor
 # does, and a being is offered a line to its three nearest hearers only, so whether these two speak
 # there depends on where the seed puts everyone; what the door sends does not depend on the ground.
-# From a chosen seed: the one a saved world derives from its world id changes each run, and under
-# some the knight's day takes it out of the visitor's hearing before both lines are said.
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_lines_reach_the_visitor_s_bridge_as_said_frames_screened_as_they_are_sent(door, crossings):
-    choose_society_seed(door["client"].app, SAID_FRAMES_SEED)
     world, society = _world_with_a_knight(door)
     client = door["client"]
     knight = _person(society, placed="knight")
@@ -784,7 +785,6 @@ def test_a_departure_is_told_after_the_lines_before_it_when_they_overflow_a_poll
 ):
     """A visitor says several lines and is then sent away; read again from the start, four frames
     a poll, its departure is told after every line, though a poll reads departures first."""
-    choose_society_seed(door["client"].app, SAID_FRAMES_SEED)
     world, society = _world_with_a_knight(door)
     client = door["client"]
     host, _manifest, _model_id = _host(door, _Knight())
@@ -832,7 +832,6 @@ def test_lines_after_a_grant_s_first_visitor_left_reach_it_until_its_last_leaves
     """Two visitors of one grant; the first is sent away, the second goes on speaking and is then
     sent away too: read again from the start, the second's lines after the first left are told,
     since a grant's lines end at its last visitor's departure, not its first."""
-    choose_society_seed(door["client"].app, SAID_FRAMES_SEED)
     world, society = _world_with_a_knight(door)
     client = door["client"]
     host, _manifest, _model_id = _host(door, _Knight())
