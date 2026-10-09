@@ -5,6 +5,11 @@ world on this checkout's stack, lives there as the world decides, leaves, and is
         [--game http://127.0.0.1:19508] [--match FILE] [--minutes-speed 1] [--lives-s 60]
         [--limit-s 900] [--look cc0-hoplite] [--scripted-model PLAN [--traveller-mind]]
         [--keep-stack]
+    <checkout>/.venv/bin/python bridges/zero_ad/run/check.py --declare OUT [--label WORDS]
+        [--game-words WORDS]
+    <checkout>/.venv/bin/python bridges/zero_ad/run/check.py --api URL --token-file FILE
+        --record FILE [--scene FILE] [--game http://127.0.0.1:19508] [--lives-s 60]
+        [--traveller-mind]
 
 The game runs first, on this machine, with its interface on (``pyrogenesis
 --rl-interface=127.0.0.1:19508``). What this does, refusing by name at the first thing that is not
@@ -36,6 +41,18 @@ as expected:
     credential, no token) into ``.exulanica/zero-ad-checks/<time>/`` and brings the stack down
     (``--keep-stack`` leaves it up for a look in the browser).
 
+``--declare OUT`` writes the bridge into the door bridge declarations a stack someone else starts
+reads (``launch.py up --door-bridges OUT``) and stops: beside the bridges OUT already declares, so
+one stack lets several games in (the Luanti tool's ``declare`` writes its file anew, so it goes
+first), and in place of an earlier entry of this bridge. The bridge is declared in neutral words
+(``--label`` and ``--game-words``, by default "another open-source game", each one line of 1 to 80
+characters as the door takes them), since a film or a demo names no game.
+``--api URL --token-file FILE --record FILE [--scene FILE]`` joins a stack this check did not start,
+where a scene was built for a take: it starts and stops no stack and builds nothing, crosses into
+the world the scene builder's record names, reads the owner's token once into this process, and
+closes the grant it issued when it ends; the stack keeps running. The summary keeps the words the
+stack shows for the bridge.
+
 ``--scripted-model PLAN`` serves the stack's API with ``scripts/acceptance/scripted_model.py``
 answering every model request from PLAN (``run/plans/``), with no provider, key or cost; with
 ``--traveller-mind`` the soldier's mind is asked of it. Without them the world's routine decides.
@@ -48,6 +65,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import re
 import secrets
 import sys
 import threading
@@ -91,6 +109,59 @@ WALK_LIMIT_S = 60.0
 #: How often the stack is started before the check gives up when its tile worker cannot reach its
 #: database in time, as a heavily loaded machine sometimes makes it.
 LAUNCH_ATTEMPTS = 3
+
+
+#: The words a world shows for where this bridge's visitors came from, unless the operator names
+#: others: a film or a demo names no game.
+NEUTRAL_WORDS = "another open-source game"
+#: A bridge's label or game as the door takes them: one line of 1 to 80 characters.
+WORDS = re.compile(r"[^\x00-\x1f\x7f]{1,80}")
+
+
+def plain_words(text: str, what: str) -> str:
+    """``text`` as the door takes a bridge's ``what`` (its label or game), or a refusal."""
+    words = text.strip()
+    if not WORDS.fullmatch(words):
+        raise SystemExit(f"a bridge's {what} is one line of 1 to 80 characters")
+    return words
+
+
+def declaration(
+    mapping_sha256: str, *, label: str = NEUTRAL_WORDS, game: str = NEUTRAL_WORDS
+) -> dict[str, Any]:
+    """The door bridge entry a stack is started with for this adapter (``launch.py up
+    --door-bridges``): run by a server, unlisted, offered to the stack's synthetic workspaces,
+    pinning the mapping by ``mapping_sha256`` and admitting the adapter's version, shown in
+    ``label`` and ``game`` words. Its own credential is random and only its digest is written."""
+    return {
+        "bridge": "zero-ad",
+        "label": plain_words(label, "label"),
+        "game": plain_words(game, "game"),
+        "run_by": "server",
+        "ai": False,
+        "credential_sha256": hashlib.sha256(secrets.token_urlsafe(32).encode()).hexdigest(),
+        "mapping_sha256": [mapping_sha256],
+        "adapter_versions": [ADAPTER_VERSION],
+        "listed": False,
+        "workspaces": "synthetic",
+    }
+
+
+def declare(out: Path, entry: dict[str, Any]) -> int:
+    """Write ``entry`` into the door bridge declarations at ``out``, one file for every game a
+    stack lets in: beside the bridges ``out`` already declares, and in place of an earlier entry
+    of the same bridge (the door refuses a bridge declared twice). How many the file declares."""
+    declared: Any = []
+    if out.exists():
+        try:
+            declared = json.loads(out.read_text())
+        except ValueError:
+            declared = None
+        if not isinstance(declared, list) or not all(isinstance(e, dict) for e in declared):
+            raise SystemExit(f"{out} is not a list of door bridge declarations")
+    kept = [other for other in declared if other.get("bridge") != entry["bridge"]]
+    out.write_text(json.dumps([*kept, entry], indent=2) + "\n")
+    return len(kept) + 1
 
 
 def luanti_helpers() -> Any:
@@ -283,70 +354,17 @@ class CheckBridge(Bridge):
             self.recorder.mark("brought_back", thing_id=thing_id)
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--port-base", type=int, default=19500)
-    parser.add_argument("--game", default="http://127.0.0.1:19508")
-    parser.add_argument("--match", type=Path, default=MATCH)
-    parser.add_argument("--player", type=int, default=1)
-    parser.add_argument("--look", default="cc0-hoplite")
-    parser.add_argument("--minutes-speed", type=int, default=1)
-    parser.add_argument("--lives-s", type=float, default=60.0)
-    parser.add_argument("--limit-s", type=float, default=900.0)
-    parser.add_argument("--keep-stack", action="store_true")
-    parser.add_argument("--scripted-model", type=Path, metavar="PLAN")
-    parser.add_argument("--traveller-mind", action="store_true")
-    arguments = parser.parse_args(argv)
-    luanti = luanti_helpers()
-    Refused, Api = luanti.Refused, luanti.Api
-    from exulanica.canonical import sha256_of_canonical
-
-    mapping = json.loads(MAPPING.read_text())
-    reads = json.loads(READS.read_text())
-    mapping_sha256 = sha256_of_canonical(mapping).hex()
-    [visitor] = mapping["visitors"]
-    soldier = template(visitor["game_type"])
-    looks = {look["look_key"]: look["look"] for look in visitor["looks"]}
-    if arguments.look not in looks:
-        parser.error(f"--look names no look the mapping offers: {sorted(looks)}")
-    game = RLInterface(arguments.game)
-    if game.evaluate("1") != 1:
-        raise Refused("game", f"the game at {arguments.game} does not answer its interface")
-    folder = CHECKOUT / ".exulanica" / "zero-ad-checks" / time.strftime("%Y%m%d-%H%M%S")
-    folder.mkdir(parents=True)
-    recorder = Recorder(folder / "exchanges.jsonl")
-    summary: dict[str, Any] = {
-        "profile": "exulanica-zero-ad.check-run/v1",
-        "started_at": now(),
-        "adapter_version": ADAPTER_VERSION,
-        "mapping_sha256": mapping_sha256,
-        "look_key": arguments.look,
-        "look": looks[arguments.look],
-        "match": arguments.match.name,
-        "lives_s": arguments.lives_s,
-    }
-    bridges = [
-        {
-            "bridge": "zero-ad",
-            "label": "0 A.D.",
-            "game": "0 A.D. Empires Ascendant",
-            "run_by": "server",
-            "ai": False,
-            "credential_sha256": hashlib.sha256(secrets.token_urlsafe(32).encode()).hexdigest(),
-            "mapping_sha256": [mapping_sha256],
-            "adapter_versions": [ADAPTER_VERSION],
-            "listed": False,
-            "workspaces": "synthetic",
-        }
-    ]
-    declared = folder / "door-bridges.json"
-    declared.write_text(json.dumps(bridges))
+def start_stack(
+    luanti: Any, arguments: argparse.Namespace, declared: Path, recorder: Recorder
+) -> dict[str, Any]:
+    """This checkout's stack on the run's port slot with the bridges ``declared``: the launcher's
+    state. It is started again where its tile worker could not reach its database in time, as a
+    heavily loaded machine sometimes makes it."""
     scripted = (
         ["--scripted-model", str(arguments.scripted_model.resolve())]
         if arguments.scripted_model
         else []
     )
-    started = ""
     for attempt in range(1, LAUNCH_ATTEMPTS + 1):
         try:
             started = luanti.launch(
@@ -360,8 +378,8 @@ def main(argv: list[str] | None = None) -> int:
                 "--society-of-things",
                 *scripted,
             )
-            break
-        except Refused as refused:
+            return json.loads(started[: started.rindex("}") + 1])
+        except luanti.Refused as refused:
             # A start that failed part way may leave its database and state behind: bring them
             # down, and start again where the tile worker could not reach its database in time.
             luanti.subprocess.run(
@@ -373,7 +391,95 @@ def main(argv: list[str] | None = None) -> int:
             if "tile-worker-startup" not in str(refused) or attempt == LAUNCH_ATTEMPTS:
                 raise
             recorder.mark("stack_started_again", after=str(refused)[:160])
-    state = json.loads(started[: started.rindex("}") + 1])
+    raise AssertionError("every start either returned or raised")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--port-base", type=int, default=19500)
+    parser.add_argument("--game", default="http://127.0.0.1:19508")
+    parser.add_argument("--match", type=Path, default=MATCH)
+    parser.add_argument("--player", type=int, default=1)
+    parser.add_argument("--look", default="cc0-hoplite")
+    parser.add_argument("--minutes-speed", type=int, default=1)
+    parser.add_argument("--lives-s", type=float, default=60.0)
+    parser.add_argument("--limit-s", type=float, default=900.0)
+    parser.add_argument("--keep-stack", action="store_true")
+    parser.add_argument("--scripted-model", type=Path, metavar="PLAN")
+    parser.add_argument("--traveller-mind", action="store_true")
+    parser.add_argument(
+        "--declare",
+        type=Path,
+        metavar="OUT",
+        help="write the bridge into the door bridge declarations a stack starts with, and stop",
+    )
+    parser.add_argument("--label", default=NEUTRAL_WORDS, help="the bridge's declared label")
+    parser.add_argument("--game-words", default=NEUTRAL_WORDS, help="the bridge's declared game")
+    parser.add_argument(
+        "--api",
+        metavar="URL",
+        help="join a stack this check did not start, with --token-file and --record",
+    )
+    parser.add_argument("--token-file", type=Path, help="with --api: the owner's token, read once")
+    parser.add_argument(
+        "--record", type=Path, help="with --api: the scene builder's record of the world"
+    )
+    parser.add_argument("--scene", type=Path, help="with --api: the file of the record's scene")
+    arguments = parser.parse_args(argv)
+    joined = arguments.api is not None
+    if [arguments.token_file is not None, arguments.record is not None] != [joined, joined]:
+        parser.error("--api, --token-file and --record go together")
+    if joined and (arguments.keep_stack or arguments.scripted_model):
+        parser.error("--api joins a running stack: no --keep-stack or --scripted-model")
+    if arguments.scene is not None and not joined:
+        parser.error("--scene names the scene of a joined stack's record: it goes with --api")
+    luanti = luanti_helpers()
+    Refused, Api = luanti.Refused, luanti.Api
+    from exulanica.canonical import sha256_of_canonical
+
+    mapping = json.loads(MAPPING.read_text())
+    reads = json.loads(READS.read_text())
+    mapping_sha256 = sha256_of_canonical(mapping).hex()
+    [visitor] = mapping["visitors"]
+    soldier = template(visitor["game_type"])
+    looks = {look["look_key"]: look["look"] for look in visitor["looks"]}
+    if arguments.look not in looks:
+        parser.error(f"--look names no look the mapping offers: {sorted(looks)}")
+    entry = declaration(mapping_sha256, label=arguments.label, game=arguments.game_words)
+    if arguments.declare:
+        count = declare(arguments.declare, entry)
+        print(
+            f"{arguments.declare}: bridge zero-ad ({entry['label']}), mapping "
+            f"{mapping_sha256[:16]}..., adapter {ADAPTER_VERSION}; {count} declared in the file"
+        )
+        return 0
+    game = RLInterface(arguments.game)
+    if game.evaluate("1") != 1:
+        raise Refused("game", f"the game at {arguments.game} does not answer its interface")
+    folder = (
+        CHECKOUT
+        / ".exulanica"
+        / "zero-ad-checks"
+        / time.strftime("%Y%m%d-%H%M%S-joined" if joined else "%Y%m%d-%H%M%S")
+    )
+    folder.mkdir(parents=True)
+    recorder = Recorder(folder / "exchanges.jsonl")
+    summary: dict[str, Any] = {
+        "profile": "exulanica-zero-ad.check-run/v1",
+        "started_at": now(),
+        "adapter_version": ADAPTER_VERSION,
+        "mapping_sha256": mapping_sha256,
+        "look_key": arguments.look,
+        "look": looks[arguments.look],
+        "match": arguments.match.name,
+        "lives_s": arguments.lives_s,
+    }
+    state: dict[str, Any] | None = None
+    if not joined:
+        # The stack this check starts reads the bridge from here; a joined stack read its own.
+        declared = folder / "door-bridges.json"
+        declared.write_text(json.dumps([entry]))
+        state = start_stack(luanti, arguments, declared, recorder)
     checks: list[dict[str, Any]] = []
 
     def check(name: str, ok: bool, **seen: Any) -> None:
@@ -381,15 +487,32 @@ def main(argv: list[str] | None = None) -> int:
 
     stop = threading.Event()
     try:
-        token = (Path(state["run_dir"]) / "token").read_text().strip()
-        api = Api(f"http://127.0.0.1:{state['ports']['api']}", token)
-        summary["stack"] = {"api": api.base, "started_by_this_check": True}
-        scene = luanti.newest_demo_scene()
-        placed = luanti.build_scene(api, folder, token, scene)
-        del token
-        offered = [bridge["bridge"] for bridge in api("GET", "/door/bridges")["bridges"]]
+        if joined:
+            # A stack someone else started for a take: its world is the one the scene builder's
+            # record names, and the owner's token is read once into this process.
+            api = Api(arguments.api.rstrip("/"), arguments.token_file.read_text().strip())
+            recorded = arguments.record.read_bytes()
+            summary["stack"] = {
+                "api": api.base,
+                "started_by_this_check": False,
+                "record": str(arguments.record),
+                "record_sha256": hashlib.sha256(recorded).hexdigest(),
+            }
+            placed = json.loads(recorded)
+            scene = luanti.scene_of_record(placed, arguments.scene)
+        else:
+            assert state is not None
+            token = (Path(state["run_dir"]) / "token").read_text().strip()
+            api = Api(f"http://127.0.0.1:{state['ports']['api']}", token)
+            summary["stack"] = {"api": api.base, "started_by_this_check": True}
+            scene = luanti.newest_demo_scene()
+            placed = luanti.build_scene(api, folder, token, scene)
+            del token
+        offered = {bridge["bridge"]: bridge for bridge in api("GET", "/door/bridges")["bridges"]}
         if "zero-ad" not in offered:
             raise Refused("bridge", "the stack offers this workspace no zero-ad bridge")
+        # The words the world shows for where the visitor came from, as the stack declared them.
+        summary["bridge"] = {key: offered["zero-ad"].get(key) for key in ("label", "game")}
         world = luanti.crossing_world(api, placed, scene)
         summary["scene"] = {
             "file": scene.name,
@@ -558,9 +681,13 @@ def main(argv: list[str] | None = None) -> int:
         summary["marks"] = marks
     finally:
         stop.set()
-        if not arguments.keep_stack:
+        if joined:
+            # Nothing of the run stays open in a world it did not build; the stack keeps running.
+            if "grant_id" in summary:
+                summary["grant_closed"] = luanti.close_grant(api, summary["grant_id"])
+        elif not arguments.keep_stack:
             luanti.launch("down")
-            if arguments.scripted_model:
+            if arguments.scripted_model and state is not None:
                 summary["scripted_model"] = luanti.scripted_record(Path(state["run_dir"]), folder)
         summary["checks"] = checks
         summary["ended_at"] = now()

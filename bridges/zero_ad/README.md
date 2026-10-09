@@ -66,6 +66,20 @@ decided, the replay). It writes the run's summary and every exchange, with no cr
 --traveller-mind` a scripted model is the soldier's mind, so no provider is called:
 `soldier-leaves.json` leaves when it may, `soldier-waits.json` waits until it is sent home.
 
+For a take in a stack started for it, as a film or a demo does:
+
+1. `run/check.py --declare <file>` writes this bridge into the door bridge declarations the stack
+   starts with (`scripts/acceptance/launch.py up --door-bridges <file>`): beside the bridges the
+   file already declares, so one stack lets several games in (the Luanti tool's `declare` writes
+   its file anew, so it goes first), and in place of an earlier entry of this bridge. A film or a
+   demo names no game, so the bridge is declared as "another open-source game" unless `--label`
+   and `--game-words` say otherwise (each one line of 1 to 80 characters).
+2. `run/check.py --api <the stack's API> --token-file <the owner's token> --record <the scene
+   builder's record>` joins that stack once its scene is built (`scripts/demo/build_scene.py
+   --record`): it starts and stops no stack and builds nothing, crosses into the world the record
+   names, keeps the owner's token in its own process, and closes the grant it issued when it ends.
+   The summary keeps the words the stack shows for the bridge.
+
 ## Tests
 
 `tests/test_bridge_zero_ad.py` holds the mapping to the door's checks and the adapter to fakes of the

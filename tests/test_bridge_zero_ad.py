@@ -243,3 +243,84 @@ def test_a_restart_brings_back_a_soldier_that_departed_while_the_adapter_was_dow
     assert restarted.cursor == "c1" and list(bridge.away) == [away.thing_id]
     bridge.handle([{"kind": "departed", "thing_id": away.thing_id, "why": "sent_home"}])
     assert [e["template"] for e in game.entities.values()] == [HOPLITE]
+
+
+def _run_check() -> Any:
+    """``run/check.py``, which declares the bridge for a stack and runs a crossing."""
+    spec = importlib.util.spec_from_file_location("zero_ad_run_check", ADAPTER / "run" / "check.py")
+    assert spec is not None and spec.loader is not None
+    check = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(check)
+    return check
+
+
+def _admitted(declarations: Path) -> dict[str, Any]:
+    """The bridges a stack started with ``declarations`` admits, read by the door's own setting
+    reader once the launcher names the run's workspace where an entry says synthetic."""
+    from exulanica.door.bridges import load_bridge_directory
+
+    setting = json.dumps(
+        [
+            {**entry, "workspaces": ["6f1b9a52-4d1e-4c55-9e4b-0c8f0d2b7a11"]}
+            if entry.get("workspaces") == "synthetic"
+            else entry
+            for entry in json.loads(declarations.read_text())
+        ]
+    )
+    return dict(load_bridge_directory({"EXULANICA_DOOR_BRIDGES": setting}).bridges)
+
+
+def test_the_run_declares_its_bridge_in_words_that_name_no_game(tmp_path):
+    """A film or a demo names no game: by default the bridge is declared in neutral words, which the
+    door's own setting reader admits as what a world shows for where its visitors came from."""
+    from exulanica.canonical import sha256_of_canonical
+
+    from test_door_names_no_game import GAME_NAMES
+
+    out = tmp_path / "bridges.json"
+    assert _run_check().main(["--declare", str(out)]) == 0
+    [entry] = json.loads(out.read_text())
+    assert (entry["label"], entry["game"]) == (
+        "another open-source game",
+        "another open-source game",
+    )
+    assert GAME_NAMES.search(entry["label"] + " " + entry["game"]) is None
+    bridge = _admitted(out)["zero-ad"]
+    assert (bridge.label, bridge.game) == (entry["label"], entry["game"])
+    assert bridge.mapping_sha256 == {sha256_of_canonical(_mapping()).hex()}
+
+
+def test_a_declaration_joins_the_file_another_game_declared_first(tmp_path):
+    """One stack lets both games in: the bridge is written beside the bridges the file declares
+    (the Luanti tool writes its file anew, so it goes first), and declaring it again replaces its
+    entry, since the door refuses a bridge declared twice."""
+    spec = importlib.util.spec_from_file_location(
+        "luanti_cross_once", ADAPTER.parent / "luanti" / "tools" / "cross_once.py"
+    )
+    assert spec is not None and spec.loader is not None
+    luanti = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(luanti)
+    out = tmp_path / "bridges.json"
+    luanti.declare(out, label="an open-source block game", game="an open-source block game")
+    [declared_first] = json.loads(out.read_text())
+    check = _run_check()
+    assert check.main(["--declare", str(out)]) == 0
+    assert check.main(["--declare", str(out), "--label", "a strategy game"]) == 0
+    declared = json.loads(out.read_text())
+    assert [entry["bridge"] for entry in declared] == ["luanti", "zero-ad"]
+    assert declared[0] == declared_first
+    admitted = _admitted(out)
+    assert sorted(admitted) == ["luanti", "zero-ad"]
+    assert admitted["zero-ad"].label == "a strategy game"
+
+
+@pytest.mark.parametrize(
+    ("option", "words"), [("--label", ""), ("--label", "two\nlines"), ("--game-words", "x" * 81)]
+)
+def test_a_declared_label_or_game_is_one_line_of_1_to_80_characters(tmp_path, option, words):
+    """The door takes a bridge's label and game as one line of 1 to 80 characters: other words
+    are refused before anything is written."""
+    out = tmp_path / "bridges.json"
+    with pytest.raises(SystemExit, match="one line of 1 to 80 characters"):
+        _run_check().main(["--declare", str(out), option, words])
+    assert not out.exists()
