@@ -48,6 +48,8 @@ export interface InputModeDependencies {
   readonly handleAtlasCommand: (command: AtlasCommand) => void;
   /** Who decides, opened or closed through its action, so it is refused where it is not offered. */
   readonly toggleDecides: () => void;
+  /** G: play the person selected in the world, or give back the one played. */
+  readonly togglePlay?: () => void;
   readonly showTravelStatus: (message: string, kind?: 'progress' | 'failure') => void;
   readonly travelUsesReducedMotion: () => boolean;
   readonly setInputMode: (mode: FirstUseMode) => void;
@@ -337,6 +339,11 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
       if (command === 'toggle-decides') {
         event.preventDefault();
         deps.toggleDecides();
+        return;
+      }
+      if (command === 'toggle-play' && deps.togglePlay !== undefined) {
+        event.preventDefault();
+        deps.togglePlay();
         return;
       }
       if (command === 'toggle-controls') {

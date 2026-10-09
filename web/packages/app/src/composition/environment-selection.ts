@@ -96,6 +96,8 @@ import { engineCreatedOver, societyEngine } from '../society-engines.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
 import { LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings, THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type MountedThings, type ThingLookChosenDetail, type ThingPickDetail, type ThingPickVia, type ThingsDependencies } from './things.js';
 import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
+import { mountPlayThisOne, type MountedPlayThisOne } from './play-this-one.js';
+import { SocietyPlayClient } from '../society-play-api.js';
 import { markLabel, markOf, type MarkInput } from './thing-marks.js';
 import { LineWatch, thingLine } from './thing-lines.js';
 import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
@@ -295,6 +297,11 @@ export interface MountedEnvironmentSelection {
    * bar, the command palette). Each call is the same request the panel's own buttons make.
    */
   readonly people: PeopleControls;
+  /** Play one being of a society of things from the world (Play this one), or give it back. */
+  play(subjectId: string): Promise<void>;
+  giveBack(): Promise<void>;
+  /** G: give back the being played from this page, else play the person selected in the world. */
+  togglePlay(): void;
 }
 
 /** What the world clock shows: the saved playback control and whether a request is in flight. */
@@ -618,6 +625,8 @@ export function mountEnvironmentSelection(
   let society: SocietySnapshot | null = null;
   let renderedSnapshot: SocietySnapshot | null = null;
   let selectedInhabitant: string | null = null;
+  /** Play this one, made the first time a person plays a being of this world. */
+  let playThisOne: MountedPlayThisOne | null = null;
   // What the inspector is showing. A society refresh re-renders an inspected inhabitant and
   // re-gates a destination's directed-action control; it never swaps one view for the other.
   let inspectedInhabitant: string | null = null;
@@ -958,6 +967,8 @@ export function mountEnvironmentSelection(
   function onThingPick(event: Event): void {
     const detail = (event as CustomEvent<ThingPickDetail>).detail;
     if (detail === null) return;
+    // A click on a mark acts for the played being as a click on what it marks does.
+    if (playThisOne?.onPick({ subjectId: detail.subjectId, thingId: detail.subjectId === null ? detail.thingId : null }) === true) return;
     if (detail.subjectId !== null) { inspectInhabitant(detail.subjectId); return; }
     if (detail.placedId !== null) inspectPlacedThing(detail.placedId);
   }
@@ -1992,6 +2003,27 @@ export function mountEnvironmentSelection(
     atlas?.invalidate();
   }
 
+  /**
+   * Play this one for the saved world open now, made the first time it is asked for: its band sits
+   * over the world, and its client asks the world's own play routes.
+   */
+  function playController(): MountedPlayThisOne | null {
+    if (playThisOne !== null) return playThisOne;
+    const world = savedWorld;
+    if (world === null) return null;
+    playThisOne = mountPlayThisOne({
+      client: new SocietyPlayClient({ ...deps.credentials, worldId: world.worldId }),
+      versionId: () => savedWorld?.versionId ?? null,
+      nameOf: (id) => {
+        const person = society?.state.inhabitants.find((one) => one.id === id);
+        return person === undefined ? 'them' : inhabitantLabel(person);
+      },
+      refreshModels: async () => { await societyModels?.refresh(society?.currentTick ?? null, societyPeople(), true); },
+    });
+    deps.env.shell.append(playThisOne.band.root);
+    return playThisOne;
+  }
+
   /** The connected society's people, as People nearby names them. */
   function societyPeople(): readonly { readonly id: string; readonly name: string }[] {
     return (society?.state.inhabitants ?? []).map((person) => ({ id: person.id, name: inhabitantLabel(person) }));
@@ -2010,6 +2042,12 @@ export function mountEnvironmentSelection(
       onRead: () => {
         if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) inspectInhabitant(selectedInhabitant, false);
         refreshMarks();
+        // A being this person plays (after a reload, or from another tab) takes its band up again.
+        if (playThisOne?.playing() == null) {
+          const mine = [...(societyModels?.playedSubjects() ?? new Map<string, { readonly byYou: boolean }>())]
+            .find(([, played]) => played.byYou)?.[0];
+          if (mine !== undefined) void playController()?.resume(mine);
+        }
       },
     });
   }
@@ -2364,6 +2402,8 @@ export function mountEnvironmentSelection(
     // The state just drawn: `renderedSnapshot` names it only once this returns.
     refreshMarks(next.state);
     if (next.state.things !== undefined) readLooks();
+    // A new minute drawn: the played being's options are read again.
+    if (next.state.tick !== renderedSnapshot?.state.tick) playThisOne?.minuteMoved();
     moved = [...named.values()];
   }
 
@@ -2497,6 +2537,10 @@ export function mountEnvironmentSelection(
     ): boolean => {
       const thing = things?.pick(origin, direction) ?? null;
       const inhabitantId = atlas.authoredSociety?.pickInhabitant(origin, direction, thing?.distance ?? Number.POSITIVE_INFINITY);
+      // While a person plays a being, a click acts for it rather than opening a card.
+      if (playThisOne?.onPick(inhabitantId
+        ? { subjectId: inhabitantId, thingId: null }
+        : { subjectId: thing?.pick.subjectId ?? null, thingId: thing?.pick.thingId ?? null }) === true) return true;
       if (inhabitantId) { inspectInhabitant(inhabitantId); return true; }
       if (thing !== null) { things?.raise(thing.pick, via); return true; }
       return false;
@@ -2751,6 +2795,12 @@ export function mountEnvironmentSelection(
       return { versionId: society.versionId, inhabitantId };
     },
     societyNames,
+    play: async (subjectId) => { await playController()?.play(subjectId); },
+    giveBack: async () => { await playThisOne?.giveBack(); },
+    togglePlay: () => {
+      if (playThisOne?.playing() != null) { playThisOne.toggle(null); return; }
+      playController()?.toggle(selectedInhabitant);
+    },
     people: {
       clock: (): PeopleClock => {
         const view = liveSociety?.view ?? null;
@@ -2830,6 +2880,10 @@ export function mountEnvironmentSelection(
       if (!deps.env.preview) clearDistrict();
       liveSociety?.dispose();
       societyModels?.dispose();
+      // The being played from this page stays the person's until they give it back or go quiet:
+      // the server gives it back after its quiet minutes.
+      playThisOne?.dispose();
+      playThisOne = null;
       savedFlight?.stop();
       savedFlight = null;
       flightWords = null;

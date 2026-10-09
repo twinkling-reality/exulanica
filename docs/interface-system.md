@@ -249,6 +249,23 @@ waits because the world already runs as many minds as it may (a choice's `from` 
 `_over_bound`) reads "Their own routine for now: this world already runs as many minds as it may, so
 their model waits." (`OVER_BOUND_WORDS`).
 
+### Play this one
+
+A person may play one being of a society of things (`composition/play-this-one.ts`,
+`ui/play-this-one.ts`, THINGS's routes under `/world/versions/{version_id}/society/play`): with the being
+selected in the world, G starts it (the card's own control is the thing card's), and G or the band's Give
+it back gives it back. While they play, one dark band under the world's bar says "You are playing
+{name}", the world's minute and when the next is due (or that the world is paused), and what they chose
+for the next minute ("At the next minute: {the option's words}"). The world is the menu: a click on
+someone or something, or on its mark, acts on the turn's options that name it, at once where one option
+without a line matches, else through a small panel in the band in the server's own words, with a field
+for anything said (Enter says it, its length counted against the served bound). Options that act on
+nothing a person can click are the band's own buttons. A later choice before the minute replaces the
+earlier one; an answer the minute already holds is said to be taken and is never sent again. A page
+opened again while the person still plays takes the band up again; the server gives a being back after
+its quiet minutes, and the band then says so. Hover hints and walking to a clicked spot come with
+THINGS 3p.1.
+
 ### The thing card
 
 The thing card (`web/packages/app/src/ui/thing-card.ts`, `ui/thing-card.css`, mounted by

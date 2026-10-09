@@ -1745,6 +1745,7 @@ async function mountWorld(): Promise<void> {
     dispatchShell,
     handleAtlasCommand,
     toggleDecides: () => { if (actions !== null) void perform(actions.host, 'people.decides'); },
+    togglePlay: () => environmentSelection.togglePlay(),
     showTravelStatus,
     travelUsesReducedMotion,
     setInputMode: (mode) => { inputMode = mode; },
