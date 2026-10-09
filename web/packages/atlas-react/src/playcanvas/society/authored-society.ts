@@ -46,6 +46,27 @@ export function visitorPointInRoot(
   return fromWorld.transformPoint(out, out);
 }
 
+/**
+ * Where a ray of the visitor's world comes down to `root`'s ground (its own level plane, where its
+ * people's feet are drawn), as a point of that frame in whole millimetres, as a society's state and
+ * a person's walk name one; null where the ray never comes down to it.
+ */
+export function visitorRayOnRootGround(
+  root: pc.GraphNode,
+  renderOrigin: { readonly x: number; readonly y: number; readonly z: number },
+  origin: readonly [number, number, number],
+  direction: readonly [number, number, number],
+): { readonly xMm: number; readonly zMm: number } | null {
+  const fromWorld = new pc.Mat4();
+  const from = visitorPointInRoot(root, renderOrigin, origin, fromWorld);
+  const along = fromWorld.transformVector(new pc.Vec3(direction[0], direction[1], direction[2]), new pc.Vec3());
+  if (!(along.y < 0) || from.y <= 0) return null;
+  const t = -from.y / along.y;
+  // Whole millimetres, never a negative zero (adding zero makes -0 plain 0).
+  const mm = (metres: number): number => Math.round(metres * 1000) + 0;
+  return { xMm: mm(from.x + t * along.x), zMm: mm(from.z + t * along.z) };
+}
+
 export class AuthoredRegionSociety {
   readonly root: pc.Entity;
   private readonly crowd: SocietyCrowd;
@@ -338,6 +359,17 @@ export class AuthoredRegionSociety {
         ? this.hitPoint.distance(this.ray.origin)
         : null;
     });
+  }
+
+  /**
+   * Where a world-space ray comes down to this society's ground, a point of its own frame in
+   * millimetres, or null: the spot a click on open ground names for a person's walk.
+   */
+  groundPoint(
+    origin: readonly [number, number, number],
+    direction: readonly [number, number, number],
+  ): { readonly xMm: number; readonly zMm: number } | null {
+    return visitorRayOnRootGround(this.root, this.renderOrigin, origin, direction);
   }
 
   destroy(): void {

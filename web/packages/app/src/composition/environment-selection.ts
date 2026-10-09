@@ -96,7 +96,7 @@ import { engineCreatedOver, societyEngine } from '../society-engines.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
 import { LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings, THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type MountedThings, type ThingLookChosenDetail, type ThingPickDetail, type ThingPickVia, type ThingsDependencies, visitorsOf } from './things.js';
 import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
-import { mountPlayThisOne, type MountedPlayThisOne } from './play-this-one.js';
+import { mountPlayThisOne, type MountedPlayThisOne, type PlayPick } from './play-this-one.js';
 import { SocietyPlayClient } from '../society-play-api.js';
 import { markLabel, markOf, type MarkInput } from './thing-marks.js';
 import { LineWatch, thingLine } from './thing-lines.js';
@@ -680,6 +680,8 @@ export function mountEnvironmentSelection(
   } | null = null;
   let installedPointerPick: ((clientX: number, clientY: number) => boolean) | null = null;
   let priorPointerPick: ((clientX: number, clientY: number) => boolean) | null = null;
+  /** Ends the pointer's hint over the world (Play this one) when the world closes. */
+  const pointerHover = new AbortController();
 
   overview.addEventListener('click', () => deps.state.atlas?.binding.setCityView('overview'));
   street.addEventListener('click', () => deps.state.atlas?.binding.setCityView('street'));
@@ -900,7 +902,9 @@ export function mountEnvironmentSelection(
         (bridge) => bridges?.get(bridge)?.label ?? null,
         // A place the input lists that none of the person's objects names (a town's premises) is still
         // there, said by what its town calls it where the input says.
-        new Map(society.places.targets.filter((target) => target.enabled).map((target) => [target.targetId, target.place ?? null])))
+        new Map(society.places.targets.filter((target) => target.enabled).map((target) => [target.targetId, target.place ?? null])),
+        // A being a person plays: its choices are that person's, never a model's or its routine's.
+        societyModels?.mindOf(id)?.played != null)
       : null;
     inspector.show({
       subject: id,
@@ -2022,6 +2026,8 @@ export function mountEnvironmentSelection(
         return person === undefined ? 'them' : inhabitantLabel(person);
       },
       refreshModels: async () => { await societyModels?.refresh(society?.currentTick ?? null, societyPeople(), true); },
+      // DRAW's ring on the ground where the played being's chosen walk goes.
+      showDestination: (point) => { things?.setDestination(point); },
     });
     deps.env.shell.append(playThisOne.band.root);
     return playThisOne;
@@ -2539,19 +2545,50 @@ export function mountEnvironmentSelection(
     priorInteract = atlas.controls.onInteract;
     // The nearest along a ray wins: a placed thing, or one of the world's people in front of it.
     // Aiming and pressing E and a click on the world before looking around pick the same way.
+    const pickedAlong = (origin: readonly [number, number, number], direction: readonly [number, number, number]) => {
+      const thing = things?.pick(origin, direction) ?? null;
+      const inhabitantId = atlas.authoredSociety?.pickInhabitant(origin, direction, thing?.distance ?? Number.POSITIVE_INFINITY) ?? null;
+      const pick: PlayPick | null = inhabitantId !== null ? { subjectId: inhabitantId, thingId: null }
+        : thing !== null ? { subjectId: thing.pick.subjectId, thingId: thing.pick.thingId } : null;
+      return { thing, inhabitantId, pick };
+    };
     const pickAlong = (
       origin: readonly [number, number, number], direction: readonly [number, number, number], via: ThingPickVia,
     ): boolean => {
-      const thing = things?.pick(origin, direction) ?? null;
-      const inhabitantId = atlas.authoredSociety?.pickInhabitant(origin, direction, thing?.distance ?? Number.POSITIVE_INFINITY);
-      // While a person plays a being, a click acts for it rather than opening a card.
-      if (playThisOne?.onPick(inhabitantId
-        ? { subjectId: inhabitantId, thingId: null }
-        : { subjectId: thing?.pick.subjectId ?? null, thingId: thing?.pick.thingId ?? null }) === true) return true;
-      if (inhabitantId) { inspectInhabitant(inhabitantId); return true; }
+      const { thing, inhabitantId, pick } = pickedAlong(origin, direction);
+      // While a person plays a being, a click acts for it rather than opening a card, and a click
+      // on open ground walks there where the minute offers it.
+      if (playThisOne?.playing() != null) {
+        if (pick !== null ? playThisOne.onPick(pick) : playThisOne.onGround(atlas.authoredSociety?.groundPoint(origin, direction) ?? null)) return true;
+      }
+      if (inhabitantId !== null) { inspectInhabitant(inhabitantId); return true; }
       if (thing !== null) { things?.raise(thing.pick, via); return true; }
       return false;
     };
+    // While playing, the pointer over the world says what a click there would do, once a frame at
+    // most; never while the pointer is locked to look around (it has no position then).
+    const canvas = deps.env.canvas ?? null;
+    let hoverAt: { readonly x: number; readonly y: number } | null = null;
+    let hoverFrame: number | null = null;
+    const hoverNow = (): void => {
+      hoverFrame = null;
+      const at = hoverAt;
+      const play = playThisOne;
+      if (play?.playing() == null) return;
+      const ray = at === null || document.pointerLockElement != null || atlas.interactionRay === undefined
+        ? null : pointerRay(atlas, at.x, at.y);
+      if (ray === null) { play.hover(null, false); return; }
+      const { pick } = pickedAlong(ray.origin, ray.direction);
+      play.hover(pick, pick === null && atlas.authoredSociety?.groundPoint(ray.origin, ray.direction) != null);
+    };
+    const hoverSoon = (at: { readonly x: number; readonly y: number } | null): void => {
+      hoverAt = at;
+      if (playThisOne?.playing() == null || hoverFrame !== null) return;
+      hoverFrame = window.requestAnimationFrame(hoverNow);
+    };
+    canvas?.addEventListener('pointermove', (event) => hoverSoon({ x: event.clientX, y: event.clientY }), { signal: pointerHover.signal });
+    canvas?.addEventListener('pointerleave', () => hoverSoon(null), { signal: pointerHover.signal });
+    pointerHover.signal.addEventListener('abort', () => { if (hoverFrame !== null) window.cancelAnimationFrame(hoverFrame); });
     installedInteract = () => {
       const ray = atlas.interactionRay?.();
       const position = ray ? { x: ray.origin[0], y: ray.origin[1], z: ray.origin[2] } : atlas.controls.state;
@@ -2889,6 +2926,7 @@ export function mountEnvironmentSelection(
       societyModels?.dispose();
       // The being played from this page stays the person's until they give it back or go quiet:
       // the server gives it back after its quiet minutes.
+      pointerHover.abort();
       playThisOne?.dispose();
       playThisOne = null;
       savedFlight?.stop();

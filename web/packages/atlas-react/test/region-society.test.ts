@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { islandId } from '@exulanica/atlas-core';
-import { visitorPointInRoot } from '../src/playcanvas/society/authored-society.js';
+import { visitorPointInRoot, visitorRayOnRootGround } from '../src/playcanvas/society/authored-society.js';
 import { hostRegionSociety } from '../src/playcanvas/society/region-society.js';
 import { drawDeclaredFloors } from '../src/playcanvas/declared-floor.js';
 
@@ -50,6 +50,21 @@ describe('a society hung from a made world\'s island', () => {
     app.root.addChild(starter);
     const same = visitorPointInRoot(starter, { x: 0, y: 0, z: 0 }, [3, 1.5, -4]);
     expect([same.x, same.y, same.z]).toEqual([3, 1, -4]);
+    app.destroy();
+  });
+
+  it('names where a ray comes down to the island\'s ground in its own frame, in millimetres', () => {
+    const { app, island } = world();
+    const placed = island('region-a', 10, 5, 90);
+    const origin = { x: 64, y: 0, z: 0 };
+    // From 2 m over the island's local (2, 0, 0), looking down and a little along world -z, which is
+    // the island's +x: the ray reaches its ground 1 m further along it.
+    const spot = visitorRayOnRootGround(placed.entity, origin, [10 + origin.x, 2, 5 - 2], [0, -2, -1]);
+    expect(spot).toEqual({ xMm: 3000, zMm: 0 });
+    // A ray level with the ground or rising, or one starting under it, never comes down to it.
+    expect(visitorRayOnRootGround(placed.entity, origin, [10 + origin.x, 2, 3], [1, 0, 0])).toBeNull();
+    expect(visitorRayOnRootGround(placed.entity, origin, [10 + origin.x, 2, 3], [0, 1, 0])).toBeNull();
+    expect(visitorRayOnRootGround(placed.entity, origin, [10 + origin.x, -1, 3], [0, -1, 0])).toBeNull();
     app.destroy();
   });
 

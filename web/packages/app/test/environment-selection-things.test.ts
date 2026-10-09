@@ -25,7 +25,11 @@ const { FakeLayer, layers } = vi.hoisted(() => {
     /** The maker the crowd's figures read the library's looks from. */
     readonly maker = { library: { list: { kinds: [], looks: [] } } };
     society: unknown = null;
+    /** Play this one's ring where the played being's walk goes. */
+    destination: unknown = null;
     constructor(readonly options: ThingLayerOptions) { made.push(this); }
+    setPlayed(_subjectId: string | null) {}
+    setDestination(point: unknown) { this.destination = point; }
     setSociety(state: unknown) { this.society = state; }
     async setPlaced(things: readonly PlacedThingRecord[]) { this.placed = things; }
     pick() { return this.placed.length === 0 ? null : { pick: { placedId: this.placed[0]!.thingId, thingId: null, subjectId: null }, distance: this.distance }; }
@@ -48,6 +52,27 @@ const { pointerRay } = vi.hoisted(() => ({
 vi.mock('@exulanica/atlas-react/playcanvas', async (original) => ({
   ...(await original<typeof import('@exulanica/atlas-react/playcanvas')>()),
   pointerRay,
+}));
+
+// Play this one's routes: the minute offers the person's walk to a spot they choose (THINGS 3p.1).
+const { playClient } = vi.hoisted(() => ({
+  playClient: {
+    start: vi.fn(async () => undefined),
+    giveBack: vi.fn(async () => undefined),
+    turn: vi.fn(async () => ({
+      subjectId: 'person-0', baseTick: 3, lineCharactersMaximum: 120, played: true, playedByYou: true,
+      quietMinutes: 5, quietLeft: 5, nextDueAt: null, minuteMs: null,
+      options: [
+        { label: 'wait a moment', kind: 'wait', targetId: null, beingId: null, takesLine: false, takesPoint: false },
+        { label: 'walk to a spot you choose', kind: 'point', targetId: null, beingId: null, takesLine: false, takesPoint: true },
+      ],
+    })),
+    answer: vi.fn(async () => ({ baseTick: 3, answerSeq: 1 })),
+  },
+}));
+vi.mock('../src/society-play-api.js', async (original) => ({
+  ...(await original<typeof import('../src/society-play-api.js')>()),
+  SocietyPlayClient: class { constructor() { return playClient; } },
 }));
 
 const WORLD = 'world:authored:saved';
@@ -252,6 +277,28 @@ describe('a saved world\'s placed things', () => {
     }));
     // The state's thing whose placed id is the pick's: 't-well' in thingsSociety above.
     expect(view.showThing.mock.calls[0]![0]).toMatchObject({ placed: { thingId: 'well-1' }, societyThingId: 't-well' });
+    mounted.dispose();
+  });
+
+  it('while a being is played, walks it to a click on open ground and rings the spot', async () => {
+    const { mounted, crowd, controls } = mount(true);
+    await mounted.begin();
+    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    const layer = layers.at(-1)!;
+    // The click meets neither the well nor the person: it comes down to the ground.
+    layer.distance = Number.POSITIVE_INFINITY;
+    layer.placed = [];
+    crowd.pickInhabitant.mockImplementation(() => null);
+    const groundPoint = vi.fn(() => ({ xMm: 1200, zMm: -800 }));
+    Object.assign(crowd, { groundPoint });
+    // Not playing, a click on open ground is left to looking around.
+    expect(controls.onPointerPick!(640, 400)).toBe(false);
+    await mounted.play('person-0');
+    expect(controls.onPointerPick!(640, 400)).toBe(true);
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    expect(groundPoint).toHaveBeenCalledWith([0, 1.68, 4], [0, 0, -1]);
+    expect(playClient.answer).toHaveBeenLastCalledWith('version', 'person-0', 3, 'walk to a spot you choose', null, { xMm: 1200, zMm: -800 });
+    expect(layer.destination).toEqual({ xMm: 1200, zMm: -800 });
     mounted.dispose();
   });
 });

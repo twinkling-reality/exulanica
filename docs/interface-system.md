@@ -260,11 +260,18 @@ for the next minute ("At the next minute: {the option's words}"). The world is t
 someone or something, or on its mark, acts on the turn's options that name it, at once where one option
 without a line matches, else through a small panel in the band in the server's own words, with a field
 for anything said (Enter says it, its length counted against the served bound). Options that act on
-nothing a person can click are the band's own buttons. A later choice before the minute replaces the
-earlier one; an answer the minute already holds is said to be taken and is never sent again. A page
-opened again while the person still plays takes the band up again; the server gives a being back after
-its quiet minutes, and the band then says so. Hover hints and walking to a clicked spot come with
-THINGS 3p.1.
+nothing a person can click are the band's own buttons. Where the minute offers a walk to a spot the
+person chooses (an option with `takes_point`), a click on open ground walks there: the spot, where the
+click's ray comes down to the society's ground in its own frame, goes with the answer as `point`, and a
+ring in the world-mark person colour marks it until that minute is drawn or another choice replaces it;
+"Nobody walks there" answers a spot off the walking ground. Where no walk is offered, a click on open
+ground looks around as it always does. Before the pointer is locked to look around, one quiet line in the
+band says what a click under it would do ("Click to pick up the sword", "Click to walk here"), or that
+nothing is offered there this minute. A later choice before the minute replaces the earlier one; an
+answer the minute already holds is said to be taken and is never sent again, and one past the minute's
+limit says in how many seconds the next minute takes answers. A page opened again while the person still
+plays takes the band up again; the server gives a being back after its quiet minutes, and the band then
+says so. The inspector's words for a played being say its person chose what it does, never a model.
 
 ### The thing card
 

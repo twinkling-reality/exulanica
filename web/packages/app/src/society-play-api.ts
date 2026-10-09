@@ -6,7 +6,9 @@
  * The server keeps the account out of every answer: a read says only whether the reader is the one
  * playing (`played_by_you`). A turn offers the being's options for the next minute by their words
  * (`label`), each naming what it acts on where it acts on something (a place or thing, `targetId`;
- * another being, `beingId`) and whether it takes a line. One answer per minute counts, the latest.
+ * another being, `beingId`), whether it takes a line and whether it walks to a spot the person
+ * chooses (`takesPoint`, answered with a point of the society's own frame). One answer per minute
+ * counts, the latest.
  */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
@@ -15,13 +17,21 @@ import { openWorldPath } from './world-scope.js';
 /** One thing the played being may do at the next minute, in the words the server gives it. */
 export interface PlayOption {
   readonly label: string;
-  /** `target`, `talk`, `stand`, `wait`, `carry_on`, `say_to`, `say_all`, `leave`, `pick_up`, `put_down`, `give`, `take`. */
+  /** `target`, `talk`, `stand`, `wait`, `carry_on`, `say_to`, `say_all`, `leave`, `pick_up`, `put_down`, `give`, `take`, `point`. */
   readonly kind: string;
   /** The place or society thing it acts on, or null. */
   readonly targetId: string | null;
   /** The other being it involves (talked to, given to, taken from), or null. */
   readonly beingId: string | null;
   readonly takesLine: boolean;
+  /** Whether it walks to a spot the person chooses: its answer gives the spot. */
+  readonly takesPoint: boolean;
+}
+
+/** A spot on the society's ground, millimetres in its own frame, as a walk to it names one. */
+export interface PlayPoint {
+  readonly xMm: number;
+  readonly zMm: number;
 }
 
 export interface PlayTurn {
@@ -70,6 +80,7 @@ export function parsePlayTurn(raw: unknown): PlayTurn {
         targetId: maybe(option['target_id'], text),
         beingId: maybe(option['being_id'], text),
         takesLine: flag(option['takes_line']),
+        takesPoint: flag(option['takes_point']),
       });
     })),
     lineCharactersMaximum: count(held['line_characters_maximum']),
@@ -104,9 +115,11 @@ export class SocietyPlayClient {
     return parsePlayTurn(await this.#transport.getJson<unknown>(this.#path(versionId, `/${encodeURIComponent(subjectId)}/turn`)));
   }
 
-  async answer(versionId: string, subjectId: string, baseTick: number, label: string, line: string | null): Promise<PlayAnswered> {
+  async answer(
+    versionId: string, subjectId: string, baseTick: number, label: string, line: string | null, point: PlayPoint | null = null,
+  ): Promise<PlayAnswered> {
     const held = object(await this.#transport.postJson<unknown>(this.#path(versionId, `/${encodeURIComponent(subjectId)}/answer`), {
-      base_tick: baseTick, label, ...(line === null ? {} : { line }),
+      base_tick: baseTick, label, ...(line === null ? {} : { line }), ...(point === null ? {} : { point: [point.xMm, point.zMm] }),
     }));
     return { baseTick: count(held['base_tick']), answerSeq: count(held['answer_seq']) };
   }

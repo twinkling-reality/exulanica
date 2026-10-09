@@ -54,6 +54,12 @@
 #shell .play-band-chosen { color: var(--color-text); }
 #shell .play-band-status { color: var(--color-text-muted); }
 #shell .play-band-status:empty { display: none; }
+/* What a click would do follows the pointer: its line is kept, so the band never jumps as it moves. */
+#shell .play-band-hint {
+  min-height: 1.3em;
+  color: var(--color-text-muted);
+  font: var(--weight-medium) 0.74rem / 1.3 var(--font-mono);
+}
 
 #shell .play-band-loose,
 #shell .play-band-asking {
