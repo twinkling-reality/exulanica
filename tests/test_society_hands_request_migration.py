@@ -4,7 +4,9 @@ A schema of this test's own is migrated with every migration below the hands req
 its title, so renumbering it at landing changes nothing here) and given a saved world on a host
 that offers societies of things: a well, a knight, a sword and a gate placed, a society of things
 over them, and two of the owner's direct requests of the kinds every stored request is, go_to and
-perform, each consumed by a minute. Then the migration runs on it as deployed. What is held:
+perform, each consumed by a minute. Then the migration runs on it as deployed, and every migration
+after it, so a request made then binds as the code that composed the society writes it (a society of
+things composed today runs hands v2, which a later migration binds). What is held:
 
 *   every stored request row is byte for byte what it was, and the society replays verified;
 *   0060's four request checks are gone and the migration's two stand in their place, valid over
@@ -258,6 +260,10 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
                     (sorted(NEW_CHECKS),),
                 ).fetchone() == (True,)
                 assert world.replayed() is True
+                for later in everything:
+                    if later.version > hands.version:
+                        admin.execute(later.sql)
+                admin.commit()
                 # A new request of each profile binds and is consumed.
                 state = world.read(world.society)["state"]
                 sword = next(t for t in state["things"] if t["placed_id"] == "sword")
