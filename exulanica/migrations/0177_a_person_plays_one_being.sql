@@ -42,6 +42,8 @@ create table world_society_person_answer (
   document_sha256 text not null check (document_sha256 ~ '^[0-9a-f]{64}$'),
   recorded_at timestamptz not null default statement_timestamp(),
   primary key (workspace_id, society_id, subject_id, base_tick, answer_seq),
+  constraint world_society_person_answer_world_is_registered
+    foreign key (workspace_id, world_id) references world_identity (workspace_id, world_id),
   foreign key (workspace_id, society_id) references world_society (workspace_id, society_id),
   check (document->>'profile' is not distinct from 'exulanica.person-answer/v1'),
   check (document->>'subject_id' is not distinct from subject_id::text),
