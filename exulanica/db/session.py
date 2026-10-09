@@ -121,9 +121,10 @@ class Database:
         """A connection with no workspace. For migrations, the schema check, and the door's two
         reads before any workspace is known: looking up a presented secret in ``door_secret`` and
         counting a bridge's refused redemptions in ``door_redemption_refusal``, the two tables
-        migration 0149 keeps outside every workspace (:mod:`exulanica.door.secrets`); and the
-        generation worker's and the operator's session commands reading the register of generation
-        sessions, which belongs to no workspace (:mod:`exulanica.generation`). Nothing else.
+        migration 0149 keeps outside every workspace (:mod:`exulanica.door.secrets`); the
+        generation worker reading the register of generation sessions, and the operator's session
+        commands writing it, since it belongs to no workspace (:mod:`exulanica.generation`).
+        Nothing else.
 
         This opens a connection and declines to declare a workspace. That is the whole of what
         it does, and **what the connection can then see is a property of the role behind the URL

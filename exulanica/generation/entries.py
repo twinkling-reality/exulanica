@@ -7,6 +7,8 @@ are two entries, each with its own claim, done marker and charge. The worker:
 - writes an entry's job and request documents (:func:`write_files`), then ``ready.json`` last
   (:func:`write_ready`), so the session never takes a half-written entry, and ``ready.json`` names
   the one session that may take it and the instant after which none does;
+- withdraws an entry it no longer wants run (:func:`write_withdrawn`), which a session checks
+  before it claims;
 - reads the claim and done markers the session writes for an entry (:func:`claim`, :func:`done`),
   each checked to name that entry, its job and the session it went to, and to be dated no earlier
   than the entry was queued (less the clocks' allowed difference);
@@ -33,6 +35,7 @@ from exulanica_pieces.queue import (
     BEAT_PROFILE,
     DONE_PROFILE,
     build_ready,
+    build_withdrawn,
     entry_files,
     read_claim,
     read_done,
@@ -52,6 +55,7 @@ __all__ = [
     "outputs",
     "write_files",
     "write_ready",
+    "write_withdrawn",
 ]
 
 _INSTANT: Final = "%Y-%m-%dT%H:%M:%SZ"
@@ -285,3 +289,8 @@ def outputs(
     if len(set(keys)) != len(keys):
         raise EntryRefused("outputs_unreadable", "two receipts name one request's variant")
     return sorted(found, key=lambda output: (output.request_sha256, output.variant))
+
+
+def write_withdrawn(bucket: GenerationBucket, entry: str, at: datetime) -> None:
+    """Withdraw an entry: a session that has not claimed it never does."""
+    bucket.put(f"withdrawn/{entry}.json", build_withdrawn(entry, at))

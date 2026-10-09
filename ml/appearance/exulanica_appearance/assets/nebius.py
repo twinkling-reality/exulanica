@@ -177,9 +177,8 @@ def stage(
     (staging / "requests").mkdir(parents=True, exist_ok=True)
     (staging / "code.tar").write_bytes(code)
     (staging / "job.json").write_bytes(job_raw)
-    (staging / "job.sh").write_bytes(
-        (repository / "ml/appearance/container/assets/job.sh").read_bytes()
-    )
+    # The entry script the submit command pins: this tooling's own (JOB_SCRIPT).
+    (staging / "job.sh").write_bytes(JOB_SCRIPT.read_bytes())
     files = {"code.tar": sha256_hex(code), "job.json": job_sha256}
     for path in sorted(requests.glob("*.json")):
         (staging / "requests" / path.name).write_bytes(path.read_bytes())
@@ -377,7 +376,7 @@ def session_stage(
         bucket,
         {
             "code.tar": code,
-            "job.sh": (repository / "ml/appearance/container/assets/job.sh").read_bytes(),
+            "job.sh": JOB_SCRIPT.read_bytes(),
             "session.json": session_raw,
         },
         f"runs/{session_sha256}/",

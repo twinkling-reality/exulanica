@@ -30,9 +30,21 @@ SESSION_1 = ROOT / "ml/appearance/evidence/generated-assets-session-1"
 COMPUTE_KEY = "nebius-ai-cloud-rtx-pro-6000"
 
 
+def _record_with_nonce() -> bytes:
+    """Session 1's record as the tooling now writes it: the same settings and a fresh nonce."""
+    first = json.loads((SESSION_1 / "session.json").read_bytes())
+    return build_session(
+        route=first["route"],
+        code_sha256=first["code_sha256"],
+        idle_seconds=first["idle_seconds"],
+        stop_seconds=first["stop_seconds"],
+        nonce="1f" * 16,
+    )
+
+
 @pytest.fixture
 def files(tmp_path):
-    session_raw = (SESSION_1 / "session.json").read_bytes()
+    session_raw = _record_with_nonce()
     job = read_job(min((SESSION_1 / "jobs").glob("*.json")).read_bytes())
     session = tmp_path / "session.json"
     session.write_bytes(session_raw)
@@ -145,7 +157,9 @@ def test_a_session_of_a_route_no_piece_request_takes_is_refused(
     # Piece requests take route A (the recipes' object route); a route S session could build no
     # job of them, so every request would stay waiting behind it.
     job = read_job(min((SESSION_1 / "jobs").glob("*.json")).read_bytes())
-    raw = build_session(route="S", code_sha256=job["code_sha256"], stop_seconds=1800)
+    raw = build_session(
+        route="S", code_sha256=job["code_sha256"], stop_seconds=1800, nonce="2f" * 16
+    )
     session = tmp_path / "session-s.json"
     session.write_bytes(raw)
     other = tmp_path / "manifest-s.json"
@@ -157,6 +171,32 @@ def test_a_session_of_a_route_no_piece_request_takes_is_refused(
     code, refused = _open(capsys, session, other)
     assert code == 2 and "piece requests take route A" in refused["refused"]
     assert _run(capsys, "session", "status") == (0, {"open": []})
+
+
+def test_a_session_record_without_a_nonce_is_refused(cli_database, capsys, tmp_path) -> None:
+    # Session 1's own record carries none: two sessions with its settings would share a digest.
+    raw = (SESSION_1 / "session.json").read_bytes()
+    job = read_job(min((SESSION_1 / "jobs").glob("*.json")).read_bytes())
+    session = tmp_path / "session-1.json"
+    session.write_bytes(raw)
+    manifest = tmp_path / "manifest-1.json"
+    manifest.write_bytes(
+        build_session_manifest(
+            raw, components_sha256=job["components_sha256"], container=job["container"]
+        )
+    )
+    code, refused = _open(capsys, session, manifest)
+    assert code == 2 and "carries no nonce" in refused["refused"]
+    assert _run(capsys, "session", "status") == (0, {"open": []})
+
+
+def test_a_session_record_is_registered_once(cli_database, files, capsys) -> None:
+    session, manifest, _ = files
+    assert _open(capsys, session, manifest)[0] == 0
+    code, refused = _open(capsys, session, manifest)
+    assert code == 2 and "registered already" in refused["refused"]
+    code, status = _run(capsys, "session", "status")
+    assert code == 0 and len(status["open"]) == 1
 
 
 def test_the_runtime_role_reads_the_register_and_writes_none_of_it(

@@ -625,9 +625,12 @@ def test_a_malformed_output_ends_the_batch_refused_and_still_settles_its_time(pl
     assert Decimal(reservation["settled_usd"]) == Decimal("0.020372")
 
 
+@pytest.mark.parametrize("error", [OSError, RuntimeError])
 def test_an_entry_that_never_reached_the_bucket_is_refused_and_its_reservations_released(
-    played,
+    played, error
 ) -> None:
+    # Whatever fails before ready.json (a refused write, or any other error), no session can have
+    # taken the entry, so nothing of it was sent.
     p = played()
     p.ask()
     p.beat("idle")
@@ -635,7 +638,7 @@ def test_an_entry_that_never_reached_the_bucket_is_refused_and_its_reservations_
 
     def refusing(key, data):
         if key.endswith("/job.json"):
-            raise OSError("the bucket refused the write")
+            raise error("the bucket refused the write")
         return put(key, data)
 
     p.bucket.put = refusing  # type: ignore[method-assign]
@@ -707,9 +710,16 @@ def test_nothing_is_queued_that_the_session_could_not_finish(played) -> None:
 
 def test_a_queued_request_its_workspace_s_deletion_cancelled_is_settled_unknown(played) -> None:
     p = played()
-    _queued(p)
+    entry = _queued(p)
     p.tombstone()
     p.worker.run_once()
+    # The entry is withdrawn before the settlement is decided, so a session that has not claimed it
+    # never does.
+    withdrawn = json.loads(p.bucket.get(f"withdrawn/{entry}.json"))
+    assert (withdrawn["entry_id"], withdrawn["profile"]) == (
+        entry,
+        "exulanica.generated-asset-queue-withdrawn/v1",
+    )
     [row] = p.rows("select state, failure from piece_request")
     assert (row["state"], row["failure"]) == ("cancelled", "workspace_deleted")
     [settlement] = p.rows("select basis, settled_at from piece_settlement")
@@ -748,3 +758,90 @@ def test_a_piece_made_by_other_models_is_not_kept(played) -> None:
     assert row["state"] == "refused"
     assert p.rows("select variant from piece_output") == []
     assert list(p.pieces.iter_blob_ids()) == []
+
+
+def test_a_heartbeat_that_does_not_read_stops_queueing_and_nothing_else(played) -> None:
+    p = played()
+    _queued(p)
+    p.run_the_entry(milliseconds=40743)
+    p.ask(kinds=(("lantern", 1),))
+    # The latest heartbeat is not one: the session is not warm, and the batch is still followed.
+    p.bucket.put(f"session/{p.session_sha256}/beat-29991231T000000Z.json", b"{}")
+    report = p.worker.run_once()
+    assert report["session"] == "starting"
+    states = [r["state"] for r in p.rows("select state from piece_request order by requested_at")]
+    assert states == ["made", "requested"]
+    [reservation] = p.reservations()
+    assert Decimal(reservation["settled_usd"]) == Decimal("0.020372")
+
+
+def test_a_deletion_between_a_batch_s_record_and_its_offer_sends_nothing(
+    played, monkeypatch
+) -> None:
+    from exulanica.generation import entries
+
+    p = played()
+    p.ask()
+    p.beat("idle")
+    real = entries.write_files
+
+    def then_deleted(*arguments, **keywords):
+        real(*arguments, **keywords)
+        p.tombstone()
+
+    monkeypatch.setattr(entries, "write_files", then_deleted)
+    p.worker.run_once()
+    # The batch was erased before its ready.json: no session can take what was never offered.
+    assert p.entries() == []
+    p.worker.run_once()
+    [settlement] = p.rows("select basis from piece_settlement")
+    assert settlement["basis"] == "not_sent"
+    [reservation] = p.reservations()
+    assert reservation["state"] == "released"
+
+
+def test_a_deleted_request_whose_reservation_was_only_admitted_is_released(
+    played, monkeypatch
+) -> None:
+    from exulanica.spending import ledger
+
+    p = played()
+    p.ask()
+    p.beat("idle")
+
+    def deleted_then_refused(self, ticket):
+        p.tombstone()
+        raise RuntimeError("the dispatch did not happen")
+
+    monkeypatch.setattr(ledger.WorkspaceSpending, "dispatch", deleted_then_refused)
+    p.worker.run_once()
+    monkeypatch.undo()
+    p.worker.run_once()
+    [settlement] = p.rows("select basis, usd from piece_settlement")
+    assert (settlement["basis"], settlement["usd"]) == ("not_sent", Decimal(0))
+    [reservation] = p.reservations()
+    assert reservation["state"] == "released"
+
+
+def test_a_gpu_the_compute_catalog_no_longer_prices_is_given_nothing_and_settled_unknown(
+    played,
+) -> None:
+    p = played()
+    _queued(p)
+    p.run_the_entry(milliseconds=40743)
+    p.ask(kinds=(("lantern", 1),))
+    compute = p.worker.catalogs.compute
+    p.worker.catalogs = dataclasses.replace(
+        p.worker.catalogs,
+        compute=dataclasses.replace(
+            compute, entries={k: v for k, v in compute.entries.items() if k != COMPUTE_KEY}
+        ),
+    )
+    p.worker.run_once()
+    rows = p.rows("select state from piece_request order by requested_at")
+    # The made batch cannot be priced, so its whole reservation stays until reconciled; the
+    # waiting request is admitted against nothing.
+    assert [r["state"] for r in rows] == ["made", "requested"]
+    [reservation] = p.reservations()
+    assert reservation["state"] == "unknown"
+    assert Decimal(reservation["settled_usd"]) == Decimal("0.06")

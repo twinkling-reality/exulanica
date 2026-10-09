@@ -14,16 +14,18 @@ Layout, relative to the bucket's root (the job's mount, or a directory in tests)
     queue/<entry id>/           job.json and requests/<request sha256>.json, then ready.json last
     claimed/<entry id>.json     written by the session when it takes an entry
     done/<entry id>.json        written when every item has ended and its outputs are published
+    withdrawn/<entry id>.json   written by the product when it no longer wants an entry run
     session/<session sha256>/   beat-<UTC stamp>.json every 30 s, and stop when the operator asks
     out/                        pieces, receipts and intermediates, published as a job's are
 
 An entry is named by its own id (32 lowercase hex: the product's batch id, or a uuid4 the
 operator's tooling draws), never by its job's digest: two identical asks make the same job, and
 each is its own entry with its own claim, done marker and charge. Its ``ready.json`` names the one
-session that may take it and states ``not_after``: only that session takes the entry, and only
-before that instant, so an entry its asker has given up on, or one queued for another session on
-the same bucket, is never run. The session record may carry a nonce, so two sessions started with
-the same settings still have their own digests, heartbeats and markers.
+session that may take it and states ``not_after``: only that session takes the entry, only before
+that instant and only while no withdrawal names it, so an entry its asker has given up on, or one
+queued for another session on the same bucket, is never run. The session record carries a nonce,
+so two sessions started with the same settings still have their own digests, heartbeats and
+markers; the product registers no session without one.
 
 The mount refuses renames, so nothing is moved: each marker is a new file, written once. An entry
 is ready only when ``ready.json`` exists, and ``ready.json`` names every other file of the entry
@@ -68,11 +70,13 @@ __all__ = [
     "ENTRY_PROFILE",
     "SESSION_MANIFEST_PROFILE",
     "SESSION_PROFILE",
+    "WITHDRAWN_PROFILE",
     "build_claim",
     "build_done",
     "build_ready",
     "build_session",
     "build_session_manifest",
+    "build_withdrawn",
     "charges_from_done",
     "entry_files",
     "is_entry_id",
@@ -80,6 +84,7 @@ __all__ = [
     "read_entry",
     "read_session",
     "read_session_manifest",
+    "read_withdrawn",
     "uncached_requests",
 ]
 
@@ -89,6 +94,7 @@ CLAIM_PROFILE: Final = "exulanica.generated-asset-queue-claim/v2"
 DONE_PROFILE: Final = "exulanica.generated-asset-queue-done/v2"
 #: The done marker of an entry named by its job's digest, as the measured sessions wrote it.
 DONE_PROFILE_V1: Final = "exulanica.generated-asset-queue-done/v1"
+WITHDRAWN_PROFILE: Final = "exulanica.generated-asset-queue-withdrawn/v1"
 BEAT_PROFILE: Final = "exulanica.generated-asset-session-beat/v1"
 #: What the product's register of a session needs beside the session record: the pinned models the
 #: session runs and the container it runs in, written by the operator's tooling at record time.
@@ -119,6 +125,7 @@ _READY_KEYS: Final = (
     "session_sha256",
 )
 _CLAIM_KEYS: Final = ("at", "entry_id", "job_sha256", "profile", "session_sha256")
+_WITHDRAWN_KEYS: Final = ("at", "entry_id", "profile")
 _DONE_KEYS_V1: Final = ("claimed_at", "ended_at", "job_sha256", "profile", "session_sha256")
 _DONE_KEYS: Final = (*_DONE_KEYS_V1, "entry_id")
 _DONE_RAN_V1: Final = ("items", "request_milliseconds", "results_ended_at")
@@ -364,6 +371,22 @@ def uncached_requests(
         if made.get(digest, set()) != set(range(variants)):
             kept.append(raw)
     return kept
+
+
+def build_withdrawn(entry_id: str, at: datetime) -> bytes:
+    """A withdrawal: the product no longer wants the entry run, and no session claims it."""
+    if not is_entry_id(entry_id):
+        raise Refused("an entry is named by 32 lowercase hex")
+    return canonical_bytes({"at": instant(at), "entry_id": entry_id, "profile": WITHDRAWN_PROFILE})
+
+
+def read_withdrawn(raw: bytes, entry_id: str) -> dict[str, Any]:
+    """A withdrawal, strictly, checked to name ``entry_id``."""
+    document = exact_keys(parse_canonical(raw, "withdrawal"), _WITHDRAWN_KEYS, "withdrawal")
+    if document["profile"] != WITHDRAWN_PROFILE or document["entry_id"] != entry_id:
+        raise Refused(f"a withdrawal is {WITHDRAWN_PROFILE} naming its entry")
+    _instant(document["at"], "withdrawal: at")
+    return document
 
 
 def build_claim(*, entry_id: str, job_sha256: str, session_sha256: str, at: datetime) -> bytes:

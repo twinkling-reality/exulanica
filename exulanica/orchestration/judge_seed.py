@@ -196,6 +196,8 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     "character_catalog_publication": "host-admin character catalog publication, per deployment",
     "character_catalog_withdrawal": "host-admin character catalog withdrawal, per deployment",
     "generation_session": "the operator's register of GPU sessions, per deployment",
+    # A piece request's settlement of its spending reservation: money, which no seed carries.
+    "piece_settlement": "per-deployment settlement of a piece request's spending reservation",
     # The bake stage a deployment runs is stated by its own migrations, as its schema is; an
     # owner's decision to serve a faulted tile is about that deployment's bakes (migration 0144).
     "baked_tile_stage": "the bake stage the destination's own migrations state",
@@ -204,6 +206,21 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     # a credential, even a digest of one. A destination issues its own.
     "door_secret": "per-deployment door credentials, never carried by an import",
     "door_redemption_refusal": "per-deployment record of a bridge's refused invite redemptions",
+}
+
+#: Workspace tables carried narrower than the whole workspace, with the exact predicate.
+#:
+#: ``piece_request``: only ended requests. The export refuses a workspace holding an open request
+#: before it copies anything, but it copies on a connection that sees each statement's own
+#: snapshot, so a request asked between that refusal and the copy would otherwise be carried
+#: open, and a destination's generation worker would make pieces nobody asked it for.
+#: ``piece_batch``: only ended batches, for the same reason: a batch queued in that window would
+#: travel queued without its requests, and a destination worker would never end it.
+WORKSPACE_ROW_PREDICATES: Final[Mapping[str, str]] = {
+    "piece_request": (
+        "t.workspace_id = %(workspace_id)s and t.state not in ('requested', 'queued')"
+    ),
+    "piece_batch": "t.workspace_id = %(workspace_id)s and t.state <> 'queued'",
 }
 
 #: Tables with no ``workspace_id`` that nevertheless hold this workspace's rows, with the exact
@@ -219,18 +236,6 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
 #: ``%(workspace_id)s`` is a bound parameter. None of this is ever formatted into SQL as text.
 #: ``%(baked_tile_ids)s`` is bound too: the baked tiles :func:`_reached_baked_tiles` finds in
 #: Python, because a generated world names its tiles through its receipt rather than in a column.
-#: Workspace tables carried narrower than the whole workspace, with the exact predicate.
-#:
-#: ``piece_request``: only ended requests. The export refuses a workspace holding an open request
-#: before it copies anything, but it copies on a connection that sees each statement's own
-#: snapshot, so a request asked between that refusal and the copy would otherwise be carried
-#: open, and a destination's generation worker would make pieces nobody asked it for.
-WORKSPACE_ROW_PREDICATES: Final[Mapping[str, str]] = {
-    "piece_request": (
-        "t.workspace_id = %(workspace_id)s and t.state not in ('requested', 'queued')"
-    ),
-}
-
 REACHED_TABLES: Final[Mapping[str, str]] = {
     "blob": (
         "t.blob_sha256 in ("
@@ -382,6 +387,10 @@ _TRUNCATE_GUARDED: Final = ("purge_job", "tombstone")
 #: bake's inputs, so emptying it would empty tiles that belong to no workspace
 #: (:func:`reset_to_seed`). Staged in :data:`_STAGED_BAKED_TILE` for the comparison.
 _MERGED_TABLE: Final = "baked_tile"
+#: The carried table a reset neither truncates nor loads: the installation's index of kept
+#: generated pieces, which no deletion erases (contract: generated pieces). An export refuses a
+#: workspace holding generated outputs, whose bytes a seed does not carry, so its file is empty.
+_KEPT_TABLE: Final = "generated_piece"
 _STAGED_BAKED_TILE: Final = "seed_baked_tile"
 
 #: How much of a row file or an archived object is read at once: one mebibyte, so a file is
@@ -1001,6 +1010,23 @@ def _refuse_unfinished_creature_drafts(
         )
 
 
+def _refuse_generated_outputs(connection: psycopg.Connection, workspace_id: uuid.UUID) -> None:
+    """A workspace holding outputs of generated pieces cannot be seeded: the pieces' bytes live in
+    the shared generated-pieces namespace, which a seed does not carry, so a destination would hold
+    index rows and outputs for pieces it cannot serve."""
+    present = connection.execute("select to_regclass('piece_output') is not null as present")
+    if not present.fetchone()["present"]:
+        return
+    held = connection.execute(
+        "select count(*) as n from piece_output where workspace_id = %s", (workspace_id,)
+    ).fetchone()
+    if held["n"]:
+        raise SeedRefused(
+            f"workspace {workspace_id} holds {held['n']} generated piece output(s), whose bytes "
+            "live in the shared generated-pieces store a seed does not carry"
+        )
+
+
 def export_seed(
     connection: psycopg.Connection,
     store: ContentAddressedStore,
@@ -1039,6 +1065,7 @@ def export_seed(
     _refuse_private_workspace_style_packs(connection, workspace_id)
     _refuse_open_piece_requests(connection, workspace_id)
     _refuse_unfinished_creature_drafts(connection, workspace_id)
+    _refuse_generated_outputs(connection, workspace_id)
 
     buckets = classify_tables(connection)
     exported = list(buckets["workspace"]) + list(buckets["reached"])
@@ -1594,11 +1621,17 @@ def reset_to_seed(
         )
     _require_tile_bytes(tiles, manifest)
 
+    kept = [name for name, table in files if table == _KEPT_TABLE]
+    if any(int(manifest.rows[name]["rows"]) > 0 for name in kept):
+        raise SeedRefused(
+            f"the archive carries rows for {_KEPT_TABLE}, the installation's index of generated "
+            "pieces, which a reset never empties and an export never fills"
+        )
     merged = [(name, table) for name, table in files if table == _MERGED_TABLE]
     keep = [
         (name, table)
         for name, table in files
-        if table not in _TRUNCATE_GUARDED and table != _MERGED_TABLE
+        if table not in _TRUNCATE_GUARDED and table not in (_MERGED_TABLE, _KEPT_TABLE)
     ]
     with connection.transaction():
         connection.execute(

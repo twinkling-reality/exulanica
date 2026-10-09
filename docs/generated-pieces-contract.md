@@ -131,7 +131,15 @@ A registered session reports its state by a heartbeat in the bucket every 30 sec
 `starting` until its models have loaded, `warm` while its latest heartbeat is idle or working and at
 most 90 seconds old, and `ended` when a heartbeat says so or they stop; with no session registered,
 or past its window, it is `off`. Each session record carries a fresh nonce, so two sessions started
-with the same settings have their own digests, heartbeats and markers.
+with the same settings have their own digests, heartbeats and markers; `session open` refuses a
+record without one, and the register holds each digest once.
+
+A session takes only the entries whose ready marker names it, never one past its not-after instant
+or withdrawn by the worker, and passes over a directory that is not an entry or whose ready marker
+does not read, since nothing then shows the entry is its own. It writes its last heartbeat, which
+says it ended, only after every claim and done marker it will write, and the bucket mount writes
+each file whole before the next is begun; the worker relies on both when it releases an entry an
+ended session never claimed.
 
 Nothing the session runs is taken from the bucket on trust. Its start command pins the digest of
 the entry script beside the code archive's; the container copies the staged script to its own disk
@@ -161,9 +169,15 @@ one pass every 15 seconds, each workspace in its own session under row-level sec
   digest however many requests hold it, each request, and the ready marker last, which names the
   one session that may take the entry. A waiting request that no longer reads under the catalogs
   this server deploys (its piece budgets file changed since it was asked) ends `failed`
-  (`request_unreadable`) before anything is admitted, since no session could make it. A failure before
-  the ready marker ends the batch `refused` (`not_sent`) and releases its reservations, since no
-  session could have taken it.
+  (`request_unreadable`) before anything is admitted, since no session could make it. That end is
+  final: a request asked under a catalog version the worker no longer runs, for instance during a
+  deployment that updates the API before the worker, is asked again under the new one. Any failure
+  before the ready marker ends the batch `refused` (`not_sent`) and releases its reservations, since
+  no session could have taken it. The ready marker is written under the workspace's lock and only
+  while the batch is still queued, so a deletion is either before it, and nothing is offered, or
+  after it, and the worker withdraws the entry (`withdrawn/<entry>.json`) before it decides the
+  cancelled requests' settlements. A session whose GPU the deployed compute catalog no longer
+  prices is given nothing, and a batch it ran settles `unknown`.
 - **Following**, every pass, for every batch still queued, each on its own, and each workspace on
   its own, so one fault never stops the rest. The worker reads only that entry's markers, and a
   marker naming another entry, job or session, or dated more than two minutes before the batch was
@@ -184,9 +198,12 @@ one pass every 15 seconds, each workspace in its own session under row-level sec
   listed rate times the milliseconds the GPU measured for its items, at most its reservation, and
   charged once for requests sharing a digest (to the oldest; the others settle at USD 0), when the
   entry ran, its outputs read or not; released when no session took the entry or it never reached
-  the bucket; and `unknown` (the whole reservation stays until an administrator reconciles it) when
-  a session took it and said nothing more, when a marker was not the entry's or states more time
-  than the job's stop, or when the workspace was deleted while it was queued.
+  the bucket, or (deleted while queued) its reservation was only admitted; and `unknown` (the whole
+  reservation stays until an administrator reconciles it) when a session took it and said nothing
+  more, when a marker was not the entry's or states more time than the job's stop, or when the
+  workspace was deleted while it was queued with its reservation dispatched. The ask's own check of
+  the allowance counts only requests that hold no reservation yet, since the allowance left already
+  leaves out what a queued request reserved.
 
 A session's own start, loading and idle time is not a request's and is charged to no workspace; it
 is the operator's, on their Nebius bill. The worker holds two credentials, both from the operator's
@@ -220,9 +237,12 @@ namespace.
 Each kept piece is listed in the installation's index (table `generated_piece`: its cache key and
 variant, receipt, piece digest and size). The index holds catalog content only, no workspace's: it
 has no workspace column and no row-level security, its rows are never changed, and no workspace's
-deletion erases them, as none erases the pieces. Every output names an index row, and a request
-whose every variant is indexed under its cache key is answered from it (section 5.2). A judge seed
-carries the index rows its outputs name.
+deletion erases them, as none erases the pieces. Each row's columns are its receipt's own, and its
+cache key is computed from them, both checked by the table itself. Every output names an index
+row, an output answered from the index is that row's receipt, and a request whose every variant is
+indexed under its cache key is answered from it (section 5.2). A judge seed carries no generated
+piece: its export refuses a workspace holding outputs, since the pieces' bytes are not in it, and a
+reset of a judge stack leaves the destination's index as it is.
 
 The namespace is bounded (`EXULANICA_GENERATED_PIECES_MAX_BYTES`, two gibibytes by default): a
 piece that would take it past the bound is refused. A piece refused at the boundary, for any of
@@ -267,10 +287,11 @@ numbers.
 The same tombstone erases the workspace's batches and outputs (a trigger owned by the definer role,
 which may only read and delete those two tables). Its settlements are kept, since they hold only
 ids, a basis and an amount and its reservations must still be settled: a request the tombstone
-cancelled while queued is settled `unknown`. A stored piece and its index row stay, because they
-hold nothing of the workspace's (section 5.3). The judge's seed export refuses a workspace that
-holds an open request and copies only ended requests, so a seed never carries one into another
-database, even one asked while the export runs.
+cancelled while queued is settled `unknown`, or released when its reservation was only admitted.
+A stored piece and its index row stay, because they hold nothing of the workspace's (section 5.3).
+The judge's seed export refuses a workspace that holds an open request and copies only ended
+requests and batches, so a seed never carries one into another database, even one asked while the
+export runs; settlements, as money rows, never travel in a seed.
 
 An ask holds the workspace's lock (880024) from its first statement, as a deletion's own triggers
 do, so the two never interleave: an ask after a deletion that has not yet committed waits for it and
@@ -293,3 +314,4 @@ once (migration 0137) and, sent again after the ask, cancels the request that as
 | The queue format both sides read, and the session that serves it | `exulanica_pieces/queue.py`, `ml/appearance/exulanica_appearance/assets/session.py`, `ml/appearance/container/assets/job.sh` | `ml/appearance/tests/test_assets_session.py` |
 | The shared store's boundary and bound | `exulanica/generation/pieces.py` | `tests/test_generated_piece_store.py` |
 | Deletion of batches and outputs | the second migration's definer trigger | `tests/test_piece_request_erasure_postgres.py` |
+| The index held to its receipts, one registration per session, and the output trigger's erased-workspace and kept-receipt checks | the migration `a_kept_piece_is_its_receipt` (after the one that creates batches) | `tests/test_piece_requests_postgres.py`, `tests/test_generation_session_commands_postgres.py` |

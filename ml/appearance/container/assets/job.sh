@@ -42,6 +42,10 @@ code=/opt/gen
 if [ "$mode" = session ]; then
   cp "$run/session.json" "$stage/session.json"
   test "$(sha256sum "$stage/session.json" | cut -c1-64)" = "$JOB"
+else
+  # A single job's record is data its strict reader checks, held to the digest the command named.
+  cp "$run/job.json" "$stage/job.json"
+  test "$(sha256sum "$stage/job.json" | cut -c1-64)" = "$JOB"
 fi
 
 echo "phase system $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -100,11 +104,11 @@ if [ "$mode" = session ]; then
 elif [ "$ROUTE" = C ]; then
   # A creature job: each item from its plan's sketch to a checked skinned look.
   PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance creatures run \
-    --code "$code" --upstream /opt/upstream --job "$run/job.json" --requests "$run/requests" \
+    --code "$code" --upstream /opt/upstream --job "$stage/job.json" --requests "$run/requests" \
     --sketches "$run/sketches" --weights "$work/weights" --out "$work/out"
 else
   PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance assets remote run \
-    --code "$code" --route "$ROUTE" --job "$run/job.json" --requests "$run/requests" \
+    --code "$code" --route "$ROUTE" --job "$stage/job.json" --requests "$run/requests" \
     --weights "$work/weights" --cutouts "$data/out/inputs" --out "$work/out"
 fi
 echo "phase done $(date -u +%Y-%m-%dT%H:%M:%SZ)"

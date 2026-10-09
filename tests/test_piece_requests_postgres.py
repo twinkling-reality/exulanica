@@ -14,6 +14,7 @@ import datetime as dt
 import hashlib
 import json
 import uuid
+from decimal import Decimal
 
 import psycopg
 import pytest
@@ -30,6 +31,7 @@ from exulanica.world.style_pack_library import style_pack_library
 from exulanica_pieces.canonical import canonical_bytes, sha256_hex
 from psycopg.rows import dict_row
 
+from generated_piece_support import kept_output
 from world_support import FIXTURE_WORLD_ID, registered_world
 
 pytestmark = pytest.mark.postgres
@@ -377,40 +379,33 @@ def test_a_workspace_holding_an_open_piece_request_cannot_be_seeded(world, tmp_p
     export("ended")
 
 
-def test_a_seed_carries_ended_requests_only_with_the_kept_pieces_their_outputs_name(
-    world, tmp_path, monkeypatch
-) -> None:
-    """The kept pieces have no workspace column: a seed carries exactly the ones its outputs name
-    (each output's foreign key needs its row). A request asked after the export refused open ones,
-    but before it copied, is not carried open."""
-    from decimal import Decimal
-
-    from exulanica.generation.entries import Output
+def _export(connection, workspace_id, destination):
     from exulanica.orchestration import judge_seed
     from exulanica.store.local import LocalContentAddressedStore
+
+    judge_seed.export_seed(
+        connection,
+        LocalContentAddressedStore(destination.parent / "blobs"),
+        workspace_id=workspace_id,
+        destination=destination,
+        created_at="2026-10-08T00:00:00Z",
+        allow_absent=True,
+    )
+    return {
+        entry["table"]: entry["rows"]
+        for entry in json.loads((destination / "manifest.json").read_text())["rows"].values()
+    }
+
+
+def test_a_workspace_holding_generated_outputs_cannot_be_seeded(world, tmp_path) -> None:
+    """A generated piece's bytes are in the shared store, which a seed does not carry, so a seed
+    of a workspace holding outputs would restore pieces its destination cannot serve."""
+    from exulanica.orchestration.judge_seed import SeedRefused
 
     connection, workspace_id = world.connection, world.workspace_id
     (well,), _ = _ask(connection, workspace_id)
     _queue(connection, workspace_id, well.piece_request_id)
     [batch] = batches.batches_in_flight(connection, workspace_id)
-
-    def kept(key: str, variant: int) -> batches.KeptOutput:
-        receipt = canonical_bytes({"a receipt": key, "variant": variant})
-        output = Output(
-            receipt_sha256=sha256_hex(receipt),
-            receipt=receipt,
-            document={
-                "request_sha256": batch.requests[0].request_sha256,
-                "variant": variant,
-                "verdict": {"over": [], "within": True},
-            },
-            piece_sha256=sha256_hex(receipt + b"piece"),
-            piece=receipt + b"piece",
-        )
-        return batches.KeptOutput(
-            output, key, "c0" * 32, "exulanica.generated-asset-postprocess/v2"
-        )
-
     batches.end_batch(
         connection,
         workspace_id,
@@ -418,30 +413,41 @@ def test_a_seed_carries_ended_requests_only_with_the_kept_pieces_their_outputs_n
         state="done",
         ended_at=dt.datetime.now(dt.UTC),
         settlements={well.piece_request_id: ("reported", Decimal("0.01"))},
-        outputs=[kept("ca" * 32, 0)],
+        outputs=[kept_output(batch.requests[0].request_sha256)],
     )
-    # A kept piece no output of this workspace names.
-    with connection.cursor() as cursor:
-        batches._record_generated(cursor, kept("cb" * 32, 0))
-    # The race: the export's refusal of open requests has run, and then the person asks.
-    monkeypatch.setattr(judge_seed, "_refuse_open_piece_requests", lambda *_: None)
-    _ask(connection, workspace_id, kinds=(("lantern", 1),))
     connection.commit()
-    judge_seed.export_seed(
+    with pytest.raises(SeedRefused, match="generated piece output"):
+        _export(connection, workspace_id, tmp_path / "seed")
+
+
+def test_a_seed_carries_only_ended_requests_and_batches_and_no_settlement(
+    world, tmp_path, monkeypatch
+) -> None:
+    """A request asked, and a batch queued, after the export refused open requests but before it
+    copied, are not carried open; settlements are money and never travel."""
+    from exulanica.orchestration import judge_seed
+
+    connection, workspace_id = world.connection, world.workspace_id
+    (well,), _ = _ask(connection, workspace_id)
+    _queue(connection, workspace_id, well.piece_request_id)
+    [batch] = batches.batches_in_flight(connection, workspace_id)
+    batches.end_batch(
         connection,
-        LocalContentAddressedStore(tmp_path / "blobs"),
-        workspace_id=workspace_id,
-        destination=tmp_path / "seed",
-        created_at="2026-10-08T00:00:00Z",
-        allow_absent=True,
+        workspace_id,
+        batch,
+        state="expired",
+        ended_at=dt.datetime.now(dt.UTC),
+        settlements={well.piece_request_id: ("not_sent", Decimal(0))},
     )
-    rows = {
-        entry["table"]: entry["rows"]
-        for entry in json.loads((tmp_path / "seed" / "manifest.json").read_text())["rows"].values()
-    }
-    assert rows["piece_request"] == 1
-    assert rows["generated_piece"] == 1
-    assert rows["piece_output"] == 1
+    # The race: the export's refusal of open requests has run, and then a request is asked and
+    # queued.
+    monkeypatch.setattr(judge_seed, "_refuse_open_piece_requests", lambda *_: None)
+    (lantern,), _ = _ask(connection, workspace_id, kinds=(("lantern", 1),))
+    _queue(connection, workspace_id, lantern.piece_request_id)
+    connection.commit()
+    rows = _export(connection, workspace_id, tmp_path / "seed")
+    assert (rows["piece_request"], rows["piece_batch"], rows["generated_piece"]) == (1, 1, 0)
+    assert "piece_settlement" not in rows
 
 
 def test_a_request_is_queued_only_into_an_open_batch_of_its_workspace(world) -> None:
@@ -478,3 +484,123 @@ def test_a_request_is_queued_only_into_an_open_batch_of_its_workspace(world) -> 
     # The control: an open batch of the workspace takes it.
     _queue(connection, workspace_id, lantern.piece_request_id, b'{"a second job":"for the test"}')
     assert _row(connection, lantern.piece_request_id)["state"] == "queued"
+
+
+def test_a_kept_piece_s_index_row_is_its_receipt_s_own(world) -> None:
+    """Every column of an index row is read from its receipt, and its cache key computed from
+    them, by the table itself: no row can name a piece its receipt does not."""
+    connection = world.connection
+    (well,), _ = _ask(connection, world.workspace_id)
+    kept = kept_output(well.request_sha256)
+    columns = (
+        "cache_key", "variant", "request_sha256", "components_sha256", "postprocess_version",
+        "receipt_canonical", "receipt_sha256", "piece_sha256", "piece_bytes", "within",
+        "over_checks",
+    )  # fmt: skip
+    row = {
+        "cache_key": kept.cache_key,
+        "variant": 0,
+        "request_sha256": well.request_sha256,
+        "components_sha256": kept.components_sha256,
+        "postprocess_version": kept.postprocess_version,
+        "receipt_canonical": kept.output.receipt.decode("ascii"),
+        "receipt_sha256": kept.output.receipt_sha256,
+        "piece_sha256": kept.output.piece_sha256,
+        "piece_bytes": len(kept.output.piece),
+        "within": True,
+        "over_checks": [],
+    }
+    insert = (
+        f"insert into generated_piece ({', '.join(columns)}) "
+        f"values ({', '.join(f'%({name})s' for name in columns)})"
+    )
+    for change in (
+        {"variant": 1},
+        {"request_sha256": "0" * 64},
+        {"piece_sha256": "0" * 64},
+        {"piece_bytes": 1},
+        {"within": False, "over_checks": ["triangles"]},
+        {"cache_key": "0" * 64},
+    ):
+        with pytest.raises(psycopg.errors.CheckViolation), connection.transaction():
+            connection.execute(insert, {**row, **change})
+    # A receipt lacking the members the check compares makes each comparison null, which a check
+    # would pass: it is refused, its digest its own.
+    for receipt in ("{}", "[]", json.dumps({"variant": 0})):
+        bare = {
+            **row,
+            "receipt_canonical": receipt,
+            "receipt_sha256": hashlib.sha256(receipt.encode("utf-8")).hexdigest(),
+        }
+        with pytest.raises(psycopg.errors.CheckViolation), connection.transaction():
+            connection.execute(insert, bare)
+    # The control: the row as its receipt states it goes in.
+    with connection.transaction():
+        connection.execute(insert, row)
+
+
+def test_an_output_answered_from_the_index_is_the_index_row_s_receipt(world) -> None:
+    connection, workspace_id = world.connection, world.workspace_id
+    (well,), _ = _ask(connection, workspace_id)
+    kept = kept_output(well.request_sha256)
+    with connection.cursor() as cursor:
+        batches._record_generated(cursor, kept)
+    connection.commit()
+    other = kept_output(well.request_sha256, within=False)
+    with pytest.raises(psycopg.errors.CheckViolation, match="kept receipt"):
+        batches.answer_from_cache(
+            connection,
+            workspace_id,
+            well.piece_request_id,
+            cache_key=kept.cache_key,
+            cached=[
+                {
+                    "variant": 0,
+                    "receipt_canonical": other.output.receipt.decode("ascii"),
+                    "receipt_sha256": other.output.receipt_sha256,
+                    "piece_sha256": other.output.piece_sha256,
+                    "within": False,
+                    "over_checks": ["triangles"],
+                }
+            ],
+        )
+    connection.rollback()
+    assert _row(connection, well.piece_request_id)["state"] == "requested"
+
+
+def test_an_output_answered_from_the_index_carries_the_index_row_s_verdict(world) -> None:
+    """The kept receipt and piece with another verdict is not the index row's: a piece the index
+    holds as refused is never answered as passed."""
+    connection, workspace_id = world.connection, world.workspace_id
+    (well,), _ = _ask(connection, workspace_id)
+    refused = kept_output(well.request_sha256, within=False)
+    with connection.cursor() as cursor:
+        batches._record_generated(cursor, refused)
+    connection.commit()
+    claimed = {
+        "variant": 0,
+        "receipt_canonical": refused.output.receipt.decode("ascii"),
+        "receipt_sha256": refused.output.receipt_sha256,
+        "piece_sha256": refused.output.piece_sha256,
+    }
+    with pytest.raises(psycopg.errors.CheckViolation, match="kept receipt"):
+        batches.answer_from_cache(
+            connection,
+            workspace_id,
+            well.piece_request_id,
+            cache_key=refused.cache_key,
+            cached=[{**claimed, "within": True, "over_checks": []}],
+        )
+    connection.rollback()
+    assert _row(connection, well.piece_request_id)["state"] == "requested"
+
+
+def test_a_queued_request_is_not_counted_again_against_the_allowance(world) -> None:
+    """The allowance left already leaves out what a queued request reserved, so the open worst
+    case counts only requests that hold no reservation."""
+    connection, workspace_id = world.connection, world.workspace_id
+    (well, lantern), _ = _ask(connection, workspace_id, kinds=(("well", 1), ("lantern", 1)))
+    both = store.open_worst_case(connection, workspace_id)
+    assert both == well.worst_case_usd + lantern.worst_case_usd
+    _queue(connection, workspace_id, well.piece_request_id)
+    assert store.open_worst_case(connection, workspace_id) == lantern.worst_case_usd

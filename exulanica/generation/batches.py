@@ -22,7 +22,12 @@ Each request a batch held gets its settlement decided in the same transaction as
 when no session took it or it never reached the bucket; ``unknown`` when a session took it and
 said nothing more. The worker settles each decided one with the spending authority afterwards and
 marks it settled (:func:`mark_settled`), retrying on every pass until it is. A request a
-workspace's deletion cancelled while queued is decided ``unknown`` (:func:`decide_cancelled`).
+workspace's deletion cancelled while queued is decided by its reservation: ``not_sent`` while it was
+only admitted, ``unknown`` once dispatched (:func:`decide_cancelled`), and its entry is withdrawn.
+
+``ready.json`` is written only while the batch is still queued, under the workspace's lock
+(:func:`while_queued`), so a deletion either comes before it, and no entry is ever offered, or after
+it, and the entry is withdrawn.
 
 One generation worker runs per installation; the rowcount checks below refuse a second writer's
 change rather than rely on that.
@@ -32,7 +37,8 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -59,6 +65,7 @@ __all__ = [
     "answer_from_cache",
     "batches_in_flight",
     "cached_pieces",
+    "cancelled_batches",
     "decide_cancelled",
     "end_batch",
     "fail_unreadable",
@@ -69,6 +76,7 @@ __all__ = [
     "session_by_id",
     "unsettled",
     "waiting_requests",
+    "while_queued",
 ]
 
 #: The most requests one queue entry holds: an ask's most kinds.
@@ -481,22 +489,59 @@ def answer_from_cache(
     return end
 
 
-def decide_cancelled(connection: psycopg.Connection, workspace_id: uuid.UUID) -> int:
-    """Decide ``unknown`` for each request a deletion cancelled while it was queued: its batch is
-    erased with the workspace, so whether a session ran it is not known; its whole reservation
-    stays charged until an administrator reconciles it. Returns how many were decided."""
-    with connection.transaction():
+_CANCELLED: Final = (
+    "from piece_request p left join spending_reservation r on r.workspace_id = p.workspace_id "
+    "and r.reservation_id = p.reservation_id "
+    "where p.workspace_id = %s and p.reservation_id is not null "
+    "and p.state = 'cancelled' and not exists "
+    "(select 1 from piece_settlement s where s.workspace_id = p.workspace_id "
+    "and s.piece_request_id = p.piece_request_id) "
+)
+
+
+def cancelled_batches(connection: psycopg.Connection, workspace_id: uuid.UUID) -> list[uuid.UUID]:
+    """The batches of requests a deletion cancelled while queued and not yet decided: the entries
+    the worker withdraws before it decides them."""
+    with connection.cursor(row_factory=dict_row) as cursor:
+        rows = cursor.execute(
+            f"select distinct p.piece_batch_id {_CANCELLED}", (workspace_id,)
+        ).fetchall()
+    return sorted((row["piece_batch_id"] for row in rows), key=str)
+
+
+def decide_cancelled(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    *,
+    unsent: frozenset[uuid.UUID] | set[uuid.UUID] = frozenset(),
+) -> list[uuid.UUID]:
+    """Decide each request a deletion cancelled while it was queued, by its reservation: one only
+    admitted, or in a batch the worker knows it never offered (``unsent``), never reached a session
+    (``not_sent``); one dispatched may have (``unknown``: its whole reservation stays charged until
+    an administrator reconciles it), since its batch is erased with the workspace. Returns the
+    batches decided."""
+    with connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
         lock_workspace(connection, workspace_id)
-        decided = connection.execute(
-            "insert into piece_settlement (workspace_id, piece_request_id, reservation_id, "
-            "basis, usd) select p.workspace_id, p.piece_request_id, p.reservation_id, 'unknown', "
-            "p.worst_case_usd from piece_request p where p.workspace_id = %s "
-            "and p.reservation_id is not null and p.state = 'cancelled' and not exists "
-            "(select 1 from piece_settlement s where s.workspace_id = p.workspace_id "
-            "and s.piece_request_id = p.piece_request_id)",
+        rows = cursor.execute(
+            "select p.piece_request_id, p.reservation_id, p.piece_batch_id, p.worst_case_usd, "
+            f"r.state as reservation_state {_CANCELLED}"
+            "order by p.requested_at, p.piece_request_id",
             (workspace_id,),
-        )
-    return decided.rowcount
+        ).fetchall()
+        for row in rows:
+            admitted = row["reservation_state"] == "admitted" or row["piece_batch_id"] in unsent
+            cursor.execute(
+                "insert into piece_settlement (workspace_id, piece_request_id, reservation_id, "
+                "basis, usd) values (%s, %s, %s, %s, %s)",
+                (
+                    workspace_id,
+                    row["piece_request_id"],
+                    row["reservation_id"],
+                    "not_sent" if admitted else "unknown",
+                    Decimal(0) if admitted else row["worst_case_usd"],
+                ),
+            )
+    return sorted({row["piece_batch_id"] for row in rows}, key=str)
 
 
 def fail_unreadable(
@@ -513,6 +558,22 @@ def fail_unreadable(
             (workspace_id, piece_request_id),
         )
     return moved.rowcount == 1
+
+
+@contextmanager
+def while_queued(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, piece_batch_id: uuid.UUID
+) -> Iterator[bool]:
+    """Hold the workspace's lock and say whether the batch is still queued: what is done inside
+    happens before any deletion of the workspace or after it, never during."""
+    with connection.transaction():
+        lock_workspace(connection, workspace_id)
+        row = connection.execute(
+            "select 1 from piece_batch where workspace_id = %s and piece_batch_id = %s "
+            "and state = 'queued'",
+            (workspace_id, piece_batch_id),
+        ).fetchone()
+        yield row is not None
 
 
 def unsettled(connection: psycopg.Connection, workspace_id: uuid.UUID) -> list[Settlement]:

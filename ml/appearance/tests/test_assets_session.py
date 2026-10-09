@@ -26,6 +26,7 @@ from exulanica_appearance.assets.dryrun import STUB_PACK, StubBackend, dry_run
 from exulanica_appearance.assets.queue import (
     build_ready,
     build_session,
+    build_withdrawn,
     charges_from_done,
     entry_files,
     read_done,
@@ -302,26 +303,6 @@ def test_an_entry_past_its_not_after_is_never_claimed_or_run(
         ),
         (
             lambda d, job, reqs: (d / "ready.json").write_bytes(
-                canonical_bytes(
-                    dict(
-                        json.loads(
-                            build_ready(
-                                d.name,
-                                job,
-                                reqs,
-                                session_sha256=sha256_hex(_session_raw()),
-                                queued_at=START,
-                                not_after=START + timedelta(hours=1),
-                            )
-                        ),
-                        files={"job.json": sha256_hex(job), "../../runs/x/job.sh": "ab" * 32},
-                    )
-                )
-            ),
-            "other than job.json",
-        ),
-        (
-            lambda d, job, reqs: (d / "ready.json").write_bytes(
                 build_ready(
                     d.name,
                     job,
@@ -346,6 +327,53 @@ def test_an_entry_out_of_shape_is_refused_and_never_run(
     done = _done(root, job)
     assert match in done["refused"]
     assert backend.meshes == 0
+
+
+def test_an_entry_that_cannot_be_shown_to_be_this_session_s_is_never_claimed(
+    repository: Path, tmp_path: Path
+) -> None:
+    # A ready.json that does not read, a directory not named as an entry, and a withdrawn entry:
+    # none is claimed (claiming could take another session's entry) and none is run.
+    root = tmp_path / "bucket"
+    job, requests = _job(repository, BENCH)
+    spoiled = _enqueue(root, job, requests)
+    (spoiled / "ready.json").write_bytes(
+        canonical_bytes(
+            dict(
+                json.loads((spoiled / "ready.json").read_bytes()),
+                files={"job.json": sha256_hex(job), "../../runs/x/job.sh": "ab" * 32},
+            )
+        )
+    )
+    misnamed = root / "queue" / sha256_hex(job)
+    _enqueue(root, job, requests).rename(misnamed)
+    withdrawn = _enqueue(root, job, requests).name
+    (root / "withdrawn").mkdir()
+    (root / "withdrawn" / f"{withdrawn}.json").write_bytes(build_withdrawn(withdrawn, START))
+    backend = CountingBackend()
+    result = _serve(repository, root, backend)
+    assert (result["served"], backend.meshes) == ([], 0)
+    assert not (root / "claimed").exists()
+
+
+def test_a_withdrawn_entry_does_not_hold_back_the_entries_queued_after_it(
+    repository: Path, tmp_path: Path
+) -> None:
+    # The listing passes over a withdrawn entry; were it chosen and then dropped by the claim's
+    # re-check, it would stay first in line until its not_after, and so would every entry behind it.
+    root = tmp_path / "bucket"
+    job, requests = _job(repository, BENCH)
+    until = START + timedelta(minutes=10)
+    withdrawn = _enqueue(root, job, requests, queued_at=START, not_after=until).name
+    (root / "withdrawn").mkdir()
+    (root / "withdrawn" / f"{withdrawn}.json").write_bytes(build_withdrawn(withdrawn, START))
+    later, later_requests = _job(repository, LANTERN)
+    kept = _enqueue(
+        root, later, later_requests, queued_at=START + timedelta(seconds=1), not_after=until
+    ).name
+    result = _serve(repository, root)
+    assert [entry["entry_id"] for entry in result["served"]] == [kept]
+    assert not (root / "claimed" / f"{withdrawn}.json").exists()
 
 
 def test_an_entry_holding_a_request_its_job_does_not_name_is_refused(
@@ -583,12 +611,15 @@ def test_the_container_runs_the_staged_job_script_only_as_the_pinned_digest(
 
 def test_the_job_script_checks_and_uses_local_copies_of_what_it_trusts() -> None:
     lines = nebius.JOB_SCRIPT.read_text().splitlines()
-    uses = [
-        line.strip() for line in lines if '"$run/code.tar"' in line or '"$run/session.json"' in line
-    ]
+    trusted = ('"$run/code.tar"', '"$run/session.json"', '"$run/job.json"')
+    uses = [line.strip() for line in lines if any(name in line for name in trusted)]
     assert uses == [
         'cp "$run/code.tar" "$stage/code.tar"',
         'cp "$run/session.json" "$stage/session.json"',
+        'cp "$run/job.json" "$stage/job.json"',
+    ]
+    assert 'test "$(sha256sum "$stage/job.json" | cut -c1-64)" = "$JOB"' in [
+        line.strip() for line in lines
     ]
     assert 'test "$(sha256sum "$stage/code.tar" | cut -c1-64)" = "$CODE_SHA256"' in [
         line.strip() for line in lines

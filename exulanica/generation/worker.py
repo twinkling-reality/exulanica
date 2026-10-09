@@ -67,9 +67,9 @@ from exulanica_pieces.records import (
 
 from exulanica.db.session import Database
 from exulanica.generation import batches, entries
-from exulanica.generation.bucket import GenerationBucket, GenerationBucketRefused
+from exulanica.generation.bucket import GenerationBucket
 from exulanica.generation.entries import CLOCK_ALLOWANCE, EntryRefused
-from exulanica.generation.pieces import PieceRefused, store_piece
+from exulanica.generation.pieces import PieceRefused, store_piece, stored_bytes
 from exulanica.generation.requests import GPU_PROVIDER, GenerationCatalogs
 from exulanica.generation.session import SessionState, session_state
 from exulanica.models.spending import SpendingRefused, SpendingRequest, SpendingTicket
@@ -123,15 +123,25 @@ class PieceGenerationWorker:
         state: SessionState = "off"
         beat = None
         if session is not None:
-            beat = entries.latest_beat(self.bucket, session.session_sha256)
-            state = session_state(
-                registered=True, window_ends_at=session.window_ends_at, beat=beat, now=now
-            )
+            try:
+                beat = entries.latest_beat(self.bucket, session.session_sha256)
+            except Exception as failure:
+                # A heartbeat that does not read leaves the session not warm: nothing is queued,
+                # and following and settling, which need no heartbeat, go on.
+                _LOG.warning(
+                    "the session's heartbeat does not read: %s", type(failure).__qualname__
+                )
+                state = "starting"
+            else:
+                state = session_state(
+                    registered=True, window_ends_at=session.window_ends_at, beat=beat, now=now
+                )
         report: dict[str, Any] = {"session": state, "workspaces": {}}
         for workspace_id in sorted(self.workspaces()):
             try:
                 with self.database.session(workspace_id) as connection:
-                    done = self._serve(connection, workspace_id, session, state, beat, now)
+                    # Read for each workspace, so a slow pass never dates a later one's caps early.
+                    done = self._serve(connection, workspace_id, session, state, beat, self.now())
             except Exception as failure:  # one workspace's fault never stops the others
                 _LOG.warning(
                     "workspace %s was not served this pass: %s",
@@ -152,6 +162,10 @@ class PieceGenerationWorker:
         beat: Mapping[str, Any] | None,
         now: datetime,
     ) -> dict[str, Any]:
+        # A request a deletion cancelled while queued: its entry is withdrawn first, so a session
+        # that has not claimed it never does, and only then is its settlement decided.
+        for piece_batch_id in batches.cancelled_batches(connection, workspace_id):
+            entries.write_withdrawn(self.bucket, entries.entry_id(piece_batch_id), now)
         batches.decide_cancelled(connection, workspace_id)
         ended = self._follow(connection, workspace_id, now)
         settled = self._settle_decided(connection, workspace_id, now)
@@ -321,9 +335,10 @@ class PieceGenerationWorker:
             )
             return
         kept = []
+        held = stored_bytes(self.pieces_store)
         for output in found:
             try:
-                admitted = store_piece(
+                stored = store_piece(
                     self.pieces_store,
                     request_raw=documents[output.request_sha256].request_canonical.encode("ascii"),
                     receipt_raw=output.receipt,
@@ -333,16 +348,19 @@ class PieceGenerationWorker:
                     library=self.library,
                     shipped=self.shipped,
                     bound=self.store_bound,
+                    held=held,
                 )
             except PieceRefused as refused:
                 _LOG.warning(
                     "a generated piece was not kept: %s (%s)", refused.code, output.piece_sha256
                 )
                 continue
+            if stored.written:
+                held += len(output.piece)
             kept.append(
                 batches.KeptOutput(
                     output=output,
-                    cache_key=admitted.cache_key,
+                    cache_key=stored.admitted.cache_key,
                     components_sha256=session.components_sha256,
                     postprocess_version=POSTPROCESS_VERSION,
                 )
@@ -365,11 +383,15 @@ class PieceGenerationWorker:
     ) -> dict[uuid.UUID, tuple[str, Decimal]] | None:
         """Each request's settlement from the done marker: the measured time of its digest at the
         rate, at most its reservation, charged once to the oldest request holding the digest. None
-        when the marker states more time for a digest than the job's stop allows."""
-        compute = self.catalogs.compute.entries[session.compute_key]
+        when the marker states more time, over all its digests, than the job's stop allows, or when
+        the deployed compute catalog no longer prices the session's GPU."""
+        compute = self.catalogs.compute.entries.get(session.compute_key)
+        if compute is None:
+            _LOG.warning("no compute catalog entry prices %s", session.compute_key)
+            return None
         stop_milliseconds = _job_stop(batch.job_canonical) * 1000
         milliseconds = marker["request_milliseconds"]
-        if any(int(value) > stop_milliseconds for value in milliseconds.values()):
+        if sum(int(value) for value in milliseconds.values()) > stop_milliseconds:
             return None
         settlements: dict[uuid.UUID, tuple[str, Decimal]] = {}
         charged: set[str] = set()
@@ -460,6 +482,11 @@ class PieceGenerationWorker:
             if not self._readable(connection, workspace_id, row, session):
                 continue
             rest.append(row)
+        if session.compute_key not in self.catalogs.compute.entries:
+            # The session's GPU is no longer priced: nothing is admitted against it; the requests
+            # wait for a session the catalog prices.
+            _LOG.warning("no compute catalog entry prices %s", session.compute_key)
+            return answered, None
         ends_at = min(
             _instant(beat["started_at"]) + timedelta(seconds=session.stop_seconds),
             session.window_ends_at,
@@ -523,26 +550,35 @@ class PieceGenerationWorker:
             for _row, ticket in admitted:
                 gate.dispatch(ticket)
             entries.write_files(self.bucket, entry, job_raw, requests)
-        except (SpendingRefused, GenerationBucketRefused, OSError, Refused) as failure:
+        except Exception as failure:  # no session takes an entry without its ready.json
             _LOG.warning("a batch was not sent: %s", type(failure).__qualname__)
             self._not_sent(connection, workspace_id, piece_batch_id, now)
             return answered, None
-        # ready.json last. A failure here may still have reached the bucket, so the batch stays
-        # queued and is followed (its claim, done marker or not_after decide it).
+        # ready.json last, and only while the batch is still queued, under the workspace's lock: a
+        # deletion is then either before it (nothing is offered) or after it (the entry is
+        # withdrawn). A failure writing it may still have reached the bucket, so the batch stays
+        # queued and is followed (its claim, done marker, session or not_after decide it).
         try:
-            entries.write_ready(
-                self.bucket,
-                entry,
-                job_raw,
-                requests,
-                session_sha256=session.session_sha256,
-                queued_at=now,
-                not_after=ends_at,
-            )
-        except (GenerationBucketRefused, OSError) as failure:
+            with batches.while_queued(connection, workspace_id, piece_batch_id) as queued:
+                if queued:
+                    entries.write_ready(
+                        self.bucket,
+                        entry,
+                        job_raw,
+                        requests,
+                        session_sha256=session.session_sha256,
+                        queued_at=now,
+                        not_after=ends_at,
+                    )
+        except Exception as failure:
             _LOG.warning(
                 "a batch's ready.json may not have been written: %s", type(failure).__qualname__
             )
+            return answered, entry
+        if not queued:
+            # Deleted between its record and its offer: nothing reached a session.
+            batches.decide_cancelled(connection, workspace_id, unsent={piece_batch_id})
+            return answered, None
         return answered, entry
 
     def _readable(

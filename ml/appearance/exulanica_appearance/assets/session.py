@@ -8,8 +8,10 @@ It loads the route's backend once and then, every poll:
 1. ends if ``session/<id>/stop`` exists, or no entry has been ready for its idle stop;
 2. takes the oldest ready entry nobody has claimed (by ``queued_at``, then its id) that names this
    session and whose ``not_after`` has not passed, unless its job's own stop would carry the
-   session past its hard stop, in which case the entry waits; an entry for another session, or past
-   its ``not_after``, is never claimed or run;
+   session past its hard stop, in which case the entry waits; an entry for another session, past its
+   ``not_after``, withdrawn (``withdrawn/<entry>.json``), whose ``ready.json`` does not read, or in a
+   directory not named as an entry, is never claimed or run (none of these can be shown to be this
+   session's to take);
 3. writes ``claimed/<entry>.json``, reads the entry strictly, runs every item through the same
    runner a single job uses, publishes the outputs, and writes ``done/<entry>.json`` with each
    request's milliseconds and the receipts it published, so each request is charged what its
@@ -19,6 +21,11 @@ A heartbeat thread writes ``session/<id>/beat-<UTC stamp>.json`` every 30 second
 time, since the mount refuses renames and a file is written once) with the state, the job in hand
 and the batches served. The hard stop is also enforced outside this loop, by ``timeout`` in
 ``job.sh``, and the service's own timeout is the backstop.
+
+The product relies on one order: the session writes its last heartbeat, ``ended: <reason>``, only
+after the loop has ended, so after every claim and done marker it will ever write, and each file
+on the mount is written whole and closed before the next is begun. A worker that reads an ended
+heartbeat and then finds no claim for an entry knows no claim will come.
 """
 
 from __future__ import annotations
@@ -41,6 +48,7 @@ from exulanica_appearance.assets.queue import (
     build_claim,
     build_done,
     instant,
+    is_entry_id,
     read_entry,
     read_ready,
     read_session,
@@ -98,26 +106,26 @@ def _beat(root: Path, session: str, state: _State, started_at: str, clock: Clock
 class _Ready:
     queued_at: str
     entry_id: str
-    #: None when ready.json does not read: such an entry is claimed and refused, so it is looked
-    #: at once.
-    job_sha256: str | None = None
-    not_after: str | None = None
+    job_sha256: str
+    not_after: str
 
 
 def _ready(root: Path, session_sha256: str) -> list[_Ready]:
-    """This session's unclaimed entries with a ready.json, oldest first (by queued_at, then id); one
-    whose ready.json does not read is claimed and refused, so it is looked at once."""
+    """This session's unclaimed, unwithdrawn entries, oldest first (by queued_at, then id). A
+    directory not named as an entry, or whose ready.json does not read, is passed over: nothing in it
+    shows it is this session's to take, so claiming it could take another session's entry."""
     queue = root / "queue"
     found = []
     for directory in sorted(queue.iterdir()) if queue.is_dir() else ():
-        if not (directory / "ready.json").exists():
+        if not is_entry_id(directory.name) or not (directory / "ready.json").exists():
             continue
         if (root / "claimed" / f"{directory.name}.json").exists():
+            continue
+        if (root / "withdrawn" / f"{directory.name}.json").exists():
             continue
         try:
             ready = read_ready(directory)
         except Refused:
-            found.append(_Ready("", directory.name))
             continue
         if ready["session_sha256"] != session_sha256:
             continue
@@ -181,7 +189,7 @@ def serve(
             now = instant(clock.now())
             chosen = None
             for entry in _ready(root, session_sha256):
-                if entry.not_after is not None and now > entry.not_after:
+                if now > entry.not_after:
                     continue
                 stop = _job_stop(root / "queue" / entry.entry_id)
                 if stop is None or elapsed + stop <= session["stop_seconds"]:
@@ -195,6 +203,9 @@ def serve(
                     reason = "hard_stop"
                     break
                 clock.sleep(poll_seconds)
+                continue
+            # A withdrawal written after the listing still stops the claim.
+            if (root / "withdrawn" / f"{chosen.entry_id}.json").exists():
                 continue
             with state.lock:
                 state.state, state.job = "working", chosen.job_sha256
@@ -249,9 +260,7 @@ def _serve_one(
 ) -> dict[str, Any]:
     claimed = clock.now()
     claimed_at = instant(claimed)
-    # An entry whose ready.json did not read names no job; its claim and done name a digest of
-    # nothing, which no batch holds.
-    job_sha256 = entry.job_sha256 or sha256_hex(b"")
+    job_sha256 = entry.job_sha256
     _write_new(
         root / "claimed" / f"{entry.entry_id}.json",
         build_claim(

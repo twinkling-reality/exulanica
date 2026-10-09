@@ -63,6 +63,11 @@ def _open(database: Database, arguments: argparse.Namespace) -> dict[str, Any]:
     session_raw = Path(arguments.session).read_bytes()
     session = read_session(session_raw)
     manifest = read_session_manifest(Path(arguments.manifest).read_bytes(), session_raw)
+    if "nonce" not in session:
+        raise Refused(
+            "the session record carries no nonce; record it with the tooling, which draws one, so "
+            "no two sessions share a digest or its markers"
+        )
     if session["route"] != OBJECT_ROUTE:
         # Piece requests take route A; a session of another route could build no job of them.
         raise Refused(
@@ -75,6 +80,15 @@ def _open(database: Database, arguments: argparse.Namespace) -> dict[str, Any]:
     if not 0 < arguments.window_hours <= MAX_WINDOW_HOURS:
         raise Refused(f"a session's window is more than 0 and at most {MAX_WINDOW_HOURS} hours")
     with database.unscoped() as connection:
+        held = connection.execute(
+            "select 1 from generation_session where session_sha256 = %s",
+            (sha256_hex(session_raw),),
+        ).fetchone()
+        if held is not None:
+            raise Refused(
+                "that session record is registered already; a session is registered once, since "
+                "its markers and heartbeats are named by its digest"
+            )
         row = connection.execute(
             "insert into generation_session (session_canonical, session_sha256, route, "
             "code_sha256, components_sha256, container, compute_key, provider_job_id, opened_by, "

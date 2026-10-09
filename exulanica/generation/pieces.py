@@ -58,9 +58,11 @@ __all__ = [
     "MAX_BYTES_ENV",
     "AdmittedPiece",
     "PieceRefused",
+    "StoredPiece",
     "admit_piece",
     "max_bytes",
     "store_piece",
+    "stored_bytes",
 ]
 
 MAX_BYTES_ENV: Final = env_name("GENERATED_PIECES_MAX_BYTES")
@@ -153,7 +155,16 @@ def admit_piece(
     )
 
 
-def _stored_bytes(store: Any) -> int:
+@dataclass(frozen=True, slots=True)
+class StoredPiece:
+    """What :func:`store_piece` admitted, and whether it wrote the bytes now."""
+
+    admitted: AdmittedPiece
+    written: bool
+
+
+def stored_bytes(store: Any) -> int:
+    """The namespace's bytes: read once per batch by its caller, not once per piece."""
     return sum(store.size(blob) for blob in store.iter_blob_ids())
 
 
@@ -168,10 +179,13 @@ def store_piece(
     library: StylePackLibrary,
     shipped: Mapping[tuple[str, int], ThingKind],
     bound: int,
-) -> AdmittedPiece:
+    held: int | None = None,
+) -> StoredPiece:
     """Admit a piece at the boundary (:func:`admit_piece`) and keep it in the shared store, or
     refuse it (:class:`PieceRefused`). A piece already there is not written again; one that would
-    take the namespace past ``bound`` is refused. Returns what was admitted."""
+    take the namespace past ``bound`` is refused. ``held`` is the namespace's bytes as its caller
+    last counted them (:func:`stored_bytes`, then the bytes it wrote since), so a batch counts the
+    namespace once; without it the namespace is counted here."""
     admitted = admit_piece(
         request_raw=request_raw,
         receipt_raw=receipt_raw,
@@ -183,8 +197,8 @@ def store_piece(
     )
     blob = BlobId.from_hex(admitted.piece_sha256)
     if store.exists(blob):
-        return admitted
-    if _stored_bytes(store) + len(admitted.piece) > bound:
+        return StoredPiece(admitted, written=False)
+    if (stored_bytes(store) if held is None else held) + len(admitted.piece) > bound:
         raise PieceRefused("pieces_store_full", "the generated pieces store is at its bound")
     store.put_bytes(admitted.piece)
-    return admitted
+    return StoredPiece(admitted, written=True)

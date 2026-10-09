@@ -110,13 +110,13 @@ REGENERATION: Final = (
     "GPU generation is not bit-exact across hardware, drivers or library versions; the stored "
     "output bytes are the artifact, and a regeneration is a new version, never a replay."
 )
-#: A: concept picture, TRELLIS-image-large for shape and colour. B: concept picture, Step1X-3D
-#: geometry for shape, colour from the picture and the palette. S: the stub of the dry run.
 #: The deterministic post-process's version. v2 adds the yaw choice of a contained piece; an output
 #: is cached under its version, so a piece made by v1 is never served as v2. Here, beside the cache
 #: key, so the product reads it without the post-process's numpy half
 #: (:mod:`exulanica_pieces.geometry.postprocess` makes pieces under it).
 POSTPROCESS_VERSION: Final = "exulanica.generated-asset-postprocess/v2"
+#: A: concept picture, TRELLIS-image-large for shape and colour. B: concept picture, Step1X-3D
+#: geometry for shape, colour from the picture and the palette. S: the stub of the dry run.
 ROUTES: Final = frozenset({"A", "B", "S"})
 _SEED_PREFIX: Final = b"exulanica.generated-asset-seed/v1\x00"
 _PACK_ID: Final = re.compile(r"[a-z][a-z0-9.-]{0,63}")

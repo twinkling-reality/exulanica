@@ -191,11 +191,14 @@ def answer_for_key(
 
 
 def open_worst_case(connection: psycopg.Connection, workspace_id: uuid.UUID) -> Decimal:
-    """What the workspace's open requests can cost at most, together."""
+    """What the workspace's open requests can cost at most, together, beyond what the allowance
+    already holds for them: a request a session's queue took holds its own reservation, which the
+    allowance left already leaves out, so only requests with no reservation are counted."""
     with connection.cursor(row_factory=dict_row) as cursor:
         row = cursor.execute(
             "select coalesce(sum(worst_case_usd), 0) as usd from piece_request "
-            "where workspace_id = %s and state in ('requested', 'queued')",
+            "where workspace_id = %s and state in ('requested', 'queued') "
+            "and reservation_id is null",
             (workspace_id,),
         ).fetchone()
     assert row is not None

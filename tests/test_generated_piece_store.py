@@ -95,7 +95,7 @@ def _refused(code: str, request_raw: bytes, receipt_raw: bytes, piece: bytes, **
     assert refused.value.code == code
 
 
-def _store(store, request_raw: bytes, receipt_raw: bytes, piece: bytes, *, bound: int):
+def _store(store, request_raw: bytes, receipt_raw: bytes, piece: bytes, *, bound: int, held=None):
     return store_piece(
         store,
         request_raw=request_raw,
@@ -106,13 +106,16 @@ def _store(store, request_raw: bytes, receipt_raw: bytes, piece: bytes, *, bound
         library=LIBRARY,
         shipped=SHIPPED,
         bound=bound,
+        held=held,
     )
 
 
 def test_a_catalog_piece_is_admitted_and_kept_once(tmp_path) -> None:
     store = LocalContentAddressedStore(tmp_path / "generated-pieces")
     request_raw, receipt_raw, piece = _piece(_well_request())
-    admitted = _store(store, request_raw, receipt_raw, piece, bound=DEFAULT_MAX_BYTES)
+    stored = _store(store, request_raw, receipt_raw, piece, bound=DEFAULT_MAX_BYTES)
+    admitted = stored.admitted
+    assert stored.written
     blob = BlobId.from_hex(admitted.piece_sha256)
     assert store.exists(blob) and store.size(blob) == len(piece)
     # Kept under the cache key of its request, the session's models and the post-process version,
@@ -131,7 +134,7 @@ def test_a_catalog_piece_is_admitted_and_kept_once(tmp_path) -> None:
     names = sorted(
         path.name for path in (tmp_path / "generated-pieces").rglob("*") if path.is_file()
     )
-    _store(store, request_raw, receipt_raw, piece, bound=DEFAULT_MAX_BYTES)
+    assert not _store(store, request_raw, receipt_raw, piece, bound=DEFAULT_MAX_BYTES).written
     assert names == sorted(
         path.name for path in (tmp_path / "generated-pieces").rglob("*") if path.is_file()
     )
@@ -206,8 +209,24 @@ def test_a_piece_past_the_bound_is_refused_and_nothing_is_written(tmp_path) -> N
         _store(store, request_raw, receipt_raw, piece, bound=bound)
     assert refused.value.code == "pieces_store_full"
     assert not store.exists(BlobId.from_hex(sha256_hex(piece)))
-    admitted = _store(store, request_raw, receipt_raw, piece, bound=bound + 1)
+    admitted = _store(store, request_raw, receipt_raw, piece, bound=bound + 1).admitted
     assert store.exists(BlobId.from_hex(admitted.piece_sha256))
+
+
+def test_the_bound_is_held_to_the_bytes_its_caller_counted(tmp_path) -> None:
+    # A batch counts the namespace once and passes what it holds since: an empty store whose caller
+    # says it already holds the bound takes nothing more, and no listing is read for it.
+    store = LocalContentAddressedStore(tmp_path / "generated-pieces")
+    request_raw, receipt_raw, piece = _piece(_well_request())
+
+    def no_listing():
+        raise AssertionError("the namespace was listed although its caller counted it")
+
+    store.iter_blob_ids = no_listing  # type: ignore[method-assign]
+    with pytest.raises(PieceRefused) as refused:
+        _store(store, request_raw, receipt_raw, piece, bound=len(piece), held=1)
+    assert refused.value.code == "pieces_store_full"
+    assert _store(store, request_raw, receipt_raw, piece, bound=len(piece), held=0).written
 
 
 def test_the_bound_is_the_deployments_or_two_gibibytes() -> None:

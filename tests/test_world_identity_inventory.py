@@ -127,7 +127,6 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
         for name in (
             "answer_from_cache",
             "batches_in_flight",
-            "decide_cancelled",
             "end_batch",
             "fail_unreadable",
             "record_batch",
@@ -135,6 +134,11 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
             "waiting_requests",
         )
     },
+    "exulanica/generation/batches.py::<module> [piece_request]": (
+        "_CANCELLED, the requests a workspace's deletion cancelled while queued, which "
+        "cancelled_batches and decide_cancelled read across every world the workspace held; each "
+        "row names its own world"
+    ),
     "exulanica/generation/store.py::open_worst_case [piece_request]": (
         "the GPU allowance is the workspace's, so what its open requests can still cost is summed "
         "over every world it holds"

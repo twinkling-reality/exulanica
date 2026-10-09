@@ -29,6 +29,7 @@ from exulanica.generation.requests import (
 from exulanica.ingest.repository import IngestRepository
 from exulanica.world.style_pack_library import style_pack_library
 
+from generated_piece_support import kept_output
 from test_purge import _APP_PASSWORD, _APP_ROLE
 from test_purge import purged as purged
 from test_restore_replay_search_entries import commands as commands
@@ -117,8 +118,6 @@ def test_a_restore_replays_the_tombstone_onto_the_request_the_backup_held_open(
 def _made_batch(purged) -> None:
     """A request queued into a batch that ended done with one output, as the worker records it."""
     from exulanica.generation import batches
-    from exulanica.generation.entries import Output
-    from exulanica_pieces.canonical import canonical_bytes, sha256_hex
 
     made = _open_request(purged)
     connection, workspace_id = purged.repository.connection, purged.workspace_id
@@ -140,19 +139,6 @@ def _made_batch(purged) -> None:
         ],
     )
     [batch] = batches.batches_in_flight(connection, workspace_id)
-    receipt = canonical_bytes({"a receipt": "for the test"})
-    piece = b"a piece"
-    output = Output(
-        receipt_sha256=sha256_hex(receipt),
-        receipt=receipt,
-        document={
-            "request_sha256": batch.requests[0].request_sha256,
-            "variant": 0,
-            "verdict": {"over": [], "within": True},
-        },
-        piece_sha256=sha256_hex(piece),
-        piece=piece,
-    )
     batches.end_batch(
         connection,
         workspace_id,
@@ -160,14 +146,7 @@ def _made_batch(purged) -> None:
         state="done",
         ended_at=dt.datetime.now(dt.UTC),
         settlements={made: ("reported", Decimal("0.01"))},
-        outputs=[
-            batches.KeptOutput(
-                output=output,
-                cache_key="ca" * 32,
-                components_sha256="c0" * 32,
-                postprocess_version="exulanica.generated-asset-postprocess/v2",
-            )
-        ],
+        outputs=[kept_output(batch.requests[0].request_sha256)],
     )
     connection.commit()
 
@@ -182,8 +161,11 @@ def _batch_rows(purged) -> int:
 def test_a_workspace_tombstone_erases_the_workspace_s_batches_and_outputs(purged) -> None:
     _made_batch(purged)
     assert _batch_rows(purged) == 2
+    [kept] = purged.rows("select cache_key, variant from generated_piece")
     _workspace_tombstone_as_runtime(purged)
     assert _batch_rows(purged) == 0
+    # The installation's index of kept pieces holds nothing of the workspace's and stays.
+    assert purged.rows("select cache_key, variant from generated_piece") == [kept]
 
 
 def test_the_administrative_role_s_tombstone_erases_them_too(purged) -> None:

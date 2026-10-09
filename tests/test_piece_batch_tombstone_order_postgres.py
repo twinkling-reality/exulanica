@@ -210,8 +210,9 @@ def test_a_batch_s_end_after_the_tombstone_waits_and_writes_nothing(
         ).fetchall()
         assert (row["state"], row["failure"]) == ("cancelled", "workspace_deleted")
         assert observer.execute("select count(*) as n from piece_settlement").fetchone()["n"] == 0
-        # The worker's next pass decides it unknown: whether a session ran it is not known.
-        assert batches.decide_cancelled(observer, workspace_id) == 1
+        # The worker's next pass decides it unknown: whether a session ran it is not known (its
+        # reservation, which no ledger here admitted, is not one still only admitted).
+        assert len(batches.decide_cancelled(observer, workspace_id)) == 1
         [settlement] = observer.execute("select basis, usd from piece_settlement").fetchall()
         assert (settlement["basis"], settlement["usd"]) == ("unknown", Decimal("0.06"))
     finally:
