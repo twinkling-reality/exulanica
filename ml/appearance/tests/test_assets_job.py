@@ -444,6 +444,42 @@ def test_the_lock_file_the_entry_script_installs_is_in_the_archive_by_exact_name
         assert resolved.removeprefix("./") in members, resolved
 
 
+def test_the_install_waits_a_minute_for_a_read_retries_and_runs_once_more(tmp_path: Path) -> None:
+    """One stalled read from the package mirror must not end a job. The install block of job.sh,
+    run with a python that fails its first install, runs it a second time with the same
+    hash-pinned lock file, and a second failure still ends the job."""
+    script = (Path(__file__).resolve().parents[1] / "container" / "assets" / "job.sh").read_text()
+    lines = script.splitlines()
+    start = lines.index("install_wheels() {")
+    end = next(n for n in range(start, len(lines)) if lines[n] == "fi")
+    block = "\n".join(lines[start : end + 1])
+    calls = tmp_path / "calls.txt"
+    fake = tmp_path / "bin" / "python"
+    fake.parent.mkdir()
+    fake.write_text(f'#!/bin/sh\necho "$*" >> {calls}\n[ "$(wc -l < {calls})" -gt "$FAILURES" ]\n')
+    fake.chmod(0o755)
+
+    def run(failures: int) -> subprocess.CompletedProcess[str]:
+        calls.write_text("")
+        return subprocess.run(
+            ["sh", "-c", f"set -eu; code=/opt/gen; route=a\n{block}"],
+            env={"PATH": f"{fake.parent}:/usr/bin:/bin", "FAILURES": str(failures)},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    once = run(1)
+    assert once.returncode == 0 and "phase install again" in once.stdout
+    made = calls.read_text().splitlines()
+    assert len(made) == 2 and made[0] == made[1]
+    assert "--require-hashes" in made[0] and "--timeout 60 --retries 10" in made[0]
+    assert made[0].endswith("-r /opt/gen/ml/appearance/container/assets/lock-route-a.txt")
+    assert run(0).returncode == 0 and len(calls.read_text().splitlines()) == 1
+    twice = run(2)
+    assert twice.returncode != 0 and len(calls.read_text().splitlines()) == 2
+
+
 def test_the_job_entry_script_parses() -> None:
     script = Path(__file__).resolve().parents[1] / "container" / "assets" / "job.sh"
     subprocess.run(["sh", "-n", str(script)], check=True)

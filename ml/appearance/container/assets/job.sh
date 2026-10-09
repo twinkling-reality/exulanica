@@ -51,9 +51,19 @@ apt-get update -qq
 apt-get install -y -qq --no-install-recommends gcc libc6-dev > /dev/null
 
 echo "phase install $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-python -m pip install --quiet --no-deps --require-hashes --only-binary :all: \
-  --extra-index-url https://download.pytorch.org/whl/cu128 \
-  -r "$code/ml/appearance/container/assets/lock-route-$route.txt"
+# Each wheel is pinned by its hash, so installing again is safe. A read that stalls for a minute is
+# retried by pip, and a failed install runs once more, so one stalled read from the package mirror
+# does not end the job.
+install_wheels() {
+  python -m pip install --quiet --no-deps --require-hashes --only-binary :all: \
+    --timeout 60 --retries 10 \
+    --extra-index-url https://download.pytorch.org/whl/cu128 \
+    -r "$code/ml/appearance/container/assets/lock-route-$route.txt"
+}
+if ! install_wheels; then
+  echo "phase install again $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  install_wheels
+fi
 
 publish() {
   PYTHONPATH="$code:$code/ml/appearance" python -m exulanica_appearance assets remote publish \
