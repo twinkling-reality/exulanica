@@ -1,0 +1,534 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "authoritative_total": "the provider's billing page, read by the operator",
+  "compute": {
+   "gpu": "RTX PRO 6000 Blackwell Server Edition, 96 GB",
+   "instance_type": "gpu-rtx6000-a, preset 1gpu-24vcpu-218gb",
+   "provider": "Nebius AI Cloud, uk-south2, Serverless AI job",
+   "rate_cents_per_hour": 180,
+   "rate_source": "nebius.com/prices, RTX PRO 6000 on demand per GPU-hour, read 2026-10-06 about 20:27 UTC; started_at is the first STARTING state the watcher saw (polled each minute; hard_deadline_at is the service's 3,600 s timeout from the container's start), deleted_at the job's deletion"
+  },
+  "evidence": {
+   "files_sha256": {
+    "session-3/build/build.json": "41824efc26b2dda214ad4bdeb0160a4dc8418cb67d0a69884d950bf0fe0048b8",
+    "session-3/build/entry-1/requests/9fb3d953054d7c8d53c01d250d01ed90021f60c37e56ec30d675cd3126dca0b8.json": "9fb3d953054d7c8d53c01d250d01ed90021f60c37e56ec30d675cd3126dca0b8",
+    "session-3/build/entry-2/requests/a72c64f44d4c76aa0b68a5dbcffc93cc4e67585eeff77d56a5881a8ae872a9ab.json": "a72c64f44d4c76aa0b68a5dbcffc93cc4e67585eeff77d56a5881a8ae872a9ab",
+    "session-3/gpu-run-aijob-e05ra7h44sp3nc6rzs.json": "8fdf46d833622719a774b0390e52bd08298d33f0f50d735d17db29bd32ec3436",
+    "session-3/record.json": "3342e2e7efbe510219ee40708b1535e078f0107a201c230dcf5e7363a0d317a9",
+    "session-3/start-time.txt": "f59b44f6697bc1739436c16ec3cc43476996a703dce641a09555038bd55df488",
+    "session-3/submit-1.json": "f709d2f886a0919afc842debe0719f76f7bcf6765c77faf67ff465955ec072f5",
+    "session-3/watch/logs-final.txt": "d71f65194ade241294c59f2773f18a9cb5bf308765baae199b20ff5c4b65a82a",
+    "session-3/watch/status-final.json": "222a651d97f935e6dd293b1abb1e5d7b5b0685fc6624a66296b2343ac5bfebbb",
+    "session-3b/build/build.json": "41824efc26b2dda214ad4bdeb0160a4dc8418cb67d0a69884d950bf0fe0048b8",
+    "session-3b/build/entry-1/requests/9fb3d953054d7c8d53c01d250d01ed90021f60c37e56ec30d675cd3126dca0b8.json": "9fb3d953054d7c8d53c01d250d01ed90021f60c37e56ec30d675cd3126dca0b8",
+    "session-3b/build/entry-2/requests/a72c64f44d4c76aa0b68a5dbcffc93cc4e67585eeff77d56a5881a8ae872a9ab.json": "a72c64f44d4c76aa0b68a5dbcffc93cc4e67585eeff77d56a5881a8ae872a9ab",
+    "session-3b/charges.json": "70d21b99b718e2f4a4402290517dc2c06f67b40c200775cfd8fbb2a4e797299d",
+    "session-3b/fetch/done/0212ebb5fbd640e2b1460db6c97c8ce4.json": "047846c2f433fec8156da07ee72dcd300cd47f2fa76d458e68f94561b7abdea6",
+    "session-3b/fetch/done/036d0c72b60a4db5a47a2fa7b3c6b237.json": "3fb4ea7a4cfac150e9bbd793e6f2ca0a231424f54566d1462b7e9d4f15738037",
+    "session-3b/fetch/out/receipts/174de682f600fefc3faa11c0a87e6ebc0f12bed02efe52496184bc9425d84c61.json": "174de682f600fefc3faa11c0a87e6ebc0f12bed02efe52496184bc9425d84c61",
+    "session-3b/fetch/out/receipts/1a9323d7051c301764061533d15a7d80d12b43e9aa10aba49261c370a8cb76b1.json": "1a9323d7051c301764061533d15a7d80d12b43e9aa10aba49261c370a8cb76b1",
+    "session-3b/fetch/out/receipts/40975a073c3fac7d68325d4415d2d20ac58aee1f1c040ce68c7cc72684ea5a22.json": "40975a073c3fac7d68325d4415d2d20ac58aee1f1c040ce68c7cc72684ea5a22",
+    "session-3b/fetch/out/receipts/9116a04289b3785052e91bcbf59109c260c8d9d9872a5b7c84ce02ed7e1b10df.json": "9116a04289b3785052e91bcbf59109c260c8d9d9872a5b7c84ce02ed7e1b10df",
+    "session-3b/fetch/out/receipts/a1319415cb1ad93b676fbdc25ef2ec200feab79e3ff728cccf7e1a965c1c72a2.json": "a1319415cb1ad93b676fbdc25ef2ec200feab79e3ff728cccf7e1a965c1c72a2",
+    "session-3b/fetch/out/receipts/beec10a9e28f83c5d9bbaff6dd604330e0d7fefa2ac4c90d32e9e60f77039333.json": "beec10a9e28f83c5d9bbaff6dd604330e0d7fefa2ac4c90d32e9e60f77039333",
+    "session-3b/fetch/out/receipts/c92c47b7f2bb3cdce95ebb4c8934e7010fcbf7ba1fd2f8e09e4c41c4f42ec03a.json": "c92c47b7f2bb3cdce95ebb4c8934e7010fcbf7ba1fd2f8e09e4c41c4f42ec03a",
+    "session-3b/fetch/out/receipts/fa178048265e7eb61a42ad2032dac0b3350ed188a1d0797f972d625121599246.json": "fa178048265e7eb61a42ad2032dac0b3350ed188a1d0797f972d625121599246",
+    "session-3b/gpu-run-aijob-e05ntzm049c6ydej67.json": "85cdcb1127fd9dfd5539ca8c2674895ba5e828ab5bafc10a200893bfabc48598",
+    "session-3b/record.json": "efdcd0c1aaefd4bcf4c5f9d3099488a01b14badaccdb7d4bfa0078c34156106e",
+    "session-3b/start-time.txt": "a29c4447717de7ac4adc7a273603b6400a88a94f5d585a4cd0547aa4c23c64b2",
+    "session-3b/submit-1.json": "448c788d862c03dcdc0bbb465a2cc24b8138f6782c078dd02581a5679f0610df",
+    "session-3b/submit-2.json": "cac2a263ebdf9c6674ecfba8813790c88e88ce9cec67b04ea1a30f5ec698d0c5",
+    "session-3b/watch/status-final.json": "52611a15de0739cf8467a4653c677ccc4c105180750add7861c1c612e0bec9f1",
+    "session-4/build/build.json": "16bfcaaaad059936b59d629d7bf4a4aebf324f8bafa09d507c5df13a95ede0eb",
+    "session-4/build/entry-1/requests/add47bcc03a3536d13fa5b8adb41211b68f8e04fbc703d2731315a9545339da2.json": "add47bcc03a3536d13fa5b8adb41211b68f8e04fbc703d2731315a9545339da2",
+    "session-4/build/entry-2/requests/93e870e0a8dbb430db575a2556ddc996d6f0489f954adcd83d8fa2a26dfcf32e.json": "93e870e0a8dbb430db575a2556ddc996d6f0489f954adcd83d8fa2a26dfcf32e",
+    "session-4/charges.json": "aadf9f102bc56581b0a2c157d028dd0019f3cef08b09acbb60858abbac3e121b",
+    "session-4/fetch/done/91ebeb42c8fa4729a19850cb35a542a0.json": "f20a517b811de4ca502d95e01b949cb93bf00091d6ff53f26d9c9ee14989dd4c",
+    "session-4/fetch/done/b014a61358c84dad93e43e134e4d357a.json": "e5497dd4b47cec77c0117757c964af4dee5756dfef001c85b72b8abd9ffad030",
+    "session-4/fetch/out/receipts/026acd2e015417124d754cbd9c64f9453f3d1e3628c57e0e8453a1b5b713fe44.json": "026acd2e015417124d754cbd9c64f9453f3d1e3628c57e0e8453a1b5b713fe44",
+    "session-4/fetch/out/receipts/5eebbd40272cf305b73cd37addcbbab237b123065aefd8b9d5aad4a852bc6f40.json": "5eebbd40272cf305b73cd37addcbbab237b123065aefd8b9d5aad4a852bc6f40",
+    "session-4/fetch/out/receipts/8d5e9d500de070f134c83cfcc87abf543dd85f8e480ebaad840b837115deef0c.json": "8d5e9d500de070f134c83cfcc87abf543dd85f8e480ebaad840b837115deef0c",
+    "session-4/fetch/out/receipts/979f0acecb98e0584bf388bc455f9daab08f4d56da1f11a58d2cbcb80c9e5f14.json": "979f0acecb98e0584bf388bc455f9daab08f4d56da1f11a58d2cbcb80c9e5f14",
+    "session-4/fetch/out/receipts/98d951b5c46b9b8e74336ad12cb747dc796bb5e1f53a15e48c2bdc006cbbbf82.json": "98d951b5c46b9b8e74336ad12cb747dc796bb5e1f53a15e48c2bdc006cbbbf82",
+    "session-4/fetch/out/receipts/ccdcd11248560c4a06d95f137b384e4c50a2a4d69eea118f3306ee747dcc57dc.json": "ccdcd11248560c4a06d95f137b384e4c50a2a4d69eea118f3306ee747dcc57dc",
+    "session-4/fetch/out/receipts/d691e64cacec0ef93a57018847aba35b400310bcfb8bf529d3b57c728723fce3.json": "d691e64cacec0ef93a57018847aba35b400310bcfb8bf529d3b57c728723fce3",
+    "session-4/fetch/out/receipts/effacbc228fe74448f3d38ce419b9bd849c116242198ee4aeb406fbe7ca4a852.json": "effacbc228fe74448f3d38ce419b9bd849c116242198ee4aeb406fbe7ca4a852",
+    "session-4/gpu-run-aijob-e05cd08r49n72mn4gb.json": "4c6c10fac29bd99e00cbd47fbb8a7e2d7008ff0362f1d8f069b60762993a89f2",
+    "session-4/record.json": "9d0e6f912b967ed2e545203179a9e0bdeb94186344d8d9b2112c4d901642b4ef",
+    "session-4/start-time.txt": "38e6d9bb71a840cd9b944c47e4c0fba40980d89fad667e35ab476a0da8f528b1",
+    "session-4/submit-1.json": "4403c2ebdf8a8bd57808f278f7dfb7c719d6e601c25a3cf07b48581d01f03535",
+    "session-4/submit-2.json": "3bd300da8d53836478405fad6cd26daa0e3c0a41bfb70a6ddf6206258861b458",
+    "session-4/watch/status-final.json": "6117a3c38f609e08391032b54d6651ed8f36e7ab63ecd89278ff894b2d3fb496"
+   },
+   "held": "outside the repository; paths are relative to the directory the script reads"
+  },
+  "kind": "exulanica.generated-asset-warm-sessions/v1",
+  "script": "scripts/record_generated_asset_sessions.py",
+  "script_sha256": "8ff7df79f90ced8556ddce9198bb6551e85d1ee08bee386fb98a64b2f4d0b91d",
+  "sessions": [
+   {
+    "billed_cost_microdollars": 129000,
+    "billed_from": "2026-10-09T16:34:54Z",
+    "billed_seconds": 258,
+    "billed_to": "2026-10-09T16:39:12Z",
+    "box_mm": {
+     "depth": 870,
+     "height": 6000,
+     "width": 1425
+    },
+    "charges": [],
+    "code_sha256": "07cb478f88451ccd82aac6c3aa76b7d9f86f115bc253c6ec652371876264b205",
+    "computed_cost_microdollars": 40508,
+    "container": "sha256:782412e85d0f0984994c290652577d4018aff08145c85b262bb63dc0c7522254",
+    "container_finished_at": "2026-10-09T16:37:16.032090806Z",
+    "container_milliseconds": 81015,
+    "container_started_at": "2026-10-09T16:35:55.016238696Z",
+    "entries": [
+     {
+      "entry": "by key",
+      "items": 4,
+      "job_sha256": "8e5d6fd452e91e54878e06e7c1ad8bffdf47d193f969f71fe5e0fd057be4fc7d",
+      "queued": true,
+      "request_sha256": "9fb3d953054d7c8d53c01d250d01ed90021f60c37e56ec30d675cd3126dca0b8",
+      "words": null
+     },
+     {
+      "entry": "with words",
+      "items": 4,
+      "job_sha256": "ca6efd989ed22255dc37c4799cecec54622af74912d99c005cc65dee1421d1cc",
+      "queued": false,
+      "request_sha256": "a72c64f44d4c76aa0b68a5dbcffc93cc4e67585eeff77d56a5881a8ae872a9ab",
+      "words": "a tall slender street lamp: a thin post, one arm to one side, a lamp hanging"
+     }
+    ],
+    "job_id": "aijob-e05ra7h44sp3nc6rzs",
+    "kind": {
+     "key": "lamp_post",
+     "sha256": "76aa7991996910e79ec5682f2f41897335674cc066266f17a058d9c8d6f90850",
+     "version": 2
+    },
+    "outcome": "failed in the install phase, before any entry was claimed (ContainerFailed: Container exited with non-zero exit code.); the log's last line: pip._vendor.urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='files.pythonhosted.org', port=443): Read timed out.",
+    "pack": {
+     "id": "exulanica.cozy-town",
+     "sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+     "version": 3
+    },
+    "pieces": [],
+    "route": "A",
+    "session": "3",
+    "session_sha256": "1d5be3929b9f17ab9002c81af98b9ad28671ea109fc0766f59651689dbeb3eb5",
+    "upper_bound_cost_microdollars": 168000,
+    "upper_bound_from": "2026-10-09T16:33:36Z",
+    "upper_bound_to": "2026-10-09T16:39:12Z"
+   },
+   {
+    "billed_cost_microdollars": 505500,
+    "billed_from": "2026-10-09T16:43:38Z",
+    "billed_seconds": 1011,
+    "billed_to": "2026-10-09T17:00:29Z",
+    "box_mm": {
+     "depth": 870,
+     "height": 6000,
+     "width": 1425
+    },
+    "charges": [
+     {
+      "cost_microdollars": 21662,
+      "entry": "by key",
+      "job_sha256": "8e5d6fd452e91e54878e06e7c1ad8bffdf47d193f969f71fe5e0fd057be4fc7d",
+      "milliseconds": 43324,
+      "request_sha256": "9fb3d953054d7c8d53c01d250d01ed90021f60c37e56ec30d675cd3126dca0b8"
+     },
+     {
+      "cost_microdollars": 14147,
+      "entry": "with words",
+      "job_sha256": "ca6efd989ed22255dc37c4799cecec54622af74912d99c005cc65dee1421d1cc",
+      "milliseconds": 28293,
+      "request_sha256": "a72c64f44d4c76aa0b68a5dbcffc93cc4e67585eeff77d56a5881a8ae872a9ab"
+     }
+    ],
+    "code_sha256": "07cb478f88451ccd82aac6c3aa76b7d9f86f115bc253c6ec652371876264b205",
+    "computed_cost_microdollars": 407900,
+    "container": "sha256:782412e85d0f0984994c290652577d4018aff08145c85b262bb63dc0c7522254",
+    "container_finished_at": "2026-10-09T16:58:28.770088136Z",
+    "container_milliseconds": 815799,
+    "container_started_at": "2026-10-09T16:44:52.970211548Z",
+    "entries": [
+     {
+      "entry": "by key",
+      "items": 4,
+      "job_sha256": "8e5d6fd452e91e54878e06e7c1ad8bffdf47d193f969f71fe5e0fd057be4fc7d",
+      "queued": true,
+      "request_sha256": "9fb3d953054d7c8d53c01d250d01ed90021f60c37e56ec30d675cd3126dca0b8",
+      "words": null
+     },
+     {
+      "entry": "with words",
+      "items": 4,
+      "job_sha256": "ca6efd989ed22255dc37c4799cecec54622af74912d99c005cc65dee1421d1cc",
+      "queued": true,
+      "request_sha256": "a72c64f44d4c76aa0b68a5dbcffc93cc4e67585eeff77d56a5881a8ae872a9ab",
+      "words": "a tall slender street lamp: a thin post, one arm to one side, a lamp hanging"
+     }
+    ],
+    "job_id": "aijob-e05ntzm049c6ydej67",
+    "kind": {
+     "key": "lamp_post",
+     "sha256": "76aa7991996910e79ec5682f2f41897335674cc066266f17a058d9c8d6f90850",
+     "version": 2
+    },
+    "outcome": "completed: 2 entries claimed, 8 of 8 items made with receipts, 0 within every check, the rest over: box_fill",
+    "pack": {
+     "id": "exulanica.cozy-town",
+     "sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+     "version": 3
+    },
+    "pieces": [
+     {
+      "box_fill_permille": 758,
+      "entry": "by key",
+      "over": [
+       "box_fill"
+      ],
+      "piece_sha256": "ab9ec3a330c307ecd2fe8158c222cc9760cdfd5204aa1b7b362337164fa02b45",
+      "receipt_sha256": "1a9323d7051c301764061533d15a7d80d12b43e9aa10aba49261c370a8cb76b1",
+      "request_sha256": "9fb3d953054d7c8d53c01d250d01ed90021f60c37e56ec30d675cd3126dca0b8",
+      "size_mm": {
+       "depth": 870,
+       "height": 4552,
+       "width": 972
+      },
+      "variant": 1,
+      "within": false
+     },
+     {
+      "box_fill_permille": 730,
+      "entry": "by key",
+      "over": [
+       "box_fill"
+      ],
+      "piece_sha256": "c0cd3761ad674675a95e029a561204a8fd916763eec1f72caf83feaf9d418e63",
+      "receipt_sha256": "40975a073c3fac7d68325d4415d2d20ac58aee1f1c040ce68c7cc72684ea5a22",
+      "request_sha256": "9fb3d953054d7c8d53c01d250d01ed90021f60c37e56ec30d675cd3126dca0b8",
+      "size_mm": {
+       "depth": 870,
+       "height": 4383,
+       "width": 1001
+      },
+      "variant": 3,
+      "within": false
+     },
+     {
+      "box_fill_permille": 607,
+      "entry": "by key",
+      "over": [
+       "box_fill"
+      ],
+      "piece_sha256": "46bcecef45186544bbaa65ccd985df5f383f95ca392a624a283b0d533a57314d",
+      "receipt_sha256": "beec10a9e28f83c5d9bbaff6dd604330e0d7fefa2ac4c90d32e9e60f77039333",
+      "request_sha256": "9fb3d953054d7c8d53c01d250d01ed90021f60c37e56ec30d675cd3126dca0b8",
+      "size_mm": {
+       "depth": 870,
+       "height": 3646,
+       "width": 971
+      },
+      "variant": 2,
+      "within": false
+     },
+     {
+      "box_fill_permille": 736,
+      "entry": "by key",
+      "over": [
+       "box_fill"
+      ],
+      "piece_sha256": "5e0c3a13dae45721816e5dbcc49e40eb393e390ccdf09b1534f7029f1c15853f",
+      "receipt_sha256": "c92c47b7f2bb3cdce95ebb4c8934e7010fcbf7ba1fd2f8e09e4c41c4f42ec03a",
+      "request_sha256": "9fb3d953054d7c8d53c01d250d01ed90021f60c37e56ec30d675cd3126dca0b8",
+      "size_mm": {
+       "depth": 870,
+       "height": 4421,
+       "width": 954
+      },
+      "variant": 0,
+      "within": false
+     },
+     {
+      "box_fill_permille": 624,
+      "entry": "with words",
+      "over": [
+       "box_fill"
+      ],
+      "piece_sha256": "2592572b47279134e8394c51c388165b44691e556a1bbe8849639802106b31dc",
+      "receipt_sha256": "174de682f600fefc3faa11c0a87e6ebc0f12bed02efe52496184bc9425d84c61",
+      "request_sha256": "a72c64f44d4c76aa0b68a5dbcffc93cc4e67585eeff77d56a5881a8ae872a9ab",
+      "size_mm": {
+       "depth": 589,
+       "height": 3745,
+       "width": 1425
+      },
+      "variant": 0,
+      "within": false
+     },
+     {
+      "box_fill_permille": 722,
+      "entry": "with words",
+      "over": [
+       "box_fill"
+      ],
+      "piece_sha256": "c05163e4380418a4ef258612bee7f200d459b2e438849d1fb730ad663a4912aa",
+      "receipt_sha256": "9116a04289b3785052e91bcbf59109c260c8d9d9872a5b7c84ce02ed7e1b10df",
+      "request_sha256": "a72c64f44d4c76aa0b68a5dbcffc93cc4e67585eeff77d56a5881a8ae872a9ab",
+      "size_mm": {
+       "depth": 588,
+       "height": 4334,
+       "width": 1425
+      },
+      "variant": 2,
+      "within": false
+     },
+     {
+      "box_fill_permille": 749,
+      "entry": "with words",
+      "over": [
+       "box_fill"
+      ],
+      "piece_sha256": "f3d0005b980ab5612a147a5583716bc5dc9957c607d395e39fb1fc8753c25687",
+      "receipt_sha256": "a1319415cb1ad93b676fbdc25ef2ec200feab79e3ff728cccf7e1a965c1c72a2",
+      "request_sha256": "a72c64f44d4c76aa0b68a5dbcffc93cc4e67585eeff77d56a5881a8ae872a9ab",
+      "size_mm": {
+       "depth": 625,
+       "height": 4499,
+       "width": 1425
+      },
+      "variant": 3,
+      "within": false
+     },
+     {
+      "box_fill_permille": 777,
+      "entry": "with words",
+      "over": [
+       "box_fill"
+      ],
+      "piece_sha256": "07d517f1f6c5898f091c9c9c39c526474f516f38c0e012c80d2376d67c06807c",
+      "receipt_sha256": "fa178048265e7eb61a42ad2032dac0b3350ed188a1d0797f972d625121599246",
+      "request_sha256": "a72c64f44d4c76aa0b68a5dbcffc93cc4e67585eeff77d56a5881a8ae872a9ab",
+      "size_mm": {
+       "depth": 620,
+       "height": 4665,
+       "width": 1425
+      },
+      "variant": 1,
+      "within": false
+     }
+    ],
+    "route": "A",
+    "session": "3b",
+    "session_sha256": "f08708a7cb17db8546c9d24cdbeb5b0fd3853ff2367813bb135eae3944336a84",
+    "upper_bound_cost_microdollars": 541500,
+    "upper_bound_from": "2026-10-09T16:42:26Z",
+    "upper_bound_to": "2026-10-09T17:00:29Z"
+   },
+   {
+    "billed_cost_microdollars": 421500,
+    "billed_from": "2026-10-09T18:49:58Z",
+    "billed_seconds": 843,
+    "billed_to": "2026-10-09T19:04:01Z",
+    "box_mm": {
+     "depth": 870,
+     "height": 4500,
+     "width": 1425
+    },
+    "charges": [
+     {
+      "cost_microdollars": 21547,
+      "entry": "by key",
+      "job_sha256": "5d02f7d319e1a8ede4ba67ba57215f8768e57646d620fbc129349b464b919d29",
+      "milliseconds": 43094,
+      "request_sha256": "add47bcc03a3536d13fa5b8adb41211b68f8e04fbc703d2731315a9545339da2"
+     },
+     {
+      "cost_microdollars": 14129,
+      "entry": "with words",
+      "job_sha256": "7b61c10c981cb89225b2f2a57e2c494424240ed46d941a2a0dcecb61c7179ab3",
+      "milliseconds": 28257,
+      "request_sha256": "93e870e0a8dbb430db575a2556ddc996d6f0489f954adcd83d8fa2a26dfcf32e"
+     }
+    ],
+    "code_sha256": "9c59578d1dd38cb641ff6af47687713bbe2a55813241f0dbecddf0eeb7cc0c0f",
+    "computed_cost_microdollars": 327957,
+    "container": "sha256:782412e85d0f0984994c290652577d4018aff08145c85b262bb63dc0c7522254",
+    "container_finished_at": "2026-10-09T19:01:54.760534103Z",
+    "container_milliseconds": 655914,
+    "container_started_at": "2026-10-09T18:50:58.845710908Z",
+    "entries": [
+     {
+      "entry": "by key",
+      "items": 4,
+      "job_sha256": "5d02f7d319e1a8ede4ba67ba57215f8768e57646d620fbc129349b464b919d29",
+      "queued": true,
+      "request_sha256": "add47bcc03a3536d13fa5b8adb41211b68f8e04fbc703d2731315a9545339da2",
+      "words": null
+     },
+     {
+      "entry": "with words",
+      "items": 4,
+      "job_sha256": "7b61c10c981cb89225b2f2a57e2c494424240ed46d941a2a0dcecb61c7179ab3",
+      "queued": true,
+      "request_sha256": "93e870e0a8dbb430db575a2556ddc996d6f0489f954adcd83d8fa2a26dfcf32e",
+      "words": "a tall slender street lamp: a thin post, one arm to one side, a lamp hanging"
+     }
+    ],
+    "job_id": "aijob-e05cd08r49n72mn4gb",
+    "kind": {
+     "key": "lamp_post",
+     "sha256": "8a4482b81eb6f87cc9e336edf724387b0ca183c52d24f3910697120d3049eb9b",
+     "version": 3
+    },
+    "outcome": "completed: 2 entries claimed, 8 of 8 items made with receipts, 8 within every check",
+    "pack": {
+     "id": "exulanica.cozy-town",
+     "sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+     "version": 3
+    },
+    "pieces": [
+     {
+      "box_fill_permille": 952,
+      "entry": "by key",
+      "over": [],
+      "piece_sha256": "1cd687a6b606b825d41261e992d60323a6e4af6cb15ec418787b0728ca7a3724",
+      "receipt_sha256": "8d5e9d500de070f134c83cfcc87abf543dd85f8e480ebaad840b837115deef0c",
+      "request_sha256": "add47bcc03a3536d13fa5b8adb41211b68f8e04fbc703d2731315a9545339da2",
+      "size_mm": {
+       "depth": 870,
+       "height": 4285,
+       "width": 970
+      },
+      "variant": 0,
+      "within": true
+     },
+     {
+      "box_fill_permille": 1000,
+      "entry": "by key",
+      "over": [],
+      "piece_sha256": "0735c93541babf7de7f49424c7678e6be50db236d87a89ae5ea40321777b1eb2",
+      "receipt_sha256": "979f0acecb98e0584bf388bc455f9daab08f4d56da1f11a58d2cbcb80c9e5f14",
+      "request_sha256": "add47bcc03a3536d13fa5b8adb41211b68f8e04fbc703d2731315a9545339da2",
+      "size_mm": {
+       "depth": 812,
+       "height": 4500,
+       "width": 936
+      },
+      "variant": 2,
+      "within": true
+     },
+     {
+      "box_fill_permille": 952,
+      "entry": "by key",
+      "over": [],
+      "piece_sha256": "9dcc3e2f3a73d6c2bb96980f3b9b5c80e3093dcf6fade5cc8139f2a1ac2bc901",
+      "receipt_sha256": "98d951b5c46b9b8e74336ad12cb747dc796bb5e1f53a15e48c2bdc006cbbbf82",
+      "request_sha256": "add47bcc03a3536d13fa5b8adb41211b68f8e04fbc703d2731315a9545339da2",
+      "size_mm": {
+       "depth": 870,
+       "height": 4284,
+       "width": 953
+      },
+      "variant": 1,
+      "within": true
+     },
+     {
+      "box_fill_permille": 1000,
+      "entry": "by key",
+      "over": [],
+      "piece_sha256": "3f24e27b1c77b37bf34bdc3db439703df27615858f6a8dcac98cbd1fe57f1f32",
+      "receipt_sha256": "effacbc228fe74448f3d38ce419b9bd849c116242198ee4aeb406fbe7ca4a852",
+      "request_sha256": "add47bcc03a3536d13fa5b8adb41211b68f8e04fbc703d2731315a9545339da2",
+      "size_mm": {
+       "depth": 770,
+       "height": 4500,
+       "width": 885
+      },
+      "variant": 3,
+      "within": true
+     },
+     {
+      "box_fill_permille": 952,
+      "entry": "with words",
+      "over": [],
+      "piece_sha256": "e1d03d2f92e84ad2f7b18e7f29e44016d19a23dabafac26ab1ea4c4e2aa063bc",
+      "receipt_sha256": "026acd2e015417124d754cbd9c64f9453f3d1e3628c57e0e8453a1b5b713fe44",
+      "request_sha256": "93e870e0a8dbb430db575a2556ddc996d6f0489f954adcd83d8fa2a26dfcf32e",
+      "size_mm": {
+       "depth": 631,
+       "height": 4288,
+       "width": 1425
+      },
+      "variant": 3,
+      "within": true
+     },
+     {
+      "box_fill_permille": 984,
+      "entry": "with words",
+      "over": [],
+      "piece_sha256": "2b4c45b01bebc77b8b29855dc64a2fdcdb0cb8d04e8f1a9aa3ec050fe5337ddf",
+      "receipt_sha256": "5eebbd40272cf305b73cd37addcbbab237b123065aefd8b9d5aad4a852bc6f40",
+      "request_sha256": "93e870e0a8dbb430db575a2556ddc996d6f0489f954adcd83d8fa2a26dfcf32e",
+      "size_mm": {
+       "depth": 631,
+       "height": 4432,
+       "width": 1425
+      },
+      "variant": 2,
+      "within": true
+     },
+     {
+      "box_fill_permille": 899,
+      "entry": "with words",
+      "over": [],
+      "piece_sha256": "9e5b1e9c399ee038e29c4d895eb2216af9d9a02c80d02a96a22fca3d845b068e",
+      "receipt_sha256": "ccdcd11248560c4a06d95f137b384e4c50a2a4d69eea118f3306ee747dcc57dc",
+      "request_sha256": "93e870e0a8dbb430db575a2556ddc996d6f0489f954adcd83d8fa2a26dfcf32e",
+      "size_mm": {
+       "depth": 651,
+       "height": 4048,
+       "width": 1425
+      },
+      "variant": 0,
+      "within": true
+     },
+     {
+      "box_fill_permille": 869,
+      "entry": "with words",
+      "over": [],
+      "piece_sha256": "1ad0e8119b686a2e3ec916a13fe5e890141e54df0b090e51d7d4d457846da8fa",
+      "receipt_sha256": "d691e64cacec0ef93a57018847aba35b400310bcfb8bf529d3b57c728723fce3",
+      "request_sha256": "93e870e0a8dbb430db575a2556ddc996d6f0489f954adcd83d8fa2a26dfcf32e",
+      "size_mm": {
+       "depth": 655,
+       "height": 3913,
+       "width": 1425
+      },
+      "variant": 1,
+      "within": true
+     }
+    ],
+    "route": "A",
+    "session": "4",
+    "session_sha256": "da8647c79abb6e43813ad9e0b0c3dae94b6dd050be9aa881149a56cbad281168",
+    "upper_bound_cost_microdollars": 458500,
+    "upper_bound_from": "2026-10-09T18:48:44Z",
+    "upper_bound_to": "2026-10-09T19:04:01Z"
+   }
+  ],
+  "totals": {
+   "billed_cost_microdollars": 1056000,
+   "computed_cost_microdollars": 776365,
+   "pieces_with_receipts": 16,
+   "pieces_within_every_check": 8,
+   "sessions": 3,
+   "upper_bound_cost_microdollars": 1168000
+  }
+ },
+ "record_sha256": "a1c6a6338f1bd9f5270febbf79c00d6fcf23790c693e87dd6d5c1b02671db718"
+}

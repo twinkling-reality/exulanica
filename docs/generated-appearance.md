@@ -564,6 +564,21 @@ whose thin depth bounds the contain fit, and the swords failed their grip checks
 record, jobs, requests, results, receipts and claim and done markers are in
 `ml/appearance/evidence/generated-assets-session-1/`.
 
+Three later sessions on the same card made lamp posts to the `lamp_post` kind, each from two batches
+of four variants, one by the kind's key and one with the recipe catalog's words;
+[`docs/evaluation/2026-10-09-nebius-generated-asset-warm-sessions.json`](evaluation/2026-10-09-nebius-generated-asset-warm-sessions.json)
+records each session's job, session and code digests, kind and box, container and billed times,
+charge lines and computed, billed and upper-bound costs, and every piece by receipt with its measured size
+and box fill, with the digest of every evidence file it was built from. The first of the three failed
+in its install phase on a read timeout from the Python package index, before it claimed a batch. With
+kind version 2 (a 6,000 mm box) all 8 pieces were refused at the box fill check, filling 607 to 777
+per mille; with version 3 (4,500 mm) all 8 were within every check, filling 869 to 1,000 per mille.
+Each batch's items took 28 to 43 seconds of the session's time. Across the three sessions, at the
+listed rate, the computed cost is 0.776365 USD, the container's own time from start to finish; the
+billed cost is 1.056 USD, the run records' time from the first starting state seen to the job's
+deletion; and the upper bound is 1.168 USD, from the start command to the job's deletion. The
+provider's billing page is the authoritative total.
+
 **Route C: a creature's sculpted look.** A creature drafted from words wears its sketch at once
 (see the [things contract](things-contract.md)); route C makes it a sculpted, rigged look with no
 learned rig. The product writes an `exulanica.creature-look-request/v1`
