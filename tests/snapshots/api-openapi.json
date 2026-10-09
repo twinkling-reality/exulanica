@@ -147,7 +147,7 @@
      "accounts"
     ],
     "summary": "Guest Entry",
-    "description": "Enter as a guest: an account with no identity, a workspace of its own and a session.\n\nAfter the account's transaction commits, the workspace is given its allowance by the spending\nauthority's guest policy and its first world from the installation's arrival list. Either can\nfail without undoing the entry, so once the account exists the answer is always 201 with the\nsession cookie, and ``incomplete`` names each step that failed (``allowance`` with the\nrefusal's code, or ``arrival``). A visitor whose allowance is missing is granted it on their\nnext session read (``GET /auth/session``).",
+    "description": "Enter as a guest: an account with no identity, a workspace of its own and a session.\n\nAfter the account's transaction commits, the workspace is given its allowance by the spending\nauthority's guest policy and its first world from the installation's arrival list, dressed\nwith the scene the list names for it, if any. Any of these can fail without undoing the entry,\nso once the account exists the answer is always 201 with the session cookie, and\n``incomplete`` names each step that failed (``allowance`` with the refusal's code,\n``arrival``, or ``scene`` with its code and, for one being's mind, its ``thing_id``). A visitor\nwhose allowance is missing is granted it on their next session read (``GET /auth/session``).",
     "operationId": "guest_entry_auth_guest_post",
     "requestBody": {
      "content": {

@@ -259,11 +259,12 @@ def guest_entry(
     """Enter as a guest: an account with no identity, a workspace of its own and a session.
 
     After the account's transaction commits, the workspace is given its allowance by the spending
-    authority's guest policy and its first world from the installation's arrival list. Either can
-    fail without undoing the entry, so once the account exists the answer is always 201 with the
-    session cookie, and ``incomplete`` names each step that failed (``allowance`` with the
-    refusal's code, or ``arrival``). A visitor whose allowance is missing is granted it on their
-    next session read (``GET /auth/session``).
+    authority's guest policy and its first world from the installation's arrival list, dressed
+    with the scene the list names for it, if any. Any of these can fail without undoing the entry,
+    so once the account exists the answer is always 201 with the session cookie, and
+    ``incomplete`` names each step that failed (``allowance`` with the refusal's code,
+    ``arrival``, or ``scene`` with its code and, for one being's mind, its ``thing_id``). A visitor
+    whose allowance is missing is granted it on their next session read (``GET /auth/session``).
     """
     try:
         runtime = _runtime(request)
@@ -297,9 +298,10 @@ def guest_entry(
         )
     workspace = entry.account.session.workspace_id
     incomplete = [{"step": "allowance", **problem} for problem in _grant_guest(request, workspace)]
-    arrival = _arrival(request, workspace, entry.account.session.actor)
+    arrival, dressing = _arrival(request, workspace, entry.account.session.actor)
     if arrival is None:
         incomplete.append({"step": "arrival", "code": "arrival_not_made"})
+    incomplete.extend(dressing)
     view = _session_view(request, entry.account)
     if view.get("allowance") is None:
         incomplete.append({"step": "allowance", "code": "allowance_unread"})
@@ -352,9 +354,16 @@ def _grant_guest(
     return problems
 
 
-def _arrival(request: Request, workspace_id: uuid.UUID, actor: uuid.UUID) -> dict[str, Any] | None:
+def _arrival(
+    request: Request, workspace_id: uuid.UUID, actor: uuid.UUID
+) -> tuple[dict[str, Any] | None, list[dict[str, str]]]:
     """The workspace's first world, from the installation's arrival list, or None when it could
-    not be made; the visitor can still make one."""
+    not be made (the visitor can still make one), with what its scene's dressing left incomplete
+    (:func:`~exulanica.api.arrival_dressing.dress_arrival`). The dressing runs on a connection of
+    its own, after the world's transaction has committed: each of its steps commits its own."""
+    from exulanica.api.arrival_dressing import dress_arrival
+    from exulanica.api.society_making import SocietyHooks
+    from exulanica.selection.validation import Session
     from exulanica.world.arrival_worlds import load_arrival_worlds, make_arrival_world
     from exulanica.world.saved_entries import SavedWorldEntryRepository
 
@@ -367,10 +376,23 @@ def _arrival(request: Request, workspace_id: uuid.UUID, actor: uuid.UUID) -> dic
                 world,
                 created_by=actor,
             )
-        return {"entry_id": entry.entry_id, "world_id": entry.world_id}
     except Exception as exc:  # the entry stands without its arrival world; say why in the log
         _LOG.warning("a guest's arrival world was not made: %s: %s", type(exc).__name__, exc)
-        return None
+        return None, []
+    arrival = {"entry_id": entry.entry_id, "world_id": entry.world_id}
+    try:
+        with services.database.session(workspace_id) as connection:
+            dressing = dress_arrival(
+                SocietyHooks.of_app(request.app),
+                connection,
+                Session(workspace_id=workspace_id, actor=actor),
+                entry.entry_id,
+                world,
+            )
+    except Exception as exc:  # the world stands as it was laid; say why in the log
+        _LOG.warning("a guest's arrival world was not dressed: %s", type(exc).__qualname__)
+        dressing = [{"step": "scene", "code": "scene_not_dressed"}]
+    return arrival, dressing
 
 
 @router.post("/logout")

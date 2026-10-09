@@ -13,7 +13,8 @@
 #   mint <label>      a rehearsal visitor: a token for a workspace of its own
 #   revoke <label>    delete that rehearsal token; `up` then serves without it
 #   up                start the server; the first run installs, migrates and publishes the catalogs
-#   prepare-towns     make the arrival worlds once in the operator's workspace, so their tiles bake
+#   prepare-towns     make the arrival worlds once in the operator's workspace, so their tiles bake,
+#                     and dress each with the scene the arrival list names
 #   issue-authority   issue the server's spending authority from the EXULANICA_AUTHORITY_* values
 #   guest-policy      set what each guest is granted under it, from the EXULANICA_GUEST_* values
 #   guest-policy-withdraw  end the guest policy: no guest is granted anything until another is set
@@ -447,11 +448,13 @@ print(" ".join(name for name in ("api", "client") if services.get(name, {}).get(
 
   prepare-towns)
     # The arrival worlds (exulanica/world/arrival-worlds.v1.json in the image) made once in the
-    # operator's own workspace, as the runtime role, inside the API's container. The tile worker
-    # drains that workspace and bakes them; run again to read each tile's state.
+    # operator's own workspace, as the runtime role, inside the API's container, and each dressed
+    # with the scene the list names for it, as every guest's copy is. The tile worker drains that
+    # workspace and bakes them; run again to read each tile's state. Exits 1 when a dressing is
+    # incomplete, naming the step's code.
     need_env_file
     workspace="$(python3 -c 'import json,sys; print(next(iter(json.load(open(sys.argv[1])).values()))["workspace_id"])' "$token_dir/operator.json")"
-    compose exec -T api exulanica-arrival-worlds prepare --workspace "$workspace"
+    compose exec -T api python -m exulanica.api.arrival_dressing prepare --workspace "$workspace"
     ;;
 
   issue-authority)

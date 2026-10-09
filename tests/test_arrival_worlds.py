@@ -224,3 +224,56 @@ def test_an_arrival_catalog_that_does_not_say_what_is_read_is_refused_by_name(
 ):
     with pytest.raises(ArrivalWorldsInvalid, match=named):
         load_arrival_worlds(_catalog(tmp_path, worlds))
+
+
+def test_the_shipped_arrival_town_is_dressed_with_a_locked_scene_for_a_generated_town():
+    (world, *_) = load_arrival_worlds({})
+    assert world.scene is not None
+    assert world.scene.ground == "generated"
+    assert world.scene.reference() == {
+        "scene": "three-strangers-in-town",
+        "version": 1,
+        "sha256": "f5e1b614710642b3bff1d89181a412bcde9f56263aea0d41ed8175199eeb8ddd",
+    }
+
+
+_TOWN = {
+    "key": "a",
+    "recipe": "small_town",
+    "title": "A",
+    "world_id": "world:generated:8d8ea411-9010-446b-9699-dce63add6a2a",
+}
+_IN_TOWN = {
+    "scene": "three-strangers-in-town",
+    "version": 1,
+    "sha256": "f5e1b614710642b3bff1d89181a412bcde9f56263aea0d41ed8175199eeb8ddd",
+}
+
+
+@pytest.mark.parametrize(
+    ("scene", "named"),
+    [
+        ({**_IN_TOWN, "sha256": "0" * 64}, "scene_unshipped"),
+        ({**_IN_TOWN, "version": 2}, "scene_unshipped"),
+        ({**_IN_TOWN, "version": "1"}, "a scene's version is an integer"),
+        ({**_IN_TOWN, "minds": []}, "a scene is"),
+        ("three-strangers-in-town", "a scene is"),
+        (
+            {
+                "scene": "three-strangers",
+                "version": 5,
+                "sha256": "eb19d11820c4b013e5391f575d1b7b50ad97ba118512eb5a5d3371567b64875b",
+            },
+            "not a generated town",
+        ),
+    ],
+)
+def test_an_arrival_scene_not_shipped_or_not_for_a_town_is_refused_by_name(tmp_path, scene, named):
+    with pytest.raises(ArrivalWorldsInvalid, match=named):
+        load_arrival_worlds(_catalog(tmp_path, [{**_TOWN, "scene": scene}]))
+
+
+def test_an_arrival_world_naming_no_scene_holds_none(tmp_path):
+    for entry in (_TOWN, {**_TOWN, "scene": None}):
+        (world,) = load_arrival_worlds(_catalog(tmp_path, [entry]))
+        assert world.scene is None

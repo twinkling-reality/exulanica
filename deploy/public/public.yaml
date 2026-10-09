@@ -115,6 +115,13 @@ services:
       # reach the player.
       EXULANICA_SOCIETY_CONTROL_WORKER: "on"
       EXULANICA_PLAYBACK_WORKER: "on"
+      # Whether societies of things are made through the routes here, off unless public.env says
+      # `EXULANICA_SOCIETY_OF_THINGS=on`. On, a guest's arrival world is dressed with the scene the
+      # arrival list names (exulanica/api/arrival_dressing.py), whose beings live in a society of
+      # things; off, it opens undressed and the entry names the step. The first society of things
+      # a non-rehearsal server plays fixes how its engine version must replay, so it is turned on
+      # deliberately. Only the API makes a society; every other container leaves it unset.
+      EXULANICA_SOCIETY_OF_THINGS: ${EXULANICA_SOCIETY_OF_THINGS:-off}
     # A fixed address too. The client proxy finds `api` by name once, when it starts; an `up` that
     # recreates the API beside other containers, or a host restart, can otherwise give it a new
     # address, and the proxy then answers 502 for every API path while the API is well.

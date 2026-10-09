@@ -331,6 +331,23 @@ def test_an_entry_whose_later_steps_fail_still_answers_201_with_its_cookie(guest
     assert len(spending.asked) > asked, "a session read asks again for an allowance not held"
 
 
+def test_an_arrival_world_left_part_dressed_is_named_in_the_entry_s_answer(guest_app, monkeypatch):
+    """The arrival world stands and the entry answers 201 with it, and each step its scene's
+    dressing could not take is named beside the others (exulanica/api/arrival_dressing.py)."""
+    client = guest_app(per_day=1_000_000)
+    world = {"entry_id": str(uuid.uuid4()), "world_id": f"world:generated:{uuid.uuid4()}"}
+    left = [
+        {"step": "scene", "code": "society_engine_not_offered"},
+        {"step": "scene", "code": "model_not_offered", "thing_id": "knight"},
+    ]
+    monkeypatch.setattr(accounts, "_arrival", lambda request, workspace, actor: (world, left))
+    entered = _enter(client)
+    assert entered.status_code == 201, entered.text
+    body = entered.json()
+    assert body["arrival"] == world
+    assert [problem for problem in body["incomplete"] if problem["step"] == "scene"] == left
+
+
 def test_a_full_day_says_when_the_next_one_starts():
     import datetime as dt
 

@@ -509,6 +509,27 @@ def test_guests_towns_play_in_the_api_with_their_settings_from_init():
     assert "EXULANICA_PLAYBACK_WORKERS: ${EXULANICA_PLAYBACK_WORKERS:-}" in base_api
 
 
+def test_only_the_api_makes_a_society_of_things_and_prepare_towns_dresses_the_arrival():
+    """A guest's arrival town is dressed with a scene whose beings live in a society of things
+    (exulanica/api/arrival_dressing.py): only the API is handed the setting, off by default; the
+    installation's own copy is made and dressed by the same module, so a host that cannot dress it
+    says so at prepare-towns rather than on a guest's first look."""
+    for name, block in {**BASE_SERVICES, **OVERLAY_SERVICES}.items():
+        if name != "api":
+            assert "EXULANICA_SOCIETY_OF_THINGS" not in block, name
+    # Off unless public.env turns it on: a server deployed from these files plays no society of
+    # things until its operator says so.
+    assert re.search(
+        r"^      EXULANICA_SOCIETY_OF_THINGS: \$\{EXULANICA_SOCIETY_OF_THINGS:-off\}$",
+        OVERLAY_SERVICES["api"],
+        re.M,
+    )
+    assert "EXULANICA_SOCIETY_OF_THINGS" not in BASE_SERVICES["api"]
+    prepare = _directives(SCRIPT.read_text(encoding="utf-8")).split("  prepare-towns)", 1)[1]
+    prepare = prepare.split(";;", 1)[0]
+    assert "exec -T api python -m exulanica.api.arrival_dressing prepare" in prepare
+
+
 @needs_shell
 def test_init_writes_the_guests_play_window_and_maximum(tmp_path):
     env = {

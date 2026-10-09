@@ -15,6 +15,13 @@ The catalog is data: ``arrival-worlds.v1.json`` beside this module, or the file
 ``EXULANICA_ARRIVAL_WORLDS`` names, so an operator chooses the content without a code change.
 Identities are keyed by workspace (migration 0099), so one identity in many workspaces names many
 worlds, each its workspace's own.
+
+An arrival world may name a **scene** (``assets/catalogs/scenes``, by key, version and digest): the
+things a visitor finds already placed in front of them, the society they live in and the open
+model each being's mind is. Making the world here never lays it; the dressing is the HTTP
+surface's (:mod:`exulanica.api.arrival_dressing`), which lays it into each copy, the
+installation's own included, through the same edit and society paths a person's choices take.
+Without a scene an arrival world is made exactly as before.
 """
 
 from __future__ import annotations
@@ -29,6 +36,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from exulanica.env import env_get
+from exulanica.world.scenes import Scene, SceneRefused, shipped_scene
 from exulanica.world.worlds import GENERATED, world_kind
 
 __all__ = [
@@ -58,14 +66,47 @@ class ArrivalWorld:
     values: Mapping[str, object] | None
     title: str
     world_id: str
+    #: The scene each copy is dressed with, read at the catalog's digest; None for none.
+    scene: Scene | None = None
+
+
+#: The fields a catalog's scene reference holds, and nothing else.
+_SCENE_REFERENCE: Final = frozenset({"scene", "version", "sha256"})
+
+
+def _arrival_scene(key: object, named: object) -> Scene | None:
+    """The shipped scene an arrival world's ``scene`` field names, or None when it names none.
+
+    Refused by name: a reference that is not exactly a scene key, an integer version and a digest;
+    a scene not shipped at that digest; and one laid out for another ground than a generated
+    town's, which no arrival world is."""
+    if named is None:
+        return None
+    if not isinstance(named, dict) or set(named) != _SCENE_REFERENCE:
+        raise ArrivalWorldsInvalid(f"{key}: a scene is {{scene, version, sha256}} or null")
+    version = named["version"]
+    if not isinstance(version, int) or isinstance(version, bool):
+        raise ArrivalWorldsInvalid(f"{key}: a scene's version is an integer")
+    try:
+        scene = shipped_scene(str(named["scene"]), version, str(named["sha256"]))
+    except SceneRefused as refused:
+        raise ArrivalWorldsInvalid(f"{key}: {refused.code}: {refused.detail}") from refused
+    if scene.ground != GENERATED:
+        raise ArrivalWorldsInvalid(
+            f"{key}: scene {scene.scene} v{scene.version} is laid out for a {scene.ground}, "
+            "not a generated town"
+        )
+    return scene
 
 
 def load_arrival_worlds(environ: Mapping[str, str] | None = None) -> tuple[ArrivalWorld, ...]:
     """The catalog ``EXULANICA_ARRIVAL_WORLDS`` names, or the shipped one, checked.
 
     Refused by name: another profile, no world, a repeated key or identity, an identity that is
-    not a generated world's, or a title outside 1 to 200 characters. Whether each recipe and its
-    values generate is the recipe gate's and the composer's to refuse, when the world is made.
+    not a generated world's, a title outside 1 to 200 characters, or a scene that is not shipped
+    at the digest named or not laid out for a generated town (:func:`_arrival_scene`). Whether
+    each recipe and its values generate is the recipe gate's and the composer's to refuse, when the
+    world is made.
     """
     named = env_get("ARRIVAL_WORLDS", environ)
     path = Path(named) if named else ARRIVAL_WORLDS_PATH
@@ -97,6 +138,7 @@ def load_arrival_worlds(environ: Mapping[str, str] | None = None) -> tuple[Arriv
                 values=values,
                 title=title,
                 world_id=world_id,
+                scene=_arrival_scene(entry.get("key"), entry.get("scene")),
             )
         )
     for field in ("key", "world_id"):
@@ -158,10 +200,12 @@ def make_arrival_world(
 def main(argv: Sequence[str] | None = None, *, stream: Any = None) -> int:
     """``exulanica-arrival-worlds check|prepare``.
 
-    ``check`` loads the catalog and composes each world without writing anything. ``prepare``
-    makes each world in ``--workspace`` (the installation's own) as the runtime role, so the tile
-    worker draining that workspace bakes its tiles once for every later copy, and prints each
-    world's tiles and their states. Both exit 1 when a world is refused.
+    ``check`` loads the catalog and composes each world without writing anything, naming each
+    world's scene. ``prepare`` makes each world in ``--workspace`` (the installation's own) as the
+    runtime role, so the tile worker draining that workspace bakes its tiles once for every later
+    copy, and prints each world's tiles and their states; it lays no scene, which the HTTP
+    surface's ``python -m exulanica.api.arrival_dressing prepare`` does as well. Both exit 1 when a
+    world is refused.
     """
     from exulanica.db.roles import assert_runtime_role
     from exulanica.db.session import Database
@@ -180,7 +224,11 @@ def main(argv: Sequence[str] | None = None, *, stream: Any = None) -> int:
         for world in worlds:
             recipe = town_recipe(world.recipe, world.values)
             composed = compose_generated_world(recipe, world.world_id)
-            print(json.dumps({"key": world.key, "tiles": composed.receipt["tiles"]}), file=output)
+            scene = None if world.scene is None else world.scene.reference()
+            print(
+                json.dumps({"key": world.key, "tiles": composed.receipt["tiles"], "scene": scene}),
+                file=output,
+            )
         return 0
     if args.workspace is None:
         parser.error("prepare needs --workspace")

@@ -1,13 +1,18 @@
 {
   "profile": "exulanica.arrival-worlds/v1",
-  "reason": "The worlds a visitor's workspace starts with. Each names a recipe, its values and a fixed identity: a generated town's seed is drawn from the recipe and the identity, so every workspace's copy is the same town, and its tiles, baked once on the installation, are every copy's at once. The identity was chosen so the recipe's first seed candidates generate; a recipe or grammar change that stops it generating refuses the arrival world by name.",
+  "reason": "The worlds a visitor's workspace starts with. Each names a recipe, its values and a fixed identity: a generated town's seed is drawn from the recipe and the identity, so every workspace's copy is the same town, and its tiles, baked once on the installation, are every copy's at once. The identity was chosen so the recipe's first seed candidates generate; a recipe or grammar change that stops it generating refuses the arrival world by name. A world may name a shipped scene by key, version and digest, which each copy is dressed with: the things a visitor finds in front of them, the society they live in and each being's open model.",
   "worlds": [
     {
       "key": "small-town",
       "recipe": "small_town",
       "values": null,
       "title": "A small town",
-      "world_id": "world:generated:8d8ea411-9010-446b-9699-dce63add6a2a"
+      "world_id": "world:generated:8d8ea411-9010-446b-9699-dce63add6a2a",
+      "scene": {
+        "scene": "three-strangers-in-town",
+        "version": 1,
+        "sha256": "f5e1b614710642b3bff1d89181a412bcde9f56263aea0d41ed8175199eeb8ddd"
+      }
     }
   ]
 }

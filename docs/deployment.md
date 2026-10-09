@@ -520,7 +520,8 @@ in one transaction on the account role, it counts the day's entries against the 
 
 After that commits, the workspace is granted its allowance by the spending authority's guest policy
 ([model spending](model-spending-contract.md#2-authorities-grants-and-bounds)) and given its first
-world from the arrival list (8.2). Either may fail without undoing the entry.
+world from the arrival list (8.2), dressed with the scene the list names for it, if any. Any of
+these may fail without undoing the entry.
 
 Once the account exists it answers 201 with the session cookie, `role`, `allowance`, `arrival` and
 `incomplete`, which names each step that failed: `allowance` with the refusal's code (for instance
@@ -1417,7 +1418,18 @@ a recipe, its values, a title and a fixed world identity. A generated town's see
 recipe and its identity, so every workspace's copy of an arrival world is the same town, and a tile
 already baked queues no job. `prepare-towns` makes them once in the operator's own workspace, and
 the tile worker bakes them there. Identities are keyed by workspace, so one identity in many
-workspaces names many worlds, each its workspace's own.
+workspaces names many worlds, each its workspace's own. An entry may also name a shipped scene
+(`assets/catalogs/scenes`) by key, version and digest; the shipped town names
+`three-strangers-in-town` v1. Each copy, the operator's included, is then dressed with it through
+the scene dressing a server runs ([things](things-contract.md)): its things are placed through the
+things route's edit, the version's society is made on the scene's engine, and each being's mind is
+recorded as the owner's choice, so a guest's own allowance pays for those minds and the routine
+decides once it is spent. That engine is a society of things, which the overlay hands the API
+alone, off unless `public.env` sets `EXULANICA_SOCIETY_OF_THINGS=on` (the first one a
+non-rehearsal server plays fixes how its engine version must replay). A host that does not offer
+it places nothing, so the arrival town opens undressed as it did before, and names the step
+`scene` with `society_engine_not_offered` in the entry's `incomplete`; any other refusal is named
+there by its code, with what was laid kept.
 
 **Built and not built.**
 - Built: the composition, `deploy/public/public.sh`, the tile worker and the arrival worlds, and the
@@ -1441,7 +1453,7 @@ secrets directory `EXULANICA_DEPLOY_DIR`:
 | `init` | Writes `public.env` (mode 0600, in a directory created 0700). It holds seven generated role passwords, the `public` profile, the host, issuer, edge address and ports, the backup and custody directories, and the model endpoint's allowlist. It also writes the operator's token, whose grant holds `operations.read` alone. Custody inside the backup directory is refused. The fuse is left empty |
 | `mint <label>`, `revoke <label>` | Add or remove a token for a workspace of its own, minted by the image's `exulanica-seed token` with the reviewer's permissions. The next `up` serves the change and plays those workspaces |
 | `up` | Starts the server from loaded images, never building. It refuses until the fuse is filled in, and refuses when the merged Compose configuration publishes a port for `api` or `client`: only the edge may. The overlay gives the network a fixed range and the edge, the client proxy and the API fixed addresses: the client proxy trusts `X-Forwarded-For` from the edge's address alone and the API trusts forwarded headers from the client proxy's alone, so a process on the host, which reaches every container at its bridge address from the network's gateway, names neither its counted address nor its scheme. The client proxy finds the API by name once, when it starts, so the API keeps one address through every recreation and host restart. A host that already uses that range changes every place `deploy/public/public.yaml` names. `restore-marker`, `migrate` and `catalogs` run to completion on every start |
-| `prepare-towns` | Makes the arrival worlds in the operator's workspace, inside the API's container (`exulanica-arrival-worlds prepare`), and prints each tile's state; run it again to read them once baked |
+| `prepare-towns` | Makes the arrival worlds in the operator's workspace, inside the API's container, and dresses each with the scene the arrival list names (`python -m exulanica.api.arrival_dressing prepare`); prints each tile's state and what each dressing left incomplete, and exits 1 when anything is, except a host that does not offer the scene's engine; run it again to read the tiles once baked |
 | `issue-authority`, `guest-policy`, `guest-policy-withdraw`, `grant <label>`, `spending` | Issue the server's spending authority from `EXULANICA_AUTHORITY_USD`, `EXULANICA_AUTHORITY_CALLS` and `EXULANICA_AUTHORITY_VALID_UNTIL`; grant a minted workspace `EXULANICA_GRANT_USD` and `EXULANICA_GRANT_CALLS` under it; set what each guest is granted under it (`EXULANICA_GUEST_USD`, `EXULANICA_GUEST_CALLS`, `EXULANICA_GUEST_DAYS`) and how many guests it grants in a UTC day (`EXULANICA_GUEST_GRANTS_PER_DAY`, the day's entries unless stated); end that policy so no guest is granted anything until another is set; print the authorities' state and each live guest policy, with whether it must be set again. Each runs `python -m exulanica.spending` as the owner in a one-shot container on the server's network, with the witness volume |
 | `backup-now` | One maintenance pass now (9.3) |
 | `status` | The containers, readiness from inside the client container, Docker's disk use and the backup and custody file systems |
