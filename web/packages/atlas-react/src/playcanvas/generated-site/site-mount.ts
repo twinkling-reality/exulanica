@@ -1,4 +1,4 @@
-import { materialOfLeaf, unknownSurfaceLeaf, type RoofForms, type SiteSceneryCatalog, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { materialOfLeaf, unknownSurfaceLeaf, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type SurfaceMaterials } from '@exulanica/atlas-core';
 import type * as pc from 'playcanvas';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
 import { applyTileEnvironment } from '../generated-tile/environment.js';
@@ -6,6 +6,7 @@ import { TILE_LOOK_V1, type TileLook } from '../generated-tile/look.js';
 import type { SiteDrawing, SiteSlot } from './site-drawing.js';
 import { siteNavigationWorld, siteStart } from './site-navigation.js';
 import { drawSiteSlots, type DrawnSiteSlots } from './site-primitives.js';
+import { SITE_CEILING, ceilingRests, drawSiteCeiling, lightFromAbove } from './site-interior.js';
 import { drawSiteScenery, sceneryOf, type DrawnScenery } from './site-scenery.js';
 
 /**
@@ -60,6 +61,12 @@ export interface SiteMountOptions {
    * stand on and draws none. Scenery is drawn beside the site's slots and is none of them.
    */
   readonly scenery?: SiteSceneryCatalog;
+  /**
+   * The interior catalog: the ceiling and the light an indoor place is drawn with
+   * (`site-interior.ts`). None draws an indoor place as a walled floor under the look's sky and sun,
+   * as before. The ceiling is drawn beside the site's slots and is none of them.
+   */
+  readonly interior?: SiteInteriorCatalog;
 }
 
 /**
@@ -104,6 +111,17 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       const scenery = standing === null || standing.pieces.length === 0 ? null : drawSiteScenery(host.app.graphicsDevice, standing, materials);
       if (scenery !== null) host.environmentRoot.addChild(scenery.root);
       const undress = options.dress?.(host, slots, drawing, scenery) ?? null;
+      // An indoor place: a ceiling on the top of the tallest thing it draws, in what that is drawn
+      // in once dressed, and the look's sun turned into the light under it.
+      const rests = drawing.extent.enclosure === 'indoor' && options.interior !== undefined ? ceilingRests(drawing) : null;
+      const ceiling = rests === null ? null : drawSiteCeiling(drawing, rests, options.interior!.indoor);
+      if (ceiling !== null) {
+        host.environmentRoot.addChild(ceiling.root);
+        const dressed = (slots.entities.get(rests!.identity)?.findByName(`${rests!.identity}:shape`) as pc.Entity | null)?.render?.meshInstances[0]?.material ?? null;
+        const worn = (ceiling.root.findByName(`${SITE_CEILING}:shape`) as pc.Entity).render!.meshInstances[0]!;
+        if (dressed !== null) worn.material = dressed;
+        lightFromAbove(environment.sun, options.interior!.indoor);
+      }
       // The ground beyond: the look's own plane, drawn in what the dressed base ground is drawn in.
       const beyond = environment.ground?.render?.meshInstances[0] ?? null;
       const baseShape = base === null ? null : (slots.entities.get(base.identity)?.findByName(`${base.identity}:shape`) as pc.Entity | null);
@@ -116,6 +134,8 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       }
       const canvas = host.app.graphicsDevice.canvas as HTMLCanvasElement | undefined;
       if (edged && canvas?.dataset !== undefined) canvas.dataset['siteGroundBeyond'] = base!.lookRole;
+      // An indoor place's ceiling, said on the canvas: how high it lies.
+      if (ceiling !== null && canvas?.dataset !== undefined) canvas.dataset['siteCeiling'] = String(ceiling.heightMm);
       // What stands beyond, said on the canvas: what, how many, and beyond which ground.
       if (scenery !== null && canvas?.dataset !== undefined) {
         canvas.dataset['siteScenery'] = JSON.stringify({ stands: scenery.stands, beyond: scenery.material, pieces: scenery.pieces.length });
@@ -149,6 +169,9 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
             delete canvas.dataset['siteUnknownLooks'];
           }
           if (scenery !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteScenery'];
+          if (ceiling !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteCeiling'];
+          // The ceiling goes before the dressing is undone: it wears a material the dressing made.
+          ceiling?.destroy();
           undress?.();
           scenery?.destroy();
           slots.destroy();

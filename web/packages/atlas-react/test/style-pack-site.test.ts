@@ -14,10 +14,10 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import {
-  readSiteScenery, readStylePackManifest, readSurfaceMaterials, readSurfacePatterns, resolveStylePack, sceneryBeyond,
-  type LookFamily, type ResolvedStylePack, type SiteSceneryCatalog, type StylePackFile, type SurfaceMaterials, type SurfacePatterns,
+  readSiteInterior, readSiteScenery, readStylePackManifest, readSurfaceMaterials, readSurfacePatterns, resolveStylePack, sceneryBeyond,
+  type LookFamily, type ResolvedStylePack, type SiteInteriorCatalog, type SiteSceneryCatalog, type StylePackFile, type SurfaceMaterials, type SurfacePatterns,
 } from '@exulanica/atlas-core';
-import { baseGroundSlot, parseSiteDrawing, sceneryOf, siteMount, siteNavigationWorld, type SiteDrawing } from '../src/playcanvas/generated-site/index.js';
+import { baseGroundSlot, ceilingRests, parseSiteDrawing, sceneryOf, siteMount, siteNavigationWorld, type SiteDrawing } from '../src/playcanvas/generated-site/index.js';
 import type { RenderShading } from '../src/playcanvas/generated-tile/look.js';
 import { fetchPackPieces, packSiteDresser, type FetchedPieces, type SiteDressingSummary } from '../src/playcanvas/style-pack/index.js';
 import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
@@ -35,6 +35,7 @@ const families = new Map<string, LookFamily>(CATALOG.entries.map((entry) => [ent
 const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-kinds/surface-material.v2.json', 'utf8'));
 const PATTERNS = readSurfacePatterns(readFileSync('../assets/catalogs/world-kinds/surface-pattern.v1.json', 'utf8'));
 const SCENERY = readSiteScenery(readFileSync('../assets/catalogs/world-kinds/site-scenery.v1.json', 'utf8'));
+const INTERIOR = readSiteInterior(readFileSync('../assets/catalogs/world-kinds/site-interior.v1.json', 'utf8'));
 /** The colour chunk a material was given, or undefined where it draws its plain colour. */
 const colourChunk = (material: pc.Material): string | undefined => (material as pc.StandardMaterial).getShaderChunks(pc.SHADERLANGUAGE_GLSL).get('diffusePS') as string | undefined;
 const colourOf = (key: string): number[] => [...MATERIALS.materials.find((material) => material.key === key)!.swatch.srgb8];
@@ -174,7 +175,7 @@ function nullApp(): { app: pc.AppBase; camera: pc.Entity; environmentRoot: pc.En
 
 async function dressedSite(
   shading: RenderShading, materials?: SurfaceMaterials, site: SiteDrawing = drawing, patterns?: SurfacePatterns,
-  beyondIt: { readonly scenery?: SiteSceneryCatalog; readonly plant?: boolean } = {},
+  beyondIt: { readonly scenery?: SiteSceneryCatalog; readonly plant?: boolean; readonly interior?: SiteInteriorCatalog } = {},
 ) {
   const pack = sitePack(beyondIt.plant === true);
   const pieces: FetchedPieces = await fetchPackPieces(pack, Object.keys(pack.modules), TABLE, async (file: StylePackFile) => PIECES[file.path]!);
@@ -182,7 +183,7 @@ async function dressedSite(
   const { app, camera, environmentRoot } = nullApp();
   // The pack's own light, with a ground beyond the world stated where the pack states none.
   const look = renderLookOfPreset(pack.light.presets[pack.light.default_preset]!, pack.shading, pack.edge ?? { ground: [136, 165, 96], drop_mm: 600, reach_mm: 3_000_000 });
-  const mount = siteMount(site, { servedBytes: 1, look, dress: packSiteDresser({ pack, families, pieces, shading, ...(materials === undefined ? {} : { materials }), ...(patterns === undefined ? {} : { patterns }), told: (summary) => summaries.push(summary) }), ...(materials === undefined || beyondIt.scenery === undefined ? {} : { materials, scenery: beyondIt.scenery }) });
+  const mount = siteMount(site, { servedBytes: 1, look, dress: packSiteDresser({ pack, families, pieces, shading, ...(materials === undefined ? {} : { materials }), ...(patterns === undefined ? {} : { patterns }), told: (summary) => summaries.push(summary) }), ...(materials === undefined || beyondIt.scenery === undefined ? {} : { materials, scenery: beyondIt.scenery }), ...(beyondIt.interior === undefined ? {} : { interior: beyondIt.interior }) });
   const attachment = mount.attach({ app, camera, environmentRoot });
   const canvas = app.graphicsDevice.canvas as HTMLCanvasElement;
   const root = environmentRoot.findByName(`generated-site:${site.worldId}`) as pc.Entity;
@@ -192,7 +193,7 @@ async function dressedSite(
     return [r, g, b].map((channel) => Math.round(channel * 255));
   };
   const beyond = (): pc.Material => (app.root.findByName('generated-tile:edge-ground') as pc.Entity).render!.meshInstances[0]!.material;
-  return { root, environmentRoot, attachment, summaries, shape, rgb, canvas, beyond, mount };
+  return { root, environmentRoot, attachment, summaries, shape, rgb, canvas, beyond, mount, app };
 }
 
 describe('a site dressed in a pack that carries the surface material catalog', () => {
@@ -550,6 +551,100 @@ describe('the scenery beyond a made place', () => {
     expect(on.attachment.metrics.triangles).toBe(off.attachment.metrics.triangles);
     expect(on.attachment.metrics.drawBatches).toBe(off.attachment.metrics.drawBatches);
     expect({ ...on.summaries[0]!, sceneryPieces: 0 }).toEqual(off.summaries[0]);
+    on.attachment.dispose();
+    off.attachment.dispose();
+  });
+});
+
+describe('the inside of an indoor made place', () => {
+  // The place of the scenery tests, indoors: a floor 40 m by 30 m and one timber wall 2.4 m high.
+  const hall = placeOn('ground.floor', 'indoor');
+  const { indoor } = INTERIOR;
+
+  it('has a ceiling over its whole extent on the top of its walls, in what they are drawn in, and light from above', async () => {
+    const open = await dressedSite(PBR, MATERIALS, placeOn('ground.floor'), undefined, { interior: INTERIOR });
+    const sunOf = (site: Awaited<ReturnType<typeof dressedSite>>) => site.app.root.findByName('generated-tile-sun') as pc.Entity;
+    const lookSun = { intensity: sunOf(open).light!.intensity, down: sunOf(open).up.clone().mulScalar(-1) };
+    // An open place has no ceiling and the look's own sun.
+    expect(open.environmentRoot.findByName('site-ceiling')).toBeNull();
+    expect(open.canvas.dataset['siteCeiling']).toBeUndefined();
+    open.attachment.dispose();
+
+    const site = await dressedSite(PBR, MATERIALS, hall, undefined, { interior: INTERIOR });
+    const ceiling = site.environmentRoot.findByName('site-ceiling') as pc.Entity;
+    const shape = ceiling.findByName('site-ceiling:shape') as pc.Entity;
+    // It lies on the wall's top, 2.4 m, a slab of the catalog's thickness over the whole extent:
+    // its middle is half a thickness over the wall, at the middle of the floor (east 20, south -15).
+    const at = ceiling.getPosition();
+    expect([at.x, at.y, at.z].map((value) => Number(value.toFixed(6)))).toEqual([20, (2400 + indoor.ceilingThicknessMm / 2) / 1000, -15]);
+    const size = shape.getLocalScale();
+    expect([size.x, size.y, size.z].map((value) => Number(value.toFixed(6)))).toEqual([40, indoor.ceilingThicknessMm / 1000, 30]);
+    expect(site.canvas.dataset['siteCeiling']).toBe('2400');
+    // It wears what the wall wears once the place is dressed, and casts no shadow: the light is under it.
+    const worn = shape.render!.meshInstances[0]!;
+    expect(worn.material).toBe(site.shape('hut:wall:0').material);
+    expect(worn.material.name).not.toBe('site-ceiling-colour');
+    expect(shape.render!.castShadows).toBe(false);
+    // The look's sun is the room's light: from the catalog's tilt off straight down (the cosine of
+    // the angle between where it shines and straight down), at its share of the look's strength,
+    // in its colour; no longer the low sun the look states.
+    const sun = sunOf(site);
+    const shines = sun.up.clone().mulScalar(-1);
+    expect(-shines.y).toBeCloseTo(Math.cos(indoor.lightTiltDegrees * Math.PI / 180), 6);
+    expect(-lookSun.down.y).toBeLessThan(-shines.y);
+    expect(sun.light!.intensity).toBeCloseTo(lookSun.intensity * indoor.lightSharePermille / 1000, 9);
+    const { r, g, b } = sun.light!.color;
+    expect([r, g, b].map((channel) => Math.round(channel * 255))).toEqual([...indoor.lightSrgb8]);
+    site.attachment.dispose();
+    expect(site.canvas.dataset['siteCeiling']).toBeUndefined();
+    expect(site.environmentRoot.findByName('site-ceiling')).toBeNull();
+  });
+
+  it('lies on the tallest box the place draws, whatever it is, the first of those as tall', () => {
+    const market = parseSiteDrawing({
+      profile: 'exulanica.site-drawing/v1', world_id: 'world:generated:market', receipt_sha256: 'a'.repeat(64),
+      kind: { kind: 'fixture_market', version: 1, label: 'Market' },
+      extent: { widthMm: 20_000, depthMm: 16_000, enclosure: 'indoor' },
+      arrival: { positionMm: [10_000, 4000, 0], facingMm: [0, 1] },
+      slots: [
+        slot('floor', 'ground.floor', 'plane', [10_000, 8000, 0], 0, [20_000, 16_000, 0], 'surface'),
+        slot('stall', 'fixture.stall', 'box', [5000, 8000, 0], 0, [3000, 2000, 2200]),
+        slot('hall:wall:0', 'wall.plaster', 'box', [10_000, 15_900, 0], 0, [20_000, 200, 4000], 'surface'),
+        // A lintel over the door reaches as high as the wall, from 2.1 m up: the wall, stated first, is what the ceiling lies on.
+        slot('hall:lintel:0', 'wall.plaster', 'box', [10_000, 100, 2100], 0, [1200, 200, 1900], 'surface'),
+        slot('counter', 'fixture.counter', 'box', [15_000, 8000, 0], 0, [2000, 800, 1100]),
+        // The roof over a stall is a ridge, not a box, and is not what a ceiling lies on though it is the highest thing.
+        slot('stall:roof', 'roof.canvas', 'gable', [5000, 8000, 2200], 0, [3200, 2200, 2500], 'surface'),
+      ],
+      walk: { floorMm: [0, 0, 20_000, 16_000], blockersMm: [], keepOutMm: [] },
+      seats: [],
+    });
+    expect(ceilingRests(market)?.identity).toBe('hall:wall:0');
+    // A place that draws no box has nothing for a ceiling to lie on.
+    expect(ceilingRests(parseSiteDrawing({
+      profile: 'exulanica.site-drawing/v1', world_id: 'world:generated:bare', receipt_sha256: 'a'.repeat(64),
+      kind: { kind: 'fixture_bare', version: 1, label: 'Bare' },
+      extent: { widthMm: 10_000, depthMm: 10_000, enclosure: 'indoor' },
+      arrival: { positionMm: [5000, 2000, 0], facingMm: [0, 1] },
+      slots: [slot('floor', 'ground.floor', 'plane', [5000, 5000, 0], 0, [10_000, 10_000, 0], 'surface')],
+      walk: { floorMm: [0, 0, 10_000, 10_000], blockersMm: [], keepOutMm: [] },
+      seats: [],
+    }))).toBeNull();
+  });
+
+  it('is drawn as before with no catalog handed, and is no part of the world: the drawing, the walk and the site\'s own shapes are the same', async () => {
+    const before = JSON.stringify(hall);
+    const off = await dressedSite(PBR, MATERIALS, hall, undefined, {});
+    const on = await dressedSite(PBR, MATERIALS, hall, undefined, { interior: INTERIOR });
+    expect(off.environmentRoot.findByName('site-ceiling')).toBeNull();
+    expect(on.mount.drawing).toBe(hall);
+    expect(JSON.stringify(hall)).toBe(before);
+    expect(JSON.stringify(on.mount.navigationWorld.polygonObstacles)).toBe(JSON.stringify(off.mount.navigationWorld.polygonObstacles));
+    const named = (root: pc.Entity) => root.find(() => true).map((entity) => entity.name).sort();
+    expect(named(on.root)).toEqual(named(off.root));
+    expect(on.attachment.metrics.triangles).toBe(off.attachment.metrics.triangles);
+    expect(on.attachment.metrics.drawBatches).toBe(off.attachment.metrics.drawBatches);
+    expect(on.summaries[0]).toEqual(off.summaries[0]);
     on.attachment.dispose();
     off.attachment.dispose();
   });

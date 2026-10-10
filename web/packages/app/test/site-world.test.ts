@@ -7,6 +7,7 @@ import type { GeneratedSiteMount } from '@exulanica/atlas-react/generated-site';
 import { DRAWING_ASKS, loadSiteWorld, openSiteWorld, switchableSite, type SiteWorld } from '../src/composition/site-world.js';
 import { redrawWorldLook } from '../src/composition/world-look-redraw.js';
 import { ROOF_FORMS } from '../src/roof-forms.js';
+import { SITE_INTERIOR } from '../src/site-interior.js';
 import { SITE_SCENERY } from '../src/site-scenery.js';
 import { SURFACE_MATERIALS } from '../src/surface-materials.js';
 import { STYLE_PACK_LIST_PROFILE, type WorldLookChoice } from '../src/world-look.js';
@@ -183,6 +184,8 @@ describe('the look a site world is drawn in', () => {
     expect(options.roofForms).toBe(ROOF_FORMS);
     // And the scenery catalog, so what stands beyond a place is drawn in the pack's look too.
     expect((options as { scenery?: unknown }).scenery).toBe(SITE_SCENERY);
+    // And the interior catalog, so an indoor place has its ceiling and light in the pack's look too.
+    expect((options as { interior?: unknown }).interior).toBe(SITE_INTERIOR);
     expect(ROOF_FORMS.byMaterial.get('canvas')?.ridge?.eaves).toBe('ground');
   });
 
@@ -191,7 +194,7 @@ describe('the look a site world is drawn in', () => {
     const world = await loadSiteWorld(access, entry, () => {}, async () => {}, '', null);
     expect(world?.look).toEqual({ pack: 'exulanica.cozy-town', source: 'default', drawn: false, reason: 'The style pack list unavailable: HTTP 503' });
     // With no pack the engine's own colours are still read from the catalog, leaf by leaf.
-    expect(mounts.asked.at(-1)).toEqual({ servedBytes: new TextEncoder().encode(DRAWING).byteLength, materials: SURFACE_MATERIALS, roofForms: ROOF_FORMS, scenery: SITE_SCENERY });
+    expect(mounts.asked.at(-1)).toEqual({ servedBytes: new TextEncoder().encode(DRAWING).byteLength, materials: SURFACE_MATERIALS, roofForms: ROOF_FORMS, scenery: SITE_SCENERY, interior: SITE_INTERIOR });
   });
 
   it('is the tile look, with no pack read, when the address asks for today\'s look', async () => {

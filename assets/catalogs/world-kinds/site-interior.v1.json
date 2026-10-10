@@ -1,0 +1,27 @@
+{
+ "schema_version": 1,
+ "catalog_id": "site-interior",
+ "catalog_version": 1,
+ "entries": [
+  {
+   "key": "indoor",
+   "ceiling_thickness_mm": 100,
+   "light_tilt_degrees": 18,
+   "light_turn_degrees": 25,
+   "light_share_permille": 550,
+   "light_srgb8": [
+    255,
+    250,
+    240
+   ],
+   "reason": "Authored: a place whose extent is indoors has a ceiling and is lit from it. The ceiling is a slab a hand thick lying on the top of the tallest thing the place draws, over its whole extent, in what its walls are drawn in; it casts no shadow, because the light is under it. The look's one sun becomes the room's light: it shines from 18 degrees off straight down, so walls take some of it and are not lit by the sky's glow alone, turned 25 degrees so no wall is edge on to it; at 55 hundredths of the look's sun, because a room is dimmer than a street; and near white, because a ceiling's light is not a low sun's orange. Before this an indoor place was drawn as a walled yard under the open sky with a low sun's long shadows across its floor. Each figure is a chosen default, picked by eye on a covered market 20 m by 16 m with walls 4 m high and a station 31 m by 25 m with walls 3 m high; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  }
+ ]
+}

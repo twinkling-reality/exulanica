@@ -711,6 +711,9 @@ export {
 export type { RidgeRuns, RoofForm, RoofForms } from './roof-form.js';
 export { ROOF_FORM_CATALOG_ID, readRoofForms } from './roof-form.js';
 export type { MaterialDressing, SurfaceMaterial, SurfaceMaterials } from './surface-material.js';
+export type { SiteInterior, SiteInteriorCatalog } from './site-interior.js';
+export { SITE_INTERIOR_CATALOG_ID, readSiteInterior } from './site-interior.js';
+
 export type { SceneryPiece, SceneryStands, SiteScenery, SiteSceneryCatalog } from './site-scenery.js';
 export { SCENERY_STANDS, SITE_SCENERY_CATALOG_ID, readSiteScenery, sceneryBeyond } from './site-scenery.js';
 
