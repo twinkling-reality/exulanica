@@ -25,6 +25,10 @@ vi.mock('../src/world-look.js', async (original) => ({
   listedSettings: async () => null,
   stylePackContent: async () => new Uint8Array([1, 2, 3]),
 }));
+// The stubbed module is made here, once, before any test. Made on a test's first read instead, its
+// making (which loads the real module) ran inside that test's wait; and a second read that arrived
+// before the making finished was handed the real module by the runner, which asked the network.
+await import('../src/world-look.js');
 const { readLookLibrary } = await import('../src/composition/look-library.js');
 const { buildTownLook } = await import('../src/composition/town-look.js');
 const { attachWorldDescription } = await import('../src/composition/world-description.js');
