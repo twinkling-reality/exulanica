@@ -9,9 +9,16 @@ the newest is the budget. A world nobody set one for has the two figures its rol
 states (``spend_per_world_hour_microusd``, ``decisions_per_world_hour_maximum``), as every world
 had before a budget could be set.
 
-A budget only lowers what the host allows: the process's own budget, a deployment's allowance and
-the durable spending authority's grants bound every call whatever is set here. So no figure is
-refused for being large; a figure is refused only where it cannot be stored as written.
+A budget is never above what the host allows: the process's own budget and the part of it kept
+for other work, a deployment's allowance and the workspace's grant under the durable spending
+authority bound every call whatever is set here. Against the two figures every world had before a
+budget could be set, a budget may be lower or higher; it unlocks nothing the host does not
+already allow. So no figure is refused for being large; a figure is refused only where it cannot
+be stored as written.
+
+Two settings at once, or a retry racing its original, are taken one after the other: ``record``
+takes the lock the table's own trigger takes (a world and a role) before it reads anything, so
+the second reads what the first wrote and a retried request answers the record it made.
 """
 
 from __future__ import annotations
@@ -111,7 +118,13 @@ def _figures(usd_per_hour: Any, decisions_per_hour: Any) -> tuple[Decimal, int]:
         usd = Decimal(str(usd_per_hour))
     except (InvalidOperation, ValueError) as exc:
         raise MindsBudgetRefused("budget_usd_not_a_figure") from exc
-    if not usd.is_finite() or usd < 0 or usd > USD_MAXIMUM or usd != usd.quantize(_MICRO):
+    if (
+        not usd.is_finite()
+        # A signed zero is no figure a row can hold ("-0.000000" is not a dollar amount).
+        or usd.is_signed()
+        or usd > USD_MAXIMUM
+        or usd != usd.quantize(_MICRO)
+    ):
         raise MindsBudgetRefused("budget_usd_not_a_figure")
     if (
         isinstance(decisions_per_hour, bool)
@@ -162,6 +175,13 @@ class MindsBudgetRepository:
         (``budget_key_reused``)."""
         usd, decisions = _figures(usd_per_hour, decisions_per_hour)
         with self.connection.transaction():
+            # The lock the insert's trigger takes, taken first: one setter a world and role reads
+            # the key and the newest sequence at a time, so neither a second setter nor a retry
+            # racing its original computes a sequence another already took.
+            self.connection.execute(
+                "select pg_advisory_xact_lock(hashtext(%s), hashtext(%s))",
+                (str(self.workspace_id), f"{self.world_id}|minds-budget|{role.key}"),
+            )
             existing = self.connection.execute(
                 "select budget_seq,request_id,document,document_sha256,set_by,recorded_at "
                 "from world_minds_budget where workspace_id=%s and world_id=%s and role_key=%s "

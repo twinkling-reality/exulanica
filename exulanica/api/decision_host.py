@@ -2,8 +2,9 @@
 
 Every decision role an engine hosts (:mod:`exulanica.world.decision_roles`) is asked the same way,
 by :class:`DecisionHost`: only in a workspace the host's environment lists or, under durable
-spending, one account discovery watches, within each role's
-contract bounds per world and hour, within the share of the process's model budget the role's
+spending, one account discovery watches, within each world's budget for the role's minds in any
+hour (the role's contract figures where nobody set one), within the share of the process's model
+budget the role's
 contract lets its decisions spend, and with no connection held while a model is asked. A person
 in a purposeful society is the first such role.
 

@@ -743,9 +743,13 @@ refused (`budget_key_reused`). A budget names a world and no society, so it outl
 of the day. Another role's asks are bounded by its own contract's figures, and a budget for one
 is refused (`budget_not_for_this_role`).
 
-A budget only lowers what the host allows: the process's budget and its reserve, a deployment's
-allowance and the spending authority's grants bound every call whatever a world's budget says, so
-no figure is refused for being large. A budget of nothing asks no model: every being decides by
+A budget is never above what the host allows: the process's budget and its reserve, a deployment's
+allowance and the workspace's grant bound every call whatever a world's budget says, so no figure
+is refused for being large. Against the policy's two figures a budget may be lower or higher; a
+caller who plays a world (`world.write`) spends up to the budget its owner set, inside those
+bounds. Two settings at once are taken one after the other, and a request answers the record it
+made, also when another has been set since. A restore brings back the budget its backup held, as
+it brings back the model choices it held; the host's bounds bind either way. A budget of nothing asks no model: every being decides by
 its routine and each choice point's receipt names the hour's bound.
 
 The host reads the world's budget once a claim, before it reserves a minute's asks

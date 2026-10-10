@@ -333,9 +333,10 @@ def set_world_minds_budget(
     """Set what this world may spend on the model minds of its beings, in any hour of real time.
 
     One appended record of the world, naming who set it; the newest is the budget, and the same
-    request asked again answers the record it made. It asks no model and spends nothing. The
-    process's own budget, a deployment's allowance and the spending authority's grants still
-    bound every call, so a budget only lowers what the host allows.
+    request asked again answers the record it made (``budget`` is that record, also when a later
+    request has set another since). It asks no model and spends nothing. The process's own
+    budget and its reserve, a deployment's allowance and the workspace's grant still bound every
+    call: a budget is never above them, whatever it reads.
     """
     require_world(connection, session.workspace_id, world_id)
     version = _version(connection, session.workspace_id, world_id, version_id)
@@ -353,7 +354,9 @@ def set_world_minds_budget(
             content={"code": BUDGET_NOT_FOR_THIS_ROLE, "detail": role.subject},
         )
     try:
-        MindsBudgetRepository(connection, session.workspace_id, world_id=world_id).record(
+        recorded = MindsBudgetRepository(
+            connection, session.workspace_id, world_id=world_id
+        ).record(
             role,
             request_id=body.idempotency_key,
             usd_per_hour=body.usd_per_hour,
@@ -375,4 +378,6 @@ def set_world_minds_budget(
         "version_id": str(version_id),
         "role_key": role.key,
         **(read or {}),
+        # The record this request made, which a late retry of an old key is answered with.
+        "budget": recorded.view(),
     }

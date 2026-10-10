@@ -316,8 +316,11 @@ does not refill while the process runs, and it holds each admitted call's reserv
 call's usage is recorded, so calls admitted at once never cross it together. People's decisions may
 use all of it but the contract's `process_reserve_percent`, 50, which is kept for the Companion,
 photograph ingestion, vision and caption search, since they share the ceiling. By arithmetic from
-the bounds, not a measurement: a world at the hourly bound asks 600 decisions, up to 1,200 calls
-with the one retry, which would use the default 2,000 calls in under two hours without the share.
+the bounds, not a measurement: a world at the default hourly budget asks 600 decisions, up to 1,200
+calls with the one retry, which would use the default 2,000 calls in under two hours without the
+share. A person may set a world's budget lower or higher
+([a world's budget for its minds](decision-roles-contract.md#a-worlds-budget-for-its-minds)); the
+process's ceiling and the share bound every call the same.
 Decided on what the process has spent, never on what calls under way hold: once what is left, beside
 the part kept for other work, fits no ask of an offered model, the host asks nobody and writes
 nothing until the process restarts, and a person whose own model's ask no longer fits is not asked

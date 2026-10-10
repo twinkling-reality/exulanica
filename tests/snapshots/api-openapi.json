@@ -16664,7 +16664,7 @@
      "world"
     ],
     "summary": "Set World Minds Budget",
-    "description": "Set what this world may spend on the model minds of its beings, in any hour of real time.\n\nOne appended record of the world, naming who set it; the newest is the budget, and the same\nrequest asked again answers the record it made. It asks no model and spends nothing. The\nprocess's own budget, a deployment's allowance and the spending authority's grants still\nbound every call, so a budget only lowers what the host allows.",
+    "description": "Set what this world may spend on the model minds of its beings, in any hour of real time.\n\nOne appended record of the world, naming who set it; the newest is the budget, and the same\nrequest asked again answers the record it made (``budget`` is that record, also when a later\nrequest has set another since). It asks no model and spends nothing. The process's own\nbudget and its reserve, a deployment's allowance and the workspace's grant still bound every\ncall: a budget is never above them, whatever it reads.",
     "operationId": "set_world_minds_budget_world_versions__version_id__models__role_key__budget_post",
     "parameters": [
      {
