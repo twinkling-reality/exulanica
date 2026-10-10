@@ -1,3 +1,4 @@
+import { materialOfLeaf, unknownSurfaceLeaf, type SurfaceMaterials } from '@exulanica/atlas-core';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
 import { applyTileEnvironment } from '../generated-tile/environment.js';
 import { TILE_LOOK_V1, type TileLook } from '../generated-tile/look.js';
@@ -32,6 +33,13 @@ export interface SiteMountOptions {
   readonly servedBytes: number;
   readonly look?: TileLook;
   readonly dress?: SiteDresser;
+  /**
+   * The surface material catalog the engine's own colours are read from, leaf by leaf. A dresser
+   * carries its own; with no dresser the mount says on the canvas how many slots wear a material
+   * and which look roles named none (`data-site-materials`, `data-site-unknown-looks`), as a
+   * dresser does.
+   */
+  readonly materials?: SurfaceMaterials;
 }
 
 /** The mount for a checked site drawing. */
@@ -45,9 +53,17 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
     start: siteStart(drawing, navigationWorld),
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
       const environment = applyTileEnvironment(host.app, host.camera, look);
-      const slots = drawSiteSlots(host.app.graphicsDevice, drawing);
+      const materials = options.materials ?? null;
+      const slots = drawSiteSlots(host.app.graphicsDevice, drawing, materials);
       host.environmentRoot.addChild(slots.root);
       const undress = options.dress?.(host, slots, drawing) ?? null;
+      const canvas = host.app.graphicsDevice.canvas as HTMLCanvasElement | undefined;
+      const said = options.dress === undefined && materials !== null && canvas?.dataset !== undefined;
+      if (said) {
+        const drawn = drawing.slots.filter((slot) => slots.entities.has(slot.identity));
+        canvas.dataset['siteMaterials'] = String(drawn.filter((slot) => slot.leaf !== 'default' && materialOfLeaf(materials, slot.family, slot.leaf) !== null).length);
+        canvas.dataset['siteUnknownLooks'] = JSON.stringify([...new Set(drawn.filter((slot) => unknownSurfaceLeaf(materials, slot.lookRole)).map((slot) => slot.lookRole))].sort());
+      }
       let disposed = false;
       return {
         metrics: Object.freeze({
@@ -64,6 +80,10 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         dispose(): void {
           if (disposed) return;
           disposed = true;
+          if (said) {
+            delete canvas.dataset['siteMaterials'];
+            delete canvas.dataset['siteUnknownLooks'];
+          }
           undress?.();
           slots.destroy();
           environment.dispose();

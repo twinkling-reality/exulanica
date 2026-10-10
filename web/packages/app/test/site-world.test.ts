@@ -6,12 +6,13 @@ import type { GeneratedTileHost } from '@exulanica/atlas-react/generated-tile';
 import type { GeneratedSiteMount } from '@exulanica/atlas-react/generated-site';
 import { DRAWING_ASKS, loadSiteWorld, switchableSite, type SiteWorld } from '../src/composition/site-world.js';
 import { redrawWorldLook } from '../src/composition/world-look-redraw.js';
+import { SURFACE_MATERIALS } from '../src/surface-materials.js';
 import { STYLE_PACK_LIST_PROFILE, type WorldLookChoice } from '../src/world-look.js';
 import type { SavedWorldEntry } from '../src/world-entry-api.js';
 
 // The site's mount is wrapped, so a test sees the light and dresser the page hands it; the texture
 // library is the committed manifest, read from its file.
-const mounts = vi.hoisted(() => ({ asked: [] as { look?: { id: string }; dress?: unknown }[] }));
+const mounts = vi.hoisted(() => ({ asked: [] as { look?: { id: string }; dress?: unknown; materials?: unknown }[] }));
 vi.mock('@exulanica/atlas-react/generated-site', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@exulanica/atlas-react/generated-site')>();
   return {
@@ -172,13 +173,17 @@ describe('the look a site world is drawn in', () => {
     const options = mounts.asked.at(-1)!;
     expect(options.look?.id).toBe('exulanica.render-look');
     expect(typeof options.dress).toBe('function');
+    // The surface material catalog the page bundles goes with it, so a leaf the pack does not state is read by its words.
+    expect(options.materials).toBe(SURFACE_MATERIALS);
+    expect(SURFACE_MATERIALS.materials.some((material) => material.key === 'sand')).toBe(true);
   });
 
   it('is the tile look in the engine\'s own colours when the pack cannot be read, saying why', async () => {
     vi.stubGlobal('fetch', host(503).fetched);
     const world = await loadSiteWorld(access, entry, () => {}, async () => {}, '', null);
     expect(world?.look).toEqual({ pack: 'exulanica.cozy-town', source: 'default', drawn: false, reason: 'The style pack list unavailable: HTTP 503' });
-    expect(mounts.asked.at(-1)).toEqual({ servedBytes: new TextEncoder().encode(DRAWING).byteLength });
+    // With no pack the engine's own colours are still read from the catalog, leaf by leaf.
+    expect(mounts.asked.at(-1)).toEqual({ servedBytes: new TextEncoder().encode(DRAWING).byteLength, materials: SURFACE_MATERIALS });
   });
 
   it('is the tile look, with no pack read, when the address asks for today\'s look', async () => {

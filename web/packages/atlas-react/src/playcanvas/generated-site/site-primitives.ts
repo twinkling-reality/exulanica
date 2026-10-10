@@ -1,4 +1,5 @@
 import * as pc from 'playcanvas';
+import { materialOfLeaf, type SurfaceMaterials } from '@exulanica/atlas-core';
 import type { SiteDrawing, SiteSlot } from './site-drawing.js';
 
 /**
@@ -12,9 +13,10 @@ import type { SiteDrawing, SiteSlot } from './site-drawing.js';
  * 2 and east 3. The site's x east, y north and z up are the renderer's x, -z and y, so a quarter
  * turn is 90 degrees about the renderer's up axis.
  *
- * The colour is the fallback a pack replaces: one per look family, and for a ground or an area one
- * of a few materials its leaf names (soil, crops, gravel, paving, timber), so a field reads apart
- * from the yard round it. The colours decide nothing about a pack's look.
+ * The colour is the fallback a pack replaces: the material the slot's leaf names in the surface
+ * material catalog (`assets/catalogs/world-kinds/surface-material.v1.json`, passed in), so sand,
+ * a field and a stone wall read apart with no pack at all, and otherwise one colour per look family.
+ * The colours decide nothing about a pack's look.
  */
 
 const MILLIMETRES = 1000;
@@ -41,28 +43,17 @@ const FAMILY_RGB: Readonly<Record<string, Rgb>> = Object.freeze({
 });
 /** A ground indoors is a floor. */
 const INDOOR_GROUND_RGB: Rgb = [0.66, 0.55, 0.42];
-/** Materials a ground's, a path's or a road's leaf may name, by a word in it, checked in order. */
-const MATERIAL_WORDS: readonly (readonly [readonly string[], Rgb])[] = Object.freeze([
-  [['soil', 'earth', 'dirt', 'mud', 'plough', 'tilled', 'bare'], [0.48, 0.37, 0.26]],
-  [['wheat', 'barley', 'hay', 'straw', 'corn', 'grain', 'crop', 'stubble'], [0.8, 0.7, 0.4]],
-  [['grass', 'lawn', 'meadow', 'pasture', 'paddock', 'green'], [0.44, 0.58, 0.3]],
-  [['gravel', 'sand', 'aggregate', 'hardcore'], [0.74, 0.68, 0.55]],
-  [['concrete', 'cement', 'slab', 'paving', 'paved', 'flag', 'tarmac', 'asphalt'], [0.64, 0.64, 0.62]],
-  [['brick'], [0.62, 0.34, 0.26]],
-  [['timber', 'wood', 'plank', 'board', 'deck', 'parquet'], [0.62, 0.48, 0.33]],
-  [['tile', 'stone', 'terrazzo', 'marble'], [0.76, 0.74, 0.7]],
-]);
-const SURFACE_FAMILIES = new Set(['ground', 'path', 'road']);
-
-/** The colour a slot is drawn in when no pack dresses it. */
-export function slotColour(slot: SiteSlot, enclosure: SiteDrawing['extent']['enclosure']): Rgb {
-  if (SURFACE_FAMILIES.has(slot.family)) {
-    const words = slot.leaf.split('_');
-    for (const [names, rgb] of MATERIAL_WORDS) {
-      if (words.some((word) => names.includes(word))) return rgb;
-    }
-    if (slot.family === 'ground' && enclosure === 'indoor') return INDOOR_GROUND_RGB;
+/**
+ * The colour a slot is drawn in when no pack dresses it: its leaf's material in `materials`, else an
+ * indoor floor's for a ground indoors, else its family's.
+ */
+export function slotColour(slot: SiteSlot, enclosure: SiteDrawing['extent']['enclosure'], materials: SurfaceMaterials | null = null): Rgb {
+  const material = materials === null || slot.leaf === 'default' ? null : materialOfLeaf(materials, slot.family, slot.leaf);
+  if (material !== null) {
+    const [r, g, b] = material.swatch.srgb8;
+    return [r / 255, g / 255, b / 255];
   }
+  if (slot.family === 'ground' && enclosure === 'indoor') return INDOOR_GROUND_RGB;
   return FAMILY_RGB[slot.family] ?? FAMILY_RGB['prop']!;
 }
 
@@ -110,8 +101,8 @@ export interface DrawnSiteSlots {
   destroy(): void;
 }
 
-/** Draw every slot of a site under a new root, at the site's origin in the renderer's frame. */
-export function drawSiteSlots(device: pc.GraphicsDevice, drawing: SiteDrawing): DrawnSiteSlots {
+/** Draw every slot of a site under a new root, at the site's origin in the renderer's frame, each in its leaf's material where `catalog` names one. */
+export function drawSiteSlots(device: pc.GraphicsDevice, drawing: SiteDrawing, catalog: SurfaceMaterials | null = null): DrawnSiteSlots {
   const root = new pc.Entity(`generated-site:${drawing.worldId}`);
   const materials = new Map<string, pc.StandardMaterial>();
   const material = (rgb: Rgb): pc.StandardMaterial => {
@@ -140,7 +131,7 @@ export function drawSiteSlots(device: pc.GraphicsDevice, drawing: SiteDrawing): 
     entity.setLocalPosition(x / MILLIMETRES, z / MILLIMETRES, -y / MILLIMETRES);
     entity.setLocalEulerAngles(0, 90 * slot.yawQuarterTurns, 0);
     const shape = new pc.Entity(`${slot.identity}:shape`);
-    const colour = material(slotColour(slot, drawing.extent.enclosure));
+    const colour = material(slotColour(slot, drawing.extent.enclosure, catalog));
     if (slot.primitive === 'plane') {
       shape.addComponent('render', { type: 'plane', material: colour, castShadows: false });
       shape.setLocalScale(width, 1, depth);

@@ -7,7 +7,8 @@
  * 12 m yard with one 4 m by 3 m shed whose door is a 1 m gap in its south wall, a bench and a gable
  * roof. It is a test fixture, not a site a kind generated.
  */
-import { isNavigationPositionClear, atlasVec3 } from '@exulanica/atlas-core';
+import { readFileSync } from 'node:fs';
+import { isNavigationPositionClear, atlasVec3, readSurfaceMaterials } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import { describe, expect, it } from 'vitest';
 import {
@@ -108,6 +109,10 @@ describe('walking a site', () => {
   });
 });
 
+// Relative to web/, where the suite runs: the catalog a deployment ships.
+const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-kinds/surface-material.v1.json', 'utf8'));
+const bytes = (rgb: readonly number[]): number[] => rgb.map((channel) => Math.round(channel * 255));
+
 const xyz = (v: pc.Vec3): number[] => [v.x, v.y, v.z].map((n) => Math.round(n * 1e6) / 1e6);
 
 function nullApp(): { app: pc.AppBase; camera: pc.Entity; environmentRoot: pc.Entity } {
@@ -147,11 +152,49 @@ describe('drawing a site', () => {
     drawn.destroy();
   });
 
-  it('colours a surface by the material its leaf names, and anything else by its family', () => {
+  it('colours a slot by the material its leaf names in the catalog, and anything else by its family', () => {
     const [ground, wall] = drawing.slots;
-    expect(slotColour(ground!, 'open')).toEqual([0.48, 0.37, 0.26]);
+    const roof = drawing.slots.find((slot) => slot.identity === 'shed:roof')!;
+    const bench = drawing.slots.find((slot) => slot.identity === 'bench')!;
+    const colourOf = (key: string) => [...MATERIALS.materials.find((material) => material.key === key)!.swatch.srgb8];
+    // Tilled soil is soil, a plaster wall plaster and a clay roof its tiles: the catalog's colours.
+    expect(bytes(slotColour(ground!, 'open', MATERIALS))).toEqual(colourOf('soil'));
+    expect(bytes(slotColour(wall!, 'open', MATERIALS))).toEqual(colourOf('plaster'));
+    expect(bytes(slotColour(roof, 'open', MATERIALS))).toEqual(colourOf('roof_tile'));
+    // A leaf that names no material, a default leaf and a family no material serves: the family's.
+    expect(slotColour({ ...ground!, leaf: 'yard' }, 'open', MATERIALS)).toEqual([0.47, 0.56, 0.33]);
+    expect(slotColour({ ...ground!, leaf: 'default' }, 'open', MATERIALS)).toEqual([0.47, 0.56, 0.33]);
+    expect(slotColour(bench, 'open', MATERIALS)).toEqual([0.58, 0.44, 0.3]);
+    expect(slotColour({ ...ground!, leaf: 'yard' }, 'indoor', MATERIALS)).toEqual([0.66, 0.55, 0.42]);
+    // With no catalog nothing is read from a leaf: one colour a family.
+    expect(slotColour(ground!, 'open')).toEqual([0.47, 0.56, 0.33]);
     expect(slotColour(wall!, 'open')).toEqual([0.85, 0.82, 0.75]);
-    expect(slotColour({ ...ground!, leaf: 'yard' }, 'indoor')).toEqual([0.66, 0.55, 0.42]);
+  });
+
+  it('draws each slot in its leaf\'s material where the mount carries the catalog, and says on the canvas what it read', () => {
+    const { app, camera, environmentRoot } = nullApp();
+    const canvas = app.graphicsDevice.canvas as HTMLCanvasElement;
+    const unread = { ...served(), slots: [
+      ...(served()['slots'] as unknown[]),
+      slot('yard', 'ground.play_yard', 'plane', [5000, 2000, 6], 0, [2000, 2000, 0]),
+      // Two holes only a pack fills, which the engine never draws: neither is counted, whatever its words.
+      slot('gap', 'wall.stone', 'none', [9000, 9000, 0], 0, [1000, 200, 2000]),
+      slot('hole', 'wall.who_knows', 'none', [9000, 5000, 0], 0, [1000, 200, 2000]),
+    ] };
+    const mount = siteMount(parseSiteDrawing(unread), { servedBytes: 1, materials: MATERIALS });
+    const attachment = mount.attach({ app, camera, environmentRoot });
+    const shape = (identity: string) => ((environmentRoot.findByName(`${identity}:shape`) as pc.Entity).render!.meshInstances[0]!.material as pc.StandardMaterial).diffuse;
+    const soil = MATERIALS.materials.find((material) => material.key === 'soil')!.swatch.srgb8;
+    expect(bytes([shape('ground').r, shape('ground').g, shape('ground').b])).toEqual([...soil]);
+    // The ground, three walls and the roof name a material; the bench is no surface; the yard names none.
+    expect(canvas.dataset['siteMaterials']).toBe('5');
+    expect(JSON.parse(canvas.dataset['siteUnknownLooks']!)).toEqual(['ground.play_yard']);
+    attachment.dispose();
+    expect('siteMaterials' in canvas.dataset || 'siteUnknownLooks' in canvas.dataset).toBe(false);
+    // With no catalog the mount reads no leaf and says nothing.
+    const plain = siteMount(drawing, { servedBytes: 1 }).attach({ app, camera, environmentRoot });
+    expect('siteMaterials' in canvas.dataset).toBe(false);
+    plain.dispose();
   });
 
   it('hands a dresser every drawn slot by identity and undresses before the slots go', () => {

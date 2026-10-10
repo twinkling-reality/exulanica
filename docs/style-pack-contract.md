@@ -87,6 +87,32 @@ family has several variants, the part's identity picks one: FNV-1a over `identit
 modulo the count, so every runtime picks the same piece for the same part; a variant that does not
 fit the slot passes to the next.
 
+A world made from a kind adds one step between the leaf and the family's default, for the families
+that take a surface. Its parts name their surfaces in a kind's own words (`ground.sand`,
+`wall.adobe`, `roof.thatched`, `path.desert_track`), and a pack states few of them, so the plain rule
+would draw every ground as the pack's one ground. The surface material catalog
+([`surface-material.v1.json`](../assets/catalogs/world-kinds/surface-material.v1.json)) states
+each material a surface may be drawn in: the words that name it, the families that may wear it,
+what it is in plain words, and the colour it is drawn in. A leaf is read by its words, whole and
+then one by one in the order written, among the materials its family may wear
+(`materialOfLeaf`, in
+[`surface-material.ts`](../web/packages/atlas-core/src/surface-material.ts)), so `forest_floor` is
+the forest's floor, a `lake_shore` named for ground is sand and not water, and `tile` is a floor's
+tile underfoot and a clay tile on a roof. The order is then (`resolveSurfaceLookRole`):
+
+1. the pack's own dressing for the leaf, a surface or a piece, exactly as the plain rule gives it;
+2. for a leaf that names a material: the pack's own surface under `family.material` (a pack that
+   wants its own sand states `ground.sand`); or the pack's family default where the catalog says
+   that default is this material already (every pack's ground default is a lawn, so grass is the
+   pack's own); or the catalog's colour, which the dresser draws as a swatch in the pack's shading;
+3. the family's default, as before.
+
+A leaf whose words name no material takes the default and is counted, never refused: the canvas
+states how many slots wear a catalog material and which look roles named none
+(`data-site-materials`, `data-site-unknown-looks`), so the next version of the catalog is written
+from the words that were written. A town does not come through this step: its tiles name only
+leaves its packs state, and the code that dresses a town calls the plain rule.
+
 A piece meets its slot by its family's fit. Pieces are authored at real size in metres, +Y up, +Z
 toward the front, pivot at the base centre; a slot is millimetres, front +y, up +z, and a piece is
 placed by the rotation that takes +Z to the slot's front (never a reflection, so lettering never
@@ -212,7 +238,8 @@ material back and shows every primitive again.
 | --- | --- |
 | Light | The pack's default preset is the site's render look, as it is a town's |
 | Resolving | Each slot by its look role (section 3): a slot the engine draws as a primitive takes either a surface or a piece, a surface before a piece at each leaf; a `none` slot, a hole only a pack fills, takes a piece alone |
-| Surfaces | A swatch, with its up swatch, becomes the material of the slot's primitive, in the pack's shading. A site holds no texture set's images, so a leaf the pack dresses with a texture set is resolved as if the pack left it out, and takes its family's `default` |
+| Surfaces | A swatch, with its up swatch, becomes the material of the slot's primitive, in the pack's shading. A site holds no texture set's images, so a leaf the pack dresses with a texture set is resolved as if the pack left it out, and takes its material where its words name one and otherwise its family's `default` |
+| Materials | A leaf the pack does not state is drawn in the material its words name (section 3): the pack's own surface for that material, or the surface material catalog's colour in the pack's shading. A leaf that names none takes its family's `default` and is counted on the canvas |
 | Pieces | Placed by the family's fit and baked one mesh per swatch, as a town's are (`dressSlots`); the slot's primitive is hidden while its piece stands |
 | The rest | A slot the pack does not dress keeps the engine's primitive in its fallback colour, drawn in the pack's shading; when the shading draws ink, everything the site draws is outlined |
 

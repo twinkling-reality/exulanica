@@ -71,7 +71,10 @@ take each and why, are the [role catalog](../assets/catalogs/world-kinds/kind-ro
 (`family.leaf`) names what a style pack dresses. The sixteen families, each with its fit
 (`contain`, `fill`, `tile` or `surface`), are the [look-family
 catalog](../assets/catalogs/world-kinds/look-family.v1.json); the leaf is the kind's own word, so
-a pack dresses any leaf of a family it knows and the engine's own primitive draws the rest.
+a pack dresses any leaf of a family it knows and the engine's own primitive draws the rest. A
+surface's leaf (a ground, a path, water, a wall, a roof) is read by its words in the [surface
+material catalog](../assets/catalogs/world-kinds/surface-material.v1.json), so sand is drawn as sand
+and adobe as adobe in any pack ([style pack contract](style-pack-contract.md), section 3).
 
 ## Checks
 
@@ -396,7 +399,12 @@ town's receipt or digest depends on the adapter.
 ## Limits
 
 - A site takes a pack's swatches and pieces only: it holds no texture set's images, so a leaf a pack
-  dresses with a texture set takes its family's `default`.
+  dresses with a texture set takes its material where its words name one, and otherwise its
+  family's `default`.
+- A surface is drawn in one flat colour for its material
+  ([style pack contract](style-pack-contract.md), section 3). The shape of what wears it does not
+  follow its words: every structure is a box under a slab or a gable, so a tent is a canvas
+  coloured box, and nothing is drawn beyond the site's own rectangle.
 - A draft's state lives in the API process that started it, so drafting needs one API process or
   routing that sends each person to the same one ([deployment guide](deployment.md), 5.4): a poll
   another process answers reads `kind_draft_unknown` while the draft still runs. A draft still

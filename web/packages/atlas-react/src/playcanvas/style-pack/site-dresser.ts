@@ -1,5 +1,8 @@
 import type * as pc from 'playcanvas';
-import { resolveLookRole, type LookFamily, type ResolvedStylePack, type StylePackSurface } from '@exulanica/atlas-core';
+import {
+  resolveLookRole, resolveSurfaceLookRole, unknownSurfaceLeaf,
+  type LookFamily, type ResolvedStylePack, type StylePackSurface, type SurfaceMaterials,
+} from '@exulanica/atlas-core';
 import type { SiteDrawing, SiteSlot } from '../generated-site/site-drawing.js';
 import type { SiteDresser } from '../generated-site/site-mount.js';
 import { attachTileInk } from '../generated-tile/ink.js';
@@ -23,9 +26,18 @@ import { swatchMaterial } from './swatch-material.js';
  * shading, so a toon site has no surface outside its bands. When the shading draws ink, everything
  * the site draws is outlined.
  *
+ * A LEAF THE PACK DOES NOT STATE IS READ BY ITS MATERIAL before it takes the family's `default`,
+ * where the dressing carries the surface material catalog (`resolveSurfaceLookRole`): `ground.sand`
+ * is sand and `wall.adobe` adobe, in the pack's own surface for that material where it states one
+ * and otherwise in the catalog's colour, drawn in the pack's shading like any swatch. A leaf whose
+ * words name no material takes the default as before and is counted: the canvas says how many
+ * slots wear a catalog material and which look roles were thrown away (`data-site-materials`,
+ * `data-site-unknown-looks`), so the next catalog is written from the words that were written.
+ *
  * A site holds no texture set's images, so it takes a pack's swatches and pieces only: a leaf the
- * pack dresses with a texture set is resolved as if the pack left it out, so it takes its family's
- * `default`. Nothing here changes a slot, the walk or the seats; the disposer puts back every
+ * pack dresses with a texture set is resolved as if the pack left it out, so it takes its material
+ * where its words name one (a town pack's `wall.brick_running_bond` is brick) and otherwise its
+ * family's `default`. Nothing here changes a slot, the walk or the seats; the disposer puts back every
  * material, shows every primitive again and frees everything it made, before the slots go.
  */
 
@@ -35,6 +47,8 @@ export interface SitePackDressing {
   readonly families: ReadonlyMap<string, LookFamily>;
   readonly pieces: FetchedPieces;
   readonly shading: RenderShading;
+  /** The surface material catalog a leaf is read by before it takes its family's default; none reads no leaf. */
+  readonly materials?: SurfaceMaterials;
   /** Told what one site's dressing drew, each time a site is dressed. */
   readonly told?: (summary: SiteDressingSummary) => void;
 }
@@ -43,6 +57,10 @@ export interface SitePackDressing {
 export interface SiteDressingSummary {
   /** Slots drawn in one of the pack's surfaces. */
   readonly surfaces: number;
+  /** Slots drawn in a catalog material's own colour, because the pack states none for it. */
+  readonly materials: number;
+  /** The look roles thrown away: each names no material the catalog knows, and its slots took the family default. Sorted. */
+  readonly unknownLooks: readonly string[];
   /** Slots a piece stands in. */
   readonly pieces: number;
   /** Pieces placed: a tiled slot places one per copy. */
@@ -82,6 +100,7 @@ function pieceSlot(slot: SiteSlot): PieceSlot {
 export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
   const pack = swatchesOnly(dressing.pack);
   const { families, shading } = dressing;
+  const catalog = dressing.materials ?? null;
   return (host, drawn, drawing: SiteDrawing) => {
     const device = host.app.graphicsDevice;
     const made: pc.StandardMaterial[] = [];
@@ -115,14 +134,33 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     };
 
     let surfaces = 0;
+    let materials = 0;
     let undressed = 0;
+    const unknownLooks = new Set<string>();
     const modules: PieceSlot[] = [];
     const leftAsDrawn: SiteSlot[] = [];
     for (const slot of drawing.slots) {
       const entity = drawn.entities.get(slot.identity);
-      const resolved = resolveLookRole(pack, slot, families, entity === undefined ? 'module' : 'either');
+      const accepts = entity === undefined ? 'module' : 'either';
+      const resolved = catalog === null
+        ? resolveLookRole(pack, slot, families, accepts)
+        : resolveSurfaceLookRole(pack, slot, families, accepts, catalog);
+      // A drawn slot whose leaf names nothing known is drawn as its family's default: counted, by its words.
+      if (catalog !== null && entity !== undefined && resolved?.role !== slot.lookRole && unknownSurfaceLeaf(catalog, slot.lookRole)) {
+        unknownLooks.add(slot.lookRole);
+      }
       if (resolved?.kind === 'module') {
         modules.push(pieceSlot(slot));
+      } else if (resolved?.kind === 'material' && entity !== undefined) {
+        let material = surfaceMaterials.get(resolved.role);
+        if (material === undefined) {
+          material = swatchMaterial(resolved.material.swatch, null, shading, `style-pack:material:${resolved.role}`);
+          made.push(material);
+          surfaceMaterials.set(resolved.role, material);
+        }
+        const worn = material;
+        wear(entity, slot.identity, () => worn);
+        materials += 1;
       } else if (resolved?.kind === 'surface' && resolved.swatch !== null && entity !== undefined) {
         let material = surfaceMaterials.get(resolved.role);
         if (material === undefined) {
@@ -159,8 +197,16 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     }
 
     const ink = shading.ink === null ? null : attachTileInk(device, drawn.root, shading.ink, undefined, ['']);
+    const unknown = [...unknownLooks].sort();
+    const canvas = device.canvas as HTMLCanvasElement | undefined;
+    if (catalog !== null && canvas?.dataset !== undefined) {
+      canvas.dataset['siteMaterials'] = String(materials);
+      canvas.dataset['siteUnknownLooks'] = JSON.stringify(unknown);
+    }
     dressing.told?.({
       surfaces,
+      materials,
+      unknownLooks: unknown,
       pieces: standing.size,
       placed: placed.placed,
       undressed,
@@ -171,6 +217,10 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     return () => {
       if (undone) return;
       undone = true;
+      if (catalog !== null && canvas?.dataset !== undefined) {
+        delete canvas.dataset['siteMaterials'];
+        delete canvas.dataset['siteUnknownLooks'];
+      }
       ink?.dispose();
       placed.dispose();
       for (const [entity, enabled] of hidden.splice(0).reverse()) entity.enabled = enabled;

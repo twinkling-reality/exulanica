@@ -708,5 +708,9 @@ export {
   readWorldSetting,
   readWorldSettingRules,
 } from './world-setting.js';
+export type { MaterialDressing, SurfaceMaterial, SurfaceMaterials } from './surface-material.js';
+export {
+  SURFACE_MATERIAL_CATALOG_ID, materialOfLeaf, readSurfaceMaterials, resolveSurfaceLookRole, unknownSurfaceLeaf,
+} from './surface-material.js';
 export type { StylePiece, StylePieceGroup } from './style-piece.js';
 export { StylePieceRefusal, readStylePiece } from './style-piece.js';

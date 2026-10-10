@@ -13,7 +13,10 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
-import { readStylePackManifest, resolveStylePack, type LookFamily, type ResolvedStylePack, type StylePackFile } from '@exulanica/atlas-core';
+import {
+  readStylePackManifest, readSurfaceMaterials, resolveStylePack,
+  type LookFamily, type ResolvedStylePack, type StylePackFile, type SurfaceMaterials,
+} from '@exulanica/atlas-core';
 import { parseSiteDrawing, siteMount, type SiteDrawing } from '../src/playcanvas/generated-site/index.js';
 import type { RenderShading } from '../src/playcanvas/generated-tile/look.js';
 import { fetchPackPieces, packSiteDresser, type FetchedPieces, type SiteDressingSummary } from '../src/playcanvas/style-pack/index.js';
@@ -27,6 +30,9 @@ const CATALOG = JSON.parse(readFileSync('../assets/catalogs/world-kinds/look-fam
 const families = new Map<string, LookFamily>(CATALOG.entries.map((entry) => [entry.key, {
   fit: entry.fit, dressing: entry.dressing, fillMinimumPermille: entry.fill_minimum_permille, fillMaximumPermille: entry.fill_maximum_permille,
 }]));
+
+const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-kinds/surface-material.v1.json', 'utf8'));
+const colourOf = (key: string): number[] => [...MATERIALS.materials.find((material) => material.key === key)!.swatch.srgb8];
 
 const SOIL = [120, 90, 60] as const;
 const OAK = [150, 110, 70] as const;
@@ -153,21 +159,76 @@ function nullApp(): { app: pc.AppBase; camera: pc.Entity; environmentRoot: pc.En
   return { app, camera, environmentRoot };
 }
 
-async function dressedSite(shading: RenderShading) {
+async function dressedSite(shading: RenderShading, materials?: SurfaceMaterials, site: SiteDrawing = drawing) {
   const pack = sitePack();
   const pieces: FetchedPieces = await fetchPackPieces(pack, Object.keys(pack.modules), TABLE, async (file: StylePackFile) => PIECES[file.path]!);
   const summaries: SiteDressingSummary[] = [];
   const { app, camera, environmentRoot } = nullApp();
-  const mount = siteMount(drawing, { servedBytes: 1, dress: packSiteDresser({ pack, families, pieces, shading, told: (summary) => summaries.push(summary) }) });
+  const mount = siteMount(site, { servedBytes: 1, dress: packSiteDresser({ pack, families, pieces, shading, ...(materials === undefined ? {} : { materials }), told: (summary) => summaries.push(summary) }) });
   const attachment = mount.attach({ app, camera, environmentRoot });
+  const canvas = app.graphicsDevice.canvas as HTMLCanvasElement;
   const root = environmentRoot.findByName('generated-site:world-1') as pc.Entity;
   const shape = (identity: string): pc.MeshInstance => (root.findByName(`${identity}:shape`) as pc.Entity).render!.meshInstances[0]!;
   const rgb = (material: pc.Material): number[] => {
     const { r, g, b } = (material as pc.StandardMaterial).diffuse;
     return [r, g, b].map((channel) => Math.round(channel * 255));
   };
-  return { root, environmentRoot, attachment, summaries, shape, rgb };
+  return { root, environmentRoot, attachment, summaries, shape, rgb, canvas };
 }
+
+describe('a site dressed in a pack that carries the surface material catalog', () => {
+  it('draws a leaf the pack does not state in its material, not the family default, and says what it read', async () => {
+    const site = await dressedSite(PBR, MATERIALS);
+    // Tilled soil, a thatched roof and a brick wall whose texture set a site cannot hold: each its own material.
+    expect(site.shape('ground').material.name).toBe('style-pack:material:ground.soil');
+    expect(site.rgb(site.shape('ground').material)).toEqual(colourOf('soil'));
+    expect(site.shape('shed:roof').material.name).toBe('style-pack:material:roof.thatch');
+    expect(site.rgb(site.shape('shed:roof').material)).toEqual(colourOf('thatch'));
+    expect(site.shape('shed:wall:0').material.name).toBe('style-pack:material:wall.brick');
+    // The pieces stand as before: a leaf's material never takes a slot a piece fills.
+    expect((site.root.findByName('fence') as pc.Entity).enabled).toBe(false);
+    expect(site.summaries).toEqual([{ surfaces: 0, materials: 3, unknownLooks: ['boundary.picket'], pieces: 2, placed: 4, undressed: 2, inkSegments: 0 }]);
+    expect(site.canvas.dataset['siteMaterials']).toBe('3');
+    expect(JSON.parse(site.canvas.dataset['siteUnknownLooks']!)).toEqual(['boundary.picket']);
+    site.attachment.dispose();
+    expect('siteMaterials' in site.canvas.dataset || 'siteUnknownLooks' in site.canvas.dataset).toBe(false);
+  });
+
+  it('draws a material in the pack\'s shading, as it draws a swatch', async () => {
+    const toon = await dressedSite(TOON, MATERIALS);
+    const plain = await dressedSite(PBR, MATERIALS);
+    const chunk = (material: pc.Material): string | undefined => (material as pc.StandardMaterial).getShaderChunks(pc.SHADERLANGUAGE_GLSL).get('lightDiffuseLambertPS') as string | undefined;
+    // Positive control: a swatch surface of the same pack is banded in toon and not in pbr.
+    expect(chunk(toon.shape('ground').material)).not.toEqual(chunk(plain.shape('ground').material));
+    toon.attachment.dispose();
+    plain.attachment.dispose();
+  });
+
+  it('gives a leaf that names no material its family default as before, and counts its words', async () => {
+    const yard = parseSiteDrawing({
+      profile: 'exulanica.site-drawing/v1', world_id: 'world-1', receipt_sha256: 'a'.repeat(64),
+      kind: { kind: 'fixture_yard', version: 1, label: 'Yard' },
+      extent: { widthMm: 12_000, depthMm: 12_000, enclosure: 'open' },
+      arrival: { positionMm: [5000, 3000, 0], facingMm: [0, 1] },
+      slots: [
+        slot('ground', 'ground.playground', 'plane', [6000, 6000, 0], 0, [12_000, 12_000, 0], 'surface'),
+        slot('lawn', 'ground.grass', 'plane', [3000, 3000, 6], 0, [2000, 2000, 0], 'surface'),
+        slot('plain', 'ground.default', 'plane', [9000, 3000, 6], 0, [2000, 2000, 0], 'surface'),
+        slot('wall', 'wall.market_wall', 'box', [3750, 7100, 0], 0, [1500, 200, 2400], 'surface'),
+      ],
+      walk: { floorMm: [0, 0, 12_000, 12_000], blockersMm: [], keepOutMm: [] },
+      seats: [],
+    });
+    const site = await dressedSite(PBR, MATERIALS, yard);
+    expect(site.shape('ground').material.name).toBe('style-pack:surface:ground.default');
+    expect(site.shape('wall').material.name).toBe('style-pack:surface:wall.default');
+    // Grass is what the pack's ground default is already, and a default leaf names nothing to throw away.
+    expect(site.shape('lawn').material.name).toBe('style-pack:surface:ground.default');
+    expect(site.shape('plain').material.name).toBe('style-pack:surface:ground.default');
+    expect(site.summaries[0]).toMatchObject({ surfaces: 4, materials: 0, unknownLooks: ['ground.playground', 'wall.market_wall'] });
+    site.attachment.dispose();
+  });
+});
 
 describe('a site dressed in a pack', () => {
   it('draws a surface slot in the swatch its leaf, else its family default, names', async () => {
@@ -192,7 +253,7 @@ describe('a site dressed in a pack', () => {
     expect(pieces.render!.meshInstances[0]!.mesh.primitive[0]!.count).toBe(4 * 6);
     expect((site.root.findByName('fence') as pc.Entity).enabled).toBe(false);
     expect(site.root.findByName('barn')).toBeNull();
-    expect(site.summaries).toEqual([{ surfaces: 3, pieces: 2, placed: 4, undressed: 2, inkSegments: 0 }]);
+    expect(site.summaries).toEqual([{ surfaces: 3, materials: 0, unknownLooks: [], pieces: 2, placed: 4, undressed: 2, inkSegments: 0 }]);
     site.attachment.dispose();
   });
 
