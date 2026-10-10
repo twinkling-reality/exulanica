@@ -828,6 +828,117 @@ def test_a_recreation_with_no_credential_to_keep_says_so_by_the_variable_s_name(
 
 
 @needs_shell
+def test_a_watch_that_holds_a_credential_hands_its_own_to_the_recreation(tmp_path):
+    """The rule is one for `watch` and `up` alike: a process that holds a credential hands that
+    one on and reads no container for another."""
+    typed = "held-by-the-watching-shell"
+    output, _, held = _recreation(
+        tmp_path, WATCH_HELD_KEY=CREDENTIAL_PROBE, **{"NEBIUS_API_KEY": typed}
+    )
+    assert held == typed
+    assert CREDENTIAL_PROBE not in output and typed not in output
+
+
+#: Stand-ins for an `up`: every image is loaded, the merged configuration publishes nothing, and
+#: the command that starts the services writes down the model credential it held.
+_UP_STUBS = {
+    "docker": """#!/bin/sh
+case " $* " in
+  *" image inspect "*) echo sha256:stand-in ;;
+  *" config --format json "*) echo '{"services": {}}' ;;
+  *" ps -a -q api "*) [ -n "${WATCH_REPLACED-container}" ] && echo "${WATCH_REPLACED-container}" ;;
+  *" inspect "*)
+    echo "PATH=/usr/bin"
+    [ -n "${WATCH_HELD_KEY:-}" ] && printf 'NEBIUS_API_KEY=%s\\n' "$WATCH_HELD_KEY"
+    echo "EXULANICA_SPENDING=durable" ;;
+  *" up "*)
+    echo "up $*" >>"$WATCH_ACTIONS"
+    printf '%s' "${NEBIUS_API_KEY:-}" >"$WATCH_ACTIONS.key" ;;
+  *" ps "*) : ;;
+  *) echo "unexpected docker $*" >>"$WATCH_ACTIONS"; exit 1 ;;
+esac
+""",
+    "sleep": "#!/bin/sh\n",
+}
+
+
+def _up(tmp_path: pathlib.Path, **extra: str) -> tuple[subprocess.CompletedProcess, list[str], str]:
+    """`up` on an initialised server with its fuse stated, against the stand-ins: the result, the
+    docker commands that started anything, and the model credential that command held."""
+    stubs = tmp_path / "up-stubs"
+    stubs.mkdir()
+    for name, body in _UP_STUBS.items():
+        (stubs / name).write_text(body, encoding="utf-8")
+        (stubs / name).chmod(0o755)
+    assert _script(tmp_path, "init", **_init_env(tmp_path)).returncode == 0
+    env_file = tmp_path / "deploy" / "public.env"
+    stated = env_file.read_text(encoding="utf-8")
+    stated = stated.replace("EXULANICA_BUDGET_USD=\n", "EXULANICA_BUDGET_USD=1\n")
+    stated = stated.replace("EXULANICA_BUDGET_MAX_CALLS=\n", "EXULANICA_BUDGET_MAX_CALLS=10\n")
+    env_file.write_text(stated, encoding="utf-8")
+    actions = tmp_path / "actions.log"
+    actions.write_text("", encoding="utf-8")
+    result = _script(
+        tmp_path,
+        "up",
+        PATH=f"{stubs}{os.pathsep}{os.environ['PATH']}",
+        WATCH_ACTIONS=str(actions),
+        **extra,
+    )
+    held = pathlib.Path(f"{actions}.key")
+    return (
+        result,
+        actions.read_text(encoding="utf-8").splitlines(),
+        held.read_text(encoding="utf-8") if held.exists() else "",
+    )
+
+
+@needs_shell
+def test_up_from_a_shell_with_no_credential_keeps_the_replaced_api_s(tmp_path):
+    """A redeploy or a changed setting is an `up` from a shell that holds no model credential: the
+    services it starts hold the one the replaced API held, which appears in nothing `up` prints,
+    in no command line and in no file of the deploy directory; `up` says only that it was kept."""
+    result, actions, held = _up(tmp_path, WATCH_HELD_KEY=CREDENTIAL_PROBE)
+    assert result.returncode == 0, result.stderr
+    assert held == CREDENTIAL_PROBE
+    assert len(actions) == 1 and " up -d --wait " in actions[0], actions
+    assert "NEBIUS_API_KEY is kept from the api container this up replaces" in result.stderr
+    assert "NEBIUS_API_KEY is not set" not in result.stderr
+    assert CREDENTIAL_PROBE not in result.stdout + result.stderr + "\n".join(actions)
+    for path in (tmp_path / "deploy").rglob("*"):
+        if path.is_file():
+            assert CREDENTIAL_PROBE.encode() not in path.read_bytes(), path
+
+
+@needs_shell
+def test_a_shell_that_holds_a_credential_always_replaces_the_one_the_api_held(tmp_path):
+    """How an operator changes the credential: `up` from a shell that holds one hands that one
+    over, whatever the replaced container held, and reads no container for it."""
+    typed = "typed-by-the-operator-now"
+    result, _, held = _up(tmp_path, WATCH_HELD_KEY=CREDENTIAL_PROBE, **{"NEBIUS_API_KEY": typed})
+    assert result.returncode == 0, result.stderr
+    assert held == typed
+    assert "is kept from" not in result.stderr and "is not set" not in result.stderr
+    assert CREDENTIAL_PROBE not in result.stdout + result.stderr
+
+
+@needs_shell
+@pytest.mark.parametrize(
+    "extra",
+    [{}, {"WATCH_REPLACED": ""}],
+    ids=["the container holds none", "no container to replace"],
+)
+def test_up_with_no_credential_anywhere_starts_and_says_so_by_the_variable_s_name(tmp_path, extra):
+    """A first `up` with no credential, or one over an API that held none, starts the server as
+    before and names the variable: every route that asks a model will say none is configured."""
+    result, actions, held = _up(tmp_path, **extra)
+    assert result.returncode == 0, result.stderr
+    assert held == "" and len(actions) == 1
+    assert "NEBIUS_API_KEY is not set" in result.stderr
+    assert "is kept from" not in result.stderr
+
+
+@needs_shell
 def test_watch_reports_a_failing_edge_and_restarts_nothing_for_it(tmp_path):
     """A failed issuance or a rate-limited certificate makes the edge fail while the proxy and the
     API are well; neither restart fixes it. From the third check in a row it is reported in the

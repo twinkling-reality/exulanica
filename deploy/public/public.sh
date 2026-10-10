@@ -173,6 +173,24 @@ compose() {
   docker compose -p "$project" --project-directory "$root" --env-file "$env_file" \
     -f "$root/compose.yaml" -f "$here/public.yaml" --profile tiles "$@"
 }
+# The model credential lives only in the environment `up` gave the API's container: it is never
+# written to a file. A command that starts an API again from a shell holding none (a timer's
+# `watch`, an `up` for a redeploy or a changed setting) would start it without one, and every model
+# mind would stop until somebody typed it again. So the container being replaced hands its own on:
+# read here into this process's environment alone, for the compose command that follows. It is
+# never printed, logged, put on a command line or written to a file. A shell that holds a
+# credential always wins, which is how an operator replaces it.
+keep_model_credential() {
+  [ -z "${NEBIUS_API_KEY:-}" ] || return 0
+  local replaced
+  replaced="$(compose ps -a -q api 2>/dev/null | head -n 1 || true)"
+  [ -n "$replaced" ] || return 0
+  NEBIUS_API_KEY="$(
+    docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$replaced" 2>/dev/null \
+      | sed -n 's/^NEBIUS_API_KEY=//p' | head -n 1 || true
+  )"
+  export NEBIUS_API_KEY
+}
 
 merge_tokens() {
   # Every token file, merged into the one directory the API loads, written through a descriptor
@@ -435,8 +453,15 @@ services = json.load(sys.stdin)["services"]
 print(" ".join(name for name in ("api", "client") if services.get(name, {}).get("ports")))
 ')"
     [ -z "$published" ] || refuse "these services publish a port, which only the edge may: $published"
+    # A redeploy or a changed setting is an `up` from a shell that usually holds no model
+    # credential: the API it replaces hands its own on. A shell that holds one always wins.
     if [ -z "${NEBIUS_API_KEY:-}" ]; then
-      echo "NEBIUS_API_KEY is not set: every route that asks a model will say no credential is configured" >&2
+      keep_model_credential
+      if [ -n "${NEBIUS_API_KEY:-}" ]; then
+        echo "NEBIUS_API_KEY is kept from the api container this up replaces" >&2
+      else
+        echo "NEBIUS_API_KEY is not set: every route that asks a model will say no credential is configured" >&2
+      fi
     fi
     # What the installation facts name as its identity: the images this server runs.
     EXULANICA_IMAGE_BACKEND="$(docker image inspect --format '{{.Id}}' "$backend_image")"
@@ -609,21 +634,9 @@ PY
     repaired=""
     if [ "$failures" -ge 3 ]; then
       echo "$now recreating api after $failures failures of its own liveness"
-      # The model credential lives only in the environment `up` gave the API's container, and this
-      # check runs from a timer that holds none: a recreation would start the API without it, and
-      # every model mind would stop until somebody ran `up` again. So the container being replaced
-      # hands its own on: read here into this process's environment alone, for the one command
-      # below. It is never printed, logged, put on a command line or written to a file.
-      if [ -z "${NEBIUS_API_KEY:-}" ]; then
-        replaced="$(compose ps -a -q api 2>/dev/null | head -n 1 || true)"
-        if [ -n "$replaced" ]; then
-          NEBIUS_API_KEY="$(
-            docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$replaced" 2>/dev/null \
-              | sed -n 's/^NEBIUS_API_KEY=//p' | head -n 1 || true
-          )"
-          export NEBIUS_API_KEY
-        fi
-      fi
+      # This check runs from a timer that holds no model credential, so the recreated API keeps
+      # the one its predecessor held (keep_model_credential).
+      keep_model_credential
       [ -n "${NEBIUS_API_KEY:-}" ] \
         || echo "$now the replaced api held no NEBIUS_API_KEY: the recreated api asks no model until up is run with it"
       compose up -d --no-build --pull never --no-deps --force-recreate api

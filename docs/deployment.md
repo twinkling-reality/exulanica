@@ -1480,7 +1480,19 @@ secrets directory `EXULANICA_DEPLOY_DIR`:
 | `logs`, `down`, `destroy --yes-delete-volumes` | Follow the logs; stop and keep the volumes; stop and delete them, the database, store and spending witness included |
 
 The model credential is never written to a file: `up` passes `NEBIUS_API_KEY` through from the
-calling shell.
+calling shell. An `up` from a shell that holds none (a redeploy, or a changed setting) keeps the
+one the API container it replaces held, read from that container into the command's own
+environment and nowhere else, and says `NEBIUS_API_KEY is kept from the api container this up
+replaces`; `watch` does the same when it recreates the API. A shell that holds a credential always
+wins, which is how an operator replaces it: `read -rs NEBIUS_API_KEY && export NEBIUS_API_KEY`,
+then `up`. With no container and no credential `up` starts the server and says `NEBIUS_API_KEY is
+not set`: every route that asks a model then says none is configured.
+
+A setting in `public.env` is changed the same way: edit the line, then `up`. The base wait between
+simulated minutes (`EXULANICA_SOCIETY_TICK_INTERVAL_MS`, 5.1.5) reaches the API, which plays every
+town here; a town already playing keeps the interval its playback was last set with, until its
+control is next written (paused and played again, or its speed changed), and no stored minute
+changes.
 
 **On one host.** The machine is section 8.1's: a `cpu-d3` virtual machine with Ubuntu 24.04, a
 public address, and inbound TCP 80 and 443, with 22 limited to the operator's address. It also has
