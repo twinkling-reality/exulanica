@@ -26,9 +26,15 @@ from exulanica.world.traffic_episodes import (
 )
 
 import traffic_corridor_support as corridor
+from living_town_support import before_floor_area
 
 #: The corridor signal the continuation tests read.
 CORRIDOR_SIGNAL = "4c2a6323-4ae3-5581-9d67-d681421f0f12"
+#: The town here is made as towns were made before their homes followed floor area: a town's
+#: traffic is seeded by its receipt, which pins the routine it was made under, and the histories
+#: below were read for that town.
+pytestmark = pytest.mark.usefixtures(before_floor_area.__name__)
+
 #: A small town whose first signal meets a run of twelve keeps with a vehicle still near it.
 TOWN = "small_town"
 TOWN_WORLD = "world:generated:v7-signal-small_town-0"

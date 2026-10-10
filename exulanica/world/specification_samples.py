@@ -151,6 +151,7 @@ def compute_sample(preset: str, values: dict[str, int | str], world_id: str) -> 
     from exulanica.grammar.grammars.city.streets import StreetSegmentRecord
     from exulanica.traffic.errors import UnsupportedNetworkError
     from exulanica.world.composers import GeneratedWorldRefused
+    from exulanica.world.society_living import town_routine_of
     from exulanica.world.society_walking_surfaces import walking_surfaces_place
     from exulanica.world.specification_source import composed_town
     from exulanica.world.traffic_episodes import TrafficRefused, prepared, traffic_input
@@ -168,7 +169,10 @@ def compute_sample(preset: str, values: dict[str, int | str], world_id: str) -> 
         return {"status": "refused", "refused": getattr(refused, "code", type(refused).__name__)}
     records = composed.records
     grammar_version = int(composed.receipt["grammar"]["grammar_version"])
-    place = walking_surfaces_place(f"generated:{world_id}", records)
+    # Under the routine the town was made under, which its people are made under too.
+    place = walking_surfaces_place(
+        f"generated:{world_id}", records, town_routine_of(composed.receipt)
+    )
     streets: dict[str, str] = {}
     uses: Counter[str] = Counter()
     buildings: set[str] = set()
@@ -181,7 +185,8 @@ def compute_sample(preset: str, values: dict[str, int | str], world_id: str) -> 
     sample: dict[str, Any] = {
         "status": "sampled",
         "tiles": len(composed.receipt["tiles"]),
-        # The residents rule the town's society starts with: one person per place in a home.
+        # The residents rule the town's society starts with: one person for each place in a home
+        # that is lived in.
         "people": sum(d.get("resident_capacity", 0) for d in place["destinations"]),
         "streets": _counted(
             Counter(streets.values()), _labels("street-hierarchy", grammar_version)

@@ -21,6 +21,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import pytest
 from exulanica.canonical import canonical_json
 from exulanica.world.kinds.document import read_kind
 from exulanica.world.kinds.routine import kind_routine
@@ -35,7 +36,11 @@ from exulanica.world.society_living import (
 )
 from exulanica.world.society_planner import validate_society_input
 
-from living_town_support import SEED, town_input
+from living_town_support import SEED, before_floor_area, town_input
+
+#: The town here is made as towns were made before their homes followed floor area, as its
+#: receipt pins: the bytes below are that town's, and it still composes to them.
+pytestmark = pytest.mark.usefixtures(before_floor_area.__name__)
 
 CAFE = Path(__file__).parent / "fixtures" / "world-kinds" / "fixture-cafe.json"
 SOCIETY = uuid.UUID("5a5a5a5a-0000-4000-8000-000000000005")

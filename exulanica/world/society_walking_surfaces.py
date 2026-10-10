@@ -753,8 +753,9 @@ def build_walking_surfaces_input(
     things placed in the world's region (``segment_blocked`` tells whether a step crosses one,
     ``obstructions`` what of the town's own a thing's place keeps clear of; ``made_kinds`` the run
     forms of the kinds its workspace keeps, by digest, so a thing of one is read as a being), whose
-    first input also carries ``people``, what the town's people are made from
-    (:func:`~exulanica.world.town_people.people_frame`), where one is given;
+    population is that of ``people``, what the town's people are made from
+    (:func:`~exulanica.world.town_people.people_frame`), where one is given, and whose first input
+    also records it;
     without either, the walking-surfaces-v1 input the purposeful society reads."""
     if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
@@ -821,7 +822,9 @@ def build_walking_surfaces_input(
     targets: list[dict[str, Any]] = []
     records_list: list[dict[str, Any]] = []
     kept: list[list[int]] = []
-    residents = place_residents(place)
+    # A things town's people are its frame's, made under the routine the town was made under;
+    # any other input counts the places in the homes of the place it walks.
+    residents = place_residents(place) if people is None else int(people["population"])
     for destination in sorted(place["destinations"], key=lambda d: d["destination_id"]):
         affordance = _affordance(destination)
         if affordance is None or not destination["enabled"]:
@@ -1009,7 +1012,8 @@ def build_walking_surfaces_input(
             document["modules"] = list(current_modules())
             if people is not None and reason is None:
                 # What the town's people are made from, before any draw: genesis completes it
-                # with the society's seed, and replay reads it from this input.
+                # with the society's seed, and replay reads it from this input. A later input
+                # is given the frame for its population alone and records none.
                 document["people"] = dict(people)
     if living is not None:
         document["living"] = {

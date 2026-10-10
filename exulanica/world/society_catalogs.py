@@ -99,6 +99,7 @@ __all__ = [
     "SHIFT_CATALOG",
     "STATES_AND_ACTS",
     "TOWN_ROUTINE_VERSIONS",
+    "TOWN_ROUTINE_VERSIONS_BEFORE_FLOOR_AREA",
     "UNRECORDED_ROUTINE_VERSIONS",
     "Activity",
     "ActivityKind",
@@ -151,11 +152,24 @@ ROUTINE_VERSIONS: Final = {
 #: others: a use class names the shifts its positions take in turn.
 SHIFT_CATALOG: Final = "society-shift"
 #: The catalog versions a new town's living society reads (``exulanica-society/v5``): the living
-#: routine with each workplace's opening hours and the shifts its positions work
-#: (``society-use-class`` v2 over ``society-shift`` v1), and a policy that employs a share of the
-#: town's residents and starts its day early (``society-policy`` v2). A town's input records the
-#: versions its living place was built under, and its society reads them from there.
+#: routine with each workplace's opening hours and the shifts its positions work and, from its
+#: third version, the floor area a dwelling takes, so a town's homes follow the floor its premises
+#: records state (``society-use-class`` v3 over ``society-shift`` v1), and a policy that employs a
+#: share of the town's residents, starts its day early and, from its third version, states how
+#: many people a new town starts with (``society-policy`` v3). A town's receipt pins the versions
+#: it was made under and its input records the versions its living place was built under; its
+#: society reads them from there, so a town made under earlier versions keeps its people.
 TOWN_ROUTINE_VERSIONS: Final = {
+    "society-activity": 1,
+    "society-capacity": 1,
+    "society-need": 1,
+    "society-policy": 3,
+    SHIFT_CATALOG: 1,
+    "society-use-class": 3,
+}
+#: The versions a town was made under before its homes followed floor area: every town's receipt
+#: of that time pins them, and its people are still made under them.
+TOWN_ROUTINE_VERSIONS_BEFORE_FLOOR_AREA: Final = {
     "society-activity": 1,
     "society-capacity": 1,
     "society-need": 1,
@@ -298,6 +312,9 @@ POLICY_KEYS: Final = frozenset(
 POLICY_KEYS_BY_VERSION: Final = {
     1: POLICY_KEYS,
     2: POLICY_KEYS | {"employment_share_milli"},
+    # The third also states how many people a new town starts with: a chosen budget, spent over
+    # its homes (:func:`~exulanica.world.society_city_place.place_from_city_records`).
+    3: POLICY_KEYS | {"employment_share_milli", "town_people_default"},
 }
 
 
@@ -495,6 +512,15 @@ def _use_class_v2_bounds(where: str, values: dict[str, FieldValue]) -> None:
         raise CatalogError(f"{where}: opening and closing minutes differ; 0 to 1440 is always")
 
 
+def _use_class_v3_bounds(where: str, values: dict[str, FieldValue]) -> None:
+    """A third-version use class is a second-version one that also states the floor area one
+    dwelling of it takes: positive exactly where residents live there, so its premises holds a
+    dwelling for each such area of its recorded floor, and 0 anywhere else."""
+    _use_class_v2_bounds(where, values)
+    if (values["dwelling_floor_area_mm2"] != 0) != (values["resident_capacity"] != 0):
+        raise CatalogError(f"{where}: exactly a home states the floor area a dwelling takes")
+
+
 #: Every schema the society reads, keyed by catalog id and version. A version a stored society
 #: names keeps its schema here and its file in the directory for as long as the society exists.
 SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
@@ -577,6 +603,26 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         ),
         entry_check=_use_class_v2_bounds,
     ),
+    ("society-use-class", 3): CatalogSchema(
+        "society-use-class",
+        3,
+        (
+            ("label", text_field),
+            ("kind", _choice(USE_CLASS_KINDS)),
+            ("role_key", _key),
+            ("role_label", text_field),
+            ("staff_per_unit", integer_field(0, 4096)),
+            ("visitor_capacity", integer_field(0, 4096)),
+            ("resident_capacity", integer_field(0, 4096)),
+            ("dwelling_floor_area_mm2", integer_field(0, 1_000_000_000_000)),
+            ("visitor_affordances", key_list_field),
+            ("opening_minute", _MINUTE),
+            ("closing_minute", _MINUTE),
+            ("shifts", _shift_keys),
+            ("reason", text_field),
+        ),
+        entry_check=_use_class_v3_bounds,
+    ),
     (SHIFT_CATALOG, 1): CatalogSchema(
         SHIFT_CATALOG,
         1,
@@ -593,7 +639,7 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
             version,
             (("value", integer_field(0, 10**9)), ("reason", text_field)),
         )
-        for version in (1, 2)
+        for version in (1, 2, 3)
     },
     **{
         (PURPOSEFUL_CATALOG, version): CatalogSchema(
@@ -795,6 +841,10 @@ class UseClass:
     #: The shifts its positions work in turn, by the shift catalog's keys; empty where its
     #: catalog version names none, and every position works :attr:`shift_start`.
     shifts: tuple[str, ...] = ()
+    #: The floor area one dwelling of it takes, where its catalog version states one: a premises
+    #: of it then holds a dwelling for each such area of its recorded floor, at least one, each
+    #: housing :attr:`resident_capacity`. 0 where it states none: one dwelling a premises.
+    dwelling_floor_area_mm2: int = 0
 
     def open_at(self, minute: int) -> bool:
         """Whether its hours admit a visitor at this minute of the day; hours may wrap midnight."""
@@ -1087,6 +1137,7 @@ def load_routine_model(
                 else None
             ),
             shifts=named,
+            dwelling_floor_area_mm2=int(v.get("dwelling_floor_area_mm2", 0)),  # type: ignore[arg-type]
         )
     policy = {key: int(v["value"]) for key, v in by_id["society-policy"].items()}  # type: ignore[arg-type]
     policy_keys = POLICY_KEYS_BY_VERSION[chosen["society-policy"]]
@@ -1094,6 +1145,8 @@ def load_routine_model(
         raise CatalogError(f"the policy catalog holds exactly {sorted(policy_keys)}")
     if not 0 < policy.get("employment_share_milli", 1000) <= 1000:
         raise CatalogError("the employment share is a positive share of residents, at most 1000")
+    if policy.get("town_people_default", 1) < 1:
+        raise CatalogError("a new town starts with at least one person")
     if not 0 < policy["occupancy_target_milli"] <= policy["occupancy_maximum_milli"] <= 1000:
         raise CatalogError("occupancy target is positive and at most the maximum, at most 1000")
     if not 0 < policy["walk_speed_minimum_mm_per_tick"] <= policy["walk_speed_maximum_mm_per_tick"]:

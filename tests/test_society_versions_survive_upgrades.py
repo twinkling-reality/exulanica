@@ -149,6 +149,12 @@ def test_released_catalog_versions_never_change_in_place():
 #: the codes each kind of activity records, the legacy identities of the first three engines and
 #: the living town's routine; a new version adds a line here, and no line ever changes.
 RELEASED_CATALOGS = {
+    # A town's homes follow the floor its premises records state, and a new town starts with a
+    # chosen number of people (the town routine's third use-class and policy versions).
+    "society-use-class.v3.json": (
+        "90e429b18665e7b1da8bc763bbe3a12ac935a5c07fdd4e8fb7a6627baee047a2"
+    ),
+    "society-policy.v3.json": "3e085cf79bd3e5a75d5f1f33e5f2ede9c10526ff95d006a6faecd721ffa8ad42",
     "society-comparison-seeds.v6.json": (
         "012fc1270c313e47628b35148992cc01d9e51de2a11c7021cbea31f22606474d"
     ),

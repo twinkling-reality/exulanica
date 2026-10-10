@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-import functools
 import hashlib
 from typing import Any
 
@@ -46,6 +45,11 @@ from exulanica.world.society_walking_surfaces import (
 from exulanica.world.town_people import people_frame, resident_of, town_people
 
 import test_walking_surfaces_v3 as town
+from living_town_support import before_floor_area, per_town_routine
+
+#: The town here is made as towns were made before their homes followed floor area, the town the
+#: digests below were read for; who its people are does not depend on which routine that is.
+pytestmark = pytest.mark.usefixtures(before_floor_area.__name__)
 
 SEED = town.SEED
 SOCIETY = town.SOCIETY
@@ -72,7 +76,7 @@ def _sha(value: Any) -> str:
     return hashlib.sha256(canonical_json(value)).hexdigest()
 
 
-@functools.cache
+@per_town_routine
 def _living_place() -> dict[str, Any]:
     """The town's place under the routine a living town is made under."""
     ground = town._town()[0]

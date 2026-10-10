@@ -37,7 +37,7 @@ import json
 import threading
 import uuid
 from collections import OrderedDict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from functools import cache, lru_cache, partial
 from itertools import pairwise
 from pathlib import Path
@@ -93,6 +93,7 @@ __all__ = [
     "next_minute_options",
     "routine_for",
     "town_routine",
+    "town_routine_of",
 ]
 
 LIVING_PROFILE: Final = "exulanica-society/v4"
@@ -227,6 +228,23 @@ def town_routine() -> RoutineModel:
     hours, the shifts each workplace's positions work, and a share of the residents employed."""
     versions = society_catalogs.TOWN_ROUTINE_VERSIONS
     return _routine(tuple(sorted(versions.items())), society_catalogs.ROUTINE_DIRECTORY)
+
+
+def town_routine_of(receipt: Mapping[str, Any]) -> RoutineModel:
+    """The routine a town's people are made under: the one the town's receipt pins
+    (``arrival_routine``, the routine it was composed under), whatever a new town is made under
+    today, so a town made before a routine was published keeps its people. A receipt from before
+    receipts pinned one names the versions towns were made under then."""
+    pinned = receipt.get("arrival_routine")
+    if pinned is None:
+        versions = society_catalogs.TOWN_ROUTINE_VERSIONS_BEFORE_FLOOR_AREA
+        return _routine(tuple(sorted(versions.items())), society_catalogs.ROUTINE_DIRECTORY)
+    routine = _bound_routine(dict(pinned))
+    _require(
+        routine.binding() == dict(pinned),
+        "the town's receipt names a living routine these catalogs differ from",
+    )
+    return routine
 
 
 def input_routine(document: dict[str, Any]) -> RoutineModel:

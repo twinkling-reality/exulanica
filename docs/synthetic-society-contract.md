@@ -504,7 +504,8 @@ is, because a ground module need not state an edge.
   standing spacing from another, and any object the person placed in the town, is recorded as
   unreachable (`authored_affordance_unreachable`), because the composition joins nothing a person
   placed to the world's surfaces. The population is the entry's rule, `residents`: one inhabitant
-  per place in a home the world's premises offer (each premises' use class's resident capacity),
+  per place in a home that is lived in, as the town's place states it for each premises under
+  the routine the town was made under (below, "Its homes follow its floor"),
   recorded in the input, and a world whose homes hold nobody, or more than the entry's figure of
   128 (the town's tick budget, 200 ms at the 95th percentile, a tenth of the 2,000 ms fastest play
   interval, within which one tick of 128 people on the largest walking graph measured for the
@@ -1606,10 +1607,47 @@ the overlay.
 **Its day is data.** The town's routine (`TOWN_ROUTINE_VERSIONS` in
 `exulanica/world/society_catalogs.py`) reads the living routine's needs, activities and
 capacities with three catalogs of its own under `assets/catalogs/society/`, each entry with its
-reason: `society-use-class` v2, which states each use class's opening hours and the shifts its
-positions work in turn; `society-shift` v1, the early, day, late and evening shifts; and
-`society-policy` v2, which employs six in ten residents and starts the town's day at 06:00. One
-inhabitant lives in each place in a home the town's premises offer. A seeded share of them takes
+reason: `society-use-class` v3, which states each use class's opening hours, the shifts its
+positions work in turn and, for a home, the floor area one dwelling takes; `society-shift` v1,
+the early, day, late and evening shifts; and `society-policy` v3, which employs six in ten
+residents, starts the town's day at 06:00 and states how many people a new town starts with.
+
+**Its homes follow its floor.** A premises of homes holds one dwelling for each
+`dwelling_floor_area_mm2` of the floor its premises record states (`floor_area_mm2`: the storeys
+it takes, walls and shared stairs included), at least one, and a dwelling houses the use class's
+`resident_capacity`. The residential entry states 50 m2 a dwelling and two residents, a default
+with its source in the entry's reason (the nationally described space standard's minimum for a
+one bedroom, two person, one storey dwelling, Open Government Licence v3.0), replaceable by a
+world's own value and never a census claim; a storey more is homes more. How many of those
+places are lived in is a chosen budget, not a limit: `town_people_default` (128, the crowd the
+page's frame budget was measured with) is how many people a new town starts with, never more
+than its homes hold, spread over the premises in proportion to the people each holds, by largest
+remainder with ties in premises order (`_people_living` in
+`exulanica/world/society_city_place.py`). The place states the result as each home's
+`resident_capacity`, the people who live there, which is what both engines and
+[the people's frame](#a-towns-people-as-a-document) read, so one inhabitant lives in each place
+in a home that is lived in. On the shipped small town's preset the homes hold 628 people and on
+the market town's 1,162 where each housed two a premises before; both start with 128
+(`tests/test_town_homes_by_floor_area.py` holds each home to its record's floor, worked from the
+catalogs' own figures). The ground's figure of 128 still refuses a larger town when it is
+composed.
+
+**A town keeps the routine it was made under.** A town's receipt pins the routine it was
+composed under (`arrival_routine`), and a society new to that town is made under the pinned one
+(`town_routine_of` in `exulanica/world/society_living.py`), whatever a new town is made under
+today: the living town's place and a society of things' people frame are both made under it. A
+town made under `society-use-class` v2 and `society-policy` v2
+(`TOWN_ROUTINE_VERSIONS_BEFORE_FLOOR_AREA`) keeps two residents a premises and the people it
+would have had, composes to the bytes it did, and a receipt from before receipts pinned a
+routine names those versions. A society already held keeps the routine its own inputs record.
+An arrival world is not a stored town a guest inherits: each guest's copy is composed in their own
+workspace when they enter, so a new copy is a new town made under the routine a new town is made
+under, with that routine's people, while a copy a workspace already holds keeps its receipt and its
+people. The new copy is the same town to the eye and to the bake: the same seed and candidate, the
+same records and the same input digest for every tile (`tests/test_town_homes_by_floor_area.py`,
+for every entry of the arrival catalog), so no tile is baked again.
+
+**Who works.** A seeded share of the residents takes
 the town's positions workplace-first: every workplace gets one worker, in a seeded order, before
 any gets a second, and each position works the shift its use class names for it. The rest keep
 no job. A premises admits visitors inside its opening hours and only while one of its workers is
@@ -1696,11 +1734,11 @@ JSON named by `document_sha256`, the SHA-256 of every other key. Its origin is `
 a rule from the town's records and a seed. Its profile grows only by optional fields.
 
 `exulanica.town-people-rule/v1` is the living town's assignment, draw for draw: one resident in
-each place in a home in premises order, a seeded order of the residents cut to the routine's
-employment share taking the positions workplace-first, each position working the shift its use
-class names for it in turn. `tests/test_town_people.py` holds every person of the document to
-the person the living town's genesis makes over shipped towns, seeds and populations, and works a
-town of six from the catalogs and the draws alone. `validate_town_people` refuses, as
+each place in a home that is lived in, in premises order, a seeded order of the residents cut to
+the routine's employment share taking the positions workplace-first, each position working the
+shift its use class names for it in turn. `tests/test_town_people.py` holds every person of the
+document to the person the living town's genesis makes over shipped towns, seeds and populations,
+and works a town of six from the catalogs and the draws alone. `validate_town_people` refuses, as
 `malformed_people`, a document whose keys are not exactly the profile's, whose people or premises
 are out of order, that houses more people in a home than it has places, that gives two people one
 position or a person another position's shift, or whose digest does not name it.

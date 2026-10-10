@@ -603,6 +603,40 @@ def place_from_city_documents(
     )
 
 
+def _people_living(premises_units: Sequence[Any], routine: RoutineModel) -> dict[str, int]:
+    """How many people live at each premises of homes among ``premises_units``, by its identity.
+
+    A premises of homes holds one dwelling for each ``dwelling_floor_area_mm2`` of the floor its
+    record states, at least one, where its use class states that area, and one dwelling where it
+    states none; a dwelling houses the use class's ``resident_capacity``. Where the routine's
+    policy states how many people a new town starts with (``town_people_default``, a chosen
+    budget) and the homes hold more, that many are spread over the premises in proportion to the
+    people each holds, by largest remainder, ties in identity order; otherwise every place in
+    every home is lived in. Under a routine that states neither, this is the use class's
+    ``resident_capacity`` for each premises, as it always was.
+    """
+    holds: dict[str, int] = {}
+    for premises in premises_units:
+        use = routine.use_classes[premises.use_class]
+        if not use.resident_capacity:
+            continue
+        dwellings = (
+            max(1, premises.floor_area_mm2 // use.dwelling_floor_area_mm2)
+            if use.dwelling_floor_area_mm2
+            else 1
+        )
+        holds[premises.identity] = dwellings * use.resident_capacity
+    budget = routine.policy.get("town_people_default")
+    total = sum(holds.values())
+    if budget is None or budget >= total:
+        return holds
+    living = {identity: places * budget // total for identity, places in holds.items()}
+    remainder = budget - sum(living.values())
+    for identity in sorted(holds, key=lambda i: (-(holds[i] * budget % total), i))[:remainder]:
+        living[identity] += 1
+    return living
+
+
 def place_from_city_records(
     *,
     place_id: str,
@@ -959,6 +993,9 @@ def place_from_city_records(
 
     massing = {r.identity: r for r in by_type[MassingRecord]}
     parcels = {r.identity: r for r in by_type[ParcelRecord]}
+    living = _people_living(
+        [premises for premises in premises_units if premises.identity in access], routine
+    )
     for premises in premises_units:
         if premises.identity not in access:
             continue
@@ -984,7 +1021,7 @@ def place_from_city_records(
                 "address_number": parcel.address_number if parcel is not None else None,
                 "street_segment_ordinal": frontage,
                 "staff_capacity": use.staff_per_unit,
-                "resident_capacity": use.resident_capacity,
+                "resident_capacity": living.get(premises.identity, 0),
                 "role": {"key": use.role_key, "label": use.role_label},
                 "shift": {"start_minute": use.shift_start, "minutes": use.shift_minutes}
                 if use.kind == "workplace"

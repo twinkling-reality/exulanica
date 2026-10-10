@@ -110,7 +110,7 @@ from exulanica.world.society_input_policy import (
 from exulanica.world.society_input_policy import (
     composition_profile as policy_for_input,
 )
-from exulanica.world.society_living import current_routine, input_routine, town_routine
+from exulanica.world.society_living import current_routine, input_routine, town_routine_of
 from exulanica.world.society_place import place_sha256
 from exulanica.world.society_planner import input_sha256, validate_society_input
 from exulanica.world.society_repository import SocietyRepository
@@ -192,6 +192,8 @@ class _TownRead:
     place: Mapping[str, Any] | None
     refusal: str | None
     records: tuple[object, ...] = ()
+    #: A town's receipt, which pins the routine its people are made under.
+    receipt: Mapping[str, Any] | None = None
     living_places: dict[str, Mapping[str, Any]] = field(default_factory=dict)
     #: For a world made from a world kind, its receipt and the routine it names: the place and the
     #: routine its society lives under come from it (:mod:`exulanica.world.composers.site_plan`),
@@ -627,9 +629,22 @@ class SocietyRuntime:
             place,
             None,
             tuple(generated.records),
+            receipt=generated.receipt,
             # Held to their shapes by the place just made from them.
             obstructions=city_obstructions(generated.records, checked=True),
         )
+
+    @staticmethod
+    def _made_under(town: _TownRead) -> RoutineModel:
+        """The routine a town's people are made under, as its receipt pins it."""
+        if town.receipt is None:
+            raise UnavailableSocietyInput("the town's receipt was not read before the lock")
+        try:
+            return town_routine_of(town.receipt)
+        except (CatalogError, ValueError) as exc:
+            raise UnavailableSocietyInput(
+                f"the routine the town was made under cannot be read: {exc}"
+            ) from exc
 
     @staticmethod
     def _living_place(
@@ -1778,17 +1793,19 @@ class SocietyRuntime:
                         "the input names another routine than the world's"
                     )
             elif chosen == WALKING_SURFACES_COMPOSITION_V2:
-                routine = town_routine() if living_routine is None else living_routine
+                # A new society's people are made under the routine the town's own receipt pins,
+                # whatever a new town is made under today; a society already held keeps its own.
+                routine = self._made_under(town) if living_routine is None else living_routine
                 place = self._living_place(ground, town, routine)
             people = None
-            if chosen == WALKING_SURFACES_COMPOSITION_V3 and seq == 1 and reason is None:
-                # What the town's people are made from, under the routine a new town's place is
-                # made under: the homes and positions the living town reads, so a society of
-                # things over the town is the same people. Seed-free: its genesis completes it.
+            if chosen == WALKING_SURFACES_COMPOSITION_V3 and reason is None:
+                # What the town's people are made from, under the routine the town's receipt
+                # pins: the homes and positions the living town reads, so a society of things
+                # over the town is the same people. Seed-free: its genesis completes it. Every
+                # input states the population it gives; the first alone records the frame.
+                made_under = self._made_under(town)
                 try:
-                    people = people_frame(
-                        self._living_place(ground, town, town_routine()), town_routine()
-                    )
+                    people = people_frame(self._living_place(ground, town, made_under), made_under)
                 except TownPeopleRefused as exc:
                     raise UnavailableSocietyInput(
                         f"the town's people could not be stated: {exc}"

@@ -7,7 +7,6 @@ change. Composed without a database, as tests/living_town_support.py composes a 
 from __future__ import annotations
 
 import dataclasses
-import functools
 import json
 import math
 import uuid
@@ -54,7 +53,11 @@ from exulanica.world.society_walking_surfaces import (
 from exulanica.world.world_recipes import town_recipe
 
 import things_society_support as things_support
-from living_town_support import town_input, version_of
+from living_town_support import before_floor_area, per_town_routine, town_input, version_of
+
+#: Every town here is made as towns were made before their homes followed floor area: the digests
+#: below were read from trees of that time, and such a town still composes to them.
+pytestmark = pytest.mark.usefixtures(before_floor_area.__name__)
 
 #: The digests of the town's v1 and v2 inputs, read from a clean checkout of 1c16ea69, a tree
 #: with no walking-surfaces-v3 composition, so they come from code without it: the things
@@ -74,12 +77,12 @@ SOCIETY = uuid.uuid5(uuid.NAMESPACE_URL, "walking-surfaces-v3-society")
 WORLD_ID = "world:generated:walking-surfaces-v3"
 
 
-@functools.cache
+@per_town_routine
 def _composed() -> Any:
     return compose_generated_world(town_recipe("small_town"), WORLD_ID)
 
 
-@functools.cache
+@per_town_routine
 def _town() -> tuple[Any, Any, Any, StandingPolicy]:
     world_id = WORLD_ID
     composed = _composed()
@@ -144,12 +147,12 @@ def _compose(
     )
 
 
-@functools.cache
+@per_town_routine
 def _obstructions() -> Any:
     return city_obstructions(_composed().records)
 
 
-@functools.cache
+@per_town_routine
 def _bare() -> dict[str, Any]:
     return _compose(as_things=False)
 
