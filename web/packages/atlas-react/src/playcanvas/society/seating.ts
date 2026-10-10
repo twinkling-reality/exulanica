@@ -54,6 +54,34 @@ export interface SeatingObject {
   readonly scaleMilli: number;
 }
 
+/**
+ * One box of a piece of a town's street furniture, in the furniture's own frame: millimetres along
+ * the way it faces and to the left of that, about its base point, and up from its base.
+ */
+export interface StreetFurniturePart {
+  readonly alongMm: number;
+  readonly leftMm: number;
+  readonly bottomMm: number;
+  readonly sizeAlongMm: number;
+  readonly sizeLeftMm: number;
+  readonly heightMm: number;
+}
+
+/**
+ * A piece of street furniture a generated town's own records state: where its base stands in the
+ * society root's plan (millimetres east and south), the way it faces there, and its parts. The
+ * town's records, not a catalog of kinds, say what it is made of, so what is read here is geometry.
+ */
+export interface StreetFurniture {
+  /** The record's identity. */
+  readonly identity: string;
+  readonly eastMm: number;
+  readonly southMm: number;
+  /** Its direction in the plan, east and south, of any nonzero length; its parts' `left` is to the left of it. */
+  readonly facing: readonly [number, number];
+  readonly parts: readonly StreetFurniturePart[];
+}
+
 /** What the drawn version and the society's consumed input say a person can use. */
 export interface SeatingLayout {
   /** Each kind's use, by asset key. */
@@ -61,6 +89,8 @@ export interface SeatingLayout {
   readonly objects: readonly SeatingObject[];
   /** Society target id to the object it belongs to, or null for a district's own destination. */
   readonly targets: ReadonlyMap<string, string | null>;
+  /** The street furniture of a generated town, from its own records; absent where the world has none. */
+  readonly streetFurniture?: readonly StreetFurniture[];
 }
 
 /** Where a person at a place is drawn. Metres and radians in the society root's frame. */
@@ -74,6 +104,11 @@ export interface PlaceDrawing {
     readonly position: readonly [number, number, number];
     readonly facing: number;
   } | null;
+  /**
+   * True where nothing says which way a person here faces (a seat with no back): `facing` and the
+   * seat's are then not read, and the person sits facing as they already did.
+   */
+  readonly facesAsHeld?: boolean;
 }
 
 /**
@@ -233,4 +268,80 @@ export function seatApproach(
   }
   const side = dx * across[0] + dz * across[1] >= 0 ? 1 : -1;
   return [seat[0] + across[0] * side * SEAT_APPROACH_METRES, seat[1] + across[1] * side * SEAT_APPROACH_METRES];
+}
+
+/**
+ * How far a person's recorded position may lie outside a part's plan box and still be on it, in
+ * millimetres: the place a town makes for a seat is a whole millimetre on each axis, and the turn of
+ * an offset by an integer direction is within a millimetre more.
+ */
+export const STREET_SEAT_MATCH_MM = 2;
+/** A part must rise this far above a seat's top to be what a sitter leans back on, millimetres. */
+const SEAT_BACK_RISE_MM = 100;
+
+/**
+ * Where a person resting on a town's own street furniture is drawn, or null where their recorded
+ * position is on no part of any.
+ *
+ * A town seats a person on the furniture itself: their recorded position is a point of its plan.
+ * The seat is the highest part under that point, drawn at its top, and the person keeps their own
+ * point on it. They sit with their back to what rises behind the seat: of the parts that stand
+ * higher than the seat's top, the nearest in plan, faced away from across its thin side. A seat with
+ * nothing rising beside it (a ledge, a backless bench) is sat on facing as the person already faced
+ * (`facesAsHeld`).
+ */
+export function streetSeatDrawing(
+  furniture: readonly StreetFurniture[],
+  positionMm: readonly [number, number],
+): PlaceDrawing | null {
+  for (const item of furniture) {
+    const length = Math.hypot(item.facing[0], item.facing[1]);
+    if (!(length > 0)) continue;
+    // The furniture's own frame in the plan: along the way it faces, and to the left of that. East
+    // and south are a left-handed pair seen from above, so left of (e, s) is (s, -e).
+    const along = [item.facing[0] / length, item.facing[1] / length] as const;
+    const left = [along[1], -along[0]] as const;
+    const de = positionMm[0] - item.eastMm, ds = positionMm[1] - item.southMm;
+    const a = de * along[0] + ds * along[1];
+    const l = de * left[0] + ds * left[1];
+    let seat: StreetFurniturePart | null = null;
+    for (const part of item.parts) {
+      const under = Math.abs(a - part.alongMm) <= part.sizeAlongMm / 2 + STREET_SEAT_MATCH_MM &&
+        Math.abs(l - part.leftMm) <= part.sizeLeftMm / 2 + STREET_SEAT_MATCH_MM;
+      if (under && (seat === null || part.bottomMm + part.heightMm > seat.bottomMm + seat.heightMm)) seat = part;
+    }
+    if (seat === null) continue;
+    const top = seat.bottomMm + seat.heightMm;
+    let back: StreetFurniturePart | null = null;
+    let nearest = Number.POSITIVE_INFINITY;
+    for (const part of item.parts) {
+      if (part === seat || part.bottomMm + part.heightMm < top + SEAT_BACK_RISE_MM) continue;
+      const apart = Math.hypot(part.alongMm - a, part.leftMm - l);
+      if (apart < nearest) {
+        nearest = apart;
+        back = part;
+      }
+    }
+    // Away from the back across its thin side: a long board is leaned on, not sat beside.
+    let out: readonly [number, number] | null = null;
+    if (back !== null) {
+      const acrossLeft = back.sizeAlongMm >= back.sizeLeftMm;
+      const offset = acrossLeft ? l - back.leftMm : a - back.alongMm;
+      if (offset !== 0) out = acrossLeft ? [0, Math.sign(offset)] : [Math.sign(offset), 0];
+    }
+    const forward = out === null ? null : [out[0] * along[0] + out[1] * left[0], out[0] * along[1] + out[1] * left[1]] as const;
+    const facing = forward === null ? 0 : Math.atan2(-forward[0], -forward[1]);
+    return {
+      objectId: `street-furniture:${item.identity}`,
+      // Two people on one bench hold two seats: their own whole millimetre along it tells them apart.
+      placeIndex: Math.round(a),
+      facing,
+      seat: {
+        position: [positionMm[0] / MILLIMETRES_PER_METRE, top / MILLIMETRES_PER_METRE, positionMm[1] / MILLIMETRES_PER_METRE],
+        facing,
+      },
+      ...(forward === null ? { facesAsHeld: true } : {}),
+    };
+  }
+  return null;
 }

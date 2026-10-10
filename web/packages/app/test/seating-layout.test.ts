@@ -73,4 +73,18 @@ describe('the seating layout', () => {
     expect(seatingLayout(assets, null, places)).toBeNull();
     expect(seatingLayout(assets, version, null)).toBeNull();
   });
+
+  it('carries a town\'s own street furniture beside the objects, and states none where a world has none', () => {
+    const bench = {
+      identity: 'bench-1', eastMm: 10_000, southMm: -20_000, facing: [1, 0] as const,
+      parts: [{ alongMm: 0, leftMm: 0, bottomMm: 420, sizeAlongMm: 1800, sizeLeftMm: 450, heightMm: 60 }],
+    };
+    const town = seatingLayout(assets, version, places, [bench])!;
+    expect(town.streetFurniture).toEqual([bench]);
+    expect(town.objects).toHaveLength(1);
+    // A world with no furniture read says nothing of it: the layout is what it was.
+    expect('streetFurniture' in seatingLayout(assets, version, places)!).toBe(false);
+    expect('streetFurniture' in seatingLayout(assets, version, places, [])!).toBe(false);
+    expect(seatingLayout(assets, null, places, [bench])).toBeNull();
+  });
 });

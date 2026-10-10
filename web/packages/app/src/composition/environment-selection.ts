@@ -90,6 +90,7 @@ import {
 } from '../world-objects-api.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
 import { seatingLayout } from './seating-layout.js';
+import { townFurniture } from './town-furniture.js';
 import { pointerRay, type SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyPlaces } from '../society-api.js';
 import { engineCreatedOver, societyEngine } from '../society-engines.js';
@@ -2420,7 +2421,7 @@ export function mountEnvironmentSelection(
     const kept = current === null && authoredWorldFailure !== null && lastSeating !== null;
     deps.env.canvas.dataset.societySeatingLayout = kept ? 'kept-after-failed-read' : 'current';
     if (kept) return lastSeating;
-    lastSeating = seatingLayout(worldClient.assets(), current, places);
+    lastSeating = seatingLayout(worldClient.assets(), current, places, townFurniture(deps.state.activeWorldEntry?.entryId));
     return lastSeating;
   }
 

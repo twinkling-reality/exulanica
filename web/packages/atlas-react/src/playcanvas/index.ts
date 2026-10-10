@@ -179,7 +179,9 @@ export type {
 } from './owned-district-runtime.js';
 export { OwnedDistrictRuntime } from './owned-district-runtime.js';
 export { KIND_SIDES } from './society/seating.js';
-export type { KindPlace, KindSeat, KindSide, KindUse, SeatingLayout, SeatingMiss, SeatingObject } from './society/seating.js';
+export type {
+  KindPlace, KindSeat, KindSide, KindUse, SeatingLayout, SeatingMiss, SeatingObject, StreetFurniture, StreetFurniturePart,
+} from './society/seating.js';
 export type { FlightKindLook, FlightSamples, FlightState, FlightWindow } from './flight/types.js';
 export type {
   RepresentationDraw,

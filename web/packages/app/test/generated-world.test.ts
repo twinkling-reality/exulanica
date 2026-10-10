@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { groundNear, isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generated-world.js';
+import { townFurniture } from '../src/composition/town-furniture.js';
 import type { GeneratedGround, GeneratedTile, SavedWorldEntry } from '../src/world-entry-api.js';
 import { worldDidNotOpen } from '../src/ui/startup-state.js';
 
@@ -8,7 +9,9 @@ import { worldDidNotOpen } from '../src/ui/startup-state.js';
 // runtime: which containers, in which roles, read from where.
 const loadGeneratedTile = vi.hoisted(() => vi.fn());
 const TILE_LOOK_V1 = vi.hoisted(() => ({ id: 'exulanica.generated-tile-look', version: 1 }));
-vi.mock('@exulanica/atlas-react/generated-tile', () => ({ loadGeneratedTile, TILE_LOOK_V1 }));
+// A container's street furniture, as the tile module would read it from the container's records.
+const streetFurnitureOf = vi.hoisted(() => vi.fn<(bytes: Uint8Array) => { identity: string }[]>(() => []));
+vi.mock('@exulanica/atlas-react/generated-tile', () => ({ loadGeneratedTile, TILE_LOOK_V1, streetFurnitureOf }));
 vi.mock('../src/texture-library.js', () => ({
   committedTextureLibrary: async () => ({
     textureManifest: new Uint8Array(),
@@ -131,6 +134,31 @@ describe('a saved generated world of several tiles', () => {
     // A person opens at the served arrival, which may lie on any of the tiles.
     if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
     expect(loaded.tile.start).toMatchObject({ x: 128, z: -58.75 });
+  });
+
+  it('keeps the town\'s street furniture from every tile, each piece once, for the entry it opened', async () => {
+    const tiles = [tile(0, 'baked'), tile(1, 'baked')];
+    const [west, east] = tiles.map((one) => one.bakedTileId!);
+    const bytes = { [west!]: new Uint8Array([1, 2, 3]), [east!]: new Uint8Array([4, 5, 6]) };
+    vi.stubGlobal('fetch', tileRoute(bytes).fetch);
+    streetFurnitureOf.mockClear();
+    // The east tile carries a halo copy of the bench at the seam, which the west tile owns.
+    streetFurnitureOf.mockImplementation((container) => (container[0] === 1
+      ? [{ identity: 'bench-west' }, { identity: 'bench-seam' }]
+      : [{ identity: 'bench-seam' }, { identity: 'bench-east' }]));
+    try {
+      await loadGeneratedWorld(access, entry(tiles), '?look=today');
+      expect(streetFurnitureOf.mock.calls.map(([container]) => [...container])).toEqual([[1, 2, 3], [4, 5, 6]]);
+      expect(townFurniture('entry').map((item) => item.identity)).toEqual(['bench-west', 'bench-seam', 'bench-east']);
+      expect(townFurniture('another entry')).toEqual([]);
+      // Records that cannot be read stop no town from opening: it opens with no furniture kept.
+      streetFurnitureOf.mockImplementation(() => { throw new Error('not a container'); });
+      const opened = await loadGeneratedWorld(access, entry(tiles), '?look=today');
+      expect(isGeneratedWorld(opened)).toBe(true);
+      expect(townFurniture('entry')).toEqual([]);
+    } finally {
+      streetFurnitureOf.mockImplementation(() => []);
+    }
   });
 
   it('draws itself in another look from the tiles it loaded, reading and loading nothing again', async () => {

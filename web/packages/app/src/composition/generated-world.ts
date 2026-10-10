@@ -37,6 +37,8 @@
  */
 
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
+import type { StreetFurniture } from '@exulanica/atlas-react/playcanvas';
+import { rememberTownFurniture } from './town-furniture.js';
 import { toApiError } from '@exulanica/graph-client';
 import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
 import { accessHeaders, type Credentials } from '../config.js';
@@ -85,6 +87,27 @@ const UNREADABLE_PREFIX = 'generated_world_';
 /** What the note names when the page could not load its own traffic code. */
 const TRAFFIC_NOT_LOADED = 'traffic_not_loaded';
 
+
+/**
+ * The town's street furniture, from every tile's own records, each piece once by identity (a tile
+ * carries halo copies of its neighbours'). Furniture is where a town's people sit, and drawing them
+ * there is not what a town's opening depends on: where the records cannot be read here, none is
+ * kept and people are drawn as they are with no seat.
+ */
+function streetFurnitureOfTown(
+  route: { readonly streetFurnitureOf?: (bytes: Uint8Array) => readonly StreetFurniture[] },
+  containers: readonly { readonly bytes: Uint8Array }[],
+): readonly StreetFurniture[] {
+  try {
+    const kept = new Map<string, StreetFurniture>();
+    for (const { bytes } of containers) {
+      for (const item of route.streetFurnitureOf?.(bytes) ?? []) if (!kept.has(item.identity)) kept.set(item.identity, item);
+    }
+    return [...kept.values()];
+  } catch {
+    return [];
+  }
+}
 
 /** What the page draws of a saved generated world, once every tile it names is baked. */
 export interface GeneratedWorld {
@@ -243,6 +266,7 @@ export async function loadGeneratedWorld(
   })));
   const [first, ...rest] = containers;
   const neighbours: readonly { readonly name: string; readonly bytes: Uint8Array }[] = rest;
+  rememberTownFurniture(entry.entryId, streetFurnitureOfTown(route, containers));
   const worldLook = await import('../world-look.js');
   type Prepared = import('../world-look.js').PreparedWorldLook;
   type Choice = import('../world-look.js').WorldLookChoice;

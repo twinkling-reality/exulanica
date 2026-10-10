@@ -634,6 +634,22 @@ is and named with its reason (`seatingMisses`, which the page records on the can
 posture, such as making room, is drawn standing, and so is everybody drawn by a renderable with no
 postures, which also stays standing at its place rather than being lifted onto a seat.
 
+**A town's own seats.** A generated town seats its people on its street furniture, which is a record
+of its tiles and no object of a version, and a living town's action names a destination, never a
+target. The layout therefore also carries the town's street furniture as its tiles' own records
+state it (`generated-tile/street-furniture.ts` reads every `city.street_furniture` record of the
+containers the page already holds, each once by identity: base point, direction vector and parts,
+carried from the tile's east and north into the society's east and south). A person who holds no
+object's place is looked for on that furniture by their recorded position (`streetSeatDrawing`),
+and sits there when their activity is one the catalog draws on a seat, as at an object's: the seat
+is the highest part under their point, they sit at
+their own point on it at its top, and they sit with their back to what rises behind it, the nearest
+part that stands at least 100 mm above the seat, faced away from across its thin side. Nothing names
+a kind of furniture: the parts are the geometry, so a bench of another shape, or a ledge, is sat on
+by the same rule, and a seat with nothing rising beside it is sat on facing as the person came.
+Where a town's records are not read, or a person rests where no furniture is, the ground rule holds
+as before. Sitting down and getting up are drawn as at an object's seat.
+
 **Posing by distance.** Every drawn inhabitant is placed at its recorded point every frame, but only
 the nearest full characters are posed every frame: the nearest 4 every frame, the next 8 every
 second frame and the rest every third (`POSE_INTERVAL` in `society/crowd.ts`), each carried to its

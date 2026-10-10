@@ -9,7 +9,10 @@ import { inhabitantRenderable } from '../character/inhabitant.js';
 import type { CharacterPose } from '../character/renderable.js';
 import { postureSeatMetres, type FarAppearance } from '../character/far.js';
 import { POSTURE_BLEND_SECONDS } from '../character/person.js';
-import { placeDrawing, seatApproach, type PlaceDrawing, type SeatingLayout, type SeatingMiss } from './seating.js';
+import {
+  placeDrawing, seatApproach, streetSeatDrawing,
+  type PlaceDrawing, type SeatingLayout, type SeatingMiss, type SeatingResult,
+} from './seating.js';
 import { facingRule, type FacingRule } from './activity-facing.js';
 import type {
   CrowdJump,
@@ -324,6 +327,23 @@ function stateAction(person: SocietyInhabitantSnapshot): { kind: string; target:
   return { kind: action.kind, target: action.target_id ?? null };
 }
 
+/**
+ * Where a person is drawn at what they use: at an object's place, by the target their action names;
+ * else on the town's own street furniture under their recorded position, which no object of the
+ * version is. A place draws nothing by itself: what a person does there, if anything, is the state's.
+ */
+function placeOf(
+  layout: SeatingLayout | null,
+  target: string | null,
+  positionMm: readonly [number, number],
+): SeatingResult | null {
+  if (layout === null) return null;
+  const atObject = target === null ? null : placeDrawing(layout, target, positionMm);
+  if (atObject?.kind === 'place' || layout.streetFurniture === undefined) return atObject;
+  const onStreet = streetSeatDrawing(layout.streetFurniture, positionMm);
+  return onStreet === null ? atObject : { kind: 'place', drawing: onStreet };
+}
+
 /** The partner a person's goal names, for a state whose goals name one. */
 function statePartner(person: SocietyInhabitantSnapshot): string | null {
   const goal: object | null | undefined = person.goal;
@@ -528,7 +548,7 @@ export class SocietyCrowd {
       const at = stateAction(person);
       const rule = at === null ? null : facingRule(at.kind);
       const target = layout === null ? null : at?.target ?? null;
-      const found = target === null ? null : placeDrawing(layout!, target, person.position_mm);
+      const found = placeOf(layout, target, person.position_mm);
       if (found?.kind === 'miss') misses.push({ inhabitantId: person.id, reason: found.reason });
       if (layout !== null && at !== null && rule === null) {
         misses.push({ inhabitantId: person.id, reason: 'activity-has-no-facing' });
@@ -702,7 +722,7 @@ export class SocietyCrowd {
   setLayout(layout: SeatingLayout | null): void {
     const misses: CrowdSeatingMiss[] = this.missesRead.filter((miss) => miss.reason === 'activity-has-no-facing');
     for (const walker of this.walkers.values()) {
-      const found = layout === null || walker.target === null ? null : placeDrawing(layout, walker.target, walker.recordedMm);
+      const found = placeOf(layout, walker.target, walker.recordedMm);
       if (found?.kind === 'miss') misses.push({ inhabitantId: walker.id, reason: found.reason });
       walker.place = found?.kind === 'place' ? found.drawing : null;
     }
@@ -979,7 +999,8 @@ export class SocietyCrowd {
         toFront: apart(walker.position, front),
         ontoSeat: apart(front, at),
         lift: seat.position[1] - postureSeatMetres(this.far.appearanceOf(walker.id), posture),
-        facing: seat.facing,
+        // A seat with no back is sat on facing as they came.
+        facing: place!.facesAsHeld === true ? walker.facing : seat.facing,
         key: key!,
         walkSpeed: this.far.walkSpeedOf(walker.id),
         progress: 0,
@@ -1056,7 +1077,7 @@ export class SocietyCrowd {
 
   /** The way a walker standing at the end of their path faces, by their activity's rule. */
   private facingOf(walker: Walker): number {
-    if (walker.facingRule === 'place' && walker.place !== null) return walker.place.facing;
+    if (walker.facingRule === 'place' && walker.place !== null && walker.place.facesAsHeld !== true) return walker.place.facing;
     if (walker.facingRule === 'partner' && walker.partnerId !== null) {
       const partner = this.walkers.get(walker.partnerId);
       if (partner !== undefined && !partner.indoors) return heading(walker.position, partner.position, walker.facing);

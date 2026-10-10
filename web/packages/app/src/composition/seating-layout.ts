@@ -3,18 +3,24 @@
  *
  * Each kind's use comes from the registry list (`GET /world/assets`, `ReviewedAsset.use`), each
  * object's kind and transform from the version being drawn, and which object each society target
- * belongs to from the places the society's current state consumed (`SocietySnapshot.places`).
+ * belongs to from the places the society's current state consumed (`SocietySnapshot.places`), and a
+ * generated town's street furniture from the town's own tile records (`town-furniture.ts`).
  * Nothing here decides where anybody is; the crowd reads a person's place from their own state.
  */
-import type { SeatingLayout, SeatingObject } from '@exulanica/atlas-react/playcanvas';
+import type { SeatingLayout, SeatingObject, StreetFurniture } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyPlaces } from '../society-api.js';
 import type { AlternateVersion, ReviewedAsset } from '../world-objects-api.js';
 
-/** The layout for one drawn version and one consumed input, or null when either is not read. */
+/**
+ * The layout for one drawn version and one consumed input, or null when either is not read. A
+ * generated town's own street furniture, read from its tiles, rides with it: a town seats people on
+ * furniture no object of the version is.
+ */
 export function seatingLayout(
   assets: readonly ReviewedAsset[],
   version: AlternateVersion | null,
   places: SocietyPlaces | null,
+  streetFurniture: readonly StreetFurniture[] = [],
 ): SeatingLayout | null {
   if (version === null || places === null) return null;
   const uses = new Map(
@@ -32,5 +38,5 @@ export function seatingLayout(
       scaleMilli: object.transform.scaleMilli,
     }));
   const targets = new Map(places.targets.map((target) => [target.targetId, target.objectId] as const));
-  return { uses, objects, targets };
+  return { uses, objects, targets, ...(streetFurniture.length === 0 ? {} : { streetFurniture }) };
 }

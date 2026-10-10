@@ -135,3 +135,5 @@ export type { CapturedPose, TileCaptureSession } from './capture.js';
 export { beginTileCapture } from './capture.js';
 export type { ObstructionRings, RefusedObstructionRing, StatedObstructionRing } from './obstruction-rings.js';
 export { obstructionRings } from './obstruction-rings.js';
+export type { StatedFurniturePart, StatedStreetFurniture } from './street-furniture.js';
+export { STREET_FURNITURE_KIND, streetFurnitureOf } from './street-furniture.js';
