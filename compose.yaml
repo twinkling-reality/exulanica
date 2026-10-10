@@ -133,6 +133,12 @@ services:
       EXULANICA_GUEST_WORLDS_HELD: ${EXULANICA_GUEST_WORLDS_HELD:-}
       EXULANICA_TILES_A_DAY: ${EXULANICA_TILES_A_DAY:-}
       EXULANICA_GUEST_TILES_A_DAY: ${EXULANICA_GUEST_TILES_A_DAY:-}
+      # How this host compares with the machines a society's minute was measured on, a decimal
+      # taken from a measurement on this host (docs/deployment.md 5.1.5): making a society admits a
+      # town's people by the measured cost of their minute times it. Empty means 1, the measured
+      # machines themselves, so a slower host that leaves it empty admits by their figures. Only
+      # this process makes a society.
+      EXULANICA_MINUTE_COST_SCALE: ${EXULANICA_MINUTE_COST_SCALE:-}
       <<: *society-playback
       # Who plays: "on" (the default), this process in threads; "process", the playback-worker
       # service below, started with `--profile playback`, and this process plays nothing.

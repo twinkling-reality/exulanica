@@ -524,6 +524,20 @@ def test_guests_towns_play_in_the_api_with_their_settings_from_init():
     assert "EXULANICA_PLAYBACK_WORKERS: ${EXULANICA_PLAYBACK_WORKERS:-}" in base_api
 
 
+def test_the_api_alone_is_handed_this_host_s_minute_cost_scale():
+    """A town's people are admitted by the measured cost of their minute times the host's scale
+    (EXULANICA_MINUTE_COST_SCALE). The measured machines are not the server: a public host states
+    its own figure in public.env, and the composition must hand it to the one process that makes a
+    society, or the server admits by another machine's figures without saying so. Empty is the
+    default the API reads as 1, and the overlay neither fixes nor drops it."""
+    line = "EXULANICA_MINUTE_COST_SCALE: ${EXULANICA_MINUTE_COST_SCALE:-}"
+    assert line in BASE_SERVICES["api"]
+    for name, block in {**BASE_SERVICES, **OVERLAY_SERVICES}.items():
+        if name != "api":
+            assert "EXULANICA_MINUTE_COST_SCALE" not in block, name
+    assert "EXULANICA_MINUTE_COST_SCALE" not in OVERLAY_SERVICES["api"]
+
+
 def test_only_the_api_makes_a_society_of_things_and_prepare_towns_dresses_the_arrival():
     """A guest's arrival town is dressed with a scene whose beings live in a society of things
     (exulanica/api/arrival_dressing.py): only the API is handed the setting, off by default; the

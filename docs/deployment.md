@@ -1496,7 +1496,10 @@ A setting in `public.env` is changed the same way: edit the line, then `up`. The
 simulated minutes (`EXULANICA_SOCIETY_TICK_INTERVAL_MS`, 5.1.5) reaches the API, which plays every
 town here; a town already playing keeps the interval its playback was last set with, until its
 control is next written (paused and played again, or its speed changed), and no stored minute
-changes.
+changes. A public host also states its own `EXULANICA_MINUTE_COST_SCALE` there, from a measurement
+of a society's minute on that host (5.1.5): the composition hands it to the API, the one process
+that makes a society, and a host that leaves it out admits a town's people by the measured
+machines' figures, not its own.
 
 **On one host.** The machine is section 8.1's: a `cpu-d3` virtual machine with Ubuntu 24.04, a
 public address, and inbound TCP 80 and 443, with 22 limited to the operator's address. It also has
