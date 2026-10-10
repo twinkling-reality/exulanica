@@ -1659,26 +1659,47 @@ states its hours (`tests/test_society_living_town.py`).
 for 1 to 45 minutes, so its first minutes show an empty street. Where a society is made
 (`make_society` in `exulanica/api/society_making.py`, which the society route and an installation's
 arrival worlds both go through), the server therefore advances it at once, minute by ordinary
-minute, until a stated share of its people is outdoors (`open_awake` in
-`exulanica/api/society_opening.py`). Each of those minutes is the repository's own `advance`, the
-call the steps route makes: stored with its events, replayed like any other, decided by the routine
-alone since no model is asked, and written without a playback receipt, so a control set playing
-afterwards has its next minute due at once. A society read back because its version already holds
-one is never advanced again, and a creation is never undone by a minute refused afterwards: the
-society stands wherever it reached. The rule reads the state and no engine's name: a state that
-says for every person whether they are indoors is advanced, and one that does not (a society of
-things, a starter's society) is left at its first minute, as is a place whose people already stand
-outdoors.
+minute, until it is awake (`open_awake` in `exulanica/api/society_opening.py`). Each of those
+minutes is the repository's own `advance`, the call the steps route makes: stored with its events,
+replayed like any other, decided by the routine alone since no model is asked, and written without
+a playback receipt, so a control set playing afterwards has its next minute due at once. A society
+read back because its version already holds one is never advanced again, and a creation is never
+undone by a minute refused afterwards: the society stands wherever it reached. A caller that makes
+a society inside a transaction of its own (a living town taking newcomers in, under the workspace
+lock) makes it unopened and opens it once that transaction is committed (`open_made`), so no
+minute is advanced under its locks.
 
-The rule is data, `exulanica/world/society-opening-policy.v1.json`: the share to reach (150
-thousandths), the most minutes (60) and the most seconds inside the request (5), each a chosen
-budget with its reason, and a default of on. On two towns made from a sentence (48 and 52 people)
-nobody was outdoors for the first 4 minutes, 15 percent was first reached at minutes 14 and 17, and
-the ten minutes after held 8.1 and 8.6 people outdoors with 3.0 and 2.6 walking. A host changes it
-with `EXULANICA_SOCIETY_OPENING` (`off`, `on`, or `share:minutes:seconds`); a hand-built `Services`
-opens nothing. What a town of 500 costs to open is not measured: the seconds budget bounds it, and
-such a town opens partly awake (`tests/test_society_opening.py`,
-`tests/test_society_opening_postgres.py`).
+What awake means is read from the state. A state that says for every person whether they are
+indoors (a living town) is advanced until a stated share of its people is outdoors, whatever
+engine keeps it. A state that does not, but says for every being what it is doing, is advanced
+until a stated share of its beings is doing something, an action whose kind is not `idle`, where
+the policy states that share for the family of state its engine keeps. Version 2 of the policy
+states it for a society of things, whose beings are always out on the walking graph and are born
+idle with no goal: on a dressed arrival town stepped with no model asked, every being was idle at
+minute 0 and all but one were not at minute 1, at 42 beings and at 130, so such a society opens
+after one minute, which took 0.4 s at 42 beings and 2.6 s at 130 on a busy development machine.
+In that minute a being a scene placed acts by the routine like anyone else, and may walk. A
+purposeful society (a site world's) is born idle too, and is left at its first minute: its first
+minutes are not measured. A place whose people already stand outdoors, or are already doing
+something, is advanced by nothing.
+
+The rule is data, `exulanica/world/society-opening-policy.v2.json`: the outdoors share (150
+thousandths), the share doing something (500 thousandths) and the state families it is read for,
+the least minutes (10), the most minutes (60) and the most seconds inside the request (5), each a
+chosen budget with its reason, and a default of on. Version 1 of the file, which states the
+outdoors share, the most minutes and the most seconds alone, stays beside it and is read by the
+same loader. On two towns made from a sentence (48 and 52 people) nobody was outdoors for the first
+4 minutes, 15 percent was first reached at minutes 14 and 17, and the ten minutes after held 8.1
+and 8.6 people outdoors with 3.0 and 2.6 walking. The seconds are the server's clock, so a busy
+host would open a town less awake than a quiet one (a town opened under a load average of 280 was
+cut at minute 6 with nobody outdoors): the least minutes are advanced before the seconds are
+counted, unless the share is reached first. A host changes the rule with
+`EXULANICA_SOCIETY_OPENING` (`off`, `on`, or `share:minutes:seconds`, which may go on
+`:least-minutes` and `:active-share`; three numbers state the seconds as the whole wait, a least
+of 0); a hand-built `Services` opens nothing. What a town of 500 costs to open is not measured:
+past the least minutes the seconds budget bounds it, and such a town opens partly awake
+(`tests/test_society_opening.py`, `tests/test_society_opening_postgres.py`,
+`tests/test_society_take_in_postgres.py`).
 
 **A model its owner chose decides for a person** through the person role as registered
 ([decision roles](decision-roles-contract.md)): at the engine's own choice point, when nothing is

@@ -10,8 +10,12 @@ made through ``make_society`` by the arrival step, as a guest's is. What is show
     exactly that state, with every minute stored and replaying, and nothing asked of any model;
 *   asking for the society again advances nothing;
 *   the route a person's page asks (``POST .../society``) opens the same way;
-*   a budget of minutes stops it short, and a town that lives in a society of things is left at its
-    first minute;
+*   a budget of minutes stops it short;
+*   a town that lives in a society of things, whose state says what each being does and not who is
+    indoors, is left at its first minute by an opening that states no share doing something
+    (version 1's values) and, as the policy in force opens it, stands at the first minute half its
+    beings are doing something, which this test finds by stepping the same town by hand, with
+    every minute replaying;
 *   set playing afterwards, the society's next minute is due at once, because the minutes it was
     opened by wrote no playback receipt, where a minute stepped through the playback control makes
     the same Play wait out an interval.
@@ -23,7 +27,7 @@ import dataclasses
 from datetime import UTC, datetime
 
 import pytest
-from exulanica.api.society_opening import OPENING_OFF, SocietyOpening
+from exulanica.api.society_opening import OPENING_OFF, SocietyOpening, opening_setting
 from exulanica.world import arrival_worlds
 from exulanica.world.arrival_worlds import load_arrival_worlds
 
@@ -180,6 +184,70 @@ def test_a_town_living_in_a_society_of_things_is_left_at_its_first_minute(made, 
     (world, *_) = load_arrival_worlds()
     assert world.scene is not None and society["profile"] == world.scene.document["engine"]
     assert society["current_tick"] == 0
+
+
+def _doing_milli(state: dict) -> int:
+    beings = state["inhabitants"]
+    return 1000 * sum(1 for being in beings if being["action"]["kind"] != "idle") // len(beings)
+
+
+def test_a_town_living_in_a_society_of_things_opens_when_half_its_beings_are_doing_something(
+    made, monkeypatch
+):
+    api = made
+    monkeypatch.setattr(arrival_worlds, "arrival_tiles_baked", lambda connection, world: True)
+    _offer(api)
+    # First with the opening off, stepped by hand to the first minute half are doing something.
+    _open_as(api, OPENING_OFF)
+    arrival, _ = _enter_arrival(api)
+    base, scope = _paths(api, arrival)
+    body = _society(api, arrival).json()
+    born = body
+    # Born with every being idle, and none of them says whether it is indoors.
+    assert body["current_tick"] == 0 and _doing_milli(body["state"]) == 0
+    assert all("indoors" not in being["location"] for being in body["state"]["inhabitants"])
+    while _doing_milli(body["state"]) < 500:
+        assert body["current_tick"] < 60, "the society never came to be doing something"
+        stepped = api.post(
+            f"{base}/steps?{scope}",
+            {"base_tick": body["current_tick"], "base_state_sha256": body["state_sha256"]},
+        )
+        assert stepped.status_code == 200, stepped.text
+        body = stepped.json()
+    by_hand = body
+    assert by_hand["current_tick"] >= 1
+    erased = api.client.delete(
+        f"{base}?{scope}", headers={"Authorization": f"Bearer {personal.OWNER_TOKEN}"}
+    )
+    assert erased.status_code == 204, erased.text
+    # Made again as the policy in force opens a society: time is not the subject, so its seconds
+    # are an hour here and its other values are the host's own reading of the setting.
+    opening = dataclasses.replace(opening_setting("on"), seconds_maximum=3600)
+    assert opening.active_share_milli == 500 and opening.active_state_families == {"things"}
+    _open_as(api, opening)
+    before = _model_rows(api)
+    made_again = api.post(
+        f"{base}?{scope}", {"region_id": born["region_id"], "profile": born["profile"]}
+    )
+    assert made_again.status_code in (200, 201), made_again.text
+    opened = made_again.json()
+    assert opened["current_tick"] == by_hand["current_tick"]
+    assert opened["state_sha256"] == by_hand["state_sha256"]
+    assert _doing_milli(opened["state"]) >= 500
+    assert _model_rows(api) == before
+    # The scene's own beings are among them still. Where each stands is the routine's minute, as
+    # for anyone else: a placed being may have walked.
+    placed = {b["placed_id"] for b in born["state"]["inhabitants"] if b["came_by"] == "placed"}
+    assert placed and placed == {
+        b["placed_id"] for b in opened["state"]["inhabitants"] if b["came_by"] == "placed"
+    }
+    replayed = api.get(f"{base}/replay?{scope}")
+    assert replayed.status_code == 200 and replayed.json()["replay_verified"] is True
+    # Asked for again, it is read back and not opened further.
+    again = api.post(
+        f"{base}?{scope}", {"region_id": born["region_id"], "profile": born["profile"]}
+    )
+    assert again.status_code == 200 and again.json()["current_tick"] == opened["current_tick"]
 
 
 def _seconds_until_due(control: dict) -> float:

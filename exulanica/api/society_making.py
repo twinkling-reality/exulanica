@@ -57,6 +57,7 @@ __all__ = [
     "SocietyTakeInRefused",
     "engine_holding_things",
     "make_society",
+    "open_made",
     "society_refusal",
     "society_repository",
     "take_newcomers_in",
@@ -254,11 +255,13 @@ def make_society(
     profile: str,
     place_id: uuid.UUID | None = None,
     prepared: bool = False,
+    opens: bool = True,
 ) -> dict[str, Any]:
     """Make the version's society in ``region_id`` on the engine ``profile`` names and answer it as
     served, or answer the one the version already holds there. ``prepared`` says the caller made
     the saved world ready before a transaction of its own (``prepare_saved_world``), which this
-    then runs inside.
+    then runs inside; such a caller passes ``opens=False`` and opens the society itself once its
+    transaction is committed (:func:`open_made`), so no minute is advanced under its locks.
 
     A society of things is made only where the host offers it (:class:`SocietyEngineNotOffered`
     otherwise, before anything is read), and there a new society of another engine over a world the
@@ -270,7 +273,8 @@ def make_society(
 
     A society this call makes is then opened awake, as the host's opening says
     (:func:`exulanica.api.society_opening.open_awake`): advanced by ordinary recorded minutes until
-    a share of its people is outdoors. One read back is answered as it stands.
+    a share of its people is outdoors or, where its state does not say who is indoors, a share of
+    its beings is doing something. One read back is answered as it stands.
     """
     services = hooks.services
     if society_engine(profile).state_family == "things" and not services.societies_of_things:
@@ -322,10 +326,50 @@ def make_society(
             profile=profile,
             initial_input=document,
         )
+    if not opens:
+        return served_snapshot(created)
     # Made and committed: now opened awake, as this host's opening says (a town's people are on
     # its streets when it is first shown). A minute refused there never undoes the creation.
     return served_snapshot(
-        open_awake(repo, version_id, created, services.society_opening, actor=session.actor)
+        open_awake(
+            repo,
+            version_id,
+            created,
+            services.society_opening,
+            actor=session.actor,
+            family=society_engine(profile).state_family,
+        )
+    )
+
+
+def open_made(
+    hooks: SocietyHooks,
+    connection: Any,
+    session: Any,
+    world_id: str,
+    version_id: uuid.UUID,
+    *,
+    region_id: str | None,
+    profile: str,
+    made: dict[str, Any],
+) -> dict[str, Any]:
+    """Open awake the society a caller made inside a transaction of its own with ``opens=False``,
+    now that the transaction is committed, and answer it as served: the society the version holds
+    is read back and advanced as the host's opening says. Where it is no longer held as it was
+    made (somebody else advanced or erased it meanwhile), ``made`` is answered as it stands."""
+    repo = society_repository(connection, session, hooks, world_id)
+    held = repo.held(version_id, profile=profile, region_id=region_id)
+    if held is None or held["state_sha256"] != made["state_sha256"]:
+        return made
+    return served_snapshot(
+        open_awake(
+            repo,
+            version_id,
+            held,
+            hooks.services.society_opening,
+            actor=session.actor,
+            family=society_engine(profile).state_family,
+        )
     )
 
 
@@ -338,7 +382,8 @@ def take_newcomers_in(
 ) -> dict[str, Any]:
     """A living town's people take in what was placed in their world after they came: the
     version's living society is ended and a society of things made on the same version, in one
-    transaction, and answered as served.
+    transaction, and answered as served; once that transaction is committed the new society is
+    opened awake as a creation's is, outside the transaction and its workspace lock.
 
     The living society is erased by the erasure a person's own erasing uses
     (:func:`~exulanica.world.society_erasure.erase_society`: a society tombstone, and every row
@@ -392,14 +437,27 @@ def take_newcomers_in(
             # Named here: the erasure's refusal is a ValueError, which a creation's table of
             # refusals would answer as an invalid state.
             raise SocietyTakeInRefused(exc.code) from exc
-        return make_society(
+        region_id = held["region_id"]
+        made = make_society(
             hooks,
             connection,
             session,
             world_id,
             version_id,
-            region_id=held["region_id"],
+            region_id=region_id,
             profile=engine,
             place_id=place_id,
             prepared=True,
+            opens=False,
         )
+    # Taken in and committed: the opening's minutes are advanced here, never under the lock.
+    return open_made(
+        hooks,
+        connection,
+        session,
+        world_id,
+        version_id,
+        region_id=region_id,
+        profile=engine,
+        made=made,
+    )

@@ -1206,7 +1206,7 @@
         "arrival_clearance_mm": 2000,
         "arrival_clearance_reason": "The pinned minimum resident clearance in exulanica/world/composers/town-arrival.v1.json; the first society read checks actual resident positions against the served arrival, not only the receipt's claimed choice.",
         "opening_minutes_maximum": 60,
-        "opening_minutes_reason": "A new society opens awake: the server advances it until a share of its people is outdoors, for at most the minutes exulanica/world/society-opening-policy.v1.json states, so the first society read stands at a minute from 0 to that many; whoever stands is held to the clearance and whoever is walking past the arrival is listed."
+        "opening_minutes_reason": "A new society opens awake: the server advances it until a share of its people is outdoors, for at most the minutes exulanica/world/society-opening-policy.v2.json states, so the first society read stands at a minute from 0 to that many; whoever stands is held to the clearance and whoever is walking past the arrival is listed."
       },
       "owner_area": "town societies: exulanica/world/society_grounds.py, exulanica/world/society_walking_surfaces.py and web/packages/app/src/composition/environment-selection.ts",
       "expect": {

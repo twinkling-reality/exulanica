@@ -7,10 +7,12 @@ of the making leaves the living society and writes no tombstone; each refusal is
 
 from __future__ import annotations
 
+import dataclasses
 import uuid
 
 import pytest
 from exulanica.api import society_making
+from exulanica.api.society_opening import opening_setting
 from exulanica.api.society_runtime import UnavailableSocietyInput
 
 from test_society_made_world import made as imported_made  # noqa: F401
@@ -165,6 +167,51 @@ def test_a_living_town_s_people_take_a_knight_in_and_stay_who_they_are(made):
     assert (again.status_code, again.json()["code"]) == (409, "society_takes_in_already")
     assert _held(api, entry)["erasures"] == 1
     assert _offered(api, entry) == ("unsupported", "society_takes_in_already")
+
+
+def test_the_people_taken_in_are_opened_awake_after_the_transaction_and_not_inside_it(
+    made, monkeypatch
+):
+    api = made
+    _offering_things(api)
+    # As a deployment opens a society: the policy in force, with seconds that do not run out here.
+    api.client.app.state.services = dataclasses.replace(
+        api.client.app.state.services,
+        society_opening=dataclasses.replace(opening_setting("on"), seconds_maximum=3600),
+    )
+    entry, society, take_in = _town(api, "A town that wakes when it takes a knight in")
+    created = api.post(
+        society, {"region_id": entry["generated_ground"]["region_id"], "profile": V5}
+    )
+    assert created.status_code in (200, 201), created.text
+    east, _height, south = entry["generated_ground"]["arrival_mm"]
+    _place(api, entry, "knight", "knight", 1, east - 2_000, south)
+    # Every minute the opening advances is advanced with no transaction open on the request's
+    # connection: the take-in's own transaction, and its workspace lock, are behind it.
+    seen = []
+    advance = society_making.open_awake
+
+    def watched(repository, version_id, snapshot, opening, **keywords):
+        seen.append((repository.connection.info.transaction_status.name, snapshot["current_tick"]))
+        return advance(repository, version_id, snapshot, opening, **keywords)
+
+    monkeypatch.setattr(society_making, "open_awake", watched)
+    taken = api.post(take_in, {})
+    assert taken.status_code in (200, 201), taken.text
+    after = taken.json()
+    assert seen == [("IDLE", 0)]
+    # Born idle at minute 0, it is answered at the minute half its beings are doing something.
+    beings = after["state"]["inhabitants"]
+    assert after["profile"] == V7 and after["current_tick"] >= 1
+    assert 2 * sum(being["action"]["kind"] != "idle" for being in beings) >= len(beings)
+    held = _held(api, entry)
+    assert held["society"]["current_tick"] == after["current_tick"]
+    assert held["society"]["state_sha256"] == after["state_sha256"]
+    assert (held["erasures"], held["tombstones"]) == (1, 1)
+    replayed = api.get(
+        f"/world/versions/{entry['authored_version_id']}/society/replay?world_id={entry['world_id']}"
+    )
+    assert replayed.status_code == 200 and replayed.json()["replay_verified"] is True
 
 
 def test_a_host_that_offers_no_society_of_things_offers_no_taking_in(made):

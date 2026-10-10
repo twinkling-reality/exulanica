@@ -1,0 +1,31 @@
+{
+ "policy_id": "exulanica.society-opening",
+ "version": 2,
+ "default": "on",
+ "values": {
+  "outdoors_share_milli": 150,
+  "active_share_milli": 500,
+  "minutes_minimum": 10,
+  "minutes_maximum": 60,
+  "seconds_maximum": 5
+ },
+ "active_share_state_families": [
+  "things"
+ ],
+ "classes": {
+  "outdoors_share_milli": "chosen_budget",
+  "active_share_milli": "chosen_budget",
+  "minutes_minimum": "chosen_budget",
+  "minutes_maximum": "chosen_budget",
+  "seconds_maximum": "chosen_budget"
+ },
+ "reasons": {
+  "default": "A society that is made opens awake unless its host says otherwise: a town whose people are brought in is shown with people on its streets and doing something. A host sets EXULANICA_SOCIETY_OPENING to off, to on, or to share:minutes:seconds, optionally followed by :least-minutes and :active-share, in this file's units, and a hand-built set of services, which states no host, opens nothing. Version 1 of this policy stays beside this file and is read as before.",
+  "outdoors_share_milli": "Where a state says for every person whether they are indoors, a new society is advanced, minute by ordinary recorded minute, until at least this share of its people is outdoors, in thousandths. A living town is born with everyone at home, so its first minutes show an empty street: on two towns made from a sentence (48 and 52 people, recorded 2026-10-09), 15 percent was first reached at minutes 14 and 17, and the ten minutes after held 8.1 and 8.6 people outdoors with 3.0 and 2.6 walking; 20 percent took until minutes 19 and 31 and 25 percent until 57 and 33, so a higher share buys little and costs minutes. Unchanged from version 1.",
+  "active_share_milli": "Where a state does not say who is indoors but says for every being what it is doing (a society of things, whose beings are always out on the walking graph), a new society is advanced until at least this share of its beings is doing something: an action whose kind is not idle, the state's own word for a being with nothing under way, which is what a page draws standing still. Such a society is born with every being idle and no goal. On a dressed arrival town stepped with no model asked (2026-10-10), every being was idle at minute 0 and all but one were not at minute 1, at 42 beings (41) and at 130 (129), and the share stayed there for the 45 minutes stepped; so half is reached in one minute and any share up to nine tenths asks the same single minute. That minute took 0.4 s at 42 beings and 2.6 s at 130 through the steps route on a machine at a load average of 50 to 60; what it costs at 500 beings is not measured.",
+  "minutes_minimum": "Never fewer minutes than this before the seconds are counted, unless the share is reached first: the seconds are read from the server's clock, so a busy host would otherwise open a town less awake than a quiet one. A living town opened under a load average of 280 was cut by its 5 seconds at minute 6 with nobody outdoors, where the same town had opened at minute 17 twenty minutes earlier on a quieter machine. At minute 10 the two recorded towns had 6 of 48 and 5 of 38 people outdoors, against 2 and 3 at minute 6 and none at minute 1. A host that must answer within its seconds whatever a town shows sets a least of 0.",
+  "minutes_maximum": "Never more minutes than this, so a society that does not reach the share (a town of three people, a town whose day is set at night) still opens. An hour is past the minute both recorded towns reached 20 percent. Unchanged from version 1.",
+  "seconds_maximum": "Past the least minutes, never longer than this inside the request that makes the society, read from the server's clock between minutes, so a larger town opens partly awake rather than late. A stored minute of a town of about 60 people took 93 ms (docs/synthetic-society-contract.md, the living town's cost), so a town of about 50 reaches the share in about 2 seconds; the cost at 500 people is not measured. Unchanged from version 1.",
+  "active_share_state_families": "The share doing something is read only for a society whose engine keeps a state of these families, as the engine table names them. It is measured for a society of things alone (the figures under active_share_milli); what a purposeful society's first minutes show and cost is not measured, so such a society is left at its first minute, as under version 1, until a later version of this policy states otherwise."
+ }
+}

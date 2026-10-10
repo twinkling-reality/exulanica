@@ -231,8 +231,11 @@ SOCIETY_SETTING_REFUSALS: Final = {
     "society_control_workspaces_not_uuid": "names an entry that is not a workspace id",
     "society_control_workspaces_duplicate": "names a workspace more than once",
     "society_tick_interval_not_integer": "must be a whole number of milliseconds",
-    "society_opening_not_recognised": "must be absent, off, on or share:minutes:seconds",
-    "society_opening_not_whole_numbers": "must state three whole numbers",
+    "society_opening_not_recognised": (
+        "must be absent, off, on or share:minutes:seconds, with :least-minutes and"
+        " :active-share after them if stated"
+    ),
+    "society_opening_not_whole_numbers": "must state whole numbers",
     "society_opening_share_out_of_bounds": "must state a share from 1 to 1000 thousandths",
     "comparison_worker_not_recognised": "must be absent, on, process or off",
     "playback_worker_not_recognised": "must be absent, on, process or off",
@@ -400,8 +403,8 @@ class Services:
     #: hand-built Services, as for a host that does not set it.
     societies_of_things: bool = False
     #: How a society that is made opens (:data:`SOCIETY_OPENING_ENV`, read by
-    #: :mod:`exulanica.api.society_opening`): advanced until a share of its people is outdoors, or
-    #: not at all. Nothing for a hand-built
+    #: :mod:`exulanica.api.society_opening`): advanced until a share of its people is outdoors or,
+    #: for a society of things, doing something, or not at all. Nothing for a hand-built
     #: Services, as before the setting existed; ``build_services`` reads the setting, whose default
     #: is the opening policy's (on).
     society_opening: SocietyOpening = OPENING_OFF

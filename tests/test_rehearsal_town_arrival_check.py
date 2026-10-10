@@ -36,7 +36,7 @@ from living_town_support import SEED, town_input  # noqa: E402
 
 HANDLERS = ROOT / "scripts" / "rehearsal" / "handlers.mjs"
 OPENING_POLICY = json.loads(
-    (ROOT / "exulanica/world/society-opening-policy.v1.json").read_text(encoding="utf-8")
+    (ROOT / "exulanica/world/society-opening-policy.v2.json").read_text(encoding="utf-8")
 )
 ARRIVAL_POLICY = json.loads(
     (ROOT / "exulanica/world/composers/town-arrival.v1.json").read_text(encoding="utf-8")
