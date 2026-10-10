@@ -348,7 +348,13 @@ accepted one with `{kind: person, answer_sha256}`, or, where none was posted, it
 model. A line carrying a name saved since it was posted is not said: the being carries on,
 `person_line_withheld`, with no digest, a minute its person answered and so no quiet one. Five
 minutes in a row with no answer (`QUIET_MINUTES`) and the host gives the being back, `ended:
-player_left`. The minute applies the receipt as any decider's: its `decision_applied` event's
+player_left`. A world set playing whose last minute is at least a wait old runs its first minute
+at once
+([the first minute after Play](synthetic-society-contract.md#the-first-minute-after-play)), so
+that minute takes the answer the being's person posted while the world was paused, which the turn
+read and the answer route serve as they do while it plays, or, with none, the idle option: one
+quiet minute of the five. The minute applies the receipt as any decider's: its
+`decision_applied` event's
 `origin` and a line's `said` event's `decider` read `person`, and the Companion's line for the goal
 it set says the person playing them chose it, never a model, by that event's origin (as it says an
 outside program's choice is the program's); the inspector's words take the same phrase where the

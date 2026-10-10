@@ -71,6 +71,24 @@ def ticks_due(now: dt.datetime, due_at: dt.datetime, interval_ms: int) -> int:
     return milliseconds // interval_ms + 1
 
 
+def playing_due_at(
+    now: dt.datetime, last_minute_at: dt.datetime | None, interval_ms: int
+) -> dt.datetime:
+    """When a society set playing at ``now``, or given another speed while it plays, is next due.
+
+    One effective interval after its last minute was advanced, by an automatic batch or by a
+    manual step, and never before ``now``. A society whose control has advanced no minute, or
+    whose last minute is at least an interval old, is due at once and owes one minute, however
+    long it stood paused. One whose last minute is newer waits out the rest of that interval,
+    which after a batch is where the batch itself left the deadline: so pausing and playing,
+    stepping, or changing the speed never brings a batch sooner than the chosen speed's wait after
+    the minute before it.
+    """
+    if last_minute_at is None:
+        return now
+    return max(now, last_minute_at + dt.timedelta(milliseconds=interval_ms))
+
+
 @dataclass(frozen=True)
 class ControlClaim:
     workspace_id: uuid.UUID

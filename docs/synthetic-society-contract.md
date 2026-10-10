@@ -1160,7 +1160,9 @@ The authenticated base route is `/world/versions/{version_id}/society/control`:
 - `PUT` accepts only `{base_revision, mode: "playing" | "paused", speed: 1 | 2 | 4}`. Successful
   configuration increments the control revision and cancels any pending claim. Stale revision
   returns 409. Unknown/foreign branches are indistinguishable 404s. Invalid input types are 422;
-  unsupported settings or v1 play are 409. Unavailable current inputs are 424.
+  unsupported settings or v1 play are 409. Unavailable current inputs are 424. A configuration
+  that leaves the society playing sets `next_due_at` as
+  [the first minute after Play](#the-first-minute-after-play) states.
 - `POST /steps` accepts `{base_revision, base_tick, base_state_sha256}` and requires paused mode.
   It performs exactly one deterministic step and returns `{control, society, receipt}`. Both
   control revision and simulation tick/digest must match. First successful use persists paused
@@ -1255,6 +1257,37 @@ current geometry as a substitute nor schedules new work. Control configuration a
 rewind society time. Object undo and restore append an ordered authored input. Historical source
 withdrawal denies historical replay even when control metadata stays readable. Stepping by hand
 needs no background process.
+
+#### The first minute after Play
+
+A configuration that leaves a society playing (Play, or another speed while it plays) sets
+`next_due_at` to one effective wait (`tick_interval_ms`) after the society's last minute was
+advanced through its control, and never before the moment the configuration is saved, which is
+PostgreSQL's `clock_timestamp()` then (`playing_due_at`, `exulanica/world/society_controls.py`).
+The last minute's time is the one the society's newest `advanced` or `manual_step` receipt
+states, whichever receipt is newer: an automatic batch's `completed_at`, which the control read
+also carries as `last_batch_execution.completed_at`, or a manual step's `recorded_at`. It is read
+in the transaction that saves the control, under the workspace lock a batch or a step holds until
+it commits. So:
+
+- a society whose control has advanced no minute, or whose last minute is at least a wait old,
+  is due at once. The worker's next round claims it and it runs one minute, however long it stood
+  paused: at a 60,000 ms base as at the default, Play is followed by a minute, not by a wait;
+- a society paused and played again inside the wait after a batch is due when that wait ends:
+  at an unchanged speed and base, the deadline the batch itself left;
+- a society played inside the wait after a minute stepped by hand is due when that wait ends, so
+  the stepped minute is presented for its whole wait before the next one begins;
+- another speed while playing times the next batch from the last minute at the new wait: sooner
+  when the speed rises, at once when the new wait has already passed, later when it falls.
+
+No sequence of pausing, playing, stepping and changing speed therefore brings a batch sooner
+than the chosen speed's wait after the batch or the manual step before it, so
+`minimum_wait_after_batch_completion` holds across configurations and a world cannot be run
+faster than its speed that way. A configuration carries no debt either: the deadline it saves is
+never in the past, so the batch that follows owes one minute unless the host itself is late.
+Stepping by hand stays outside the pace: a paused society is stepped as often as it is asked. A
+minute advanced through `POST /world/versions/{version_id}/society/steps` writes no control
+receipt and moves no deadline.
 
 ### Server integration and HTTP
 

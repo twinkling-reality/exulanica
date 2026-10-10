@@ -226,7 +226,7 @@ The society's playback controls stay the only controls
 | Pause | The people pause; traffic and birds keep the wall clock | Every system stops: traffic seals what the society let through, and the presented minute holds |
 | Speed | 1x, 2x or 4x of the host's base wait between the people's minutes | The same, for all three: a pace, never a real-time claim |
 | Step | One simulated minute of the people | One minute of every system; past the lead, 409 `clock_lead_exhausted` |
-| Resume | The next minute is due one interval from now | The same; paused time is never replayed |
+| Resume | The next minute is due one interval after the last minute was advanced, by a playback batch or a manual step, and never before the resume, so a world that stood paused runs a minute at once ([the first minute after Play](synthetic-society-contract.md#the-first-minute-after-play)) | The same, where the lead allows it; paused time is never replayed |
 | Catching up after downtime | The people run at most three overdue minutes a claim and discard the rest (existing). A model-controlled signal catches up at most one episode: a longer gap is left unsealed, recorded once as a `legacy_signal_gap` receipt, and the chain starts again at the current episode, every minute sealed before it unchanged. Fixed traffic and flight hold no state | The people run at most three overdue minutes a claim, and no more than the lead allows; the rest is discarded. Traffic is never further behind than the lead |
 | Reopening | The people's state from its row; traffic and birds from the wall clock | The clock, the occupancy and the sealed minutes from their rows; traffic rebuilt and checked |
 

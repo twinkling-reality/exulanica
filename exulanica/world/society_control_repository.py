@@ -28,6 +28,7 @@ from exulanica.world.society_controls import (
     MAX_CLAIM_ATTEMPTS,
     ControlClaim,
     LeaseLost,
+    playing_due_at,
     ticks_due,
     utc,
     validate_settings,
@@ -208,6 +209,36 @@ class SocietyControlRepository:
             "completed_at": doc["completed_at"],
         }
 
+    def _last_minute_at(self, society_id: uuid.UUID) -> dt.datetime | None:
+        """When the society's last minute was advanced through its control, or None where none was.
+
+        The time its newest ``advanced`` or ``manual_step`` receipt states, whichever receipt is
+        newer. An automatic batch's is ``completed_at``: the clock ``execute`` read once the
+        batch's minutes had run, in the transaction that committed them, and the time it added the
+        interval to for the next deadline. A manual step's is ``recorded_at``: the clock read as
+        the step's receipt was written, in the transaction that committed its minute. Receipts are
+        written in sequence under the workspace lock, so the newest of the two kinds is the last
+        minute. The control row keeps no such time across a pause. Read in the caller's
+        transaction, under that lock; the walk back from the newest receipt passes only the
+        receipts written since that minute.
+        """
+        row = self.connection.execute(
+            "select document,document_sha256 from world_society_control_event "
+            "where workspace_id=%s and society_id=%s "
+            "and document->>'kind' in ('advanced','manual_step') "
+            "order by event_seq desc limit 1",
+            (self.workspace_id, society_id),
+        ).fetchone()
+        if row is None:
+            return None
+        doc = row["document"]
+        digest = society_state_sha256({k: v for k, v in doc.items() if k != "document_sha256"})
+        if digest != row["document_sha256"] or digest != doc["document_sha256"]:
+            raise ValueError("control receipt digest mismatch")
+        return dt.datetime.fromisoformat(
+            doc["completed_at"] if doc["kind"] == "advanced" else doc["recorded_at"]
+        )
+
     def _public(self, society: dict, control: dict | None) -> dict:
         c = control or {
             "revision": 0,
@@ -295,7 +326,11 @@ class SocietyControlRepository:
             due = (
                 None
                 if mode == "paused"
-                else self._now() + dt.timedelta(milliseconds=self.base_tick_interval_ms // speed)
+                else playing_due_at(
+                    self._now(),
+                    self._last_minute_at(society["society_id"]),
+                    self.base_tick_interval_ms // speed,
+                )
             )
             self.connection.execute(
                 "insert into world_society_control(workspace_id,society_id,"
