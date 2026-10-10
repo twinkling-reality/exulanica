@@ -883,8 +883,10 @@ class SocietyRuntime:
         kind's run form, by its digest (:meth:`~exulanica.world.thing_store.ThingStore.run_form`).
 
         Rows only, so it is asked under the asset read lock. A thing removed, or whose kind is
-        gone, is passed by, and so is a kind whose run form the store cannot build: the composer
-        leaves a thing of such a kind out and names the thing among those gone.
+        gone, is passed by, and so is a kind whose run form the store cannot build. The composer
+        leaves a thing of either out of the input; it names among those gone only one whose kind
+        is gone (erased), so a being of a kind still held whose run form does not build leaves as
+        a removed one does, not as an erased one.
         """
         from exulanica.world.thing_store import ThingStore
 

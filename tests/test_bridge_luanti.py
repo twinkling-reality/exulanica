@@ -801,6 +801,30 @@ def _check() -> Any:
     return module
 
 
+def test_the_check_finds_the_gate_in_a_world_that_also_holds_a_made_creature(tmp_path):
+    """A thing of a kind its workspace keeps is named by digest alone and has no key: the check
+    reads past it to the gate, and refuses by name a record that placed no gate."""
+    check = _check()
+    creature = {"thing_id": "creature:1", "kind": {"source": "workspace", "sha256": "ab" * 32}}
+    gate = {"thing_id": "gate", "kind": {"kind": "gate", "version": 1}}
+    scene = tmp_path / "scene.json"
+    scene.write_text(json.dumps({"title": "A square"}), encoding="utf-8")
+
+    def api(method, path, **_kwargs):
+        return {"society_id": "s", "profile": "exulanica-society/v7"}
+
+    placed = {
+        "things": [creature, gate],
+        "version_id": "v",
+        "world_id": "w",
+        "arrival": {"region_id": "region:starter"},
+        "society": {"society_id": "s"},
+    }
+    assert check.crossing_world(api, placed, scene)["gate"] == "gate"
+    with pytest.raises(check.Refused, match="placed no gate"):
+        check.crossing_world(api, {**placed, "things": [creature]}, scene)
+
+
 def test_only_a_pictured_world_loads_the_director_for_its_one_player(tmp_path):
     """The director moves a real player; it is loaded in the world a pictured run makes and named
     that run's player, and in no world a person plays in or a check plays."""

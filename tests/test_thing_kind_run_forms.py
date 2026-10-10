@@ -204,6 +204,41 @@ def test_every_string_of_a_run_form_is_a_catalog_name_a_module_a_digest_or_a_fig
         raise AssertionError(f"{name}: {string!r} is in no vocabulary")
 
 
+def test_every_count_the_grammar_admits_of_a_counted_part_has_a_number_to_be_named_by():
+    """A counted feature names its count in a word, and a count with no word is passed over, so
+    the body would be named without the feature. The names catalog holds a word for every count
+    the body grammar admits of each part it counts: a grammar that grows past them fails here
+    until the names do. The most of each part is read from the grammar's own file: single limbs
+    for a part that comes in pairs."""
+    directory = Path(__file__).resolve().parents[1] / "assets" / "catalogs" / "things"
+    grammar = json.loads((directory / "body-grammar.v1.json").read_text(encoding="utf-8"))
+    names = json.loads((directory / "body-names.v1.json").read_text(encoding="utf-8"))
+    specs = {entry["key"]: entry["spec"] for entry in grammar["entries"]}
+    most = {
+        "heads": specs["head"]["count"]["maximum"],
+        "legs": 2 * specs["leg"]["pairs"]["maximum"],
+        "arms": 2 * specs["arm"]["pairs"]["maximum"],
+        "tentacles": specs["tentacle"]["count"]["maximum"],
+    }
+    # By hand from the grammar: five heads, six pairs of legs, three of arms, twelve tentacles.
+    assert most == {"heads": 5, "legs": 12, "arms": 6, "tentacles": 12}
+    counted = {
+        entry["spec"]["part"]: entry["spec"]["least"]
+        for entry in names["entries"]
+        if entry["group"] == "feature" and entry["spec"]["counted"]
+    }
+    assert set(counted) == set(most)
+    numbers = {e["spec"]["value"] for e in names["entries"] if e["group"] == "number"}
+    for part, least in counted.items():
+        assert set(range(least, most[part] + 1)) <= numbers, part
+    # And the reader names the largest of each: twelve legs, not a bare creature.
+    loaded = body_names(1)
+    body = {"heads": [{}], "spine": 4, "limbs": [{"role": "leg", "count": 12}]}
+    assert body_name(body, loaded) == "twelve legged creature"
+    body = {"heads": [{}], "spine": 4, "limbs": [{"role": "tentacle", "count": 12}]}
+    assert body_name(body, loaded) == "twelve tentacled creature"
+
+
 @pytest.mark.parametrize("name", NAMES)
 def test_a_body_is_named_by_its_own_figures(name):
     form = _run_form(name)

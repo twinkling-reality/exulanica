@@ -6211,7 +6211,7 @@ def row_hm1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
         query=query,
         body={"region_id": record["arrival"]["region_id"], "profile": THINGS_ENGINE},
     )
-    gate = next(t["thing_id"] for t in record["things"] if t["kind"]["kind"] == "gate")
+    gate = next(t["thing_id"] for t in record["things"] if t["kind"].get("kind") == "gate")
     status_grant, granted = w2.call(
         "HM1",
         "POST",
@@ -6382,7 +6382,7 @@ def row_v2(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
         query=query,
         body={"region_id": record["arrival"]["region_id"], "profile": THINGS_ENGINE},
     )
-    gate = next(t["thing_id"] for t in record["things"] if t["kind"]["kind"] == "gate")
+    gate = next(t["thing_id"] for t in record["things"] if t["kind"].get("kind") == "gate")
     grant_body = {
         "idempotency_key": str(uuid.uuid4()),
         "bridge": "luanti",

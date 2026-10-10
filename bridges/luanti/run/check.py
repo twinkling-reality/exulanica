@@ -223,7 +223,8 @@ def crossing_world(api: Api, placed: dict[str, Any], scene: Path) -> dict[str, A
     """The world a scene builder's record names, the gate travellers come through, and its society
     of things: the one the builder started (``--minds``), read back, or else one started over the
     version (asked again, the version's society is read back)."""
-    gates = [thing["thing_id"] for thing in placed["things"] if thing["kind"]["kind"] == "gate"]
+    # A thing of a kind its workspace keeps (a made creature) is named by digest and has no key.
+    gates = [thing["thing_id"] for thing in placed["things"] if thing["kind"].get("kind") == "gate"]
     if not gates:
         raise Refused("scene", "the scene placed no gate for travellers to come through")
     # A scene may say which gate travellers come through and the mind the world gives them; the

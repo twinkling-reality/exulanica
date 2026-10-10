@@ -206,7 +206,7 @@ def cross(arguments: argparse.Namespace) -> None:
     society = f"/world/versions/{placed['version_id']}/society"
     travellers = placed.get("travellers") or {}
     gate = travellers.get("gate") or next(
-        thing["thing_id"] for thing in placed["things"] if thing["kind"]["kind"] == "gate"
+        thing["thing_id"] for thing in placed["things"] if thing["kind"].get("kind") == "gate"
     )
     if gate not in {thing["thing_id"] for thing in placed["things"]}:
         raise SystemExit(f"travellers come through {gate}, which the scene did not place")
