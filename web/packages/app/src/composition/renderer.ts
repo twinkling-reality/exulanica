@@ -31,7 +31,7 @@ import { withDeclaredFloors } from './declared-floors.js';
 import { GENERATED_WORLD_WAITING_ATTRIBUTE } from './generated-world-ready.js';
 import { reconstructionRungsFor } from './session-and-geometry.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
-import { planSight } from './sight.js';
+import { holdSight } from './sight.js';
 import { TOWN_FIRST_VIEW } from '../town-first-view.js';
 import type { MountedStatusAndInspector } from './status-and-inspector.js';
 
@@ -107,16 +107,16 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
         : undefined;
     // Words saying a world is being built belong to that world: opening any world takes them down.
     env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
-    // What hides a being belongs to the world mounted: none until this one states its own.
-    state.worldSight = null;
+    // What hides a being belongs to the world mounted: none until this one states its own plan of
+    // what stands in a sight line (a town's tiles, a made place's drawing).
+    const standing = holdSight(state, TOWN_FIRST_VIEW.life?.sightMarginMm ?? 0);
     // A saved world generated from a recipe draws the tiles its entry declares, read through its
     // own version, once every one is baked; while one is not, the page says so and draws none.
     const generatedWorld = generatedTile === undefined && state.activeWorldEntry?.generatedGround != null
       && state.credentials !== null
       ? await (await import('./generated-world.js')).openGeneratedWorld(
         env, state.credentials, state.activeWorldEntry, state.worldStyleConnection?.state.current.stylePack ?? null,
-        // The plan the town's first view was chosen by answers what hides a being while it is mounted.
-        (blockers) => { state.worldSight = planSight(blockers, TOWN_FIRST_VIEW.life?.sightMarginMm ?? 0); },
+        standing,
       )
       : undefined;
     // A saved world made from a world kind draws its site's served drawing, read through its own
@@ -126,6 +126,7 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       && state.credentials !== null
       ? await (await import('./site-world.js')).openSiteWorld(
         env, state.credentials, state.activeWorldEntry, state.worldStyleConnection?.state.current.stylePack ?? null,
+        standing,
       )
       : undefined;
     const district = generatedTile === undefined && state.activeWorldEntry === null

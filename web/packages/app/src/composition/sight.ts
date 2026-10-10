@@ -6,8 +6,12 @@
  * once to choose the first view). The same rings answer for the mark and name over a being, for a
  * line of speech and for a click: a sight line is followed in plan until a ring's edge crosses it.
  *
+ * A made place states its plan in its drawing: every box it draws that stands across eye height (a
+ * wall piece, a post, a tall thing), turned as it is drawn (`siteSightRings`). Its walls are pieces
+ * with a gap where each door is, so a door there is open to the eye.
+ *
  * It is the plan's answer and no more. What does not cross eye height in the plan hides nobody: a
- * parked vehicle, a bench, a bin, a canopy, another person. A doorway is not an opening in a
+ * parked vehicle, a bench, a bin, a canopy, another person. A doorway is not an opening in a town
  * building's ring. It is right for a viewer on foot, which is the only viewer there is. Nothing is
  * read back from the picture.
  */
@@ -25,6 +29,48 @@ export interface Sight {
    * infinity where nothing does (or the ray looks straight up or down). Metres, x east, y up, z south.
    */
   reach(origin: readonly [number, number, number], direction: readonly [number, number, number]): number;
+}
+
+/**
+ * What a made place puts in a sight line at a height: the plan rectangle, millimetres east and
+ * south, of every box its drawing draws whose bottom is at or below `heightMm` and whose top is at
+ * or above it. A slot's position is its base's centre in site millimetres (x east, y north), its
+ * box is its width along its front, its depth and its height, and it is turned by quarter turns;
+ * what is drawn as a plane, a ridge or nothing (ground, a roof, a door, a structure's own outline)
+ * is no box and is left out. No family or kind of slot is named here.
+ */
+export function siteSightRings(
+  drawing: { readonly slots: readonly {
+    readonly primitive: string; readonly positionMm: readonly [number, number, number];
+    readonly boxMm: readonly [number, number, number]; readonly yawQuarterTurns: number;
+  }[] },
+  heightMm: number,
+): SightBlocker[] {
+  const rings: SightBlocker[] = [];
+  for (const slot of drawing.slots) {
+    const [x, y, base] = slot.positionMm;
+    const [width, depth, height] = slot.boxMm;
+    if (slot.primitive !== 'box' || base > heightMm || base + height < heightMm) continue;
+    // A quarter turn lays the width along north and south.
+    const turned = slot.yawQuarterTurns % 2 !== 0;
+    const east = (turned ? depth : width) / 2, north = (turned ? width : depth) / 2;
+    rings.push([[x - east, -(y + north)], [x + east, -(y + north)], [x + east, -(y - north)], [x - east, -(y - north)]]);
+  }
+  return rings;
+}
+
+/**
+ * Hold what hides a being on the session for the world about to be mounted: none from now, and the
+ * world's own once it states its plan. What stands within `marginMm` of a point is the thing the
+ * point is at (`planSight`).
+ */
+export function holdSight(
+  session: { worldSight: Sight | null }, marginMm: number,
+): (blockers: readonly SightBlocker[]) => void {
+  session.worldSight = null;
+  return (blockers) => {
+    session.worldSight = planSight(blockers, marginMm);
+  };
 }
 
 /**

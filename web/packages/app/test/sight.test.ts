@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planSight } from '../src/composition/sight.js';
+import { holdSight, planSight, siteSightRings, type Sight } from '../src/composition/sight.js';
 import type { SightBlocker } from '../src/composition/arrival-view.js';
 
 /*
@@ -73,6 +73,54 @@ describe('what hides a being, from a plan of what stands at eye height', () => {
     for (const x of [-390, -250, -110]) expect(wide.sees({ x, z: -60 }, { x, z: -40 })).toBe(false);
     expect(wide.sees({ x: -90, z: -60 }, { x: -90, z: -40 })).toBe(true);
     expect(wide.reach([-250, 1.6, -60], [0, 0, 1])).toBeCloseTo(10, 9);
+  });
+
+  it('reads a made place\'s plan from the boxes its drawing draws across eye height, turned as they are drawn', () => {
+    // Site millimetres are x east and y north. A shed's west wall in two pieces with a door between
+    // (each 2.4 m long, 20 cm thick, 3 m high, laid north to south by a quarter turn), the lintel
+    // over the door, a north wall laid east to west, a crate 1.2 m high, the ground, a roof and the
+    // shed's own outline.
+    const slot = (primitive: string, positionMm: [number, number, number], yawQuarterTurns: number, boxMm: [number, number, number]) =>
+      ({ primitive, positionMm, yawQuarterTurns, boxMm });
+    const drawing = { slots: [
+      slot('box', [35_400, 14_700, 0], 1, [2400, 200, 3000]),
+      slot('box', [35_400, 18_300, 0], 1, [2400, 200, 3000]),
+      slot('box', [35_400, 16_500, 2100], 1, [1200, 200, 900]),
+      slot('box', [37_400, 19_400, 0], 0, [4000, 200, 3000]),
+      slot('box', [30_000, 16_500, 0], 0, [1000, 1000, 1200]),
+      slot('plane', [40_000, 30_000, 0], 0, [80_000, 60_000, 0]),
+      slot('gable', [37_400, 16_500, 3000], 0, [4200, 6200, 1500]),
+      slot('none', [37_400, 16_500, 0], 0, [4000, 6000, 3000]),
+    ] };
+    const rings = siteSightRings(drawing, 1600);
+    // The three walls: east and south, so north 13,500 to 15,900 is south -15,900 to -13,500.
+    expect(rings).toEqual([
+      [[35_300, -15_900], [35_500, -15_900], [35_500, -13_500], [35_300, -13_500]],
+      [[35_300, -19_500], [35_500, -19_500], [35_500, -17_100], [35_300, -17_100]],
+      [[35_400, -19_500], [39_400, -19_500], [39_400, -19_300], [35_400, -19_300]],
+    ]);
+    // A box that only reaches the height, or only starts at it, stands across it.
+    expect(siteSightRings({ slots: [slot('box', [0, 0, 0], 0, [100, 100, 1600]), slot('box', [0, 0, 1600], 0, [100, 100, 10])] }, 1600)).toHaveLength(2);
+    // From 5 m west of the shed, in the world's metres (z is south): someone inside is seen through
+    // the door, between the two pieces, and not through the wall beside it.
+    const sight = planSight(rings, 500);
+    const eye = { x: 30.4, z: -16.5 };
+    expect(sight.sees(eye, { x: 37.4, z: -16.5 })).toBe(true);
+    expect(sight.sees({ x: 30.4, z: -14.7 }, { x: 37.4, z: -14.7 })).toBe(false);
+    // The crate, 1.2 m high, hides nobody behind it.
+    expect(sight.sees({ x: 28, z: -16.5 }, { x: 32, z: -16.5 })).toBe(true);
+  });
+
+  it('holds no sight for a world about to be mounted, and the world\'s own once it states its plan', () => {
+    const before: Sight = { sees: () => false, reach: () => 0 };
+    const session: { worldSight: Sight | null } = { worldSight: before };
+    const standing = holdSight(session, 500);
+    // The world before is not this one's answer.
+    expect(session.worldSight).toBeNull();
+    standing([HOUSE]);
+    expect(session.worldSight!.sees(eye, { x: 0, z: 40 })).toBe(false);
+    expect(session.worldSight!.sees(eye, { x: 0, z: 20.3 })).toBe(true);
+    expect(session.worldSight!.reach([0, 1.6, 0], [0, 0, 1])).toBeCloseTo(20, 9);
   });
 
   it('hides nothing where the plan is empty', () => {

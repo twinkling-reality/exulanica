@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GeneratedTileHost } from '@exulanica/atlas-react/generated-tile';
 import type { GeneratedSiteMount } from '@exulanica/atlas-react/generated-site';
-import { DRAWING_ASKS, loadSiteWorld, switchableSite, type SiteWorld } from '../src/composition/site-world.js';
+import { DRAWING_ASKS, loadSiteWorld, openSiteWorld, switchableSite, type SiteWorld } from '../src/composition/site-world.js';
 import { redrawWorldLook } from '../src/composition/world-look-redraw.js';
 import { ROOF_FORMS } from '../src/roof-forms.js';
 import { SURFACE_MATERIALS } from '../src/surface-materials.js';
@@ -108,7 +108,7 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** A yard of tilled ground and one plastered wall, in the served shape. */
+/** A yard of tilled ground, one plastered wall and a crate a metre high, in the served shape. */
 const DRAWING = canonical({
   profile: 'exulanica.site-drawing/v1',
   world_id: entry.worldId,
@@ -119,6 +119,7 @@ const DRAWING = canonical({
   slots: [
     { identity: 'ground', part: 'ground', label: 'Ground', lookRole: 'ground.tilled_soil', positionMm: [5000, 5000, 0], yawQuarterTurns: 0, boxMm: [10_000, 10_000, 0], front: '+y', fit: 'surface', primitive: 'plane' },
     { identity: 'wall', part: 'wall', label: 'Wall', lookRole: 'wall.plaster', positionMm: [5000, 8000, 0], yawQuarterTurns: 0, boxMm: [4000, 200, 2400], front: '+y', fit: 'surface', primitive: 'box' },
+    { identity: 'crate', part: 'crate', label: 'Crate', lookRole: 'fixture.crate', positionMm: [2000, 3000, 0], yawQuarterTurns: 0, boxMm: [800, 800, 1000], front: '+y', fit: 'surface', primitive: 'box' },
   ],
   walk: { floorMm: [0, 0, 10_000, 10_000], blockersMm: [], keepOutMm: [] },
   seats: [],
@@ -196,6 +197,29 @@ describe('the look a site world is drawn in', () => {
     const world = await loadSiteWorld(access, entry, () => {}, async () => {}, '?look=today', null);
     expect(world?.look).toEqual({ pack: null, source: 'address', drawn: false, reason: null });
     expect(asked.filter((path) => path.startsWith('/world/style-packs'))).toEqual([]);
+  });
+});
+
+describe('what stands in a sight line in a site world', () => {
+  it('is handed over once when the site opens: the boxes its drawing draws across the eye height it is walked at', async () => {
+    const { fetched } = host();
+    vi.stubGlobal('fetch', fetched);
+    const standing = vi.fn();
+    const shell = document.createElement('div');
+    const mount = await openSiteWorld({ shell } as never, access, entry, null, standing);
+    expect(mount).not.toBeNull();
+    // The yard's one wall, 4 m long and 20 cm thick about (5000, 8000) north, 2.4 m high: east 3000 to
+    // 7000, south -8100 to -7900. The ground under it is a plane and the crate is lower than the eye
+    // a person walks the yard at: neither is part of the plan.
+    expect(standing.mock.calls).toEqual([[[[[3000, -8100], [7000, -8100], [7000, -7900], [3000, -7900]]]]]);
+    // A site that cannot be read hands nothing over (the page says why in words and warns the console).
+    vi.stubGlobal('fetch', vi.fn(async () => refused(404, 'unknown_reference')));
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const none = vi.fn();
+    expect(await openSiteWorld({ shell } as never, access, entry, null, none)).toBeNull();
+    expect(none).not.toHaveBeenCalled();
+    expect(warned).toHaveBeenCalledTimes(1);
+    warned.mockRestore();
   });
 });
 

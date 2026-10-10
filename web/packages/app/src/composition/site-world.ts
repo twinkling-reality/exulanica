@@ -34,7 +34,9 @@ import type { WorldLookChoice } from '../world-look.js';
 import type { SavedWorldEntry } from '../world-entry-api.js';
 import type { WorldStylePackBinding } from '../world-style-api.js';
 import { GENERATED_WORLD_WAITING_ATTRIBUTE } from './generated-world-ready.js';
+import type { SightBlocker } from './arrival-view.js';
 import type { AppEnvironment } from './session-state.js';
+import { siteSightRings } from './sight.js';
 import { WORLD_LOOK_ATTRIBUTE, swappableDrawing, type WorldLookState } from './world-look-redraw.js';
 
 /** How many times the page asks for a drawing the server's kind worker has not finished. */
@@ -191,6 +193,8 @@ export async function openSiteWorld(
   access: Credentials,
   entry: SavedWorldEntry,
   bound: WorldStylePackBinding | null = null,
+  /** Handed the place's plan of what stands in a sight line, once its drawing is read and will be drawn. */
+  standing: (blockers: readonly SightBlocker[]) => void = () => undefined,
 ): Promise<GeneratedSiteMount | null> {
   env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
   const waiting = (): void => {
@@ -204,6 +208,8 @@ export async function openSiteWorld(
     const world = await loadSiteWorld(access, entry, waiting, undefined, undefined, bound);
     env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
     if (world === null) return null;
+    // Every box the drawing draws across the eye height a person walks it at.
+    standing(siteSightRings(world.mount.drawing, world.mount.navigationWorld.eyeHeight * 1000));
     const stated = (look: WorldLookState): void => env.shell.setAttribute(WORLD_LOOK_ATTRIBUTE, JSON.stringify(look));
     stated(world.look);
     return switchableSite(world, stated, env.shell);

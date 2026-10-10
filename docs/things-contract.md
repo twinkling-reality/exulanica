@@ -1283,7 +1283,10 @@ the marks of those standing by it, which it hides for as long.
 What hides a being is the world's own plan, asked one question: how far a sight line runs before
 something stands in it ([`sight.ts`](../web/packages/app/src/composition/sight.ts)). In a town the plan
 is the one its first view is chosen by: every building's base and each trunk and post that crosses a
-standing person's eye height, from the town's own tiles. A being with something of the plan between
+standing person's eye height, from the town's own tiles. In a place made from a world kind it is
+every box the place's drawing draws across that height, turned as it is drawn; walls there are
+pieces with a gap at each door, so a person inside is seen through the door and not through the
+wall beside it. A being with something of the plan between
 it and the viewer wears no mark and no name, its line of speech is not drawn, and a click or an aim
 picks neither it nor a placed thing behind what stands there; it is counted (`hidden` in
 `data-unnamed`). What stands within the first-view catalog's `sight_margin_mm` of a point is the
@@ -1291,12 +1294,13 @@ thing the point is at, so a person in a doorway is seen from in front. Two being
 through a wall, because the person asked to: the picked one and the one the viewer plays keep what
 they wear, drawn in one look that says behind something (faded and flat, `thing-mark-behind`), and
 neither can be picked through the wall nor heard through it. It is the plan's answer and no more:
-a parked vehicle, a bench, a bin, a tree's canopy and another person hide nobody, since none
-crosses eye height in the plan; a town's doorway is not an opening in its building's base, so past
-the margin a person standing inside one is hidden; and it is asked in plan, which is right for a
-viewer on foot. A saved world with no town under it, a made place and a district state no such plan
-to the marks yet, and there a name still shows through a wall; the district's own click already
-stops at its buildings. Nothing is read back from the picture.
+a parked vehicle, a bench, a bin, a tree's canopy, a thing lower than the eye and another person
+hide nobody, since none crosses eye height in the plan; a town's doorway is not an opening in its
+building's base, so past the margin a person standing inside one is hidden; a made place's roof is
+no box, so a ridge that comes down lower than its walls hides nothing more than they do; and it is
+asked in plan, which is right for a viewer on foot. A saved world with no town under it and a
+district state no such plan to the marks yet, and there a name still shows through a wall; the
+district's own click already stops at its buildings. Nothing is read back from the picture.
 
 When a minute takes up a model's decision, what the model chose opens over its name, in the action's
 offered words as the models read serves them ("Chose “walk to the well”."), with what came of it where
