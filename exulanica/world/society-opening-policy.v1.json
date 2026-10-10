@@ -1,0 +1,21 @@
+{
+ "policy_id": "exulanica.society-opening",
+ "version": 1,
+ "default": "on",
+ "values": {
+  "outdoors_share_milli": 150,
+  "minutes_maximum": 60,
+  "seconds_maximum": 5
+ },
+ "classes": {
+  "outdoors_share_milli": "chosen_budget",
+  "minutes_maximum": "chosen_budget",
+  "seconds_maximum": "chosen_budget"
+ },
+ "reasons": {
+  "default": "A society that is made opens awake unless its host says otherwise: a town whose people are brought in is shown with people on its streets. A host sets EXULANICA_SOCIETY_OPENING to off, to on, or to share:minutes:seconds in this file's units, and a hand-built set of services, which states no host, opens nothing.",
+  "outdoors_share_milli": "A new society is advanced, minute by ordinary recorded minute, until at least this share of its people is outdoors, in thousandths. A living town is born with everyone at home for 1 to 45 minutes, so its first minutes show an empty street: on two towns made from a sentence (48 and 52 people, recorded 2026-10-09), nobody was outdoors for the first 4 minutes, 15 percent was first reached at minutes 14 and 17, and the ten minutes after held 8.1 and 8.6 people outdoors with 3.0 and 2.6 walking; 20 percent took until minutes 19 and 31 and 25 percent until 57 and 33, so a higher share buys little and costs minutes. A society whose state does not say who is indoors, or where the share already holds, is advanced by nothing.",
+  "minutes_maximum": "Never more minutes than this, so a society that does not reach the share (a town of three people, a town whose day is set at night) still opens. An hour is past the minute both recorded towns reached 20 percent.",
+  "seconds_maximum": "Never longer than this inside the request that makes the society, read from the server's clock between minutes, so a larger town opens partly awake rather than late. A stored minute of a town of about 60 people took 93 ms (docs/synthetic-society-contract.md, the living town's cost), so a town of about 50 reaches the share in about 2 seconds; the cost at 500 people is not measured."
+ }
+}

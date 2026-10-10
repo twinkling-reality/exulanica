@@ -236,6 +236,19 @@ def test_the_driver_and_its_page_file_name_the_same_words_and_selectors():
     assert not re.search(r"(?:button|buttonStarting|anyWords|shownWords)\('", driver)
 
 
+def test_a_take_waits_for_the_page_s_own_minute_line_whatever_minute_the_society_opened_at():
+    # A society may open awake, at a minute the town decides (the synthetic society contract, "It
+    # opens awake"), so the take waits for the words the page writes before the number, and for no
+    # minute by name.
+    page = json.loads((DEMO / "film_page.json").read_text())
+    line = (ROOT / "web/packages/app/src/ui/world-inhabitants.ts").read_text()
+    started = page["words"]["society_started"]
+    assert started
+    for words in started:
+        assert f"{words}${{snapshot.currentTick}}" in line
+        assert not any(character.isdigit() for character in words)
+
+
 def test_the_driver_opens_a_world_from_the_list_in_one_place_that_waits_for_either():
     # A slow page may open the world before its Open button is looked for, and a take stopped
     # there: the list's Open is clicked in one place, after a wait the open world also ends, and

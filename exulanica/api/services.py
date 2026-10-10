@@ -79,6 +79,13 @@ from exulanica.api.society_control_worker import (
     SocietyControlWorker,
     playback_configuration_sha256,
 )
+from exulanica.api.society_opening import (
+    OPENING_OFF,
+    SOCIETY_OPENING_ENV,
+    SocietyOpening,
+    SocietyOpeningRefused,
+    opening_setting,
+)
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
 from exulanica.consent.place_name_rights import released_place_names
 from exulanica.db.account_workspaces import PacedWorkspaces
@@ -224,6 +231,9 @@ SOCIETY_SETTING_REFUSALS: Final = {
     "society_control_workspaces_not_uuid": "names an entry that is not a workspace id",
     "society_control_workspaces_duplicate": "names a workspace more than once",
     "society_tick_interval_not_integer": "must be a whole number of milliseconds",
+    "society_opening_not_recognised": "must be absent, off, on or share:minutes:seconds",
+    "society_opening_not_whole_numbers": "must state three whole numbers",
+    "society_opening_share_out_of_bounds": "must state a share from 1 to 1000 thousandths",
     "comparison_worker_not_recognised": "must be absent, on, process or off",
     "playback_worker_not_recognised": "must be absent, on, process or off",
     "playback_workers_out_of_bounds": "must be absent or a whole number from 1 to 8",
@@ -389,6 +399,12 @@ class Services:
     #: Whether the routes make a society of things (:data:`SOCIETY_OF_THINGS_ENV`); off for a
     #: hand-built Services, as for a host that does not set it.
     societies_of_things: bool = False
+    #: How a society that is made opens (:data:`SOCIETY_OPENING_ENV`, read by
+    #: :mod:`exulanica.api.society_opening`): advanced until a share of its people is outdoors, or
+    #: not at all. Nothing for a hand-built
+    #: Services, as before the setting existed; ``build_services`` reads the setting, whose default
+    #: is the opening policy's (on).
+    society_opening: SocietyOpening = OPENING_OFF
     #: The development seeds comparisons started from the application run on, in the seed
     #: catalog's order; ``build_services`` takes them from the seed catalog a new comparison is
     #: defined under, which commits their text.
@@ -1340,6 +1356,7 @@ def build_services(
             "society_of_things_not_boolean",
             SOCIETY_OF_THINGS_ENV,
         ),
+        society_opening=_society_opening(env_get("SOCIETY_OPENING", environ)),
         comparison_seeds=development_seeds(load_comparison_catalogs()),
         runs_comparison_worker=comparison_player == "here",
         comparisons_played_elsewhere=comparison_player == "process",
@@ -1571,6 +1588,15 @@ def _playback_workers(value: str | None) -> int:
     return int(text)
 
 
+def _society_opening(value: str | None) -> SocietyOpening:
+    """How this host opens a society that is made, or a named refusal. Absence is the opening
+    policy's own default, read from its file and never restated here."""
+    try:
+        return opening_setting(value)
+    except SocietyOpeningRefused as refused:
+        raise SocietySettingRefused(refused.code, SOCIETY_OPENING_ENV) from None
+
+
 def _society_tick_interval_ms(value: str | None) -> int:
     """The host's base wait between simulated minutes, or a named refusal.
 
@@ -1605,6 +1631,7 @@ def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str
         SOCIETY_CONTROL_WORKER_ENV,
         SOCIETY_CONTROL_WORKSPACES_ENV,
         SOCIETY_TICK_INTERVAL_MS_ENV,
+        SOCIETY_OPENING_ENV,
         API_TOKENS_ENV,
         *AdmissionSettings.variables(),
         env_name(RETAINED_BYTES_SETTING),

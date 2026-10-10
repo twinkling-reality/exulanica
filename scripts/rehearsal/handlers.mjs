@@ -1695,6 +1695,47 @@ async function offerSettled(page, where, what) {
 }
 
 /**
+ * Whether a town's first society stands clear of where a person arrives: `arrivalMm` and every
+ * resident's position are in the one frame a society states, millimetres east and south.
+ *
+ * A society may open awake (docs/synthetic-society-contract.md, "It opens awake"): the first one
+ * read then stands at any minute up to the opening policy's most minutes, and some of its people
+ * have left home. Two things keep people off the arrival, and each is held here. The town chooses
+ * the arrival at least the clearance from every home (exulanica/world/composers/
+ * town-arrival.v1.json), so whoever is at home is that far; and the town's place leaves out the
+ * standing spots nearer than that, so whoever stands outdoors is that far. Whoever is walking
+ * between two points of the street (their location states the edge they are on) may be passing
+ * and is listed, not refused; whoever is indoors somewhere other than home is not on the street.
+ * Every resident states a position, and a town has residents.
+ */
+export function residentsClearOfArrival(society, arrivalMm, clearanceMm, openingMinutesMaximum) {
+  const residents = society?.state?.inhabitants ?? [];
+  const tick = society?.current_tick ?? null;
+  const measured = residents.map((person) => {
+    const location = person.location ?? {};
+    const where = (location.edge ?? null) !== null ? 'walking'
+      : location.indoors !== true ? 'standing'
+        : location.destination_id === (person.home?.destination_id ?? null) ? 'home' : 'indoors';
+    return { id: person.id, where,
+      squared_mm: Array.isArray(person.position_mm) && Array.isArray(arrivalMm)
+        ? (person.position_mm[0] - arrivalMm[0]) ** 2 + (person.position_mm[1] - arrivalMm[1]) ** 2 : null };
+  });
+  const near = (person) => person.squared_mm < clearanceMm * clearanceMm;
+  const placed = measured.every((person) => Number.isInteger(person.squared_mm));
+  const held = measured.filter((person) => person.where === 'standing' || person.where === 'home');
+  const heldNear = placed ? held.filter(near).map((person) => person.id) : [];
+  return {
+    ok: Number.isInteger(tick) && tick >= 0 && tick <= openingMinutesMaximum
+      && Array.isArray(arrivalMm) && residents.length > 0 && placed && heldNear.length === 0,
+    tick,
+    resident_count: residents.length,
+    nearest_held_squared_mm: placed && held.length > 0 ? Math.min(...held.map((person) => person.squared_mm)) : null,
+    held_near: heldNear,
+    passing: placed ? measured.filter((person) => person.where === 'walking' && near(person)).map((person) => person.id) : [],
+  };
+}
+
+/**
  * Every way the offer a person reads departs from the server's read of it: a refusal must be
  * shown in the server's own words with no button; an action must be offered by the button the
  * step names for it, beside the server's counts of composed photographs and places, or, for an
@@ -2783,23 +2824,18 @@ async function peopleCrossTileSeams(ctx) {
   }
   const firstSociety = (await ctx.api('GET', societyPath(entry))).body;
   const servedArrival = entry.generated_ground?.arrival_mm ?? null;
-  // The entry's drawing frame is east/height/south; society positions use east/north.
+  // The entry's drawing frame is east/height/south, and a society states positions east and south.
   const arrivalPlan = Array.isArray(servedArrival) && servedArrival.length === 3
-    ? [servedArrival[0], -servedArrival[2]] : null;
-  const residents = firstSociety?.state?.inhabitants ?? [];
+    ? [servedArrival[0], servedArrival[2]] : null;
   const clearance = ctx.parameters.arrival_clearance_mm;
-  const distances = residents.map((person) => ({ id: person.id,
-    squared_mm: Array.isArray(person.position_mm) && arrivalPlan !== null
-      ? (person.position_mm[0] - arrivalPlan[0]) ** 2 + (person.position_mm[1] - arrivalPlan[1]) ** 2 : null }));
+  const clear = residentsClearOfArrival(firstSociety, arrivalPlan, clearance, ctx.parameters.opening_minutes_maximum);
   ctx.observe('resident-starts-clear-of-arrival', firstSociety?.profile === 'exulanica-society/v5'
     && firstSociety.world_id === entry.world_id && firstSociety.version_id === entry.authored_version_id
-    && firstSociety.region_id === entry.generated_ground?.region_id && firstSociety.current_tick === 0
-    && arrivalPlan !== null && residents.length > 0
-    && distances.every((person) => Number.isInteger(person.squared_mm)
-      && person.squared_mm >= clearance * clearance),
+    && firstSociety.region_id === entry.generated_ground?.region_id && clear.ok,
   { world_id: entry.world_id, version_id: entry.authored_version_id, source_snapshot_id: entry.source_snapshot_id,
-    served_arrival_mm: servedArrival, city_arrival_mm: arrivalPlan, clearance_mm: clearance,
-    resident_count: residents.length, nearest_squared_mm: Math.min(...distances.map((person) => person.squared_mm ?? 0)) });
+    served_arrival_mm: servedArrival, arrival_east_south_mm: arrivalPlan, clearance_mm: clearance,
+    opening_minutes_maximum: ctx.parameters.opening_minutes_maximum, ...pick(clear, ['tick', 'resident_count',
+      'nearest_held_squared_mm', 'held_near', 'passing']) });
   await ctx.screenshot('people-at-arrival', 'the town on the first frame after its residents arrive');
   await page.waitFor(`(() => { const b = ${PLAYBACK}; return b && !b.hidden && !b.disabled ? true : null; })()`, SETTLE_MS, 'Play beside the people');
   if (await page.evaluate(`${PLAYBACK}?.dataset.action`) === 'play') await page.click(PLAYBACK, 'Play');

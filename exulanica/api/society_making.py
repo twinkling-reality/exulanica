@@ -22,6 +22,7 @@ from typing import Any, Final
 from fastapi.responses import JSONResponse
 
 from exulanica.api.services import Services
+from exulanica.api.society_opening import open_awake
 from exulanica.world.errors import UnknownWorldResource
 from exulanica.world.kinds.worker import KindWorkWaiting
 from exulanica.world.object_repository import WorldObjectRepository, version_holds_things
@@ -232,6 +233,10 @@ def make_society(
     its first input and its society are made in one transaction or not at all, so a refusal such
     as nothing reachable leaves nothing behind; every refusal is raised for the caller to answer
     (:func:`society_refusal`).
+
+    A society this call makes is then opened awake, as the host's opening says
+    (:func:`exulanica.api.society_opening.open_awake`): advanced by ordinary recorded minutes until
+    a share of its people is outdoors. One read back is answered as it stands.
     """
     services = hooks.services
     if society_engine(profile).state_family == "things" and not services.societies_of_things:
@@ -273,14 +278,17 @@ def make_society(
             document = provider(connection, session, version_id, place_id, region_id, profile)
         elif place_id is None:
             raise ValueError("a society without inputs needs a place_id")
-        return served_snapshot(
-            repo.create(
-                version_id,
-                place_id=place_id,
-                region_id=region_id,
-                seed=services.society_seed(session.workspace_id, world_id),
-                actor=session.actor,
-                profile=profile,
-                initial_input=document,
-            )
+        created = repo.create(
+            version_id,
+            place_id=place_id,
+            region_id=region_id,
+            seed=services.society_seed(session.workspace_id, world_id),
+            actor=session.actor,
+            profile=profile,
+            initial_input=document,
         )
+    # Made and committed: now opened awake, as this host's opening says (a town's people are on
+    # its streets when it is first shown). A minute refused there never undoes the creation.
+    return served_snapshot(
+        open_awake(repo, version_id, created, services.society_opening, actor=session.actor)
+    )

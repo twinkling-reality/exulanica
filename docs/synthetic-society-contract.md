@@ -1555,6 +1555,31 @@ at work there, so a shop is open while it is staffed and a workplace nobody work
 closed. Every use class the city grammar can give a premises (`assets/catalogs/use-class.v1.json`)
 states its hours (`tests/test_society_living_town.py`).
 
+**It opens awake.** A living town's society is born at the start of its day with everyone at home
+for 1 to 45 minutes, so its first minutes show an empty street. Where a society is made
+(`make_society` in `exulanica/api/society_making.py`, which the society route and an installation's
+arrival worlds both go through), the server therefore advances it at once, minute by ordinary
+minute, until a stated share of its people is outdoors (`open_awake` in
+`exulanica/api/society_opening.py`). Each of those minutes is the repository's own `advance`, the
+call the steps route makes: stored with its events, replayed like any other, decided by the routine
+alone since no model is asked, and written without a playback receipt, so a control set playing
+afterwards has its next minute due at once. A society read back because its version already holds
+one is never advanced again, and a creation is never undone by a minute refused afterwards: the
+society stands wherever it reached. The rule reads the state and no engine's name: a state that
+says for every person whether they are indoors is advanced, and one that does not (a society of
+things, a starter's society) is left at its first minute, as is a place whose people already stand
+outdoors.
+
+The rule is data, `exulanica/world/society-opening-policy.v1.json`: the share to reach (150
+thousandths), the most minutes (60) and the most seconds inside the request (5), each a chosen
+budget with its reason, and a default of on. On two towns made from a sentence (48 and 52 people)
+nobody was outdoors for the first 4 minutes, 15 percent was first reached at minutes 14 and 17, and
+the ten minutes after held 8.1 and 8.6 people outdoors with 3.0 and 2.6 walking. A host changes it
+with `EXULANICA_SOCIETY_OPENING` (`off`, `on`, or `share:minutes:seconds`); a hand-built `Services`
+opens nothing. What a town of 500 costs to open is not measured: the seconds budget bounds it, and
+such a town opens partly awake (`tests/test_society_opening.py`,
+`tests/test_society_opening_postgres.py`).
+
 **A model its owner chose decides for a person** through the person role as registered
 ([decision roles](decision-roles-contract.md)): at the engine's own choice point, when nothing is
 under way for them, the host asks the chosen model to choose among the engine's own answer set for
