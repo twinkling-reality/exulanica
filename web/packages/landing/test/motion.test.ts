@@ -90,7 +90,7 @@ function looping(source: string): ReadonlySet<string> {
 describe('landing motion', () => {
   it('finds the loops it is meant to be checking', () => {
     expect(looping(PAGE)).toEqual(
-      new Set(['nav-edge-color']),
+      new Set(['nav-edge-color', 'companion-breathe', 'menu-companion-blink']),
     );
     expect(looping(ARTWORK)).toEqual(new Set(['gradient-forms-color']));
     expect(looping(FIELD)).toEqual(new Set(['orbit-travel']));

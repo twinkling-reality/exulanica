@@ -75,6 +75,36 @@ describe('the public invitation and navigation', () => {
     expect(chrome.root.querySelector<HTMLElement>('#panel-explore')?.hidden).toBe(true);
   });
 
+  it('moves one decorative companion between measured rows for mouse and keyboard attention', () => {
+    const chrome = setup();
+    const panel = chrome.root.querySelector<HTMLElement>('#panel-explore')!;
+    const track = panel.querySelector<HTMLElement>('.menu-companions')!;
+    const companion = track.querySelector<SVGSVGElement>('svg')!;
+    const first = panel.querySelector<HTMLAnchorElement>('#path-purpose')!;
+    const second = panel.querySelector<HTMLAnchorElement>('#path-capabilities')!;
+    vi.spyOn(track, 'getBoundingClientRect').mockReturnValue(new DOMRect(200, 100, 28, 180));
+    vi.spyOn(first, 'getBoundingClientRect').mockReturnValue(new DOMRect(10, 110, 190, 44));
+    // Unequal row heights exercise layout-driven placement, including a wrapped label.
+    vi.spyOn(second, 'getBoundingClientRect').mockReturnValue(new DOMRect(10, 176, 190, 70));
+    click(chrome.root, 'menu-explore');
+    expect(track.querySelectorAll('svg')).toHaveLength(1);
+    expect(companion.getAttribute('aria-hidden')).toBe('true');
+    expect(companion.dataset.state).toBe('resting');
+    first.focus();
+    expect(companion.style.getPropertyValue('--companion-target-y')).toBe('20px');
+    expect(companion.dataset.state).toBe('attending');
+    second.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+    expect(companion.style.getPropertyValue('--companion-target-y')).toBe('99px');
+    expect(document.activeElement).toBe(first);
+    panel.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse' }));
+    expect(companion.style.getPropertyValue('--companion-target-y')).toBe('20px');
+    second.focus();
+    expect(companion.style.getPropertyValue('--companion-target-y')).toBe('99px');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(companion.dataset.state).toBe('resting');
+    expect(document.activeElement?.id).toBe('menu-explore');
+  });
+
   it('keeps the focused dropdown destination visible when opening another tab or window', () => {
     const chrome = setup();
     click(chrome.root, 'menu-builders');

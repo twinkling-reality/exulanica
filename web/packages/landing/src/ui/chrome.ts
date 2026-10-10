@@ -1,6 +1,8 @@
 /** Public navigation: a home link, three disclosures, and independent utility links. */
 import { el } from './dom.js';
 import { icon } from './icons.js';
+import { createMenuCompanion, type MenuCompanion } from './menu-companion.js';
+import type { CompanionColorVariant } from '@exulanica/presentation/companion';
 import type { Surface } from '../router.js';
 export type { Surface } from '../router.js';
 
@@ -33,7 +35,7 @@ export function buildChrome(): Chrome {
     }, [icon(mark)]));
   }
 
-  let opened: { trigger: HTMLButtonElement; panel: HTMLElement } | null = null;
+  let opened: { trigger: HTMLButtonElement; panel: HTMLElement; companion: MenuCompanion } | null = null;
   const tracked: { link: HTMLAnchorElement; surface: Surface; trigger: HTMLButtonElement }[] = [];
   let closeTimer = 0;
   let openedByHover = false;
@@ -41,10 +43,11 @@ export function buildChrome(): Chrome {
   const close = (restoreFocus = false): void => {
     keepOpen();
     if (!opened) return;
-    const { trigger, panel } = opened;
+    const { trigger, panel, companion } = opened;
     opened = null;
     delete bar.dataset.menuOpen;
     trigger.setAttribute('aria-expanded', 'false');
+    companion.setOpen(false);
     panel.hidden = true;
     document.removeEventListener('pointerdown', outside);
     document.removeEventListener('keydown', escape);
@@ -66,11 +69,14 @@ export function buildChrome(): Chrome {
     }, [el('span', { class: 'nav-marker', 'aria-hidden': 'true' }), el('span', { text: label })]);
     const panel = el('div', { class: 'menu-panel', id: `panel-${key}`, 'aria-labelledby': trigger.id, hidden: '' });
     const links = el('div', { class: 'menu-links' });
-    panel.append(links);
+    const companions = el('div', { class: 'menu-companions', 'aria-hidden': 'true' });
+    panel.append(links, companions);
+    const color: CompanionColorVariant = key === 'builders' ? 'rose' : key === 'resources' ? 'mint' : 'periwinkle';
     for (const item of items) {
       const link = el('a', { class: 'menu-link', href: item.href, 'aria-label': item.label,
-        ...(item.id ? { id: item.id } : {}), text: item.label,
+        ...(item.id ? { id: item.id } : {}),
       });
+      link.append(el('span', { text: item.label }));
       link.addEventListener('click', (event) => {
         // Opening another tab or window leaves this page and its focused link in place.
         if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
@@ -79,15 +85,18 @@ export function buildChrome(): Chrome {
       links.append(link);
       if (item.surface) tracked.push({ link, surface: item.surface, trigger });
     }
+    const companion = createMenuCompanion(panel, Array.from(links.querySelectorAll('a')), color);
+    companions.append(companion.root);
     const open = (hover = false): void => {
       keepOpen();
       if (opened?.trigger === trigger) return;
       close();
-      opened = { trigger, panel };
+      opened = { trigger, panel, companion };
       openedByHover = hover;
       bar.dataset.menuOpen = 'true';
       trigger.setAttribute('aria-expanded', 'true');
       panel.hidden = false;
+      companion.setOpen(true);
       document.addEventListener('pointerdown', outside);
       document.addEventListener('keydown', escape);
     };

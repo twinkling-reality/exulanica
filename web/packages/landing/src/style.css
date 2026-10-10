@@ -70,8 +70,20 @@ a { color: inherit; }
 .nav-sections, .nav-utilities { display: flex; align-items: center; min-width: 0; }
 .nav-sections { gap: 8px; }
 .nav-utilities { justify-content: flex-end; gap: 8px; }
-.utility-link { display: grid; place-items: center; width: 40px; min-height: 44px; color: var(--ink-soft); text-decoration: none; transition: color 180ms ease; }
-.utility-link:hover { color: var(--ink); }
+.utility-link { position: relative; display: grid; place-items: center; width: 40px; min-height: 44px; background: transparent; color: var(--ink-soft); text-decoration: none; transition: color 180ms ease; }
+.utility-link::before {
+  content: ''; position: absolute; width: min(36px, 100%); aspect-ratio: 1;
+  border-radius: 50%; padding: 1px; pointer-events: none;
+  background: linear-gradient(125deg, #6496a6, rgb(168 203 210 / 18%) 48%, rgb(100 150 166 / 65%));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0; transition: opacity 180ms ease;
+}
+.utility-link:is(:hover, :focus-visible) { color: var(--ink); }
+.utility-link:is(:hover, :focus-visible)::before { opacity: 1; }
+.utility-link:focus-visible { outline: none; }
+.utility-link:focus-visible::before { background: var(--focus); padding: 2px; }
 .utility-link .icon { width: 18px; height: 18px; }
 .utility-link .icon-twinkling { width: 23px; height: 23px; }
 /* Noveuis reference: stepped translucent panels and narrow rectangular markers.
@@ -154,7 +166,7 @@ a { color: inherit; }
 .nav-group[data-menu='resources'] .menu-panel::after { transform: scaleX(-1); }
 .menu-links { display: grid; gap: 4px; }
 .menu-link {
-  position: relative; display: flex; align-items: center; min-height: 44px; padding: 8px 12px;
+  position: relative; display: flex; align-items: center; min-height: 44px; padding: 6px 40px 6px 12px;
   text-decoration: none; font-size: 15px; line-height: 1.4; letter-spacing: -.01em; color: #1b3034;
   border-radius: 9px; animation: nav-link-reveal 300ms ease-out both; animation-delay: 50ms;
 }
@@ -169,6 +181,19 @@ a { color: inherit; }
 }
 .menu-link:is(:hover,:focus-visible)::after { opacity: 1; }
 .menu-link[aria-current='page'] { font-weight: 500; }
+.menu-companions { position: absolute; top: 28px; bottom: 32px; right: 22px; width: 28px; pointer-events: none; }
+.menu-companion {
+  position: absolute; top: 0; right: 0; width: 24px; height: 24px; overflow: visible;
+  transform: translate(var(--companion-x, 0px), var(--companion-y, 0px));
+  filter: drop-shadow(0 2px 2px rgb(28 43 69 / .14));
+}
+.menu-companion-drift { transform-origin: 120px 150px; animation: companion-breathe 5.8s ease-in-out infinite; }
+.menu-companion-figure { transform-origin: 120px 150px; transform: rotate(var(--attention-turn, 0deg)); transition: transform 280ms ease-out; }
+.menu-companion-gaze { transform: translate(var(--gaze-x, 0px), var(--gaze-y, 0px)); transition: transform 160ms ease-out; }
+.menu-companion-eyes { transform-box: fill-box; transform-origin: center; animation: menu-companion-blink 6.5s linear infinite; }
+.menu-companion[data-state='attending'] .menu-companion-eyes { animation: none; transform: scaleY(1); }
+@keyframes companion-breathe { 0%, 100% { transform: translateY(0) scale(1); } 48% { transform: translateY(-7px) scale(1.025,1.04); } }
+@keyframes menu-companion-blink { 0%, 43%, 47%, 100% { transform: scaleY(1); } 45% { transform: scaleY(.12); } }
 @keyframes nav-panel-reveal { from { opacity: 0; } to { opacity: 1; } }
 @keyframes nav-link-reveal { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: blur(0); } }
 @keyframes nav-edge-color { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
@@ -441,13 +466,21 @@ section.capability-section .reading-link { margin-top: 0; }
     scroll-behavior: auto !important;
   }
   .hero-content, .menu-panel { animation: none !important; opacity: 1; }
+  .menu-companion-drift, .menu-companion-eyes { animation: none !important; }
+  .menu-companion-figure, .menu-companion-gaze { transform: none; }
+
 }
 @media (forced-colors: active) {
   .menu-panel { border: 1px solid CanvasText; background: Canvas; filter: none; }
   .menu-panel::after { display: none; }
   .nav-marker::before, .nav-marker::after { background: ButtonText; }
   .menu-link { color: LinkText; }
-  .action-label, .action-icon, .utility-link { border: 1px solid ButtonText; }
+  .menu-companion-body { fill: CanvasText; }
+  .menu-companion-sheen { display: none; }
+  .menu-companion-eyes { fill: Canvas; }
+  .action-label, .action-icon { border: 1px solid ButtonText; }
+  .utility-link::before { background: none; mask: none; -webkit-mask: none; border: 1px solid ButtonText; }
+  .utility-link:focus-visible::before { background: none; border-width: 2px; }
   .brand { background: none; color: LinkText; -webkit-text-fill-color: LinkText; }
 }
 
