@@ -268,3 +268,47 @@ def test_place_words_that_cannot_be_said_are_refused_by_name(words, code):
         read_kind(document)
     assert refused.value.code == code
     assert refused.value.where.startswith("society.place_words")
+
+
+@pytest.mark.parametrize("name", ["farm", "cafe", "site"])
+def test_every_piece_of_a_building_states_its_building_and_nothing_else_does(name: str) -> None:
+    _kind, composed = _composed(name)
+    drawing = site_drawing(
+        world_id="world:generated:test",
+        receipt=composed.receipt,
+        receipt_sha256=composed.receipt_sha256,
+        records=composed.records,
+    )
+    slots = drawing["slots"]
+    # The footprint of each building, worked here from the records, not from the drawing.
+    buildings = {
+        record.identity: (record.min_x_mm, record.min_y_mm, record.max_x_mm, record.max_y_mm)
+        for record in composed.records
+        if isinstance(record, SiteStructureRecord)
+    }
+    stated: dict[str, list[dict[str, Any]]] = {identity: [] for identity in buildings}
+    for slot in slots:
+        east, north, _up = slot["positionMm"]
+        inside = [
+            identity
+            for identity, (x0, y0, x1, y1) in buildings.items()
+            if x0 <= east <= x1 and y0 <= north <= y1
+        ]
+        family = slot["lookRole"].split(".")[0]
+        if "structure" in slot:
+            # A piece that states a building stands on that building's own ground.
+            assert slot["structure"] in inside, slot["identity"]
+            assert slot["identity"] != slot["structure"]
+            stated[slot["structure"]].append(slot)
+        elif family in ("roof", "door") or (family == "wall" and inside):
+            # A roof, a door, or a wall on a building's ground that states none would be a piece
+            # the building's own slot could not gather: none may exist.
+            assert not inside, slot["identity"]
+    for identity, pieces in stated.items():
+        own = next(slot for slot in slots if slot["identity"] == identity)
+        assert (own["primitive"], "structure" in own) == ("none", False)
+        families = [piece["lookRole"].split(".")[0] for piece in pieces]
+        assert families.count("roof") == 1 and families.count("door") >= 1
+        assert families.count("wall") >= 4
+    # A place inside one building (the cafe) has no building of its own, so nothing states one.
+    assert bool(buildings) == any("structure" in slot for slot in slots)

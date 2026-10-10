@@ -365,6 +365,7 @@ def site_drawing(
                         "seatHeightMm": min(SEAT_HEIGHT_MAXIMUM_MM, record.height_mm // 2),
                     }
                 )
+    _state_structures(slots, records)
     arrival = receipt["arrival"]
     return {
         "profile": DRAWING_PROFILE,
@@ -398,6 +399,28 @@ def site_drawing(
         },
         "seats": seats,
     }
+
+
+def _state_structures(slots: list[dict[str, Any]], records: Sequence[object]) -> None:
+    """Say, on every slot that is a piece of a building, which building: its walls, lintels and
+    doors, its roof, its rooms' floors and the fixtures in its rooms state ``structure``, the
+    identity of the building's own slot. A pack that fills that slot with one piece for the whole
+    building can then hide or show the building's own pieces together. A slot that belongs to no
+    building (a boundary's wall, a fixture in a zone, the building's own slot) states none."""
+    structures = {r.identity for r in records if isinstance(r, SiteStructureRecord)}
+    rooms = {r.identity: r.structure_identity for r in records if isinstance(r, SiteRoomRecord)}
+    owners: dict[str, str] = dict(rooms)
+    for record in records:
+        if isinstance(record, SiteWallRecord | SiteFixtureRecord):
+            owner = rooms.get(record.owner_identity, record.owner_identity)
+            if owner in structures:
+                owners[record.identity] = owner
+    for slot in slots:
+        record_identity, _, piece = str(slot["identity"]).partition(":")
+        structure = record_identity if piece and record_identity in structures else None
+        structure = owners.get(record_identity, structure)
+        if structure is not None:
+            slot["structure"] = structure
 
 
 def site_drawing_sha256(drawing: Mapping[str, Any]) -> str:

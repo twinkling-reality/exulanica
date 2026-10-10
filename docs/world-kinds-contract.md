@@ -257,7 +257,10 @@ generates again ([`site_drawing.py`](../exulanica/world/site_drawing.py)):
   quarter turns, its box, its front (+y of the slot), its family's fit, the engine's own primitive
   (`box`, `plane`, `gable` or `none`) and, for a surface, a UV frame at physical scale. Surfaces lie
   a few millimetres apart by kind (ground, zone, path, area, floor), so none fights another for the
-  same pixels;
+  same pixels. A slot that is a piece of a building (its walls, lintels and doors,
+  its roof, its rooms' floors and the fixtures in its rooms) states `structure`, the identity of
+  the building's own slot, so a pack that fills that slot with one piece for the whole building
+  can show or hide the building's own pieces together; a slot of no building states none;
 - **walk**: the floor a person exploring stands on and the boxes they keep out of (wall pieces,
   blocking fixtures and water);
 - **seats**: each seat's height;
