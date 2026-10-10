@@ -168,6 +168,12 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
     "exulanica/orchestration/judge_seed.py::_refuse_open_piece_requests [piece_request]": (
         "a seed is the whole workspace, so an open request for any of its worlds refuses it"
     ),
+    "exulanica/world/thing_kind_gone.py::<module> [world_alternate_version_edit]": (
+        "THING_KIND_GONE_SQL is a condition on a placed thing's row, not a statement: it finds the "
+        "one edit that placed the thing by that edit's primary key, and it is read only inside "
+        "statements that name the thing's own world, which "
+        "test_the_kind_gone_condition_is_read_only_inside_statements_that_name_their_world holds"
+    ),
 }
 
 #: Routes whose ``world_id`` parameter a caller may omit.
@@ -518,6 +524,44 @@ def test_every_world_table_statement_names_its_world():
     tables = world_tables_from_migrations() - {REGISTRY_OF_WORLDS}
     found = worldless_queries(python_sources(), tables)
     _only_shrinks(found, ALLOWED_WORLDLESS_QUERIES, "world-table statements naming no world")
+
+
+def kind_gone_readers(sources: Iterable[Source]) -> dict[str, list[str]]:
+    """Every statement that reads the kind-gone condition (an f-string holding
+    ``THING_KIND_GONE_SQL``), by where it stands, with its text as the scans read one."""
+    found: dict[str, list[str]] = {}
+    for source in sources:
+        parents = _parents(source.tree)
+        for node in ast.walk(source.tree):
+            if not isinstance(node, ast.Name) or node.id != "THING_KIND_GONE_SQL":
+                continue
+            if not isinstance(node.ctx, ast.Load):
+                continue
+            statement: ast.AST = node
+            while isinstance(
+                parents.get(statement), (ast.FormattedValue, ast.JoinedStr, ast.BinOp)
+            ):
+                statement = parents[statement]
+            key = f"{source.name}::{_qualname(node, parents)}"
+            found.setdefault(key, []).append(_flatten(statement))
+    return found
+
+
+def test_the_kind_gone_condition_is_read_only_inside_statements_that_name_their_world():
+    """The condition names a world table and no world (it is allowlisted above for that), so
+    every statement it is read into must name the world itself. The positive control is the four
+    statements that read it today: a scan that finds none of them proves nothing."""
+    readers = kind_gone_readers(python_sources())
+    assert sorted(readers) == [
+        "exulanica/world/object_repository.py::WorldObjectRepository._things",
+        "exulanica/world/object_repository.py::version_holds_things",
+        "exulanica/world/society_repository.py::SocietyRepository._any_kind_gone",
+        "exulanica/world/society_repository.py::SocietyRepository._holds_a_gone_kind",
+    ]
+    for where, statements in readers.items():
+        for text in statements:
+            assert re.search(r"\bt\.world_id\b", text), f"{where} reads it and names no world"
+            assert "world_alternate_thing t" in text, f"{where} reads it over another row"
 
 
 def test_every_route_requires_the_world_it_names():
