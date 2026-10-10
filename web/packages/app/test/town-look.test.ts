@@ -20,6 +20,9 @@ const listed = vi.hoisted(() => ({ packs: [] as ListedStylePack[] }));
 vi.mock('../src/world-look.js', async (original) => ({
   ...await original<typeof import('../src/world-look.js')>(),
   listedStylePacks: async () => listed.packs,
+  // The library also reads the host's named setting parts; this file is about the look, so the
+  // host lists none. Left unstubbed, that read went to the real network for exulanica.test.
+  listedSettings: async () => null,
   stylePackContent: async () => new Uint8Array([1, 2, 3]),
 }));
 const { readLookLibrary } = await import('../src/composition/look-library.js');
