@@ -315,6 +315,8 @@ export interface MountedEnvironmentSelection {
 export const PAUSED_ARRIVAL_HINT = 'The world is paused. Press Play to let it run.';
 /** Said with it where nothing is placed and nobody is in sight yet (the people are out in the town). */
 export const PEOPLE_OUT_OF_SIGHT = 'People are out in the town: open People to find them.';
+/** Said in its place where the state says nobody is outdoors: the streets are empty because everyone is inside. */
+export const PEOPLE_ALL_INDOORS = 'Everyone is indoors just now: open People to see where they are.';
 
 /** What the world clock shows: the saved playback control and whether a request is in flight. */
 export interface PeopleClock {
@@ -870,7 +872,8 @@ export function mountEnvironmentSelection(
    * The arrival line: what a person first needs to know about a world they open, held until it is no
    * longer true. A world with people in it that opens paused says how to let it run, until it plays (once
    * this browser has seen it play, not again); a world with nothing placed whose people are all out of
-   * sight says where they are, until somebody comes near. It never plays the world by itself.
+   * sight says where they are, out in the town or, where the state says so, all indoors, until
+   * somebody comes near. It never plays the world by itself.
    */
   function arrivalLine(worldId: string): void {
     const key = `exulanica.paused-hint.${worldId}`;
@@ -882,7 +885,10 @@ export function mountEnvironmentSelection(
     const paused = peopleHere && societyControl?.mode === 'paused' && societyControl.playEligible && !played();
     const nothingPlaced = (current?.things ?? []).every((thing) => thing.removed);
     const outOfSight = peopleHere && nothingPlaced && !somebodyNear;
-    const line = [paused ? PAUSED_ARRIVAL_HINT : null, outOfSight ? PEOPLE_OUT_OF_SIGHT : null]
+    // Where the state says who is indoors and that is everyone, nobody is out in the town to find.
+    const somebodyOutdoors = peopleHere && society!.state.inhabitants.some((person) => person.indoors !== true);
+    const whereTheyAre = somebodyOutdoors ? PEOPLE_OUT_OF_SIGHT : PEOPLE_ALL_INDOORS;
+    const line = [paused ? PAUSED_ARRIVAL_HINT : null, outOfSight ? whereTheyAre : null]
       .filter((part) => part !== null).join(' ') || null;
     if (line === arrivalHeld) return;
     arrivalHeld = line;

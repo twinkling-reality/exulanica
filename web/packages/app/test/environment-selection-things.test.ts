@@ -110,7 +110,7 @@ const thingsSociety = (): SocietySnapshot => parseSociety({
   },
 });
 
-function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean } = {}) {
+function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; readonly everyoneIndoors?: boolean } = {}) {
   const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
   const regionEntity = { name: 'authored-region:region:starter' };
   const crowd = {
@@ -136,7 +136,13 @@ function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean } 
     memoryLayerVisible: false, onMemoryLayerChange: null,
   };
   const societyClient = {
-    read: vi.fn(async () => { if (!withSociety) throw missing(); return thingsSociety(); }),
+    read: vi.fn(async () => {
+      if (!withSociety) throw missing();
+      const read = thingsSociety();
+      if (scene.everyoneIndoors !== true) return read;
+      // As a state that says who is indoors reaches the page: every one of its people inside.
+      return { ...read, state: { ...read.state, inhabitants: read.state.inhabitants.map((person) => ({ ...person, indoors: true })) } };
+    }),
     create: vi.fn(), connect: vi.fn(), advance: vi.fn(), events: vi.fn(async () => []),
   };
   const control = (mode: 'paused' | 'playing' = 'paused') => parseSocietyControl({
@@ -332,6 +338,17 @@ describe('a saved world\'s placed things', () => {
       'The world is paused. Press Play to let it run. People are out in the town: open People to find them.');
     mounted.dispose();
     expect(holdStatus).toHaveBeenLastCalledWith(null);
+  });
+
+  it('says everyone is indoors, not out in the town, where the state says nobody is outdoors', async () => {
+    window.localStorage.clear();
+    const { mounted, holdStatus } = mount(true, { nothingPlaced: true, everyoneIndoors: true });
+    await mounted.begin();
+    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(holdStatus).toHaveBeenLastCalledWith(
+      'The world is paused. Press Play to let it run. Everyone is indoors just now: open People to see where they are.');
+    expect(holdStatus).not.toHaveBeenCalledWith(expect.stringContaining('People are out in the town'));
+    mounted.dispose();
   });
 
   it('takes the paused line away as soon as the world plays, by the Play write itself', async () => {

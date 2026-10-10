@@ -159,7 +159,9 @@ is near. A world with people in it that opens paused keeps "The world is paused.
 run." in the status place until it plays or closes, and once a browser has seen the world play the line is
 not said for it again; the world never plays by itself. Where nothing is placed in it and none of its
 people is in sight yet, the same line adds "People are out in the town: open People to find them." until
-somebody comes near.
+somebody comes near; where the society's state says every one of them is indoors, it adds "Everyone is
+indoors just now: open People to see where they are." instead, so the line never sends a person looking
+for people who are not on the streets.
 
 ### Your worlds and Create a world
 
