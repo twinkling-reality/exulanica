@@ -1585,6 +1585,44 @@ the fastest cadence (1,000 ms base interval, speed 4), the API's health check to
 95th percentile, where it took 7.3 ms with the town paused: the society host shares the API
 process.
 
+## A town's people as a document
+
+Who a town's residents are is data of the town, whichever engine its society runs.
+`exulanica.town-people/v1` (`exulanica/world/town_people.py`) states it and nothing an engine
+keeps for itself: each resident by ordinal with their home and household, their job or none (the
+premises, the position, and the shift that position works with the person's own start), their
+role by key and label, and why they hold that job or none (`works_at_premises`, `keeps_no_job`,
+`no_open_position`, or `lives_at_premises` where the place offers no position at all). It names no
+person: a name belongs to the world's style.
+
+A home or a workplace is named by the subject its place states for it
+(`city.premises:<identity>`, or `site.structure:<identity>` for a site's structure), never by an
+engine's destination or target id, and each premises a person may live or work at is described
+once: its use class, label and address number, the node its door stands at, the places in a home
+it offers and its positions with the shift each works. A reader therefore says "the bakery at
+number 12" from the document alone.
+
+The document names the rule that made it, the routine it was made under by its binding (catalog
+versions, digest and any overlay), the place it was made over by id and digest, and the minute
+its day starts at. It holds the outcomes of the seed's draws and never the seed, and is canonical
+JSON named by `document_sha256`, the SHA-256 of every other key. Its origin is `derived`: made by
+a rule from the town's records and a seed. Its profile grows only by optional fields.
+
+`exulanica.town-people-rule/v1` is the living town's assignment, draw for draw: one resident in
+each place in a home in premises order, a seeded order of the residents cut to the routine's
+employment share taking the positions workplace-first, each position working the shift its use
+class names for it in turn. `tests/test_town_people.py` holds every person of the document to
+the person the living town's genesis makes over shipped towns, seeds and populations, and works a
+town of six from the catalogs and the draws alone. `validate_town_people` refuses, as
+`malformed_people`, a document whose keys are not exactly the profile's, whose people or premises
+are out of order, that houses more people in a home than it has places, that gives two people one
+position or a person another position's shift, or whose digest does not name it.
+
+**Implemented boundary.** The document, its rule and its check are built. No society input
+carries one: the living town makes the same people at its genesis and reads no document, and a
+society of things makes its villagers by the purposeful genesis, with a role word and no home or
+job in the town.
+
 ## The society of things (v7)
 
 The society of things (`exulanica/world/society_things.py`) is the purposeful society where
