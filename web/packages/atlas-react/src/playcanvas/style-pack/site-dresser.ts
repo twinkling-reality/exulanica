@@ -5,6 +5,7 @@ import {
 } from '@exulanica/atlas-core';
 import type { SiteDrawing, SiteSlot } from '../generated-site/site-drawing.js';
 import type { SiteDresser } from '../generated-site/site-mount.js';
+import { SCENERY_STONES, SCENERY_TREES } from '../generated-site/site-scenery.js';
 import { attachTileInk } from '../generated-tile/ink.js';
 import type { RenderShading } from '../generated-tile/look.js';
 import { applyShading } from '../generated-tile/shading.js';
@@ -81,6 +82,8 @@ export interface SiteDressingSummary {
   readonly undressed: number;
   /** Ink segments drawn, when the shading draws ink. */
   readonly inkSegments: number;
+  /** Pieces of the pack standing as scenery beyond the place (its own tree at each tree); 0 where it has none. */
+  readonly sceneryPieces: number;
 }
 
 /**
@@ -88,6 +91,9 @@ export interface SiteDressingSummary {
  * slot facing north turns 0, west 1, south 2 and east 3.
  */
 const FRONTS: readonly (readonly [number, number])[] = Object.freeze([[0, 1], [-1, 0], [0, -1], [1, 0]]);
+
+/** The look role a tree of the scenery beyond a place is dressed by: the pack's plant, whatever its leaf. */
+const SCENERY_TREE_ROLE = 'plant.tree';
 
 /** The pack as a site may draw it: its surfaces that are swatches, every texture set left out. */
 function swatchesOnly(pack: ResolvedStylePack): ResolvedStylePack {
@@ -120,7 +126,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     const material = materialOfLeaf(catalog, slot.family, slot.leaf);
     return material === null ? null : patterns.byMaterial.get(material.key) ?? null;
   };
-  return (host, drawn, drawing: SiteDrawing) => {
+  return (host, drawn, drawing: SiteDrawing, scenery = null) => {
     const device = host.app.graphicsDevice;
     const made: pc.StandardMaterial[] = [];
     const replaced: (readonly [pc.MeshInstance, pc.Material])[] = [];
@@ -224,6 +230,34 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       undressed += 1;
     }
 
+    // Scenery beyond the place: the pack's own tree stands at each tree where the pack has one, in
+    // its own mesh beside the site's (it is none of the site's slots, and far trees are not inked);
+    // plain trees the pack cannot stand in, and stones, keep their plain shapes in the pack's shading.
+    let sceneryPieces: ReturnType<typeof dressSlots> | null = null;
+    if (scenery !== null) {
+      const trees = scenery.root.findByName(SCENERY_TREES) as pc.Entity | null;
+      const stones = scenery.root.findByName(SCENERY_STONES) as pc.Entity | null;
+      if (trees !== null && scenery.root.parent !== null) {
+        const standingTrees = scenery.pieces.map((piece): PieceSlot => ({
+          identity: `site-scenery:${piece.identity}`,
+          lookRole: SCENERY_TREE_ROLE,
+          positionMm: [piece.xMm, piece.yMm, 0],
+          front: FRONTS[piece.quarterTurns]!,
+          boxMm: [piece.widthMm, piece.widthMm, piece.heightMm],
+        }));
+        const stood = dressSlots(scenery.root.parent as pc.Entity, standingTrees, pack, families, pieces, shading);
+        if (stood.undressed.length === 0 && stood.placed > 0) {
+          sceneryPieces = stood;
+          hidden.push([trees, trees.enabled]);
+          trees.enabled = false;
+        } else {
+          stood.dispose();
+          wear(trees, SCENERY_TREES, shaded);
+        }
+      }
+      if (stones !== null) wear(stones, SCENERY_STONES, shaded);
+    }
+
     const ink = shading.ink === null ? null : attachTileInk(device, drawn.root, shading.ink, undefined, ['']);
     const unknown = [...unknownLooks].sort();
     const canvas = device.canvas as HTMLCanvasElement | undefined;
@@ -232,6 +266,8 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       canvas.dataset['siteUnknownLooks'] = JSON.stringify(unknown);
       canvas.dataset['sitePatterned'] = String(patterned);
     }
+    // How many of the scenery's pieces are the pack's own, said beside what the mount says of it.
+    if (sceneryPieces !== null && canvas?.dataset !== undefined) canvas.dataset['siteSceneryPieces'] = String(sceneryPieces.placed);
     dressing.told?.({
       surfaces,
       materials,
@@ -241,6 +277,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       placed: placed.placed,
       undressed,
       inkSegments: ink?.segments ?? 0,
+      sceneryPieces: sceneryPieces?.placed ?? 0,
     });
 
     let undone = false;
@@ -252,7 +289,9 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         delete canvas.dataset['siteUnknownLooks'];
         delete canvas.dataset['sitePatterned'];
       }
+      if (sceneryPieces !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteSceneryPieces'];
       ink?.dispose();
+      sceneryPieces?.dispose();
       placed.dispose();
       for (const [entity, enabled] of hidden.splice(0).reverse()) entity.enabled = enabled;
       for (const [instance, material] of replaced.splice(0).reverse()) instance.material = material;

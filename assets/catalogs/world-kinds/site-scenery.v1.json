@@ -1,0 +1,79 @@
+{
+ "schema_version": 1,
+ "catalog_id": "site-scenery",
+ "catalog_version": 1,
+ "entries": [
+  {
+   "key": "forest_floor",
+   "stands": "tree",
+   "spacing_mm": 7000,
+   "from_mm": 3000,
+   "edge_thin_mm": 24000,
+   "to_mm": 160000,
+   "near_keep_permille": 900,
+   "far_keep_permille": 350,
+   "height_mm": [
+    5000,
+    9000
+   ],
+   "width_permille": 550,
+   "most": 1200,
+   "reason": "Authored: a place whose ground is a forest's floor stands in a forest. Trees stand beyond its rectangle about seven metres apart, the spacing of a grown wood a person can walk through, from three metres past the edge so no crown overhangs the place, thinning toward the place over the first 24 m so its edge reads as a clearing's ragged edge and not a wall of trunks along a straight line, and thinning again far out, where a tree is a few pixels and the row in front hides most of the row behind. Each is 5 to 9 m tall and a little over half as wide, the proportion of the packs' own tree. The count is a rendering budget and no fact of any world: at most 1,200, nearest first, which is 216,000 triangles of the packs' 180 triangle tree in one draw. Each figure is a chosen default, picked by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "sand",
+   "stands": "stone",
+   "spacing_mm": 19000,
+   "from_mm": 2000,
+   "edge_thin_mm": 0,
+   "to_mm": 220000,
+   "near_keep_permille": 420,
+   "far_keep_permille": 420,
+   "height_mm": [
+    300,
+    1300
+   ],
+   "width_permille": 2200,
+   "most": 300,
+   "reason": "Authored: open sand is not empty to the horizon; stones lie on it here and there. A low stone, 30 cm to 1.3 m high and a little over twice as wide (the first figures, 25 to 90 cm, were specks from any distance on a frame), lies beyond a sandy place's rectangle in fewer than half of squares 19 m across, out to 220 m, where one is a pixel high. No dune is drawn: a dune is a shape of the ground, and a mound standing on a flat plane reads as an object. The count is a rendering budget: at most 300, nearest first. Each figure is a chosen default, picked by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "grass",
+   "stands": "tree",
+   "spacing_mm": 26000,
+   "from_mm": 6000,
+   "edge_thin_mm": 0,
+   "to_mm": 240000,
+   "near_keep_permille": 380,
+   "far_keep_permille": 380,
+   "height_mm": [
+    5000,
+    8000
+   ],
+   "width_permille": 550,
+   "most": 220,
+   "reason": "Authored: open grass has a tree here and there, never a wood. A tree stands beyond a grassy place's rectangle in under four of ten squares 26 m across, from six metres past the edge out to 240 m, so the land round the place reads as country and the horizon is not a ruled line. The count is a rendering budget: at most 220, nearest first. Each figure is a chosen default, picked by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  }
+ ]
+}

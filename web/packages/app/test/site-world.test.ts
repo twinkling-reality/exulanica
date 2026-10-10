@@ -7,6 +7,7 @@ import type { GeneratedSiteMount } from '@exulanica/atlas-react/generated-site';
 import { DRAWING_ASKS, loadSiteWorld, openSiteWorld, switchableSite, type SiteWorld } from '../src/composition/site-world.js';
 import { redrawWorldLook } from '../src/composition/world-look-redraw.js';
 import { ROOF_FORMS } from '../src/roof-forms.js';
+import { SITE_SCENERY } from '../src/site-scenery.js';
 import { SURFACE_MATERIALS } from '../src/surface-materials.js';
 import { STYLE_PACK_LIST_PROFILE, type WorldLookChoice } from '../src/world-look.js';
 import type { SavedWorldEntry } from '../src/world-entry-api.js';
@@ -149,15 +150,15 @@ function committedLibrary(): { list: unknown; content: Map<string, Uint8Array<Ar
   return { list: { profile: STYLE_PACK_LIST_PROFILE, packs }, content };
 }
 
-/** A host serving the drawing and, unless `listStatus` says otherwise, the committed packs. */
-function host(listStatus = 200) {
+/** A host serving a drawing (the yard's unless another is given) and, unless `listStatus` says otherwise, the committed packs. */
+function host(listStatus = 200, served: string = DRAWING) {
   const library = committedLibrary();
   const asked: string[] = [];
   const fetched = vi.fn(async (input: string): Promise<Response> => {
     const path = input.slice(access.baseUrl.length);
     asked.push(path);
     if (path.startsWith('/world/versions/')) {
-      return new Response(DRAWING, { status: 200, headers: { ETag: `"${sha256(new TextEncoder().encode(DRAWING))}"` } });
+      return new Response(served, { status: 200, headers: { ETag: `"${sha256(new TextEncoder().encode(served))}"` } });
     }
     if (path === '/world/style-packs') return new Response(JSON.stringify(library.list), { status: listStatus });
     const digest = /^\/world\/style-packs\/([0-9a-f]{64})$/.exec(path)?.[1];
@@ -180,6 +181,8 @@ describe('the look a site world is drawn in', () => {
     expect(SURFACE_MATERIALS.materials.some((material) => material.key === 'sand')).toBe(true);
     // And the roof forms a roof is shaped by, through its material.
     expect(options.roofForms).toBe(ROOF_FORMS);
+    // And the scenery catalog, so what stands beyond a place is drawn in the pack's look too.
+    expect((options as { scenery?: unknown }).scenery).toBe(SITE_SCENERY);
     expect(ROOF_FORMS.byMaterial.get('canvas')?.ridge?.eaves).toBe('ground');
   });
 
@@ -188,7 +191,7 @@ describe('the look a site world is drawn in', () => {
     const world = await loadSiteWorld(access, entry, () => {}, async () => {}, '', null);
     expect(world?.look).toEqual({ pack: 'exulanica.cozy-town', source: 'default', drawn: false, reason: 'The style pack list unavailable: HTTP 503' });
     // With no pack the engine's own colours are still read from the catalog, leaf by leaf.
-    expect(mounts.asked.at(-1)).toEqual({ servedBytes: new TextEncoder().encode(DRAWING).byteLength, materials: SURFACE_MATERIALS, roofForms: ROOF_FORMS });
+    expect(mounts.asked.at(-1)).toEqual({ servedBytes: new TextEncoder().encode(DRAWING).byteLength, materials: SURFACE_MATERIALS, roofForms: ROOF_FORMS, scenery: SITE_SCENERY });
   });
 
   it('is the tile look, with no pack read, when the address asks for today\'s look', async () => {
@@ -212,6 +215,17 @@ describe('what stands in a sight line in a site world', () => {
     // 7000, south -8100 to -7900. The ground under it is a plane and the crate is lower than the eye
     // a person walks the yard at: neither is part of the plan.
     expect(standing.mock.calls).toEqual([[[[[3000, -8100], [7000, -8100], [7000, -7900], [3000, -7900]]]]]);
+    // The same yard on a forest's floor has trees beyond it (the scenery catalog names them for that
+    // ground). They are scenery and no part of the place: what stands in a sight line is the same wall
+    // and nothing more, so no tree hides a person or stops a click.
+    const wooded = DRAWING.replace('ground.tilled_soil', 'ground.forest_floor');
+    expect(wooded).not.toBe(DRAWING);
+    vi.stubGlobal('fetch', host(200, wooded).fetched);
+    const inAWood = vi.fn();
+    const forestMount = await openSiteWorld({ shell } as never, access, entry, null, inAWood);
+    expect(forestMount).not.toBeNull();
+    expect(mounts.asked.at(-1)).toMatchObject({ scenery: SITE_SCENERY });
+    expect(inAWood.mock.calls).toEqual(standing.mock.calls);
     // A site that cannot be read hands nothing over (the page says why in words and warns the console).
     vi.stubGlobal('fetch', vi.fn(async () => refused(404, 'unknown_reference')));
     const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined);

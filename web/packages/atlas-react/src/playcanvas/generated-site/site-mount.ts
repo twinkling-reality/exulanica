@@ -1,4 +1,4 @@
-import { materialOfLeaf, unknownSurfaceLeaf, type RoofForms, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { materialOfLeaf, unknownSurfaceLeaf, type RoofForms, type SiteSceneryCatalog, type SurfaceMaterials } from '@exulanica/atlas-core';
 import type * as pc from 'playcanvas';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
 import { applyTileEnvironment } from '../generated-tile/environment.js';
@@ -6,6 +6,7 @@ import { TILE_LOOK_V1, type TileLook } from '../generated-tile/look.js';
 import type { SiteDrawing, SiteSlot } from './site-drawing.js';
 import { siteNavigationWorld, siteStart } from './site-navigation.js';
 import { drawSiteSlots, type DrawnSiteSlots } from './site-primitives.js';
+import { drawSiteScenery, sceneryOf, type DrawnScenery } from './site-scenery.js';
 
 /**
  * A world made from a world kind, ready for the binding: where a person walks, where they open and
@@ -36,7 +37,7 @@ export interface GeneratedSiteMount extends GeneratedTileMount {
  * disposer, which runs before the slots are taken away and puts back everything it changed. It
  * never changes a slot, the walk or the seats; the mount stays the one owner of its entities.
  */
-export type SiteDresser = (host: GeneratedTileHost, drawn: DrawnSiteSlots, drawing: SiteDrawing) => () => void;
+export type SiteDresser = (host: GeneratedTileHost, drawn: DrawnSiteSlots, drawing: SiteDrawing, scenery?: DrawnScenery | null) => () => void;
 
 export interface SiteMountOptions {
   /** The bytes the drawing was served as, which the attachment reports as transferred. */
@@ -52,6 +53,13 @@ export interface SiteMountOptions {
   readonly materials?: SurfaceMaterials;
   /** The roof form catalog a roof is shaped by, through its material; none draws every roof as served. */
   readonly roofForms?: RoofForms;
+  /**
+   * The scenery catalog: what stands on the ground beyond the place, by its base ground's material
+   * (`site-scenery.ts`). It needs `materials` to name that material; none, or no `materials`, draws
+   * the ground beyond bare, and a look with no ground beyond (the tile look) has nothing for it to
+   * stand on and draws none. Scenery is drawn beside the site's slots and is none of them.
+   */
+  readonly scenery?: SiteSceneryCatalog;
 }
 
 /**
@@ -86,10 +94,18 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       const materials = options.materials ?? null;
       const slots = drawSiteSlots(host.app.graphicsDevice, drawing, materials, options.roofForms ?? null);
       host.environmentRoot.addChild(slots.root);
-      const undress = options.dress?.(host, slots, drawing) ?? null;
+      const base = drawing.extent.enclosure === 'open' ? baseGroundSlot(drawing) : null;
+      // What stands beyond the place: scenery, beside the site's slots in the same frame and none of
+      // them, so nothing that reads or outlines the slots meets it. The dresser is handed it to
+      // shade, or to stand its own trees in.
+      // It stands on the ground beyond: a look that draws no ground beyond the place draws none.
+      const standing = options.scenery === undefined || materials === null || environment.ground === null
+        ? null : sceneryOf(drawing, base, options.scenery, materials);
+      const scenery = standing === null || standing.pieces.length === 0 ? null : drawSiteScenery(host.app.graphicsDevice, standing, materials);
+      if (scenery !== null) host.environmentRoot.addChild(scenery.root);
+      const undress = options.dress?.(host, slots, drawing, scenery) ?? null;
       // The ground beyond: the look's own plane, drawn in what the dressed base ground is drawn in.
       const beyond = environment.ground?.render?.meshInstances[0] ?? null;
-      const base = drawing.extent.enclosure === 'open' ? baseGroundSlot(drawing) : null;
       const baseShape = base === null ? null : (slots.entities.get(base.identity)?.findByName(`${base.identity}:shape`) as pc.Entity | null);
       const worn = baseShape?.render?.meshInstances[0]?.material ?? null;
       const edged = beyond !== null && worn !== null && environment.ground !== null;
@@ -100,6 +116,10 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       }
       const canvas = host.app.graphicsDevice.canvas as HTMLCanvasElement | undefined;
       if (edged && canvas?.dataset !== undefined) canvas.dataset['siteGroundBeyond'] = base!.lookRole;
+      // What stands beyond, said on the canvas: what, how many, and beyond which ground.
+      if (scenery !== null && canvas?.dataset !== undefined) {
+        canvas.dataset['siteScenery'] = JSON.stringify({ stands: scenery.stands, beyond: scenery.material, pieces: scenery.pieces.length });
+      }
       const said = options.dress === undefined && materials !== null && canvas?.dataset !== undefined;
       if (said) {
         const drawn = drawing.slots.filter((slot) => slots.entities.has(slot.identity));
@@ -128,7 +148,9 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
             delete canvas.dataset['siteMaterials'];
             delete canvas.dataset['siteUnknownLooks'];
           }
+          if (scenery !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteScenery'];
           undress?.();
+          scenery?.destroy();
           slots.destroy();
           environment.dispose();
         },

@@ -14,10 +14,10 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import {
-  readStylePackManifest, readSurfaceMaterials, readSurfacePatterns, resolveStylePack,
-  type LookFamily, type ResolvedStylePack, type StylePackFile, type SurfaceMaterials, type SurfacePatterns,
+  readSiteScenery, readStylePackManifest, readSurfaceMaterials, readSurfacePatterns, resolveStylePack, sceneryBeyond,
+  type LookFamily, type ResolvedStylePack, type SiteSceneryCatalog, type StylePackFile, type SurfaceMaterials, type SurfacePatterns,
 } from '@exulanica/atlas-core';
-import { parseSiteDrawing, siteMount, type SiteDrawing } from '../src/playcanvas/generated-site/index.js';
+import { baseGroundSlot, parseSiteDrawing, sceneryOf, siteMount, siteNavigationWorld, type SiteDrawing } from '../src/playcanvas/generated-site/index.js';
 import type { RenderShading } from '../src/playcanvas/generated-tile/look.js';
 import { fetchPackPieces, packSiteDresser, type FetchedPieces, type SiteDressingSummary } from '../src/playcanvas/style-pack/index.js';
 import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
@@ -34,6 +34,7 @@ const families = new Map<string, LookFamily>(CATALOG.entries.map((entry) => [ent
 
 const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-kinds/surface-material.v2.json', 'utf8'));
 const PATTERNS = readSurfacePatterns(readFileSync('../assets/catalogs/world-kinds/surface-pattern.v1.json', 'utf8'));
+const SCENERY = readSiteScenery(readFileSync('../assets/catalogs/world-kinds/site-scenery.v1.json', 'utf8'));
 /** The colour chunk a material was given, or undefined where it draws its plain colour. */
 const colourChunk = (material: pc.Material): string | undefined => (material as pc.StandardMaterial).getShaderChunks(pc.SHADERLANGUAGE_GLSL).get('diffusePS') as string | undefined;
 const colourOf = (key: string): number[] => [...MATERIALS.materials.find((material) => material.key === key)!.swatch.srgb8];
@@ -92,17 +93,21 @@ function paletteGlb(quads: readonly { points: number[][]; normal: number[]; srgb
 const DOOR = paletteGlb([{ points: [[-0.5, 0, 0.09], [0.5, 0, 0.09], [0.5, 2.1, 0.09], [-0.5, 2.1, 0.09]], normal: [0, 0, 1], srgb: OAK }]);
 /** A fence panel 2 m long and 1 m tall. */
 const FENCE = paletteGlb([{ points: [[-1, 0, 0], [1, 0, 0], [1, 1, 0], [-1, 1, 0]], normal: [0, 0, 1], srgb: OAK }]);
-const PIECES: Readonly<Record<string, Uint8Array<ArrayBuffer>>> = { 'pieces/door.glb': DOOR, 'pieces/fence.glb': FENCE };
+/** A tree as a town pack's is sized, 3.2 m across and 5.8 m tall: one green quad. */
+const LEAF = [70, 110, 60] as const;
+const TREE = paletteGlb([{ points: [[-1.6, 0, 0], [1.6, 0, 0], [1.6, 5.8, 0], [-1.6, 5.8, 0]], normal: [0, 0, 1], srgb: LEAF }]);
+const PIECES: Readonly<Record<string, Uint8Array<ArrayBuffer>>> = { 'pieces/door.glb': DOOR, 'pieces/fence.glb': FENCE, 'pieces/tree.glb': TREE };
 
 /**
  * The readers' complete case with this site's dressing: swatches for ground, walls and roofs, a
  * texture set for one wall leaf, and pieces for doors and boundaries; nothing for fixtures.
  */
-function sitePack(): ResolvedStylePack {
+function sitePack(plant = false): ResolvedStylePack {
   const manifest = structuredClone(CASES.cases.find((c: { name: string }) => c.name === 'a complete pack with no base').manifest);
   manifest['palette'].swatches.push(
     { key: 'soil', srgb8: [...SOIL], roughness_permille: 900, metalness_permille: 0, emission_permille: 0 },
     { key: 'oak', srgb8: [...OAK], roughness_permille: 700, metalness_permille: 0, emission_permille: 0 },
+    ...(plant ? [{ key: 'leaf', srgb8: [...LEAF], roughness_permille: 900, metalness_permille: 0, emission_permille: 0 }] : []),
   );
   manifest['surfaces'] = {
     'ground.default': { swatch: 'soil', up: null },
@@ -115,8 +120,10 @@ function sitePack(): ResolvedStylePack {
   manifest['modules'] = {
     'boundary.default': { variants: [{ file: 'pieces/fence.glb', lod1: null, size_mm: [2000, 100, 1000], stretch_mm: [null, null, null] }] },
     'door.default': { variants: [{ file: 'pieces/door.glb', lod1: null, size_mm: [1000, 180, 2100], stretch_mm: [null, null, null] }] },
+    // A pack with a tree of its own, as every town pack has.
+    ...(plant ? { 'plant.default': { variants: [{ file: 'pieces/tree.glb', lod1: null, size_mm: [3200, 3200, 5800], stretch_mm: [null, null, null] }] } } : {}),
   };
-  manifest['files'] = Object.entries(PIECES).map(([path, bytes]) => ({
+  manifest['files'] = Object.entries(PIECES).filter(([path]) => plant || path !== 'pieces/tree.glb').map(([path, bytes]) => ({
     path, sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.byteLength, media_type: 'model/gltf-binary',
   }));
   return resolveStylePack([readStylePackManifest(manifest, { families, textureSets: new Set<string>(CASES.context.texture_sets) })]);
@@ -165,24 +172,27 @@ function nullApp(): { app: pc.AppBase; camera: pc.Entity; environmentRoot: pc.En
   return { app, camera, environmentRoot };
 }
 
-async function dressedSite(shading: RenderShading, materials?: SurfaceMaterials, site: SiteDrawing = drawing, patterns?: SurfacePatterns) {
-  const pack = sitePack();
+async function dressedSite(
+  shading: RenderShading, materials?: SurfaceMaterials, site: SiteDrawing = drawing, patterns?: SurfacePatterns,
+  beyondIt: { readonly scenery?: SiteSceneryCatalog; readonly plant?: boolean } = {},
+) {
+  const pack = sitePack(beyondIt.plant === true);
   const pieces: FetchedPieces = await fetchPackPieces(pack, Object.keys(pack.modules), TABLE, async (file: StylePackFile) => PIECES[file.path]!);
   const summaries: SiteDressingSummary[] = [];
   const { app, camera, environmentRoot } = nullApp();
   // The pack's own light, with a ground beyond the world stated where the pack states none.
   const look = renderLookOfPreset(pack.light.presets[pack.light.default_preset]!, pack.shading, pack.edge ?? { ground: [136, 165, 96], drop_mm: 600, reach_mm: 3_000_000 });
-  const mount = siteMount(site, { servedBytes: 1, look, dress: packSiteDresser({ pack, families, pieces, shading, ...(materials === undefined ? {} : { materials }), ...(patterns === undefined ? {} : { patterns }), told: (summary) => summaries.push(summary) }) });
+  const mount = siteMount(site, { servedBytes: 1, look, dress: packSiteDresser({ pack, families, pieces, shading, ...(materials === undefined ? {} : { materials }), ...(patterns === undefined ? {} : { patterns }), told: (summary) => summaries.push(summary) }), ...(materials === undefined || beyondIt.scenery === undefined ? {} : { materials, scenery: beyondIt.scenery }) });
   const attachment = mount.attach({ app, camera, environmentRoot });
   const canvas = app.graphicsDevice.canvas as HTMLCanvasElement;
-  const root = environmentRoot.findByName('generated-site:world-1') as pc.Entity;
+  const root = environmentRoot.findByName(`generated-site:${site.worldId}`) as pc.Entity;
   const shape = (identity: string): pc.MeshInstance => (root.findByName(`${identity}:shape`) as pc.Entity).render!.meshInstances[0]!;
   const rgb = (material: pc.Material): number[] => {
     const { r, g, b } = (material as pc.StandardMaterial).diffuse;
     return [r, g, b].map((channel) => Math.round(channel * 255));
   };
   const beyond = (): pc.Material => (app.root.findByName('generated-tile:edge-ground') as pc.Entity).render!.meshInstances[0]!.material;
-  return { root, environmentRoot, attachment, summaries, shape, rgb, canvas, beyond };
+  return { root, environmentRoot, attachment, summaries, shape, rgb, canvas, beyond, mount };
 }
 
 describe('a site dressed in a pack that carries the surface material catalog', () => {
@@ -196,7 +206,7 @@ describe('a site dressed in a pack that carries the surface material catalog', (
     expect(site.shape('shed:wall:0').material.name).toBe('style-pack:material:wall.brick');
     // The pieces stand as before: a leaf's material never takes a slot a piece fills.
     expect((site.root.findByName('fence') as pc.Entity).enabled).toBe(false);
-    expect(site.summaries).toEqual([{ surfaces: 0, materials: 3, unknownLooks: ['boundary.picket'], patterned: 0, pieces: 2, placed: 4, undressed: 2, inkSegments: 0 }]);
+    expect(site.summaries).toEqual([{ surfaces: 0, materials: 3, unknownLooks: ['boundary.picket'], patterned: 0, pieces: 2, placed: 4, undressed: 2, inkSegments: 0, sceneryPieces: 0 }]);
     // The ground beyond the site wears the very material the dressed ground wears: soil to the horizon.
     expect(site.beyond()).toBe(site.shape('ground').material);
     expect(site.beyond().name).toBe('style-pack:material:ground.soil');
@@ -327,7 +337,7 @@ describe('a site dressed in a pack', () => {
     expect(pieces.render!.meshInstances[0]!.mesh.primitive[0]!.count).toBe(4 * 6);
     expect((site.root.findByName('fence') as pc.Entity).enabled).toBe(false);
     expect(site.root.findByName('barn')).toBeNull();
-    expect(site.summaries).toEqual([{ surfaces: 3, materials: 0, unknownLooks: [], patterned: 0, pieces: 2, placed: 4, undressed: 2, inkSegments: 0 }]);
+    expect(site.summaries).toEqual([{ surfaces: 3, materials: 0, unknownLooks: [], patterned: 0, pieces: 2, placed: 4, undressed: 2, inkSegments: 0, sceneryPieces: 0 }]);
     site.attachment.dispose();
   });
 
@@ -376,5 +386,171 @@ describe('a site dressed in a pack', () => {
     mount.attach({ app, camera, environmentRoot }).dispose();
     expect(seenBeforeTheSlotsWent).toEqual({ ground: expect.stringMatching(/^generated-site-colour:/), fence: true, pieces: false, ink: 0 });
     expect(environmentRoot.children).toEqual([]);
+  });
+});
+
+/** A place of one ground over its whole extent and one wall, in the served shape: 40 m by 30 m. */
+const placeOn = (ground: string, enclosure: 'open' | 'indoor' = 'open'): SiteDrawing => parseSiteDrawing({
+  profile: 'exulanica.site-drawing/v1',
+  world_id: 'world:generated:beyond',
+  receipt_sha256: 'a'.repeat(64),
+  kind: { kind: 'fixture_place', version: 1, label: 'Place' },
+  extent: { widthMm: 40_000, depthMm: 30_000, enclosure },
+  arrival: { positionMm: [20_000, 3000, 0], facingMm: [0, 1] },
+  slots: [
+    slot('ground', ground, 'plane', [20_000, 15_000, 0], 0, [40_000, 30_000, 0], 'surface'),
+    slot('hut:wall:0', 'wall.timber', 'box', [20_000, 20_000, 0], 0, [4000, 200, 2400], 'surface'),
+  ],
+  walk: { floorMm: [0, 0, 40_000, 30_000], blockersMm: [[18_000, 19_900, 22_000, 20_100]], keepOutMm: [] },
+  seats: [],
+});
+
+/** Every point of an entity's meshes, in the renderer's metres (east, up, south). */
+function pointsUnder(entity: pc.Entity): number[][] {
+  const out: number[][] = [];
+  for (const render of entity.findComponents('render') as pc.RenderComponent[]) {
+    for (const instance of render.meshInstances) {
+      const flat: number[] = [];
+      instance.mesh.getPositions(flat);
+      for (let i = 0; i < flat.length; i += 3) out.push([flat[i]!, flat[i + 1]!, flat[i + 2]!]);
+    }
+  }
+  return out;
+}
+
+describe('the scenery beyond a made place', () => {
+  const forest = placeOn('ground.forest_floor');
+  const expected = sceneryBeyond(forest.worldId, forest.extent, SCENERY.byMaterial.get('forest_floor')!);
+
+  it('stands trees beyond a forest floor as plain trunks and crowns where no pack has a tree, all of them past the rectangle', async () => {
+    // The test pack has no plant of its own: the plain trees stay, in the pack's shading.
+    const site = await dressedSite(TOON, MATERIALS, forest, undefined, { scenery: SCENERY });
+    const scenery = site.environmentRoot.findByName('site-scenery') as pc.Entity;
+    const trees = scenery.findByName('site-scenery:trees') as pc.Entity;
+    expect(trees.enabled).toBe(true);
+    // Two meshes for the whole wood: every trunk, every crown.
+    const instances = (trees.findByName('site-scenery:trees:shape') as pc.Entity).render!.meshInstances;
+    expect(instances).toHaveLength(2);
+    expect(instances.map((instance) => instance.material.name)).toEqual(['style-pack:shaded:site-scenery-colour:trunk', 'style-pack:shaded:site-scenery-colour:crown']);
+    expect(expected.length).toBeGreaterThan(300);
+    expect(JSON.parse(site.canvas.dataset['siteScenery']!)).toEqual({ stands: 'tree', beyond: 'forest_floor', pieces: expected.length });
+    expect(site.canvas.dataset['siteSceneryPieces']).toBeUndefined();
+    expect(site.summaries[0]!.sceneryPieces).toBe(0);
+    // Every point of every tree lies beyond the place's rectangle (east 0 to 40, south -30 to 0), on
+    // or over the ground, and no higher than the tallest tree the catalog states.
+    const points = pointsUnder(trees);
+    expect(points.length).toBeGreaterThan(expected.length * 10);
+    const tallest = SCENERY.byMaterial.get('forest_floor')!.heightMm[1] / 1000;
+    for (const [x, y, z] of points) {
+      expect(x! > 0 && x! < 40 && z! > -30 && z! < 0).toBe(false);
+      expect(y!).toBeGreaterThanOrEqual(-1e-6);
+      expect(y!).toBeLessThanOrEqual(tallest + 1e-6);
+    }
+    // The nearest tree's trunk stands where the placement puts it: east is x, north is minus z.
+    const [first] = expected;
+    const near = points.filter(([x, , z]) => Math.hypot(x! - first!.xMm / 1000, z! + first!.yMm / 1000) < first!.heightMm / 1000 * 0.05);
+    expect(near.length).toBeGreaterThan(0);
+    site.attachment.dispose();
+    expect(site.canvas.dataset['siteScenery']).toBeUndefined();
+    expect(site.environmentRoot.findByName('site-scenery')).toBeNull();
+  });
+
+  it('stands the pack\'s own tree at each tree where the pack has one, in a mesh beside the site\'s, and puts all back', async () => {
+    const site = await dressedSite(PBR, MATERIALS, forest, undefined, { scenery: SCENERY, plant: true });
+    const trees = site.environmentRoot.findByName('site-scenery:trees') as pc.Entity;
+    // The plain trees are hidden: the pack's piece stands at each.
+    expect(trees.enabled).toBe(false);
+    expect(site.summaries[0]!.sceneryPieces).toBe(expected.length);
+    expect(site.canvas.dataset['siteSceneryPieces']).toBe(String(expected.length));
+    // The pack's trees are their own mesh under the environment, not under the site's root: nothing
+    // that reads or outlines the site's slots meets them.
+    const packs = site.environmentRoot.children.filter((child) => child.name === 'style-pack:pieces');
+    expect(packs).toHaveLength(1);
+    expect(site.root.findByName('site-scenery')).toBeNull();
+    const points = pointsUnder(packs[0] as pc.Entity);
+    // The test tree is one quad, baked as its two triangles: six points a tree, each past the rectangle.
+    expect(points).toHaveLength(expected.length * 6);
+    for (const [x, , z] of points) expect(x! > 0 && x! < 40 && z! > -30 && z! < 0).toBe(false);
+    // Each is the piece scaled to its own tree: the nearest is as tall as the placement says, within
+    // the uniform fit (3.2 by 5.8 into a box 0.55 as wide as it is tall loses under 1 percent).
+    const heights = points.map(([, y]) => y!);
+    expect(Math.max(...heights)).toBeLessThanOrEqual(SCENERY.byMaterial.get('forest_floor')!.heightMm[1] / 1000 + 1e-6);
+    expect(Math.max(...heights)).toBeGreaterThan(SCENERY.byMaterial.get('forest_floor')!.heightMm[1] / 1000 * 0.9);
+    site.attachment.dispose();
+    expect(site.canvas.dataset['siteSceneryPieces']).toBeUndefined();
+    expect(site.environmentRoot.children.filter((child) => child.name === 'style-pack:pieces')).toHaveLength(0);
+  });
+
+  it('lays stones beyond sand, a tree here and there beyond grass, and nothing beyond any other ground, indoors, or with no catalog', async () => {
+    const sand = await dressedSite(PBR, MATERIALS, placeOn('ground.sand'), undefined, { scenery: SCENERY, plant: true });
+    const stones = sand.environmentRoot.findByName('site-scenery:stones') as pc.Entity;
+    expect((stones.findByName('site-scenery:stones:shape') as pc.Entity).render!.meshInstances).toHaveLength(1);
+    expect(sand.environmentRoot.findByName('site-scenery:trees')).toBeNull();
+    const count = sceneryBeyond('world:generated:beyond', { widthMm: 40_000, depthMm: 30_000 }, SCENERY.byMaterial.get('sand')!).length;
+    expect(JSON.parse(sand.canvas.dataset['siteScenery']!)).toEqual({ stands: 'stone', beyond: 'sand', pieces: count });
+    // A stone is no piece of any pack: none stands as one, though the pack has a tree.
+    expect(sand.summaries[0]!.sceneryPieces).toBe(0);
+    // Low: no point of any stone is higher than the catalog's tallest, and each lies past the rectangle.
+    for (const [x, y, z] of pointsUnder(stones)) {
+      expect(y!).toBeLessThanOrEqual(SCENERY.byMaterial.get('sand')!.heightMm[1] / 1000 + 1e-6);
+      expect(x! > 0 && x! < 40 && z! > -30 && z! < 0).toBe(false);
+    }
+    sand.attachment.dispose();
+    const grass = await dressedSite(PBR, MATERIALS, placeOn('ground.grass'), undefined, { scenery: SCENERY, plant: true });
+    const fewer = JSON.parse(grass.canvas.dataset['siteScenery']!) as { stands: string; pieces: number };
+    expect(fewer.stands).toBe('tree');
+    expect(fewer.pieces).toBeLessThan(expected.length / 3);
+    grass.attachment.dispose();
+    // Tilled soil has no entry; an indoor place has no ground beyond; a leaf that names no material
+    // names no scenery; and with no catalog handed, a forest floor is bare as before.
+    for (const [place, withCatalog] of [
+      [placeOn('ground.tilled_soil'), true], [placeOn('ground.forest_floor', 'indoor'), true],
+      [placeOn('ground.playground'), true], [forest, false],
+    ] as const) {
+      const bare = await dressedSite(PBR, MATERIALS, place, undefined, withCatalog ? { scenery: SCENERY } : {});
+      expect(bare.environmentRoot.findByName('site-scenery')).toBeNull();
+      expect(bare.canvas.dataset['siteScenery']).toBeUndefined();
+      bare.attachment.dispose();
+    }
+    // Asked directly, with its ground handed: an indoor place has none, an open one of the same ground has.
+    const indoors = placeOn('ground.forest_floor', 'indoor');
+    expect(baseGroundSlot(indoors)).not.toBeNull();
+    expect(sceneryOf(indoors, baseGroundSlot(indoors), SCENERY, MATERIALS)).toBeNull();
+    expect(sceneryOf(forest, baseGroundSlot(forest), SCENERY, MATERIALS)?.pieces).toEqual(expected);
+    expect(sceneryOf(forest, null, SCENERY, MATERIALS)).toBeNull();
+    // A look that draws no ground beyond the place (the tile look) has nothing for a tree to stand
+    // on: a forest floor there has none, with the catalog handed and no dresser.
+    const { app, camera, environmentRoot } = nullApp();
+    const plain = siteMount(forest, { servedBytes: 1, materials: MATERIALS, scenery: SCENERY }).attach({ app, camera, environmentRoot });
+    expect(app.root.findByName('generated-tile:edge-ground')).toBeNull();
+    expect(environmentRoot.findByName('site-scenery')).toBeNull();
+    expect((app.graphicsDevice.canvas as HTMLCanvasElement).dataset['siteScenery']).toBeUndefined();
+    plain.dispose();
+  });
+
+  it('is no part of the world: the drawing, the walk, the site\'s own shapes and what the site counts are the same with it as without', async () => {
+    const before = JSON.stringify(forest);
+    const off = await dressedSite(PBR, MATERIALS, forest, undefined, {});
+    const on = await dressedSite(PBR, MATERIALS, forest, undefined, { scenery: SCENERY, plant: true });
+    // The drawing is the same object, untouched: scenery is never a slot of it.
+    expect(on.mount.drawing).toBe(forest);
+    expect(JSON.stringify(forest)).toBe(before);
+    expect(forest.slots.map((one) => one.identity)).toEqual(['ground', 'hut:wall:0']);
+    // The place a person and a society stand on is the drawing's own: the same floor, the same
+    // blockers, nothing added for a tree.
+    expect(JSON.stringify(on.mount.navigationWorld.polygonObstacles)).toBe(JSON.stringify(off.mount.navigationWorld.polygonObstacles));
+    expect(JSON.stringify(siteNavigationWorld(forest).polygonObstacles)).toBe(JSON.stringify(off.mount.navigationWorld.polygonObstacles));
+    expect(on.mount.navigationWorld.fieldRadius).toBe(off.mount.navigationWorld.fieldRadius);
+    expect(on.mount.navigationWorld.surface.sample(-20, -15)).toEqual(off.mount.navigationWorld.surface.sample(-20, -15));
+    // The site's own root holds the same shapes: nothing of the scenery is under it, so nothing
+    // that reads the site's slots (its ink, its dressing, what hides a being) can meet a tree.
+    const named = (root: pc.Entity) => root.find(() => true).map((entity) => entity.name).sort();
+    expect(named(on.root)).toEqual(named(off.root));
+    // And what the site says it drew is the same: scenery is counted on its own, never as the site.
+    expect(on.attachment.metrics.triangles).toBe(off.attachment.metrics.triangles);
+    expect(on.attachment.metrics.drawBatches).toBe(off.attachment.metrics.drawBatches);
+    expect({ ...on.summaries[0]!, sceneryPieces: 0 }).toEqual(off.summaries[0]);
+    on.attachment.dispose();
+    off.attachment.dispose();
   });
 });

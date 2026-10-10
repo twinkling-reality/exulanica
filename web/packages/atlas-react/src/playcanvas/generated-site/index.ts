@@ -22,4 +22,6 @@ export { drawSiteSlots, slotColour } from './site-primitives.js';
 export type { RoofInput, RoofMesh, ShapedRoofs } from './site-roofs.js';
 export { ridgeAxis, roofMesh, shapeRoofs } from './site-roofs.js';
 export type { GeneratedSiteMount, SiteDresser, SiteMountOptions } from './site-mount.js';
+export type { DrawnScenery } from './site-scenery.js';
+export { SCENERY_STONES, SCENERY_TREES, drawSiteScenery, sceneryOf } from './site-scenery.js';
 export { SITE_BEYOND_DROP_M, baseGroundSlot, siteMount } from './site-mount.js';
