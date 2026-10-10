@@ -1775,6 +1775,77 @@
     }
    }
   },
+  "/world/versions/{version_id}/society/take-in": {
+   "post": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Take Newcomers In Society",
+    "description": "A living town's people take in what was placed in their world after they came: this\nversion's living society is ended and a society of things made on the same version, in one\ntransaction, and answered as a creation answers. They are the same people, with their\nidentities, homes, jobs, roles and shifts; their day so far is not kept: the erasure is the\none ``DELETE .../society`` makes (a society tombstone, every row that records the society,\nits clock, its asks and crossings, the comparisons and experiments started from it, and the\nCompanion's answers that cited the version withdrawn). Refused ``society_unavailable`` (404)\nwhere the version holds no society, ``society_takes_in_already`` (409) where its society is\nnot a living one, ``nothing_to_take_in`` (409) where the engine table gives the version no\nsociety of things, and ``restore_sealed`` (409) while the installation is sealed for a\nrestore; a refusal of the making is answered as a creation's and leaves the living society\nas it was.",
+    "operationId": "take_newcomers_in_society_world_versions__version_id__society_take_in_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Take Newcomers In Society World Versions  Version Id  Society Take In Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/society/steps": {
    "post": {
     "tags": [

@@ -84,6 +84,7 @@ the tick and state digest they were made against, and a stale base is refused.
 | `POST /world/versions/{version_id}/society` | Bring a society into a saved version |
 | `GET /world/versions/{version_id}/society` | Its state, with the places its people can go |
 | `DELETE /world/versions/{version_id}/society` | Erase the society whole, with every record of it; needs `deletion.write` beside `world.write` ([erasing a society](../synthetic-society-contract.md#erasing-a-society)) |
+| `POST /world/versions/{version_id}/society/take-in` | A living town's people take in what was placed after they came: the living society is erased and a society of things made with the same people; needs `deletion.write` beside `world.write` |
 | `GET /world/versions/{version_id}/society/events` | Its recorded events, newest first, in pages: `limit` (at most 256) and `before`, the `next` cursor the previous page answered with, `null` when no older event is left |
 | `GET /world/versions/{version_id}/society/inputs/{input_seq}` | One stored input's identity and the authored state it was composed after (`authored_state`: the version's `edit_seq` and state digest), never the input itself |
 | `GET /world/versions/{version_id}/society/replay` | Its history replayed from stored records, calling no model |

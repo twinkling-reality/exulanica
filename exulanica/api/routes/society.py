@@ -20,9 +20,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from exulanica.api.dependencies import CurrentSession, ScopedConnection
 from exulanica.api.society_making import (
     SocietyHooks,
+    SocietyTakeInRefused,
     make_society,
     society_refusal,
     society_repository,
+    take_newcomers_in,
 )
 from exulanica.api.world_scope import WorldId
 from exulanica.world.society import (
@@ -227,6 +229,39 @@ def erase_society_records(
             content={"code": exc.code, "detail": exc.detail},
         )
     return Response(status_code=204)
+
+
+@router.post("/versions/{version_id}/society/take-in")
+def take_newcomers_in_society(
+    version_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+) -> Any:
+    """A living town's people take in what was placed in their world after they came: this
+    version's living society is ended and a society of things made on the same version, in one
+    transaction, and answered as a creation answers. They are the same people, with their
+    identities, homes, jobs, roles and shifts; their day so far is not kept: the erasure is the
+    one ``DELETE .../society`` makes (a society tombstone, every row that records the society,
+    its clock, its asks and crossings, the comparisons and experiments started from it, and the
+    Companion's answers that cited the version withdrawn). Refused ``society_unavailable`` (404)
+    where the version holds no society, ``society_takes_in_already`` (409) where its society is
+    not a living one, ``nothing_to_take_in`` (409) where the engine table gives the version no
+    society of things, and ``restore_sealed`` (409) while the installation is sealed for a
+    restore; a refusal of the making is answered as a creation's and leaves the living society
+    as it was."""
+    try:
+        return _call(
+            lambda: take_newcomers_in(
+                SocietyHooks.of_app(request.app), connection, session, world_id, version_id
+            )
+        )
+    except SocietyTakeInRefused as exc:
+        return JSONResponse(
+            status_code=404 if exc.code == "society_unavailable" else 409,
+            content={"code": exc.code, "detail": exc.detail},
+        )
 
 
 @router.post("/versions/{version_id}/society/steps")

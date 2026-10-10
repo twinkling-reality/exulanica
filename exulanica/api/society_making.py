@@ -33,6 +33,7 @@ from exulanica.world.society import (
     served_snapshot,
 )
 from exulanica.world.society_engines import RetiredSocietyEngine, creatable_engine, society_engine
+from exulanica.world.society_erasure import SocietyErasureRefused, erase_society
 from exulanica.world.society_grounds import (
     SocietyPopulationRefused,
     UnknownSocietyGround,
@@ -41,19 +42,24 @@ from exulanica.world.society_grounds import (
 )
 from exulanica.world.society_planner import SocietyStartRefused
 from exulanica.world.society_repository import InvalidEventCursor, SocietyRepository
+from exulanica.world.workspace_lock import lock_workspace
 from exulanica.world.world_clock import ClockRefused
 from exulanica.world.worlds import require_world
 
 __all__ = [
     "SOCIETY_ENGINE_DIFFERS",
     "SOCIETY_ENGINE_NOT_OFFERED",
+    "TAKE_IN_REFUSALS",
     "SocietyEngineDiffers",
     "SocietyEngineNotOffered",
     "SocietyHooks",
     "SocietyRefusal",
+    "SocietyTakeInRefused",
+    "engine_holding_things",
     "make_society",
     "society_refusal",
     "society_repository",
+    "take_newcomers_in",
 ]
 
 #: Why a society of things is not made here: the host does not offer it through its routes.
@@ -74,6 +80,31 @@ class SocietyEngineNotOffered(Exception):
 #: Why a society is not made with the engine asked for: on this host the engine table gives the
 #: world a society of things, since its version holds a thing its author placed.
 SOCIETY_ENGINE_DIFFERS: Final = "society_engine_differs"
+
+
+#: Why a town's people do not take the newcomers in, by code.
+TAKE_IN_REFUSALS: Final = {
+    "society_unavailable": "this world version holds no society",
+    "society_takes_in_already": (
+        "this version's society is not a living town's: only a living town's people take in what "
+        "was placed after they came"
+    ),
+    "nothing_to_take_in": (
+        "nothing placed in this world asks for another society here: the host offers no society "
+        "of things, or the version holds no thing its ground gives one"
+    ),
+    "restore_sealed": ("the installation is sealed for a restore; ask again once it is replayed"),
+}
+
+
+class SocietyTakeInRefused(Exception):
+    """A take-in refused by a code a caller can act on, with nothing erased or made. Not a
+    ``ValueError``, so no table of a creation's refusals answers it as an invalid state."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(TAKE_IN_REFUSALS[code])
+        self.code = code
+        self.detail = TAKE_IN_REFUSALS[code]
 
 
 class SocietyEngineDiffers(Exception):
@@ -222,9 +253,12 @@ def make_society(
     region_id: str,
     profile: str,
     place_id: uuid.UUID | None = None,
+    prepared: bool = False,
 ) -> dict[str, Any]:
     """Make the version's society in ``region_id`` on the engine ``profile`` names and answer it as
-    served, or answer the one the version already holds there.
+    served, or answer the one the version already holds there. ``prepared`` says the caller made
+    the saved world ready before a transaction of its own (``prepare_saved_world``), which this
+    then runs inside.
 
     A society of things is made only where the host offers it (:class:`SocietyEngineNotOffered`
     otherwise, before anything is read), and there a new society of another engine over a world the
@@ -251,6 +285,7 @@ def make_society(
     runtime = services.society_runtime
     if (
         runtime is not None
+        and not prepared
         and place_id is None
         and creatable_engine(profile).takes_inputs
         and repo.held(version_id, profile=profile, region_id=region_id) is None
@@ -292,3 +327,79 @@ def make_society(
     return served_snapshot(
         open_awake(repo, version_id, created, services.society_opening, actor=session.actor)
     )
+
+
+def take_newcomers_in(
+    hooks: SocietyHooks,
+    connection: Any,
+    session: Any,
+    world_id: str,
+    version_id: uuid.UUID,
+) -> dict[str, Any]:
+    """A living town's people take in what was placed in their world after they came: the
+    version's living society is ended and a society of things made on the same version, in one
+    transaction, and answered as served.
+
+    The living society is erased by the erasure a person's own erasing uses
+    (:func:`~exulanica.world.society_erasure.erase_society`: a society tombstone, and every row
+    that records the society removed with it), and the society of things is made as a creation
+    makes one (:func:`make_society`), on the engine the engine table gives this version. A
+    society's identity and seed derive from its world and version alone, and a society of things
+    over a town is the town's own people, so they are the same people: their identities, homes,
+    jobs, roles and shifts. Their day so far is not kept. Where the making refuses, the erasure is
+    undone with it, so a version is never left with nobody.
+
+    Refused by name with nothing erased or made (:class:`SocietyTakeInRefused`): a version that
+    holds no society, one whose society is not a living one, one the engine table gives no
+    society of things (the host offers none, or nothing its ground admits is placed there), and
+    an installation sealed for a restore, which the erasure itself refuses."""
+    services = hooks.services
+    require_world(connection, session.workspace_id, world_id)
+    runtime = services.society_runtime
+    if runtime is not None:
+        # What a creation readies before its transaction, readied before this one: a making
+        # inside it holds the transaction's locks and waits for nothing.
+        runtime.prepare_saved_world(connection, session, version_id, None)
+    with connection.transaction():
+        # The lock an erasure, a playback round and an edit take before they touch a society.
+        lock_workspace(connection, session.workspace_id)
+        held = connection.execute(
+            "select engine_version, region_id from world_society "
+            "where workspace_id = %s and world_id = %s and version_id = %s",
+            (session.workspace_id, world_id, version_id),
+        ).fetchone()
+        if held is None:
+            raise SocietyTakeInRefused("society_unavailable")
+        if society_engine(held["engine_version"]).state_family != "living":
+            raise SocietyTakeInRefused("society_takes_in_already")
+        engine = engine_holding_things(connection, session, services, world_id, version_id)
+        if engine is None:
+            raise SocietyTakeInRefused("nothing_to_take_in")
+        # The making's place first, as a creation makes it: what its first input reads is read
+        # ahead and the asset read lock taken in the creation's order, before the erasure's
+        # tombstone takes that lock's shared side. So the lock is never asked for after the
+        # tombstone, and a town is never generated again while it is held.
+        place_id = (
+            None
+            if runtime is None
+            else runtime.saved_world_place(connection, session, version_id, held["region_id"])
+        )
+        try:
+            erase_society(
+                connection, session.workspace_id, world_id, version_id, erased_by=session.actor
+            )
+        except SocietyErasureRefused as exc:
+            # Named here: the erasure's refusal is a ValueError, which a creation's table of
+            # refusals would answer as an invalid state.
+            raise SocietyTakeInRefused(exc.code) from exc
+        return make_society(
+            hooks,
+            connection,
+            session,
+            world_id,
+            version_id,
+            region_id=held["region_id"],
+            profile=engine,
+            place_id=place_id,
+            prepared=True,
+        )

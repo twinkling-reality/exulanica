@@ -226,6 +226,9 @@ class VersionContext:
     #: The engine the version's society runs, or else the one the engine table creates a new one
     #: with on this ground; None where no ground is stated.
     engine: SocietyEngine | None
+    #: The engine of things the engine table gives this version, where it holds a living society
+    #: whose people could take in what was placed after they came; None anywhere else.
+    takes_in: str | None = None
     #: What :meth:`roads` read, once it has: the roads, or the refusal reading them raised.
     _roads: TrafficInput | Exception | None = field(
         default=None, init=False, repr=False, compare=False

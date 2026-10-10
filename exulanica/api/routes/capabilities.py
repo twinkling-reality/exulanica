@@ -66,6 +66,7 @@ from exulanica.api.routes.society import (
     change_society_presence,
     create_society,
     society,
+    take_newcomers_in_society,
 )
 from exulanica.api.routes.society_actions import record_action
 from exulanica.api.routes.society_control import configure_control, manual_step, read_control
@@ -111,6 +112,7 @@ from exulanica.api.routes.world_versions import alternate_version
 from exulanica.api.routes.worlds import compose_personal_source_world, personal_source_world
 from exulanica.api.services import Services
 from exulanica.api.society_control_worker import host_playback_refusal
+from exulanica.api.society_making import engine_holding_things
 from exulanica.api.world_edit import OBJECT_PROBLEMS
 from exulanica.api.world_scope import WorldId
 from exulanica.graph.personal_sources import personal_sources
@@ -514,6 +516,23 @@ def _playback_effect(context: VersionContext) -> tuple[Effect, ...]:
     return (Effect("playback", AVAILABLE if refusal is None else unavailable(refusal)),)
 
 
+def _take_in(context: VersionContext, composable: bool) -> Availability:
+    """Whether this version's people can take in what was placed after they came (``POST
+    .../society/take-in``): only a living society does, and only where the engine table gives the
+    version a society of things, the test a creation makes (``engine_holding_things``, read once
+    for the context: the host offers them and the version holds a placed thing its ground
+    admits), and where a first input can be composed (``composable``, the creation's own
+    condition: without it the making answers 424 and nothing is erased)."""
+    if context.society is None:
+        return unavailable(_SOCIETY_UNAVAILABLE)
+    if context.engine is None or context.engine.state_family != "living":
+        return unsupported("society_takes_in_already")
+    if context.takes_in is None:
+        return unavailable("nothing_to_take_in")
+    # The society of things is composed from the version's source, as a creation's is.
+    return AVAILABLE if composable else unavailable("unavailable_society_input")
+
+
 def _society_operations(context: VersionContext) -> list[Operation]:
     held = context.society is not None
     engine = context.engine
@@ -542,6 +561,9 @@ def _society_operations(context: VersionContext) -> list[Operation]:
             AVAILABLE if held or composable else unavailable("unavailable_society_input"),
             "version",
             context.bind,
+        ),
+        Operation(
+            take_newcomers_in_society, _take_in(context, composable), "version", context.bind
         ),
         Operation(
             advance_society,
@@ -714,6 +736,10 @@ def version_context(
         engine = society_engine(created_engine(ground, holding_things=holding))
     else:
         engine = None
+    takes_in = None
+    if held_society is not None and engine is not None and engine.state_family == "living":
+        # What the take-in route itself asks before it erases anything.
+        takes_in = engine_holding_things(connection, session, services, world_id, version_id)
     return VersionContext(
         request=request,
         connection=connection,
@@ -727,6 +753,7 @@ def version_context(
         ground=ground,
         society=held_society,
         engine=engine,
+        takes_in=takes_in,
     )
 
 

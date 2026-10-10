@@ -11,6 +11,7 @@ every mutating route of a version, the way the route probes hold ROUTE_RULES to 
 
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from types import SimpleNamespace
 from typing import Any
@@ -254,6 +255,30 @@ def _state(context: capabilities.VersionContext, operation: str) -> tuple[str, s
     ]
     assert len(found) == 1, (operation, found)
     return found[0]
+
+
+def test_taking_newcomers_in_is_offered_only_where_a_request_would_be_taken():
+    """The states are the route's own answers: no society, a society that is not a living
+    town's, a living town the engine table gives no society of things, one whose source can no
+    longer be composed (the making's 424), and a living town holding a thing placed after."""
+    take_in = "POST /world/versions/{version_id}/society/take-in"
+    living = "exulanica-society/v5"
+    things = "exulanica-society/v7"
+    assert _state(_context("generated_town"), take_in) == ("unavailable", "society_unavailable")
+    for engine in (things, "exulanica-society/v2"):
+        assert _state(_context("generated_town", society=engine), take_in) == (
+            "unsupported",
+            "society_takes_in_already",
+        )
+    town = _context("generated_town", society=living)
+    assert town.takes_in is None
+    assert _state(town, take_in) == ("unavailable", "nothing_to_take_in")
+    offered = dataclasses.replace(town, takes_in=things)
+    assert _state(offered, take_in) == ("available", None)
+    gone = dataclasses.replace(
+        _context("generated_town", society=living, invalidated=True), takes_in=things
+    )
+    assert _state(gone, take_in) == ("unavailable", "unavailable_society_input")
 
 
 def test_a_town_states_what_its_engine_and_ground_never_do():

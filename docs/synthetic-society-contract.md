@@ -1070,6 +1070,68 @@ references; the looks a minute recorded for visitors' arrivals (a world version'
 thing id, a crossing id and a look digest, no text, as a visitor's departure leaves them); and every
 copy already sent to a hosted model provider or an outside program.
 
+A society made again on a version after its erasure has the erased society's identity, since a
+society's identity derives from its version alone. A restore from a backup taken after it was made
+again holds the erasure itself, so the carried row is found present and deletes nothing, and the
+society and a Companion answer given about it after the erasure stay as the backup holds them
+(`tests/test_society_made_again_restore_postgres.py`).
+
+### A living town takes in what was placed after its people came
+
+An engine is immutable for a version's society, so a living town reads no thing placed in its
+world after its people came: a knight placed there stands outside the society.
+`POST /world/versions/{version_id}/society/take-in` (`world.write` and `deletion.write`, the
+erasure's own pair; `take_newcomers_in` in `exulanica/api/society_making.py`) ends the version's
+living society and makes a society of things on the same version, in one transaction, and answers
+it as a creation does. It writes nothing of its own: the living society is erased by the erasure
+above (one `society` tombstone, one `society_erasure` row, every row that records the society
+deleted and the Companion's answers that cited the version withdrawn), and the society of things
+is made as `POST .../society` makes one, on the engine the engine table gives the version
+(`creates_holding_things`).
+
+**The same people.** A society's identity and seed derive from its world and version alone, and a
+society of things over a town is the town's own people
+([a town's people](#a-towns-people-as-a-document)), so each person keeps their identity, home,
+job, role and shift (`tests/test_society_take_in_postgres.py` holds each villager after to the
+resident before, read from the living society's stored state and first input).
+
+**What is not kept** is everything the erasure removes: the recorded day (every state and event, and
+where each person stood); the clock's position; the playback setting (playing or paused, and its
+speed); the models chosen for people; the looks a person saved for residents (their appearance
+revisions, which name the society); the comparisons and experiments started from the living society;
+and the Companion's answers about it. An erasure also removes whether everyone was sent away and the
+requests a person directed at people, which a living town never holds (its engine takes neither).
+The people's identities continue, so a look or a model can be chosen again for the same person. What
+stays is the world, its version, everything placed, door grants and programs, and the world's look.
+The society of things starts at its first minute. There is no way back: a society of things is not
+made a living town again. Carrying the day and the clock across would need the living society's
+state read into the society of things' genesis, which no engine does; the loss is this route's
+behavior, stated wherever it is offered.
+
+**Refusals,** each with nothing erased or made: 404 `society_unavailable` (the version holds no
+society), 409 `society_takes_in_already` (its society is not a living one), 409
+`nothing_to_take_in` (the engine table gives the version no society of things: the host offers
+none, or nothing its ground admits is placed there) and 409 `restore_sealed`. A refusal of the
+making is answered as a creation's (`unavailable_society_input` and the others
+`society_refusal` names) and undoes the erasure with it, so the request never leaves a version
+with nobody and writes no tombstone then. That is true of the request, not of a restore: a
+restore from a backup taken before a take-in holds the living society, the carried erasure
+deletes it again, and the society of things, made after the backup, is not in it, so the version
+holds nobody until people are brought in again. The version's capability read states the route
+available exactly where a request would be taken: a living society held, a society of things
+given, and a first input that can be composed.
+
+The making's place is made first, as a creation makes it, so what the first input reads is read
+ahead and the asset read lock is taken in the creation's order, before the erasure's tombstone
+takes that lock's shared side.
+
+What is read before the transaction is only what a creation readies there
+(`prepare_saved_world`: a site world's place, which a town has none of) and that the world is
+the workspace's. Everything the request decides on is read inside the transaction, after the
+workspace's lock that an edit, a playback round and an erasure take first: the held society's
+engine and region, whether the engine table gives the version a society of things, and the rows
+the first input is composed from.
+
 ### Versions that survive upgrades
 
 A routine catalog is published beside the versions before it and never edited in place
