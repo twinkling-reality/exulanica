@@ -251,10 +251,15 @@ class SavedWorldEntryRepository:
         connection: psycopg.Connection,
         workspace_id: uuid.UUID,
         store: ContentAddressedStore | None = None,
+        *,
+        guest: bool = False,
     ) -> None:
         self.connection = connection
         self.workspace_id = workspace_id
         self.store = store
+        #: Whether the workspace is a guest's: the world-count policy states a guest's own
+        #: budgets, and a world made through this repository is held to them.
+        self.guest = guest
 
     def entries(self) -> tuple[SavedWorldEntry, ...]:
         rows = self.connection.execute(
@@ -468,7 +473,9 @@ class SavedWorldEntryRepository:
 
         clean_title = _clean_title(title)
         recipe = town_recipe(recipe_key, values)
-        refuse_past_limit(self.connection, self.workspace_id, GENERATED)
+        refuse_past_limit(
+            self.connection, self.workspace_id, GENERATED, guest=self.guest, tiles=len(recipe.tiles)
+        )
         refused: dict[str, GeneratedWorldRefused] = {}
         fixed = fixed_world_id
         for _ in range(1 if fixed is not None else GENERATED_WORLD_DRAWS):
@@ -491,6 +498,7 @@ class SavedWorldEntryRepository:
                 title=clean_title,
                 recipe=recipe,
                 composed=composed,
+                guest=self.guest,
             )
             return self.create(
                 world_id=world_id,
@@ -528,7 +536,7 @@ class SavedWorldEntryRepository:
         from exulanica.world.kinds.samples import SiteRefused
 
         clean_title = _clean_title(title)
-        refuse_past_limit(self.connection, self.workspace_id, GENERATED)
+        refuse_past_limit(self.connection, self.workspace_id, GENERATED, guest=self.guest)
         refusals: list[dict[str, object]] = []
         code = "kind_generation_refused"
         for _ in range(GENERATED_WORLD_DRAWS):
@@ -552,6 +560,7 @@ class SavedWorldEntryRepository:
                 kind=kind.kind,
                 version=kind.version,
                 composed=composed,
+                guest=self.guest,
             )
             return self.create(
                 world_id=world_id,

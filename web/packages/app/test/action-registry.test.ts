@@ -153,7 +153,8 @@ describe('making a world reads the workspace’s creation descriptors', () => {
 
   it('says why in its own words for each code the create can give', () => {
     for (const [code, happened] of [
-      ['world_limit_reached', 'This workspace already holds as many towns as it may.'],
+      ['world_limit_reached', 'This workspace already holds as many towns as it may at once.'],
+      ['tile_budget_reached', 'This workspace has made as many towns as it may in one day.'],
       ['generated_tiles_not_installed', 'This server cannot build new towns.'],
       ['worlds_read_only', 'This server does not make new worlds.'],
     ] as const) {

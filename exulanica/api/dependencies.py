@@ -96,6 +96,7 @@ __all__ = [
     "current_session",
     "get_services",
     "held_permissions",
+    "holds_as_guest",
     "owns_workspace",
 ]
 
@@ -319,6 +320,24 @@ def held_permissions(request: Request, _session: CurrentSession) -> frozenset[Pe
 
 
 HeldPermissions = Annotated[frozenset[Permission], Depends(held_permissions)]
+
+
+def holds_as_guest(request: Request) -> bool:
+    """Whether the caller is a guest: a browser session held in the membership role ``guest``
+    (0139). A bearer token is the operator's grant to a program and an owner signed in, so both
+    answer no. The world-count policy states a guest's workspace its own budgets
+    (:mod:`exulanica.world.worlds`); the account tables are the account role's alone, so the
+    account runtime reads the role, as :func:`owns_workspace` has it read."""
+    if request.headers.get("authorization") is not None:
+        return False
+    accounts = get_services(request).accounts
+    if accounts is None:
+        return False
+    try:
+        account = accounts.browser_session(request)
+    except (AccountRejected, AccountUnavailable, TokenNotAccepted):
+        return False
+    return account.role == "guest"
 
 
 def owns_workspace(request: Request, session: Session) -> bool:

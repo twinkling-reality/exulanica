@@ -36,6 +36,7 @@ from exulanica.api.dependencies import (
     ReadOnlyConnection,
     ScopedConnection,
     get_services,
+    holds_as_guest,
 )
 from exulanica.api.routes.world import StylePackBody, stated_style_pack
 from exulanica.api.routes.world_entries import SavedWorldEntryView, _view
@@ -64,6 +65,7 @@ from exulanica.world.world_recipes import (
     world_recipes,
 )
 from exulanica.world.worlds import (
+    TileBudgetReached,
     WorldLimitReached,
     WorldsReadOnly,
     require_world,
@@ -102,8 +104,8 @@ class CreateGeneratedWorldBody(BaseModel):
     style_pack: StylePackBody | None = None
 
 
-def _problem(status: int, code: str, detail: str) -> JSONResponse:
-    return JSONResponse(status_code=status, content={"code": code, "detail": detail})
+def _problem(status: int, code: str, detail: str, **extra: str) -> JSONResponse:
+    return JSONResponse(status_code=status, content={"code": code, "detail": detail, **extra})
 
 
 @router.get("/recipes", summary="The recipes a world can be generated from.")
@@ -136,6 +138,7 @@ def create_generated_world(
     connection: ScopedConnection,
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
+    guest: Annotated[bool, Depends(holds_as_guest)],
 ) -> SavedWorldEntryView | JSONResponse:
     """Generate the preset's world with the values asked for, for a new identity, save it and its
     entry, and queue its bakes.
@@ -179,7 +182,9 @@ def create_generated_world(
             f"style pack {pack.pack_id} version {pack.version} is not a pack of this host's "
             "library",
         )
-    entries = SavedWorldEntryRepository(connection, session.workspace_id, services.store)
+    entries = SavedWorldEntryRepository(
+        connection, session.workspace_id, services.store, guest=guest
+    )
     try:
         created = entries.create_generated(
             title=body.title,
@@ -195,6 +200,9 @@ def create_generated_world(
     except SpecificationRefused as exc:
         # The client's own value is said back, so only as JSON and UTF-8 can carry it.
         return JSONResponse(status_code=422, content=sayable(exc.document()))
+    except TileBudgetReached as exc:
+        # When room returns, as an instant a page says in the person's own time.
+        return _problem(409, exc.code, str(exc), returns_at=exc.returns_at.isoformat())
     except (GeneratedWorldRefused, UnknownWorldComposer, WorldLimitReached) as exc:
         return _problem(409, exc.code, str(exc))
     # Refused as busy, the world stays as made, naming no pack: a page draws it in the default.

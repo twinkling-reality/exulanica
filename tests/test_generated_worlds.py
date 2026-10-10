@@ -287,7 +287,10 @@ def test_a_recipe_of_a_grammar_version_its_composer_does_not_generate_is_refused
 
 
 def test_a_workspace_holds_at_most_the_policy_s_generated_worlds(objects_api, monkeypatch):
+    # A deployment states its own figure, three here; the policy's 24 is a figure, not a rule.
+    monkeypatch.setenv("EXULANICA_WORLDS_HELD", "3")
     limit = WORLD_COUNT_POLICY.limit(GENERATED)
+    assert limit == 3
     made = [_make(objects_api, title=f"Town {n}") for n in range(limit)]
     assert [response.status_code for response in made] == [201] * limit
     # A workspace at its limit is refused before any world is generated for it.
@@ -302,6 +305,76 @@ def test_a_workspace_holds_at_most_the_policy_s_generated_worlds(objects_api, mo
     assert refused.status_code == 409, refused.text
     assert refused.json()["code"] == "world_limit_reached"
     assert composed == []
+
+
+def test_a_workspace_s_towns_come_to_at_most_the_day_s_tiles_and_it_is_told_when_room_returns(
+    objects_api, repository, monkeypatch
+):
+    """The cost the count of three stood for has its own bound: the tiles of the worlds a
+    workspace made in the last day. Past it a making is refused before anything is generated, by
+    name, with the instant room returns: a day after the oldest of those worlds was made."""
+    import datetime as dt
+
+    from exulanica.world.world_recipes import town_recipe
+
+    tiles = len(town_recipe("small_town", None).tiles)
+    monkeypatch.setenv("EXULANICA_TILES_A_DAY", str(2 * tiles))
+    made = [_make(objects_api, title=f"Town {n}") for n in range(2)]
+    assert [response.status_code for response in made] == [201, 201]
+    composed = []
+    compose = generated_worlds_module.compose_generated_world
+    monkeypatch.setattr(
+        generated_worlds_module,
+        "compose_generated_world",
+        lambda recipe, world_id: composed.append(world_id) or compose(recipe, world_id),
+    )
+    refused = _make(objects_api, title="One too many today")
+    assert refused.status_code == 409, refused.text
+    body = refused.json()
+    assert body["code"] == "tile_budget_reached"
+    assert "has made as many towns as it may in one day" in body["detail"]
+    assert composed == []
+    # Room returns a day after the oldest of those worlds was made: said in the words, and given
+    # as an instant for a page to say in the person's own time.
+    worlds = workspace_worlds(repository.connection, repository.workspace_id)
+    oldest = min(world.created_at for world in worlds if world.kind == GENERATED)
+    returns = (oldest + dt.timedelta(days=1)).astimezone(dt.UTC)
+    assert f"from {returns:%H:%M} UTC on {returns.day} {returns:%B}" in body["detail"]
+    assert dt.datetime.fromisoformat(body["returns_at"]) == returns
+    # The worlds held are still under their own bound: it is the day's tiles that refused.
+    assert len(worlds) < WORLD_COUNT_POLICY.limit(GENERATED)
+    # A deployment that states more has room at once.
+    monkeypatch.setenv("EXULANICA_TILES_A_DAY", str(3 * tiles))
+    monkeypatch.setattr(generated_worlds_module, "compose_generated_world", compose)
+    assert _make(objects_api, title="Room again").status_code == 201
+
+
+def test_a_guest_s_workspace_is_held_to_a_guest_s_figures(repository, monkeypatch):
+    """A guest's workspace has budgets of its own: the repository a guest's request is given
+    reads them, and the same workspace asked as a person's is not refused by them."""
+    from exulanica.world.saved_entries import SavedWorldEntryRepository
+    from exulanica.world.worlds import TileBudgetReached, WorldLimitReached
+
+    connection, workspace = repository.connection, repository.workspace_id
+    actor = uuid.uuid4()
+    guests = SavedWorldEntryRepository(connection, workspace, guest=True)
+    persons = SavedWorldEntryRepository(connection, workspace)
+    monkeypatch.setenv("EXULANICA_GUEST_WORLDS_HELD", "1")
+    first = guests.create_generated(
+        title="A guest's town", recipe_key="small_town", created_by=actor
+    )
+    with pytest.raises(WorldLimitReached) as held:
+        guests.create_generated(title="A second", recipe_key="small_town", created_by=actor)
+    assert (held.value.code, held.value.limit) == ("world_limit_reached", 1)
+    # The day's tiles, a guest's figure: one two-tile town is all of it.
+    monkeypatch.setenv("EXULANICA_GUEST_WORLDS_HELD", "5")
+    monkeypatch.setenv("EXULANICA_GUEST_TILES_A_DAY", "2")
+    with pytest.raises(TileBudgetReached) as spent:
+        guests.create_generated(title="A second", recipe_key="small_town", created_by=actor)
+    assert (spent.value.code, spent.value.limit, spent.value.asked) == ("tile_budget_reached", 2, 2)
+    # Neither figure is a signed-in person's: the same workspace asked as theirs makes the town.
+    second = persons.create_generated(title="A person's", recipe_key="small_town", created_by=actor)
+    assert first.world_id != second.world_id
 
 
 def test_each_world_of_a_recipe_draws_its_own_seed_and_one_world_always_the_same():

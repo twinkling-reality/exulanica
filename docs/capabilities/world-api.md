@@ -213,7 +213,9 @@ What differs by kind, as the reads state it:
 
 Making worlds: a starter is refused `saved_world_conflict` once the workspace holds any saved world,
 although the count policy sets no starter limit, and the read says so. A generated world is refused
-`world_limit_reached` at the policy's limit, and needs the installation's `generated_tiles`
+`world_limit_reached` at the generated worlds the workspace may hold, or `tile_budget_reached` when
+the tiles of the towns it made in the last day leave no room for one tile, each by the caller's
+own figure, a guest's for a guest ([the two budgets](../saved-world-entry.md)); it needs the installation's `generated_tiles`
 component: where a profile does not install it, nothing would bake the town's tiles, and making
 one is unavailable `generated_tiles_not_installed`. A world from photographs takes the state and
 code of the `GET /worlds/personal-source` plan, which needs `admission.read`; without it the state

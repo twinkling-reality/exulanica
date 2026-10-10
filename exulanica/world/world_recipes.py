@@ -127,7 +127,8 @@ _SCHEMA_NAME: Final = re.compile(rf"{SCHEMA_ID}\.v[1-9][0-9]*")
 _COMPOSER_NAME: Final = re.compile(r"[a-z][a-z0-9]*(-[a-z0-9]+)*")
 #: The most tiles a recipe may state. A workspace holds at most the world-count policy's limit of
 #: generated worlds and no route deletes one, so that limit times this figure bounds every tile
-#: bake a workspace can cause (``world-count-policy.v2.json`` says so beside the limit). Four is a
+#: bake a workspace can ever cause, and the policy's tiles a day bound how fast
+#: (``world-count-policy.v3.json`` says so beside each figure). Four is a
 #: town of two tiles by two: one bake of the one-tile town took 13.3 s on the development machine,
 #: so four keep one world's bakes near a minute of one worker's time.
 TILES_MAXIMUM: Final = 4
@@ -186,6 +187,12 @@ REFUSALS: Final = (
         "world_limit_reached",
         409,
         "The workspace already holds as many generated worlds as the world-count policy allows.",
+    ),
+    (
+        "tile_budget_reached",
+        409,
+        "The tiles of the generated worlds the workspace made in the last day already come to as "
+        "many as the world-count policy allows in a day; the refusal says when room returns.",
     ),
 )
 
@@ -953,6 +960,15 @@ def tick_budget_ms() -> int:
     return DEFAULT_BASE_TICK_INTERVAL_MS // max(SPEEDS) // TICK_SHARE_DIVISOR
 
 
+def _tiles_a_day(policy: Any, *, guest: bool) -> int | None:
+    """The tiles a workspace's generated worlds may come to in a day by the policy's own figure,
+    or None where it states no such budget."""
+    from exulanica.world.worlds import GENERATED
+
+    budget = policy.tiles_in_a_day(GENERATED, guest=guest, environ={})
+    return None if budget is None else budget[0]
+
+
 def specification_document() -> dict[str, Any]:
     """Every schema value, preset and refusal a request for a world meets, as one document.
 
@@ -995,7 +1011,13 @@ def specification_document() -> dict[str, Any]:
                 {"ground": ground.key, "composer": ground.composer_key, "most": ground.population}
                 for ground in grounds
             ],
-            "generated_worlds_per_workspace": policy.limit(GENERATED),
+            # The policy's own figures. A deployment may state others in its environment, and
+            # GET /worlds/capabilities reports the figure in force for the caller; this document
+            # is the same on every deployment.
+            "generated_worlds_per_workspace": policy.limit(GENERATED, environ={}),
+            "generated_worlds_per_guest_workspace": policy.limit(GENERATED, guest=True, environ={}),
+            "generated_tiles_a_day": _tiles_a_day(policy, guest=False),
+            "generated_tiles_a_day_for_a_guest": _tiles_a_day(policy, guest=True),
             "world_count_policy": policy.reference(),
             "tick": {
                 "budget_ms_p95": tick_budget_ms(),

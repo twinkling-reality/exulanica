@@ -225,6 +225,11 @@ TILES_PERMISSION = "tiles.materialise"
 #: The tiles a ``--tiles`` run's workspace may be served: the development corridor's five tiles
 #: at each of the two city grammar versions it is baked at, ten, and six to spare.
 TILES_LIMIT = 16
+#: The generated worlds a workspace of the stack may hold: what the stack states to the API in
+#: EXULANICA_WORLDS_HELD, as a deployment states its own figure in place of the count policy's.
+#: Three, so the foundation's row (scripts/acceptance/foundation.py, GENERATED_WORLDS_ALLOWED)
+#: makes three towns and reads the fourth refused.
+WORLDS_HELD = 3
 
 #: What ``--model`` passes from this process's environment to the API, each required.
 MODEL_VARIABLES = {
@@ -827,8 +832,12 @@ def api_environment(
     environ: Mapping[str, str] | None = None,
     references: Mapping[str, str] | None = None,
     creatures: Sequence[str] | None = None,
+    worlds_held: int | None = None,
 ) -> dict[str, str]:
     environment = clean_environment(environ)
+    # The stack states the generated worlds its workspaces may hold, as a deployment does: the
+    # foundation's row makes that many towns and reads the next refused by name.
+    environment["EXULANICA_WORLDS_HELD"] = str(WORLDS_HELD if worlds_held is None else worlds_held)
     if model:
         environment.update(model_environment(environ))
     environment.update(
@@ -1786,6 +1795,7 @@ def up(arguments: argparse.Namespace) -> None:
         references=references_environment(state.get("references")),
         creatures=state.get("creatures"),
         workspace_style_packs=bool(state.get("workspace_style_packs")),
+        worlds_held=arguments.worlds_held,
     )
     environment.update(model_witness_environment(environment, run_dir))
     plan = None
@@ -1812,6 +1822,7 @@ def up(arguments: argparse.Namespace) -> None:
             "embedding_partition": partition,
             "derivative_worker": "off" if arguments.no_derivative_worker else "in-process",
             "model": bool(arguments.model),
+            "worlds_held": arguments.worlds_held,
             "society_playback": bool(arguments.society_playback),
             "budget_usd": environment.get("EXULANICA_BUDGET_USD"),
             "actor": actor,
@@ -2109,6 +2120,7 @@ def restart_api(arguments: argparse.Namespace) -> None:
         references=references_environment(state.get("references")),
         creatures=state.get("creatures"),
         workspace_style_packs=bool(state.get("workspace_style_packs")),
+        worlds_held=state.get("worlds_held"),
     )
     environment.update(model_witness_environment(environment, run_dir))
     scripted = state.get("scripted_model")
@@ -2241,6 +2253,13 @@ def build_parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="the API advances this run's workspace's playing societies on its own "
                 "(default: it advances nothing)",
+            )
+            command.add_argument(
+                "--worlds-held",
+                type=int,
+                default=WORLDS_HELD,
+                help="the generated worlds a workspace of this stack may hold, stated to the API "
+                "as EXULANICA_WORLDS_HELD (default: WORLDS_HELD, which the foundation's row makes)",
             )
             command.add_argument(
                 "--tiles",

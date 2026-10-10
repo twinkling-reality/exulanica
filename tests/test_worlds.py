@@ -48,7 +48,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 MIGRATION = (
     ROOT / "exulanica" / "migrations" / ("0099_a_world_is_registered_before_it_holds_anything.sql")
 )
-POLICY = ROOT / "exulanica" / "world" / "world-count-policy.v2.json"
+POLICY = ROOT / "exulanica" / "world" / "world-count-policy.v3.json"
 
 #: World tables whose rows do not all name a world: the stored generated column each one's key
 #: reads instead of ``world_id``, and that column's expression as the catalog prints it.
@@ -78,13 +78,63 @@ def _raised(limit: int) -> worlds.WorldCountPolicy:
 
 def test_the_policy_allows_one_personal_source_world_and_states_every_kind():
     assert WORLD_COUNT_POLICY.policy_id == "exulanica.world-count"
-    assert WORLD_COUNT_POLICY.version == 2
-    assert WORLD_COUNT_POLICY.limit(PERSONAL_SOURCE) == 1
-    assert WORLD_COUNT_POLICY.limit(AUTHORED_STARTER) is None
-    assert WORLD_COUNT_POLICY.limit(GENERATED) == 3
+    assert WORLD_COUNT_POLICY.version == 3
+    assert WORLD_COUNT_POLICY.limit(PERSONAL_SOURCE, environ={}) == 1
+    assert WORLD_COUNT_POLICY.limit(AUTHORED_STARTER, environ={}) is None
     assert set(WORLD_COUNT_POLICY.limits) == {kind.name for kind in WORLD_KINDS}
     document = json.loads(POLICY.read_text(encoding="utf-8"))
     assert WORLD_COUNT_POLICY.limits == document["limits"]
+
+
+def test_generated_worlds_have_two_budgets_each_with_a_person_s_figure_and_a_guest_s():
+    """Version 3 replaces three generated worlds a workspace by the worlds it may hold and the
+    tiles its worlds may come to in a day, a signed-in person's figure and a guest's for each."""
+    policy = WORLD_COUNT_POLICY
+    assert (
+        policy.limit(GENERATED, environ={}),
+        policy.limit(GENERATED, guest=True, environ={}),
+    ) == (
+        24,
+        6,
+    )
+    assert policy.tiles_in_a_day(GENERATED, environ={}) == (48, 86_400)
+    assert policy.tiles_in_a_day(GENERATED, guest=True, environ={}) == (12, 86_400)
+    # No other kind has a day's budget, and a guest holds one personal-source world like anyone.
+    assert policy.tiles_in_a_day(PERSONAL_SOURCE, environ={}) is None
+    assert policy.limit(PERSONAL_SOURCE, guest=True, environ={}) == 1
+    # Every figure's reason says it is chosen, and names what replaces it.
+    document = json.loads(POLICY.read_text(encoding="utf-8"))
+    assert "A CHOSEN BUDGET" in document["reasons"][GENERATED]
+    assert "chosen, not measured" in document["reasons"]["tiles_a_day"]
+
+
+def test_a_deployment_states_its_own_figures_in_the_variables_the_policy_names():
+    policy = WORLD_COUNT_POLICY
+    document = json.loads(POLICY.read_text(encoding="utf-8"))
+    assert document["environment"] == {
+        "limits.generated": "EXULANICA_WORLDS_HELD",
+        "guest_limits.generated": "EXULANICA_GUEST_WORLDS_HELD",
+        "tiles_a_day.limit": "EXULANICA_TILES_A_DAY",
+        "tiles_a_day.guest_limit": "EXULANICA_GUEST_TILES_A_DAY",
+    }
+    stated = {
+        "EXULANICA_WORLDS_HELD": "3",
+        "EXULANICA_GUEST_WORLDS_HELD": "2",
+        "EXULANICA_TILES_A_DAY": "8",
+        "EXULANICA_GUEST_TILES_A_DAY": "4",
+    }
+    assert policy.limit(GENERATED, environ=stated) == 3
+    assert policy.limit(GENERATED, guest=True, environ=stated) == 2
+    assert policy.tiles_in_a_day(GENERATED, environ=stated) == (8, 86_400)
+    assert policy.tiles_in_a_day(GENERATED, guest=True, environ=stated) == (4, 86_400)
+    # A variable is not read for a kind the policy names none for.
+    assert policy.limit(PERSONAL_SOURCE, environ=stated) == 1
+    # Empty is unset; anything that is not a whole number of at least 1 is refused by name, never
+    # read as no bound.
+    assert policy.limit(GENERATED, environ={"EXULANICA_WORLDS_HELD": " "}) == 24
+    for wrong in ("0", "-1", "many", "2.5", "\u0663"):
+        with pytest.raises(ValueError, match="EXULANICA_WORLDS_HELD must be a whole number"):
+            policy.limit(GENERATED, environ={"EXULANICA_WORLDS_HELD": wrong})
 
 
 @pytest.mark.parametrize(
@@ -96,7 +146,14 @@ def test_the_policy_allows_one_personal_source_world_and_states_every_kind():
         (lambda d: d["limits"].update({PERSONAL_SOURCE: True}), "a limit is null or >= 1"),
         (lambda d: d.update({"scope": "account"}), "only workspace is read"),
         (lambda d: d.update({"version": 0}), "positive integer version"),
-        (lambda d: d.update({"note": "x"}), "limits, policy_id, reasons, scope, version only"),
+        (lambda d: d.update({"note": "x"}), "must state environment, guest_limits, limits"),
+        (lambda d: d["guest_limits"].update({AUTHORED_STARTER: 2}), "a kind it does not count"),
+        (lambda d: d["guest_limits"].update({GENERATED: 0}), "not a whole number >= 1"),
+        (lambda d: d["tiles_a_day"].update({"limit": 0}), "a window in seconds and two figures"),
+        (lambda d: d["tiles_a_day"].update({"kind": "district"}), "two figures"),
+        (lambda d: d["environment"].update({"limits.district": "EXULANICA_X"}), "does not state"),
+        (lambda d: d["environment"].update({"limits.generated": "WORLDS"}), "does not state"),
+        (lambda d: d["reasons"].pop("tiles_a_day"), "and for tiles_a_day"),
         (lambda d: d["reasons"].pop(GENERATED), "a reason for exactly the kinds"),
     ],
 )

@@ -396,7 +396,8 @@ def _arrival(
         world, *_ = load_arrival_worlds()
         with services.database.session(workspace_id) as connection:
             entry = make_arrival_world(
-                SavedWorldEntryRepository(connection, workspace_id, services.store),
+                # A guest's first world, held to a guest's budgets like any they make after it.
+                SavedWorldEntryRepository(connection, workspace_id, services.store, guest=True),
                 world,
                 created_by=actor,
             )

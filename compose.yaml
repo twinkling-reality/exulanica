@@ -126,6 +126,13 @@ services:
       # (docs/deployment.md 5.1.5); empty takes the defaults. Guests' towns play in this process.
       EXULANICA_GUEST_PLAY_SECONDS: ${EXULANICA_GUEST_PLAY_SECONDS:-}
       EXULANICA_GUEST_PLAYING_MAXIMUM: ${EXULANICA_GUEST_PLAYING_MAXIMUM:-}
+      # The world-count policy's figures a deployment states for itself: the generated worlds a
+      # workspace may hold and the tiles its worlds may come to in a day, a signed-in person's and
+      # a guest's. Empty leaves the policy's own (exulanica/world/world-count-policy.v3.json).
+      EXULANICA_WORLDS_HELD: ${EXULANICA_WORLDS_HELD:-}
+      EXULANICA_GUEST_WORLDS_HELD: ${EXULANICA_GUEST_WORLDS_HELD:-}
+      EXULANICA_TILES_A_DAY: ${EXULANICA_TILES_A_DAY:-}
+      EXULANICA_GUEST_TILES_A_DAY: ${EXULANICA_GUEST_TILES_A_DAY:-}
       <<: *society-playback
       # Who plays: "on" (the default), this process in threads; "process", the playback-worker
       # service below, started with `--profile playback`, and this process plays nothing.

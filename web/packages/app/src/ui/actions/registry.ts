@@ -523,8 +523,12 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     icon: 'world', group: 'system', placement: ['palette'], operation: MAKE_GENERATED,
     refusals: {
       world_limit_reached: {
-        happened: 'This workspace already holds as many towns as it may.',
+        happened: 'This workspace already holds as many towns as it may at once.',
         next: 'Open one of the towns you already have instead.',
+      },
+      tile_budget_reached: {
+        happened: 'This workspace has made as many towns as it may in one day.',
+        next: 'You can make another town within a day; open one you already have meanwhile.',
       },
       generated_tiles_not_installed: {
         happened: 'This server cannot build new towns.',

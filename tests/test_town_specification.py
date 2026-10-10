@@ -150,6 +150,7 @@ def test_the_served_specification_states_every_value_its_range_its_reason_and_th
         "specification_value_out_of_range",
         "specification_values_disagree",
         "generated_world_refused",
+        "tile_budget_reached",
         "world_limit_reached",
     }
     # A town three tiles long takes cross streets at least 130 m apart; a town two tiles long takes
@@ -162,6 +163,14 @@ def test_the_served_specification_states_every_value_its_range_its_reason_and_th
     )
     [people] = document["bounds"]["people"]
     assert people["most"] == society_ground_for_composer("city-grammar-town").population
+    # The count policy's own figures, a person's and a guest's, whatever a deployment states.
+    bounds = document["bounds"]
+    assert (
+        bounds["generated_worlds_per_workspace"],
+        bounds["generated_worlds_per_guest_workspace"],
+        bounds["generated_tiles_a_day"],
+        bounds["generated_tiles_a_day_for_a_guest"],
+    ) == (24, 6, 48, 12)
     # The tick budget is a share of the fastest wait between ticks at play, with its measurement.
     tick = document["bounds"]["tick"]
     assert tick["budget_ms_p95"] == tick["fastest_interval_ms"] // tick["share_divisor"]

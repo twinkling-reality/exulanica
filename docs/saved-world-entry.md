@@ -338,14 +338,34 @@ with the kind its stored rows state; no dataset package was registered as a worl
 | `personal-source` | A world composed from the workspace's own photographs and other personal sources | `POST /worlds/personal-source`; composing personal sources into a region; a frontier build manifest |
 | `authored-starter` | A source-independent authored world that starts empty | `POST /world-entries/starter` |
 
-**One personal-source world per account.** `exulanica/world/world-count-policy.v1.json` states,
-for each kind, the most worlds one workspace may hold. Version 1 allows one personal-source world
-and sets no count for authored starters, whose route creates one only for a workspace with no saved
-world. Sign-in gives each account one owned workspace, so the limit is one per account. The server
-checks the policy when a world is created (`register_world` in `exulanica/world/worlds.py`, under
-the workspace lock every world writer takes), and refuses a creation past it with
-`WorldLimitReached` (`world_limit_reached`), which names the kind, the limit and the policy
-version. A policy never removes a world that exists.
+**One personal-source world per account.** `exulanica/world/world-count-policy.v3.json` states,
+for each kind, the most worlds one workspace may hold, with the reason for each figure. It allows
+one personal-source world and sets no count for authored starters, whose route creates one only
+for a workspace with no saved world. Sign-in gives each account one owned workspace, so the limit
+is one per account. The server checks the policy when a world is created (`register_world` in
+`exulanica/world/worlds.py`, under the workspace lock every world writer takes), and refuses a
+creation past it with `WorldLimitReached` (`world_limit_reached`), which names the kind, the limit
+and the policy version. A policy never removes a world that exists.
+
+**Generated worlds have two budgets.** Each is a chosen budget, stated as such in the policy's
+reasons, with one figure for a signed-in person's workspace and one for a guest's:
+
+| Budget | A person's workspace | A guest's | A deployment states its own in |
+| --- | --- | --- | --- |
+| Generated worlds held at once | 24 | 6 | `EXULANICA_WORLDS_HELD`, `EXULANICA_GUEST_WORLDS_HELD` |
+| Tiles its generated worlds may come to in a day | 48 | 12 | `EXULANICA_TILES_A_DAY`, `EXULANICA_GUEST_TILES_A_DAY` |
+
+A making past the worlds held is `world_limit_reached`. A making whose tiles would pass the
+day's is `tile_budget_reached`, a kind of the same refusal, and its words say when room returns:
+a day after the oldest counted world was made. The day's tiles are counted from the worlds the
+workspace made in the last 24 hours and each one's receipt, every tile of a world made, baked
+already or not, and nothing in the count reads whether a world was later removed. A variable that
+is not a whole number of at least 1 refuses the read by name; it is never taken as no bound.
+`GET /worlds/capabilities` reports the worlds held and the figure in force for the caller, a
+guest's for a guest. Version 2 allowed three generated worlds, a figure that bounded tile bakes
+while no route removed a world; no route removes one yet, so worlds held times the recipes' tile
+maximum still bounds every bake a workspace can ever cause. The figures are chosen, not
+measured: a measurement of bake seconds and stored bytes a tile replaces them.
 
 Every route that reads or changes a world's content requires `world_id`: style, source media,
 versions, objects, environments, compositions, interaction settings, the World Read bundles,

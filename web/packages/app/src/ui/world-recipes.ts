@@ -23,6 +23,7 @@
  */
 
 import { problemSentence } from './words/problems.js';
+import { worldBudgetWords } from './words/world-budgets.js';
 import type { SavedWorldEntry } from '../world-entry-api.js';
 import {
   effectiveRange,
@@ -369,7 +370,9 @@ export function buildWorldRecipes(options: {
       making = false;
       for (const button of cards()) button.disabled = false;
       status.textContent = fill('worldRecipes.failed', {
-        reason: problemSentence(error),
+        // The count policy's two budgets are said in the person's terms: which one refused, and
+        // for the day's, when another town can be made by their own clock.
+        reason: problemSentence(error, worldBudgetWords(error)),
       });
       make.disabled = refusal !== null;
     });

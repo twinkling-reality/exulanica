@@ -1,0 +1,31 @@
+{
+  "policy_id": "exulanica.world-count",
+  "version": 3,
+  "scope": "workspace",
+  "limits": {
+    "authored-starter": null,
+    "generated": 24,
+    "personal-source": 1
+  },
+  "guest_limits": {
+    "generated": 6
+  },
+  "tiles_a_day": {
+    "kind": "generated",
+    "window_seconds": 86400,
+    "limit": 48,
+    "guest_limit": 12
+  },
+  "environment": {
+    "limits.generated": "EXULANICA_WORLDS_HELD",
+    "guest_limits.generated": "EXULANICA_GUEST_WORLDS_HELD",
+    "tiles_a_day.limit": "EXULANICA_TILES_A_DAY",
+    "tiles_a_day.guest_limit": "EXULANICA_GUEST_TILES_A_DAY"
+  },
+  "reasons": {
+    "authored-starter": "A starter holds nothing but what its person places in it and costs nothing to make, so the policy does not count starters.",
+    "generated": "A CHOSEN BUDGET, not a measured cost. Holding a generated world costs rows only; what grows with worlds held is the Your worlds page, which reads and draws every card at once. A signed-in person's workspace may hold 24 and a guest's 6; a deployment states its own figures in the environment variables named here. No route removes a world yet, so worlds held times the recipes' tile maximum (exulanica/world/world_recipes.py, TILES_MAXIMUM) still bounds every bake a workspace can ever cause.",
+    "personal-source": "One world is composed from a workspace's own photographs and other personal sources: code that means that world resolves it from the registry, and a second is another version of this policy.",
+    "tiles_a_day": "A CHOSEN BUDGET over the cost the earlier limit of three stood for: tile bakes. A workspace may make generated worlds whose tiles, counted from each world's receipt over the last 24 hours, come to at most 48 for a signed-in person (twelve four-tile towns) and 12 for a guest (six two-tile towns). Every tile of a world made is counted, baked already or not, and a world counts whether or not it is later removed, so removing and making again cannot reopen the bound. The figures are chosen, not measured: one bake of the one-tile town took 13.3 s on the development machine, and a measurement of bake seconds and stored bytes a tile, for each recipe, replaces them."
+  }
+}

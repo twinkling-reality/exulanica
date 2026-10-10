@@ -177,6 +177,7 @@ def create_generated_authorities(
     title: str,
     recipe: WorldRecipe,
     composed: ComposedWorld,
+    guest: bool = False,
 ) -> tuple[uuid.UUID, StyleVersion, uuid.UUID]:
     """Register the world, then write its receipt, snapshot, style, version and bake jobs.
 
@@ -191,6 +192,7 @@ def create_generated_authorities(
         title=title,
         reason=f"generated from world recipe {recipe.key}",
         composed=composed,
+        guest=guest,
     )
 
 
@@ -203,6 +205,7 @@ def create_kind_world_authorities(
     kind: str,
     version: int,
     composed: ComposedWorld,
+    guest: bool = False,
 ) -> tuple[uuid.UUID, StyleVersion, uuid.UUID]:
     """Register a world made from a world kind and write its receipt, snapshot, style and version,
     as :func:`create_generated_authorities` does for a recipe's; a site world has no tiles, so no
@@ -214,6 +217,7 @@ def create_kind_world_authorities(
         title=title,
         reason=f"generated from world kind {kind} version {version}",
         composed=composed,
+        guest=guest,
     )
 
 
@@ -225,6 +229,7 @@ def _create_authorities(
     title: str,
     reason: str,
     composed: ComposedWorld,
+    guest: bool = False,
 ) -> tuple[uuid.UUID, StyleVersion, uuid.UUID]:
     world_id = str(composed.receipt["world_id"])
     register_world(
@@ -234,6 +239,10 @@ def _create_authorities(
         kind=GENERATED,
         created_by=actor,
         reason=reason,
+        # The count policy's budgets: a guest's figures for a guest's workspace, and the tiles
+        # this world's receipt states, which is what its bakes can come to.
+        guest=guest,
+        tiles=len(composed.receipt.get("tiles", ())),
     )
     if receipt_sha256(composed.receipt) != composed.receipt_sha256:
         raise InvalidStructuralData("a generated world's receipt does not match its digest")

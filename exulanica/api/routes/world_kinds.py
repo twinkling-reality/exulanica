@@ -47,6 +47,7 @@ from exulanica.api.dependencies import (
     ReadOnlyConnection,
     ScopedConnection,
     get_services,
+    holds_as_guest,
 )
 from exulanica.api.kind_drafts import (
     KIND_DRAFT_CODES,
@@ -107,6 +108,7 @@ from exulanica.world.world_recipes import (
     specification_document,
 )
 from exulanica.world.worlds import (
+    TileBudgetReached,
     WorldLimitReached,
     WorldsReadOnly,
     require_world,
@@ -779,6 +781,7 @@ def create_kind_world(
     connection: ScopedConnection,
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
+    guest: Annotated[bool, Depends(holds_as_guest)],
 ) -> SavedWorldEntryView | JSONResponse:
     """Make a world of ``kind`` with a preset and values, for a new identity, and save its entry.
 
@@ -795,7 +798,9 @@ def create_kind_world(
         require_world_registration(connection)
     except WorldsReadOnly as exc:
         return _problem(403, exc.code, str(exc))
-    entries = SavedWorldEntryRepository(connection, session.workspace_id, services.store)
+    entries = SavedWorldEntryRepository(
+        connection, session.workspace_id, services.store, guest=guest
+    )
     try:
         if kind == town_adapter().kind and body.version in (None, town_adapter().version):
             created = entries.create_generated(
@@ -839,6 +844,8 @@ def create_kind_world(
         return _problem(409, exc.code, str(exc), refusals=list(exc.refusals))
     except KindWorkWaiting as exc:
         return _problem(503, exc.code, str(exc), headers={"Retry-After": str(exc.retry_seconds)})
+    except TileBudgetReached as exc:
+        return _problem(409, exc.code, str(exc), returns_at=exc.returns_at.isoformat())
     except (GeneratedWorldRefused, UnknownWorldComposer, WorldLimitReached) as exc:
         return _problem(409, exc.code, str(exc))
     return _view(created, societies_of_things=services.societies_of_things)

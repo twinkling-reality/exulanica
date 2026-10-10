@@ -50,6 +50,7 @@ from exulanica.api.dependencies import (
     HeldPermissions,
     ScopedConnection,
     get_services,
+    holds_as_guest,
 )
 from exulanica.api.permissions import Permission, Requires, rule_for
 from exulanica.api.role_hosts import RoleContext
@@ -219,7 +220,10 @@ def _generated(
         # The creation route's own early checks, which may be stale and are never a permission:
         # a role that cannot register a world, then the count policy.
         require_world_registration(connection)
-        refuse_past_limit(connection, session.workspace_id, GENERATED)
+        # Asked for the smallest world there is, one tile: whether any town can be made now.
+        refuse_past_limit(
+            connection, session.workspace_id, GENERATED, guest=holds_as_guest(request), tiles=1
+        )
         state = AVAILABLE
     except (WorldsReadOnly, WorldLimitReached) as exc:
         state = unavailable(exc.code)
@@ -282,6 +286,7 @@ def world_creation(
 ) -> dict[str, Any]:
     services = get_services(request)
     policy = current_world_count_policy()
+    guest = holds_as_guest(request)
     counts = Counter(world.kind for world in workspace_worlds(connection, session.workspace_id))
     routes = surface(request.app)
     facts = installation_facts_of(services)
@@ -292,7 +297,7 @@ def world_creation(
             {
                 "kind": kind.name,
                 "held": counts[kind.name],
-                "limit": policy.limit(kind.name),
+                "limit": policy.limit(kind.name, guest=guest),
                 "kind_facts": _kind_facts(kind),
                 "create": None
                 if creator is None

@@ -160,7 +160,8 @@ def test_what_a_workspace_may_make_follows_what_it_holds(api):
     assert kinds["authored-starter"]["create"]["operation"] == "POST /world-entries/starter"
     assert kinds["authored-starter"]["create"]["state"] == "available"
     assert kinds["generated"]["create"]["state"] == "available"
-    assert kinds["generated"]["limit"] == 3 and kinds["generated"]["held"] == 0
+    # The count policy's own figure for a signed-in person's workspace.
+    assert kinds["generated"]["limit"] == 24 and kinds["generated"]["held"] == 0
     assert kinds["generated"]["create"]["options"] == [
         "GET /worlds/recipes",
         "GET /worlds/specification",
@@ -193,6 +194,27 @@ def test_what_a_workspace_may_make_follows_what_it_holds(api):
     )
     refused = api.post("/world-entries/starter", {"title": "Another"})
     assert refused.status_code == 409 and refused.json()["code"] == "saved_world_conflict"
+
+
+def test_making_a_town_is_unavailable_by_the_budget_that_refuses_it(api, monkeypatch):
+    """The read reports the figure in force, a deployment's own where it states one, and names
+    which of the two budgets leaves no room: the worlds held, or the day's tiles."""
+    monkeypatch.setenv("EXULANICA_WORLDS_HELD", "5")
+    monkeypatch.setenv("EXULANICA_TILES_A_DAY", "2")
+    assert _creation(api)["generated"]["limit"] == 5
+    made = api.post("/worlds/generated", {"recipe": "small_town", "title": "Today's town"})
+    assert made.status_code == 201, made.text
+    generated = _creation(api)["generated"]
+    assert generated["held"] == 1
+    # One two-tile town is all of a day's two tiles: no room for even one tile more.
+    assert (generated["create"]["state"], generated["create"]["code"]) == (
+        "unavailable",
+        "tile_budget_reached",
+    )
+    monkeypatch.setenv("EXULANICA_TILES_A_DAY", "48")
+    monkeypatch.setenv("EXULANICA_WORLDS_HELD", "1")
+    generated = _creation(api)["generated"]
+    assert (generated["limit"], generated["create"]["code"]) == (1, "world_limit_reached")
 
 
 def test_a_caller_who_may_not_read_admission_is_told_it_is_not_known(api):

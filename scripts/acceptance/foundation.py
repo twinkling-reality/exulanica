@@ -81,7 +81,9 @@ STARTER_REGION = "region:starter"
 SAVED_WORLD_SOCIETY = "exulanica-society/v2"
 #: How many simulated minutes N1.d may advance before the response is declared not observed.
 JOURNEY_MINUTES_MAXIMUM = 60
-#: How many generated towns the count policy allows a workspace; the next is refused.
+#: How many generated towns a workspace of the acceptance stack may hold; the next is refused.
+#: The stack states it to the API (scripts/acceptance/launch.py, WORLDS_HELD), as a deployment
+#: states its own figure in place of the count policy's.
 GENERATED_WORLDS_ALLOWED = 3
 #: How long the tile worker may take to bake the towns' tiles before A2's bake outcome fails.
 BAKE_SECONDS = 900
