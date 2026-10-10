@@ -402,9 +402,10 @@ town's receipt or digest depends on the adapter.
   dresses with a texture set takes its material where its words name one, and otherwise its
   family's `default`.
 - A surface is drawn in one flat colour for its material
-  ([style pack contract](style-pack-contract.md), section 3). The shape of what wears it does not
-  follow its words: every structure is a box under a slab or a gable, so a tent is a canvas
-  coloured box.
+  ([style pack contract](style-pack-contract.md), section 3). A roof is shaped by its material
+  (thatch steep and overhanging, a canvas roof a tent's, an earth roof a slab with a parapet); the
+  walls under it are not: every structure but a tent is a box of walls, and a tall thing standing
+  near a tent's side shows through its canvas.
 - Beyond an open site its own base ground runs out to the pack's reach, flat. What surrounds a
   place is not read from its words: an island has no sea round it and a forest camp no tree.
 - A draft's state lives in the API process that started it, so drafting needs one API process or

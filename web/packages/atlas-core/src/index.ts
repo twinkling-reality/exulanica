@@ -708,6 +708,8 @@ export {
   readWorldSetting,
   readWorldSettingRules,
 } from './world-setting.js';
+export type { RidgeRuns, RoofForm, RoofForms } from './roof-form.js';
+export { ROOF_FORM_CATALOG_ID, readRoofForms } from './roof-form.js';
 export type { MaterialDressing, SurfaceMaterial, SurfaceMaterials } from './surface-material.js';
 export {
   SURFACE_MATERIAL_CATALOG_ID, materialOfLeaf, readSurfaceMaterials, resolveSurfaceLookRole, unknownSurfaceLeaf,

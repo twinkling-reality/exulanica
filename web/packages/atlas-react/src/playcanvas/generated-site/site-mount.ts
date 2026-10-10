@@ -1,4 +1,4 @@
-import { materialOfLeaf, unknownSurfaceLeaf, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { materialOfLeaf, unknownSurfaceLeaf, type RoofForms, type SurfaceMaterials } from '@exulanica/atlas-core';
 import type * as pc from 'playcanvas';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
 import { applyTileEnvironment } from '../generated-tile/environment.js';
@@ -50,6 +50,8 @@ export interface SiteMountOptions {
    * dresser does.
    */
   readonly materials?: SurfaceMaterials;
+  /** The roof form catalog a roof is shaped by, through its material; none draws every roof as served. */
+  readonly roofForms?: RoofForms;
 }
 
 /**
@@ -82,7 +84,7 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
       const environment = applyTileEnvironment(host.app, host.camera, look);
       const materials = options.materials ?? null;
-      const slots = drawSiteSlots(host.app.graphicsDevice, drawing, materials);
+      const slots = drawSiteSlots(host.app.graphicsDevice, drawing, materials, options.roofForms ?? null);
       host.environmentRoot.addChild(slots.root);
       const undress = options.dress?.(host, slots, drawing) ?? null;
       // The ground beyond: the look's own plane, drawn in what the dressed base ground is drawn in.

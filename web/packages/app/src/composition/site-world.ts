@@ -129,10 +129,11 @@ async function siteInLook(
   search: string,
   bound: WorldStylePackBinding | null,
 ): Promise<SiteWorld> {
-  const [{ siteMount }, worldLook, { SURFACE_MATERIALS: materials }] = await Promise.all([
+  const [{ siteMount }, worldLook, { SURFACE_MATERIALS: materials }, { ROOF_FORMS: roofForms }] = await Promise.all([
     import('@exulanica/atlas-react/generated-site'),
     import('../world-look.js'),
     import('../surface-materials.js'),
+    import('../roof-forms.js'),
   ]);
   /** The pack a choice draws: its own, or for the default the pack the host's list marks so, by its digest. */
   const resolved = async (choice: WorldLookChoice): Promise<WorldLookChoice> => {
@@ -143,14 +144,14 @@ async function siteInLook(
   };
   /** The mount in a resolved choice's pack, or in the tile look for none. Throws when the pack cannot be read. */
   const mounted = async (choice: WorldLookChoice): Promise<GeneratedSiteMount> => {
-    if (choice.packId === null) return siteMount(drawing, { servedBytes, materials });
+    if (choice.packId === null) return siteMount(drawing, { servedBytes, materials, roofForms });
     const [library, { packSiteDresser }] = await Promise.all([
       import('../texture-library.js').then((module) => module.committedTextureLibrary()),
       import('@exulanica/atlas-react/style-pack'),
     ]);
     const prepared = await worldLook.prepareWorldLook(access, choice.packId, library.textureManifest, [], choice.manifestSha256, null, choice.setting ?? null);
     const dress = packSiteDresser({ pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading, materials });
-    return siteMount(drawing, { servedBytes, look: prepared.look, dress, materials });
+    return siteMount(drawing, { servedBytes, look: prepared.look, dress, materials, roofForms });
   };
   let choice = worldLook.worldLookChoice(search, bound);
   let mount: GeneratedSiteMount;
@@ -160,7 +161,7 @@ async function siteInLook(
     mount = await mounted(choice);
   } catch (error) {
     reason = error instanceof Error ? error.message : String(error);
-    mount = siteMount(drawing, { servedBytes, materials });
+    mount = siteMount(drawing, { servedBytes, materials, roofForms });
   }
   return {
     mount,

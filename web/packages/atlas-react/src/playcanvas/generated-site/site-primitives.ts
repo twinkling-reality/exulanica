@@ -1,6 +1,7 @@
 import * as pc from 'playcanvas';
-import { materialOfLeaf, type SurfaceMaterials } from '@exulanica/atlas-core';
+import { materialOfLeaf, type RoofForms, type SurfaceMaterials } from '@exulanica/atlas-core';
 import type { SiteDrawing, SiteSlot } from './site-drawing.js';
+import { shapeRoofs } from './site-roofs.js';
 
 /**
  * A site world's slots drawn as the engine's own primitives, in the engine's own colours.
@@ -101,8 +102,12 @@ export interface DrawnSiteSlots {
   destroy(): void;
 }
 
-/** Draw every slot of a site under a new root, at the site's origin in the renderer's frame, each in its leaf's material where `catalog` names one. */
-export function drawSiteSlots(device: pc.GraphicsDevice, drawing: SiteDrawing, catalog: SurfaceMaterials | null = null): DrawnSiteSlots {
+/**
+ * Draw every slot of a site under a new root, at the site's origin in the renderer's frame, each in its
+ * leaf's material where `catalog` names one, and each roof in its material's form where `roofForms`
+ * shapes it (`shapeRoofs`); the wall pieces a tent stands in place of are not drawn.
+ */
+export function drawSiteSlots(device: pc.GraphicsDevice, drawing: SiteDrawing, catalog: SurfaceMaterials | null = null, roofForms: RoofForms | null = null): DrawnSiteSlots {
   const root = new pc.Entity(`generated-site:${drawing.worldId}`);
   const materials = new Map<string, pc.StandardMaterial>();
   const material = (rgb: Rgb): pc.StandardMaterial => {
@@ -123,8 +128,31 @@ export function drawSiteSlots(device: pc.GraphicsDevice, drawing: SiteDrawing, c
   const entities = new Map<string, pc.Entity>();
   let drawn = 0;
   let triangles = 0;
+  // Roofs their material's form shapes, and the wall pieces a tent's canvas stands in place of.
+  const roofs = shapeRoofs(drawing, catalog, roofForms);
+  const shaped: pc.Mesh[] = [];
   for (const slot of drawing.slots) {
-    if (slot.primitive === 'none') continue;
+    if (slot.primitive === 'none' || roofs.undrawn.has(slot.identity)) continue;
+    const roof = roofs.meshes.get(slot.identity);
+    if (roof !== undefined) {
+      // Worked in the site's own axes at the slot's base, so the entity is not turned.
+      const entity = new pc.Entity(slot.identity);
+      entity.setLocalPosition(slot.positionMm[0] / MILLIMETRES, slot.positionMm[2] / MILLIMETRES, -slot.positionMm[1] / MILLIMETRES);
+      const mesh = new pc.Mesh(device);
+      mesh.setPositions(roof.positions);
+      mesh.setNormals(roof.normals);
+      mesh.setIndices(roof.indices);
+      mesh.update();
+      shaped.push(mesh);
+      const shape = new pc.Entity(`${slot.identity}:shape`);
+      shape.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, material(slotColour(slot, drawing.extent.enclosure, catalog)))], castShadows: true });
+      entity.addChild(shape);
+      root.addChild(entity);
+      entities.set(slot.identity, entity);
+      drawn += 1;
+      triangles += roof.indices.length / 3;
+      continue;
+    }
     const [x, y, z] = slot.positionMm;
     const [width, depth, height] = slot.boxMm.map((v) => v / MILLIMETRES) as unknown as [number, number, number];
     const entity = new pc.Entity(slot.identity);
@@ -165,6 +193,7 @@ export function drawSiteSlots(device: pc.GraphicsDevice, drawing: SiteDrawing, c
       root.destroy();
       for (const made of materials.values()) made.destroy();
       gable?.destroy();
+      for (const mesh of shaped) mesh.destroy();
     },
   };
 }

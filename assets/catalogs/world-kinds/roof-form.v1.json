@@ -1,0 +1,151 @@
+{
+ "schema_version": 1,
+ "catalog_id": "roof-form",
+ "catalog_version": 1,
+ "entries": [
+  {
+   "key": "thatch",
+   "ridge_pitch_permille": 1000,
+   "ridge_overhang_mm": 450,
+   "ridge_thickness_mm": 300,
+   "ridge_runs": "long_side",
+   "ridge_eaves": "wall",
+   "slab_parapet_mm": 0,
+   "slab_parapet_thickness_mm": 0,
+   "reason": "Authored: thatch sheds water only when steep, so a thatched ridge rises as far as it runs (45 degrees), is laid thick, and overhangs its walls deeply to throw water clear of them. Its ridge runs along the building's longer side, as a roof spanning the shorter side does. Each figure is a chosen default, picked by eye from how such roofs are commonly built; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "slate",
+   "ridge_pitch_permille": 700,
+   "ridge_overhang_mm": 250,
+   "ridge_thickness_mm": 80,
+   "ridge_runs": "long_side",
+   "ridge_eaves": "wall",
+   "slab_parapet_mm": 0,
+   "slab_parapet_thickness_mm": 0,
+   "reason": "Authored: slate lies at a moderate pitch on a thin deck with a short overhang; its ridge runs along the building's longer side. Each figure is a chosen default, picked by eye from how such roofs are commonly built; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "roof_tile",
+   "ridge_pitch_permille": 600,
+   "ridge_overhang_mm": 300,
+   "ridge_thickness_mm": 100,
+   "ridge_runs": "long_side",
+   "ridge_eaves": "wall",
+   "slab_parapet_mm": 0,
+   "slab_parapet_thickness_mm": 0,
+   "reason": "Authored: clay tiles lie shallower than slate and overhang a little more; the ridge runs along the building's longer side. Each figure is a chosen default, picked by eye from how such roofs are commonly built; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "timber",
+   "ridge_pitch_permille": 700,
+   "ridge_overhang_mm": 300,
+   "ridge_thickness_mm": 80,
+   "ridge_runs": "long_side",
+   "ridge_eaves": "wall",
+   "slab_parapet_mm": 150,
+   "slab_parapet_thickness_mm": 120,
+   "reason": "Authored: a boarded or shingled roof, at a moderate pitch with a modest overhang; the ridge runs along the building's longer side. A flat timber roof is a deck with a low kerb round it. Each figure is a chosen default, picked by eye from how such roofs are commonly built; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "metal",
+   "ridge_pitch_permille": 350,
+   "ridge_overhang_mm": 150,
+   "ridge_thickness_mm": 40,
+   "ridge_runs": "long_side",
+   "ridge_eaves": "wall",
+   "slab_parapet_mm": 0,
+   "slab_parapet_thickness_mm": 0,
+   "reason": "Authored: sheet metal sheds water at a shallow pitch and is thin, with a small overhang; the ridge runs along the building's longer side. Each figure is a chosen default, picked by eye from how such roofs are commonly built; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "canvas",
+   "ridge_pitch_permille": 1200,
+   "ridge_overhang_mm": 0,
+   "ridge_thickness_mm": 0,
+   "ridge_runs": "door_axis",
+   "ridge_eaves": "ground",
+   "slab_parapet_mm": 0,
+   "slab_parapet_thickness_mm": 0,
+   "reason": "Authored: a canvas roof is a tent's: its two sides run from the ridge down to the ground, so the walls beside them are not drawn (they stay in the walk, since nobody walks through canvas), and its ridge runs along the way the door faces, so the door stands in an end. It rises a little more than it runs, which gives standing room along the middle. Each figure is a chosen default, picked by eye from how such roofs are commonly built; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "adobe",
+   "ridge_pitch_permille": 0,
+   "ridge_overhang_mm": 0,
+   "ridge_thickness_mm": 0,
+   "ridge_runs": "as_served",
+   "ridge_eaves": "wall",
+   "slab_parapet_mm": 450,
+   "slab_parapet_thickness_mm": 300,
+   "reason": "Authored: an earth roof is flat, and its walls rise above it as a parapet a person could sit on; a pitched adobe roof is left as it is served. Each figure is a chosen default, picked by eye from how such roofs are commonly built; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "concrete",
+   "ridge_pitch_permille": 0,
+   "ridge_overhang_mm": 0,
+   "ridge_thickness_mm": 0,
+   "ridge_runs": "as_served",
+   "ridge_eaves": "wall",
+   "slab_parapet_mm": 300,
+   "slab_parapet_thickness_mm": 200,
+   "reason": "Authored: a flat concrete roof has a low upstand round its edge; a pitched one is left as it is served. Each figure is a chosen default, picked by eye from how such roofs are commonly built; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  }
+ ]
+}

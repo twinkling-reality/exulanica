@@ -8,7 +8,7 @@
  * roof. It is a test fixture, not a site a kind generated.
  */
 import { readFileSync } from 'node:fs';
-import { isNavigationPositionClear, atlasVec3, readSurfaceMaterials } from '@exulanica/atlas-core';
+import { isNavigationPositionClear, atlasVec3, readRoofForms, readSurfaceMaterials } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import { describe, expect, it } from 'vitest';
 import {
@@ -115,6 +115,7 @@ describe('walking a site', () => {
 
 // Relative to web/, where the suite runs: the catalog a deployment ships.
 const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-kinds/surface-material.v2.json', 'utf8'));
+const ROOF_FORMS = readRoofForms(readFileSync('../assets/catalogs/world-kinds/roof-form.v1.json', 'utf8'));
 const bytes = (rgb: readonly number[]): number[] => rgb.map((channel) => Math.round(channel * 255));
 /** The default light of the committed cozy town pack, which states a ground beyond the world: a lawn, 0.6 m down. */
 const COZY = JSON.parse(readFileSync('../assets/style-packs/packs/exulanica.cozy-town/manifest.json', 'utf8')) as {
@@ -248,6 +249,36 @@ describe('drawing a site', () => {
       expect('siteGroundBeyond' in (app.graphicsDevice.canvas as HTMLCanvasElement).dataset).toBe(false);
       attachment.dispose();
     }
+  });
+
+  it('draws a roof in its material\'s form where the mount carries the roof forms, and not the walls a tent stands in place of', () => {
+    // The yard's shed, roofed in canvas: a tent. Its three wall pieces are inside its footprint.
+    const camp = parseSiteDrawing({ ...served(), slots: (served()['slots'] as { identity: string }[]).map((one) => (one.identity === 'shed:roof' ? { ...one, lookRole: 'roof.tent' } : one)) });
+    const { app } = nullApp();
+    const plain = drawSiteSlots(app.graphicsDevice, camp, MATERIALS);
+    const shaped = drawSiteSlots(app.graphicsDevice, camp, MATERIALS, ROOF_FORMS);
+    // As served: the prism, turned by the slot, and every wall piece.
+    expect(plain.drawn).toBe(6);
+    expect(plain.triangles).toBe(2 + 3 * 12 + 8 + 12);
+    // In its form: the tent's own mesh in the site's axes, with no wall piece under it.
+    expect([...shaped.entities.keys()].sort()).toEqual(['bench', 'ground', 'shed:roof']);
+    const roof = shaped.entities.get('shed:roof')!;
+    expect(xyz(roof.getLocalPosition())).toEqual([5, 2.4, -8.5]);
+    expect(roof.getLocalEulerAngles().y).toBeCloseTo(0);
+    const mesh = (roof.findByName('shed:roof:shape') as pc.Entity).render!.meshInstances[0]!;
+    // Canvas, like any slot of that material; two sides and two ends, the door left open in one.
+    expect(bytes([...'rgb'].map((channel) => (mesh.material as pc.StandardMaterial).diffuse[channel as 'r']))).toEqual([...MATERIALS.materials.find((m) => m.key === 'canvas')!.swatch.srgb8]);
+    expect(shaped.triangles).toBe(2 + 12 + mesh.mesh.primitive[0]!.count / 3);
+    expect(mesh.mesh.primitive[0]!.count / 3).toBeGreaterThan(8);
+    // Without the materials a roof's leaf is not read, so nothing is shaped.
+    expect(drawSiteSlots(app.graphicsDevice, camp, null, ROOF_FORMS).drawn).toBe(6);
+    plain.destroy();
+    shaped.destroy();
+    // The mount hands the forms on: three slots drawn, not six.
+    const mounted = nullApp();
+    const attachment = siteMount(camp, { servedBytes: 1, materials: MATERIALS, roofForms: ROOF_FORMS }).attach(mounted);
+    expect(attachment.metrics.drawBatches).toBe(3);
+    attachment.dispose();
   });
 
   it('hands a dresser every drawn slot by identity and undresses before the slots go', () => {
