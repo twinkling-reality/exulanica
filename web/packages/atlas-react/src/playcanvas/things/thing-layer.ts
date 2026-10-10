@@ -388,8 +388,9 @@ export class ThingLayer {
    * Draw what a society of things says about the version's things, or the version alone with null.
    * Its beings are its people, drawn by the crowd (`figures`), so their standing figures here are
    * not drawn; each object stands where the state puts it, or is held in its holder's socket, and
-   * one the state does not list (carried away) is not drawn. A state from before v7 lists no things
-   * and changes nothing here.
+   * one the state does not list (carried away) is not drawn. A thing of a kind its workspace keeps
+   * that is none of the state's people lives in no society, so it stands where its version places
+   * it. A state from before v7 lists no things and changes nothing here.
    *
    * A thing that changes hands, or is picked up or put down, moves when the people it passes between
    * have walked to where the state ends their walks (`walkEnded`, the crowd's): the later of the two
@@ -410,7 +411,8 @@ export class ThingLayer {
       this.pending.clear();
     } else {
       const target = new Map(state.things.map((thing) => [thingKey(thing), thing as HeldThing]));
-      this.society = { things: target, figures, walkEnded, leaving };
+      const beings = new Set(state.inhabitants.map((person) => person.placed_id).filter((id): id is string => id != null));
+      this.society = { things: target, beings, figures, walkEnded, leaving };
       for (const [key, thing] of target) {
         const shown = this.shown.get(key);
         if (shown === undefined || holderOf(shown) === holderOf(thing)) {
@@ -433,6 +435,8 @@ export class ThingLayer {
 
   private society: {
     readonly things: ReadonlyMap<string, HeldThing>;
+    /** The placed ids of the state's people: the placed beings the crowd draws. */
+    readonly beings: ReadonlySet<string>;
     readonly figures: ThingCrowdFigures | null;
     readonly walkEnded: (subjectId: string) => boolean;
     readonly leaving: (subjectId: string) => boolean;
@@ -507,9 +511,10 @@ export class ThingLayer {
         continue;
       }
       // Not among the state's things: a being (the crowd draws it as one of the society's people)
-      // or an object carried away.
+      // or an object carried away. A thing of a kind its workspace keeps that is none of the state's
+      // people is in no society, so it stands where its version places it.
       if (thing === undefined) {
-        figure.setVisible(false);
+        figure.setVisible(entry.record.kind.source === 'workspace' && !society.beings.has(entry.record.thingId));
         continue;
       }
       if (holder !== null) {
