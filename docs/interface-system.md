@@ -193,9 +193,17 @@ Create a world (`ui/world-recipes.ts`, `ui/world-description.ts`, `ui/create-wor
 sheet in the same language: describing the town in the person's own words comes first, the recipes
 as picture cards under it, and the values with Create this town in the right column; the shares
 that set the mix of buildings and shops sit behind one disclosure. Above Create this town a Look
-row names the look the town will be made in, the host's default (the pack `GET /world/style-packs`
-marks default) until the person chooses another; Change look opens the Look sheet to choose only
-(Choose this look, nothing saved), and the town is made bound to the look chosen (`style_pack` on
+row (`composition/town-look.ts`) names the look the town will be made in and why it is that one:
+the host's default (the pack `GET /world/style-packs` marks default), the person's own choice, or
+their words. Change look opens the Look sheet to choose only (Choose this look, nothing saved). A
+draft whose words ask for a look says so in one line right under the person's words: the look, the
+open model that chose it, and the words that chose it. Use these values takes that look with the
+values, and the row then says it came from the person's words
+([the look offer](style-pack-contract.md#101-a-look-offered-from-a-description)). The look follows
+the draft that is taken: a later draft whose words ask for no look returns the row to the host's
+default, with none of the earlier words quoted. A look the person chose in the sheet is never
+replaced by a draft: the line says it stays and offers the other with one press, and a look taken
+by that press is theirs too. The town is made bound to the look shown (`style_pack` on
 `POST /worlds/generated`). Escape goes back; Command or
 Control with Enter creates the town once its values are admitted.
 

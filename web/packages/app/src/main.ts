@@ -74,9 +74,10 @@ import { button, errorState } from './ui/system/components.js';
 import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system/layout.js';
 import { mountActions, type MountedActions } from './composition/actions.js';
 import { redrawWorldLook } from './composition/world-look-redraw.js';
-import { buildLookRow, buildLookSheet } from './ui/look-sheet.js';
+import { buildLookSheet } from './ui/look-sheet.js';
 import type { WorldStylePackBinding } from './world-style-api.js';
 import { readLookLibrary, type LookLibrary } from './composition/look-library.js';
+import { buildTownLook } from './composition/town-look.js';
 import { fill, say } from './ui/copy.js';
 import { actionState, perform } from './ui/actions/surfaces.js';
 import { actionSpec, availability } from './ui/actions/registry.js';
@@ -365,44 +366,13 @@ function showWorldRecipes(
       if (!stand.isConnected) return;
       const specification = new WorldSpecificationClient(credentials);
       const kinds = new WorldKindsClient(credentials);
-      // The look the town is made in: the host's default until the person changes it, sent with
-      // the making so the town is bound to it (`style_pack` on POST /worlds/generated).
-      let looks: LookLibrary | null = null;
-      let chosenLook: string | null = null;
-      const lookRow = buildLookRow(() => {
-        if (looks === null) return;
-        const library = looks;
-        shell.querySelector('section.look-sheet')?.remove();
-        const sheet = buildLookSheet({
-          worldTitle: 'A new town',
-          choosing: { use: 'Choose this look', now: 'Chosen' },
-          onUse: async (option) => {
-            chosenLook = option.packId;
-            lookRow.show(option, 'Your choice. You can change it any time later in Design.');
-            sheet.root.remove();
-            current.querySelector<HTMLElement>('.look-row-change')?.focus({ preventScroll: true });
-            return '';
-          },
-          onClose: () => {
-            sheet.root.remove();
-            current.querySelector<HTMLElement>('.look-row-change')?.focus({ preventScroll: true });
-          },
-        });
-        shell.append(sheet.root);
-        sheet.show(library.options, chosenLook ?? library.defaultId);
-        sheet.focus();
-      });
-      void readLookLibrary(credentials).then((library) => {
-        looks = library;
-        const first = library.options.find((option) => option.packId === library.defaultId);
-        if (first === undefined) return;
-        lookRow.show(first, 'The look this server draws new towns in. You can change it now, or any time later in Design.');
-      }, () => undefined);
+      // The look the town is made in: the host's default until the person changes it or takes
+      // the look a draft of their words offers, sent with the making so the town is bound to it
+      // (`style_pack` on POST /worlds/generated).
+      const look = buildTownLook({ library: readLookLibrary(credentials), host: shell });
       const panel = buildWorldRecipes({
         specification: () => specification.specification(),
-        make: (preset, values) => client.makeGenerated(
-          preset.key, preset.label, values, chosenLook === null ? null : looks?.binding(chosenLook) ?? null,
-        ),
+        make: (preset, values) => client.makeGenerated(preset.key, preset.label, values, look.binding()),
         open: async (entry) => {
           panel.root.remove();
           state.savedWorldEntries = await client.entries();
@@ -429,9 +399,11 @@ function showWorldRecipes(
       current = panel.root;
       // Focus moves into the panel as it replaces the stand-in, which took it with it; Describe it
       // takes it once attached (composition/world-description.ts).
-      panel.lookSlot.append(lookRow.root);
+      panel.lookSlot.append(look.row);
       panel.focus();
-      attachWorldDescription(panel, { credentials, specification: () => specification.specification() });
+      attachWorldDescription(panel, {
+        credentials, specification: () => specification.specification(), look: look.drafted,
+      });
       // A saved world's own values, loaded as a person's edit is: what is out of range now is said
       // by the panel's own check, and the world they came from never changes.
       if (start !== null) {

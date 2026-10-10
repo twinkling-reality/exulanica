@@ -2,14 +2,19 @@
 // Describing a town in the person's own words: the page reads the drafting route's document
 // strictly, has words for every status and refusal the server names (held here to the Python that
 // states them), shows the person's words and the parts no value can say in their own words, and
-// hands only a valid proposal's preset and values to the specification panel.
+// hands only a valid proposal's preset and values to the specification panel. The answer's optional
+// look offer is read in every state the contract lists and never refuses the draft; the panel says
+// an offered look in one line and takes it with the values.
 import { readFileSync } from 'node:fs';
 import { URL as FileUrl } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
   DRAFT_REFUSALS,
+  LOOK_OFFER_STATES,
   SAMPLE_STATUSES,
   parseWorldDraft,
+  type LookOffer,
+  type OfferedLook,
   type WorldDraft,
 } from '../src/world-draft-api.js';
 import { say } from '../src/ui/copy.js';
@@ -23,6 +28,8 @@ import {
   UNIT_WORDS,
   buildWorldDescription,
   draftLines,
+  lookLine,
+  type DraftLook,
   type SpecificationWords,
 } from '../src/ui/world-description.js';
 
@@ -71,6 +78,42 @@ const body = {
 function visibleText(root: HTMLElement): string {
   return root.textContent ?? '';
 }
+
+/** One call of the look step as the route's `execution` lists it (`ModelCallView`). */
+const lookCall = (overrides: Record<string, unknown> = {}) => ({
+  role: 'look_chooser', requested_model: 'example/chooser', served_model: 'example/chooser',
+  requested_model_name: 'Chooser Model', served_model_name: 'Chooser Model', used_fallback: false,
+  attempts: 1, latency_ms: 900, prompt_tokens: 210, completion_tokens: 24, reasoning_tokens: null,
+  usd: '0.0001', served_model_unavailable: null, outcome: 'completed', cost_basis: 'known',
+  ...overrides,
+});
+
+/** A look offer as the route serves it (`LookOfferView`), offered unless overridden. */
+const lookOffer = (overrides: Record<string, unknown> = {}) => ({
+  state: 'offered', reason: null, pack_id: 'exulanica.toon-town', version: 3,
+  manifest_sha256: 'd'.repeat(64), look_words: ['bright cartoon', 'toy box'],
+  prompt_version: 'look-choosing-1', prompt_sha256: 'e'.repeat(64),
+  execution: { prompt_version: 'look-choosing-1', rejections: [], calls: [lookCall()] },
+  ...overrides,
+});
+
+/** A state's offer as the route serves it: only an offered look names a pack and words. */
+const lookOfferIn = (state: string) => (state === 'offered' ? lookOffer() : lookOffer({
+  state, reason: state === 'unavailable' ? 'timed_out' : null, pack_id: null, version: null,
+  manifest_sha256: null, look_words: [],
+}));
+
+/** The states the contract's table lists for a look offer (section 10.1), in its order. */
+function contractLookStates(): string[] {
+  const contract = python('docs/style-pack-contract.md');
+  const table = contract.slice(contract.indexOf('| `state` | Meaning |', contract.indexOf('### 10.1 ')));
+  return [...table.slice(0, table.indexOf('\n\n')).matchAll(/^\| `(\w+)` \|/gm)]
+    .map((row) => row[1]!).filter((state) => state !== 'state');
+}
+
+/** A committed pack's title, as its own manifest states it. */
+const packTitle = (packId: string): string => (
+  JSON.parse(python(`assets/style-packs/packs/${packId}/manifest.json`)) as { title: string }).title;
 
 describe('the drafting route document', () => {
   it('names the statuses and refusals the server names', () => {
@@ -129,11 +172,112 @@ describe('the drafting route document', () => {
   });
 });
 
+describe('the look a draft offers', () => {
+  it('names the states the contract and the server name', () => {
+    const contract = contractLookStates();
+    expect(contract).toEqual(['offered', 'none', 'unavailable']);
+    expect([...LOOK_OFFER_STATES]).toEqual(contract);
+    const served = /class LookOfferView[\s\S]*?state: Literal\[([^\]]+)\]/.exec(
+      python('exulanica/api/routes/world_drafts.py'),
+    )![1]!.match(/"(\w+)"/g)!.map((quoted) => quoted.slice(1, -1));
+    expect(served.sort()).toEqual([...contract].sort());
+  });
+
+  it('is read in every state the contract lists, and is none where the answer carries none', () => {
+    for (const state of contractLookStates()) {
+      expect(parseWorldDraft({ ...body, look_offer: lookOfferIn(state) }).lookOffer?.state).toBe(state);
+    }
+    expect(parseWorldDraft({ ...body, look_offer: lookOffer() }).lookOffer).toEqual({
+      state: 'offered', packId: 'exulanica.toon-town', version: 3, manifestSha256: 'd'.repeat(64),
+      lookWords: ['bright cartoon', 'toy box'], modelName: 'Chooser Model',
+    });
+    // Absent from an answer written before the offer, and null for a refused draft.
+    expect(parseWorldDraft(body).lookOffer).toBeNull();
+    expect(parseWorldDraft({ ...body, look_offer: null }).lookOffer).toBeNull();
+  });
+
+  it('never refuses the draft it came with: an unknown state or field is passed over', () => {
+    const unreadable: unknown[] = [
+      lookOffer({ state: 'suggested' }),
+      lookOffer({ manifest_sha256: null }),
+      lookOffer({ manifest_sha256: 'not-a-digest' }),
+      lookOffer({ version: '3' }),
+      lookOffer({ pack_id: null }),
+      lookOffer({ look_words: [] }),
+      lookOffer({ look_words: 'bright cartoon' }),
+      'offered',
+      ['offered'],
+      7,
+    ];
+    for (const offer of unreadable) {
+      const draft = parseWorldDraft({ ...body, look_offer: offer });
+      expect(draft.lookOffer).toBeNull();
+      expect(draft.proposal?.values).toEqual(body.proposal.values);
+    }
+    // A field a later server adds is passed over, in any state; so is an execution it cannot read.
+    const grown = parseWorldDraft({ ...body, look_offer: lookOffer({ preview: 'later', execution: 'later' }) });
+    expect(grown.lookOffer).toMatchObject({ state: 'offered', packId: 'exulanica.toon-town', modelName: null });
+    expect(parseWorldDraft({ ...body, look_offer: { state: 'none', more: 1 } }).lookOffer).toEqual({ state: 'none' });
+  });
+
+  it('names the model whose call answered: the last completed one, as served', () => {
+    const named = (calls: unknown[]) => {
+      const offer = parseWorldDraft({ ...body, look_offer: lookOffer({
+        execution: { prompt_version: 'look-choosing-1', rejections: [], calls },
+      }) }).lookOffer;
+      return offer?.state === 'offered' ? offer.modelName : undefined;
+    };
+    // A first answer refused and repaired by a fallback: the repair chose the look.
+    expect(named([
+      lookCall({ served_model_name: 'First Model' }),
+      lookCall({ served_model_name: 'Second Model', used_fallback: true }),
+      lookCall({ served_model_name: null, served_model: null, outcome: 'timed_out' }),
+    ])).toBe('Second Model');
+    // A response that named no model is called by the one that was asked.
+    expect(named([lookCall({ served_model_name: null, served_model: null })])).toBe('Chooser Model');
+    expect(named([lookCall({ outcome: 'failed' })])).toBeNull();
+    expect(named([])).toBeNull();
+  });
+
+  it('is said in one line: the look, the model that chose it and the words that chose it', () => {
+    const toon = packTitle('exulanica.toon-town');
+    const cozy = packTitle('exulanica.cozy-town');
+    const offered = parseWorldDraft({ ...body, look_offer: lookOffer() }).lookOffer;
+    expect(lookLine(offered, { title: toon, kept: null })).toEqual({
+      line: `Chooser Model chose the look ${toon} from your words “bright cartoon”, “toy box”.`,
+      instead: null,
+    });
+    // A look the person chose themselves stays, and the other is one press away.
+    expect(lookLine(offered, { title: toon, kept: cozy })).toEqual({
+      line: `Chooser Model chose the look ${toon} from your words “bright cartoon”, “toy box”. `
+        + `You chose ${cozy} yourself, so it stays.`,
+      instead: `Use ${toon} instead`,
+    });
+    const unnamed = parseWorldDraft({ ...body, look_offer: lookOffer({ execution: null }) }).lookOffer;
+    expect(lookLine(unnamed, { title: toon, kept: null })?.line).toBe(
+      `An open model chose the look ${toon} from your words “bright cartoon”, “toy box”.`);
+    // A look the page cannot name is not said.
+    expect(lookLine(offered, null)).toBeNull();
+  });
+
+  it('is one calm line when the step did not answer, and no line when it offers none', () => {
+    const lineOf = (state: string) => lookLine(
+      parseWorldDraft({ ...body, look_offer: lookOfferIn(state) }).lookOffer, null);
+    expect(lineOf('unavailable')).toEqual({
+      line: 'No look was chosen from your words this time. The town will be drawn in the look shown.',
+      instead: null,
+    });
+    expect(lineOf('none')).toBeNull();
+    expect(lookLine(null, null)).toBeNull();
+  });
+});
+
 describe('the Describe it panel', () => {
-  async function drafted(answer: WorldDraft) {
+  async function drafted(answer: WorldDraft, look?: DraftLook) {
     const useValues = vi.fn();
     const panel = buildWorldDescription({
       draft: async () => answer, useValues, words: WORDS, maximumCharacters: 1000,
+      ...(look === undefined ? {} : { look }),
     });
     document.body.append(panel.root);
     panel.root.querySelector('textarea')!.value = answer.description;
@@ -214,5 +358,108 @@ describe('the Describe it panel', () => {
       'The server refuses Length of a block at 100 m while Length of the town is 384 m: with that '
       + 'it takes 130 m to 140 m, in steps of 10 m.',
     );
+  });
+
+  /** The Look row's side, as the panel is handed it: what it was asked, and what it answers. */
+  function rowSide(known: { title: string; kept: string | null } | null, takes = true) {
+    const taken: (LookOffer | null)[] = [];
+    const instead: OfferedLook[] = [];
+    const look: DraftLook = {
+      offered: () => known,
+      take: (offer) => { taken.push(offer); return takes; },
+      takeInstead: (offer) => { instead.push(offer); return true; },
+      watch: () => undefined,
+    };
+    return { look, taken, instead };
+  }
+  const lookText = (root: HTMLElement): string | null => (
+    root.querySelector('.world-description-look p')?.textContent ?? null);
+
+  it('says the offered look right under the person\'s words and takes it with the values', async () => {
+    const toon = packTitle('exulanica.toon-town');
+    const side = rowSide({ title: toon, kept: null });
+    const { panel, useValues } = await drafted(parseWorldDraft({ ...body, look_offer: lookOffer() }), side.look);
+    expect(lookText(panel.root)).toBe(
+      `Chooser Model chose the look ${toon} from your words “bright cartoon”, “toy box”.`);
+    const result = [...panel.root.querySelector('.world-description-result')!.children];
+    expect(result[0]!.textContent).toContain('You asked for:');
+    expect(result[1]!.className).toBe('world-description-look');
+    expect(panel.root.querySelector('.world-description-look-instead')).toBeNull();
+    expect(side.taken).toEqual([]);
+    panel.root.querySelector<HTMLButtonElement>('.world-description-use')!.click();
+    expect(useValues).toHaveBeenCalledWith('market_town', body.proposal.values);
+    expect(side.taken).toEqual([{
+      state: 'offered', packId: 'exulanica.toon-town', version: 3, manifestSha256: 'd'.repeat(64),
+      lookWords: ['bright cartoon', 'toy box'], modelName: 'Chooser Model',
+    }]);
+    expect(panel.root.querySelector('.world-description-status')!.textContent).toBe(
+      `These values are in the controls below, and the look is ${toon}. Change any of them, then make the town.`);
+  });
+
+  it('keeps a look the person chose themselves, and takes the other only on its own press', async () => {
+    const toon = packTitle('exulanica.toon-town');
+    const finished = packTitle('exulanica.finished-town');
+    const side = rowSide({ title: toon, kept: finished }, false);
+    const { panel } = await drafted(parseWorldDraft({ ...body, look_offer: lookOffer() }), side.look);
+    expect(lookText(panel.root)).toBe(
+      `Chooser Model chose the look ${toon} from your words “bright cartoon”, “toy box”. `
+      + `You chose ${finished} yourself, so it stays.`);
+    const instead = panel.root.querySelector<HTMLButtonElement>('.world-description-look-instead')!;
+    expect(instead.textContent).toBe(`Use ${toon} instead`);
+    panel.root.querySelector<HTMLButtonElement>('.world-description-use')!.click();
+    // The row refused the take, so the values alone are said to be in the controls.
+    expect(panel.root.querySelector('.world-description-status')!.textContent).toBe(say('worldDescription.used'));
+    expect(side.instead).toEqual([]);
+    instead.click();
+    expect(side.instead.map((offer) => offer.packId)).toEqual(['exulanica.toon-town']);
+    expect(panel.root.querySelector('.world-description-status')!.textContent).toBe(`The look is now ${toon}.`);
+  });
+
+  it('says one calm line when no look was chosen and nothing when none is offered, and tells the row which draft was taken', async () => {
+    const use = (root: HTMLElement): void => root.querySelector<HTMLButtonElement>('.world-description-use')!.click();
+    const statusOf = (root: HTMLElement) => root.querySelector('.world-description-status')!.textContent;
+    for (const [state, line] of [
+      ['unavailable', 'No look was chosen from your words this time. The town will be drawn in the look shown.'],
+      ['none', null],
+    ] as const) {
+      const side = rowSide(null, false);
+      const { panel } = await drafted(parseWorldDraft({ ...body, look_offer: lookOfferIn(state) }), side.look);
+      expect(lookText(panel.root)).toBe(line);
+      // Never an error: the draft is there to use, and nothing on the panel is an alert.
+      expect(panel.root.querySelector('[role="alert"]')).toBeNull();
+      // Nothing reaches the row when the draft arrives; the press hands it this draft's offer as
+      // it is, so the look can follow the draft that was taken.
+      expect(side.taken).toEqual([]);
+      use(panel.root);
+      expect(side.taken).toEqual([{ state }]);
+      expect(statusOf(panel.root)).toBe(say('worldDescription.used'));
+      panel.root.remove();
+    }
+    // An answer with no offer hands the row none, and says nothing of a look.
+    const side = rowSide({ title: 'Toon town', kept: null }, false);
+    const absent = await drafted(parseWorldDraft(body), side.look);
+    expect(lookText(absent.panel.root)).toBeNull();
+    use(absent.panel.root);
+    expect(side.taken).toEqual([null]);
+    expect(statusOf(absent.panel.root)).toBe(say('worldDescription.used'));
+    // A panel handed no Look row says nothing of a look.
+    expect(lookText((await drafted(parseWorldDraft({ ...body, look_offer: lookOffer() }))).panel.root)).toBeNull();
+  });
+
+  it('says no look for a draft that cannot be used', async () => {
+    const side = rowSide({ title: 'Toon town', kept: null });
+    const { panel } = await drafted(parseWorldDraft({
+      ...body,
+      look_offer: lookOffer(),
+      proposal: {
+        ...body.proposal, valid: false, sample: null,
+        value_refusal: {
+          code: 'specification_values_disagree', detail: 'three tiles need long blocks',
+          key: 'block_length_mm', value: 90000, minimum: 130000, maximum: 140000, step: 10000,
+        },
+      },
+    }), side.look);
+    expect(panel.root.querySelector('.world-description-use')).toBeNull();
+    expect(lookText(panel.root)).toBeNull();
   });
 });

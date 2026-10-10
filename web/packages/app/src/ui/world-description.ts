@@ -10,6 +10,14 @@
  * town; nothing is made here. A description that asks for nothing a town can be is refused in
  * words, with what a town here is set by, read from the served specification.
  *
+ * A draft that can be used may offer the look its words ask for (`WorldDraft.lookOffer`). The panel
+ * says it in one line under the person's words: the look by its title, the open model that chose
+ * it, and the words of theirs that chose it. "Use these values" takes that look with the values
+ * (`DraftLook.take`, handed every taken draft's offer so the look can follow the draft), and the
+ * Look row beside the controls then shows it. A look the person chose themselves stays: the line
+ * says so and offers the other with one press. A look step that did not answer is one calm line;
+ * an offer of none is no line.
+ *
  * Every word is in `copy.ts`; the tables below map each status and unit the server names to a key
  * there, and `world-description.test.ts` holds them to the server's own lists.
  */
@@ -17,6 +25,8 @@
 import { problemSentence } from './words/problems.js';
 import type {
   DraftRefusalCode,
+  LookOffer,
+  OfferedLook,
   SampleStatus,
   TownSample,
   WorldDraft,
@@ -167,6 +177,65 @@ export function draftLines(draft: WorldDraft, words: SpecificationWords): readon
   return lines;
 }
 
+/**
+ * The look a town not made yet will be made in, as this panel needs it: the Look row's side of a
+ * draft's offered look (`../composition/town-look.ts`).
+ */
+export interface DraftLook {
+  /**
+   * What the page can say of an offered look: its title as the host lists it, and `kept`, the
+   * title of another look the person chose themselves, which stays (null when they chose none, or
+   * chose this one). Null where the host's list does not hold the offered pack, or is not read
+   * yet: a look the page cannot name is not shown or taken.
+   */
+  offered(offer: OfferedLook): { readonly title: string; readonly kept: string | null } | null;
+  /**
+   * A draft was taken with its values: `offer` is its look offer as the answer carried it, null
+   * for none carried. The look follows the draft unless the person chose the look themselves, so
+   * an offered look becomes the town's, and a draft whose words ask for no look returns a look
+   * that came with an earlier draft to the host's default. True when the offered look is the
+   * town's after it; false where the person's own look stays, the page cannot name the offered
+   * one, or the draft offers none.
+   */
+  take(offer: LookOffer | null): boolean;
+  /**
+   * Take the offered look in place of the one the person chose themselves: their own press, so
+   * the look is theirs from then on.
+   */
+  takeInstead(offer: OfferedLook): boolean;
+  /** Run `changed` whenever the town's look changes or the host's looks arrive. */
+  watch(changed: () => void): void;
+}
+
+/** A draft's look line: its words, and the words of the one press that takes the look instead. */
+export interface LookLine {
+  readonly line: string;
+  readonly instead: string | null;
+}
+
+/**
+ * The line a usable draft says its look offer in, or null for no line: an offer of none, no offer,
+ * or an offered look the page cannot name (`known` null).
+ */
+export function lookLine(
+  offer: LookOffer | null,
+  known: { readonly title: string; readonly kept: string | null } | null,
+): LookLine | null {
+  if (offer === null || offer.state === 'none') return null;
+  if (offer.state === 'unavailable') return { line: say('worldDescription.look.unavailable'), instead: null };
+  if (known === null) return null;
+  const words = {
+    model: offer.modelName ?? say('worldDescription.look.unknownModel'),
+    title: known.title,
+    phrases: offer.lookWords.map((phrase) => fill('worldDescription.quoted', { phrase })).join(', '),
+  };
+  if (known.kept === null) return { line: fill('worldDescription.look.offered', words), instead: null };
+  return {
+    line: fill('worldDescription.look.kept', { ...words, chosen: known.kept }),
+    instead: fill('worldDescription.look.instead', { title: known.title }),
+  };
+}
+
 export interface WorldDescriptionPanel {
   readonly root: HTMLElement;
 }
@@ -178,6 +247,8 @@ export function buildWorldDescription(options: {
   readonly words: SpecificationWords;
   /** The longest description the server reads. */
   readonly maximumCharacters: number;
+  /** The town's look, shown and taken with a draft that offers one; absent, no look is said. */
+  readonly look?: DraftLook;
 }): WorldDescriptionPanel {
   const input = el('textarea', {
     class: 'world-description-input', rows: 3, maxlength: options.maximumCharacters,
@@ -195,8 +266,39 @@ export function buildWorldDescription(options: {
     status,
     result,
   ]);
+  // The look of the draft shown: said only for a draft that can be used, and said again whenever
+  // the town's look changes, so the line is true of the Look row beside it.
+  const look = options.look;
+  const lookBox = el('div', { class: 'world-description-look' });
+  let offer: LookOffer | null = null;
+  const offeredLook = (): OfferedLook | null => (offer !== null && offer.state === 'offered' ? offer : null);
+  const sayLook = (): void => {
+    if (look === undefined) return;
+    const offered = offeredLook();
+    const known = offered === null ? null : look.offered(offered);
+    const said = lookLine(offer, known);
+    // An offered look is said in full ink among the muted values; a step that did not answer is not.
+    lookBox.dataset['look'] = said === null || offer === null ? '' : offer.state;
+    const children: Node[] = said === null ? [] : [el('p', { text: said.line })];
+    if (said !== null && said.instead !== null && offered !== null && known !== null) {
+      const instead = el('button', { type: 'button', class: 'world-description-look-instead',
+        text: said.instead });
+      instead.addEventListener('click', () => {
+        if (look.takeInstead(offered)) {
+          status.textContent = fill('worldDescription.look.taken', { title: known.title });
+        }
+      });
+      children.push(instead);
+    }
+    replace(lookBox, children);
+  };
+  look?.watch(sayLook);
   const show = (draft: WorldDraft): void => {
-    const children: Node[] = draftLines(draft, options.words).map((line) => el('p', { text: line }));
+    const lines = draftLines(draft, options.words).map((line) => el('p', { text: line }));
+    offer = draft.proposal !== null && draft.proposal.valid ? draft.lookOffer : null;
+    sayLook();
+    // The look comes right under the person's words, before the long list of values.
+    const children: Node[] = [...lines.slice(0, 1), lookBox, ...lines.slice(1)];
     if (draft.notSupported.length > 0) {
       children.push(el('p', { class: 'world-description-not-supported', text: fill(
         'worldDescription.notSupported',
@@ -209,7 +311,13 @@ export function buildWorldDescription(options: {
         text: say('worldDescription.use') });
       use.addEventListener('click', () => {
         options.useValues(proposal.preset, proposal.values);
-        status.textContent = say('worldDescription.used');
+        // The look follows the draft taken: the row is handed this draft's offer, whatever it
+        // says, and answers whether the offered look is the town's.
+        const offered = offeredLook();
+        const known = offered === null || look === undefined ? null : look.offered(offered);
+        status.textContent = look?.take(offer) === true && known !== null
+          ? fill('worldDescription.usedWithLook', { title: known.title })
+          : say('worldDescription.used');
       });
       children.push(use);
     }

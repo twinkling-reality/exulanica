@@ -369,7 +369,39 @@ manifest's rule governs every role. The three longest calls were all one descrip
 the timeout leaves the library default with no error. The fallback serves under the same timeout
 when the primary is withdrawn; its slowest calls in the measurement were longer than the primary's
 and are cut by it. Twenty descriptions over three packs do not establish how well the step reads
-other words or a larger library. The page does not show the offer yet.
+other words or a larger library.
+
+The page shows the offer and takes it with the draft. It reads `look_offer` leniently
+(`web/packages/app/src/world-draft-api.ts`): an absent or null offer, a state it does not know, or
+an `offered` look missing its pack, version, digest or words is no offer, a field it does not know
+is passed over, and none of these refuses the draft. Under Describe it, a draft that can be used
+says an `offered` look in one line right under the person's words
+(`web/packages/app/src/ui/world-description.ts`): the look by the title the host's list gives its
+pack, the name of the model whose call answered (the last completed call in
+`look_offer.execution`), and `look_words` as typed. `unavailable` is one line saying that no look
+was chosen this time and the town is drawn in the look shown; `none` and no offer are no line.
+
+"Use these values" takes the offered look with the values
+(`web/packages/app/src/composition/town-look.ts`): the Look row above Create this town shows it,
+says it came from the person's words and keeps Change look, and Create this town sends exactly the
+offered `pack_id`, `version` and `manifest_sha256` as its `style_pack` (section 10). Nothing is
+made or saved before that. A look the person chose themselves in the Look sheet is never replaced
+by an offer: it stays, the line says so, and one press on the line takes the offered look instead.
+A look the person chooses after taking an offer is the one the town is made in.
+
+The look follows the draft that is taken, unless the person chose the look themselves. Taking a
+later draft whose offer is `none` returns a look that came with an earlier draft to the host's
+default: the Look row says what it says for that look and quotes none of the earlier words, and
+Create this town names no pack. A look the person chose in the Look sheet, or took by the one
+press on the line, stays. Taking a draft whose offer is `unavailable`, or whose answer carries no
+offer, changes nothing: the look shown stays the one the town is made in.
+
+An offered pack the host's list does not hold has no title to say, so the page neither shows nor
+takes it. A version the host no longer holds when the town is made is refused as section 10
+states, in the words Create a world says any refused making in, and the draft, its values and the
+look stay on the page. `web/packages/app/test/world-description.test.ts` holds the reader and the
+line to this section's table, and `web/packages/app/test/town-look.test.ts` holds the taking, the
+look following the draft, and the request.
 
 ## 11. A workspace's own packs
 

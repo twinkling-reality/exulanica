@@ -6,6 +6,11 @@
  * sample town of the values, the parts of the words no value can say, or a refusal by name.
  * Nothing is made by drafting; making the world is `POST /worlds/generated` with the values the
  * person confirms. Parsed strictly: a field of the wrong shape is refused, never guessed.
+ *
+ * The answer may also offer the look the words ask for (`look_offer`,
+ * `docs/style-pack-contract.md` section 10.1). That part is optional and read leniently: absent,
+ * null, a state this page does not know or an offer it cannot read whole is no offer, and never
+ * refuses the draft it came with.
  */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
@@ -62,6 +67,31 @@ export interface DraftProposal {
   readonly sample: TownSample | null;
 }
 
+/** What the look step answered, as the contract's table names it. */
+export const LOOK_OFFER_STATES = ['offered', 'none', 'unavailable'] as const;
+export type LookOfferState = typeof LOOK_OFFER_STATES[number];
+
+/** The look the words ask for: one library pack exactly, and the person's own words for it. */
+export interface OfferedLook {
+  readonly state: 'offered';
+  readonly packId: string;
+  readonly version: number;
+  readonly manifestSha256: string;
+  /** The person's own words that chose the look, as typed. */
+  readonly lookWords: readonly string[];
+  /**
+   * The name a person reads for the model that chose it, as the offer's own `execution` names the
+   * call that answered; null where it names none.
+   */
+  readonly modelName: string | null;
+}
+
+/**
+ * A draft's look offer: a look, none (the words ask for no listed look), or unavailable (the step
+ * did not answer this time).
+ */
+export type LookOffer = OfferedLook | { readonly state: 'none' } | { readonly state: 'unavailable' };
+
 export interface WorldDraft {
   /** The words as the person typed them. */
   readonly description: string;
@@ -75,6 +105,8 @@ export interface WorldDraft {
   readonly modelId: string | null;
   /** The name a person reads for `modelId`, as the server serves it (`Manifest.model_name`). */
   readonly modelName: string | null;
+  /** The look the words ask for, if the answer carries an offer this page can read; else null. */
+  readonly lookOffer: LookOffer | null;
 }
 
 type Row = Readonly<Record<string, unknown>>;
@@ -180,6 +212,48 @@ function proposal(value: unknown): DraftProposal {
   };
 }
 
+const SHA256 = /^[0-9a-f]{64}$/;
+
+/** The name of the model whose call answered the look step: the last completed one's. */
+function chooserName(execution: unknown): string | null {
+  if (execution === null || typeof execution !== 'object') return null;
+  const calls = (execution as Row)['calls'];
+  if (!Array.isArray(calls)) return null;
+  for (const call of [...calls].reverse()) {
+    if (call === null || typeof call !== 'object' || (call as Row)['outcome'] !== 'completed') continue;
+    const served = (call as Row)['served_model_name'];
+    const requested = (call as Row)['requested_model_name'];
+    if (typeof served === 'string' && served !== '') return served;
+    return typeof requested === 'string' && requested !== '' ? requested : null;
+  }
+  return null;
+}
+
+/**
+ * A draft's `look_offer`, read without ever throwing: the offer is optional, so nothing about it
+ * may refuse the draft. A field this page does not know is passed over; a state it does not know,
+ * or an offered look missing its pack, version, digest or words, is no offer.
+ */
+export function parseLookOffer(value: unknown): LookOffer | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const offer = value as Row;
+  const state = offer['state'];
+  if (state === 'none' || state === 'unavailable') return { state };
+  if (state !== 'offered') return null;
+  const packId = offer['pack_id'];
+  const version = offer['version'];
+  const manifestSha256 = offer['manifest_sha256'];
+  const words = offer['look_words'];
+  if (typeof packId !== 'string' || packId === '') return null;
+  if (typeof version !== 'number' || !Number.isInteger(version)) return null;
+  if (typeof manifestSha256 !== 'string' || !SHA256.test(manifestSha256)) return null;
+  if (!Array.isArray(words) || words.length === 0
+    || !words.every((word): word is string => typeof word === 'string' && word !== '')) return null;
+  return {
+    state, packId, version, manifestSha256, lookWords: [...words], modelName: chooserName(offer['execution']),
+  };
+}
+
 /** A drafting answer as the server serves it; a field of the wrong shape is refused. */
 export function parseWorldDraft(value: unknown): WorldDraft {
   const body = row(value, 'world draft');
@@ -204,6 +278,7 @@ export function parseWorldDraft(value: unknown): WorldDraft {
     promptVersion: text(body['prompt_version'], 'prompt version'),
     modelId: nullable(body['model_id'], text, 'model'),
     modelName: nullable(body['model_name'], text, 'model name'),
+    lookOffer: parseLookOffer(body['look_offer']),
   };
 }
 

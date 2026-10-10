@@ -77,8 +77,13 @@ comparison on version 1 of the specification and of the drafter's words
 share is and names no value, so a description's street mix and kinds of building and shop become the
 specification's values. The draft also offers the library look the words ask for, if any, chosen
 by a short call of its own after the draft that never changes it, with the person's own words that
-chose it; the person keeps or changes it, and the page does not show it yet
-([the look offer](../style-pack-contract.md#101-a-look-offered-from-a-description)). A draft may
+chose it. Describe it says the look, the open model that chose it and those words in one line, and
+"Use these values" takes the look with the values: the Look row shows it as coming from the
+person's words, and the town is made in exactly the version offered. A look the person chose
+themselves stays, and the line offers the other with one press. The look follows the draft that is
+taken: a later draft whose words ask for no look returns a look taken with an earlier draft to the
+host's default ([the look offer](../style-pack-contract.md#101-a-look-offered-from-a-description)).
+A draft may
 also be handed a finished reference request's web notes, short descriptions of what such a place
 looks like, to fill the values the words leave open; the notes are quoted as material, never
 instructions, and the person's words win ([reference notes, section 9](../reference-notes-contract.md#9-notes-for-a-drafter)).

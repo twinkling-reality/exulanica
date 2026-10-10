@@ -463,6 +463,12 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldRecipes.making': 'Creating {recipe}…',
   'worldRecipes.close': 'Close',
   'worldRecipes.failed': 'The world was not created: {reason}',
+  // The Look row above Create this town: why the look shown is the one the town will be made in.
+  'worldRecipes.look.default':
+    'The look this server draws new towns in. You can change it now, or any time later in Design.',
+  'worldRecipes.look.chosen': 'Your choice. You can change it any time later in Design.',
+  'worldRecipes.look.fromWords':
+    'From your words {phrases}. You can change it now, or any time later in Design.',
   // Kinds of place (GET /worlds/kinds): the workspace's own kinds as cards under the recipes, and
   // the last card, a new kind of place drafted from a person's words (docs/world-kinds-contract.md).
   'worldKinds.heading': 'Or a kind of place',
@@ -567,6 +573,20 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldDescription.use': 'Use these values',
   'worldDescription.used':
     'These values are in the controls below. Change any of them, then make the town.',
+  'worldDescription.usedWithLook':
+    'These values are in the controls below, and the look is {title}. Change any of them, then '
+    + 'make the town.',
+  // The look a draft's words ask for: which look, the open model that chose it, and the person's
+  // own words that chose it. A look the person chose themselves stays, and the line offers the other.
+  'worldDescription.look.offered': '{model} chose the look {title} from your words {phrases}.',
+  'worldDescription.look.kept':
+    '{model} chose the look {title} from your words {phrases}. You chose {chosen} yourself, so it '
+    + 'stays.',
+  'worldDescription.look.instead': 'Use {title} instead',
+  'worldDescription.look.taken': 'The look is now {title}.',
+  'worldDescription.look.unknownModel': 'An open model',
+  'worldDescription.look.unavailable':
+    'No look was chosen from your words this time. The town will be drawn in the look shown.',
   'worldDescription.unit.mm': '{metres} m',
   'worldDescription.unit.count': '{count}',
   'worldDescription.unit.permille': '{thousandths} of 1,000',

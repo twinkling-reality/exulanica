@@ -148,7 +148,14 @@
 
 #shell section.world-recipes .world-description-result { display: grid; gap: 0.25rem; }
 
-#shell section.world-recipes .world-description-use {
+/* The look a draft's words ask for: one line, in full ink among the muted values when a look is
+   offered, and the one press that takes it in place of a look the person chose themselves. */
+#shell section.world-recipes .world-description-look:empty { display: none; }
+#shell section.world-recipes .world-description-look { display: grid; gap: 0.375rem; }
+#shell section.world-recipes .world-description-look[data-look="offered"] p { color: var(--color-text); }
+
+#shell section.world-recipes .world-description-use,
+#shell section.world-recipes .world-description-look-instead {
   justify-self: start;
   margin-top: 0.5rem;
   min-height: 2rem;
@@ -159,6 +166,8 @@
   color: var(--color-text);
   font: 560 0.82rem / 1 var(--font-ui);
 }
+
+#shell section.world-recipes .world-description-look-instead { margin: 0 0 0.25rem; cursor: pointer; }
 
 /* The recipes: picture cards, the label the button's only text. */
 #shell section.world-recipes .world-recipes-list-label {
