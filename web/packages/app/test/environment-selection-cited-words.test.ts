@@ -8,6 +8,12 @@ import type { AppEnvironment, SessionState } from '../src/composition/session-st
 import { parseSociety, type SocietySnapshot } from '../src/society-api.js';
 import { parseSocietyControl } from '../src/society-control-api.js';
 
+// The saved world's mounts also ask the host for what this file is not about: its model
+// assignments, its things' looks, a played being's turn. The host here is made up, so those reads
+// fail at once, as a failed lookup made them fail before the suite refused the network
+// (web/vitest.setup.ts).
+vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('fetch failed'); }));
+
 /*
  * A Companion citation opened in the inspector: the cited words show beside the person it names,
  * and only while that person stays selected. Selecting somebody else forgets them, so re-selecting

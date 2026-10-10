@@ -8,6 +8,12 @@ import type { SavedWorldFlight, SavedWorldFlightStatus } from '../src/compositio
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
 
+// The saved world's mounts also ask the host for what this file is not about: its model
+// assignments, its things' looks, a played being's turn. The host here is made up, so those reads
+// fail at once, as a failed lookup made them fail before the suite refused the network
+// (web/vitest.setup.ts).
+vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('fetch failed'); }));
+
 /*
  * The open saved world's flight lives as long as the world is open: it starts when the world is
  * attached, is drawn from its first step again after an edit, and stops when the world closes. A

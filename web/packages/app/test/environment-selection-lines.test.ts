@@ -13,6 +13,12 @@ import type { SocietyModels } from '../src/society-models-api.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 
+// The saved world's mounts also ask the host for what this file is not about: its model
+// assignments, its things' looks, a played being's turn. The host here is made up, so those reads
+// fail at once, as a failed lookup made them fail before the suite refused the network
+// (web/vitest.setup.ts).
+vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('fetch failed'); }));
+
 /*
  * The lines a society of things' beings say, drawn over them through Selected's mount as the app
  * wires it: nothing said before the page looked, each new line once, oldest first, opening with the

@@ -11,6 +11,12 @@ import type { SocietyModels } from '../src/society-models-api.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 
+// The saved world's mounts also ask the host for what this file is not about: its model
+// assignments, its things' looks, a played being's turn. The host here is made up, so those reads
+// fail at once, as a failed lookup made them fail before the suite refused the network
+// (web/vitest.setup.ts).
+vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('fetch failed'); }));
+
 /*
  * Who runs each person of a saved world's society, marked over them: a model the models read says
  * is asked marks its person AI by its short name, a visitor is marked by the bridge it crossed

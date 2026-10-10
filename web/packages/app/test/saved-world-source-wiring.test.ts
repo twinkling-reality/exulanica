@@ -31,6 +31,11 @@ import { createSessionState } from '../src/composition/session-state.js';
 import { openWorldEntryContext } from '../src/composition/session-and-geometry.js';
 import type { SavedWorldEntry } from '../src/world-entry-api.js';
 
+// Opening the entry also asks the host for the world's interaction policy, which this file is not
+// about. The host here is made up, so that read fails at once, as a failed lookup made it fail
+// before the suite refused the network (web/vitest.setup.ts).
+vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('fetch failed'); }));
+
 describe('saved world source wiring', () => {
   beforeEach(() => { observed.sourceOptions = null; });
 
