@@ -117,6 +117,7 @@ from exulanica.world.society_walking_surfaces import (
     build_walking_surfaces_input,
     walking_surfaces_place,
 )
+from exulanica.world.town_people import TownPeopleRefused, people_frame
 
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Text = Annotated[str, Field(min_length=1, max_length=500)]
@@ -290,8 +291,9 @@ def _site_read(
 #: place in the sequence, the version's edit cursor, and the digest over both.
 _EDIT_CURSOR_FIELDS: Final = frozenset({"input_seq", "authored_state", "document_sha256"})
 #: What only a society's first input states (the ability modules its minutes run for its whole
-#: life), so a later input's not stating it is no difference.
-_FIRST_INPUT_ONLY: Final = frozenset({"modules"})
+#: life, and what a town's people are made from), so a later input's not stating it is no
+#: difference.
+_FIRST_INPUT_ONLY: Final = frozenset({"modules", "people"})
 
 
 def _reads_the_same(previous: Mapping[str, Any], current: Mapping[str, Any]) -> bool:
@@ -627,6 +629,22 @@ class SocietyRuntime:
             # Held to their shapes by the place just made from them.
             obstructions=city_obstructions(generated.records, checked=True),
         )
+
+    @staticmethod
+    def _living_place(
+        ground: SocietyGround, town: _TownRead, routine: RoutineModel
+    ) -> Mapping[str, Any]:
+        """The living place a town's records make under ``routine``, made once a read."""
+        place = town.living_places.get(routine.sha256)
+        if place is None:
+            try:
+                place = walking_surfaces_place(ground.place_id, town.records, routine)
+            except (CatalogError, InvalidStructuralData, ValueError) as exc:
+                raise UnavailableSocietyInput(
+                    f"the town's living place could not be made: {exc}"
+                ) from exc
+            town.living_places[routine.sha256] = place
+        return place
 
     def _transaction_read(self, connection: psycopg.Connection) -> _ReadFirst:
         """What this transaction read before the asset read lock; call inside the transaction.
@@ -1733,15 +1751,20 @@ class SocietyRuntime:
                     )
             elif chosen == WALKING_SURFACES_COMPOSITION_V2:
                 routine = town_routine() if living_routine is None else living_routine
-                place = town.living_places.get(routine.sha256)
-                if place is None:
-                    try:
-                        place = walking_surfaces_place(ground.place_id, town.records, routine)
-                    except (CatalogError, InvalidStructuralData, ValueError) as exc:
-                        raise UnavailableSocietyInput(
-                            f"the town's living place could not be made: {exc}"
-                        ) from exc
-                    town.living_places[routine.sha256] = place
+                place = self._living_place(ground, town, routine)
+            people = None
+            if chosen == WALKING_SURFACES_COMPOSITION_V3 and seq == 1 and reason is None:
+                # What the town's people are made from, under the routine a new town's place is
+                # made under: the homes and positions the living town reads, so a society of
+                # things over the town is the same people. Seed-free: its genesis completes it.
+                try:
+                    people = people_frame(
+                        self._living_place(ground, town, town_routine()), town_routine()
+                    )
+                except TownPeopleRefused as exc:
+                    raise UnavailableSocietyInput(
+                        f"the town's people could not be stated: {exc}"
+                    ) from exc
             return build_walking_surfaces_input(
                 ground=ground,
                 version=version,
@@ -1761,6 +1784,7 @@ class SocietyRuntime:
                 obstructions=town.obstructions
                 if chosen == WALKING_SURFACES_COMPOSITION_V3
                 else None,
+                people=people,
             )
         raise UnavailableSocietyInput(
             f"no society composition walks a {ground.navigation_form!r} ground"

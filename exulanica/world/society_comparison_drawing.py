@@ -117,6 +117,7 @@ DRAWING_MODULES: Final = (
     "exulanica.world.society_surroundings",
     "exulanica.world.society_thing_inputs",
     "exulanica.world.society_things",
+    "exulanica.world.town_people",
 )
 #: What a stored drawing names in place of a model's name: the name is filled in on read.
 _NAME_FILLED_ON_READ: Final = ""

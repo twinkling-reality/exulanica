@@ -31,11 +31,15 @@ from exulanica.world.society_living import (
     town_routine,
 )
 from exulanica.world.town_people import (
+    FRAME_PROFILE,
     PROFILE,
     RULE_V1,
     TownPeopleRefused,
+    people_frame,
+    people_from_frame,
     town_people,
     town_people_sha256,
+    validate_people_frame,
     validate_town_people,
 )
 
@@ -445,3 +449,94 @@ def test_a_document_changed_after_it_was_sealed_is_refused_by_its_digest():
     people["premises"][0]["address_number"] = 99
     with pytest.raises(TownPeopleRefused, match="digest mismatch"):
         validate_town_people(people)
+
+
+# The frame: what a town's people are made from before any draw, which a society input carries.
+
+
+def test_a_frame_holds_no_draw_and_any_seed_completes_it_into_that_seed_s_people():
+    routine = town_routine()
+    frame = people_frame(_six(), routine)
+    assert frame["profile"] == FRAME_PROFILE and frame["rule"] == RULE_V1
+    policy = {entry["key"]: entry["value"] for entry in _catalog("society-policy.v2.json").values()}
+    assert frame["employment_share_milli"] == policy["employment_share_milli"]
+    assert frame["shift_jitter_minutes"] == policy["shift_jitter_minutes"]
+    assert frame["population"] == 6
+    # In the place's destination order, the order people are housed in, with the home the place
+    # does not offer left out.
+    assert [row["destination_id"] for row in frame["premises"]] == sorted(
+        f"premises:{key}" for key in ("h1", "h2", "h3", "bakery", "bookshop", "cafe")
+    )
+    assert people_frame(_six(), routine, population=4)["population"] == 4
+    for seed in SEEDS:
+        assert seed not in canonical_json(frame).decode("utf-8")
+        assert people_from_frame(seed, frame) == town_people(seed, _six(), routine)
+    # Completed from the frame alone: the catalogs and the place are not read again.
+    carried = json.loads(canonical_json(frame))
+    assert people_from_frame(SEED, carried) == town_people(SEED, _six(), routine)
+
+
+def test_a_shipped_town_s_frame_completes_into_the_people_the_living_town_makes():
+    document = town_input()
+    routine = input_routine(document)
+    frame = json.loads(canonical_json(people_frame(document["living"]["place"], routine)))
+    place, state = _engine(document, SEED, document["population"]["size"])
+    assert _as_the_document_states_them(people_from_frame(SEED, frame)) == (
+        _as_the_engine_made_them(place, state)
+    )
+
+
+def _frame_extra_key(frame: dict[str, Any]) -> None:
+    frame["seed"] = SEED
+
+
+def _frame_out_of_order(frame: dict[str, Any]) -> None:
+    frame["premises"].reverse()
+
+
+def _frame_more_people_than_homes(frame: dict[str, Any]) -> None:
+    frame["population"] = 7
+
+
+def _frame_nobody(frame: dict[str, Any]) -> None:
+    frame["population"] = 0
+
+
+def _frame_a_workplace_with_no_role(frame: dict[str, Any]) -> None:
+    next(row for row in frame["premises"] if row["positions"])["role"] = None
+
+
+def _frame_a_subject_twice(frame: dict[str, Any]) -> None:
+    frame["premises"][1]["subject_id"] = frame["premises"][0]["subject_id"]
+
+
+def _frame_another_rule(frame: dict[str, Any]) -> None:
+    frame["rule"] = "exulanica.town-people-rule/v2"
+
+
+def _frame_a_share_over_everyone(frame: dict[str, Any]) -> None:
+    frame["employment_share_milli"] = 1001
+
+
+@pytest.mark.parametrize(
+    ("broken", "named"),
+    [
+        (_frame_extra_key, "exactly its profile's keys"),
+        (_frame_out_of_order, "in destination order"),
+        (_frame_more_people_than_homes, "between one and the places"),
+        (_frame_nobody, "between one and the places"),
+        (_frame_a_workplace_with_no_role, "states the role its people take"),
+        (_frame_a_subject_twice, "in destination order"),
+        (_frame_another_rule, "unknown people rule"),
+        (_frame_a_share_over_everyone, "the share who work"),
+    ],
+)
+def test_a_frame_that_breaks_its_profile_is_refused_and_the_break_named(broken, named: str):
+    frame = people_frame(_six(), town_routine())
+    validate_people_frame(frame)
+    broken(frame)
+    with pytest.raises(TownPeopleRefused, match=named) as refused:
+        validate_people_frame(frame)
+    assert refused.value.code == "malformed_people"
+    with pytest.raises(TownPeopleRefused):
+        people_from_frame(SEED, frame)

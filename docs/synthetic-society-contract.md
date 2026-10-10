@@ -1618,10 +1618,29 @@ town of six from the catalogs and the draws alone. `validate_town_people` refuse
 are out of order, that houses more people in a home than it has places, that gives two people one
 position or a person another position's shift, or whose digest does not name it.
 
-**Implemented boundary.** The document, its rule and its check are built. No society input
-carries one: the living town makes the same people at its genesis and reads no document, and a
-society of things makes its villagers by the purposeful genesis, with a role word and no home or
-job in the town.
+**What an input carries is the frame.** `exulanica.town-people-frame/v1` (`people_frame`) is what
+a town's people are made from before any draw: the rule's name, the routine binding, the place by
+id and digest, the minute the day starts at, the two policy figures the rule reads (the share who
+work, or none, and the shift jitter), how many of the homes' places are lived in, and every
+premises that offers a place in a home or a position, in the place's destination order, each with
+its destination id, the role its people take and the fields above. It holds no seed and nothing
+drawn from one, so it is composed again and compared like every other part of an input.
+`people_from_frame` completes a frame with a society's seed into the document, reading no catalog
+and no place: a society whose first input carries a frame makes, and replays, the same people from
+that input and its own seed whatever is published later. A frame names its rule by version; a
+later rule is another name beside it, so a stored society never draws its people again under
+another rule. `town_people` is the two together.
+
+**Who reads it.** A society of things over a town carries the frame in its first input and is
+the town's people (below, "On a town's ground"). The living town makes the same people at its
+genesis and reads no frame: `tests/test_society_things_town_people.py` holds every villager of a
+society of things to the resident the living town's genesis makes for the same place, seed and
+society, by home, job, shift, role and reason, with one identity in either engine. `resident_of`
+reads who a person of either engine's state is in their town the same way: their role by key and
+label, whether they work, their shift, and their home and job as the engine keeps them (a society
+of things by subject, with what each premises is called; a living town by the place's destination
+id); it answers nothing for a being its author placed, a visitor, or a person of a world with no
+homes.
 
 ## The society of things (v7)
 
@@ -1695,7 +1714,26 @@ second version recorded, a spirit resting, standing, visiting and talking in it)
 `exulanica.society-input/walking-surfaces-v3` (migration 0169): the town's walking-surfaces-v1
 input, its surfaces, premises and furniture, its residents and the purposeful routine, with the same
 `things` list and `population_kind` (the town's catalog entry names the villager), and, in a
-society's first input, the `modules` it runs. A town's footways stand on its kerbs, above the
+society's first input, the `modules` it runs and `people`, what the town's people are made from
+(the frame of [a town's people](#a-towns-people-as-a-document), made over the town's place under
+the routine a living town is made under, as many as the input's population). At genesis the
+society completes the frame with its seed: each of the ground's population states `resident`,
+who they are in the town (`home`, a premises with its household, and `job`, or null, a premises
+with its position and shift; `role` by key and label; and `reason`), and takes that role's label
+as their role's word, so a town's villager is "baker" because they work at its bakery; the state
+records the document those people are (`people`: its profile, its rule, its digest, a record from
+which nothing is ever drawn, and `premises`, what each premises of the document is called, once:
+its subject, use class, label and address number, in the document's order). A resident names a
+premises by its place in that list, so the state says what a premises is called once however
+many live or work there. A resident keeps their name, their kind and everything a villager does:
+who they are changes no choice the routine makes. A being its author placed and a visitor state
+no `resident`.
+The key is optional and a first input's alone: an input composed before it, and every later
+input, states none, a society whose first input states none draws each villager's role word as
+before, and its stored minutes replay byte for byte
+(`tests/test_society_things_town_people.py`, digests read from a tree before the key). Code from
+before the key refuses an input carrying it, so a society that has consumed one cannot be read by
+an older release. A lattice ground's things input carries no people. A town's footways stand on its kerbs, above the
 ground's plane, so a thing rests on the surface when it stands within 200 mm (`RESTS_ON_SURFACE_MM`)
 of the height of the walking line nearest it, read along the town's own edges between their ends'
 support heights; one that does not states its `height_mm` above that line, offers nothing

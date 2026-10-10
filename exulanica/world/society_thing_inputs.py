@@ -138,6 +138,24 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
             recorded_modules(document)
         except AbilityError as exc:
             raise ValueError(f"a things input records built modules only: {exc}") from exc
+    if "people" in document:
+        from exulanica.world.town_people import TownPeopleRefused, validate_people_frame
+
+        frame = document["people"]
+        if (
+            document["input_seq"] != 1
+            or document["availability"] != "available"
+            or document.get("population", {}).get("rule") != "residents"
+        ):
+            raise ValueError(
+                "an available first input over a world of homes alone carries its people's frame"
+            )
+        try:
+            validate_people_frame(frame)
+        except TownPeopleRefused as exc:
+            raise ValueError(f"a things input's people are out of shape: {exc}") from exc
+        if frame["population"] != document["population"]["size"]:
+            raise ValueError("a things input's people are as many as its population")
     things = document["things"]
     if not isinstance(things, list) or len(things) > THINGS_BOUND:
         raise ValueError("thing bound exceeded")

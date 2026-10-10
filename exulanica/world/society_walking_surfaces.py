@@ -739,6 +739,7 @@ def build_walking_surfaces_input(
     things: bool = False,
     segment_blocked: SegmentBlocked | None = None,
     obstructions: CityObstructions | None = None,
+    people: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compose a generated world's input over the walking surfaces its records state, from the
     place :func:`walking_surfaces_place` made of them for ``ground``.
@@ -747,7 +748,9 @@ def build_walking_surfaces_input(
     walking-surfaces-v2 input that also carries the place itself, for the living town to walk;
     with ``things``, a walking-surfaces-v3 input for a society of things, which also reads the
     things placed in the world's region (``segment_blocked`` tells whether a step crosses one,
-    ``obstructions`` what of the town's own a thing's place keeps clear of);
+    ``obstructions`` what of the town's own a thing's place keeps clear of), whose first input
+    also carries ``people``, what the town's people are made from
+    (:func:`~exulanica.world.town_people.people_frame`), where one is given;
     without either, the walking-surfaces-v1 input the purposeful society reads."""
     if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
@@ -998,6 +1001,10 @@ def build_walking_surfaces_input(
             from exulanica.abilities.registry import current_modules
 
             document["modules"] = list(current_modules())
+            if people is not None and reason is None:
+                # What the town's people are made from, before any draw: genesis completes it
+                # with the society's seed, and replay reads it from this input.
+                document["people"] = dict(people)
     if living is not None:
         document["living"] = {
             "routine": living.binding(),

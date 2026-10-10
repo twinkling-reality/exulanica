@@ -1070,6 +1070,8 @@ def initial_things_society(
     if "modules" in document:
         # The modules its first input records, which its minutes run for its whole life.
         state["modules"] = list(document["modules"])
+    if "people" in document:
+        _house_the_population(state, seed, document["people"])
     state["things"] = _things_of(document, hands=_runs_hands(state))
     minute = _Minute(state, state, seed, document, ())
     # The author's beings first, where they were put; then the population steps aside from them.
@@ -1077,6 +1079,33 @@ def initial_things_society(
     _population_steps_aside(state, document)
     validate_things_state(state)
     return state
+
+
+def _house_the_population(state: dict[str, Any], seed: str, frame: Mapping[str, Any]) -> None:
+    """Who the town's people are, where the first input carries what they are made from: the
+    people document its frame and the society's seed make
+    (:func:`~exulanica.world.town_people.people_from_frame`), each of the ground's population
+    given theirs as ``resident`` (their home, their job or none, their role and why) and the role
+    it names as their role's word, and the document recorded by its digest with what each of its
+    premises is called, once, for a resident to name by its place in that list. The digest is a
+    record: nothing is ever drawn from it."""
+    from exulanica.world.town_people import people_from_frame, resident_entry, resident_premises
+
+    people = people_from_frame(seed, frame)
+    _require(
+        len(people["people"]) == len(state["inhabitants"]),
+        "a town's people are as many as its population",
+    )
+    for person, stated in zip(state["inhabitants"], people["people"], strict=True):
+        _require(person["ordinal"] == stated["ordinal"], "a town's people come in ordinal order")
+        person["resident"] = resident_entry(people, stated)
+        person["role"] = stated["role"]["label"]
+    state["people"] = {
+        "profile": people["profile"],
+        "rule": people["rule"],
+        "document_sha256": people["document_sha256"],
+        "premises": resident_premises(people),
+    }
 
 
 def _population_steps_aside(state: dict[str, Any], document: Mapping[str, Any]) -> None:
@@ -1795,6 +1824,42 @@ def _optional_movement(person: Mapping[str, Any]) -> None:
     )
 
 
+def _resident_shape(person: Mapping[str, Any], premises: int) -> None:
+    """A resident's entry, each premises it names one of the ``premises`` the state states."""
+    resident = person["resident"]
+    _require(
+        isinstance(resident, dict) and set(resident) == {"home", "job", "role", "reason"},
+        "a resident states a home, a job or none, a role and why",
+    )
+    home, job, role = resident["home"], resident["job"], resident["role"]
+
+    def named(entry: Mapping[str, Any]) -> bool:
+        return type(entry["premises"]) is int and 0 <= entry["premises"] < premises
+
+    _require(
+        isinstance(home, dict)
+        and set(home) == {"premises", "household"}
+        and named(home)
+        and isinstance(role, dict)
+        and set(role) == {"key", "label"}
+        and person["role"] == role["label"]
+        and isinstance(resident["reason"], str)
+        and (resident["reason"] == "works_at_premises") == (job is not None),
+        "a resident lives at a premises the state states and is called by their role",
+    )
+    _require(
+        job is None
+        or (
+            isinstance(job, dict)
+            and set(job) == {"premises", "position", "shift"}
+            and named(job)
+            and isinstance(job["shift"], dict)
+            and set(job["shift"]) == {"key", "start_minute", "minutes"}
+        ),
+        "a resident's job states a premises the state states, its position and its shift",
+    )
+
+
 def validate_things_state(state: Mapping[str, Any]) -> None:
     """A society of things' state, held to its own fields beside the purposeful planner's: every
     person a thing of a kind, by how it came, every thing once, and nothing held by nobody here."""
@@ -1821,9 +1886,41 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
         and all(ordinal < state["next_ordinal"] for ordinal in ordinals),
         "every person has an ordinal of their own",
     )
+    housed = "people" in state
+    if housed:
+        from exulanica.world.town_people import PROFILE as PEOPLE_PROFILE
+
+        stated = state["people"]
+        _require(
+            isinstance(stated, dict)
+            and set(stated) == {"profile", "rule", "document_sha256", "premises"}
+            and stated["profile"] == PEOPLE_PROFILE
+            and isinstance(stated["rule"], str)
+            and isinstance(stated["document_sha256"], str)
+            and _HEX64.fullmatch(stated["document_sha256"]) is not None,
+            "a society of things records its town's people by profile, rule and digest",
+        )
+        _require(
+            isinstance(stated["premises"], list)
+            and all(
+                isinstance(row, dict)
+                and set(row) == {"subject_id", "use_class", "label", "address_number"}
+                and isinstance(row["subject_id"], str)
+                for row in stated["premises"]
+            ),
+            "a society of things states what each premises of its people is called",
+        )
     for person in people:
         _require(set(person) >= _PERSON_FIELDS, "a person of a society of things states its kind")
         _require(_reference_shape(person["kind"]), "a person names its kind")
+        # Who a person of the ground's population is in the town: stated by every one of them
+        # in a society whose first input carried its people, and by nobody else.
+        _require(
+            ("resident" in person) == (housed and person["came_by"] == "populated"),
+            "the people of a town's population state who they are there, and nobody else does",
+        )
+        if "resident" in person:
+            _resident_shape(person, len(state["people"]["premises"]))
         _optional_movement(person)
         _optional_lines(person)
         if "recollection" in person:
