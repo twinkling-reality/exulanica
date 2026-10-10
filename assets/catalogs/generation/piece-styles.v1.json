@@ -28,6 +28,18 @@
       }
     },
     {
+      "pack_id": "exulanica.kit-places",
+      "style": "cozy faceted low-poly toon style, warm terracotta, cream and sage colours, chunky simple shapes",
+      "reason": "The cozy town's own words: the pack is drawn on the cozy town and adds ready-made kit pieces to it, so a piece generated for a world that wears it is asked for in the look everything else of that world has. Not measured for this pack by itself.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "The cozy town entry's words, restated for the pack drawn on it; see the entry reason"
+      }
+    },
+    {
       "pack_id": "exulanica.toon-town",
       "style": "bright flat toon colours, dark ink outlines, white frames, blue glass, round toy-like shapes",
       "reason": "Authored from the pack's description and not yet measured: its colours, ink lines and toy-like shapes, without its light bands, which a single piece cannot show.",

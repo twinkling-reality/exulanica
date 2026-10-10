@@ -218,6 +218,34 @@ def test_the_default_is_the_pack_the_library_file_names_and_only_it_is_listed_so
     assert listed == {pack_id: pack_id == named["default"] for pack_id in _committed()}
 
 
+#: The looks the look chooser's recorded runs were offered (docs/evaluation, the look chooser's
+#: timings and its design's measurements): the three authored towns.
+MEASURED_WITH = ("exulanica.cozy-town", "exulanica.finished-town", "exulanica.toon-town")
+
+
+def test_the_look_chooser_is_offered_the_looks_it_was_measured_with_and_no_other() -> None:
+    """A pack added to the library is a look a person chooses. The model step that reads a
+    description for a look is offered only what its recorded runs were offered, stated as data in
+    the library file, until it is measured with more."""
+    named = json.loads((ROOT / "assets" / "style-packs" / "library.v1.json").read_text("utf-8"))
+    library = load_style_pack_library()
+    assert tuple(named["offered_to_the_look_chooser"]) == library.chooser_offers == MEASURED_WITH
+    # The positive control: the library holds a pack the step is not offered.
+    held = {pack.pack_id for pack in library.packs}
+    assert set(MEASURED_WITH) < held and "exulanica.kit-places" in held - set(MEASURED_WITH)
+    assert all(
+        library.pack(pack_id).origin == "authored"  # type: ignore[union-attr]
+        for pack_id in MEASURED_WITH
+    )
+
+
+def test_a_library_file_that_lists_no_offered_looks_offers_every_pack(tmp_path: Path) -> None:
+    library_file = tmp_path / "library.v1.json"
+    library_file.write_text(json.dumps(COMMITTED_DEFAULT))
+    library = load_style_pack_library(PACKS, CONTEXT, library_file)
+    assert library.chooser_offers == tuple(sorted(_committed()))
+
+
 COMMITTED_DEFAULT = {"profile": "exulanica.style-pack-library/v1", "default": "exulanica.cozy-town"}
 
 
@@ -225,8 +253,19 @@ COMMITTED_DEFAULT = {"profile": "exulanica.style-pack-library/v1", "default": "e
     ("change", "named"),
     [
         ({"default": "exulanica.nowhere-town"}, "not a pack of the library"),
-        ({"profile": "exulanica.style-pack-library/v2"}, "a profile and a default, nothing else"),
-        ({"fallback": "exulanica.toon-town"}, "a profile and a default, nothing else"),
+        ({"profile": "exulanica.style-pack-library/v2"}, "a profile, a default and at most"),
+        ({"fallback": "exulanica.toon-town"}, "a profile, a default and at most"),
+        ({"offered_to_the_look_chooser": ["exulanica.nowhere-town"]}, "offers the look chooser"),
+        ({"offered_to_the_look_chooser": []}, "offers the look chooser"),
+        (
+            {"offered_to_the_look_chooser": ["exulanica.toon-town", "exulanica.cozy-town"]},
+            "offers the look chooser",
+        ),
+        (
+            {"offered_to_the_look_chooser": ["exulanica.cozy-town", "exulanica.cozy-town"]},
+            "offers the look chooser",
+        ),
+        ({"offered_to_the_look_chooser": "exulanica.cozy-town"}, "offers the look chooser"),
     ],
 )
 def test_a_default_that_is_not_a_pack_or_a_file_of_another_shape_refuses_the_library(
@@ -354,7 +393,7 @@ def test_a_broken_published_version_or_note_refuses_the_library(
 ) -> None:
     root = _copy_all(tmp_path)
     # The positive control: the unbroken copy loads with every earlier version.
-    assert all(pack.earlier_versions for pack in _load_all(root).packs)
+    assert all(pack.earlier_versions for pack in _load_all(root).packs if pack.version > 1)
     ledger = root / "published.v1.json"
     notes = root / "changes.v1.json"
     toon = root / "published" / "exulanica.toon-town"

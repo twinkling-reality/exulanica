@@ -1,0 +1,59 @@
+{
+  "profile": "exulanica.kit-pack-sources/v1",
+  "about": "What the kit places pack is made from. Each piece is one model of a ready-made open kit, converted by scripts/style_packs/kit_pack.py: the archive it came in with its size and SHA-256 as fetched, the licence file read inside it, the model's path, what was left out, how it stands and how long its longest side is. A kit's archive is not in this repository; the converted pieces and kit-places.built.v1.json, the record of each conversion, are.",
+  "pack": {
+    "pack_id": "exulanica.kit-places",
+    "version": 1,
+    "title": "Kit places",
+    "description": "Cozy town with a ready-made piece from an open kit where a place has a thing of its own: a rowing boat by Kenney for a fishing boat. The piece keeps its kit's colours.",
+    "tags": [
+      "kits",
+      "low-poly",
+      "warm"
+    ],
+    "source_reference": "Kenney, Pirate Kit 2.1 (kenney.nl/assets/pirate-kit), CC0 1.0; the piece's model is named in assets/style-packs/kits/kit-places.v1.json",
+    "swatches_most": 24,
+    "swatch_distance_permille": 45,
+    "base": "exulanica.cozy-town",
+    "authors": [
+      "Exulanica",
+      "Kenney"
+    ]
+  },
+  "kits": {
+    "kenney_pirate-kit": {
+      "title": "Pirate Kit 2.1",
+      "author": "Kenney",
+      "page": "https://kenney.nl/assets/pirate-kit",
+      "archive": "kenney_pirate-kit.zip",
+      "archive_bytes": 3154665,
+      "archive_sha256": "667ed2caf92954ddb98f7b7cede831fe99ab75063c26b25e23d32715bee9c943",
+      "address": "https://kenney.nl/media/pages/assets/pirate-kit/e6d4bb1525-1771333093/kenney_pirate-kit.zip",
+      "licence": "CC0-1.0",
+      "licence_file": "License.txt",
+      "models": "Models/GLB format"
+    }
+  },
+  "pieces": [
+    {
+      "role": "vehicle.fishing_boat",
+      "file": "pieces/kit-rowing-boat.glb",
+      "words": "an open rowing boat",
+      "kit": "kenney_pirate-kit",
+      "model": "boat-row-large.glb",
+      "up": "+Y",
+      "front": "+Z",
+      "reason": "A fishing boat pulled up on a beach or moored at a quay is a small open boat; this is the kit's longer rowing boat, twice as long as wide, given the length of a four-metre skiff. The kit's shorter hull is left out of the pack: at 1.7 times as long as wide it reads as a tub once it stands in a place.",
+      "leave_out": [
+        "paddles"
+      ],
+      "longest_mm": 4200,
+      "left_out_reason": "The kit draws the oars spread, which makes the boat as wide as it is long; a boat's place is about twice as long as wide and a piece is scaled whole to fit it, so with the oars the hull would be drawn at half its length.",
+      "longest_is": "depth"
+    }
+  ],
+  "not_in_the_pack": {
+    "fixture.well": "No kit read for this pack holds a low stone well head. The roofed wells they hold are about 2.6 m tall, and a piece is scaled whole into its slot: in the 1.2 m box a drafted kind gives a well, a roofed well would stand waist high, a toy and not the thing. So the pack names no well and a well keeps the cozy town's box until a piece that is a well head exists.",
+    "the kit's shorter rowing boat": "At 1.7 times as long as wide it reads as a tub once it stands in a place."
+  }
+}

@@ -19,6 +19,7 @@ from typing import Any
 import pytest
 from exulanica.world import style_packs
 from exulanica.world import world_settings as ws
+from exulanica.world.style_pack_library import load_style_pack_library
 
 ROOT = Path(__file__).resolve().parents[1]
 STYLE_PACKS = ROOT / "assets" / "style-packs"
@@ -182,7 +183,13 @@ def test_every_part_makes_a_setting_every_published_look_can_wear(
     """A world keeps the look version it was given, so each part must compose and apply over every
     version the library still serves, alone and one of each axis together."""
     _name, manifest = named
-    pack = ws.resolve_chain([style_packs.read_manifest(manifest, CONTEXT)])
+    chain = [style_packs.read_manifest(manifest, CONTEXT)]
+    if manifest["base"] is not None:
+        # A look drawn on another is worn on its whole chain, as the library holds it.
+        below = load_style_pack_library().chain(manifest["base"]["manifest_sha256"])
+        assert below is not None, "the library does not hold this look's base"
+        chain.extend(below)
+    pack = ws.resolve_chain(chain)
     for axis, key in PARTS.parts:
         composed = ws.compose_setting({axis: key}, pack, CONTEXT, PARTS)
         setting = ws.read_setting(composed, RULES)

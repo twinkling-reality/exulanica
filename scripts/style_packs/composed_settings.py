@@ -29,6 +29,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from exulanica.world import world_settings as ws  # noqa: E402
+from exulanica.world.style_pack_library import load_style_pack_library  # noqa: E402
 from exulanica.world.style_packs import load_context, read_manifest  # noqa: E402
 
 PROFILE = "exulanica.world-setting-composed/v1"
@@ -46,10 +47,15 @@ def composed() -> dict[str, Any]:
     context = load_context(ROOT)
     parts = ws.setting_parts()
     rows: list[dict[str, Any]] = []
+    library = load_style_pack_library()
     for folder in sorted(PACKS.iterdir()):
         text = (folder / "manifest.json").read_bytes()
         manifest = read_manifest(json.loads(text), context)
-        pack = ws.resolve_chain([manifest])
+        # A pack drawn on another is composed on its whole chain, as a world that wears it is.
+        chain = library.chain(hashlib.sha256(text[:-1]).hexdigest())
+        if chain is None:
+            raise ValueError(f"the library does not hold {folder.name} as committed")
+        pack = ws.resolve_chain(chain)
         chosen: list[dict[str, str]] = [{axis: key} for axis, key in parts.parts]
         last: dict[str, str] = {}
         for axis, key in parts.parts:

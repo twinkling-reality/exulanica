@@ -1,0 +1,96 @@
+{
+  "profile": "exulanica.kit-pack-built/v1",
+  "written_by": "scripts/style_packs/kit_pack.py --convert",
+  "catalog_sha256": "bd2f01b2de48d2600733c2e4a12745ff00a58985bdb28414f773d8344e644359",
+  "swatches": [
+    {
+      "key": "kit_c1c1d8",
+      "srgb8": [
+        193,
+        193,
+        216
+      ],
+      "roughness_permille": 850,
+      "metalness_permille": 0,
+      "emission_permille": 0
+    },
+    {
+      "key": "kit_d6d6e5",
+      "srgb8": [
+        214,
+        214,
+        229
+      ],
+      "roughness_permille": 850,
+      "metalness_permille": 0,
+      "emission_permille": 0
+    },
+    {
+      "key": "kit_ea9168",
+      "srgb8": [
+        234,
+        145,
+        104
+      ],
+      "roughness_permille": 850,
+      "metalness_permille": 0,
+      "emission_permille": 0
+    },
+    {
+      "key": "kit_e6e6ef",
+      "srgb8": [
+        230,
+        230,
+        239
+      ],
+      "roughness_permille": 850,
+      "metalness_permille": 0,
+      "emission_permille": 0
+    },
+    {
+      "key": "kit_d6815b",
+      "srgb8": [
+        214,
+        129,
+        91
+      ],
+      "roughness_permille": 850,
+      "metalness_permille": 0,
+      "emission_permille": 0
+    }
+  ],
+  "pieces": [
+    {
+      "file": "pieces/kit-rowing-boat.glb",
+      "role": "vehicle.fishing_boat",
+      "model": {
+        "path": "boat-row-large.glb",
+        "bytes": 15972,
+        "sha256": "b496c0d5f9053ebc7e9b9a39a4770d5ccaff5510c51b7c72c1b8391442e61d0f"
+      },
+      "read_with": [],
+      "licence_file_sha256": "5e99246a5a65fa3420a1a1c7a8616f096202c78866f73d7aacfe73c0aab0ca36",
+      "left_out": [
+        "paddles"
+      ],
+      "triangles_read": 118,
+      "triangles_without_area": 3,
+      "size_mm": [
+        2103,
+        4200,
+        942
+      ],
+      "scale_per_million": 1472575,
+      "triangles": 115,
+      "swatches_used": [
+        "kit_c1c1d8",
+        "kit_d6815b",
+        "kit_d6d6e5",
+        "kit_e6e6ef",
+        "kit_ea9168"
+      ],
+      "bytes": 9968,
+      "sha256": "a326b7cbf49e22a3f66997c593351045e7bfbfde844806bbe5abff420cc93962"
+    }
+  ]
+}

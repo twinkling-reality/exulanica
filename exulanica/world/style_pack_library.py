@@ -14,7 +14,11 @@ one, so nothing it holds is ever served.
 
 ``assets/style-packs/library.v1.json`` names the library's default pack, the look a town is made
 in when the person making it names none; a default that is not a pack of the library refuses the
-library.
+library. It may also list the looks offered to the look chooser, the model step that reads a
+person's description for a look (``offered_to_the_look_chooser``): that step is offered only the
+looks its recorded runs were measured with, so a pack added to the library is a look a person
+chooses until the step is measured with it. A file that lists none offers every pack; a look
+listed that is not a pack of the library refuses the library.
 
 A pack's earlier versions stay servable, so a world drawn in one keeps its look when the pack
 moves on. Each is a whole pack folder as it was published, ``assets/style-packs/published/<pack
@@ -57,6 +61,7 @@ from exulanica.world.style_packs import (
 
 __all__ = [
     "CHANGES_PROFILE",
+    "CHOOSER_OFFERS",
     "LIBRARY_DIRECTORY",
     "LIBRARY_FILE",
     "LIBRARY_PROFILE",
@@ -79,6 +84,8 @@ LIBRARY_DIRECTORY: Final = _ROOT / "assets" / "style-packs" / "packs"
 LIBRARY_FILE: Final = _ROOT / "assets" / "style-packs" / "library.v1.json"
 #: The profile of that file: its default pack's id and nothing else.
 LIBRARY_PROFILE: Final = "exulanica.style-pack-library/v1"
+#: The library file's list of the looks offered to the look chooser.
+CHOOSER_OFFERS: Final = "offered_to_the_look_chooser"
 #: The profile of the list ``GET /world/style-packs`` answers.
 LIST_PROFILE: Final = "exulanica.style-pack-list/v1"
 #: The media type a manifest is served as: its canonical JSON.
@@ -171,6 +178,9 @@ class StylePackLibrary:
     content: CommittedContent
     #: The id of the pack a town is made in when the person making it names none.
     default: str
+    #: The ids of the packs the look chooser is offered, in id order: the looks its recorded runs
+    #: were measured with. Any other pack is one a person chooses.
+    chooser_offers: tuple[str, ...] = ()
 
     def pack(self, pack_id: str) -> LibraryPack | None:
         """The committed pack ``pack_id`` names, at its current version, or None."""
@@ -282,26 +292,35 @@ def _preview(manifest: dict[str, Any]) -> dict[str, str | None]:
     return {"preview_sha256": file["sha256"], "preview_media_type": file["media_type"]}
 
 
-def _default(library_file: Path, packs: dict[str, _Read]) -> str:
-    """The pack ``library_file`` names as the default, which must be one of ``packs``."""
+def _library_file(library_file: Path, packs: dict[str, _Read]) -> tuple[str, tuple[str, ...]]:
+    """The pack ``library_file`` names as the default, which must be one of ``packs``, and the
+    looks it offers the look chooser, in id order: the ones it lists, each a pack of ``packs`` and
+    listed once, or every pack where it lists none."""
     try:
         document = json.loads(library_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as unread:
         raise StylePackLibraryRefused(f"{library_file.name} cannot be read: {unread}") from unread
     if (
         not isinstance(document, dict)
-        or set(document) != {"profile", "default"}
+        or not {"profile", "default"} <= set(document) <= {"profile", "default", CHOOSER_OFFERS}
         or document["profile"] != LIBRARY_PROFILE
     ):
         raise StylePackLibraryRefused(
-            f"{library_file.name} is not {LIBRARY_PROFILE}: a profile and a default, nothing else"
+            f"{library_file.name} is not {LIBRARY_PROFILE}: a profile, a default and at most "
+            f"{CHOOSER_OFFERS}, nothing else"
         )
     if document["default"] not in packs:
         raise StylePackLibraryRefused(
             f"{library_file.name} names {document['default']!r} the default, "
             "which is not a pack of the library"
         )
-    return str(document["default"])
+    offered = document.get(CHOOSER_OFFERS, sorted(packs))
+    if not isinstance(offered, list) or not offered or offered != sorted(set(offered) & set(packs)):
+        raise StylePackLibraryRefused(
+            f"{library_file.name} offers the look chooser looks that are not packs of the "
+            "library, each once, in id order"
+        )
+    return str(document["default"]), tuple(offered)
 
 
 def _records(path: Path, profile: str, key: str, fields: set[str]) -> list[dict[str, Any]]:
@@ -443,7 +462,7 @@ def load_style_pack_library(
             raise _refuse(
                 read.manifest["pack_id"], f"its base {base['pack_id']} is not a pack of the library"
             )
-    default = _default(library_file, packs)
+    default, chooser_offers = _library_file(library_file, packs)
     notes = _notes(directory, set(held))
     return StylePackLibrary(
         packs=tuple(
@@ -479,6 +498,7 @@ def load_style_pack_library(
             item for read in (*packs.values(), *published) for item in read.items
         ),
         default=default,
+        chooser_offers=chooser_offers,
     )
 
 

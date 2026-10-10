@@ -90,6 +90,7 @@ describe('the look a generated world opens in', () => {
   it('is the pack the address names from the closed list, the tile look for today, or none', () => {
     expect(addressedWorldLook('?look=cozy')).toBe('exulanica.cozy-town');
     expect(addressedWorldLook('?look=toon')).toBe('exulanica.toon-town');
+    expect(addressedWorldLook('?look=kits')).toBe('exulanica.kit-places');
     expect(addressedWorldLook('?look=finished')).toBe('exulanica.finished-town');
     expect(addressedWorldLook('?look=today')).toBeNull();
     expect(addressedWorldLook('')).toBeUndefined();
@@ -227,6 +228,64 @@ describe('a pack the host serves, prepared for a world', () => {
     swapped.set(pieceDigest, new Uint8Array(readFileSync(`${PACKS}/exulanica.toon-town/pieces/fence.glb`)));
     vi.stubGlobal('fetch', host({ ...served, content: swapped }, []));
     await expect(prepareWorldLook(ACCESS, 'exulanica.toon-town', TEXTURES, [])).rejects.toThrow('not the ones its digest names');
+  });
+});
+
+describe('a library pack drawn on another library pack, prepared for a world', () => {
+  const KIT = 'exulanica.kit-places';
+
+  it('is read down its chain by digest: its own pieces in its own colours, everything else its base\'s', async () => {
+    const served = committedLibrary();
+    const asked: { url: string; authorization: string | null }[] = [];
+    vi.stubGlobal('fetch', host(served, asked));
+    const prepared = await prepareWorldLook(ACCESS, KIT, TEXTURES, []);
+    const kit = JSON.parse(readFileSync(`${PACKS}/${KIT}/manifest.json`, 'utf8')) as {
+      base: { pack_id: string; manifest_sha256: string };
+      palette: { swatches: { key: string }[] };
+      modules: Record<string, { variants: { file: string }[] }>;
+    };
+    expect(prepared.pack.chain.map((manifest) => manifest.pack_id)).toEqual([KIT, kit.base.pack_id]);
+    expect(asked.map((request) => request.url)).toContain(`${ACCESS.baseUrl}/world/style-packs/${kit.base.manifest_sha256}`);
+    // The base's light, surfaces and pieces are the look; the kit's roles and swatches are added.
+    const base = await prepareWorldLook(ACCESS, kit.base.pack_id, TEXTURES, []);
+    expect(prepared.look).toEqual(base.look);
+    expect(prepared.pack.surfaces).toEqual(base.pack.surfaces);
+    for (const role of Object.keys(base.pack.modules)) expect(prepared.pack.modules[role]!.variants).toEqual(base.pack.modules[role]!.variants);
+    for (const [role, module] of Object.entries(kit.modules)) {
+      expect(base.pack.modules[role]).toBeUndefined();
+      expect(prepared.pack.modules[role]!.stated).toBe(0);
+      for (const variant of module.variants) {
+        // Keyed by the manifest that stated it (0, the kit pack itself) and the piece's digest.
+        const piece = prepared.pieces.pieces.get(`0:${prepared.pack.modules[role]!.files.get(variant.file)!.sha256}`);
+        expect(piece, variant.file).toBeDefined();
+        const own = new Set(kit.palette.swatches.map((swatch) => swatch.key));
+        for (const group of piece!.groups) expect(own.has(group.swatch), `${variant.file} ${group.swatch}`).toBe(true);
+      }
+    }
+  });
+
+  it('is refused when its base arrives as another pack or version than it names', async () => {
+    const served = committedLibrary();
+    const kit = JSON.parse(readFileSync(`${PACKS}/${KIT}/manifest.json`, 'utf8')) as { base: { manifest_sha256: string } };
+    const packs = (served.list as { packs: { pack_id: string; manifest_sha256: string }[] }).packs;
+    const toon = packs.find((entry) => entry.pack_id === 'exulanica.toon-town')!;
+    // A host that answers the base's digest with another pack's manifest: held to the digest first.
+    served.content.set(kit.base.manifest_sha256, served.content.get(toon.manifest_sha256)!);
+    vi.stubGlobal('fetch', host(served, []));
+    await expect(prepareWorldLook(ACCESS, KIT, TEXTURES, [])).rejects.toThrow('not the ones its digest names');
+  });
+
+  it('is refused when the manifest its base\'s digest names is another pack than it says', async () => {
+    const served = committedLibrary();
+    const packs = (served.list as { packs: { pack_id: string; manifest_sha256: string }[] }).packs;
+    const toon = packs.find((entry) => entry.pack_id === 'exulanica.toon-town')!;
+    // The kit pack restated to name the toon town's manifest by digest while calling it the cozy town.
+    const kit = JSON.parse(readFileSync(`${PACKS}/${KIT}/manifest.json`, 'utf8')) as { base: { manifest_sha256: string } };
+    kit.base.manifest_sha256 = toon.manifest_sha256;
+    const bytes = new TextEncoder().encode(canonicalJson(kit));
+    served.content.set(sha256(bytes), bytes);
+    vi.stubGlobal('fetch', host(served, []));
+    await expect(prepareWorldLook(ACCESS, KIT, TEXTURES, [], sha256(bytes))).rejects.toThrow('does not name exulanica.toon-town as its base');
   });
 });
 

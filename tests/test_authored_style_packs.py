@@ -1,7 +1,8 @@
 """The authored style packs, held to the script that writes them and to the product's own rules.
 
 ``assets/style-packs/packs/`` holds three packs written by
-``scripts/style_packs/authored_packs.py``. These tests build every pack again in memory and require
+``scripts/style_packs/authored_packs.py`` (the library's other packs, made by other scripts, have
+tests of their own). These tests build every authored pack again in memory and require
 the committed bytes to be exactly what the script writes, so a piece changed by hand, or a script
 changed without its files, fails here. Each manifest is read by the product's reader against the
 catalogs in this tree, each piece is held to its family's budget, and each frame that stretches is
@@ -46,10 +47,12 @@ def _builder() -> ModuleType:
 
 
 def _manifests() -> dict[str, dict[str, Any]]:
-    return {
+    """The authored packs' manifests by folder: every pack of the library whose origin says so."""
+    read = {
         folder.name: json.loads((folder / "manifest.json").read_text(encoding="ascii"))
         for folder in sorted(PACKS.iterdir())
     }
+    return {name: manifest for name, manifest in read.items() if manifest["origin"] == "authored"}
 
 
 def _triangles(glb: bytes) -> int:
@@ -67,10 +70,12 @@ def test_the_committed_packs_are_exactly_what_the_script_writes() -> None:
     for spec in builder.SPECS:
         for name, data in builder.build(spec, table).items():
             expected[f"{spec.pack_id}/{name}"] = data
+    # Every authored pack is one the script writes, and each one's folder holds nothing else.
+    assert sorted(_manifests()) == sorted(spec.pack_id for spec in builder.SPECS)
     committed = {
         str(path.relative_to(PACKS)): path.read_bytes()
         for path in sorted(PACKS.rglob("*"))
-        if path.is_file()
+        if path.is_file() and path.relative_to(PACKS).parts[0] in _manifests()
     }
     assert sorted(committed) == sorted(expected)
     for path, data in expected.items():

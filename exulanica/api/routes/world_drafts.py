@@ -22,8 +22,8 @@ proposal document, the same for the page and for an agent calling the API:
     request of the caller's own that is unfinished, withdrawn or made for another draft is answered
     with its own code; either way the draft is drafted from the words alone;
 *   the specification, prompt and model it was drafted with, and what the drafting cost;
-*   for a draft that is not refused, ``look_offer``: which of the library's looks the words ask
-    for, if any, chosen by a short step of its own after the draft
+*   for a draft that is not refused, ``look_offer``: which of the looks the library offers the
+    step the words ask for, if any, chosen by a short step of its own after the draft
     (:mod:`exulanica.selection.look_choosing`), with the person's own words that chose it. The
     drafter's request is the same whether or not the step runs; whatever the step answers, the
     person picks the look, and the library's default stands when it offers none;
@@ -294,7 +294,10 @@ def _unavailable(failed: Exception) -> LookReason:
 def _look_offer(client: ModelClient, sent: SentDescription) -> LookOfferView | None:
     """Ask which listed look the words sent to the drafter ask for, after the draft. The step
     spends the same allowance the draft does, and its failure never fails the draft."""
-    packs = {pack.pack_id: pack for pack in style_pack_library().packs}
+    # Only the looks the step's recorded runs were measured with (the library file lists them):
+    # any other pack of the library is a look a person chooses.
+    library = style_pack_library()
+    packs = {pack.pack_id: pack for pack in library.packs if pack.pack_id in library.chooser_offers}
     if not packs:
         return None
     prompt = chooser_prompt()

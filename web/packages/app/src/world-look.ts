@@ -14,7 +14,7 @@
  * back.
  *
  * Which pack (`worldLookChoice`): the one the page's address names (`?look=toon`, `cozy`,
- * `finished`, or `today` for the tile look), which is presentation only and read from a closed list
+ * `finished`, `kits`, or `today` for the tile look), which is presentation only and read from a closed list
  * of words for the team's packs; else the pack the world's appearance names (its style version's
  * binding), fetched by the very manifest digest it names; else the pack the host's list marks its
  * default (`listedDefault`), which is `DEFAULT_WORLD_LOOK` only from a host that marks none.
@@ -24,6 +24,10 @@
  * `GET /workspace-style-packs/{sha256}` and each of its own pieces from that version's file route,
  * held to its digest; its base is the library pack it names, fetched as above, and the two resolve
  * as one chain. An own look that may no longer be worn (withdrawn) is drawn as its base.
+ *
+ * A library pack may itself be drawn on another library pack (the kit places on the cozy town): it
+ * names that base by its manifest's digest, which the host serves like any version it holds, and
+ * the page reads the chain down to the pack that names no base, at most four manifests.
  */
 
 import type { LookFamily, ResolvedStylePack } from '@exulanica/atlas-core';
@@ -45,6 +49,7 @@ export const WORLD_LOOKS = Object.freeze({
   toon: 'exulanica.toon-town',
   cozy: 'exulanica.cozy-town',
   finished: 'exulanica.finished-town',
+  kits: 'exulanica.kit-places',
 } as const);
 
 /**
@@ -330,6 +335,14 @@ export async function prepareWorldLook(
       throw new Error(`${packId} is not drawn on ${ownBase.packId} version ${String(ownBase.version)}`);
     }
     chain.push(base);
+  }
+  // A library pack drawn on another names it by its manifest's digest, and the host serves every
+  // version it holds by digest, so the chain is read down to the pack that names no base. Resolving
+  // holds each manifest to the id and version the one above it names.
+  for (let above = chain[chain.length - 1]!; above.base !== null; above = chain[chain.length - 1]!) {
+    if (chain.length === 4) throw new Error(`${packId} is drawn on more packs than a look resolves through`);
+    const bytes = await stylePackContent(access, above.base.manifest_sha256, `${above.base.pack_id} manifest`);
+    chain.push(readStylePackManifest(JSON.parse(new TextDecoder().decode(bytes)) as Parameters<typeof readStylePackManifest>[0], { families, textureSets }));
   }
   let pack = resolveStylePack(chain);
   let drawnSetting: PreparedWorldLook['setting'] = null;

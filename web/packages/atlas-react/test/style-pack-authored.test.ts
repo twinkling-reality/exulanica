@@ -21,7 +21,10 @@ const catalog = JSON.parse(readFileSync('../assets/catalogs/world-kinds/look-fam
 const families = new Map<string, LookFamily>(catalog.entries.map((e) => [e.key, { fit: e.fit, dressing: e.dressing, fillMinimumPermille: e.fill_minimum_permille, fillMaximumPermille: e.fill_maximum_permille }]));
 const textureSets = new Set<string>((JSON.parse(readFileSync('../assets/textures/manifest.json', 'utf8')) as { sets: { set_id: string }[] }).sets.map((s) => s.set_id));
 const TABLE = JSON.parse(readFileSync('../assets/colour/srgb8-linear16.v1.json', 'utf8')).values as number[];
-const folders = readdirSync(PACKS).sort();
+// The library's authored packs: the three one script writes. Its other packs have tests of their own.
+const folders = readdirSync(PACKS).sort().filter((folder) => (
+  (JSON.parse(readFileSync(`${PACKS}/${folder}/manifest.json`, 'utf8')) as { origin: string }).origin === 'authored'
+));
 
 describe('the authored packs', () => {
   it('are three, each read by the browser\'s reader against this tree\'s catalogs', () => {

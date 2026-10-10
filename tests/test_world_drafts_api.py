@@ -393,9 +393,19 @@ def test_a_look_the_words_ask_for_is_offered_in_the_persons_own_words(drafts):
     sent = first["payload"]["messages"][1]["content"]
     assert "[place A]" in sent
     messages = second["payload"]["messages"]
+    # The looks the step's recorded runs were offered, which the library file lists: a pack added
+    # to the library since is a look a person chooses, and the step is not shown it.
+    library = style_pack_library()
+    assert library.chooser_offers == (
+        "exulanica.cozy-town",
+        "exulanica.finished-town",
+        "exulanica.toon-town",
+    )
+    assert len(library.packs) > len(library.chooser_offers)
     looks = tuple(
         LookOption(pack.pack_id, pack.title, pack.description)
-        for pack in style_pack_library().packs
+        for pack in library.packs
+        if pack.pack_id in library.chooser_offers
     )
     words = "A cozy town in warm evening light like [place A], a harbour like it"
     assert messages[1]["content"] == render_request(words, looks)

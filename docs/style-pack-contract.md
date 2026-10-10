@@ -207,9 +207,13 @@ down puts every material back and removes every piece.
 | Ink | A shading that draws ink outlines the tiles' opaque surfaces and the pack's baked pieces (`attachTileInk`) |
 
 The app draws a saved generated world in the pack its address names (`?look=toon`, `cozy`,
-`finished`, or `today` for the tile look), else the pack its appearance names (section 10), else
+`finished`, `kits`, or `today` for the tile look: one word for each pack of the library), else the
+pack its appearance names (section 10), else
 `DEFAULT_WORLD_LOOK` (`web/packages/app/src/world-look.ts`), the cozy town, reading the pack from the
-host (section 9). A pack the page cannot read is not stood in for: the world opens in the tile look,
+host (section 9). A library pack drawn on another names that base by its manifest's digest, which
+the host serves like any version it holds; the page reads the chain down to the pack that names no
+base, at most four manifests, and holds each to the id and version the pack above it names
+(`prepareWorldLook`). A pack the page cannot read is not stood in for: the world opens in the tile look,
 and the shell's `data-world-look` attribute states the pack asked for, what chose it (`address`,
 `world` or `default`) and why it was not drawn.
 
@@ -256,7 +260,7 @@ host.
 
 ## 8. The authored packs
 
-Three packs are committed under `assets/style-packs/packs/`, each CC0-1.0 and authored by Exulanica:
+Three packs authored by Exulanica are committed under `assets/style-packs/packs/`, each CC0-1.0:
 `exulanica.toon-town` (flat colour in two light bands with ink), `exulanica.cozy-town` (faceted,
 warm light, some windows lit) and `exulanica.finished-town` (the town's own texture sets for every
 wall, road, path and ground material, physically lit, slate roofs). Each states a day and an evening
@@ -274,6 +278,31 @@ the smallest door a site cuts, each read from the grammars. `tests/test_authored
 holds the committed files to the script, the product's reader, the piece budgets, those openings
 and the previews' format and size; `web/packages/atlas-react/test/style-pack-authored.test.ts`
 reads them as the page does and holds each preset's shade light to that bound.
+
+A fourth pack, `exulanica.kit-places`, is drawn on the cozy town and adds a ready-made piece from an
+open kit where a place made from a world kind has a thing of its own: a rowing boat for
+`vehicle.fishing_boat`, from Kenney's Pirate Kit, dedicated to the public domain (CC0 1.0). Its
+manifest states only what it adds: its base (the cozy town, by version and digest), swatches of
+its own and one module a look role; its light, ground, surfaces and the town's pieces are its
+base's. Its origin is `imported`, its authors are Exulanica and the kit's maker, and it states no
+family default: a slot whose leaf it does not name keeps what the cozy town draws there.
+`assets/style-packs/kits/kit-places.v1.json` states what it is made from (each kit's archive as it
+was fetched, with its size, SHA-256 and the licence file read inside it, and each piece's model,
+what is left out of it and why, how it stands and how long its longest side is), and what it
+leaves out and why; `kit-places.built.v1.json` beside it records each conversion: the model's and
+its pictures' digests, the size given, the swatches and the piece's digest. A kit's archive is not
+in this repository. `scripts/style_packs/kit_pack.py --convert` reads the unpacked kits
+(`scripts/style_packs/kit_models.py`: a model is parsed, never run, and a file it names outside
+its own folder is refused) and writes the pieces and that record; with no flag it writes the
+manifest from the catalog, the record and the committed pieces, which is run again when the cozy
+town moves. A piece keeps its kit's colours: every triangle of a kit model has one colour, and
+the pieces' colours become the pack's swatches, heaviest first by the area they cover, a colour
+joining a swatch already made when it is within the catalog's distance of it in OKLab. A kit piece
+is scaled whole into its slot like any contained piece, so it is as large as the slot's box lets
+its own proportions be; a piece whose proportions are far from the box a kind gives its leaf
+would stand as a miniature, and is left out of the pack for that (a roofed well, for a well's low
+box). `tests/test_kit_style_pack.py` holds the committed pack to the script, the library, its own
+swatches, its family budgets and its records, and `tests/test_kit_models.py` holds the reader.
 
 Every version a pack has published stays servable, so a world keeps the look it was given. Writing a
 new version first retires the committed one: the script copies its folder whole to
@@ -293,8 +322,10 @@ symbolic link or other bytes than its manifest states, a file its manifest does 
 that is not another pack of the library at the version and digest it names. A name starting with a
 dot is passed over; no pack id or listed path can start with one. `assets/style-packs/library.v1.json`
 (`exulanica.style-pack-library/v1`) names the library's default pack, the look a world is made in
-when the person making it names none; a default that is not a pack of the library, or a file stating
-anything else, refuses the library the same way.
+when the person making it names none, and may list the looks offered to the look chooser
+(`offered_to_the_look_chooser`, section 10.1; a file that lists none offers every pack); a default
+or an offered look that is not a pack of the library, or a file stating anything else, refuses the
+library the same way.
 
 A pack's earlier versions stay served. Each is read from its folder under
 `assets/style-packs/published/` by the same rules as a pack folder and held to its entry in
@@ -371,8 +402,12 @@ world to naming no pack.
 A person who describes a world in words (`POST /worlds/specification/drafts`) is offered the look
 the words ask for, if any. After a draft that is not refused, the route makes one short call of its
 own (`exulanica/selection/look_choosing.py`, the manifest role `look_chooser`), shown only the
-description as it was sent to the drafter, every saved name replaced, and each library pack's id,
-title and description. The answer is one listed pack id or none, with up to three phrases copied
+description as it was sent to the drafter, every saved name replaced, and the id, title and
+description of each look the library offers the step: the ones
+`assets/style-packs/library.v1.json` lists as `offered_to_the_look_chooser`, which are the looks
+the step's recorded runs were measured with (the three authored towns). A pack added to the
+library since is a look a person chooses, in the Look sheet or by the page's address, and the
+step is not shown it until it is measured with it. The answer is one listed pack id or none, with up to three phrases copied
 from the description that chose it. Code decides what is kept: a pack the library does not list, a
 phrase not found word for word in the description, a look with no words or words with no look is
 refused, told why once, and on a second refusal the step answers none. The answer is the draft

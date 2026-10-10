@@ -38,7 +38,14 @@ const packs = new Map<string, ResolvedStylePack>();
 const packOf = (packId: string): ResolvedStylePack => {
   let pack = packs.get(packId);
   if (pack === undefined) {
-    pack = resolveStylePack([readStylePackManifest(read(`style-packs/packs/${packId}/manifest.json`), { families, textureSets })]);
+    // A pack drawn on another is drawn on its whole chain, each base the library's committed pack of that id.
+    const chain = [readStylePackManifest(read(`style-packs/packs/${packId}/manifest.json`), { families, textureSets })];
+    for (let above = chain[0]!; above.base !== null; above = chain[chain.length - 1]!) {
+      const base = readStylePackManifest(read(`style-packs/packs/${above.base.pack_id}/manifest.json`), { families, textureSets });
+      expect(base.version, `${above.pack_id} is drawn on the committed ${base.pack_id}`).toBe(above.base.version);
+      chain.push(base);
+    }
+    pack = resolveStylePack(chain);
     packs.set(packId, pack);
   }
   return pack;
