@@ -10,8 +10,14 @@
 //    "minds": [{"being": <as Who decides lists it>, "model": <as Who decides names it>}, ...],
 //    "speed": <the clock's speed while it plays>, "alive_seconds": <how long it plays>,
 //    "step_back_ms": <how long the viewer walks back after the things appear>,
+//    "frame": <optional: keys held in turn instead of the step back, [{"key": "KeyW" | "KeyA" | "KeyS" | "KeyD" |
+//              "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "KeyC", "ms": <how long>}, ...]: the viewer
+//              walks and turns (C changes between its own eyes and a view from behind it), for example back,
+//              off the path people walk through the arrival point, and toward the things>,
 //    "card": {"being": <whose card opens>, "look": <a look to show>, "look_back": <the look to return to>,
 //             "swap_mind": <a model to give it, or null>}}
+// A take document may also hold "scene", "doors" and "hold": take_run.sh and take_hold.sh read those (the
+// stack's doors, what happens outside the page during the hold); this script does not.
 //
 // Steps, each marked in marks.json (seconds from the recording's first frame): world-open, named,
 // asked, question, plan-shown, placed, reopened, people-in, framed, minds-chosen, playing, alive-end, then,
@@ -58,6 +64,11 @@ const minds = take.minds.map((mind) => [mind.being, mind.model]);
 const speed = String(take.speed);
 const aliveSeconds = Number(take.alive_seconds);
 const stepBackMs = Number(take.step_back_ms);
+const FRAME_KEYS = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', KeyC: 'c', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown' };
+const frameKeys = take.frame ?? null;
+if (frameKeys !== null && (!Array.isArray(frameKeys) || frameKeys.some((held) => !(held.key in FRAME_KEYS) || !(Number(held.ms) > 0)))) {
+  throw new Error('frame lists the keys the viewer moves by (W, A, S, D, C and the arrows), each held some ms');
+}
 const hold = args.hold ?? null;
 const holdMinutes = Number(args['hold-minutes'] ?? 30);
 const being = take.card.being;
@@ -215,7 +226,14 @@ try {
     await page.key('Escape', 'Escape');
     await page.clickAt(width / 2, Math.round(height * 0.18));
     await sleep(400);
-    await page.key('KeyS', 's', { holdMs: stepBackMs });
+    if (frameKeys === null) {
+      await page.key('KeyS', 's', { holdMs: stepBackMs });
+    } else {
+      for (const held of frameKeys) {
+        await page.key(held.key, FRAME_KEYS[held.key], { holdMs: Number(held.ms) });
+        await sleep(300);
+      }
+    }
     await sleep(1_000);
     await mark('framed', await page.evaluate("document.activeElement ? document.activeElement.tagName : 'none'"));
   });
@@ -350,7 +368,13 @@ try {
     say(`take: ${JSON.stringify(stats)}`);
     if (made.status === 0) rmSync(join(out, 'frames'), { recursive: true, force: true });
   }
-  rmSync(join(out, 'chrome-profile'), { recursive: true, force: true });
   await page.close();
+  // Chrome may still be writing its profile as it exits: the removal is retried, and a folder left
+  // behind is no failure of the take.
+  try {
+    rmSync(join(out, 'chrome-profile'), { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+  } catch (error) {
+    say(`the browser's profile folder stays: ${String(error.code ?? error.message)}`);
+  }
 }
 process.exit(failed ? 1 : 0);

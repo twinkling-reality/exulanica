@@ -1,0 +1,72 @@
+{
+ "profile": "exulanica.film-take/v1",
+ "title": "Three strangers",
+ "sentence": "Add a stone well, a gate for travellers, a knight on guard by the well, a lantern spirit, and a sword and a lantern by the well.",
+ "minds": [
+  {
+   "being": "Knight",
+   "model": "Nemotron 3 Super 120B"
+  },
+  {
+   "being": "Lantern spirit",
+   "model": "Qwen3 235B Instruct"
+  }
+ ],
+ "speed": 4,
+ "alive_seconds": 45,
+ "step_back_ms": 400,
+ "frame": [
+  {
+   "key": "KeyS",
+   "ms": 600
+  },
+  {
+   "key": "KeyA",
+   "ms": 500
+  },
+  {
+   "key": "ArrowRight",
+   "ms": 280
+  }
+ ],
+ "card": {
+  "being": "Knight",
+  "look": "Blocky knight",
+  "look_back": "Armoured knight",
+  "swap_mind": "Qwen3 235B Instruct"
+ },
+ "scene": "assets/catalogs/scenes/three-strangers.v5.json",
+ "doors": {
+  "game": {
+   "label": "an open-source block game",
+   "mapping": "luanti-minetest-game.v4.json"
+  },
+  "agents": "bridges/agents/examples/bridge-entry.json"
+ },
+ "hold": {
+  "crossing": {
+   "lives_s": 30,
+   "call_home_limit_s": 360,
+   "runs": 2,
+   "home_item": "default:sword_steel"
+  },
+  "requests": {
+   "giver_kind": "knight",
+   "thing_kind": "sword",
+   "receiver_kind": "traveller",
+   "pick_words": "The knight picks up the sword.",
+   "give_words": "The knight gives the sword to the traveller.",
+   "receiver_pick_words": "The traveller picks up the sword."
+  },
+  "agent": {
+   "name": "Wanderer",
+   "maker": "Exulanica demo",
+   "mind": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+   "task": "You are Wanderer. Enter the world Three strangers through its gate, then take your turns there: greet everyone, then speak with the knight and with the lantern spirit by name.",
+   "minutes": 5,
+   "speed": 1,
+   "max_calls": 60,
+   "max_usd": "0.10"
+  }
+ }
+}
