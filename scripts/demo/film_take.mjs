@@ -165,6 +165,20 @@ const step = async (name, run) => {
 };
 // A saved world's card on the list of worlds, by its title.
 const worldCard = (name) => `[...document.querySelectorAll(${JSON.stringify(selectors.world_card)})].find(b => (b.innerText || '').includes(${JSON.stringify(name)}))`;
+const worldIsOpen = `!!(${titleInput}) && (${titleInput}).offsetParent !== null`;
+// From the list of worlds to an open one: the card of the named world where the list shows it, then Open
+// where the page offers it. A slow page may open the world before Open is looked for, or draw the list
+// late, so each is waited for and neither is required.
+async function openFromList(page, name) {
+  if (await page.evaluate(worldIsOpen)) return;
+  if (name !== null && await page.evaluate(`!!(${worldCard(name)})`)) {
+    await page.click(worldCard(name), `the card of ${name}`).catch(() => null);
+    await sleep(600);
+  }
+  const offered = await page.waitFor(`(${worldIsOpen}) ? 'open' : !!(${buttonStarting(words.open_world)}) ? 'offered' : null`, 60_000, 'Open, or the open world');
+  if (offered === 'offered') await page.click(buttonStarting(words.open_world), 'Open').catch(() => null);
+  await page.waitFor(worldIsOpen, 90_000, 'the open world');
+}
 
 // The Companion's field for a person's own words. An empty world's Companion shows it at once; where the
 // Companion opens on a question (a town's does) the field is there but hidden until "Other…" is pressed.
@@ -266,14 +280,8 @@ try {
     await page.waitFor(`!!(${titleInput}) || !!(${buttonStarting(words.open_world)})`, 60_000, 'the world list or an open world');
     if (describedWorld !== null) {
       await makeWorld(describedWorld);
-    } else if (openedWorld !== null) {
-      await page.click(worldCard(openedWorld), `the card of ${openedWorld}`);
-      await sleep(600);
-      await page.click(buttonStarting(words.open_world), 'Open');
-      await page.waitFor(`!!(${titleInput}) && (${titleInput}).offsetParent !== null`, 90_000, 'the open world');
     } else {
-      if (!(await page.evaluate(`!!(${titleInput}) && (${titleInput}).offsetParent !== null`))) await page.click(buttonStarting(words.open_world), 'Open');
-      await page.waitFor(`!!(${titleInput}) && (${titleInput}).offsetParent !== null`, 90_000, 'the open world');
+      await openFromList(page, openedWorld);
     }
     await sleep(4_000);
     await mark('world-open');
@@ -330,16 +338,9 @@ try {
     await page.navigate(url);
     await page.waitFor(`!!(${titleInput}) || !!(${buttonStarting(words.open_world)})`, 60_000, 'the world list or an open world');
     // The list may hold other worlds: the take's own is the one it named, chosen by its card.
-    if (!(await page.evaluate(`!!(${titleInput}) && (${titleInput}).offsetParent !== null`))) {
-      if (await page.evaluate(`!!(${worldCard(title)})`)) {
-        await page.click(worldCard(title), `the card of ${title}`);
-        await sleep(600);
-      }
-      await page.click(buttonStarting(words.open_world), 'Open');
-    }
-    await page.waitFor(`!!(${titleInput}) && (${titleInput}).offsetParent !== null`, 90_000, 'the open world');
+    await openFromList(page, title);
     await sleep(4_000);
-    await mark('reopened');
+    await mark('reopened', await page.evaluate(`(${titleInput})?.value ?? ''`));
   });
   await step('people-in', async () => {
     await page.click(buttonStarting(words.people), 'People');

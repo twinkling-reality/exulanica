@@ -234,3 +234,17 @@ def test_the_driver_and_its_page_file_name_the_same_words_and_selectors():
         )
     # No word of the app is left in the driver's own element lookups.
     assert not re.search(r"(?:button|buttonStarting|anyWords|shownWords)\('", driver)
+
+
+def test_the_driver_opens_a_world_from_the_list_in_one_place_that_waits_for_either():
+    # A slow page may open the world before its Open button is looked for, and a take stopped
+    # there: the list's Open is clicked in one place, after a wait the open world also ends, and
+    # the click is not required.
+    driver = (DEMO / "film_take.mjs").read_text()
+    clicks = re.findall(r"page\.click\(buttonStarting\(words\.open_world\)[^\n]*", driver)
+    assert len(clicks) == 1 and clicks[0].endswith(".catch(() => null);")
+    step = driver[driver.index("async function openFromList") :]
+    step = step[: step.index("\n}\n")]
+    assert clicks[0] in step and step.index("'offered' : null") < step.index(clicks[0])
+    assert step.rstrip().endswith("await page.waitFor(worldIsOpen, 90_000, 'the open world');")
+    assert driver.count("await openFromList(page, ") == 2
