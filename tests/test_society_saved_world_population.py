@@ -176,11 +176,13 @@ def test_a_legacy_society_still_needs_a_hundred_people_in_the_database(saved_wor
 def test_a_district_society_under_a_hundred_is_refused_through_the_repository(
     runtime_world, monkeypatch, profile
 ):
-    """The database accepts 1 to 512 for v2 and v3; the district's floor is the initializer's."""
+    """The database accepts one person or more for v2 (migration 0191 states no most for it) and
+    1 to 512 for the retired v3; neither row check knows a district, so the district's floor of a
+    hundred is the initializer's, which refuses fewer by saying the least it takes."""
     w = runtime_world
     monkeypatch.setattr(society_repository, "SOCIETY_POPULATION", 50)
     b = w["binding"]
-    with pytest.raises(ValueError, match="between 100 and 512"):
+    with pytest.raises(ValueError, match="society population must be at least 100"):
         create_or_plant(
             district.society(w),
             b.version_id,
@@ -189,6 +191,35 @@ def test_a_district_society_under_a_hundred_is_refused_through_the_repository(
             seed=SEED,
             actor=w["session"].actor,
             profile=profile,
+            initial_input=district.initial(w),
+        )
+    assert (
+        w["connection"]
+        .execute("select count(*) as n from world_society where workspace_id=%s", (w["workspace"],))
+        .fetchone()["n"]
+        == 0
+    )
+
+
+def test_a_retired_engine_s_society_past_its_most_is_refused_by_name_before_any_row(
+    runtime_world, monkeypatch
+):
+    """The retired v3 still states a most of 512 in the engine table, and the initializer holds a
+    society to the bounds its engine states: 513 people are refused in words, between the floor
+    and the most, and no row is asked of the database's own check. An engine that states no most
+    (v2) is held to its floor alone."""
+    w = runtime_world
+    monkeypatch.setattr(society_repository, "SOCIETY_POPULATION", 513)
+    b = w["binding"]
+    with pytest.raises(ValueError, match="society population must be between 100 and 512"):
+        create_or_plant(
+            district.society(w),
+            b.version_id,
+            place_id=b.place_id,
+            region_id=b.region_id,
+            seed=SEED,
+            actor=w["session"].actor,
+            profile="exulanica-society/v3",
             initial_input=district.initial(w),
         )
     assert (
