@@ -177,11 +177,19 @@ export function everyWords(ms: number): string {
 
 /** What the People nearby panel knows about playing this world on its own. */
 export interface PlaybackView {
-  /** The saved control and the host's statement, or null when neither could be read. */
+  /** The saved control and the host's statement, or null while the page holds none. */
   readonly control: SocietyPlaybackControl | null;
   /** A change the person asked for is on its way. */
   readonly busy: boolean;
+  /**
+   * Why the page holds no control, where it holds none: `unread` while its first read is on its
+   * way, `failed` once a read has really failed (the page is trying again). Absent is `failed`.
+   */
+  readonly unheld?: 'unread' | 'failed';
 }
+
+/** What the panel says once a read of the world's playback has really failed; the page tries again by itself. */
+export const PLAYBACK_UNREAD_WORDS = 'Playing on its own is not available: this world\'s playback could not be read. Trying again.';
 
 /**
  * Whether Play is offered, and the words beside it. Play is offered only where the host says it
@@ -235,14 +243,15 @@ export function modelMinds(control: SocietyPlaybackControl | null): { readonly w
   };
 }
 
-export function playbackWords(control: SocietyPlaybackControl | null): {
+export function playbackWords(control: SocietyPlaybackControl | null, unheld: 'unread' | 'failed' = 'failed'): {
   readonly offerPlay: boolean;
   readonly offerPause: boolean;
   readonly status: string;
   readonly why: string | null;
 } {
   if (control === null) {
-    return { offerPlay: false, offerPause: false, status: '', why: 'Playing on its own is not available: this world\'s playback could not be read.' };
+    // Not read yet is not unreadable: while the first read is on its way the panel says nothing of playing.
+    return { offerPlay: false, offerPause: false, status: '', why: unheld === 'unread' ? null : PLAYBACK_UNREAD_WORDS };
   }
   const host = control.hostPlayback;
   const playing = control.mode === 'playing';
@@ -484,7 +493,7 @@ export function buildWorldInhabitants(handlers: {
   /** Play, Pause and pace, while people are here; nothing about playing while nobody is. */
   const renderPlayback = (here: boolean, playback: PlaybackView | null | undefined): boolean => {
     const offered = here && playback !== null && playback !== undefined;
-    const words = offered ? playbackWords(playback.control) : null;
+    const words = offered ? playbackWords(playback.control, playback.unheld) : null;
     const playing = words?.offerPause === true;
     play.hidden = !(words?.offerPlay || words?.offerPause);
     play.textContent = playing ? 'Pause' : 'Play';

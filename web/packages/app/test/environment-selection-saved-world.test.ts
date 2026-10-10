@@ -10,6 +10,7 @@ import type { AppEnvironment, SessionState } from '../src/composition/session-st
 import { parseSociety, parseSocietyActionRecord, type SocietySnapshot } from '../src/society-api.js';
 import { parseSocietyControl } from '../src/society-control-api.js';
 import { parseSocietyModels } from '../src/society-models-api.js';
+import { PLAYBACK_UNREAD_WORDS } from '../src/ui/world-inhabitants.js';
 
 /*
  * A person's own saved world: inhabitants are drawn over its authored region, they exist only
@@ -156,6 +157,123 @@ function pick(root: HTMLElement, value: string): void {
   radio.checked = true;
   radio.dispatchEvent(new Event('change'));
 }
+
+describe('what the people panel says of a saved world\'s playback', () => {
+  const bringIn = (panel: () => HTMLElement) => [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Bring people in')!.click();
+  const says = (panel: () => HTMLElement) => panel().textContent ?? '';
+
+  it('says nothing of playing while its first read is on its way after people come in, then what the read said', async () => {
+    const { mounted, controlClient, panel } = mount();
+    await mounted.begin();
+    // The read made when people come in is held open: the page holds no control yet.
+    let land!: () => void;
+    const held = new Promise<void>((resolve) => { land = resolve; });
+    const answer = controlClient.read.getMockImplementation()!;
+    controlClient.read.mockImplementationOnce(async () => { await held; return answer(); });
+    bringIn(panel);
+    for (let i = 0; i < 6; i += 1) await settle();
+    expect(panel().dataset['state']).toBe('present');
+    expect(says(panel)).not.toContain('could not be read');
+    expect(says(panel)).not.toContain('Playing on its own is not available');
+    land();
+    for (let i = 0; i < 6; i += 1) await settle();
+    // It landed: the panel now says what the host says of playing, and never that it could not be read.
+    expect(says(panel)).not.toContain('could not be read');
+    expect(says(panel)).toMatch(/Play|Next minute/);
+    mounted.dispose();
+  });
+
+  it('says a read that really failed could not be read, tries again by itself with a longer wait each time, and recovers', async () => {
+    vi.useFakeTimers();
+    try {
+      const { mounted, controlClient, panel } = mount();
+      const turn = async (ms = 0) => { await vi.advanceTimersByTimeAsync(ms); };
+      await mounted.begin();
+      await turn();
+      const before = controlClient.read.mock.calls.length;
+      const answer = controlClient.read.getMockImplementation()!;
+      const down = new ApiError(503, 'unavailable', 'the store is restarting');
+      // The read when people come in fails, and so does the first try after it.
+      controlClient.read.mockRejectedValueOnce(down).mockRejectedValueOnce(down);
+      bringIn(panel);
+      for (let i = 0; i < 6; i += 1) await turn();
+      expect(panel().dataset['state']).toBe('present');
+      expect(says(panel)).toContain(PLAYBACK_UNREAD_WORDS);
+      expect(controlClient.read.mock.calls.length).toBe(before + 1);
+      // Nothing is read again before two seconds have passed; then once, and it fails again.
+      await turn(1900);
+      expect(controlClient.read.mock.calls.length).toBe(before + 1);
+      await turn(200);
+      expect(controlClient.read.mock.calls.length).toBe(before + 2);
+      expect(says(panel)).toContain(PLAYBACK_UNREAD_WORDS);
+      // The second wait is twice the first: nothing at three seconds, a read by four, and this one lands.
+      await turn(3000);
+      expect(controlClient.read.mock.calls.length).toBe(before + 2);
+      await turn(1200);
+      expect(controlClient.read.mock.calls.length).toBe(before + 3);
+      expect(answer).toBeTypeOf('function');
+      expect(says(panel)).not.toContain('could not be read');
+      // Recovered, the page stops trying: a paused world on a host that says nothing more is not read again.
+      await turn(60_000);
+      expect(controlClient.read.mock.calls.length).toBe(before + 3);
+      mounted.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts its waits again from the short one after a read has landed', async () => {
+    vi.useFakeTimers();
+    try {
+      const { mounted, controlClient, panel } = mount();
+      const turn = async (ms = 0) => { await vi.advanceTimersByTimeAsync(ms); };
+      await mounted.begin();
+      await turn();
+      // A world its host plays: the page keeps reading its control every two seconds while it plays.
+      const playing = () => ({ ...control(0), mode: 'playing' as const, hostPlayback: { running: true, intervalMs: 4000, reason: null, code: null } });
+      controlClient.read.mockImplementation(async () => playing() as never);
+      bringIn(panel);
+      for (let i = 0; i < 6; i += 1) await turn();
+      const down = new ApiError(503, 'unavailable', 'the store is restarting');
+      // Two reads in a row fail (waits of two and four seconds), the third lands.
+      controlClient.read.mockRejectedValueOnce(down).mockRejectedValueOnce(down);
+      await turn(2100);
+      expect(says(panel)).toContain(PLAYBACK_UNREAD_WORDS);
+      await turn(2100);
+      await turn(4100);
+      expect(says(panel)).not.toContain('could not be read');
+      // The next failure, a while later, is tried again after two seconds, not after eight.
+      controlClient.read.mockRejectedValueOnce(down);
+      await turn(2100);
+      expect(says(panel)).toContain(PLAYBACK_UNREAD_WORDS);
+      const reads = controlClient.read.mock.calls.length;
+      await turn(2100);
+      expect(controlClient.read.mock.calls.length).toBe(reads + 1);
+      expect(says(panel)).not.toContain('could not be read');
+      mounted.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not keep asking for the playback of a world nobody lives in', async () => {
+    vi.useFakeTimers();
+    try {
+      const { mounted, controlClient, panel } = mount();
+      await mounted.begin();
+      await vi.advanceTimersByTimeAsync(0);
+      // Nobody has been brought in: the world has no society, its control cannot be read, and that is not retried.
+      const reads = controlClient.read.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(controlClient.read.mock.calls.length).toBe(reads);
+      expect(panel().dataset['state']).toBe('absent');
+      expect(says(panel)).not.toContain('could not be read');
+      mounted.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
 
 describe('a saved world holds inhabitants only when the person asks', () => {
   it('opening reads the saved world and creates nothing; the request brings them in and draws them', async () => {

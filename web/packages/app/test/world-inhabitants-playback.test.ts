@@ -6,6 +6,7 @@ import { parseSocietyControl, type SocietyPlaybackControl } from '../src/society
 import {
   HOST_PLAYBACK_WORDS,
   MODEL_MINDS_WORDS,
+  PLAYBACK_UNREAD_WORDS,
   buildWorldInhabitants,
   everyWords,
   inhabitantWords,
@@ -13,6 +14,7 @@ import {
   noticeWords,
   placeRows,
   type InhabitedObject,
+  type PlaybackView,
 } from '../src/ui/world-inhabitants.js';
 
 const control = (mode: 'paused' | 'playing', host?: unknown, extra: Record<string, unknown> = {}): SocietyPlaybackControl =>
@@ -85,6 +87,37 @@ describe('Play, Pause and pace beside the people', () => {
     built.pace.value = '4';
     built.pace.dispatchEvent(new Event('change'));
     expect(handlers.onPace).toHaveBeenCalledWith(4);
+  });
+
+  it('says nothing of playing before its playback has been read, the truth once it has, and that it could not be read only after a read failed', () => {
+    const { built, shown } = panel();
+    const why = (): string | null => {
+      const lines = [...built.root.querySelectorAll<HTMLElement>('p.world-help')].filter((node) => !node.hidden).map((node) => node.textContent ?? '');
+      return lines.find((line) => /Play|playback/.test(line)) ?? null;
+    };
+    const render = (playback: PlaybackView) =>
+      built.render({ society: view(), objects, walked: 0, advanceBlocked: null, playback });
+    // NOT READ YET: people are here and the first read is on its way. No Play, and no line about playing at all.
+    render({ control: null, busy: true, unheld: 'unread' });
+    expect(shown(built.play)).toBe(false);
+    expect(why()).toBeNull();
+    expect(built.root.textContent).not.toContain('could not be read');
+    // READ: the control landed and the host plays this world.
+    render({ control: control('paused', running), busy: false, unheld: 'unread' });
+    expect(shown(built.play)).toBe(true);
+    expect(built.root.textContent).not.toContain('could not be read');
+    // FAILED: a read really failed. The panel says so, and that the page is trying again.
+    render({ control: null, busy: false, unheld: 'failed' });
+    expect(shown(built.play)).toBe(false);
+    expect(why()).toBe(PLAYBACK_UNREAD_WORDS);
+    expect(PLAYBACK_UNREAD_WORDS).toBe('Playing on its own is not available: this world\'s playback could not be read. Trying again.');
+    // RECOVERED: the next read landed; the line is gone and Play is back.
+    render({ control: control('paused', running), busy: false, unheld: 'failed' });
+    expect(shown(built.play)).toBe(true);
+    expect(built.root.textContent).not.toContain('could not be read');
+    // A caller that says nothing of why it holds no control is taken at its word that none could be read.
+    render({ control: null, busy: false });
+    expect(why()).toBe(PLAYBACK_UNREAD_WORDS);
   });
 
   it('offers Pause while playing, says the pace, and takes Advance away rather than disabling it', () => {

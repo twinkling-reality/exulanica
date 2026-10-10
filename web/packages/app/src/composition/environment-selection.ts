@@ -133,6 +133,12 @@ const activityLabel = (kind: string): string =>
  */
 const CONTROL_POLL_MS = 2_000;
 const CONTROL_POLL_FLOOR_MS = 500;
+/**
+ * The longest the page waits before it reads a world's playback again after a read failed. Each wait
+ * is twice the last, from `CONTROL_POLL_MS`: a chosen default, long enough that a server that is down
+ * is not asked every two seconds, short enough that a person sees Play come back without doing anything.
+ */
+const CONTROL_RETRY_MOST_MS = 30_000;
 
 export interface EnvironmentSelectionDependencies {
   readonly env: AppEnvironment;
@@ -674,6 +680,29 @@ export function mountEnvironmentSelection(
   let societyTimer: number | null = null;
   let controlTimer: number | null = null;
   let societyControl: SocietyPlaybackControl | null = null;
+  /** Why no control is held, where none is: not read yet, or a read that really failed (and how many in a row). */
+  let controlUnheld: 'unread' | 'failed' = 'unread';
+  let controlFailures = 0;
+  /** Hold what a read of the control answered, or that it failed. */
+  /**
+   * People are about to be here whose playback the page has not read: until that read lands the page
+   * holds no control and says nothing of playing, whatever an earlier read of a world with nobody in
+   * it answered. Called before the people come, so the words never show in between.
+   */
+  const awaitFirstControl = (): void => {
+    if (societyControl !== null) return;
+    controlUnheld = 'unread';
+    controlFailures = 0;
+  };
+  const holdControl = (read: SocietyPlaybackControl | null): void => {
+    societyControl = read;
+    if (read === null) {
+      controlUnheld = 'failed';
+      controlFailures += 1;
+    } else {
+      controlFailures = 0;
+    }
+  };
   let controlBusy = false;
   let society: SocietySnapshot | null = null;
   let renderedSnapshot: SocietySnapshot | null = null;
@@ -1809,7 +1838,7 @@ export function mountEnvironmentSelection(
       .filter((person) => (person.motion_path_mm?.length ?? 0) > 1).length ?? 0;
     inhabitantsPanel.render({
       society: view, objects: savedObjects(), walked, advanceBlocked: advanceBlocked(),
-      playback: { control: societyControl, busy: controlBusy }, moved, noticing, flight: flightWords,
+      playback: { control: societyControl, busy: controlBusy, unheld: controlUnheld }, moved, noticing, flight: flightWords,
       flightUnplaced, gate: peopleGate,
     });
   }
@@ -1822,7 +1851,14 @@ export function mountEnvironmentSelection(
 
   function scheduleControlPoll(): void {
     stopControlPoll();
-    if (phase === 'disposed' || societyControl === null) return;
+    if (phase === 'disposed') return;
+    if (societyControl === null) {
+      // A read that really failed is tried again by itself while people are here, each wait twice the last.
+      if (controlUnheld !== 'failed' || current === null || (liveSociety?.view.snapshot ?? null) === null) return;
+      const wait = Math.min(CONTROL_RETRY_MOST_MS, CONTROL_POLL_MS * 2 ** Math.min(controlFailures - 1, 10));
+      controlTimer = window.setTimeout(() => void (savedWorld !== null ? pollPlayback() : refreshPlayback(true)), wait);
+      return;
+    }
     // Keep reading a saved world's control while paused: another client may start its host.
     if (savedWorld !== null && societyControl.hostPlayback?.running !== true) return;
     if (savedWorld === null && societyControl.mode !== 'playing') return;
@@ -1842,12 +1878,12 @@ export function mountEnvironmentSelection(
     try {
       const read = await controlClient.read(current.versionId);
       if ((phase as string) === 'disposed' || epoch !== controlEpoch) return;
-      societyControl = read;
+      holdControl(read);
       if (read.currentTick !== liveSociety?.view.snapshot?.currentTick) await liveSociety?.refresh();
       readRoundMs = performance.now() - started;
     } catch (error) {
       if ((phase as string) === 'disposed' || epoch !== controlEpoch) return;
-      societyControl = null;
+      holdControl(null);
       playbackStatus.textContent = problemSentence(error, PEOPLE_PROBLEMS, CLOCK_UNREAD);
     } finally {
       if ((phase as string) !== 'disposed' && epoch === controlEpoch) { reflectPlayback(); scheduleControlPoll(); }
@@ -1860,9 +1896,9 @@ export function mountEnvironmentSelection(
     stopControlPoll(); controlBusy = true; reflectPlayback();
     try {
       if (refreshSocietyState) await liveSociety?.refresh();
-      societyControl = await controlClient.read(current.versionId);
+      holdControl(await controlClient.read(current.versionId));
     } catch (error) {
-      societyControl = null;
+      holdControl(null);
       playbackStatus.textContent = problemSentence(error, PEOPLE_PROBLEMS, CLOCK_UNREAD);
     } finally {
       controlBusy = false; reflectPlayback(); scheduleControlPoll();
@@ -1877,13 +1913,13 @@ export function mountEnvironmentSelection(
     controlEpoch += 1;
     stopControlPoll(); controlBusy = true; reflectPlayback();
     try {
-      societyControl = await controlClient.configure(
+      holdControl(await controlClient.configure(
         control, mode, selectedSpeed ?? control.speed,
-      );
+      ));
       if (mode === 'paused') await liveSociety?.refresh();
     } catch (error) {
       playbackStatus.textContent = problemSentence(error, PEOPLE_PROBLEMS, CLOCK_UNCHANGED);
-      try { societyControl = current ? await controlClient.read(current.versionId) : null; } catch { societyControl = null; }
+      try { holdControl(current ? await controlClient.read(current.versionId) : null); } catch { holdControl(null); }
     } finally {
       controlBusy = false; reflectPlayback(); scheduleControlPoll();
     }
@@ -1901,11 +1937,11 @@ export function mountEnvironmentSelection(
         throw new Error('Authorized district placement is unavailable.');
       }
       const result = await controlClient.step(control, snapshot);
-      societyControl = result.control;
+      holdControl(result.control);
       await liveSociety?.refresh();
     } catch (error) {
       playbackStatus.textContent = problemSentence(error, PEOPLE_PROBLEMS, MINUTE_NOT_ADVANCED);
-      try { societyControl = current ? await controlClient.read(current.versionId) : null; } catch { societyControl = null; }
+      try { holdControl(current ? await controlClient.read(current.versionId) : null); } catch { holdControl(null); }
     } finally {
       controlBusy = false; reflectPlayback(); scheduleControlPoll();
     }
@@ -2592,6 +2628,7 @@ export function mountEnvironmentSelection(
   /** The person's own request to send everyone away or bring them back. */
   async function changePresence(wanted: 'away' | 'here'): Promise<void> {
     if (savedWorld === null || liveSociety === null || phase === 'disposed') return;
+    if (wanted === 'here') awaitFirstControl();
     await (wanted === 'away' ? liveSociety.sendAway() : liveSociety.bringBack());
     if ((phase as string) === 'disposed') return;
     await refreshPlayback();
@@ -2600,6 +2637,7 @@ export function mountEnvironmentSelection(
   /** The person's own request. Nothing else creates a saved world's society. */
   async function bringInInhabitants(): Promise<void> {
     if (savedWorld === null || liveSociety === null || phase === 'disposed') return;
+    awaitFirstControl();
     await liveSociety.bringIn();
     if ((phase as string) === 'disposed') return;
     await refreshPlayback();
@@ -3042,7 +3080,7 @@ export function mountEnvironmentSelection(
           .filter((person) => (person.motion_path_mm?.length ?? 0) > 1).length ?? 0;
         inhabitantsPanel.render({
           society: view, objects: savedObjects(), walked, advanceBlocked: advanceBlocked(),
-          playback: { control: societyControl, busy: controlBusy }, moved, noticing, flight: flightWords,
+          playback: { control: societyControl, busy: controlBusy, unheld: controlUnheld }, moved, noticing, flight: flightWords,
           flightUnplaced, gate: peopleGate,
         });
       },
