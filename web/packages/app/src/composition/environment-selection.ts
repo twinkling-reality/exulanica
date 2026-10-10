@@ -94,6 +94,7 @@ import { townFurniture } from './town-furniture.js';
 import { pointerRay, type SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyPlaces } from '../society-api.js';
 import { engineCreatedOver, societyEngine } from '../society-engines.js';
+import { CONVERSATION_DISTANCE_METRES } from '../society-presentation.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
 import { LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings, THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type MountedThings, type ThingLookChosenDetail, type ThingPickDetail, type ThingPickVia, type ThingsDependencies, visitorsOf } from './things.js';
 import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
@@ -2445,6 +2446,8 @@ export function mountEnvironmentSelection(
       ...(intervalMs === undefined ? {} : { intervalMs }),
       // Playing, each minute is learnt of up to one poll and one read late; stepped by hand, at once.
       startLagMs: playing ? pollDelayMs() + readRoundMs : 0,
+      // Two who stand talking are drawn a conversation apart, however near their recorded points.
+      conversationMetres: CONVERSATION_DISTANCE_METRES,
     };
     const observer = [deps.state.atlas!.binding.controls.state.x, deps.state.atlas!.binding.controls.state.z] as const;
     const shown = renderedSnapshot?.societyId === next.societyId ? renderedSnapshot.state : null;

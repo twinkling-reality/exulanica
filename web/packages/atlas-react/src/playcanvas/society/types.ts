@@ -210,6 +210,13 @@ export interface CrowdTiming {
    * tick's path has arrived before this one is walked to its end and nobody stops between minutes.
    */
   readonly startLagMs?: number;
+  /**
+   * How far apart two people who stand talking with each other are drawn, centre to centre, in
+   * metres, when their recorded standing points are nearer than that: each is drawn half the
+   * shortfall back from the other, a step taken at their own pace. Presentation only: no recorded
+   * position changes. Absent or zero, everyone is drawn at their recorded point, as before.
+   */
+  readonly conversationMetres?: number;
 }
 
 export interface InhabitantIdentity {

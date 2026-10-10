@@ -1,0 +1,13 @@
+{
+  "profile": "exulanica.society-presentation/v1",
+  "note": "How a page draws what a society records, where the record leaves it open. Every value here is presentation: no recorded position, path or event is changed by it, and a page that reads none of it draws everyone at their recorded point. Each value is a chosen default with its reason, not a measured cost or a safety bound; a later version is another file beside this one.",
+  "entries": [
+    {
+      "key": "conversation_distance_mm",
+      "value": 900,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Two people who stand talking with each other are drawn this far apart, centre to centre, when their recorded standing points are nearer. A society stands each talker at a node of its own walking lines, and two nodes of one line can lie a few hundred millimetres apart: on one town of 36 over four hours, 876 standing pairs were a median 590 mm apart and as near as 120 mm, so two bodies were drawn inside each other. At 900 mm, two bodies each about 250 mm from centre to front (the figure the walk to a seat already uses) have about 400 mm between them, which is inside the distance people keep to talk and outside each other. Each steps half the shortfall back along the line between them, at their own walking pace."
+    }
+  ]
+}

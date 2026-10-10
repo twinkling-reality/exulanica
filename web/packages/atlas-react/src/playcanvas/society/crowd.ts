@@ -196,6 +196,11 @@ interface Walker {
   seatBlend: number;
   /** Whether they are drawn in the seat posture: lowering onto the seat or sitting on it. */
   onSeat: boolean;
+  /**
+   * How far from their recorded point they are drawn standing, east and south in metres: the step
+   * back from a talking partner recorded too near, and nothing otherwise.
+   */
+  aside: readonly [number, number];
   /** Where they are drawn this frame: east, height of the root, south. */
   drawn: readonly [number, number, number];
   /** What draws them when they are a thing drawn by its own look, or null for one of the people. */
@@ -248,6 +253,8 @@ const FIRST_FRAME_SECONDS = 1 / 60;
 const REDUCED_FRAME_SECONDS = 0.05;
 /** Two recorded points this close are one point: the state's unit is the millimetre. */
 const SAME_POINT_METRES = 0.001;
+/** Drawn at their recorded point. */
+const NO_STEP: readonly [number, number] = [0, 0];
 /**
  * The fastest a person behind their recorded walk is drawn, as a multiple of their own pace. Half
  * again a walking pace still reads as walking briskly; beyond it a recorded walk would read as
@@ -374,6 +381,8 @@ export class SocietyCrowd {
   private startedAtMs = 0;
   private intervalMs = DEFAULT_INTERVAL_MS;
   private startLagMs = 0;
+  /** How far apart talking partners are drawn when recorded nearer, metres; 0 draws everyone where recorded. */
+  private conversationMetres = 0;
   /** Whether anybody still has recorded walking to present. */
   private moving = false;
   /** When the crowd was last drawn, in the caller's clock. */
@@ -469,6 +478,7 @@ export class SocietyCrowd {
     if (observer) this.observer = observer;
     this.intervalMs = Math.max(1, options.intervalMs ?? DEFAULT_INTERVAL_MS);
     this.startLagMs = Math.max(0, options.startLagMs ?? 0);
+    this.conversationMetres = Math.max(0, options.conversationMetres ?? 0);
     // Drawn below as on any frame: the figures are handed the time since they were last drawn.
     const sinceDrawn = continuing
       ? Math.max(0, nowMs - this.lastFrameMs) / MILLISECONDS_PER_SECOND
@@ -589,6 +599,7 @@ export class SocietyCrowd {
         settle: jumped ? null : previous?.settle ?? null,
         seatBlend: jumped ? 0 : previous?.seatBlend ?? 0,
         onSeat: jumped ? false : previous?.onSeat ?? false,
+        aside: jumped ? NO_STEP : previous?.aside ?? NO_STEP,
         drawn: jumped || previous === undefined ? [position[0], 0, position[1]] : previous.drawn,
         figure: this.figures?.figureFor(person) ?? null,
       };
@@ -1008,12 +1019,14 @@ export class SocietyCrowd {
     }
     const settle = walker.settle;
     if (settle === null) {
-      walker.drawn = [walker.position[0], 0, walker.position[1]];
+      const stepping = this.stepAside(walker, dt, reduced);
+      walker.drawn = [walker.position[0] + walker.aside[0], 0, walker.position[1] + walker.aside[1]];
       walker.seatBlend = 0;
       walker.onSeat = false;
       if (walker.arrived) this.turn(walker, this.facingOf(walker));
-      return false;
+      return stepping;
     }
+    walker.aside = NO_STEP;
     // A seat that is no longer theirs, or no longer there, is got up from before another is sat on.
     const staying = wanted && settle.key === key;
     const end = settle.toFront + settle.ontoSeat;
@@ -1059,6 +1072,45 @@ export class SocietyCrowd {
       return false;
     }
     return settle.progress !== goal;
+  }
+
+  /**
+   * Where a walker stands for a conversation, as an offset from where their path has them: two
+   * people talking with each other, nearer than a conversation's distance, each stand half the
+   * shortfall back along the line between them, so they are that distance apart; two at one point
+   * part east and west, the lesser id to the west. It holds while one walks up to the other, so
+   * they stop a conversation apart instead of walking in and stepping back. Nothing for anyone else.
+   */
+  private conversationStep(walker: Walker): readonly [number, number] {
+    if (this.conversationMetres <= 0 || walker.indoors) return NO_STEP;
+    if (walker.facingRule !== 'partner' || walker.partnerId === null) return NO_STEP;
+    const partner = this.walkers.get(walker.partnerId);
+    if (partner === undefined || partner.indoors || partner.partnerId !== walker.id) return NO_STEP;
+    const dx = walker.position[0] - partner.position[0], dz = walker.position[1] - partner.position[1];
+    const between = Math.hypot(dx, dz);
+    if (between >= this.conversationMetres) return NO_STEP;
+    const back = (this.conversationMetres - between) / 2;
+    return between > SAME_POINT_METRES
+      ? [(dx / between) * back, (dz / between) * back]
+      : [walker.id < partner.id ? -back : back, 0];
+  }
+
+  /**
+   * Move a walker one frame toward where they stand for a conversation, or back to their recorded
+   * point, at their own walking pace. Returns whether they are still on the way.
+   */
+  private stepAside(walker: Walker, dt: number, reduced: boolean): boolean {
+    const wanted = this.conversationStep(walker);
+    const dx = wanted[0] - walker.aside[0], dz = wanted[1] - walker.aside[1];
+    const left = Math.hypot(dx, dz);
+    if (left === 0) return false;
+    const reach = reduced ? left : this.walkSpeedOf(walker.id) * Math.max(0, dt);
+    if (reach >= left) {
+      walker.aside = wanted;
+      return false;
+    }
+    walker.aside = [walker.aside[0] + (dx / left) * reach, walker.aside[1] + (dz / left) * reach];
+    return true;
   }
 
   /** Turn a walker to `facing`; once turned, they no longer face as they were placed. */

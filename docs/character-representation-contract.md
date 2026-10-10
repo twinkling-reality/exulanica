@@ -611,6 +611,19 @@ faces the tree, also in the minute after a visit completes while the visitor sti
 activity with no rule is drawn that way and named. Every turn the crowd makes is a pivot: no figure
 draws a step for it.
 
+**A conversation's distance.** A society stands each of two talkers at a point of its own walking
+lines, and two such points can lie a few hundred millimetres apart, so two bodies would be drawn
+inside each other. Two people talking with each other (each one's goal names the other) who are
+nearer than a conversation's distance are drawn that distance apart: each stands half the shortfall
+back along the line between them, a step taken at their own walking pace, and two at one point part
+east and west. One who walks up to the other stops a conversation away. When the
+talk ends they walk on from where they are drawn, back onto their recorded path. The distance is a
+chosen default, stated with its reason in
+`assets/catalogs/society-presentation/society-presentation.v1.json` (`conversation_distance_mm`)
+and handed to the crowd with each state (`conversationMetres` in `CrowdTiming`); a caller that
+hands none draws everyone at their recorded point. It is presentation only: no recorded position
+changes, and `positionOf` still answers the recorded point.
+
 **Seats.** With each state the page hands the crowd a seating layout (`society/seating.ts`): each
 kind's use as `GET /world/assets` serves it from the world object catalog, the drawn version's
 objects, and the object each target of the consumed input belongs to. A person whose action, under

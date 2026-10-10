@@ -148,10 +148,12 @@ describe('watching a saved world live', () => {
     await mounted.begin();
     server.tick = 6;
     await vi.advanceTimersByTimeAsync(2_000);
-    const timing = crowd.setSociety.mock.calls.at(-1)![2] as { intervalMs: number; startLagMs: number };
+    const timing = crowd.setSociety.mock.calls.at(-1)![2] as { intervalMs: number; startLagMs: number; conversationMetres: number };
     expect(timing.intervalMs).toBe(HOST_INTERVAL_MS);
     // The poll period plus the reads it took, measured by the page (no time passes in these transports).
     expect(timing.startLagMs).toBe(2_000);
+    // How far apart talkers are drawn rides with every state, from the presentation catalog (900 mm).
+    expect(timing.conversationMetres).toBe(0.9);
     mounted.dispose();
   });
 
