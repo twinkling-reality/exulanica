@@ -10,7 +10,9 @@ proposal document, the same for the page and for an agent calling the API:
 *   one sample town of those values, generated off the request's thread and labelled a sample
     (:mod:`exulanica.world.specification_samples`): its people, vehicles, streets and premises;
 *   the parts of the words no value can say, each the person's own words;
-*   or a refusal by name when nothing the words ask for is a world this server makes;
+*   or a refusal by name when the words ask for no town or other place where people live: a
+    description that asks for a town is always answered with a proposal, the preset's own town
+    where nothing it says is a value, with every part of the words no value can say named;
 *   with ``reference_id``, a finished reference request of the caller's own made for this draft
     (``purpose`` ``world_draft``), ``references``: whether its web notes were handed to the drafter,
     how many, and what names them (the request, its bundle's digest, the notes' basis), or why not.

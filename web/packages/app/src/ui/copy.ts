@@ -553,11 +553,12 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldDescription.empty': 'Say what town you want first.',
   'worldDescription.failed': 'No draft was made: {reason}',
   'worldDescription.yourWords': 'You asked for: \u201c{words}\u201d',
-  'worldDescription.refused': 'Nothing in that is a town this server can make.',
+  // Said only when the words ask for no place where people live: one sentence, one thing to try.
+  'worldDescription.refused':
+    'This makes towns, and that does not ask for one: try something like \u201ca quiet town with low buildings\u201d.',
+  // Said when the drafter gave no usable answer, whatever the words were: one sentence, one thing to try.
   'worldDescription.notDrafted':
-    'The model could not fill in the town\'s values. Try saying it another way.',
-  'worldDescription.supported': 'A town here is set by these values:',
-  'worldDescription.range': '{label}: {minimum} to {maximum}',
+    'No town was drafted from that: say a little more about the town you want, or start from a recipe below.',
   'worldDescription.proposed': '{model} drafted these values, starting from {preset}:',
   'worldDescription.unknownModel': 'The model',
   'worldDescription.value': '{label}: {value}',
@@ -568,7 +569,9 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldDescription.valuesDisagree':
     'The server refuses {label} at {value} while {other} is {otherValue}: with that it takes '
     + '{minimum} to {maximum}, in steps of {step}. Change a value, or describe it again.',
-  'worldDescription.notSupported': 'Not in this town, because no value here makes it: {phrases}',
+  // Said first for a proposal the words changed nothing of: no value set and no look chosen.
+  'worldDescription.usual': '{preset} as it usually is: nothing you typed changes it yet.',
+  'worldDescription.notSupported': 'Not in this town yet: {phrases}',
   'worldDescription.quoted': '\u201c{phrase}\u201d',
   'worldDescription.use': 'Use these values',
   'worldDescription.used':
@@ -590,7 +593,6 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldDescription.unit.mm': '{metres} m',
   'worldDescription.unit.count': '{count}',
   'worldDescription.unit.permille': '{thousandths} of 1,000',
-  'worldDescription.choices': '{label}: {choices}',
   'worldDescription.sample.sampled':
     'One sample town of these values: {tiles} tiles, {people} people, {buildings} buildings '
     + 'and {vehicles}.',

@@ -246,8 +246,8 @@ to its own checks.
 
 The describe-a-town drafter is the first to take notes. `POST /worlds/specification/drafts` takes an
 optional `reference_id`, a request made with purpose `world_draft`; it hands the drafter the web
-notes alone, after the person's words in the same message, and asks with version 3 of its words
-(`exulanica/selection/world-drafting.v3.json`), which says what the notes are and that the person's
+notes alone, after the person's words in the same message, and asks with version 7 of its words
+(`exulanica/selection/world-drafting.v7.json`), which says what the notes are and that the person's
 words win. Saved names in the notes are replaced under the labels the words gave them. The form is
 the same as without notes, and a phrase the drafter reports as not on the form must be copied from
 the person's words, never from a note. The answer's `references` says whether the notes were used,

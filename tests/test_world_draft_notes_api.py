@@ -79,7 +79,7 @@ def _finished(repository, notes: tuple[BundleNote, ...], *, actor: uuid.UUID, wo
 
 def test_a_note_that_says_what_to_do_changes_nothing_the_words_alone_would_not(drafts, named):
     """The notes go after the words, quoted under a heading that says they never instruct; the
-    instructions are version 3's words and hold no note; the form the model fills is the one a
+    instructions are version 7's words and hold no note; the form the model fills is the one a
     draft without notes fills; a phrase copied from a note is refused as not the person's words and
     repaired; the proposal is judged by the same validation; a saved name in a note is replaced
     under the label the words gave it."""
@@ -108,8 +108,8 @@ def test_a_note_that_says_what_to_do_changes_nothing_the_words_alone_would_not(d
 
     first, repaired, plain = _drafted(transport)
     system, user = first["payload"]["messages"][:2]
-    v3 = json.loads((_SELECTION / "world-drafting.v3.json").read_text())
-    assert system == {"role": "system", "content": v3["instructions"]}
+    v7 = json.loads((_SELECTION / "world-drafting.v7.json").read_text())
+    assert system == {"role": "system", "content": v7["instructions"]}
     assert "castle" not in system["content"] and "whitewashed" not in system["content"]
     # The words first, then the quoted block, its heading saying what the notes are.
     words_at = user["content"].index('The description:\n"""A fishing village')
@@ -138,10 +138,10 @@ def test_a_note_that_says_what_to_do_changes_nothing_the_words_alone_would_not(d
         "bundle_sha256": bundle.digest,
         "basis": ["web_description"],
     }
-    assert with_notes["prompt_version"] == "world-drafting-3"
+    assert with_notes["prompt_version"] == "world-drafting-7"
     assert (
         with_notes["prompt_sha256"]
-        == hashlib.sha256((_SELECTION / "world-drafting.v3.json").read_bytes()).hexdigest()
+        == hashlib.sha256((_SELECTION / "world-drafting.v7.json").read_bytes()).hexdigest()
     )
     assert "castle" not in json.dumps(with_notes)
     assert (
@@ -182,26 +182,26 @@ def test_an_id_that_is_not_the_callers_own_request_is_answered_as_no_notes(draft
         assert answer["references"]["state"] == "not_used"
         assert answer["references"]["code"] == "reference_unknown"
         assert without_id(answer) == without_id(answers[0])
-        assert answer["prompt_version"] == plain["prompt_version"] == "world-drafting-2"
+        assert answer["prompt_version"] == plain["prompt_version"] == "world-drafting-6"
     payloads = [json.dumps(request["payload"], sort_keys=True) for request in _drafted(transport)]
     assert len(payloads) == len(named_ids) + 1
     assert payloads == [payloads[-1]] * len(payloads)
 
 
 def test_a_draft_naming_no_reference_is_asked_as_version_2_and_answers_as_before(drafts):
-    """The words version 2 holds, byte for byte, the description last, no notes, and an answer
+    """The words version 6 holds, byte for byte, the description last, no notes, and an answer
     whose ``references`` is null."""
     app, transport, _samples, _place = drafts
     transport.responses += [_reply(_form()), _choice(None, [])]
     with app() as client:
         body = _draft(client, "A quiet town with short blocks").json()
 
-    v2_bytes = (_SELECTION / "world-drafting.v2.json").read_bytes()
+    v2_bytes = (_SELECTION / "world-drafting.v6.json").read_bytes()
     (request,) = _drafted(transport)
     system, user = request["payload"]["messages"]
     assert system == {"role": "system", "content": json.loads(v2_bytes)["instructions"]}
     assert user["content"].endswith('The description:\n"""A quiet town with short blocks"""')
     assert "Reference notes" not in user["content"]
-    assert body["prompt_version"] == "world-drafting-2"
+    assert body["prompt_version"] == "world-drafting-6"
     assert body["prompt_sha256"] == hashlib.sha256(v2_bytes).hexdigest()
     assert body["references"] is None

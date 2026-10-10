@@ -382,6 +382,10 @@ says an `offered` look in one line right under the person's words
 pack, the name of the model whose call answered (the last completed call in
 `look_offer.execution`), and `look_words` as typed. `unavailable` is one line saying that no look
 was chosen this time and the town is drawn in the look shown; `none` and no offer are no line.
+The draft's line of what is not in the town yet comes right after it and leaves out every phrase
+the shown look was chosen from (a left-out phrase that lies within one of `look_words` or holds
+one, without regard to case), so the page never says of the same words both that they chose the
+look and that they are not in the town.
 
 "Use these values" takes the offered look with the values
 (`web/packages/app/src/composition/town-look.ts`): the Look row above Create this town shows it,

@@ -22,6 +22,7 @@ from exulanica.models.client import ModelClient
 from exulanica.models.errors import BudgetExceededError, TransportError
 from exulanica.models.manifest import load_manifest
 from exulanica.models.transport import HttpResponse
+from exulanica.selection import world_drafting
 from exulanica.selection.look_choosing import CHOOSER_ROLE, LookOption, render_request
 from exulanica.selection.world_drafting import DRAFTER_ROLE
 from exulanica.world import specification_source
@@ -201,7 +202,7 @@ def test_a_description_becomes_a_proposal_the_specification_judges_and_a_sample(
     assert "Estrada" not in response.text and "Lantern House" not in response.text
     assert body["model_id"] == DRAFTER
     assert body["model_name"] == load_manifest().model_name(DRAFTER)
-    assert body["prompt_version"] == "world-drafting-2"
+    assert body["prompt_version"] == "world-drafting-6"
     assert [call["role"] for call in body["execution"]["calls"]] == [str(DRAFTER_ROLE)]
     # No saved name left the server, a place's included.
     sent = json.dumps(transport.requests[0]["payload"]).lower()
@@ -236,21 +237,63 @@ def test_a_proposal_the_validation_refuses_is_returned_refused_by_name_and_not_s
     assert proposal["sample"] is None and samples.asked == []
 
 
-def test_nothing_a_town_can_be_is_refused_by_name_with_nothing_sampled(drafts):
+def test_words_that_ask_for_no_town_are_refused_by_name_with_nothing_sampled(drafts):
     app, transport, samples, _ = drafts
-    transport.responses.append(
-        _reply(_form(fit="none", not_supported=["a floating city in the clouds"]))
-    )
+    transport.responses.append(_reply(_form(fit="none", not_supported=["a red bicycle"])))
 
     with app() as client:
-        body = _draft(client, "a floating city in the clouds").json()
+        body = _draft(client, "a red bicycle").json()
 
     assert body["proposal"] is None
     assert body["refusal"]["code"] == "description_not_supported"
-    assert body["not_supported"] == ["a floating city in the clouds"]
+    assert "no town" in body["refusal"]["detail"]
+    assert body["not_supported"] == ["a red bicycle"]
     assert samples.asked == []
     # A refused draft is offered no look, and the look step asks nothing.
     assert body["look_offer"] is None and transport.call_count == 1
+
+
+def test_a_town_whose_words_no_value_can_say_is_proposed_as_the_presets_own(drafts):
+    """A description that asks for a town is never answered that it cannot be made: the drafter
+    answers fit part with no value set, and the proposal is the preset's own town with every part
+    of the words named as left out."""
+    app, transport, samples, _ = drafts
+    left_out = ["seaside", "at dawn", "mist off the water"]
+    transport.responses += [
+        _reply(_form(preset="small_town", fit="part", not_supported=left_out)),
+        _choice(None, []),
+    ]
+
+    with app() as client:
+        answer = _draft(client, "A sleepy seaside town at dawn, mist off the water")
+
+    assert answer.status_code == 200, answer.text
+    body = answer.json()
+    assert body["refusal"] is None
+    proposal = body["proposal"]
+    assert (proposal["preset"], proposal["fit"], proposal["valid"]) == ("small_town", "part", True)
+    assert proposal["set_by_words"] == []
+    preset = next(p for p in specification_document()["presets"] if p["key"] == "small_town")
+    assert proposal["values"] == preset["values"]
+    assert body["not_supported"] == left_out
+    # It is a town like any other: sampled, and asked which look its words want.
+    assert samples.asked == [("small_town", preset["values"])]
+    assert body["look_offer"]["state"] == "none" and transport.call_count == 2
+
+
+def test_the_drafters_words_refuse_only_what_asks_for_no_place_where_people_live():
+    """Both files the drafter is asked with, the one without notes and the one with, say the same
+    thing about fit: a description that asks for a town is part, and none is for no place at all."""
+    plain = world_drafting.drafting_prompt()
+    noted = world_drafting.drafting_prompt(world_drafting.NOTES_PROMPT_PATH)
+    assert (plain.prompt_version, noted.prompt_version) == ("world-drafting-6", "world-drafting-7")
+    for prompt in (plain, noted):
+        fit = next(line for line in prompt.instructions.splitlines() if line.startswith("- fit:"))
+        assert "any other place where people live" in fit
+        assert "the town is still made, from the preset" in fit
+        assert fit.endswith(
+            "none only when the description does not ask for a place where people live at all."
+        )
 
 
 def test_without_a_model_the_route_says_so_and_asks_for_nothing(drafts, monkeypatch):

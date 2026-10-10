@@ -28,6 +28,7 @@ import {
   UNIT_WORDS,
   buildWorldDescription,
   draftLines,
+  leftOutPhrases,
   lookLine,
   type DraftLook,
   type SpecificationWords,
@@ -137,7 +138,7 @@ describe('the drafting route document', () => {
   });
 
   it('holds the page to the description ceiling the server reads', () => {
-    const prompt = JSON.parse(python('exulanica/selection/world-drafting.v2.json')) as Record<string, unknown>;
+    const prompt = JSON.parse(python('exulanica/selection/world-drafting.v6.json')) as Record<string, unknown>;
     expect(DESCRIPTION_CHARACTERS).toBe(prompt['description_characters_maximum']);
   });
 
@@ -306,19 +307,61 @@ describe('the Describe it panel', () => {
     expect(visibleText(panel.root)).toContain(say('worldDescription.used'));
   });
 
-  it('refuses in words and says what a town here is set by, with nothing to use', async () => {
+  it('answers words that ask for no town in one sentence with one thing to try, and nothing to use', async () => {
     const refused = parseWorldDraft({
       ...body,
-      description: 'A floating city in the clouds',
+      description: 'A red bicycle',
       proposal: null,
-      not_supported: [],
-      refusal: { code: 'description_not_supported', detail: 'nothing the description asks for' },
+      // Whatever the answer lists, a description that asks for no town is told so and nothing more.
+      not_supported: ['A red bicycle'],
+      refusal: { code: 'description_not_supported', detail: 'the description asks for no town' },
     });
     const { panel } = await drafted(refused);
-    const text = visibleText(panel.root);
-    expect(text).toContain('Nothing in that is a town this server can make.');
-    expect(text).toContain('Length of a block: 90 m to 140 m');
+    const lines = [...panel.root.querySelectorAll('.world-description-result p')].map((p) => p.textContent);
+    // The person's words, then the one sentence: no list of the values a town is set by.
+    expect(lines).toEqual([
+      'You asked for: \u201cA red bicycle\u201d',
+      'This makes towns, and that does not ask for one: try something like \u201ca quiet town with low buildings\u201d.',
+    ]);
+    expect(panel.root.querySelector('.world-description-not-supported')).toBeNull();
     expect(panel.root.querySelector('.world-description-use')).toBeNull();
+  });
+
+  it('says in one sentence, with one thing to try, when the drafter gave no usable answer', async () => {
+    // Whatever the words were: code cannot know they ask for no town, so the page does not say so.
+    const none = parseWorldDraft({
+      ...body, description: 'asdfghjkl', proposal: null, not_supported: [],
+      refusal: { code: 'not_drafted', detail: 'the model could not fill the form' },
+    });
+    const { panel } = await drafted(none);
+    const lines = [...panel.root.querySelectorAll('.world-description-result p')].map((p) => p.textContent);
+    expect(lines).toEqual([
+      'You asked for: \u201casdfghjkl\u201d',
+      'No town was drafted from that: say a little more about the town you want, or start from a recipe below.',
+    ]);
+    expect(panel.root.querySelector('.world-description-use')).toBeNull();
+  });
+
+  it('proposes a town whose words no value can say, and says what is not in it yet in one line under them', async () => {
+    // As the route answers a description that asks for a town and names nothing on the form: the
+    // preset's own values, none set by the words, and each part of the words left out.
+    const seaside = parseWorldDraft({
+      ...body,
+      description: 'A sleepy seaside town at dawn, mist off the water',
+      proposal: { ...body.proposal, set_by_words: [], fit: 'part' },
+      not_supported: ['seaside', 'at dawn', 'mist off the water'],
+    });
+    const { panel } = await drafted(seaside);
+    const lines = [...panel.root.querySelectorAll('.world-description-result p')].map((p) => p.textContent);
+    expect(lines[0]).toBe('You asked for: \u201cA sleepy seaside town at dawn, mist off the water\u201d');
+    // Said first and plainly: the words changed nothing of this town yet.
+    expect(lines[1]).toBe('A market town as it usually is: nothing you typed changes it yet.');
+    expect(lines[2]).toBe('Not in this town yet: \u201cseaside\u201d, \u201cat dawn\u201d, \u201cmist off the water\u201d');
+    expect(lines.filter((line) => line?.startsWith('Not in this town'))).toHaveLength(1);
+    // The town is proposed and can be used: it is the recipe's own.
+    expect(lines.some((line) => line?.includes('drafted these values, starting from'))).toBe(true);
+    expect(lines.some((line) => line?.includes('from your words'))).toBe(false);
+    expect(panel.root.querySelector('.world-description-use')).not.toBeNull();
   });
 
   it('says which value the server refuses and the range it broke, and offers nothing to use', () => {
@@ -394,6 +437,50 @@ describe('the Describe it panel', () => {
     }]);
     expect(panel.root.querySelector('.world-description-status')!.textContent).toBe(
       `These values are in the controls below, and the look is ${toon}. Change any of them, then make the town.`);
+  });
+
+  it('never says of the same words both that they chose the look and that they are not in the town', async () => {
+    // As the real roles answered "A bright cartoon town like a toy box, with lofts, cafes and
+    // restaurants": the drafter left three phrases out and the look step chose from the same words.
+    const leftOut = ['bright', 'cartoon', 'toy box'];
+    const chosenFrom = ['bright', 'cartoon town', 'like a toy box'];
+    expect(leftOutPhrases(leftOut, chosenFrom)).toEqual([]);
+    // Without case and with spaces as one; a phrase that holds a chosen one goes too.
+    expect(leftOutPhrases(['Toy  Box', 'a harbour', 'bright cartoon colours'], ['toy box', 'cartoon'])).toEqual(['a harbour']);
+    expect(leftOutPhrases(['a harbour'], [])).toEqual(['a harbour']);
+
+    const side = rowSide({ title: packTitle('exulanica.toon-town'), kept: null });
+    const said = (root: HTMLElement) => root.querySelector('.world-description-not-supported')?.textContent ?? null;
+    const usual = (root: HTMLElement) => root.querySelector('.world-description-usual')?.textContent ?? null;
+    const all = await drafted(parseWorldDraft({
+      ...body, not_supported: leftOut, look_offer: lookOffer({ look_words: chosenFrom }),
+    }), side.look);
+    expect(lookText(all.panel.root)).toContain('chose the look');
+    expect(said(all.panel.root)).toBeNull();
+    // A value came from the words in this draft, so the town is not said to be the usual one.
+    expect(usual(all.panel.root)).toBeNull();
+    // No value from the words, but a look chosen from them and shown: not the usual town either.
+    const looked = await drafted(parseWorldDraft({
+      ...body, proposal: { ...body.proposal, set_by_words: [] }, not_supported: leftOut, look_offer: lookOffer({ look_words: chosenFrom }),
+    }), side.look);
+    expect(usual(looked.panel.root)).toBeNull();
+    // No value and a look the page cannot name: the words reached nothing, and the page says so.
+    const reached = await drafted(parseWorldDraft({
+      ...body, proposal: { ...body.proposal, set_by_words: [] }, not_supported: leftOut, look_offer: lookOffer({ look_words: chosenFrom }),
+    }), rowSide(null).look);
+    expect(usual(reached.panel.root)).toBe('A market town as it usually is: nothing you typed changes it yet.');
+    // What the look did not take is still said, once, right after the look's line.
+    const some = await drafted(parseWorldDraft({
+      ...body, not_supported: [...leftOut, 'a harbour'], look_offer: lookOffer({ look_words: chosenFrom }),
+    }), side.look);
+    expect(said(some.panel.root)).toBe('Not in this town yet: \u201ca harbour\u201d');
+    const order = [...some.panel.root.querySelector('.world-description-result')!.children].map((node) => node.className);
+    expect(order.slice(1, 3)).toEqual(['world-description-look', 'world-description-left-out']);
+    // A look the page cannot name is not shown, so its words stay in the line.
+    const unnamed = await drafted(parseWorldDraft({
+      ...body, not_supported: leftOut, look_offer: lookOffer({ look_words: chosenFrom }),
+    }), rowSide(null).look);
+    expect(said(unnamed.panel.root)).toBe('Not in this town yet: \u201cbright\u201d, \u201ccartoon\u201d, \u201ctoy box\u201d');
   });
 
   it('keeps a look the person chose themselves, and takes the other only on its own press', async () => {

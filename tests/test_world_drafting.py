@@ -194,6 +194,68 @@ def test_a_repaired_phrase_is_accepted_on_the_second_form() -> None:
     assert transport.call_count == 2
 
 
+def test_a_form_that_says_nothing_of_the_description_is_told_why_once_then_not_drafted() -> None:
+    """fit part with nothing left out and no value set says nothing about the description. It is
+    no town and it is not "no place" either, which code cannot know: the draft ends as not
+    drafted."""
+    says_nothing = _reply(_form(fit="part"))
+    client, transport, _ = _client(says_nothing, says_nothing)
+
+    outcome = draft_world_specification(client, "asdfghjkl", VIEW)
+
+    assert outcome.draft is None and outcome.refusal is not None
+    assert outcome.refusal.code is DraftRefusalCode.NOT_DRAFTED
+    assert transport.call_count == 2 and len(outcome.calls) == 2
+    repair = transport.requests[1]["payload"]["messages"][-1]["content"]
+    assert repair == drafting_prompt().repair_says_nothing
+    assert "names nothing in not_supported and sets no value" in repair
+
+
+@pytest.mark.parametrize(
+    ("second", "reads"),
+    [
+        (_form(fit="none", not_supported=["asdfghjkl"]), "refused"),
+        (_form(fit="part", not_supported=["harbour"]), "drafted"),
+        (_form(fit="part", storey_band_high=5), "drafted"),
+    ],
+    ids=["none-after-the-repair", "left-out-after-the-repair", "a-value-after-the-repair"],
+)
+def test_a_form_that_said_nothing_is_read_as_its_second_answer_says(
+    second: dict[str, Any], reads: str
+) -> None:
+    client, transport, _ = _client(_reply(_form(fit="part")), _reply(second))
+
+    outcome = draft_world_specification(client, "a quiet harbour village asdfghjkl", VIEW)
+
+    assert transport.call_count == 2
+    if reads == "refused":
+        assert outcome.refusal is not None
+        assert outcome.refusal.code is DraftRefusalCode.DESCRIPTION_NOT_SUPPORTED
+    else:
+        assert outcome.draft is not None and outcome.draft.fit == "part"
+
+
+@pytest.mark.parametrize(
+    "form",
+    [
+        _form(fit="all"),
+        _form(fit="part", not_supported=["harbour"]),
+        _form(fit="part", storey_band_high=5),
+    ],
+    ids=["a-plain-town", "part-with-something-left-out", "part-with-a-value-set"],
+)
+def test_a_form_that_says_something_is_never_sent_back_for_saying_nothing(
+    form: dict[str, Any],
+) -> None:
+    """A plain town is the preset's own with nothing to say, and that is an answer: only part with
+    nothing left out and nothing set contradicts itself."""
+    client, transport, _ = _client(_reply(form))
+
+    outcome = draft_world_specification(client, "a quiet harbour village", VIEW)
+
+    assert outcome.draft is not None and transport.call_count == 1
+
+
 def test_nothing_a_town_can_be_is_refused_by_name() -> None:
     client, transport, _ = _client(
         _reply(_form(fit="none", not_supported=["a floating city in the clouds"]))

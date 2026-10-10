@@ -14,8 +14,14 @@ of that specification's values. What comes back is a proposal and nothing more:
     the description ask for what the form cannot say, and each must be copied word for word from
     the description it was sent: :func:`verbatim_span` finds each in that text and returns the
     text's own slice, and a draft naming a phrase that is not there is repaired once and then
-    refused. A draft that says nothing the description asks for is a town is refused by name
-    (:attr:`DraftRefusalCode.DESCRIPTION_NOT_SUPPORTED`).
+    refused. A description that asks for a town is drafted even when nothing it says is on the
+    form: the proposal is the preset's own town and every part of the words is named as left out.
+    Only a draft that says the description asks for no place where people live is refused by name
+    (:attr:`DraftRefusalCode.DESCRIPTION_NOT_SUPPORTED`). A form that says the description is
+    partly on it while naming nothing left out and setting no value says nothing about the
+    description: it is told why once like any other form that breaks its own rules, and a second
+    one ends the draft as not drafted, never as a town and never as "not a place", which code
+    cannot know.
 *   **The server's validation is the one authority.** This module validates nothing about the
     world: the caller runs the proposal's preset and values through the same validation a person's
     own values pass (``POST /worlds/generated``), and nothing is made until the person confirms
@@ -32,8 +38,8 @@ of that specification's values. What comes back is a proposal and nothing more:
     are replaced as in the description; the form is the same; and a copied phrase is still checked
     against the description alone, so nothing in the notes can be shown as the person's words.
 
-The words the model is asked with are data (``world-drafting.v2.json`` beside this module, and
-``world-drafting.v3.json`` for a draft handed notes, so every draft records which words saw notes):
+The words the model is asked with are data (``world-drafting.v6.json`` beside this module, and
+``world-drafting.v7.json`` for a draft handed notes, so every draft records which words saw notes):
 each draft records the prompt's version and the file's SHA-256. Pure apart from the model client: no
 connection is read here except by :func:`sendable`, and nothing is written.
 """
@@ -99,10 +105,10 @@ __all__ = [
 DRAFTER_ROLE: Final = Role.SPECIFICATION_DRAFTER
 #: The words the drafter asks with: version 2, which says what a share is and names no value;
 #: version 1 stays beside it, byte for byte, as the words the judged comparison asked with.
-PROMPT_PATH: Final = Path(__file__).with_name("world-drafting.v2.json")
+PROMPT_PATH: Final = Path(__file__).with_name("world-drafting.v6.json")
 #: The words a draft handed reference notes asks with: version 2's, saying what the notes are and
 #: that the person's words win. A draft without notes asks with version 2, byte for byte.
-NOTES_PROMPT_PATH: Final = Path(__file__).with_name("world-drafting.v3.json")
+NOTES_PROMPT_PATH: Final = Path(__file__).with_name("world-drafting.v7.json")
 _PROMPT_PROFILE: Final = "exulanica.world-drafting-prompt/v1"
 #: The served specification document's profile, the one shape this module reads.
 SPECIFICATION_PROFILE: Final = "exulanica.world-specification/v1"
@@ -116,6 +122,9 @@ DRAFT_ATTEMPTS: Final = 2
 ENUMERATED_VALUES_MAXIMUM: Final = 64
 #: The form's own fields, which no specification key may take.
 _FORM_FIELDS: Final = ("preset", "fit", "not_supported")
+#: What :func:`_read` answers for a form that says fit part, names nothing left out and sets no
+#: value: not a fit the model states, a form that says nothing about the description.
+SAYS_NOTHING: Final = "says_nothing"
 #: Punctuation a model may wrap a copied phrase in, which is not part of the copy.
 _WRAPPING: Final = " \t\n\"'\u201c\u201d\u2018\u2019.,;:!?()"
 
@@ -127,7 +136,7 @@ class UnreadableSpecification(ValueError):
 
 
 class DraftRefusalCode(StrEnum):
-    #: The model said nothing the description asks for is a town this specification can make.
+    #: The model said the description asks for no town or other place where people live.
     DESCRIPTION_NOT_SUPPORTED = "description_not_supported"
     #: The model could not fill the form, with its one repair.
     NOT_DRAFTED = "not_drafted"
@@ -136,8 +145,8 @@ class DraftRefusalCode(StrEnum):
 #: What an API caller reads for each refusal; the page words them from its own copy.
 _REFUSAL_DETAILS: Final = {
     DraftRefusalCode.DESCRIPTION_NOT_SUPPORTED: (
-        "nothing the description asks for is a world this server makes; the specification "
-        "document says what a world can be"
+        "the description asks for no town or other place where people live, which is what "
+        "this server makes"
     ),
     DraftRefusalCode.NOT_DRAFTED: "the model could not fill the specification's form",
 }
@@ -159,6 +168,7 @@ class DraftingPrompt:
     repair_refused: str
     repair_truncated: str
     repair_not_verbatim: str
+    repair_says_nothing: str
     phrases_maximum: int
     phrase_characters_maximum: int
     description_characters_maximum: int
@@ -184,6 +194,7 @@ def drafting_prompt(path: Path = PROMPT_PATH) -> DraftingPrompt:
         repair_refused=str(repair["refused"]),
         repair_truncated=str(repair["truncated"]),
         repair_not_verbatim=str(repair["not_verbatim"]),
+        repair_says_nothing=str(repair["says_nothing"]),
         phrases_maximum=int(document["phrases_maximum"]),
         phrase_characters_maximum=int(document["phrase_characters_maximum"]),
         description_characters_maximum=int(document["description_characters_maximum"]),
@@ -191,7 +202,8 @@ def drafting_prompt(path: Path = PROMPT_PATH) -> DraftingPrompt:
 
 
 def notes_prompt(notes: str | None) -> DraftingPrompt:
-    """The words a draft asks with: version 3 when it is handed reference notes, else version 2."""
+    """The words a draft asks with: the notes file when it is handed reference notes, else the
+    plain one."""
     return drafting_prompt(NOTES_PROMPT_PATH) if notes else drafting_prompt()
 
 
@@ -607,6 +619,10 @@ def _read(
     for entry in view.adjustable:
         if form[entry.key] is not None:
             values[entry.key] = form[entry.key]
+    if form["fit"] == "part" and not copied and values == dict(preset.values):
+        # Part of the description is said to be off the form, yet nothing is named and no value
+        # is set: the form says nothing about the description.
+        return None, SAYS_NOTHING, (), ()
     return (
         WorldDraft(
             preset=preset.key,
@@ -672,6 +688,12 @@ def draft_world_specification(
             )
             log.record(drafted.call)
             draft, fit, copied, phrases = _read(drafted.value, view, description)
+            if fit == SAYS_NOTHING:
+                log.rejected(("fit part with nothing left out and no value set",))
+                if attempt == DRAFT_ATTEMPTS:
+                    break
+                messages.append({"role": "user", "content": prompt.repair_says_nothing})
+                continue
             if draft is not None or fit is not None:
                 return DraftOutcome(
                     draft=draft,

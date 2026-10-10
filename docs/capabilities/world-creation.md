@@ -70,8 +70,13 @@ request and says what it holds (its people, vehicles, streets and premises, labe
 because a town made from the same values draws its own identity), and names each part of the words
 no value can say in the person's own words. "Use these values" puts them in the panel's controls,
 where the person can change any of them; nothing is made until they make the town. A description
-that asks for nothing a town can be is refused in words, with the values a town here is set by. An
-agent calling the API receives the same proposal. The drafting model was chosen by a pre-registered
+that asks for a town is always answered with a proposal: where nothing it says is a value, the
+proposal is the recipe's own town, and one line under the person's words says what of them is not
+in the town yet, leaving out any words the offered look was chosen from. Where the words set no
+value and chose no look, the page says first that the town is its recipe's usual one and nothing
+typed changes it yet. A description that asks for no town or other place where people live is
+refused, in one sentence with one thing to try, and so is a draft the model gave no usable answer
+for. An agent calling the API receives the same proposal. The drafting model was chosen by a pre-registered
 comparison on version 1 of the specification and of the drafter's words
 ([record](../evaluation/2026-09-29-world-drafting-models-v2.json)); version 2 of the words says what a
 share is and names no value, so a description's street mix and kinds of building and shop become the
@@ -190,7 +195,16 @@ its roads, only the ground storey of a building is walked inside, and a worker o
 counted inside their workplace and not drawn, rather than standing at a place in it.
 
 A description sets only the values the specification offers; water, hills, a particular building
-or a value past its range is named back as not in the town rather than approximated. A description
+or a value past its range is named back as not in the town yet rather than approximated. Whether
+a description asks for a place where people live is the drafting model's judgement, so a single
+building, a ship or a camp may be answered either way. A description that is a single unknown word
+is read as a name and is proposed the usual town with that word named as not in it; text of
+several words that asks for no place is refused. In two pre-registered runs of unseen sentences
+through the route, 48 of 48 sentences that asked for a town were proposed one and 21 of 24 that
+asked for none were refused; both runs failed their bar, which asked that none of those be
+proposed a town, and the three that were proposed one held no words (a keyboard run, twice, and a
+sum) ([record](../evaluation/2026-10-10-described-town-check.json)). Nothing is made until the
+person makes the town. A description
 does not choose a world's setting: a person chooses it in the Look sheet. The sample's
 counts describe one town of the values, not the town a person makes, and the drafting model's choice
 rests on twelve fixed descriptions of version 1 of the specification; version 2's street mix and

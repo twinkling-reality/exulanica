@@ -21,7 +21,7 @@ import {
 import { WorldDraftClient } from '../world-draft-api.js';
 
 /**
- * The longest description the server reads: the ceiling `exulanica/selection/world-drafting.v2.json`
+ * The longest description the server reads: the ceiling `exulanica/selection/world-drafting.v6.json`
  * states, which `world-description.test.ts` holds this to.
  */
 export const DESCRIPTION_CHARACTERS = 1000;

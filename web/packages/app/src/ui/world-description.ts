@@ -122,20 +122,6 @@ export function draftLines(draft: WorldDraft, words: SpecificationWords): readon
   if (draft.proposal === null) {
     const code = draft.refusal?.code ?? 'not_drafted';
     lines.push(say(REFUSAL_WORDS[code]));
-    if (code === 'description_not_supported') {
-      lines.push(say('worldDescription.supported'));
-      for (const value of words.values) {
-        lines.push(value.choices !== null
-          ? fill('worldDescription.choices', {
-            label: value.label, choices: value.choices.map((choice) => choice.label).join(', '),
-          })
-          : fill('worldDescription.range', {
-            label: value.label,
-            minimum: valueWords(value.minimum, value.unit),
-            maximum: valueWords(value.maximum, value.unit),
-          }));
-      }
-    }
     return lines;
   }
   const proposal = draft.proposal;
@@ -175,6 +161,22 @@ export function draftLines(draft: WorldDraft, words: SpecificationWords): readon
   }
   if (proposal.sample !== null) lines.push(...sampleLines(proposal.sample));
   return lines;
+}
+
+/**
+ * The parts of the words a proposed town's left-out line still names: those the drafter could not
+ * place, less any that a step the page shows chose something from (`taken`, the words an offered
+ * look was chosen from), so the page never says of the same words both that they chose the look
+ * and that they are not in the town. A left-out phrase is dropped when it lies within one of those
+ * or holds one, letters compared without case and spaces as one.
+ */
+export function leftOutPhrases(notSupported: readonly string[], taken: readonly string[]): readonly string[] {
+  const fold = (words: string): string => words.toLowerCase().replace(/\s+/g, ' ').trim();
+  const chosen = taken.map(fold).filter((words) => words !== '');
+  return notSupported.filter((phrase) => {
+    const words = fold(phrase);
+    return !chosen.some((other) => other.includes(words) || words.includes(other));
+  });
 }
 
 /**
@@ -291,20 +293,42 @@ export function buildWorldDescription(options: {
       children.push(instead);
     }
     replace(lookBox, children);
+    sayLeftOut(known === null || offered === null ? null : offered.lookWords);
+  };
+  // What the words did not reach, for a town that is proposed: first, where they set no value and
+  // chose no look shown above, that the town is its recipe's usual one; then, in one plain line,
+  // what of the words is not in the town yet, never the words the shown look was chosen from.
+  const leftOutBox = el('div', { class: 'world-description-left-out' });
+  let leftOut: readonly string[] | null = null;
+  let usual: string | null = null;
+  const sayLeftOut = (taken: readonly string[] | null): void => {
+    const phrases = leftOut === null ? [] : leftOutPhrases(leftOut, taken ?? []);
+    replace(leftOutBox, [
+      ...(usual === null || taken !== null ? [] : [
+        el('p', { class: 'world-description-usual', text: fill('worldDescription.usual', { preset: usual }) }),
+      ]),
+      ...(phrases.length === 0 ? [] : [el('p', { class: 'world-description-not-supported', text: fill(
+        'worldDescription.notSupported',
+        { phrases: phrases.map((phrase) => fill('worldDescription.quoted', { phrase })).join(', ') },
+      ) })]),
+    ]);
   };
   look?.watch(sayLook);
   const show = (draft: WorldDraft): void => {
     const lines = draftLines(draft, options.words).map((line) => el('p', { text: line }));
     offer = draft.proposal !== null && draft.proposal.valid ? draft.lookOffer : null;
-    sayLook();
-    // The look comes right under the person's words, before the long list of values.
-    const children: Node[] = [...lines.slice(0, 1), lookBox, ...lines.slice(1)];
-    if (draft.notSupported.length > 0) {
-      children.push(el('p', { class: 'world-description-not-supported', text: fill(
-        'worldDescription.notSupported',
-        { phrases: draft.notSupported.map((phrase) => fill('worldDescription.quoted', { phrase })).join(', ') },
-      ) }));
-    }
+    // A description that asks for no town is answered in its one sentence, with no such line.
+    leftOut = draft.proposal === null ? null : draft.notSupported;
+    // The recipe's own town, by the name the specification gives the preset, where no value came
+    // from the words.
+    const from = draft.proposal;
+    usual = from === null || from.setByWords.length > 0 ? null
+      : options.words.presets.find((one) => one.key === from.preset)?.label ?? from.preset;
+    if (look === undefined) sayLeftOut(null);
+    else sayLook();
+    // The look comes right under the person's words, then what is not in the town yet, both
+    // before the long list of values.
+    const children: Node[] = [...lines.slice(0, 1), lookBox, leftOutBox, ...lines.slice(1)];
     const proposal = draft.proposal;
     if (proposal !== null && proposal.valid) {
       const use = el('button', { type: 'button', class: 'world-description-use',

@@ -1,0 +1,127 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "kind": "exulanica.described-town-check/v1",
+  "note": "Two pre-registered runs of unseen sentences through the real draft route (POST /worlds/specification/drafts: the specification drafter with its one repair, then the look step for a draft that is not refused), each of 36 sentences written by a fresh writer given only a plain list of the form's controls: 12 that ask for a town and name only mood, weather, place and material, 12 that ask for a town and name form values, 12 that ask for no town. The bar, fixed before each run: every town sentence gets a proposal the server's validation accepts; no other sentence gets a proposal; every left-out phrase is words the person typed; at least 10 of the 12 form sentences have a value set by their words. BOTH RUNS FAILED THE BAR on the second condition. Run 1 asked with the reworded line alone (a description that asks for a town is fit part even when nothing it says is on the form). Run 2 added the form's own consistency rule (fit part with nothing left out and no value set is told why once, then the draft ends as not drafted). The change was landed on a failed bar, by decision, not on a passed one: the bar was not restated, no third wording was tried and no further set was asked. What remains: a description that is a single unknown word is read as a name and is proposed the preset's own town with that word named as not in it. One of run 2's sentences was, letter for letter, a sentence of run 1; it is the one that failed in run 2 and it counts. Nothing of any other model is published here.",
+  "provider": "Nebius Token Factory",
+  "route": "POST /worlds/specification/drafts",
+  "tree": {
+   "head": "282ed6eb71665dea3e26403f6c05b549ad840813"
+  },
+  "module_sha256": "2c4b4e1986c17fa0422de98e86a6f58ecf398bc4e7a22318f06e9d65ed4b88f8",
+  "prompt_in_use_sha256": "d5d5cf7e42eea57623a264f0038538fce2b07df966efacff3f6289878818d689",
+  "runs": [
+   {
+    "run": "1",
+    "window": {
+     "ended": "2026-10-10 09:20:20 EDT"
+    },
+    "set_sha256": "8791b444bc51c31c57d955fc52f3c0929761177382972727e9c564515b61ffb8",
+    "preregistration_sha256": "a5b6b48a38ceda24147c3f8ed155294abfde3eea327de85c37c5702ff92cd3f8",
+    "prompt_sha256": "23c90fab4c37bd4422932389400b5822f9c24642ca32b4835d2456ac3e7e9fab",
+    "summary_sha256": "f457bf939aea8b9b07a0cdb5e64815f0a4f95266fc262fc496bf8b7427a18f8e",
+    "results_sha256": "5f22f4c5e182d30dd72f3bc3601595a7f3474e9265a90b2dd89763bbb558018e",
+    "sentences": 36,
+    "conditions": {
+     "towns_with_a_usable_proposal": {
+      "got": 24,
+      "of": 24,
+      "bar": "all",
+      "met": true
+     },
+     "others_given_a_proposal": {
+      "got": 2,
+      "of": 12,
+      "bar": "none",
+      "met": false
+     },
+     "every_left_out_phrase_is_words_the_person_typed": {
+      "met": true
+     },
+     "form_sentences_with_a_value_set_by_their_words": {
+      "got": 12,
+      "of": 12,
+      "bar": "at least 10",
+      "met": true
+     }
+    },
+    "others_given_a_proposal": [
+     {
+      "description": "asdfghjkl",
+      "fit": "part",
+      "left_out": [],
+      "values_set_by_words": 0
+     },
+     {
+      "description": "2 + 2 * 7 = ?",
+      "fit": "part",
+      "left_out": [],
+      "values_set_by_words": 0
+     }
+    ],
+    "mood_sentences_with_a_value_set_by_their_words": 0,
+    "calls": 62,
+    "bar_met": false
+   },
+   {
+    "run": "2",
+    "window": {
+     "ended": "2026-10-10 09:32:56 EDT"
+    },
+    "set_sha256": "0cd8e18dd224b8d81866eaecb85c8eecf8b2f5efd5e3356b469b4c3b2908cd33",
+    "preregistration_sha256": "adf349fb952bef1547f688131d4a29f41a86e8c9e8305171e4e284cbdca12fa0",
+    "prompt_sha256": "d5d5cf7e42eea57623a264f0038538fce2b07df966efacff3f6289878818d689",
+    "summary_sha256": "d8c355842a0a03c7963e789ba4cdbc2966d8898111edb6a748a474dc86894754",
+    "results_sha256": "cb10e415a064827343a1219332defe2bd7b71d7fd37b3b0878cc4060f47de4bd",
+    "sentences": 36,
+    "conditions": {
+     "towns_with_a_usable_proposal": {
+      "got": 24,
+      "of": 24,
+      "bar": "all",
+      "met": true
+     },
+     "others_given_a_proposal": {
+      "got": 1,
+      "of": 12,
+      "bar": "none",
+      "met": false
+     },
+     "every_left_out_phrase_is_words_the_person_typed": {
+      "met": true
+     },
+     "form_sentences_with_a_value_set_by_their_words": {
+      "got": 11,
+      "of": 12,
+      "bar": "at least 10",
+      "met": true
+     }
+    },
+    "others_given_a_proposal": [
+     {
+      "description": "asdfghjkl",
+      "fit": "part",
+      "left_out": [
+       "asdfghjkl"
+      ],
+      "values_set_by_words": 0
+     }
+    ],
+    "mood_sentences_with_a_value_set_by_their_words": 0,
+    "calls": 62,
+    "bar_met": false
+   }
+  ],
+  "across_both_runs": {
+   "town_sentences_with_a_usable_proposal": [
+    48,
+    48
+   ],
+   "other_sentences_refused": [
+    21,
+    24
+   ]
+  }
+ },
+ "record_sha256": "56b84dd2a076195fc322efc6324230749bd032ac716af5bc59bcd841f8176bfd"
+}
