@@ -663,6 +663,16 @@ by the same rule, and a seat with nothing rising beside it is sat on facing as t
 Where a town's records are not read, or a person rests where no furniture is, the ground rule holds
 as before. Sitting down and getting up are drawn as at an object's seat.
 
+Someone with nothing to do who is on a seat stays on it. An activity the catalog draws on no seat
+may be drawn there as one it does (`ACTIVITY_ON_SEAT` in `society/activity-facing.ts`, which states
+`idle` as `rest`): a person a model decides for who chooses to wait where they are is `idle` at
+their own point of the bench they were resting on, and is drawn resting there. Before this they
+were drawn standing at that point, through the board. What they are doing, as the state has it, is
+unchanged, and the page's words for them are the state's. An activity with no entry (`stand`, a
+walk, a talk) and a person the state gives no action is on their feet at a seat's point as before.
+Limit: at a placed object's seat an idle person still stands, because an object's place is found by
+the action's target and an idle action names none.
+
 **Posing by distance.** Every drawn inhabitant is placed at its recorded point every frame, but only
 the nearest full characters are posed every frame: the nearest 4 every frame, the next 8 every
 second frame and the rest every third (`POSE_INTERVAL` in `society/crowd.ts`), each carried to its

@@ -13,7 +13,7 @@ import {
   placeDrawing, seatApproach, streetSeatDrawing,
   type PlaceDrawing, type SeatingLayout, type SeatingMiss, type SeatingResult,
 } from './seating.js';
-import { facingRule, type FacingRule } from './activity-facing.js';
+import { activityOnSeat, facingRule, type FacingRule } from './activity-facing.js';
 import type {
   CrowdJump,
   CrowdJumpReason,
@@ -890,7 +890,10 @@ export class SocietyCrowd {
     return this.far.appearanceOf(id);
   }
 
-  /** The activity drawn for an inhabitant now: the state's, once its recorded path is walked. */
+  /**
+   * The activity drawn for an inhabitant now: the state's, once its recorded path is walked, or on
+   * a seat the one it is drawn as there (`ACTIVITY_ON_SEAT`).
+   */
   activityOf(id: string): string | null {
     const walker = this.walkers.get(id);
     return walker === undefined ? null : this.drawnActivity(walker);
@@ -1022,11 +1025,23 @@ export class SocietyCrowd {
     return selected;
   }
 
+  /**
+   * The activity a walker is drawn as on a seat: their own where their body has a seat posture for
+   * it, else the one it is drawn as there (`ACTIVITY_ON_SEAT`: someone idle on a seat rests on it),
+   * or null where neither has one.
+   */
+  private seatActivity(walker: Walker): string | null {
+    if (walker.activity === null) return null;
+    if (this.far.seatPostureOf(walker.id, walker.activity) !== null) return walker.activity;
+    const as = activityOnSeat(walker.activity);
+    return as !== null && this.far.seatPostureOf(walker.id, as) !== null ? as : null;
+  }
+
   /** Whether a walker's activity is drawn on the seat of their place, arrived or not. */
   private seatable(walker: Walker): boolean {
     if (walker.activity === null || walker.place?.seat == null || walker.indoors) return false;
     if (this.near.has(walker.id) && this.near.get(walker.id)!.drawsSeats !== true) return false;
-    return this.far.seatPostureOf(walker.id, walker.activity) !== null;
+    return this.seatActivity(walker) !== null;
   }
 
   /** Whether a walker is to be drawn on a seat: at their place, with a seat the catalog draws on. */
@@ -1044,7 +1059,7 @@ export class SocietyCrowd {
     const key = wanted ? `${place!.objectId}:${place!.placeIndex}` : null;
     if (wanted && walker.settle === null) {
       const seat = place!.seat!;
-      const posture = this.far.seatPostureOf(walker.id, walker.activity)!;
+      const posture = this.far.seatPostureOf(walker.id, this.seatActivity(walker))!;
       const at: Point = [seat.position[0], seat.position[2]];
       const front = seatApproach(at, seat.facing, walker.position);
       walker.settle = {
@@ -1185,8 +1200,10 @@ export class SocietyCrowd {
    */
   private drawnActivity(walker: Walker): string | null {
     if (!walker.arrived) return null;
-    // Someone whose activity is drawn on a seat is on their feet until they are on it.
-    return (walker.settle !== null || this.seatable(walker)) && !walker.onSeat ? null : walker.activity;
+    // Someone whose activity is drawn on a seat is on their feet until they are on it, and on it is
+    // posed by the activity it is drawn as there.
+    if ((walker.settle !== null || this.seatable(walker)) && !walker.onSeat) return null;
+    return walker.onSeat ? this.seatActivity(walker) ?? walker.activity : walker.activity;
   }
 
   /** Where and how a full character is posed for a walker, apart from its timing. */

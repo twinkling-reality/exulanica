@@ -137,6 +137,33 @@ describe('a town resident resting on a street bench', () => {
     done();
   });
 
+  it('keeps someone with nothing to do on the seat they are on, drawn resting there, and on their feet anywhere else', () => {
+    // A person a model decides for who chooses to wait where they are is idle at their own point of
+    // the bench. They are drawn as the one resting beside them is: on the board, facing as it faces.
+    const { crowd, last, done } = setup([resident('waiting', SEAT_MM, 'idle'), resident('resting', [9_650, -20_000], 'rest')], TOWN);
+    expect(crowd.seatedOn('waiting')).toBe(true);
+    const pose = last('waiting');
+    expect(pose.position[1]).toBeCloseTo(liftOf('waiting'), 9);
+    expect(pose).toMatchObject({ activity: 'rest', seated: true });
+    expect(pose.yaw).toBeCloseTo(last('resting').yaw!, 9);
+    // What the crowd says is drawn is what is drawn; the state's own word for them is the page's to show.
+    expect(crowd.activityOf('waiting')).toBe('rest');
+    done();
+    // Idle three metres along the kerb, on no seat: on their feet, as before.
+    const off = setup([resident('waiting', [13_350, -20_000], 'idle')], TOWN);
+    expect(off.crowd.seatedOn('waiting')).toBe(false);
+    expect(off.last('waiting').position[1]).toBe(0);
+    expect(off.last('waiting')).not.toHaveProperty('seated');
+    off.done();
+    // An activity that is neither drawn on a seat nor as one that is stands at a point of the bench.
+    for (const kind of ['stand', 'move', 'talk']) {
+      const up = setup([resident('up', SEAT_MM, kind)], TOWN);
+      expect(up.crowd.seatedOn('up')).toBe(false);
+      expect(up.last('up').position[1]).toBe(0);
+      up.done();
+    }
+  });
+
   it('finds the seat again when the furniture is read after the people are', () => {
     const { crowd, last, done } = setup([resident('resting', SEAT_MM, 'rest')], NO_FURNITURE);
     expect(crowd.seatedOn('resting')).toBe(false);
