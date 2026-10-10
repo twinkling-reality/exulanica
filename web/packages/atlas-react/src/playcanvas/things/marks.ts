@@ -30,6 +30,9 @@
  * gives the whole name at once (the page's stylesheet). So in a pile one keeps its name and the
  * others keep their marks, and no name stands where nobody can tell whose it is. The nearest being
  * a model decides for is named however small it stands, though not over somebody else's mark. A
+ * mark alone over a being that stands lower on the screen than the rule's `dotUnderPx` is a DOT, the
+ * same mark with no room for letters, so a crowd far off is a row of dots and not a smudge of
+ * pills; it is still a button, and pointing at it opens the pill and the name. A
  * being that is picked, speaking or at a decision is named whatever stands by, outside the share,
  * and is said to be held on its node so the page draws it over the rest. A marked being no model
  * decides for (a game's player, a person's) has no shorter form: too small or beyond the share it
@@ -95,7 +98,7 @@ export interface ThingDecision {
 
 /**
  * What bounds the marks, as the page's catalog states it
- * (`assets/catalogs/thing-presentation/decider-marks.v1.json`): each a value with its class and
+ * (`assets/catalogs/thing-presentation/decider-marks.v2.json`): each a value with its class and
  * reason there, none a count of beings.
  */
 export interface DeciderMarkRule {
@@ -103,6 +106,11 @@ export interface DeciderMarkRule {
   readonly nameLeastPx: number;
   /** A name is drawn over a being that stands at least this tall on the screen, in CSS pixels. */
   readonly beingLeastPx: number;
+  /**
+   * A model's mark is a dot, and not the pill that says AI, over a being that stands lower than
+   * this on the screen, in CSS pixels; 0 where the catalog states none, and then no mark is a dot.
+   */
+  readonly dotUnderPx: number;
   /** How much of the view's area names may cover, as a share of it, spent nearest first. */
   readonly screenShare: number;
   /** How many lines of speech are open at once. */
@@ -182,6 +190,8 @@ interface MarkContent {
   readonly held: boolean;
   /** Its being is followed (picked, or played by the viewer) and something stands between: drawn as behind it. */
   readonly behind: boolean;
+  /** The mark alone, over a being too low on the screen for the pill: drawn as a dot. */
+  readonly dot: boolean;
   readonly pillClass: string;
   readonly kind: ThingMark['kind'];
   readonly word: string;
@@ -202,7 +212,7 @@ interface MarkContent {
  */
 function contentOf(
   subject: MarkedSubject, mark: ThingMark, held: boolean,
-  decision: { readonly chose: string; readonly said: string | null } | null, alone: boolean, behind = false,
+  decision: { readonly chose: string; readonly said: string | null } | null, alone: boolean, behind = false, dot = false,
 ): MarkContent {
   const ai = mark.kind === 'ai';
   // The model's whole name, always: never a word of it, never hidden for being far.
@@ -217,10 +227,10 @@ function contentOf(
   const label = held ? subject.label : null;
   const classes = pillClass(mark);
   return {
-    alone, held, behind, pillClass: classes, kind: mark.kind, word, name, from, label, chose, said,
+    alone, held, behind, dot: alone && dot, pillClass: classes, kind: mark.kind, word, name, from, label, chose, said,
     aria: chose === null ? named : `${named}. ${[chose, said].filter((part) => part !== '').join(' ')}`,
     words: alone
-      ? ['alone', classes, word].join('\u0000')
+      ? [dot ? 'dot' : 'alone', classes, word].join('\u0000')
       : ['name', classes, word, name ?? '', from ?? '', label ?? '', chose === null ? '' : `\u0001${chose}\u0001${said}`].join('\u0000'),
   };
 }
@@ -400,6 +410,7 @@ export class ThingMarks {
     // First where everything stands: a model's mark is on its being's head whatever else is drawn,
     // so every one of them is known before any name is.
     const seen: Seen[] = [];
+    let first = true;
     for (const one of marked) {
       const screen = this.project(one.at, width, height);
       // Only marks on screen are drawn: one behind the eye takes no name and is no name missed.
@@ -412,9 +423,16 @@ export class ThingMarks {
         continue;
       }
       const tall = heights.get(one.id);
-      const small = !one.held && tall !== undefined && one.distance > 0 && tall * pixelsPerMetre / one.distance < this.rule.beingLeastPx;
+      // How tall it stands on the screen, where the society says how tall it stands at all.
+      const stands = tall !== undefined && one.distance > 0 ? tall * pixelsPerMetre / one.distance : null;
+      const small = !one.held && stands !== null && stands < this.rule.beingLeastPx;
       // A being a model decides for always wears its mark; anything else too small to name wears nothing.
-      const alone = one.mark.kind === 'ai' ? contentOf(one.subject, one.mark, false, null, true, behind) : null;
+      // Its mark alone is a dot where it stands lower than the pill is worth; the nearest and a held
+      // one wear the pill however small they stand.
+      const always = one.mark.kind === 'ai';
+      const dot = always && !one.held && !first && stands !== null && stands < this.rule.dotUnderPx;
+      if (always && !one.held) first = false;
+      const alone = always ? contentOf(one.subject, one.mark, false, null, true, behind, dot) : null;
       if (small && alone === null) {
         unnamed.small += 1;
         continue;
@@ -595,8 +613,9 @@ export class ThingMarks {
     node.root.classList.toggle('thing-mark-alone', content.alone);
     node.root.classList.toggle('thing-mark-held', content.held);
     node.root.classList.toggle('thing-mark-behind', content.behind);
+    node.root.classList.toggle('thing-mark-dot', content.dot);
     node.pill.className = content.pillClass;
-    node.pill.dataset['form'] = content.alone ? 'mark' : 'name';
+    node.pill.dataset['form'] = content.dot ? 'dot' : content.alone ? 'mark' : 'name';
     node.pill.dataset['subject'] = id;
     node.pill.dataset['mark'] = content.kind;
     node.pillWord.textContent = content.word;

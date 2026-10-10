@@ -49,7 +49,7 @@ const screenOf = (ahead: number, up: number, across = 0): [number, number] => [
 ];
 
 const RULE: DeciderMarkRule = {
-  nameLeastPx: 14, beingLeastPx: 22, screenShare: 0.08, linesAtOnce: 4,
+  nameLeastPx: 14, beingLeastPx: 22, dotUnderPx: 22, screenShare: 0.08, linesAtOnce: 4,
   lineBaseMs: 2000, linePerCharacterMs: 55, lineMostMs: 9000,
 };
 const NOTHING_UNNAMED = { small: 0, beyondShare: 0, collides: 0, hidden: 0 };
@@ -91,17 +91,18 @@ function shown(stage: HTMLElement) {
 
 /**
  * This page lays nothing out, so every mark states the size a browser would give it: a model's mark
- * alone 26 by 24, and with its name in the row over it 80 by 48 (so a name adds 80 by 24); any
- * other mark, one row, 80 by 24. `reads` counts how often a size is asked of the page.
+ * alone 26 by 24, as a dot 10 by 10, and with its name in the row over it 80 by 48 (so a name adds
+ * 80 by 24); any other mark, one row, 80 by 24. `reads` counts how often a size is asked of the page.
  */
 const layout = { reads: 0 };
 function sized(): () => void {
   const width = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
   const height = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
   const is = (node: HTMLElement) => node.classList.contains('thing-mark');
-  const wide = (node: HTMLElement) => (node.classList.contains('thing-mark-alone') ? 26 : 80);
+  const dot = (node: HTMLElement) => node.classList.contains('thing-mark-dot');
+  const wide = (node: HTMLElement) => (dot(node) ? 10 : node.classList.contains('thing-mark-alone') ? 26 : 80);
   const tall = (node: HTMLElement) =>
-    (node.querySelector('.thing-mark-ai') !== null && !node.classList.contains('thing-mark-alone') ? 48 : 24);
+    (dot(node) ? 10 : node.querySelector('.thing-mark-ai') !== null && !node.classList.contains('thing-mark-alone') ? 48 : 24);
   Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
     configurable: true,
     get(this: HTMLElement) {
@@ -161,7 +162,7 @@ describe('marks over the beings a model or someone outside decides for', () => {
     expect(stage.querySelector<HTMLElement>('.thing-marks')!.style.getPropertyValue('--thing-mark-name-least')).toBe('14px');
   });
 
-  it('names a being that stands tall enough on the screen, leaves a smaller one a model decides for its mark alone, and always names a held one and the nearest', () => {
+  it('names a being that stands tall enough on the screen, leaves a smaller one a model decides for its mark as a dot, and always names a held one and the nearest', () => {
     const { camera, stage } = setup();
     const overlay = new ThingMarks(stage, () => undefined, RULE);
     const ids = ['a', 'b', 'c', 'd', 'unmeasured', 'behind'];
@@ -181,8 +182,13 @@ describe('marks over the beings a model or someone outside decides for', () => {
     overlay.update(camera, anchors, null, 0, tall);
     const formOf = () => Object.fromEntries(shown(stage).map((one) => [one.subject, one.form]));
     // A being whose height the society does not state is named: nothing says it is small. The two
-    // too small to name still wear the AI mark, on their own heads; the player too small wears nothing.
-    expect(formOf()).toEqual({ a: 'name', b: 'name', unmeasured: 'name', c: 'mark', d: 'mark' });
+    // too small to name still wear their mark, on their own heads, as a dot (under the 22 px a pill is
+    // worth); the player too small wears nothing.
+    expect(formOf()).toEqual({ a: 'name', b: 'name', unmeasured: 'name', c: 'dot', d: 'dot' });
+    const dots = Array.from(stage.querySelectorAll<HTMLElement>('.thing-mark-dot')).filter((node) => node.style.display !== 'none');
+    expect(dots.map((node) => node.querySelector<HTMLElement>('.thing-mark-pill')!.dataset['subject']).sort()).toEqual(['c', 'd']);
+    // A dot is a mark alone, so the page's stylesheet opens its name when it is pointed at.
+    expect(dots.every((node) => node.classList.contains('thing-mark-alone'))).toBe(true);
     const [dx, dy] = screenOf(40, 1, 10);
     expect(shown(stage).find((one) => one.subject === 'd')).toMatchObject({
       word: 'AI', transform: `translate3d(${dx.toFixed(1)}px, ${dy.toFixed(1)}px, 0) translate(-50%, -100%)`,
@@ -205,7 +211,82 @@ describe('marks over the beings a model or someone outside decides for', () => {
     anchors.delete('b');
     anchors.delete('unmeasured');
     overlay.update(camera, anchors, null, 10_000, tall);
-    expect(formOf()).toEqual({ c: 'name', d: 'mark' });
+    expect(formOf()).toEqual({ c: 'name', d: 'dot' });
+    expect(stage.querySelectorAll('.thing-mark-dot').length).toBe(1);
+    // The height a mark is a dot under is the rule's own, apart from the height a name is drawn at:
+    // at 16 px the one that stands 21.7 px wears the pill and the one at 12.75 px the dot; where the
+    // rule states none (0, the catalog's first version) nothing is a dot.
+    anchors.set('a', new pc.Vec3(-6, 1, -5));
+    const apart = new ThingMarks(stage, () => undefined, { ...RULE, dotUnderPx: 16 });
+    apart.setMarks(marked(['a', 'c', 'd'].map((id) => [id, AI, null])));
+    apart.update(camera, anchors, null, 0, tall);
+    const formsIn = (overlay: ThingMarks) => Object.fromEntries(Array.from(overlay.root.querySelectorAll<HTMLElement>('.thing-mark'))
+      .filter((node) => node.style.display !== 'none')
+      .map((node) => node.querySelector<HTMLElement>('.thing-mark-pill')!).map((pill) => [pill.dataset['subject'], pill.dataset['form']]));
+    expect(formsIn(apart)).toEqual({ a: 'name', c: 'mark', d: 'dot' });
+    const none = new ThingMarks(stage, () => undefined, { ...RULE, dotUnderPx: 0 });
+    none.setMarks(marked(['a', 'c', 'd'].map((id) => [id, AI, null])));
+    none.update(camera, anchors, null, 0, tall);
+    expect(formsIn(none)).toEqual({ a: 'name', c: 'mark', d: 'mark' });
+  });
+
+  it('draws a crowd far off as a row of dots that do not cover each other, where pills would', () => {
+    const restore = sized();
+    try {
+      const { camera, stage } = setup();
+      // Five people 1.7 m tall 40 m off (12.75 px on this frame), 2 m apart across: 15 px between
+      // heads. A walker 5 m off is the nearest and is named.
+      const ids = ['p0', 'p1', 'p2', 'p3', 'p4'];
+      const anchors = new Map<string, pc.Vec3>([['walker', new pc.Vec3(-4, 1, -5)], ...ids.map((id, i) => [id, new pc.Vec3(2 * i, 1, -40)] as [string, pc.Vec3])]);
+      const tall = new Map([...anchors.keys()].map((id) => [id, 1.7]));
+      const boxes = (overlay: ThingMarks) => ids.map((id) => {
+        const node = Array.from(overlay.root.querySelectorAll<HTMLElement>('.thing-mark'))
+          .find((one) => one.style.display !== 'none' && one.querySelector<HTMLElement>('.thing-mark-pill')!.dataset['subject'] === id)!;
+        const [x] = /translate3d\(([-\d.]+)px/.exec(node.style.transform)!.slice(1).map(Number) as [number];
+        return [x - node.offsetWidth / 2, x + node.offsetWidth / 2] as const;
+      });
+      const overlapping = (spans: readonly (readonly [number, number])[]) => spans.filter((span, i) => i > 0 && span[0] < spans[i - 1]![1]).length;
+      const dotted = new ThingMarks(stage, () => undefined, RULE);
+      dotted.setMarks(marked([...anchors.keys()].map((id) => [id, AI, null])));
+      dotted.update(camera, anchors, null, 0, tall);
+      // Every one of the five wears its mark, as a dot 10 px wide on its own head, 15 px from the next.
+      expect(dotted.counts).toMatchObject({ marks: 6, named: 1, unnamed: { small: 5 } });
+      expect(dotted.root.querySelectorAll('.thing-mark-dot').length).toBe(5);
+      expect(overlapping(boxes(dotted))).toBe(0);
+      const [x0] = screenOf(40, 1, 0);
+      expect(boxes(dotted)[0]).toEqual([Number(x0.toFixed(1)) - 5, Number(x0.toFixed(1)) + 5]);
+      // The same five as pills 26 px wide (a rule that states no such height) cover each other.
+      const pills = new ThingMarks(stage, () => undefined, { ...RULE, dotUnderPx: 0 });
+      pills.setMarks(marked([...anchors.keys()].map((id) => [id, AI, null])));
+      pills.update(camera, anchors, null, 0, tall);
+      expect(overlapping(boxes(pills))).toBe(4);
+      const formsIn = (overlay: ThingMarks) => Object.fromEntries(Array.from(overlay.root.querySelectorAll<HTMLElement>('.thing-mark'))
+        .filter((node) => node.style.display !== 'none')
+        .map((node) => node.querySelector<HTMLElement>('.thing-mark-pill')!).map((pill) => [pill.dataset['subject'], pill.dataset['form']]));
+      // A dot takes a dot's room, not a pill's. A guard 10 m off stands 51 px; someone far off on a
+      // roof is 30 px over the guard's head on the screen and 44 px to the side. Their dot, 10 px
+      // wide, ends a pixel inside the guard's name (80 wide), which only touches it: the guard is
+      // named. A pill there, 26 px wide, would be 9 px into the name and the guard would lose it.
+      const roomy = new ThingMarks(stage, () => undefined, RULE);
+      roomy.setMarks(marked([['near', AI, null], ['guard', AI, null], ['roof', AI, null]]));
+      const roof = new Map([['near', new pc.Vec3(-6, 1, -5)], ['guard', new pc.Vec3(0, 1, -10)], ['roof', new pc.Vec3(5.8667, 8, -40)]]);
+      const [gx, gy] = screenOf(10, 1);
+      const [rx, ry] = screenOf(40, 8, 5.8667);
+      expect([Math.round(rx - gx), Math.round(gy - ry)]).toEqual([44, 30]);
+      roomy.update(camera, roof, null, 0, new Map([['near', 1.7], ['guard', 1.7], ['roof', 1.7]]));
+      expect(formsIn(roomy)).toEqual({ near: 'name', guard: 'name', roof: 'dot' });
+      // The nearest wears the pill however small it stands, named or not. Here the nearest stands
+      // 21.7 px, and someone on a roof behind has their dot in the row its name would take: it
+      // wears its mark alone, as a pill, and the one behind a dot.
+      const first = new ThingMarks(stage, () => undefined, RULE);
+      first.setMarks(marked([['front', AI, null], ['behind', AI, null]]));
+      const pair = new Map([['front', new pc.Vec3(4, 1, -23.5)], ['behind', new pc.Vec3(6.8, 5.7, -40)]]);
+      first.update(camera, pair, null, 0, new Map([['front', 1.7], ['behind', 1.7]]));
+      expect(formsIn(first)).toEqual({ front: 'mark', behind: 'dot' });
+      expect(first.counts.unnamed).toMatchObject({ collides: 1, small: 1 });
+    } finally {
+      restore();
+    }
   });
 
   it('keeps the nearer name where two would cover each other and leaves the other its mark alone, on its own head', () => {
@@ -640,8 +721,8 @@ describe('marks over the beings a model or someone outside decides for', () => {
     picked = 'baker';
     app.tick(8);
     expect(asked.sort()).toEqual(['baker', 'indoors', 'knight', 'speck']);
-    // The one 40 m off stands 12.75 px: too small to name, and it wears its mark alone.
-    expect(shown(stage).map((one) => [one.subject, one.form]).sort()).toEqual([['baker', 'name'], ['knight', 'name'], ['speck', 'mark']]);
+    // The one 40 m off stands 12.75 px: too small to name, and it wears its mark as a dot.
+    expect(shown(stage).map((one) => [one.subject, one.form]).sort()).toEqual([['baker', 'name'], ['knight', 'name'], ['speck', 'dot']]);
     picked = null;
     asked.length = 0;
     app.tick(16);

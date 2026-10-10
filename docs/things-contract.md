@@ -1260,7 +1260,7 @@ Every mark stands on its own being's head and is never lifted off it. A being a 
 wears two things: a small `AI` mark on its head, always, the same near or far, alone or in a crowd,
 and the model's whole name in a row over the mark, joined to it by a neck. A name is bounded by what
 can be read, never by how many beings a model decides for
-(`assets/catalogs/thing-presentation/decider-marks.v1.json`, each value with its class and reason,
+(`assets/catalogs/thing-presentation/decider-marks.v2.json`, each value with its class and reason,
 read by [`decider-marks.ts`](../web/packages/app/src/decider-marks.ts)). Nearest first, a name is
 drawn where its being stands at least a stated height on the screen, while the names cover no more
 than a stated share of the view (what a name adds over its mark; the marks are no part of the share),
@@ -1268,7 +1268,11 @@ and where it would cover no name already drawn and nobody else's mark. Where any
 the being wears its mark alone, which is still a button that picks it, and pointing at the mark or
 reaching it by keyboard opens its name over whatever stands there. So of two people on a bench one
 is named and both are marked, and no name stands where a reader cannot tell whose it is. The one
-named however small it stands is the nearest whose name covers nobody's mark. The picked person, a speaking one and one at a
+named however small it stands is the nearest whose name covers nobody's mark. A mark alone over a
+being that stands lower on the screen than the catalog's `dot_under_px` is a dot of the mark's own
+colour on its head, the same mark with no room for letters, so a crowd far off is a row of dots and
+not a smudge of pills; pointing at a dot or reaching it by keyboard opens the pill and the name. The
+catalog's first version states no such height and is read as before, with no mark a dot. The picked person, a speaking one and one at a
 decision are named whatever stands by, outside the share, with their kind over the name, and are
 drawn over the other marks. A marked being no model decides for (a game's player, a person's) has no
 shorter form: too small or beyond the share it wears nothing. Every name not drawn is counted by why
@@ -1276,9 +1280,9 @@ shorter form: too small or beyond the share it wears nothing. Every name not dra
 the canvas states who decides for how many beings and how many are indoors (`data-deciders`), read
 from each being's own state: one that states it is indoors (`indoors` true, or `location.indoors`
 true where the state keeps a location) is not drawn and is counted indoors, and one that states
-nothing of it is in the street. Limits: marks are not kept off each other, so far off, where a mark
-is as tall as the being under it, the marks of a crowd overlap; and a held being's name is drawn over
-the marks of those standing by it, which it hides for as long.
+nothing of it is in the street. Limits: marks are not kept off each other, so people standing nearer than a mark is wide
+wear marks that overlap, pills or dots; and a held being's name is drawn over the marks of those
+standing by it, which it hides for as long.
 
 What hides a being is the world's own plan, asked one question: how far a sight line runs before
 something stands in it ([`sight.ts`](../web/packages/app/src/composition/sight.ts)). In a town the plan

@@ -204,6 +204,22 @@
 }
 
 /*
+ * A dot: the mark of a being that stands too low on the screen for the pill (the overlay decides, by
+ * the marks catalog's height, and says so with `thing-mark-dot`). It is the same mark, in the mark's
+ * own colour and edge, on the same head, with no room for letters; a crowd far off is then a row of
+ * dots and not a smudge of pills. Pointing at it or reaching it by keyboard opens the pill and the
+ * name, as for any mark alone.
+ */
+.thing-mark-dot:not(:hover):not(:focus-within) > .thing-mark-ai > .thing-mark-word {
+  width: 0.62rem;
+  height: 0.62rem;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  font-size: 0;
+}
+
+/*
  * Behind something: the being is followed (picked, or played by the viewer) and a wall of the world
  * stands between. One look for it, whatever the mark: faded and flat, as a thing seen through
  * another is, so it reads as where the being is and not as another kind of name.

@@ -1,11 +1,14 @@
 /**
- * How the page shows who decides for a being, over the being, read from the one data file that
- * states each value with its class and reason,
- * `assets/catalogs/thing-presentation/decider-marks.v1.json`. Presentation only: nothing a society
- * records is changed by it, and no value is a count of beings.
+ * How the page shows who decides for a being, over the being, read from the data file that states
+ * each value with its class and reason, `assets/catalogs/thing-presentation/decider-marks.v2.json`,
+ * and the version before it. Presentation only: nothing a society records is changed by it, and no
+ * value is a count of beings.
+ *
+ * Version 2 is version 1 with the height under which a mark is a dot; it is the version the page
+ * draws by. Version 1 states no such height and is read as it was: no mark is a dot.
  */
 import type { DeciderMarkRule } from '@exulanica/atlas-react/things';
-import catalogText from '../../../../assets/catalogs/thing-presentation/decider-marks.v1.json?raw';
+import catalogText from '../../../../assets/catalogs/thing-presentation/decider-marks.v2.json?raw';
 
 interface MarkEntry {
   readonly key: string;
@@ -17,10 +20,13 @@ interface MarkEntry {
 
 const CLASSES = new Set(['chosen_default', 'chosen_budget', 'measured_cost']);
 
-/** The rule a decider-marks catalog file states; a file that is not one, or states less, is refused. */
+const PROFILES: ReadonlyMap<unknown, 1 | 2> = new Map([['exulanica.decider-marks/v1', 1], ['exulanica.decider-marks/v2', 2]]);
+
+/** The rule a decider-marks catalog file states, of either version; a file that is not one, or states less, is refused. */
 export function deciderMarkRule(text: string): DeciderMarkRule {
   const document = JSON.parse(text) as { readonly profile?: unknown; readonly entries?: readonly MarkEntry[] };
-  if (document.profile !== 'exulanica.decider-marks/v1' || !Array.isArray(document.entries)) {
+  const version = PROFILES.get(document.profile);
+  if (version === undefined || !Array.isArray(document.entries)) {
     throw new Error('not the decider marks catalog');
   }
   const entries = new Map<string, MarkEntry>();
@@ -39,6 +45,7 @@ export function deciderMarkRule(text: string): DeciderMarkRule {
   const rule: DeciderMarkRule = {
     nameLeastPx: stated('name_least_px', 'css_pixel'),
     beingLeastPx: stated('being_least_px', 'css_pixel'),
+    dotUnderPx: version === 1 ? 0 : stated('dot_under_px', 'css_pixel'),
     screenShare: stated('screen_share_milli', 'thousandth') / 1000,
     linesAtOnce: stated('lines_at_once', 'count'),
     lineBaseMs: stated('line_base_ms', 'millisecond'),

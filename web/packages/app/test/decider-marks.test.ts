@@ -6,7 +6,8 @@ import { DECIDER_MARKS, deciderMarkRule } from '../src/decider-marks.js';
  * The decider marks catalog through the page's reader. Each expected value is read here from the
  * file's own entry, by its key, and carried into the rule's unit by hand.
  */
-const text = readFileSync(new URL('../../../../assets/catalogs/thing-presentation/decider-marks.v1.json', import.meta.url), 'utf8');
+const text = readFileSync(new URL('../../../../assets/catalogs/thing-presentation/decider-marks.v2.json', import.meta.url), 'utf8');
+const first = readFileSync(new URL('../../../../assets/catalogs/thing-presentation/decider-marks.v1.json', import.meta.url), 'utf8');
 interface Entry { key: string; value: number; unit: string; class: string; reason: string }
 const document = JSON.parse(text) as { profile: string; entries: Entry[] };
 const entries = new Map(document.entries.map((entry) => [entry.key, entry]));
@@ -29,6 +30,7 @@ describe('the decider marks catalog', () => {
     const rule = deciderMarkRule(text);
     expect(rule.nameLeastPx).toBe(entries.get('name_least_px')!.value);
     expect(rule.beingLeastPx).toBe(entries.get('being_least_px')!.value);
+    expect(rule.dotUnderPx).toBe(entries.get('dot_under_px')!.value);
     expect(rule.screenShare).toBeCloseTo(entries.get('screen_share_milli')!.value / 1000, 12);
     expect(rule.linesAtOnce).toBe(entries.get('lines_at_once')!.value);
     expect([rule.lineBaseMs, rule.linePerCharacterMs, rule.lineMostMs]).toEqual(
@@ -38,8 +40,18 @@ describe('the decider marks catalog', () => {
     expect(rule.nameLeastPx).toBeGreaterThanOrEqual(14);
   });
 
+  it('reads the first version beside it as it was read: every value it states, the same, and no mark a dot', () => {
+    const before = deciderMarkRule(first);
+    // The second version is the first with one entry more, each value it shares unchanged.
+    const earlier = (JSON.parse(first) as { entries: Entry[] }).entries;
+    expect(document.entries.filter((entry) => entry.key !== 'dot_under_px')).toEqual(earlier);
+    expect(before).toEqual({ ...deciderMarkRule(text), dotUnderPx: 0 });
+  });
+
   it('refuses a file of another profile, one missing a value, one with no class, and a share above the whole view', () => {
-    expect(() => deciderMarkRule(JSON.stringify({ ...document, profile: 'exulanica.decider-marks/v2' }))).toThrow('not the decider marks catalog');
+    expect(() => deciderMarkRule(JSON.stringify({ ...document, profile: 'exulanica.decider-marks/v3' }))).toThrow('not the decider marks catalog');
+    expect(() => deciderMarkRule(JSON.stringify({ ...document, entries: document.entries.filter((entry) => entry.key !== 'dot_under_px') })))
+      .toThrow('dot_under_px');
     expect(() => deciderMarkRule(JSON.stringify({ ...document, entries: document.entries.filter((entry) => entry.key !== 'name_least_px') })))
       .toThrow('name_least_px');
     const unclassed = document.entries.map((entry) => (entry.key === 'being_least_px' ? { ...entry, class: 'leftover' } : entry));

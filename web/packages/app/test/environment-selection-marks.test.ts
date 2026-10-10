@@ -89,10 +89,10 @@ vi.mock('../src/door-bridges-api.js', () => ({
 /** What bounds the marks, read here from the catalog file by each entry's key. */
 // Tests run from web/.
 const STATED = new Map((JSON.parse(readFileSync(
-  resolve('..', 'assets/catalogs/thing-presentation/decider-marks.v1.json'), 'utf8',
+  resolve('..', 'assets/catalogs/thing-presentation/decider-marks.v2.json'), 'utf8',
 )) as { entries: { key: string; value: number }[] }).entries.map((entry) => [entry.key, entry.value]));
 const DECIDER_RULE = {
-  nameLeastPx: STATED.get('name_least_px'), beingLeastPx: STATED.get('being_least_px'),
+  nameLeastPx: STATED.get('name_least_px'), beingLeastPx: STATED.get('being_least_px'), dotUnderPx: STATED.get('dot_under_px'),
   screenShare: STATED.get('screen_share_milli')! / 1000, linesAtOnce: STATED.get('lines_at_once'),
   lineBaseMs: STATED.get('line_base_ms'), linePerCharacterMs: STATED.get('line_per_character_ms'), lineMostMs: STATED.get('line_most_ms'),
 };
