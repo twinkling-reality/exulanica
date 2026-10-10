@@ -43,6 +43,7 @@ const { FakeLayer, FakeMarks, bridgeReads, grantReads } = vi.hoisted(() => {
     constructor(readonly options: AttachedMarksOptions) { Marks.last = this; }
     set(subjects: ReadonlyMap<string, MarkedSubject>) { (this.sets as ReadonlyMap<string, MarkedSubject>[]).push(subjects); }
     showLine(line: ThingLine) { this.lines.push(line); }
+    showDecision() {}
     destroy() { this.destroyed = true; }
   }
   return { FakeLayer: Layer, FakeMarks: Marks, bridgeReads: { count: 0, answer: Promise.resolve() as Promise<void> }, grantReads: { count: 0, worlds: [] as (string | null)[] } };
@@ -205,12 +206,12 @@ describe('an outside agent in a saved world', () => {
     await settle();
     const marks = FakeMarks.last!;
     const last = () => marks.sets.at(-1)!;
-    expect(last().get('agent-0')!.mark).toEqual({ kind: 'ai', short: 'Scout', full: 'An outside AI agent, Scout', outside: true });
+    expect(last().get('agent-0')!.mark).toEqual({ kind: 'ai', name: 'Scout', full: 'An outside AI agent, Scout', outside: true });
     expect(last().get('agent-0')!.spoken).toBe('An outside AI agent, Scout');
     // A game's player is marked by its game as before; its grant's silence changes nothing.
     expect(last().get('player-0')!.mark).toEqual({ kind: 'from', label: 'from Block Game', full: 'From Block Game, decided from outside' });
     // Before the grants answered, the agent's pill said only that it is an agent.
-    const before = marks.sets.find((set) => set.get('agent-0')?.mark?.kind === 'ai' && (set.get('agent-0')!.mark as { short: string }).short === 'agent');
+    const before = marks.sets.find((set) => set.get('agent-0')?.mark?.kind === 'ai' && (set.get('agent-0')!.mark as { name: string }).name === 'agent');
     expect(before).toBeDefined();
     expect(grantReads.worlds.at(-1)).toBe(WORLD);
     const reads = grantReads.count;
@@ -228,7 +229,7 @@ describe('an outside agent in a saved world', () => {
     await settle();
     await refresh();
     await refresh();
-    expect(FakeMarks.last!.sets.at(-1)!.get('quiet-0')!.mark).toEqual({ kind: 'ai', short: 'agent', full: 'An outside AI agent', outside: true });
+    expect(FakeMarks.last!.sets.at(-1)!.get('quiet-0')!.mark).toEqual({ kind: 'ai', name: 'agent', full: 'An outside AI agent', outside: true });
     // Its grant says nothing yet: asked once, not on every read within the minute.
     expect(grantReads.count).toBe(reads + 1);
     mounted.dispose();

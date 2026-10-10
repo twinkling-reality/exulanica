@@ -1189,10 +1189,11 @@ there is a look or kind the workspace does not hold, drawn as any other miss. Th
 open and asks again each time it is opened, so a look the workspace withdraws is no longer drawn from
 the next time the world is opened.
 
-Who runs each person of a saved world's society is marked over them, by one decision the thing card
+Who decides for each person of a saved world's society is marked over them, by one decision the thing card
 makes too ([`composition/thing-marks.ts`](../web/packages/app/src/composition/thing-marks.ts)): a
 person whose model is asked (chosen for them, and refused neither by the host nor for them) wears an
-`AI` pill with the first word of the model's served name; a visitor its own program decides for
+`AI` mark with the model's whole served name, never a part of it and never in letters smaller than a
+stated floor, whether or not the person is picked or near; a visitor its own program decides for
 wears its bridge's mark as the door lists it here: `from` and the bridge's label for a game, read as
 decided from outside (no person is claimed, which nothing a game sends shows), an outlined `AI`
 pill for an outside agent, and `from outside` for a bridge the door does not list. An outside agent's pill names it in its own words, as its program last said them at the door
@@ -1201,13 +1202,43 @@ without a name; set as text only, a long name cut short on the pill and read who
 `agent` until its program says. A visitor the world decides for (its arrival's `decided_by` is
 `world`) is marked by who decides here: the `AI` pill naming the model asked, followed in the same
 pill by `· from` and its bridge's label, or, while its routine runs it, `from` and the label alone,
-read as run by this world. Everyone else, and every object, wears none. The pills are part of the
-page, not the picture: a fixed pool of nodes placed each frame over the box a person is drawn and
-picked by, read by a screen reader in the card's words and
-picked by a click as by aiming. The model's short name and the person's kind show over the selected
-person, a speaking one and the three nearest marked people within 12 m drawn on screen; no pill is
-drawn beyond 60 m. A pill that would cover a nearer person's stands just above it (2 px apart), so two
-people in line from the camera both read; the nearest stays over its person. When a person plays a
+read as run by this world. A being its own routine decides for wears nothing at rest, since that is
+most beings in any world, and says "Their own routine", the card's own words, while it is the picked
+one, so every being has an answer when asked; every object wears none. A being a person plays wears
+`You` or `Played`. Those words keep the same floor a model's name keeps. The marks are part of the
+page, not the picture: nodes kept and reused, placed each frame just over the box a person is drawn
+and picked by, or, for someone lowering onto a seat or sitting on it, just over the figure as it is
+drawn (the bounds its drawn meshes state in the pose they are in), so a seated person's name is over
+their head and not a head above it; read by a screen reader in the card's words and picked by a click
+as by aiming. They read nothing of the kind of world they are drawn over: a point over each being and
+how tall it stands, from the society drawn, are all they ask, so they are the same over a town, a
+farm or a site.
+
+What is drawn is bounded by what can be read, never by how many beings a model decides for
+(`assets/catalogs/thing-presentation/decider-marks.v1.json`, each value with its class and reason,
+read by [`decider-marks.ts`](../web/packages/app/src/decider-marks.ts)). A name is drawn over a being
+that stands at least a stated height on the screen, nearest first, until the names cover a stated
+share of the view. Each name stands over its own being, the nearest lowest: one that would cover a
+nearer name stands just above it (2 px apart), so two beings side by side are both named; which name
+is whose is then read from its place across the screen alone. Every name not drawn is counted by why
+(too small, beyond the share) on the overlay (`data-named`, `data-unnamed`), and the canvas states who
+decides for how many beings and how many are indoors (`data-deciders`), read from each being's own
+state: one that states it is indoors (`indoors` true, or `location.indoors` true where the state
+keeps a location) is not drawn and is counted indoors, and one that states nothing of it is in the
+street. The picked person, a speaking one and one at a decision are named outside that share and
+however small they stand, with their kind beside the name. A name can show through a wall: nothing
+here tests what stands between the viewer and a being.
+
+When a minute takes up a model's decision, what the model chose opens under its name, in the action's
+offered words as the models read serves them ("Chose “walk to the well”."), with what came of it where
+the minute did not act on it and why by its code's words, for as long as a line of speech of that length
+stays, and closes ([`thing-decisions.ts`](../web/packages/app/src/composition/thing-decisions.ts)). Each
+decision opens once, and none from before the page first read the society. The line says what was
+chosen and never why the model chose it: a decision records no reason of its decider's, and the line
+has a place for the decider's own stated words that stays empty and takes no room until a decision
+contract serves any. It opens for a model's decisions; a person's and an outside program's choices are
+not served by that read. The sentence a being's card shows as "Recorded by the engine" is the engine's
+own account of what the being is doing, not a model's reasoning. When a person plays a
 being (Play this one; the app has no screen to start it yet: see below), it is marked by who decides
 now, before its mind: a `You` pill in the world-mark person colour for the one playing it and `Played`
 for anyone else, read as played by you or by another person (and, for a visitor the world decides for,
@@ -1218,7 +1249,8 @@ which says only whether the viewer is the one playing, never who.
 
 Each line a being says is drawn over it as it is said, from the society's `said` events read with
 each minute: only lines said after the page first read the society, each once, oldest first, at most
-four bubbles at once and one per speaker, each shown for two to nine seconds by its length. A line's
+four bubbles at once and one per speaker, each shown for two to nine seconds by its length (the marks'
+catalog states each of those figures as a budget of reading, with its reason). A line's
 words are set as text only. The bubble opens with the line's own mark, decided from the line's record
 by one function the thing card shares (`lineMarkOf` in
 [`composition/thing-marks.ts`](../web/packages/app/src/composition/thing-marks.ts)): a model's line is

@@ -56,5 +56,7 @@ export type { FigureMade, FigureMakerOptions } from './figure-maker.js';
 export { ThingFigureMaker } from './figure-maker.js';
 export type { ThingCrowdFiguresOptions, ThingFigureMiss } from './crowd-figures.js';
 export { ThingCrowdFigures, ThingCrowdRenderable } from './crowd-figures.js';
-export type { AttachedMarksOptions, MarkAnchors, MarkedSubject, ThingLine, ThingMark } from './marks.js';
-export { AttachedMarks, LINES_MAXIMUM, MARKS_MAXIMUM, MARK_RANGE_METRES, NAMED_NEAREST, NAME_RANGE_METRES, ThingMarks, lineSeconds } from './marks.js';
+export type {
+  AttachedMarksOptions, DeciderMarkRule, MarkAnchors, MarkedSubject, ThingDecision, ThingLine, ThingMark, UnnamedCounts,
+} from './marks.js';
+export { AttachedMarks, NAME_LEAST_PROPERTY, ThingMarks, lineSeconds } from './marks.js';

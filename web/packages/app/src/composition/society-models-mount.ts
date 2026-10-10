@@ -14,7 +14,8 @@ import { problemSentence, problemWords } from '../ui/words/problems.js';
 import { ApiError } from '@exulanica/graph-client';
 import type { Credentials } from '../config.js';
 import {
-  SocietyModelsClient, type ModelRef, type NamedModelRef, type OutsideDecider, type SocietyModel, type SocietyModels,
+  SocietyModelsClient, type ModelRef, type NamedModelRef, type OutsideDecider, type PersonDecision, type SocietyModel,
+  type SocietyModels,
 } from '../society-models-api.js';
 import { WorldModelsClient, type SignalRole } from '../world-models-api.js';
 import {
@@ -94,6 +95,8 @@ export interface MountedSocietyModels {
   mindOf(subjectId: string): PersonMind | null;
   /** Every person a model is asked for now, by the same rule as `mindOf`. */
   runningModels(): ReadonlyMap<string, NamedModelRef>;
+  /** The society the last read was of, and each being's latest decision in it; null before the first read. */
+  latestDecisions(): { readonly societyId: string; readonly latest: readonly PersonDecision[] } | null;
   /**
    * Say why open models are not asked for the people here now (the playback control's
    * `model_minds_code`, as `modelMinds` words it), or null while they may be. While it is said,
@@ -291,6 +294,9 @@ export function mountSocietyModels(options: {
         ...(outside === undefined ? {} : { outside }),
         ...(played === undefined ? {} : { played }),
       };
+    },
+    latestDecisions() {
+      return view === null ? null : { societyId: view.societyId, latest: view.latest };
     },
     runningModels() {
       const running = new Map<string, NamedModelRef>();

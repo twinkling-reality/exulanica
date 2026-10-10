@@ -48,6 +48,8 @@
 
 /* A being a person plays (Play this one), and the lines they say: the signal yellow, fixed over the world. */
 .thing-mark-person {
+  /* "You" or "Played" is the whole answer to who decides: its letters keep the floor a name keeps. */
+  font-size: max(var(--thing-mark-name-least, 14px), 0.62rem);
   color: var(--color-world-mark-person-ink);
   background: var(--color-world-mark-person);
 }
@@ -64,6 +66,54 @@
   vertical-align: bottom;
 }
 
+/*
+ * A model's name is whole, always: it is never cut short, and its letters are never smaller than the
+ * floor the marks' catalog states, which the overlay sets on the name itself.
+ */
+.thing-mark-ai:not(.thing-mark-outside) .thing-mark-name {
+  max-width: none;
+  overflow: visible;
+}
+
+.thing-mark-name {
+  font-size: max(var(--thing-mark-name-least, 14px), 1em);
+}
+
+/* Their own routine decides: said only while the being is picked, quieter than a decider's name. */
+.thing-mark-routine {
+  /* Read from as far as a decider's name is: its letters keep the same floor. */
+  font-size: max(var(--thing-mark-name-least, 14px), 0.62rem);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: var(--color-world-mark-soft);
+}
+
+/* What the decider chose, opening under its name at a decision; its own words after, where any are served. */
+.thing-mark-decision {
+  display: grid;
+  gap: 0.14rem;
+  max-width: 17rem;
+  padding: 0.24rem 0.44rem 0.28rem;
+  /* What was chosen is read from as far as the name is: its letters keep the same floor. */
+  font: 400 max(var(--thing-mark-name-least, 14px), 0.76rem) / 1.3 var(--font-ui);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--color-world-mark-ink);
+  background: var(--color-world-mark-line);
+  border: 1px solid var(--color-world-mark-edge-soft);
+  border-radius: var(--radius-sm);
+}
+
+.thing-mark-decision[hidden],
+.thing-mark-said[hidden] {
+  display: none;
+}
+
+.thing-mark-said {
+  font-style: italic;
+  color: var(--color-world-mark-ink-muted);
+}
+
 /* Where a visitor this world's model runs came from, after its name. */
 .thing-mark-origin {
   font-weight: 400;
@@ -72,7 +122,8 @@
 }
 
 .thing-mark-label {
-  font: 500 0.66rem / 1.1 var(--font-ui);
+  /* The being's own word under a held name is read from as far as the name is: the same floor. */
+  font: 500 max(var(--thing-mark-name-least, 14px), 0.66rem) / 1.1 var(--font-ui);
   color: var(--color-world-mark-ink);
   text-shadow: 0 0 3px var(--color-world-mark-halo), 0 1px 2px var(--color-world-mark-halo);
 }

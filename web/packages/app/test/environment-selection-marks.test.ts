@@ -1,13 +1,15 @@
 // @vitest-environment happy-dom
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@exulanica/graph-client';
 import type { AtlasScene } from '@exulanica/atlas-core';
-import type { AttachedMarksOptions, MarkedSubject, PlacedThingRecord, ThingLayerOptions } from '@exulanica/atlas-react/things';
+import type { AttachedMarksOptions, MarkedSubject, PlacedThingRecord, ThingDecision, ThingLayerOptions } from '@exulanica/atlas-react/things';
 import { mountEnvironmentSelection } from '../src/composition/environment-selection.js';
 import { parseSociety, type SocietySnapshot } from '../src/society-api.js';
 import { parseSocietyControl } from '../src/society-control-api.js';
-import type { SocietyModels } from '../src/society-models-api.js';
+import type { PersonDecision, SocietyModels } from '../src/society-models-api.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 
@@ -19,7 +21,7 @@ vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('fetch failed'); 
 
 /*
  * Who runs each person of a saved world's society, marked over them: a model the models read says
- * is asked marks its person AI by its short name, a visitor is marked by the bridge it crossed
+ * is asked marks its person AI by its whole served name, a visitor is marked by the bridge it crossed
  * through as the door lists it, and nobody else wears a mark. The expected marks are the words
  * agreed with the card (CARD's design, section 3): "AI" and the model's first word; "from" a game;
  * "from outside" for a bridge the door does not list.
@@ -59,9 +61,12 @@ const { FakeLayer, FakeMarks, marksMade, layersMade, bridgeReads, workspace } = 
   const made: InstanceType<typeof Marks>[] = [];
   class Marks {
     readonly sets: ReadonlyMap<string, MarkedSubject>[] = [];
+    /** Each decision the page opened under a being's name, in order. */
+    readonly decisions: ThingDecision[] = [];
     destroyed = false;
     constructor(readonly options: AttachedMarksOptions) { made.push(this); }
     set(subjects: ReadonlyMap<string, MarkedSubject>) { (this.sets as ReadonlyMap<string, MarkedSubject>[]).push(subjects); }
+    showDecision(decision: ThingDecision) { this.decisions.push(decision); }
     destroy() { this.destroyed = true; }
   }
   return { FakeLayer: Layer, FakeMarks: Marks, marksMade: made, layersMade: layers, bridgeReads: { count: 0 }, workspace };
@@ -81,6 +86,17 @@ vi.mock('../src/door-bridges-api.js', () => ({
   },
 }));
 
+/** What bounds the marks, read here from the catalog file by each entry's key. */
+// Tests run from web/.
+const STATED = new Map((JSON.parse(readFileSync(
+  resolve('..', 'assets/catalogs/thing-presentation/decider-marks.v1.json'), 'utf8',
+)) as { entries: { key: string; value: number }[] }).entries.map((entry) => [entry.key, entry.value]));
+const DECIDER_RULE = {
+  nameLeastPx: STATED.get('name_least_px'), beingLeastPx: STATED.get('being_least_px'),
+  screenShare: STATED.get('screen_share_milli')! / 1000, linesAtOnce: STATED.get('lines_at_once'),
+  lineBaseMs: STATED.get('line_base_ms'), linePerCharacterMs: STATED.get('line_per_character_ms'), lineMostMs: STATED.get('line_most_ms'),
+};
+
 const WORLD = 'world:authored:saved';
 const version = {
   schemaVersion: 5, versionId: 'version', worldId: WORLD, sourceSnapshotId: 'snapshot', parentVersionId: null,
@@ -99,6 +115,10 @@ const person = (id: string, extra: Record<string, unknown>) => ({
 /** The minute the society is read at, and whether the knight is played (and by whom), as a test sets them. */
 let tick = 3;
 let knightPlayed: { readonly byYou: boolean } | null = null;
+/** Whether the routine's person states that they are indoors, or states nothing of it (null), as a test sets it. */
+let routineIndoors: boolean | null = null;
+/** Each being's latest decision as the models read serves it, as a test sets them. */
+let latestDecisions: PersonDecision[] = [];
 /** What the model's person is a being of, and whether it is among the people, as a test sets them. */
 const DRAKE = { source: 'workspace', sha256: 'd'.repeat(64) } as const;
 let modelsPersonKind: typeof KNIGHT | typeof DRAKE = KNIGHT;
@@ -112,7 +132,7 @@ const society = (): SocietySnapshot => parseSociety({
     input_sha256: 'b'.repeat(64),
     inhabitants: [
       ...(modelsPersonHere ? [person('knight-0', { kind: modelsPersonKind, came_by: 'placed', placed_id: 'knight-1' })] : []),
-      person('routine-0', { came_by: 'populated' }),
+      person('routine-0', { came_by: 'populated', ...(routineIndoors === null ? {} : { location: { node_id: 'home:1', edge: null, indoors: routineIndoors } }) }),
       person('player-0', { came_by: 'crossed', crossing: { arrival_id: 'arrival-1', bridge: 'blockgame', grant_id: 'grant-1' } }),
       person('stranger-0', { came_by: 'crossed', crossing: { arrival_id: 'arrival-2', bridge: 'elsewhere', grant_id: 'grant-2' } }),
     ],
@@ -137,7 +157,7 @@ const models = (): SocietyModels => ({
       : { subjectId: 'knight-0', model: null, choiceSeq: 3, refusal: null, played: knightPlayed },
     { subjectId: 'routine-0', model: QWEN, choiceSeq: 2, refusal: 'model_not_asked_here' },
   ],
-  latest: [], byModel: [], decisionsCounted: 0, decisionsMaximum: 0,
+  latest: latestDecisions, byModel: [], decisionsCounted: 0, decisionsMaximum: 0,
 });
 
 function mount() {
@@ -159,6 +179,7 @@ function mount() {
   const controls = { state: { x: 0, y: 1.68, z: 4 }, onInteract: vi.fn() as (() => void) | null, forward: () => ({ x: 0, y: 0, z: -1 }) };
   const binding = {
     app: { app: true }, camera: { forward: { x: 0, y: 0, z: -1 } }, controls, invalidate: vi.fn(),
+    // A saved world with no town under it: no generated tile and no district, so nothing here can be read from city records.
     regionRoots: new Map(), ownedDistrict: null, generatedTile: null, authoredSociety: crowd,
     memoryLayerVisible: false, onMemoryLayerChange: null, overlay: { root: overlayRoot },
   };
@@ -209,11 +230,18 @@ describe('marks over the people of a saved world\'s society', () => {
     expect(marks.options.anchors()).toBe(crowd);
     const subjects = marks.sets.at(-1)!;
     expect(Object.fromEntries(subjects)).toEqual({
-      'knight-0': { mark: { kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct' }, label: 'knight', spoken: 'run by an AI model, Qwen3 235B Instruct' },
+      'knight-0': { mark: { kind: 'ai', name: 'Qwen3 235B Instruct', full: 'Qwen3 235B Instruct' }, label: 'knight', spoken: 'run by an AI model, Qwen3 235B Instruct' },
       'player-0': { mark: { kind: 'from', label: 'from Block Game', full: 'From Block Game, decided from outside' }, label: null, spoken: 'From Block Game, decided from outside' },
       'stranger-0': { mark: { kind: 'from', label: 'from outside', full: 'Someone from outside this world' }, label: null, spoken: 'Someone from outside this world' },
+      // Its own routine decides for it: nothing at rest, and the answer for while it is the picked one.
+      'routine-0': { mark: null, picked: { kind: 'routine', label: 'Their own routine', full: 'Their own routine decides for them' }, label: null },
     });
+    // Three wear a mark; who decides for all four is counted on the canvas, and nobody here states
+    // that they are indoors, so all are in the street.
     expect(canvas.dataset['thingMarks']).toBe('3');
+    expect(JSON.parse(canvas.dataset['deciders']!)).toEqual({ models: 1, you: 0, played: 0, outside: 2, routine: 1, indoors: 0 });
+    // What bounds the marks is the catalog's rule, handed to the overlay.
+    expect(marks.options.rule).toEqual(DECIDER_RULE);
     // The door is asked once for a bridge it has not named, not on every refresh.
     expect(bridgeReads.count).toBe(1);
     // A pill picks its person as aiming does.
@@ -243,7 +271,7 @@ describe('marks over the people of a saved world\'s society', () => {
     tick = 4;
     [...document.querySelectorAll('button')].find((button) => button.textContent === 'Refresh persisted society')!.click();
     await settle();
-    expect(marks.sets.at(-1)!.get('knight-0')!.mark).toEqual({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct' });
+    expect(marks.sets.at(-1)!.get('knight-0')!.mark).toEqual({ kind: 'ai', name: 'Qwen3 235B Instruct', full: 'Qwen3 235B Instruct' });
     expect(layer.played.at(-1)).toBeNull();
     // Another person playing it: Played, and no ring here.
     knightPlayed = { byYou: false };
@@ -255,6 +283,74 @@ describe('marks over the people of a saved world\'s society', () => {
     mounted.dispose();
     knightPlayed = null;
     tick = 3;
+  });
+
+  it('counts a being indoors only where its own state says so: one that states nothing of it is in the street', async () => {
+    const counted = async (): Promise<{ indoors: number; routine: number }> => {
+      const { mounted, canvas } = mount();
+      await mounted.begin();
+      await settle();
+      const counts = JSON.parse(canvas.dataset['deciders']!) as { indoors: number; routine: number };
+      mounted.dispose();
+      return counts;
+    };
+    try {
+      routineIndoors = null;
+      expect(await counted()).toMatchObject({ indoors: 0, routine: 1 });
+      routineIndoors = false;
+      expect(await counted()).toMatchObject({ indoors: 0, routine: 1 });
+      // Stated indoors, it is counted so, and still one the routine decides for.
+      routineIndoors = true;
+      expect(await counted()).toMatchObject({ indoors: 1, routine: 1 });
+    } finally {
+      routineIndoors = null;
+    }
+  });
+
+  it('opens each decision a minute takes up under its decider, once, and none from before the visit', async () => {
+    const decided = (seq: number, extra: Partial<PersonDecision>): PersonDecision => ({
+      ...QWEN, subjectId: 'knight-0', decisionSeq: seq, baseTick: seq + 1, consumedTick: null, status: 'accepted',
+      reason: 'accepted', disposition: null, dispositionReason: null, chose: 'walk to the well', ...extra,
+    });
+    const refresh = async () => {
+      [...document.querySelectorAll('button')].find((button) => button.textContent === 'Refresh persisted society')!.click();
+      await settle();
+    };
+    try {
+      // Before the visit the knight's model had already chosen, and a minute had acted on it.
+      tick = 3;
+      latestDecisions = [decided(1, { consumedTick: 3, disposition: 'applied' })];
+      const { mounted } = mount();
+      await mounted.begin();
+      await settle();
+      const marks = marksMade.at(-1)!;
+      expect(marks.decisions).toEqual([]);
+      // A new decision is asked: nothing opens until a minute takes it up.
+      tick = 4;
+      latestDecisions = [decided(2, { chose: 'say something to the lantern spirit' })];
+      await refresh();
+      expect(marks.decisions).toEqual([]);
+      // The minute acted on it: it opens under the knight, saying what was chosen and holding an
+      // empty place for the decider's own words, which this decision contract does not serve.
+      tick = 5;
+      latestDecisions = [decided(2, { chose: 'say something to the lantern spirit', consumedTick: 5, disposition: 'applied' })];
+      await refresh();
+      expect(marks.decisions).toEqual([{ subjectId: 'knight-0', chose: 'Chose “say something to the lantern spirit”.', said: null }]);
+      // Read again with nothing new, it does not open a second time.
+      await refresh();
+      expect(marks.decisions.length).toBe(1);
+      // A decision whose model was not followed opens at once, saying so and that the routine decided.
+      tick = 6;
+      latestDecisions = [decided(3, { status: 'rejected', reason: 'stale_state' })];
+      await refresh();
+      expect(marks.decisions.length).toBe(2);
+      expect(marks.decisions[1]!.subjectId).toBe('knight-0');
+      expect(marks.decisions[1]!.chose).toMatch(/^Not followed: .+\. Its routine decided\.$/u);
+      mounted.dispose();
+    } finally {
+      latestDecisions = [];
+      tick = 3;
+    }
   });
 
   it('names a being of a kind its workspace keeps by its maker\'s word while it is here, and forgets the word when it has gone', async () => {

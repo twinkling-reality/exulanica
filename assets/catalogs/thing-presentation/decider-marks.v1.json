@@ -1,0 +1,55 @@
+{
+  "profile": "exulanica.decider-marks/v1",
+  "note": "How a page shows who decides for a being, over the being, in any kind of world: the name line (an open model's whole name, a person, an outside program) and the decision line that opens under it when a choice is taken up. Every value here is presentation: nothing a society records is changed by it. What is drawn is bounded by what can be read on a screen, never by how many beings a model decides for. A later version is another file beside this one.",
+  "entries": [
+    {
+      "key": "name_least_px",
+      "value": 14,
+      "unit": "css_pixel",
+      "class": "chosen_default",
+      "reason": "The model's name is never drawn in letters smaller than this, at any distance it is drawn: the size below which a name over a being was seen as a mark and not read (the pill it replaces was about 10 px, and a person watching a town said they saw nothing showing which beings a model decides for)."
+    },
+    {
+      "key": "being_least_px",
+      "value": 22,
+      "unit": "css_pixel",
+      "class": "chosen_default",
+      "reason": "A name is drawn over a being that stands at least this tall on the screen. Below it the being is seen to be there and too small for what it does to be read, and a name 14 px tall would be a label on nothing: a person 1.7 m tall is 22 px at 60 m on a 1080 px frame with a 70 degree vertical field. It replaces a fixed 60 m, which meant the same on that one frame and something else on every other. A being that is picked, speaking or at a decision is named however small it stands."
+    },
+    {
+      "key": "screen_share_milli",
+      "value": 80,
+      "unit": "thousandth",
+      "class": "chosen_budget",
+      "reason": "How much of the view names may cover, in thousandths of its area, spent nearest first: the budget of what a person can read over a world before the labels are the picture. On a 1920 by 1080 frame it is about forty names of one line. A name that does not fit is not drawn and is counted, so five beings with minds show five names and five thousand show the nearest that fit and how many more there are. It replaces a fixed 64 pills. A being that is picked, speaking or at a decision is named outside this budget."
+    },
+    {
+      "key": "lines_at_once",
+      "value": 4,
+      "unit": "count",
+      "class": "chosen_budget",
+      "reason": "How many lines of speech are open over the world at once: more than a person can follow are not all read, and the next line said takes the place of the one open longest. It is a budget of reading, not of who may speak: every line said is in the society's events and on its speaker's card."
+    },
+    {
+      "key": "line_base_ms",
+      "value": 2000,
+      "unit": "millisecond",
+      "class": "chosen_default",
+      "reason": "A line of speech, and a decision line, stays open at least this long, however short its words: the time to see that it opened and whose it is."
+    },
+    {
+      "key": "line_per_character_ms",
+      "value": 55,
+      "unit": "millisecond",
+      "class": "chosen_default",
+      "reason": "And this much longer for each character of its words: about eighteen characters a second, an unhurried reading pace for a short line."
+    },
+    {
+      "key": "line_most_ms",
+      "value": 9000,
+      "unit": "millisecond",
+      "class": "chosen_default",
+      "reason": "Never longer than this: a line open past it is still covering the world when the next minute's lines arrive at the default pace of a minute in eight seconds."
+    }
+  ]
+}

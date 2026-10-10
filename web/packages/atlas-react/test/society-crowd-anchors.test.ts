@@ -84,6 +84,12 @@ describe('where a mark over a person hangs', () => {
     // Inside premises, or unknown: no mark hangs anywhere.
     expect(crowd.anchorOf('indoors-1', out)).toBe(false);
     expect(crowd.anchorOf('nobody', out)).toBe(false);
+    // How tall each stands as drawn, for a mark to judge how large they are on the screen: the near
+    // figure's standing height, the far figure's own, and none for one not drawn outdoors.
+    expect(crowd.heightOf('knight-1')).toBe(STANDING);
+    expect(crowd.heightOf('villager-far')).toBe(crowd.farAppearance('villager-far').heightMetres);
+    expect(crowd.heightOf('indoors-1')).toBeNull();
+    expect(crowd.heightOf('nobody')).toBeNull();
   });
 
   it('hangs no mark over a person while their figure is hidden', () => {
@@ -95,6 +101,66 @@ describe('where a mark over a person hangs', () => {
     const root = (crowd as unknown as { near: Map<string, { root: pc.Entity }> }).near.get('knight-1')!.root;
     root.enabled = false;
     expect(crowd.anchorOf('knight-1', out)).toBe(false);
+  });
+});
+
+describe('where a mark hangs over someone on a seat', () => {
+  /** A drawn mesh under a figure whose stated bounds top out at `top` metres, in world space. */
+  const drawnTo = (root: pc.Entity, top: number): void => {
+    const body = new pc.Entity('body');
+    root.addChild(body);
+    (body as unknown as { c: Record<string, unknown> }).c['render'] = {
+      enabled: true, entity: body,
+      meshInstances: [{ visible: true, aabb: new pc.BoundingBox(new pc.Vec3(0, top / 2, 0), new pc.Vec3(0.3, top / 2, 0.3)) }],
+    };
+  };
+  const seatedCrowd = () => {
+    const crowd = setup();
+    crowd.setFigures(figures);
+    crowd.set(state([person('knight-1', [2000, 0], { kind: KNIGHT })]), [0, 0]);
+    const inner = crowd as unknown as { near: Map<string, { root: pc.Entity }>; walkers: Map<string, { seatBlend: number }> };
+    return { crowd, root: inner.near.get('knight-1')!.root, walker: inner.walkers.get('knight-1')! };
+  };
+
+  it('hangs just over the figure as drawn, not a head above it, and over the box while they stand', () => {
+    const { crowd, root, walker } = seatedCrowd();
+    // Two drawn meshes (a body and its legs, say): the top is the highest of them.
+    drawnTo(root, 1.25);
+    drawnTo(root, 0.9);
+    const out = new pc.Vec3();
+    // Standing: the box they are picked by, whatever the drawing's bounds say.
+    expect(crowd.anchorOf('knight-1', out)).toBe(true);
+    expect(out.y).toBeCloseTo(STANDING + CLEARANCE, 9);
+    // Lowering onto the seat, and seated: the top of the figure as drawn.
+    for (const blend of [0.4, 1]) {
+      walker.seatBlend = blend;
+      expect(crowd.anchorOf('knight-1', out)).toBe(true);
+      expect(out.y).toBeCloseTo(1.25 + CLEARANCE, 9);
+      // Where it hangs across the ground is the person's own place, as before.
+      expect(out.x).toBeCloseTo(10, 9);
+      expect(out.z).toBeCloseTo(3, 9);
+    }
+  });
+
+  it('never hangs above the box, and keeps the box where the drawing states no bounds', () => {
+    const tall = seatedCrowd();
+    tall.walker.seatBlend = 1;
+    const out = new pc.Vec3();
+    // Nothing drawn states bounds: the box.
+    expect(tall.crowd.anchorOf('knight-1', out)).toBe(true);
+    expect(out.y).toBeCloseTo(STANDING + CLEARANCE, 9);
+    // Something drawn with them reaches higher than they stand (a raised arm, a chair back): the box.
+    drawnTo(tall.root, STANDING + 0.6);
+    expect(tall.crowd.anchorOf('knight-1', out)).toBe(true);
+    expect(out.y).toBeCloseTo(STANDING + CLEARANCE, 9);
+    // A mesh that is not shown lowers nothing.
+    const hidden = seatedCrowd();
+    hidden.walker.seatBlend = 1;
+    drawnTo(hidden.root, 1.25);
+    const render = (hidden.root.children[hidden.root.children.length - 1] as unknown as { c: { render: { meshInstances: { visible: boolean }[] } } }).c.render;
+    render.meshInstances[0]!.visible = false;
+    expect(hidden.crowd.anchorOf('knight-1', out)).toBe(true);
+    expect(out.y).toBeCloseTo(STANDING + CLEARANCE, 9);
   });
 });
 

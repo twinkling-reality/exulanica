@@ -51,6 +51,7 @@ const { FakeLayer, FakeMarks, bridgeReads } = vi.hoisted(() => {
     constructor(readonly options: AttachedMarksOptions) { Marks.last = this; }
     set(subjects: ReadonlyMap<string, MarkedSubject>) { (this.sets as ReadonlyMap<string, MarkedSubject>[]).push(subjects); }
     showLine(line: ThingLine) { this.lines.push(line); }
+    showDecision() {}
     destroy() { this.destroyed = true; }
   }
   return { FakeLayer: Layer, FakeMarks: Marks, bridgeReads: { count: 0, answer: Promise.resolve() as Promise<void> } };
@@ -231,7 +232,7 @@ describe('lines said in a saved world', () => {
     ]);
     const [knight, player] = marks.lines;
     // A model's line wears the AI mark naming the model its own event names, by the models read's served name.
-    expect(knight!.mark).toEqual({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct' });
+    expect(knight!.mark).toEqual({ kind: 'ai', name: 'Qwen3 235B Instruct', full: 'Qwen3 235B Instruct' });
     // Three knights are drawn, so each is told apart by its number; the model is named after.
     expect(knight!.header).toBe('knight 1 to knight 2 · Qwen3 235B Instruct');
     expect(knight!.spoken).toBe('run by an AI model, Qwen3 235B Instruct');

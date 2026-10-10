@@ -175,6 +175,11 @@ export class AuthoredRegionSociety {
     return this.crowd.anchorOf(id, out);
   }
 
+  /** How tall an inhabitant stands as drawn, in metres (`Crowd.heightOf`). */
+  heightOf(id: string): number | null {
+    return this.crowd.heightOf(id);
+  }
+
   /** Where an inhabitant's feet are drawn, in world space (`SocietyCrowd.groundOf`), or false when not drawn outdoors. */
   groundOf(id: string, out: pc.Vec3): boolean {
     return this.crowd.groundOf(id, out);

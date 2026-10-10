@@ -246,6 +246,25 @@ const NEAR_LIMIT = NEAR_INHABITANT_BUDGET;
 const REFRESH_METRES = 4;
 /** How far over the top of a person's box a mark over them hangs. */
 const MARK_CLEARANCE_METRES = 0.18;
+
+/**
+ * The top of a figure as it is drawn now, in world space, in metres: the highest point of the
+ * bounds its drawn meshes state in the pose they are in. Null where it draws no mesh that states
+ * bounds (nothing loaded yet, or a drawing with none).
+ */
+function drawnTop(root: pc.Entity): number | null {
+  let top: number | null = null;
+  for (const render of root.findComponents('render') as pc.RenderComponent[]) {
+    if (!render.enabled || !render.entity.enabled) continue;
+    for (const instance of render.meshInstances ?? []) {
+      if (!instance.visible) continue;
+      const bounds = instance.aabb;
+      const y = bounds.center.y + bounds.halfExtents.y;
+      if (Number.isFinite(y) && (top === null || y > top)) top = y;
+    }
+  }
+  return top;
+}
 const DEFAULT_INTERVAL_MS = 1_850;
 const MILLISECONDS_PER_SECOND = 1000;
 /** The seconds a first drawing is handed: it has no earlier one to measure from. */
@@ -824,15 +843,34 @@ export class SocietyCrowd {
   /**
    * Where a mark over an inhabitant hangs, in world space: just over the top of the box they are
    * drawn and picked by, written into `out`. False when they are not drawn outdoors now.
+   *
+   * Someone lowering onto a seat or sitting on it is not as tall as their box: the mark then hangs
+   * just over the top of the figure as it is drawn (`drawnTop`), so it stays over their head and
+   * not a head above it. A far figure, and a near one whose drawing states no bounds, keeps the box.
    */
   anchorOf(id: string, out: pc.Vec3): boolean {
     const walker = this.drawnOutdoors(id);
     if (walker === null) return false;
     const [x, y, z] = walker.drawn;
-    const height = this.near.get(id)?.standingHeight ?? this.far.appearanceOf(id).heightMetres;
+    const renderable = this.near.get(id);
+    const height = renderable?.standingHeight ?? this.far.appearanceOf(id).heightMetres;
     out.set(x, y + height + MARK_CLEARANCE_METRES, z);
     this.root.getWorldTransform().transformPoint(out, out);
+    if (walker.seatBlend > 0 && renderable !== undefined) {
+      const top = drawnTop(renderable.root);
+      // Never above the box: a raised arm or a tall chair back drawn with them lifts no name.
+      if (top !== null && top + MARK_CLEARANCE_METRES < out.y) out.y = top + MARK_CLEARANCE_METRES;
+    }
     return true;
+  }
+
+  /**
+   * How tall an inhabitant stands as drawn, in metres: the height of the box they are drawn and
+   * picked by. Null when they are not drawn outdoors now.
+   */
+  heightOf(id: string): number | null {
+    if (this.drawnOutdoors(id) === null) return null;
+    return this.near.get(id)?.standingHeight ?? this.far.appearanceOf(id).heightMetres;
   }
 
   /**

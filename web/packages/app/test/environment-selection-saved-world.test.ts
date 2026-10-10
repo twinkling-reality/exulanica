@@ -240,7 +240,7 @@ describe('a saved world holds inhabitants only when the person asks', () => {
       .toBe('Resting at Marker plate 1, 2 more simulated minutes. Because you asked them to go there.');
     // The recorded explanation and how the person is drawn stay below, in the details.
     const details = [...inspector.querySelectorAll('dt')].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
-    expect(details).toContainEqual(['Recorded explanation', 'Person 0 (simulated) rests at the plate.']);
+    expect(details).toContainEqual(['Recorded by the engine', 'Person 0 (simulated) rests at the plate.']);
     // Resting is what the simulation says; at a plate, which has no seat, a catalog person sits on
     // the ground in front of the place.
     expect(details).toContainEqual(['Drawn as', 'Sitting on the ground in front of the place.']);

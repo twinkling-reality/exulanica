@@ -98,10 +98,12 @@ import { CONVERSATION_DISTANCE_METRES } from '../society-presentation.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
 import { LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings, THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type MountedThings, type ThingLookChosenDetail, type ThingPickDetail, type ThingPickVia, type ThingsDependencies, visitorsOf } from './things.js';
 import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
+import { DECIDER_MARKS } from '../decider-marks.js';
+import { DecisionWatch, deciderCounts, statedIndoors } from './thing-decisions.js';
 import { mountPlayThisOne, type MountedPlayThisOne, type PlayPick } from './play-this-one.js';
 import { SocietyPlayClient } from '../society-play-api.js';
 import { WorldEntryClient } from '../world-entry-api.js';
-import { markLabel, markOf, type MarkInput } from './thing-marks.js';
+import { ROUTINE_MARK, markLabel, markOf, type MarkInput } from './thing-marks.js';
 import { LineWatch, thingLine } from './thing-lines.js';
 import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
 import { DoorGrantsClient, type DoorGrant } from '../door-grants-api.js';
@@ -620,6 +622,7 @@ export function mountEnvironmentSelection(
   const visitorGates = new VisitorGates();
   /** The lines said since the page first read the society. */
   const lineWatch = new LineWatch();
+  const decisionWatch = new DecisionWatch();
   /** Crossings read but not yet told, while the door says which bridge they came through. */
   let heldNotices: readonly FreshEvent[] = [];
   /** Labels of kinds the shipped list does not hold, from their own documents; null where unreadable. */
@@ -1018,7 +1021,8 @@ export function mountEnvironmentSelection(
       details: [
         ...(citedWords?.inhabitantId === id ? [['Cited by the Companion', citedWords.text] as const] : []),
         ...(words !== null ? [
-          ['Recorded explanation', inhabitant.explanation?.summary ?? 'Unavailable'],
+          // The engine's own sentence about what the being is doing: never a model's reasoning, and labelled so.
+          ['Recorded by the engine', inhabitant.explanation?.summary ?? 'Unavailable'],
           ...(societyModels?.personDetails(id) ?? []),
           ...(resting ? [['Drawn as', restDrawn] as const] : []),
         ] as const : []),
@@ -2156,6 +2160,7 @@ export function mountEnvironmentSelection(
       onRead: () => {
         if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) inspectInhabitant(selectedInhabitant, false);
         refreshMarks();
+        showDecisions();
         // A being this person plays (after a reload, or from another tab) takes its band up again.
         if (playThisOne?.playing() == null) {
           const mine = [...(societyModels?.playedSubjects() ?? new Map<string, { readonly byYou: boolean }>())]
@@ -2196,7 +2201,10 @@ export function mountEnvironmentSelection(
    * Mark who runs each person of the drawn state, decided by the one function the card shares
    * (`markOf`): who plays them, else the model asked for them by the last models read, or the bridge
    * a visitor crossed through. A visitor whose bridge is not yet known asks the door, at most once a
-   * minute. The one the viewer plays wears its ring (Play this one).
+   * minute. The one the viewer plays wears its ring (Play this one). A being its own routine decides
+   * for wears nothing, and says so while it is the picked one. The canvas states how many beings
+   * wear a mark (`data-thing-marks`) and who decides for how many, with how many are indoors
+   * (`data-deciders`), read from each being's own state: one that states no `indoors` is in the street.
    */
   function refreshMarks(state: OwnedSocietyState | null = renderedSnapshot?.state ?? null): void {
     if (marks === null) return;
@@ -2204,6 +2212,8 @@ export function mountEnvironmentSelection(
     const running = societyModels?.runningModels() ?? new Map();
     const played = societyModels?.playedSubjects() ?? new Map();
     const subjects = new Map<string, MarkedSubject>();
+    const counted: { mark: ReturnType<typeof markOf>; indoors: boolean }[] = [];
+    let worn = 0;
     let unknownBridge = false;
     let unnamedAgent = false;
     for (const person of people) {
@@ -2213,14 +2223,23 @@ export function mountEnvironmentSelection(
       if (crossing !== null && crossing.decided_by !== 'world' && bridges?.get(crossing.bridge)?.ai === true
         && grants?.get(crossing.grant_id)?.declared == null) unnamedAgent = true;
       const mark = markOf(markInputFor(person, running, played));
-      if (mark === null) continue;
+      counted.push({ mark, indoors: statedIndoors(person) });
       const kind = person.kind;
       const label = kind === undefined ? null : kindLabelOf(kind);
+      if (mark === null) {
+        // Its own routine decides: nothing at rest, and the answer while it is the picked one.
+        subjects.set(person.id, { mark: null, picked: ROUTINE_MARK, label });
+        continue;
+      }
+      worn += 1;
       subjects.set(person.id, { mark, label, spoken: markLabel(mark) });
     }
     marks.set(subjects);
     things?.setPlayed(people.find((person) => played.get(person.id)?.byYou === true)?.id ?? null);
-    if (deps.env.canvas) deps.env.canvas.dataset['thingMarks'] = String(subjects.size);
+    if (deps.env.canvas) {
+      deps.env.canvas.dataset['thingMarks'] = String(worn);
+      deps.env.canvas.dataset['deciders'] = JSON.stringify(deciderCounts(counted));
+    }
     if (unknownBridge) readBridges();
     if (unnamedAgent) readGrants();
   }
@@ -2236,6 +2255,16 @@ export function mountEnvironmentSelection(
     const declared = crossing === null ? null : grants?.get(crossing.grant_id)?.declared ?? null;
     const playedNow = played.get(person.id);
     return { running: running.get(person.id) ?? null, crossing, bridge, declared, ...(playedNow === undefined ? {} : { played: playedNow }) };
+  }
+
+  /**
+   * Open each decision a minute has taken up since the page first read the society, under its
+   * decider's name in the world (`DecisionWatch`): what was chosen and what came of it.
+   */
+  function showDecisions(): void {
+    const read = societyModels?.latestDecisions() ?? null;
+    if (marks === null || read === null) return;
+    for (const decision of decisionWatch.take(read.societyId, read.latest)) marks.showDecision(decision);
   }
 
   /**
@@ -2745,6 +2774,8 @@ export function mountEnvironmentSelection(
         anchors: () => atlas.authoredSociety ?? null,
         selected: () => selectedInhabitant,
         onPick: (id) => { inspectInhabitant(id); },
+        // What bounds the marks is the catalog's: a floor for a name's letters and a share of the view.
+        rule: DECIDER_MARKS,
         invalidate: () => atlas.invalidate(),
       });
     }
@@ -3090,6 +3121,7 @@ export function mountEnvironmentSelection(
       stopLooksTimer();
       visitorWatch.reset();
       lineWatch.reset();
+      decisionWatch.reset();
       heldNotices = [];
       documentLabels.clear();
       kindsReading.clear();

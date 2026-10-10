@@ -9,16 +9,21 @@
  * with where it came from, or where it came from alone while its routine runs it. A being a person
  * plays (Play this one) wears the person mark while they play it, whatever its mind: "You" to the one
  * playing, "Played" to everyone else; its lines say a person played it, never who.
+ *
+ * A model is named by its whole served name, never a part of it. A being its own routine decides
+ * for wears nothing in the world, and has an answer all the same for when it is picked
+ * (`ROUTINE_MARK`): its own routine.
  */
 
 import type { NamedModelRef } from '../society-models-api.js';
 
 /**
- * The drawn mark. `short` is the pill's words ("Qwen3"), `full` what a screen reader says and a
- * line's header names. The drawing layer declares the same shape for the pills it draws.
+ * The drawn mark. An AI's `name` is the name over the being: a model's whole served name ("Qwen3
+ * 235B Instruct"), or the name an outside agent gave for itself; `full` is what a screen reader
+ * says and a line's header names. The drawing layer declares the same shape for the marks it draws.
  */
 export type ThingMark =
-  | { readonly kind: 'ai'; readonly short: string; readonly full: string; readonly outside?: true; readonly from?: string }
+  | { readonly kind: 'ai'; readonly name: string; readonly full: string; readonly outside?: true; readonly from?: string }
   | { readonly kind: 'from'; readonly label: string; readonly full: string }
   /** Played by a person: `label` the pill's word, `mine` whether the viewer is the one playing. */
   | { readonly kind: 'person'; readonly label: string; readonly full: string; readonly mine: boolean; readonly from?: string };
@@ -46,10 +51,12 @@ export interface MarkInput {
 /** What a mark naming no model says it is run by. */
 const UNNAMED_MODEL = 'an AI model';
 
-/** The first word of a served model name: "Qwen3 235B Instruct" is "Qwen3" on a pill. */
-function shortName(name: string): string {
-  return name.trim().split(/\s+/u)[0] ?? name;
-}
+/**
+ * What a being its own routine decides for wears while it is picked, and only then: the world's
+ * routine is who decides for most beings in any world, so it is never painted on all of them, and
+ * the answer is there for each when asked for.
+ */
+export const ROUTINE_MARK = { kind: 'routine', label: 'Their own routine', full: 'Their own routine decides for them' } as const;
 
 /** Where a visitor the world decides for came from, by its bridge's label; undefined for anyone else. */
 function worldVisitorOrigin(input: MarkInput): string | undefined {
@@ -69,7 +76,7 @@ export function markOf(input: MarkInput): ThingMark | null {
   if (input.crossing != null && input.crossing.decided_by === 'world') {
     const origin = input.bridge?.label ?? 'outside';
     if (input.running === null) return { kind: 'from', label: `from ${origin}`, full: `From ${origin}, run by this world` };
-    return { kind: 'ai', short: shortName(input.running.name), full: input.running.name, from: origin };
+    return { kind: 'ai', name: input.running.name, full: input.running.name, from: origin };
   }
   if (input.crossing != null) {
     const bridge = input.bridge ?? null;
@@ -78,13 +85,13 @@ export function markOf(input: MarkInput): ThingMark | null {
     const name = input.declared?.name ?? null;
     return {
       kind: 'ai',
-      short: name ?? 'agent',
+      name: name ?? 'agent',
       full: name === null ? 'An outside AI agent' : `An outside AI agent, ${name}`,
       outside: true,
     };
   }
   if (input.running === null) return null;
-  return { kind: 'ai', short: shortName(input.running.name), full: input.running.name };
+  return { kind: 'ai', name: input.running.name, full: input.running.name };
 }
 
 /** What a screen reader says for a mark, on the card and over a being. */
@@ -102,7 +109,7 @@ export function markLabel(mark: ThingMark): string {
 export type LineDecider = 'model' | 'external' | 'person';
 
 /** The plain AI mark of a model's line when the page does not know which model wrote it. */
-export const AN_AI_MODEL: ThingMark = { kind: 'ai', short: 'AI', full: UNNAMED_MODEL };
+export const AN_AI_MODEL: ThingMark = { kind: 'ai', name: 'AI', full: UNNAMED_MODEL };
 
 const FROM_OUTSIDE: ThingMark = { kind: 'from', label: 'from outside', full: 'Someone from outside this world' };
 
@@ -138,6 +145,6 @@ export function lineMarkOf(input: LineMarkInput): ThingMark | null {
   // A model's line keeps where a visitor the world decides for came from, played now or not.
   const from = (speaker?.kind === 'ai' && speaker.outside !== true) || speaker?.kind === 'person' ? speaker.from : undefined;
   const model = input.model ?? null;
-  if (model === null) return from === undefined ? AN_AI_MODEL : { kind: 'ai', short: 'AI', full: UNNAMED_MODEL, from };
-  return { kind: 'ai', short: shortName(model.name), full: model.name, ...(from === undefined ? {} : { from }) };
+  if (model === null) return from === undefined ? AN_AI_MODEL : { kind: 'ai', name: 'AI', full: UNNAMED_MODEL, from };
+  return { kind: 'ai', name: model.name, full: model.name, ...(from === undefined ? {} : { from }) };
 }

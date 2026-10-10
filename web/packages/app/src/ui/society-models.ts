@@ -205,6 +205,22 @@ export function latestDecisionWords(decision: PersonDecision): string {
 }
 
 /**
+ * A decision as the line under its decider's name says it in the world, or null while no minute has
+ * taken it up: what was chosen and what came of it. The name is on the line above, so it is not
+ * said again. It says what was chosen and never why the decider chose it: a decision records no
+ * reason of its decider's. Where it was not acted on, the why is the minute's, by its code.
+ */
+export function decisionLineWords(decision: PersonDecision): string | null {
+  if (decision.status !== 'accepted') return `Not followed: ${decisionWords(decision.reason)}. Its routine decided.`;
+  if (decision.disposition === null) return null;
+  const chose = `Chose “${decision.chose ?? 'an action'}”`;
+  if (decision.disposition === 'applied') return `${chose}.`;
+  const why = decisionWords(decision.dispositionReason ?? decision.disposition);
+  if (decision.disposition === 'superseded') return `${chose}, but ${why}, and that came first.`;
+  return `${chose}, but ${why}, so its routine decided.`;
+}
+
+/**
  * What one model's decisions came to, in a sentence. Each decision not acted on is counted once
  * under why, as the server counts it: the receipt's reason when the model was not followed, or
  * what the minute found when it was followed and could not be acted on.

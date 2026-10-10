@@ -86,7 +86,7 @@ describe('thingLine', () => {
     const drawn = thingLine(line, null, words({ knight: 2, lantern_spirit: 1 }));
     expect(drawn).toEqual({
       subjectId: 'knight-0', text: 'Who goes there?', header: 'knight 2 to lantern spirit · Qwen3 235B Instruct',
-      mark: { kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct' }, spoken: 'run by an AI model, Qwen3 235B Instruct',
+      mark: { kind: 'ai', name: 'Qwen3 235B Instruct', full: 'Qwen3 235B Instruct' }, spoken: 'run by an AI model, Qwen3 235B Instruct',
     });
   });
 
