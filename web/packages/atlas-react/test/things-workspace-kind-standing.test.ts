@@ -7,7 +7,7 @@ import { ThingCrowdFigures, type ThingCrowdRenderable } from '../src/playcanvas/
 import { RigidOnBonesFigure } from '../src/playcanvas/things/rigid-on-bones.js';
 import { ThingLibrary, type HeldThings } from '../src/playcanvas/things/library.js';
 import { ThingLayer, type PlacedThingRecord } from '../src/playcanvas/things/thing-layer.js';
-import { canonicalBytes, servedLibrary, sha256 } from './things-fixtures.js';
+import { canonicalBytes, servedLibrary, sha256, until } from './things-fixtures.js';
 
 /*
  * A thing of a kind its workspace keeps (a creature drafted from a person's words) lives in no
@@ -120,6 +120,7 @@ async function setup() {
     { thingId: 'sword-1', kind: served.kindRef('sword', 1), regionId: 'r', transform: at(1000, 0), removed: false },
   ] satisfies PlacedThingRecord[]);
   for (let i = 0; i < 8; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+  await until(() => ['creature-1', 'knight-1', 'sword-1'].every((id) => layer.figureOf(id) !== null) || layer.misses.length > 0, 'the three placed figures');
   return { layer, served, device, region };
 }
 
@@ -170,6 +171,7 @@ describe('a being of a kind its workspace keeps, as one of a society\'s people',
     expect(named.key).toBe(`workspace/${kindDigest}|none`);
     const renderable = named.factory(device, region, { societyId: 'society', branchId: 'branch', inhabitantId: 'p-creature' }, 'near') as ThingCrowdRenderable;
     for (let i = 0; i < 8; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    await until(() => renderable.figure !== null || figures.misses.length > 0, 'the creature\'s figure');
     expect(figures.misses).toEqual([]);
     // Its figure is the sketch on its own drafted plan: the three joints the plan states.
     expect(renderable.figure).toBeInstanceOf(RigidOnBonesFigure);
@@ -178,6 +180,7 @@ describe('a being of a kind its workspace keeps, as one of a society\'s people',
     const gone = figures.figureFor({ ...person, id: 'p-gone', kind: { source: 'workspace', sha256: 'e'.repeat(64) } })!;
     gone.factory(device, region, { societyId: 'society', branchId: 'branch', inhabitantId: 'p-gone' }, 'near');
     for (let i = 0; i < 8; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    await until(() => figures.misses.length > 0, 'the miss of an erased kind');
     expect(figures.misses.map((miss) => [miss.subjectId, miss.reason])).toEqual([['p-gone', 'not_in_library']]);
   });
 });

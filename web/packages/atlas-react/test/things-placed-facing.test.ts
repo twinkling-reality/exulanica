@@ -6,7 +6,7 @@ import type { OwnedSocietyState, SocietyInhabitantSnapshot } from '../src/playca
 import type { LookDrawing } from '../src/playcanvas/things/documents.js';
 import { ThingCrowdFigures } from '../src/playcanvas/things/crowd-figures.js';
 import { ThingLayer, type PlacedThingRecord } from '../src/playcanvas/things/thing-layer.js';
-import { servedLibrary } from './things-fixtures.js';
+import { servedLibrary, until } from './things-fixtures.js';
 import { ThingLibrary } from '../src/playcanvas/things/library.js';
 import { serveFixturePeople } from './served-people.js';
 
@@ -80,6 +80,7 @@ async function drawnBothWays(yawMicroradians: number, figuresFirst: boolean) {
   await layer.setPlaced([record]);
   step(layer);
   await settle();
+  await until(() => layer.figureOf('knight-1') !== null, 'the placed knight\'s figure');
   step(layer);
   const byLayer = front(layer.figureOf('knight-1')!.root);
   const figures = new ThingCrowdFigures({
@@ -97,6 +98,7 @@ async function drawnBothWays(yawMicroradians: number, figuresFirst: boolean) {
   if (!figuresFirst) crowd.setFigures(figures);
   crowd.update(1_000);
   await settle();
+  await until(() => figures.figureOf('p-knight') !== null, 'the knight\'s figure in the crowd');
   crowd.update(1_000 + 1000 / 60);
   const byCrowd = front(figures.figureOf('p-knight')!.root);
   return { byLayer, byCrowd, crowd, figures, served, knight };
@@ -130,6 +132,7 @@ describe('a placed being faces as it was placed, whoever draws it', () => {
     crowd.refreshFigures();
     crowd.update(120_100);
     await settle();
+    await until(() => figures.figureOf('p-knight') !== null, 'the knight\'s figure, asked again');
     crowd.update(120_200);
     const after = front(figures.figureOf('p-knight')!.root);
     expect(after[0]).toBeCloseTo(1, 6);

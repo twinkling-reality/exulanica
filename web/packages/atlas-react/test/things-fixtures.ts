@@ -67,3 +67,17 @@ export function servedLibrary(): ServedLibrary {
     },
   };
 }
+
+/**
+ * Wait until `ready()` holds. A figure is made after its library reads and their digest checks,
+ * which take as long as the machine lets them: a test that counts a fixed number of turns of the
+ * event loop instead reads a figure that is not there yet on a busy machine. Fails by name after
+ * `limitMs`, so a figure that is never made says what was waited for.
+ */
+export async function until(ready: () => boolean, what: string, limitMs = 10_000): Promise<void> {
+  const started = Date.now();
+  while (!ready()) {
+    if (Date.now() - started > limitMs) throw new Error(`waited ${limitMs} ms for ${what}`);
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+}

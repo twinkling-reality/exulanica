@@ -9,7 +9,7 @@ import { readKindDrawing, type LookDrawing } from '../src/playcanvas/things/docu
 import { ThingFigureMaker } from '../src/playcanvas/things/figure-maker.js';
 import { ThingLibrary, type HeldThings } from '../src/playcanvas/things/library.js';
 import { ringRadius } from '../src/playcanvas/things/ring.js';
-import { canonicalBytes, servedLibrary, sha256 } from './things-fixtures.js';
+import { canonicalBytes, servedLibrary, sha256, until } from './things-fixtures.js';
 
 /*
  * A body whose kind states its extent is picked over the ground it covers and turns no faster than
@@ -176,6 +176,7 @@ describe('a drafted body walked by the crowd', () => {
     const identity: InhabitantIdentity = { societyId: 'society', branchId: 'main', inhabitantId: 'p-dragon' };
     const renderable = figures.figureFor(person)!.factory(app.graphicsDevice, app.root, identity, 'near') as ThingCrowdRenderable;
     await settle();
+    await until(() => renderable.figure !== null || figures.misses.length > 0, 'the dragon\'s figure');
     expect(figures.misses).toEqual([]);
     expect(renderable.figure).not.toBeNull();
     return renderable;

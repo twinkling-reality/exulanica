@@ -7,7 +7,7 @@ import { RigidOnBonesFigure } from '../src/playcanvas/things/rigid-on-bones.js';
 import { ThingLibrary } from '../src/playcanvas/things/library.js';
 import { ThingLayer, type PlacedThingRecord } from '../src/playcanvas/things/thing-layer.js';
 import type { OwnedSocietyState } from '../src/playcanvas/society/types.js';
-import { servedLibrary, thingsJson } from './things-fixtures.js';
+import { servedLibrary, thingsJson, until } from './things-fixtures.js';
 
 /*
  * A thing changing hands moves when the later of the two people's drawn walks ends (the rule agreed
@@ -71,11 +71,13 @@ async function setup() {
   person('giver', 1);
   person('taker', -1);
   for (let i = 0; i < 8; i += 1) await settle();
+  await until(() => [...people.values()].every((one) => one.figure !== null), 'the two people\'s figures');
   /** The crowd makes a person again where they stand (as a changed look does): the old figure goes. */
   const remake = async (id: string, x: number) => {
     people.get(id)!.destroy();
     const made = person(id, x);
     for (let i = 0; i < 8; i += 1) await settle();
+    await until(() => made.figure !== null, `${id}'s figure, made again`);
     return made;
   };
   const ended = new Map<string, boolean>();

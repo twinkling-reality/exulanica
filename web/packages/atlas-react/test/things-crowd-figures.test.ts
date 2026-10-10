@@ -9,7 +9,7 @@ import { RigidOnBonesFigure } from '../src/playcanvas/things/rigid-on-bones.js';
 import { ThingLibrary } from '../src/playcanvas/things/library.js';
 import { ThingLayer, type PlacedThingRecord } from '../src/playcanvas/things/thing-layer.js';
 import type { OwnedSocietyState, SocietyInhabitantSnapshot } from '../src/playcanvas/society/types.js';
-import { servedLibrary, thingsJson } from './things-fixtures.js';
+import { servedLibrary, thingsJson, until } from './things-fixtures.js';
 
 /** A blocky figure's joints in the T-pose (the things contract's figures), glTF metres. */
 const BLOCKY: Record<string, [number, number, number]> = {
@@ -88,6 +88,7 @@ describe('a society\'s things drawn by their looks', () => {
     const named = figures.figureFor(odd)!;
     named.factory(device, region, identity('odd-1'), 'near');
     for (let i = 0; i < 6; i += 1) await settle();
+    await until(() => figures.misses.length > 0, 'the miss of a kind the library does not hold');
     expect(figures.misses.map((miss) => [miss.subjectId, miss.reason])).toEqual([['odd-1', 'not_in_library']]);
   });
 
@@ -103,6 +104,7 @@ describe('a society\'s things drawn by their looks', () => {
       .factory(device, region, identity('p-knight'), 'near') as ThingCrowdRenderable;
     holder.pose({ position: [1, 0, 1], deltaSeconds: 1 / 60, yaw: 0 } as never);
     for (let i = 0; i < 6; i += 1) await settle();
+    await until(() => holder.figure !== null, 'the holder\'s figure');
     // A held thing names its holder's socket (THINGS 3b) and has no position of its own.
     const society = (heldBy: string | null): OwnedSocietyState => ({
       profile: 'exulanica-society/v7', tick: 2, inhabitants: [],
