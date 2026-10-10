@@ -3,7 +3,11 @@
 One request ends the version's living society by the erasure a person's own erasing uses and makes
 a society of things on the same version, in one transaction. The people after are the people
 before, read from the living society's stored state and first input before the request; a refusal
-of the making leaves the living society and writes no tombstone; each refusal is named."""
+of the making leaves the living society and writes no tombstone; each refusal is named.
+
+Each town here is made under one fixed identity, so it is the same town on every run: a town made
+through the API otherwise takes a fresh identity, and where a person arrives in it, which is
+where the knight is placed from, follows from that."""
 
 from __future__ import annotations
 
@@ -14,6 +18,7 @@ import pytest
 from exulanica.api import society_making
 from exulanica.api.society_opening import opening_setting
 from exulanica.api.society_runtime import UnavailableSocietyInput
+from exulanica.world import saved_entries
 
 from test_society_made_world import made as imported_made  # noqa: F401
 from test_walking_surfaces_v3_postgres import (  # noqa: F401
@@ -73,10 +78,21 @@ def _offered(api, entry: dict) -> tuple[str, str | None]:
     return row["state"], row["code"]
 
 
+#: The small town every test here makes: the knight stands two metres west of where a person
+#: arrives in it, which this town's streets leave open.
+TOWN = "world:generated:00000000-0000-4000-8000-000000000003"
+
+
+@pytest.fixture(autouse=True)
+def _the_same_town_on_every_run(monkeypatch):
+    monkeypatch.setattr(saved_entries, "new_world_id", lambda kind: TOWN)
+
+
 def _town(api, title: str) -> tuple[dict, str, str]:
     made_town = api.post("/worlds/generated", {"recipe": "small_town", "title": title})
     assert made_town.status_code == 201, made_town.text
     entry = made_town.json()
+    assert entry["world_id"] == TOWN
     root = f"/world/versions/{entry['authored_version_id']}/society"
     scope = f"?world_id={entry['world_id']}"
     return entry, f"{root}{scope}", f"{root}/take-in{scope}"

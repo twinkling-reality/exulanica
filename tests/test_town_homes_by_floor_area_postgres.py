@@ -4,7 +4,11 @@ A town made through the API today starts with the people its routine's policy st
 housing them by the floor its premises record holds; a town made while towns were made under the
 earlier routine and peopled today keeps that routine and its two people a home, read from the
 routine its own receipt pins; and a society of things over a new town is as many villagers, every
-input of it stating that population."""
+input of it stating that population.
+
+Each town here is made under one fixed identity, so it is the same town on every run: a town made
+through the API otherwise takes a fresh identity, and what its homes hold and its premises offer
+follows from that."""
 
 from __future__ import annotations
 
@@ -12,7 +16,7 @@ import json
 from pathlib import Path
 
 import pytest
-from exulanica.world import society_catalogs
+from exulanica.world import saved_entries, society_catalogs
 
 from test_society_made_world import made as imported_made  # noqa: F401
 from test_walking_surfaces_v3_postgres import (  # noqa: F401
@@ -29,6 +33,16 @@ pytestmark = pytest.mark.postgres
 
 V5 = "exulanica-society/v5"
 CATALOGS = Path(__file__).resolve().parents[1] / "assets" / "catalogs" / "society"
+
+
+#: The small town every test here makes. Its homes hold 638 people by the floor their records
+#: state, read from its own place on 2026-10-10, so the 128 a new town starts with are housed.
+TOWN = "world:generated:00000000-0000-4000-8000-000000000003"
+
+
+@pytest.fixture(autouse=True)
+def _the_same_town_on_every_run(monkeypatch):
+    monkeypatch.setattr(saved_entries, "new_world_id", lambda kind: TOWN)
 
 
 def _stated(name: str, key: str) -> dict:
@@ -50,6 +64,7 @@ def _town(api, title: str) -> tuple[dict, str]:
     made_town = api.post("/worlds/generated", {"recipe": "small_town", "title": title})
     assert made_town.status_code == 201, made_town.text
     entry = made_town.json()
+    assert entry["world_id"] == TOWN
     society = f"/world/versions/{entry['authored_version_id']}/society?world_id={entry['world_id']}"
     return entry, society
 
