@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   effectiveRange,
@@ -24,6 +25,28 @@ describe('the served specification', () => {
     expect(read.generatedWorldsPerWorkspace).toBe(3);
     expect(() => parseWorldSpecification({ ...servedSpecification(), profile: 'another/v1' })).toThrow(TypeError);
     expect(() => parseWorldSpecification({ ...servedSpecification(), presets: undefined })).toThrow(TypeError);
+  });
+
+  it('reads a ground that states no maximum of people, and the least maximum where grounds state some', () => {
+    const withPeople = (people: unknown[]) => ({ ...servedSpecification(), bounds: { ...(servedSpecification() as { bounds: object }).bounds, people } });
+    const ground = (most: unknown) => ({ ground: 'generated_town', composer: 'city-grammar-town', most, minute_share_milli: 100 });
+    // A town is peopled by its own homes: the server states no maximum, as null.
+    expect(parseWorldSpecification(withPeople([ground(null)])).mostPeople).toBeNull();
+    expect(parseWorldSpecification(withPeople([ground(null), ground(64), ground(128)])).mostPeople).toBe(64);
+    // Anything else there is not a bound.
+    for (const most of ['128', 12.5, undefined, {}]) {
+      expect(() => parseWorldSpecification(withPeople([ground(most)])), String(most)).toThrow('invalid people bound');
+    }
+  });
+
+  it('reads the specification the server serves today, whole', () => {
+    // Relative to web/, where the suite runs. Written by tests/test_world_specification_served_snapshot.py
+    // from the server's own document, and held to it there: what the creation screen is given.
+    const served = JSON.parse(readFileSync('../tests/snapshots/world-specification.served.json', 'utf8')) as { presets: unknown[]; values: unknown[] };
+    const read = parseWorldSpecification(served);
+    expect(read.presets.length).toBe(served.presets.length);
+    expect(read.values.length).toBe(served.values.length);
+    expect(read.presets.length).toBeGreaterThan(0);
   });
 
   it('states the refusal the gate gives, by its code and in its words, before anything is sent', () => {

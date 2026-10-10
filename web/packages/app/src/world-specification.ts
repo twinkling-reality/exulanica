@@ -73,8 +73,12 @@ export interface WorldSpecification {
   readonly values: readonly SpecificationValue[];
   readonly presets: readonly SpecificationPreset[];
   readonly refusals: readonly SpecificationRefusalKind[];
-  /** The most people a world's society holds, and the most generated worlds a workspace holds. */
-  readonly mostPeople: number;
+  /**
+   * The most people a world's society holds: the least maximum any ground states, or null where
+   * none states one (a town is peopled by its own homes and admitted by the cost of its minute).
+   * Then the most generated worlds a workspace holds.
+   */
+  readonly mostPeople: number | null;
   readonly generatedWorldsPerWorkspace: number | null;
 }
 
@@ -201,9 +205,19 @@ export function parseWorldSpecification(raw: unknown): WorldSpecification {
         meaning: text(row['meaning'], 'refusal meaning'),
       });
     })),
-    mostPeople: Math.min(...people.map((row) => whole(object(row, 'people bound')['most'], 'people bound'))),
+    mostPeople: leastStated(people.map((row) => {
+      const most = object(row, 'people bound')['most'];
+      // A ground that states no maximum states null; anything else is a whole number or refused.
+      return most === null ? null : whole(most, 'people bound');
+    })),
     generatedWorldsPerWorkspace: perWorkspace === null ? null : whole(perWorkspace, 'generated world limit'),
   });
+}
+
+/** The least of the figures stated, or null where none is. */
+function leastStated(figures: readonly (number | null)[]): number | null {
+  const stated = figures.filter((figure): figure is number => figure !== null);
+  return stated.length === 0 ? null : Math.min(...stated);
 }
 
 /** The range in words, as the server's gate states it. */
