@@ -152,10 +152,17 @@ refusal is said by its code: a wrong code, a day's guests all admitted (with whe
 by the server itself. The developer's token entry stays last, under "or, for developers".
 
 A generated town opens where a person arrives, facing the middle of what was placed in it (a scene
-dressed for an arrival stands across the street); where a vehicle parked at the kerb would stand
+dressed for an arrival stands across the street); where a vehicle parked at the kerb, or anything the
+town's tiles state at a standing person's eye height (a building, a trunk, a lamp post), would stand
 between them, the first view steps along the footway, then back from the kerb, to the nearest spot on
 drawn ground with a clear sight of it (`composition/arrival-view.ts`), and keeps the arrival where none
-is near. A world with people in it that opens paused keeps "The world is paused. Press Play to let it
+is near. A town with nothing placed in it is not looked at straight across the road, at the wall
+opposite: the first view stands one step back from the kerb, off the line people walk, where ground is
+drawn there, and looks along the street at a slant, one way or the other, whichever view is most open
+over a fan of sight lines; a view with something standing in its face is taken only where every view
+has one. Each figure of that rule (the slant, the fan, how far a sight line is followed, the steps) is
+a chosen default stated with its reason in `assets/catalogs/arrival/town-first-view.v1.json`. A world
+with people in it that opens paused keeps "The world is paused. Press Play to let it
 run." in the status place until it plays or closes, and once a browser has seen the world play the line is
 not said for it again; the world never plays by itself. Where nothing is placed in it and none of its
 people is in sight yet, the same line adds "People are out in the town: open People to find them." until

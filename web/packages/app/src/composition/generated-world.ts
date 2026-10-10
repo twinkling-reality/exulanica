@@ -53,7 +53,8 @@ import {
   type GeneratedWorldReady,
 } from './generated-world-ready.js';
 import { committedTextureLibrary } from '../texture-library.js';
-import { arrivalView, parkedFootprint, type PlanFootprint } from './arrival-view.js';
+import { arrivalView, parkedFootprint, type PlanFootprint, type SightBlocker } from './arrival-view.js';
+import { TOWN_FIRST_VIEW } from '../town-first-view.js';
 import { WORLD_LOOK_ATTRIBUTE, swappableDrawing } from './world-look-redraw.js';
 
 /** The media type a baked tile's container is served as. */
@@ -104,6 +105,33 @@ function streetFurnitureOfTown(
       for (const item of route.streetFurnitureOf?.(bytes) ?? []) if (!kept.has(item.identity)) kept.set(item.identity, item);
     }
     return [...kept.values()];
+  } catch {
+    return [];
+  }
+}
+
+/** The record kind a tile states a building under, as its route obstructions name it. */
+const MASSING_OBSTACLE = 'city.massing:';
+
+/**
+ * What stands in a sight line at a standing person's eye height in a town, as plan rings in the
+ * region's frame (millimetres east and south): every building's base, from the obstructions the
+ * loaded tiles already state, and each part of the town's street furniture and trees that crosses
+ * eye height, from the tiles' own records. Where those cannot be read, none: the first view is
+ * then chosen past parked vehicles alone, as before.
+ */
+function sightBlockersOfTown(
+  route: { readonly sightBlockersOf?: (bytes: Uint8Array, heightMm: number) => readonly SightBlocker[] },
+  containers: readonly { readonly bytes: Uint8Array }[],
+  loaded: LoadedGeneratedTile,
+): readonly SightBlocker[] {
+  try {
+    const eyeMm = loaded.navigationWorld.eyeHeight * 1000;
+    const buildings = (loaded.routeObstructions?.obstacles ?? [])
+      .filter((obstacle) => obstacle.id.startsWith(MASSING_OBSTACLE))
+      .flatMap((obstacle) => obstacle.rings.map((ring) => ring.map((point) => [point.x * 1000, point.z * 1000] as const)));
+    const standing = containers.flatMap(({ bytes }) => route.sightBlockersOf?.(bytes, eyeMm) ?? []);
+    return [...buildings, ...standing];
   } catch {
     return [];
   }
@@ -326,17 +354,22 @@ export async function loadGeneratedWorld(
   const surface = loaded.navigationWorld.surface;
   // Facing the placed things, from the nearest spot whose sight of them nothing parked blocks.
   const inputs = await viewing;
-  const view = inputs === null ? null : arrivalView({
+  // Where the placed things and the parked vehicles could not be read in time, the view is still
+  // chosen from what the town's own tiles state: nothing known placed, nothing known parked.
+  const view = arrivalView({
     eastMm: stand?.eastMm ?? east, southMm: stand?.southMm ?? south, facing: [facingEast, facingSouth],
-    targets: inputs.targets, parked: inputs.parked,
+    targets: inputs?.targets ?? [], parked: inputs?.parked ?? [],
     ground: (e, s) => surface.sample(e / 1000, s / 1000) !== null,
+    // What stands at eye height in the town's own records, and how a town with nothing placed is looked at.
+    blockers: sightBlockersOfTown(route, containers, loaded),
+    open: TOWN_FIRST_VIEW,
   });
-  const standHeight = view?.moved === true ? surface.sample(view.eastMm / 1000, view.southMm / 1000)?.height ?? null : null;
+  const standHeight = view.moved ? surface.sample(view.eastMm / 1000, view.southMm / 1000)?.height ?? null : null;
   const start = {
-    x: (view?.eastMm ?? stand?.eastMm ?? east) / 1000,
+    x: view.eastMm / 1000,
     y: (standHeight ?? stand?.heightM ?? height / 1000) + loaded.navigationWorld.eyeHeight,
-    z: (view?.southMm ?? stand?.southMm ?? south) / 1000,
-    yaw: view?.yaw ?? Math.atan2(-facingEast, -facingSouth),
+    z: view.southMm / 1000,
+    yaw: view.yaw,
     pitch: 0,
   };
   return {

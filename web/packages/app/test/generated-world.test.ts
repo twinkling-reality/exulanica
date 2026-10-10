@@ -1,9 +1,14 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { groundNear, isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generated-world.js';
 import { townFurniture } from '../src/composition/town-furniture.js';
 import type { GeneratedGround, GeneratedTile, SavedWorldEntry } from '../src/world-entry-api.js';
 import { worldDidNotOpen } from '../src/ui/startup-state.js';
+
+// The step back from the kerb a town's first view takes, as the first view's catalog states it.
+const BACK_STEP_MM = (JSON.parse(readFileSync(new URL('../../../../assets/catalogs/arrival/town-first-view.v1.json', import.meta.url), 'utf8')) as
+  { entries: { key: string; value: number }[] }).entries.find((entry) => entry.key === 'back_step_mm')!.value;
 
 // The tile runtime and the texture library are replaced, so a test sees what the page hands the
 // runtime: which containers, in which roles, read from where.
@@ -44,22 +49,22 @@ const tile = (x: number, state: GeneratedTile['state']): GeneratedTile => ({
   state,
 });
 
-const ground = (tiles: readonly GeneratedTile[]): GeneratedGround => ({
+const ground = (tiles: readonly GeneratedTile[], arrivalFacingMm: readonly [number, number] = [0, 3000]): GeneratedGround => ({
   recipeKey: 'wide_town',
   recipeLabel: 'A wide town',
   regionId: 'region:generated',
   arrivalMm: [128000, 105, -58750],
-  arrivalFacingMm: [0, 3000],
+  arrivalFacingMm,
   tiles,
   specification: null,
   values: null,
 });
 
-const entry = (tiles: readonly GeneratedTile[]) => ({
+const entry = (tiles: readonly GeneratedTile[], arrivalFacingMm?: readonly [number, number]) => ({
   entryId: 'entry',
   worldId: 'world:generated:wide',
   authoredVersionId: 'version',
-  generatedGround: ground(tiles),
+  generatedGround: ground(tiles, arrivalFacingMm),
 }) as unknown as SavedWorldEntry;
 
 /** A route that serves each tile's bytes with the digest it names, or another digest if told. */
@@ -131,9 +136,10 @@ describe('a saved generated world of several tiles', () => {
     expect(sources.name).toBe(west);
     expect(sources.bytes).toEqual(bytes[west!]);
     expect(sources.neighbours).toEqual([{ name: east, bytes: bytes[east!] }]);
-    // A person opens at the served arrival, which may lie on any of the tiles.
+    // A person opens one step back from the served arrival, which may lie on any of the tiles: it
+    // faces south, so a step back from the kerb is a step north, off the line people walk.
     if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
-    expect(loaded.tile.start).toMatchObject({ x: 128, z: -58.75 });
+    expect(loaded.tile.start).toMatchObject({ x: 128, z: -58.75 - BACK_STEP_MM / 1000 });
   });
 
   it('keeps the town\'s street furniture from every tile, each piece once, for the entry it opened', async () => {
@@ -200,6 +206,15 @@ describe('a saved generated world of several tiles', () => {
     expect(loaded.look).toEqual({ pack: 'exulanica.toon-town', source: 'default', drawn: false, reason: 'this test reads no pack' });
   });
 
+  it('opens a step back whichever way the served arrival faces', async () => {
+    const tiles = [tile(0, 'baked')];
+    vi.stubGlobal('fetch', tileRoute({ [tiles[0]!.bakedTileId!]: new Uint8Array([1]) }).fetch);
+    // Facing east, a step back from the kerb is a step west, and nothing moves north or south.
+    const loaded = await loadGeneratedWorld(access, entry(tiles, [3000, 0]), '?look=today');
+    if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
+    expect(loaded.tile.start).toMatchObject({ x: 128 - BACK_STEP_MM / 1000, z: -58.75 });
+  });
+
   it('opens beside the served arrival when the drawn ground carves the point itself', async () => {
     const tiles = [tile(0, 'baked'), tile(1, 'baked')];
     const [west, east] = tiles.map((one) => one.bakedTileId!);
@@ -213,7 +228,8 @@ describe('a saved generated world of several tiles', () => {
     if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
     const { x, y, z } = loaded.tile.start as { x: number; y: number; z: number };
     expect(Math.hypot(x * 1000 - 128000, z * 1000 + 58750)).toBeGreaterThanOrEqual(300);
-    expect(Math.hypot(x * 1000 - 128000, z * 1000 + 58750)).toBeLessThanOrEqual(350);
+    // On the nearest drawn ground (within 350 mm of the carve), or the one step back from there.
+    expect(Math.hypot(x * 1000 - 128000, z * 1000 + 58750)).toBeLessThanOrEqual(350 + BACK_STEP_MM);
     expect(y).toBeCloseTo(0.2 + 1.6, 9);
   });
 

@@ -1,0 +1,76 @@
+{
+  "profile": "exulanica.town-first-view/v1",
+  "note": "How the first view of a generated town is chosen where nothing is placed in it. Every value is a chosen default with its reason: presentation only, changeable by a later version beside this one. Nothing here is a measured cost or a safety bound.",
+  "entries": [
+    {
+      "key": "slant_degrees",
+      "value": 60,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "A town is served facing straight across its road, at the wall opposite. The first view is turned this far from that toward one way along the street: far enough that the footways run away into the picture and people on them are in it for many seconds, near enough to across that the opposite frontage stays in frame. At a 102 degree horizontal field (70 degrees vertical at 16:9) a view turned 60 degrees holds both the far side opposite and the street's length."
+    },
+    {
+      "key": "fan_half_degrees",
+      "value": 40,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "A view is judged by sight lines spread this far either side of where it looks: most of the 51 degree half field, leaving out its edges, where what is seen is least looked at."
+    },
+    {
+      "key": "sight_lines",
+      "value": 9,
+      "unit": "count",
+      "class": "chosen_default",
+      "reason": "Nine lines across the fan are ten degrees apart, which at ten metres is under two metres: narrower than a parked car's length and a building's front, so neither slips between two lines."
+    },
+    {
+      "key": "reach_mm",
+      "value": 40000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A sight line is followed this far and no farther: a person 1.7 m tall stands about 33 px high at 40 m on a 1080 px frame at this field, and a view open beyond that shows nobody a person would notice."
+    },
+    {
+      "key": "face_mm",
+      "value": 4000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Something nearer than this dead ahead (a lamp post, a trunk, a parked car) fills the middle of the frame; a view with one there is taken only when no other is to be had."
+    },
+    {
+      "key": "back_step_mm",
+      "value": 750,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A town is served standing on the line its people walk, so walkers pass through the viewer. The first view may step back from the kerb in steps of this length: a little over a standing body's width, so one step is off the line."
+    },
+    {
+      "key": "back_maximum_mm",
+      "value": 2250,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Never farther back than three such steps: a footway is seldom wider behind its walking line, and drawn ground decides each step anyway."
+    },
+    {
+      "key": "along_step_mm",
+      "value": 1500,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "The step along the footway the first view already takes past a parked car (ARRIVAL_STEP_MM)."
+    },
+    {
+      "key": "along_maximum_mm",
+      "value": 6000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Never farther along the footway than this from where the town says a person arrives: far enough to clear a tree, a lamp post and a parked car in a row, near enough that the first view is still the place the town chose."
+    },
+    {
+      "key": "tie_milli",
+      "value": 20,
+      "unit": "thousandth",
+      "class": "chosen_default",
+      "reason": "Two views whose openness differs by less than this many thousandths are equally open, and the one nearer where the town says a person arrives is taken: without it the view backs to the wall behind for a gain of under one part in a hundred."
+    }
+  ]
+}

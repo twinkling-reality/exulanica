@@ -71,3 +71,56 @@ export function streetFurnitureOf(bytes: Uint8Array): StatedStreetFurniture[] {
   }
   return [...furniture.values()];
 }
+
+/** The record kind a tile states its street trees under: a base point and parts, facing east. */
+export const STREET_TREE_KIND = 'city.street_tree';
+
+/**
+ * What a tile's street furniture and trees put in a sight line at a height: the plan rectangle, east
+ * and south millimetres, of every part that stands across `heightMm` (its bottom at or below it, its
+ * top at or above it), turned as its record faces. A bench, a bin and a tree's canopy do not cross a
+ * standing person's eye height and are left out; a lamp post and a trunk do. Heights are read from
+ * the parts and above each record's own base, so no kind of furniture is named here.
+ */
+export function sightBlockersOf(bytes: Uint8Array, heightMm: number): (readonly (readonly [number, number])[])[] {
+  return sightBlockersOfRecords(decodeOwd(bytes).header.records, heightMm);
+}
+
+/** The same of a tile's records as read: `sightBlockersOf` is this over a container's own. */
+export function sightBlockersOfRecords(
+  records: readonly { readonly kind: string; readonly identity: string; readonly fields: { readonly [name: string]: unknown } }[],
+  heightMm: number,
+): (readonly (readonly [number, number])[])[] {
+  const rings: (readonly (readonly [number, number])[])[] = [];
+  const seen = new Set<string>();
+  for (const record of records) {
+    if ((record.kind !== STREET_FURNITURE_KIND && record.kind !== STREET_TREE_KIND) || record.identity === '') continue;
+    const named = `${record.kind}:${record.identity}`;
+    if (seen.has(named)) continue;
+    seen.add(named);
+    const fields = record.fields;
+    const x = whole(fields['x_mm']), y = whole(fields['y_mm']);
+    // A tree states no direction: its parts' frame faces east, as the tessellator reads it.
+    const dx = fields['facing_dx_mm'] === undefined ? 1 : whole(fields['facing_dx_mm']);
+    const dy = fields['facing_dx_mm'] === undefined ? 0 : whole(fields['facing_dy_mm']);
+    const stated = fields['parts'];
+    if (x === null || y === null || dx === null || dy === null || (dx === 0 && dy === 0) || !Array.isArray(stated)) continue;
+    const length = Math.hypot(dx, dy);
+    // In east and south: the direction, and to its left (left of (e, s) is (s, -e)).
+    const along = [dx / length, -dy / length] as const;
+    const left = [along[1], -along[0]] as const;
+    for (const one of stated) {
+      const part = one as { readonly [name: string]: unknown };
+      const ox = whole(part['offset_x_mm']), oy = whole(part['offset_y_mm']), oz = whole(part['offset_z_mm']);
+      const sx = whole(part['size_x_mm']), sy = whole(part['size_y_mm']), sz = whole(part['size_z_mm']);
+      if (ox === null || oy === null || oz === null || sx === null || sy === null || sz === null) continue;
+      if (oz > heightMm || oz + sz < heightMm) continue;
+      const corner = (a: number, l: number): readonly [number, number] => [
+        x + (ox + a) * along[0] + (oy + l) * left[0],
+        -y + (ox + a) * along[1] + (oy + l) * left[1],
+      ];
+      rings.push([corner(-sx / 2, -sy / 2), corner(sx / 2, -sy / 2), corner(sx / 2, sy / 2), corner(-sx / 2, sy / 2)]);
+    }
+  }
+  return rings;
+}
