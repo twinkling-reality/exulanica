@@ -401,8 +401,9 @@ town's receipt or digest depends on the adapter.
 - A site takes a pack's swatches and pieces only: it holds no texture set's images, so a leaf a pack
   dresses with a texture set takes its material where its words name one, and otherwise its
   family's `default`.
-- A surface is drawn in one flat colour for its material
-  ([style pack contract](style-pack-contract.md), section 3). A roof is shaped by its material
+- A surface is drawn in its material's colour with its material's pattern, courses or boards or a
+  grain, in colour only: it has no relief and is no photograph
+  ([style pack contract](style-pack-contract.md), sections 3 and 7.1). A roof is shaped by its material
   (thatch steep and overhanging, a canvas roof a tent's, an earth roof a slab with a parapet); the
   walls under it are not: every structure but a tent is a box of walls, and a tall thing standing
   near a tent's side shows through its canvas.

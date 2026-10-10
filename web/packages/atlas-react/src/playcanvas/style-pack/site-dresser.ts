@@ -1,7 +1,7 @@
 import type * as pc from 'playcanvas';
 import {
-  resolveLookRole, resolveSurfaceLookRole, unknownSurfaceLeaf,
-  type LookFamily, type ResolvedStylePack, type StylePackSurface, type SurfaceMaterials,
+  materialOfLeaf, resolveLookRole, resolveSurfaceLookRole, unknownSurfaceLeaf,
+  type LookFamily, type ResolvedStylePack, type StylePackSurface, type SurfaceMaterials, type SurfacePattern, type SurfacePatterns,
 } from '@exulanica/atlas-core';
 import type { SiteDrawing, SiteSlot } from '../generated-site/site-drawing.js';
 import type { SiteDresser } from '../generated-site/site-mount.js';
@@ -9,6 +9,7 @@ import { attachTileInk } from '../generated-tile/ink.js';
 import type { RenderShading } from '../generated-tile/look.js';
 import { applyShading } from '../generated-tile/shading.js';
 import { dressSlots, type PieceSlot } from './dresser.js';
+import { applyPattern } from './pattern-material.js';
 import { uploadPackPieces, type FetchedPieces } from './pieces.js';
 import { swatchMaterial } from './swatch-material.js';
 
@@ -34,6 +35,13 @@ import { swatchMaterial } from './swatch-material.js';
  * slots wear a catalog material and which look roles were thrown away (`data-site-materials`,
  * `data-site-unknown-looks`), so the next catalog is written from the words that were written.
  *
+ * A SURFACE WHOSE LEAF NAMES A MATERIAL IS NOT ONE FLAT COLOUR, where the dressing carries the
+ * surface pattern catalog: the material's pattern (courses, boards, strokes, seams, ripples or a
+ * grain) is drawn in its colour, whichever swatch that colour is (the catalog's, or the pack's own
+ * surface for it, a lawn's included), toward the pack's ink where it draws ink
+ * (`pattern-material.ts`). A pack's surface that colours its upward faces apart keeps that instead.
+ * The canvas says how many slots are patterned (`data-site-patterned`).
+ *
  * A site holds no texture set's images, so it takes a pack's swatches and pieces only: a leaf the
  * pack dresses with a texture set is resolved as if the pack left it out, so it takes its material
  * where its words name one (a town pack's `wall.brick_running_bond` is brick) and otherwise its
@@ -49,6 +57,8 @@ export interface SitePackDressing {
   readonly shading: RenderShading;
   /** The surface material catalog a leaf is read by before it takes its family's default; none reads no leaf. */
   readonly materials?: SurfaceMaterials;
+  /** The surface pattern catalog a material's colour is patterned by; none, or no `materials`, draws every surface flat. */
+  readonly patterns?: SurfacePatterns;
   /** Told what one site's dressing drew, each time a site is dressed. */
   readonly told?: (summary: SiteDressingSummary) => void;
 }
@@ -61,6 +71,8 @@ export interface SiteDressingSummary {
   readonly materials: number;
   /** The look roles thrown away: each names no material the catalog knows, and its slots took the family default. Sorted. */
   readonly unknownLooks: readonly string[];
+  /** Slots whose colour carries their material's pattern. */
+  readonly patterned: number;
   /** Slots a piece stands in. */
   readonly pieces: number;
   /** Pieces placed: a tiled slot places one per copy. */
@@ -101,6 +113,13 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
   const pack = swatchesOnly(dressing.pack);
   const { families, shading } = dressing;
   const catalog = dressing.materials ?? null;
+  const patterns = catalog === null ? null : dressing.patterns ?? null;
+  /** The pattern of the material a slot's leaf names, where the catalogs state one. */
+  const patternOf = (slot: SiteSlot): SurfacePattern | null => {
+    if (catalog === null || patterns === null) return null;
+    const material = materialOfLeaf(catalog, slot.family, slot.leaf);
+    return material === null ? null : patterns.byMaterial.get(material.key) ?? null;
+  };
   return (host, drawn, drawing: SiteDrawing) => {
     const device = host.app.graphicsDevice;
     const made: pc.StandardMaterial[] = [];
@@ -135,6 +154,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
 
     let surfaces = 0;
     let materials = 0;
+    let patterned = 0;
     let undressed = 0;
     const unknownLooks = new Set<string>();
     const modules: PieceSlot[] = [];
@@ -152,25 +172,33 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       if (resolved?.kind === 'module') {
         modules.push(pieceSlot(slot));
       } else if (resolved?.kind === 'material' && entity !== undefined) {
+        const pattern = patternOf(slot);
         let material = surfaceMaterials.get(resolved.role);
         if (material === undefined) {
           material = swatchMaterial(resolved.material.swatch, null, shading, `style-pack:material:${resolved.role}`);
+          if (pattern !== null) applyPattern(material, pattern, shading.ink);
           made.push(material);
           surfaceMaterials.set(resolved.role, material);
         }
         const worn = material;
         wear(entity, slot.identity, () => worn);
         materials += 1;
+        if (pattern !== null) patterned += 1;
       } else if (resolved?.kind === 'surface' && resolved.swatch !== null && entity !== undefined) {
-        let material = surfaceMaterials.get(resolved.role);
+        // The pack's own surface takes its material's pattern too, unless it colours its upward faces apart.
+        const pattern = resolved.up === null ? patternOf(slot) : null;
+        const key = pattern === null ? resolved.role : `${resolved.role}:${pattern.key}`;
+        let material = surfaceMaterials.get(key);
         if (material === undefined) {
-          material = swatchMaterial(resolved.swatch, resolved.up, shading, `style-pack:surface:${resolved.role}`);
+          material = swatchMaterial(resolved.swatch, resolved.up, shading, `style-pack:surface:${key}`);
+          if (pattern !== null) applyPattern(material, pattern, shading.ink);
           made.push(material);
-          surfaceMaterials.set(resolved.role, material);
+          surfaceMaterials.set(key, material);
         }
         const worn = material;
         wear(entity, slot.identity, () => worn);
         surfaces += 1;
+        if (pattern !== null) patterned += 1;
       } else if (entity !== undefined) {
         leftAsDrawn.push(slot);
       }
@@ -202,11 +230,13 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     if (catalog !== null && canvas?.dataset !== undefined) {
       canvas.dataset['siteMaterials'] = String(materials);
       canvas.dataset['siteUnknownLooks'] = JSON.stringify(unknown);
+      canvas.dataset['sitePatterned'] = String(patterned);
     }
     dressing.told?.({
       surfaces,
       materials,
       unknownLooks: unknown,
+      patterned,
       pieces: standing.size,
       placed: placed.placed,
       undressed,
@@ -220,6 +250,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       if (catalog !== null && canvas?.dataset !== undefined) {
         delete canvas.dataset['siteMaterials'];
         delete canvas.dataset['siteUnknownLooks'];
+        delete canvas.dataset['sitePatterned'];
       }
       ink?.dispose();
       placed.dispose();

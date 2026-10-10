@@ -1,0 +1,502 @@
+{
+ "schema_version": 1,
+ "catalog_id": "surface-pattern",
+ "catalog_version": 1,
+ "entries": [
+  {
+   "key": "grass",
+   "kind": "grain",
+   "period_a_mm": 900,
+   "period_b_mm": 0,
+   "strength_permille": 420,
+   "reason": "Authored: a lawn is never one green: soft patches a pace across, with a finer mottle inside them. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "meadow",
+   "kind": "grain",
+   "period_a_mm": 1200,
+   "period_b_mm": 0,
+   "strength_permille": 440,
+   "reason": "Authored: long grass lies in larger, stronger patches than a lawn. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "crop",
+   "kind": "boards",
+   "period_a_mm": 700,
+   "period_b_mm": 0,
+   "strength_permille": 170,
+   "reason": "Authored: a crop stands in drilled rows about 0.7 m apart, each row a little its own tone. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "soil",
+   "kind": "grain",
+   "period_a_mm": 700,
+   "period_b_mm": 0,
+   "strength_permille": 420,
+   "reason": "Authored: bare earth is patchy at about a stride, damp and dry. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "forest_floor",
+   "kind": "grain",
+   "period_a_mm": 500,
+   "period_b_mm": 0,
+   "strength_permille": 480,
+   "reason": "Authored: leaf litter is strongly mottled at half a metre, darker where it lies deeper. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "sand",
+   "kind": "grain",
+   "period_a_mm": 1600,
+   "period_b_mm": 0,
+   "strength_permille": 420,
+   "reason": "Authored: sand lies in broad soft patches a pace and a half across, faintly. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "gravel",
+   "kind": "grain",
+   "period_a_mm": 250,
+   "period_b_mm": 0,
+   "strength_permille": 420,
+   "reason": "Authored: loose stones mottle at the size of a hand's span. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "rock",
+   "kind": "grain",
+   "period_a_mm": 1800,
+   "period_b_mm": 0,
+   "strength_permille": 440,
+   "reason": "Authored: bare rock is blotched at about two metres, weathered and lichened. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "snow",
+   "kind": "grain",
+   "period_a_mm": 2500,
+   "period_b_mm": 0,
+   "strength_permille": 160,
+   "reason": "Authored: lying snow drifts in very broad, very faint patches. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "ice",
+   "kind": "ripples",
+   "period_a_mm": 3000,
+   "period_b_mm": 0,
+   "strength_permille": 200,
+   "reason": "Authored: ice shows faint long bands where it froze. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "cobble",
+   "kind": "courses",
+   "period_a_mm": 220,
+   "period_b_mm": 220,
+   "strength_permille": 300,
+   "reason": "Authored: cobbles are set about 220 mm apart each way, row on row with broken joints. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "paving",
+   "kind": "courses",
+   "period_a_mm": 900,
+   "period_b_mm": 600,
+   "strength_permille": 220,
+   "reason": "Authored: paving flags are about 900 by 600 mm, laid with broken joints. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "stone",
+   "kind": "courses",
+   "period_a_mm": 620,
+   "period_b_mm": 300,
+   "strength_permille": 260,
+   "reason": "Authored: walling stone is coursed about 300 mm high in blocks about 620 mm long, with broken joints. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "concrete",
+   "kind": "seams",
+   "period_a_mm": 3000,
+   "period_b_mm": 0,
+   "strength_permille": 200,
+   "reason": "Authored: cast concrete shows its pour joints about every three metres. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "asphalt",
+   "kind": "grain",
+   "period_a_mm": 300,
+   "period_b_mm": 0,
+   "strength_permille": 240,
+   "reason": "Authored: a sealed road is nearly even, with a fine faint mottle. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "brick",
+   "kind": "courses",
+   "period_a_mm": 230,
+   "period_b_mm": 76,
+   "strength_permille": 260,
+   "reason": "Authored: a brick with its joint is about 230 mm long and 76 mm high, laid in stretcher bond. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "timber",
+   "kind": "boards",
+   "period_a_mm": 180,
+   "period_b_mm": 0,
+   "strength_permille": 240,
+   "reason": "Authored: boards about 180 mm wide, each a little its own tone, with a dark joint between. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "tile",
+   "kind": "courses",
+   "period_a_mm": 300,
+   "period_b_mm": 300,
+   "strength_permille": 200,
+   "reason": "Authored: floor and wall tiles are about 300 mm square. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "roof_tile",
+   "kind": "courses",
+   "period_a_mm": 260,
+   "period_b_mm": 330,
+   "strength_permille": 260,
+   "reason": "Authored: clay roof tiles show about 260 mm wide and lap every 330 mm up the slope. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "slate",
+   "kind": "courses",
+   "period_a_mm": 320,
+   "period_b_mm": 260,
+   "strength_permille": 240,
+   "reason": "Authored: slates show about 320 mm wide and lap every 260 mm up the slope. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "thatch",
+   "kind": "strokes",
+   "period_a_mm": 70,
+   "period_b_mm": 450,
+   "strength_permille": 300,
+   "reason": "Authored: thatch is combed straw: fine streaks down the slope, and a line where each course ends about every 450 mm. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "adobe",
+   "kind": "grain",
+   "period_a_mm": 900,
+   "period_b_mm": 0,
+   "strength_permille": 320,
+   "reason": "Authored: plastered earth is softly uneven at about a pace. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "plaster",
+   "kind": "grain",
+   "period_a_mm": 1400,
+   "period_b_mm": 0,
+   "strength_permille": 160,
+   "reason": "Authored: painted plaster is nearly even, with a very faint unevenness. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "canvas",
+   "kind": "seams",
+   "period_a_mm": 1200,
+   "period_b_mm": 0,
+   "strength_permille": 160,
+   "reason": "Authored: canvas is sewn from widths of cloth about 1.2 m across. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "metal",
+   "kind": "seams",
+   "period_a_mm": 760,
+   "period_b_mm": 0,
+   "strength_permille": 180,
+   "reason": "Authored: sheet metal is lapped or ribbed about every 760 mm. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "glass",
+   "kind": "courses",
+   "period_a_mm": 1500,
+   "period_b_mm": 1500,
+   "strength_permille": 200,
+   "reason": "Authored: glazing is held in bars about 1.5 m apart each way. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "carpet",
+   "kind": "grain",
+   "period_a_mm": 120,
+   "period_b_mm": 0,
+   "strength_permille": 260,
+   "reason": "Authored: a woven floor covering has a fine, close texture. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "floor",
+   "kind": "boards",
+   "period_a_mm": 140,
+   "period_b_mm": 0,
+   "strength_permille": 200,
+   "reason": "Authored: a floor that names no material is boarded, in boards about 140 mm wide. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "sea",
+   "kind": "ripples",
+   "period_a_mm": 2600,
+   "period_b_mm": 0,
+   "strength_permille": 500,
+   "reason": "Authored: open water moves in swells a few metres apart. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "harbour",
+   "kind": "ripples",
+   "period_a_mm": 1600,
+   "period_b_mm": 0,
+   "strength_permille": 460,
+   "reason": "Authored: sheltered water moves in shorter, gentler waves. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "lake",
+   "kind": "ripples",
+   "period_a_mm": 3200,
+   "period_b_mm": 0,
+   "strength_permille": 460,
+   "reason": "Authored: a lake lies in long faint ripples. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "river",
+   "kind": "ripples",
+   "period_a_mm": 1400,
+   "period_b_mm": 0,
+   "strength_permille": 480,
+   "reason": "Authored: running water is closely rippled. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "pond",
+   "kind": "ripples",
+   "period_a_mm": 1800,
+   "period_b_mm": 0,
+   "strength_permille": 400,
+   "reason": "Authored: a pond barely moves. The sizes are those such work is commonly made at and the strength is chosen by eye; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  }
+ ]
+}

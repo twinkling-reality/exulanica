@@ -711,6 +711,8 @@ export {
 export type { RidgeRuns, RoofForm, RoofForms } from './roof-form.js';
 export { ROOF_FORM_CATALOG_ID, readRoofForms } from './roof-form.js';
 export type { MaterialDressing, SurfaceMaterial, SurfaceMaterials } from './surface-material.js';
+export type { SurfacePattern, SurfacePatternKind, SurfacePatterns } from './surface-pattern.js';
+export { SURFACE_PATTERN_CATALOG_ID, SURFACE_PATTERN_KINDS, readSurfacePatterns } from './surface-pattern.js';
 export {
   SURFACE_MATERIAL_CATALOG_ID, materialOfLeaf, readSurfaceMaterials, resolveSurfaceLookRole, unknownSurfaceLeaf,
 } from './surface-material.js';
