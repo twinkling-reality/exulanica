@@ -983,14 +983,18 @@ event's `at_ms` is the simulation's own instant and is not what the drawing wait
 walks each person at a walking pace, or evenly over the presented minute where the walk is too long
 for that, the state's budget being a bound.
 
-A visitor who crossed in is drawn stepping out of the gate it came through, at a walk (1.4 m a
-second), from the gate to where the state first places it, and back into the gate when the state no
-longer holds it, carrying what it carries out, which leaves the hand only when the visitor goes. Its
+A visitor who crossed in is drawn stepping out of the gate it came through, from the gate to where
+the state first places it, and back into the gate when the state no longer holds it, carrying what
+it carries out, which leaves the hand only when the visitor goes. It steps at its own walking pace,
+as the crowd walks everyone: its look's declared walk speed where it has one, taken up as soon as
+its figure is made, and otherwise the catalog person's for its id. Its
 gate is the placement its `thing_arrived` event names, at that placement's position; the page reads
 a minute's events just after its state, so a visitor who has just crossed in is unseen until its gate
 is read, at most 3 seconds. Neither step is in the state: the state places a visitor beside its gate
 in the minute it arrives and has it gone in the minute it leaves, so the drawing presents a departure
-for the second or two the step takes after the minute that records it. A visitor more than 5 m from
+for the seconds the step takes after the minute that records it: at most 5 m at the visitor's pace,
+which is 5 s at a catalog person's slowest 1.00 m/s and 9.9 s at the armoured knight's 0.504 m/s.
+A visitor more than 5 m from
 its gate, or one whose arrival the page never read, appears and goes where it stands, as does everyone
 under reduced motion.
 

@@ -15,10 +15,15 @@ SPEEDS = (1, 2, 4)
 BASE_TICK_INTERVAL_MIN_MS = 1000
 BASE_TICK_INTERVAL_MAX_MS = 60000
 BASE_TICK_INTERVAL_DIVISOR = math.lcm(*SPEEDS)
-#: Measured (docs/evaluation/2026-09-24-living-world-pace.json): a person in a saved world walks a
-#: median 10.0 m in a walking minute, and a renderer walks each path over the effective interval,
-#: so 8 s shows 1.26 m/s at 1x, inside the ordinary walking the society policy states. At 4x it
-#: still leaves 2 s between minutes. tests/test_living_world_pace.py holds it to both.
+#: Measured (docs/evaluation/2026-09-24-living-world-pace.json) on saved worlds of eight people and
+#: four or eight objects on a ring 6 m in radius: a person there walks a median 10.0 m in a
+#: walking minute, which over 8 s is 1.26 m/s at 1x, inside the ordinary walking the society policy
+#: states; tests/test_living_world_pace.py holds the default to that. It is a figure about those
+#: worlds, not the speed a renderer draws. A renderer walks a person at their own walking pace and
+#: walks a tick's path evenly over the presented interval only when it is too long for that pace,
+#: so a world whose ticks take people farther, up to the 60 m a new society's bound allows, is
+#: drawn faster than a walk at this base; EXULANICA_SOCIETY_TICK_INTERVAL_MS sets a longer one.
+#: At 4x this base still leaves 2 s between minutes.
 DEFAULT_BASE_TICK_INTERVAL_MS = 8000
 MAX_CATCHUP_TICKS = 3
 #: How long a playback claim holds a society before another worker may take it: the 30-second

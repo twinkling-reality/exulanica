@@ -148,9 +148,15 @@ interface Walker {
   /**
    * For a person whose state records only a bound, metres per millisecond: their own walking pace,
    * or what they have still to walk spread evenly until the next tick is expected where that is
-   * faster. Null for a v4 person, who walks at their own recorded speed.
+   * faster. Null for a v4 person, who walks at their own recorded speed, and for a gate step.
    */
   readonly rate: number | null;
+  /**
+   * Whether this walk is a visitor's step out of its gate or back into it. It is walked at their own
+   * walking pace as that is known on each frame (`walkSpeedOf`): a visitor is first drawn in the
+   * minute it steps out, and the figure that states its pace may be made while it steps.
+   */
+  readonly gateStep: boolean;
   /** When a person standing still starts the walk just read, in the caller's clock. */
   readonly startsAtMs: number;
   readonly indoors: boolean;
@@ -241,13 +247,12 @@ const SAME_POINT_METRES = 0.001;
 const CATCH_UP_SPEED_LIMIT = 1.5;
 /**
  * A visitor who crossed in through a gate and stands within this many metres of it is drawn stepping
- * out of it when it arrives and back into it when it leaves; one farther off appears and goes where
- * it stands. The state records neither step: it places a visitor beside its gate in the minute it
- * arrives and has it gone in the minute it leaves.
+ * out of it when it arrives and back into it when it leaves, at its own walking pace as everyone is
+ * walked (`Walker.gateStep`); one farther off appears and goes where it stands. The state records
+ * neither step: it places a visitor beside its gate in the minute it arrives and has it gone in the
+ * minute it leaves.
  */
 export const GATE_STEP_METRES = 5;
-/** The pace of that step, metres a second: a walk. */
-export const GATE_STEP_SPEED = 1.4;
 /**
  * How long a visitor who has just crossed in stays unseen, waiting for the gate it came through to
  * be read (the page reads a minute's events just after its state), before it is drawn where it stands.
@@ -530,7 +535,8 @@ export class SocietyCrowd {
         total,
         walked,
         budget,
-        rate: stepping ? GATE_STEP_SPEED / MILLISECONDS_PER_SECOND : boundOnly
+        gateStep: stepping,
+        rate: !stepping && boundOnly
           ? Math.min(
             // Their own walking pace, and the even spread only where the minute's distance needs more.
             Math.max(
@@ -575,8 +581,9 @@ export class SocietyCrowd {
       const route = [from, gate] as const;
       const { lengths, total } = polyline(route);
       walkers.set(id, {
-        ...walker, route, lengths, total, walked: 0, budget: walker.budget ?? GATE_STEP_SPEED,
-        rate: GATE_STEP_SPEED / MILLISECONDS_PER_SECOND, startsAtMs: nowMs, activity: null, arrived: total === 0,
+        // Paced, whatever its state records: the step has the visitor's own pace.
+        ...walker, route, lengths, total, walked: 0, budget: walker.budget ?? 0,
+        rate: null, gateStep: true, startsAtMs: nowMs, activity: null, arrived: total === 0,
         place: null, facingRule: null, partnerId: null, target: null, settle: null, seatBlend: 0, onSeat: false,
       });
       this.leaving.add(id);
@@ -1149,8 +1156,8 @@ export class SocietyCrowd {
         const route = [gate, end] as const;
         const { lengths, total } = polyline(route);
         this.walkers.set(id, {
-          ...walker, route, lengths, total, walked: 0, budget: walker.budget ?? GATE_STEP_SPEED,
-          rate: GATE_STEP_SPEED / MILLISECONDS_PER_SECOND, startsAtMs: nowMs, arrived: false,
+          ...walker, route, lengths, total, walked: 0, budget: walker.budget ?? 0,
+          rate: null, gateStep: true, startsAtMs: nowMs, arrived: false,
           position: gate, drawn: [gate[0], 0, gate[1]],
         });
         this.entering.delete(id);
@@ -1168,8 +1175,10 @@ export class SocietyCrowd {
         else if (walker.budget === null) walker.walked = eased * walker.total;
         else {
           const walking = nowMs - Math.max(walkedFrom, walker.startsAtMs);
-          if (walking > 0 && walker.rate !== null) {
-            walker.walked = Math.min(walker.total, walker.walked + walker.rate * walking);
+          // A gate step is walked at the visitor's own pace as it is known now.
+          const rate = walker.gateStep ? this.walkSpeedOf(walker.id) / MILLISECONDS_PER_SECOND : walker.rate;
+          if (walking > 0 && rate !== null) {
+            walker.walked = Math.min(walker.total, walker.walked + rate * walking);
           } else if (walking > 0) {
             const pace = walker.budget / this.intervalMs;
             // Behind by more than a tick and the wait for the next, the person walks faster.

@@ -1180,13 +1180,32 @@ manual or model-decision reservations through the same domain boundary.
 
 Speed is a playback multiplier, never a real-time claim: a simulated tick still represents 60
 simulated seconds. The host default base wait is 8,000 ms; 1x/2x/4x request minimum waits of
-8,000/4,000/2,000 ms after batch completion. Computation, polling and contention add time. The
-default is measured (`docs/evaluation/2026-09-24-living-world-pace.json`): at it a median walking
-minute shows as 1.26 m/s at 1x. The host may configure a base of 1,000 to 60,000 whole
-milliseconds divisible by four with `EXULANICA_SOCIETY_TICK_INTERVAL_MS`. Each configuration
-receipt retains the chosen base; changing deployment defaults does not silently rewrite saved
-controls. A subsequent user configuration adopts the host's current base. Renderers may interpolate
-between committed positions, but must not fabricate future goals, actions or positions as evidence.
+8,000/4,000/2,000 ms after batch completion. Computation, polling and contention add time. The host
+may configure a base of 1,000 to 60,000 whole milliseconds divisible by four with
+`EXULANICA_SOCIETY_TICK_INTERVAL_MS`; at 60,000 ms the wait for a tick at 1x is the 60 seconds the
+tick simulates. Each configuration receipt retains the chosen base; changing deployment defaults
+does not silently rewrite saved controls. A subsequent user configuration adopts the host's current
+base. Renderers may interpolate between committed positions, but must not fabricate future goals,
+actions or positions as evidence.
+
+How fast a walk is drawn depends on how far the tick took the person and on how long the tick is
+presented: the effective wait and the reader's start lag. A renderer walks a person at their own
+walking pace, and stands them where they arrive, when the tick's distance can be walked at that pace
+in the presented time. A longer walk is walked evenly over the presented time, at the tick's
+distance over that time, so it is drawn faster the farther the tick took the person, the higher the
+speed and the shorter the base
+([character representation](character-representation-contract.md#drawing-a-societys-people)).
+The default was measured on saved worlds of eight people and four or eight objects on a ring 6 m
+in radius (`docs/evaluation/2026-09-24-living-world-pace.json`): there a median walking minute
+covers 10,045 mm, and that distance over the default's 8,000 ms is 1,256 mm/s (1.26 m/s) at 1x,
+which `tests/test_living_world_pace.py` holds inside the routine policy's ordinary walking speeds.
+The record names that quotient the walking pace on screen, by the rule that a path is walked over
+the whole interval. It states that in those worlds a median walking minute takes about its
+presented time to walk at a walking pace at 1x; it is not the speed a person is drawn at, and it
+says nothing of a world whose ticks take people farther. A tick may take a person as far as the
+society's recorded bound, 60 m for a new society. At the default that is 60 m in the 8 s wait and
+the page's 2 s start lag, 6 m/s at 1x: a run, not a walk. With a base of 60,000 ms it is 60 m in
+62 s, under 1 m/s, which a person whose own pace is 1 m/s or more walks at that pace.
 
 A worker claims one due society per configured workspace per round, ordered by oldest due time
 then stable society identity, across every world the workspace holds, which all compete for the
