@@ -291,6 +291,12 @@ export interface CrowdRenderable {
    */
   readonly walkSpeed?: number | null;
   /**
+   * Optional: the ground a renderable whose body states its size covers, metres from its middle,
+   * across it and along the way it faces. Absent or null for one that states none (every catalog
+   * person): the crowd then picks it by a person's box.
+   */
+  readonly footprint?: { readonly halfAcross: number; readonly halfAlong: number } | null;
+  /**
    * Optional: whether this renderable draws an activity on a seat in a seat posture. The catalog
    * person does; one that omits it, like the abstract figure, draws every activity standing, and the
    * crowd then keeps it standing at its place rather than lifting it onto a seat it would hover over.
@@ -322,3 +328,18 @@ export type CrowdRenderableFactory = (
   identity: InhabitantIdentity,
   detail: 'near',
 ) => CrowdRenderable;
+
+/** How far from a person's middle the crowd's pick reaches, metres, east and south alike. */
+const PERSON_PICK_REACH = 0.34;
+
+/**
+ * How far a drawn inhabitant's pick box reaches from their middle along the world's x and z,
+ * metres. A renderable that states the ground its body covers (`CrowdRenderable.footprint`) is
+ * picked over that footprint turned to `facing` (radians about the upright, 0 facing +z), boxed
+ * square to the world's axes; anyone else by a person's box.
+ */
+export function pickReach(footprint: { readonly halfAcross: number; readonly halfAlong: number } | null, facing: number): readonly [number, number] {
+  if (footprint === null) return [PERSON_PICK_REACH, PERSON_PICK_REACH];
+  const along = Math.abs(Math.cos(facing)), across = Math.abs(Math.sin(facing));
+  return [along * footprint.halfAcross + across * footprint.halfAlong, across * footprint.halfAcross + along * footprint.halfAlong];
+}

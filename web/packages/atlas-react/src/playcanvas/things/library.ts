@@ -210,6 +210,37 @@ export class ThingLibrary {
     return document;
   }
 
+  /**
+   * Forget what this page keeps of a kind its workspace no longer holds (a creature its maker
+   * erased): the kind's document and, named by it, its drafted plan's and its looks' documents and
+   * their containers' bytes. They are a person's words and what was built from them, and an
+   * erasure removes them from the page that drew them too. Asked for again, each is fetched again,
+   * and the workspace answers that it holds none. A shipped kind is never forgotten.
+   */
+  async forgetHeldKind(sha256: string): Promise<void> {
+    if (this.list.kinds.some((one) => one.sha256 === sha256)) return;
+    const kept = this.held.get(sha256);
+    this.held.delete(sha256);
+    if (kept === undefined) return;
+    let document: { readonly body?: { readonly plan_sha256?: unknown }; readonly looks?: unknown };
+    try {
+      document = JSON.parse(new TextDecoder().decode(await kept)) as typeof document;
+    } catch {
+      return;
+    }
+    const shipped = new Set([...this.list.kinds.map((one) => one.sha256), ...this.list.looks.map((one) => one.sha256), this.list.bodyPlansSha256]);
+    const named: unknown[] = [document.body?.plan_sha256, ...(Array.isArray(document.looks) ? document.looks.map((look: { readonly sha256?: unknown } | null) => look?.sha256) : [])];
+    for (const digest of named) {
+      if (typeof digest !== 'string' || shipped.has(digest)) continue;
+      this.held.delete(digest);
+      for (const [container, look] of this.heldContainers) {
+        if (look !== digest) continue;
+        this.held.delete(container);
+        this.heldContainers.delete(container);
+      }
+    }
+  }
+
   async bodyPlans(): Promise<ReadonlyMap<string, BodyPlanEntry>> {
     this.plans ??= this.json(this.list.bodyPlansSha256).then(readBodyPlans);
     return this.plans;

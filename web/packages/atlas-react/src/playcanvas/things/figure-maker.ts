@@ -12,6 +12,7 @@
 
 import * as pc from 'playcanvas';
 import { createObjectContainerAsset } from '../scene-objects.js';
+import type { BodyMotion } from './body-motion.js';
 import type { KindDrawing, LookDrawing } from './documents.js';
 import { makeFigure, type InstancedContainer } from './dispatch.js';
 import type { ThingFigure } from './figures.js';
@@ -29,6 +30,8 @@ export interface FigureMakerOptions {
   readonly library: ThingLibrary;
   /** Make one figure's instance of a look's container; the engine's reader of the library's bytes when left out. */
   readonly instantiate?: (look: LookDrawing) => Promise<InstancedContainer>;
+  /** The table a drafted body's stated chains are posed by (`./body-motion.ts`); at rest when left out. */
+  readonly bodyMotion?: BodyMotion;
 }
 
 /** The look a thing with none is drawn in: nothing, at its place. */
@@ -89,6 +92,7 @@ export class ThingFigureMaker {
       plan,
       container,
       primitive: this.primitive,
+      motion: this.options.bodyMotion ?? null,
     });
     return { figure, kind, look: look === null ? 'none' : `${look.look}/v${look.version}` };
   }

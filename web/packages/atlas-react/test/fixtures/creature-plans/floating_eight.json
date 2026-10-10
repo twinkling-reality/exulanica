@@ -1,0 +1,862 @@
+{
+ "joints_m": {
+  "head1": [
+   0.0,
+   2.430000066757202,
+   0.0
+  ],
+  "hips": [
+   0.0,
+   1.4700000286102295,
+   0.0
+  ],
+  "spine1": [
+   0.0,
+   1.7899999618530273,
+   0.0
+  ],
+  "spine2": [
+   0.0,
+   2.109999895095825,
+   0.0
+  ],
+  "tentacle1Segment1": [
+   0.0,
+   1.4700000286102295,
+   0.335999995470047
+  ],
+  "tentacle1Segment2": [
+   0.0,
+   1.246000051498413,
+   0.4129999876022339
+  ],
+  "tentacle1Segment3": [
+   0.0,
+   1.0219999551773071,
+   0.4909999966621399
+  ],
+  "tentacle1Segment4": [
+   0.0,
+   0.7910000085830688,
+   0.5400000214576721
+  ],
+  "tentacle1Segment5": [
+   0.0,
+   0.5580000281333923,
+   0.5839999914169312
+  ],
+  "tentacle1Segment6": [
+   0.0,
+   0.32499998807907104,
+   0.628000020980835
+  ],
+  "tentacle2Segment1": [
+   -0.2370000034570694,
+   1.4700000286102295,
+   0.2370000034570694
+  ],
+  "tentacle2Segment2": [
+   -0.2919999957084656,
+   1.246000051498413,
+   0.2919999957084656
+  ],
+  "tentacle2Segment3": [
+   -0.34700000286102295,
+   1.0219999551773071,
+   0.34700000286102295
+  ],
+  "tentacle2Segment4": [
+   -0.38199999928474426,
+   0.7910000085830688,
+   0.38199999928474426
+  ],
+  "tentacle2Segment5": [
+   -0.4129999876022339,
+   0.5580000281333923,
+   0.4129999876022339
+  ],
+  "tentacle2Segment6": [
+   -0.4429999887943268,
+   0.32499998807907104,
+   0.4429999887943268
+  ],
+  "tentacle3Segment1": [
+   -0.335999995470047,
+   1.4700000286102295,
+   0.0
+  ],
+  "tentacle3Segment2": [
+   -0.4129999876022339,
+   1.246000051498413,
+   0.0
+  ],
+  "tentacle3Segment3": [
+   -0.4909999966621399,
+   1.0219999551773071,
+   0.0
+  ],
+  "tentacle3Segment4": [
+   -0.5400000214576721,
+   0.7910000085830688,
+   0.0
+  ],
+  "tentacle3Segment5": [
+   -0.5839999914169312,
+   0.5580000281333923,
+   0.0
+  ],
+  "tentacle3Segment6": [
+   -0.628000020980835,
+   0.32499998807907104,
+   0.0
+  ],
+  "tentacle4Segment1": [
+   -0.2370000034570694,
+   1.4700000286102295,
+   -0.2370000034570694
+  ],
+  "tentacle4Segment2": [
+   -0.2919999957084656,
+   1.246000051498413,
+   -0.2919999957084656
+  ],
+  "tentacle4Segment3": [
+   -0.34700000286102295,
+   1.0219999551773071,
+   -0.34700000286102295
+  ],
+  "tentacle4Segment4": [
+   -0.38199999928474426,
+   0.7910000085830688,
+   -0.38199999928474426
+  ],
+  "tentacle4Segment5": [
+   -0.4129999876022339,
+   0.5580000281333923,
+   -0.4129999876022339
+  ],
+  "tentacle4Segment6": [
+   -0.4429999887943268,
+   0.32499998807907104,
+   -0.4429999887943268
+  ],
+  "tentacle5Segment1": [
+   0.0,
+   1.4700000286102295,
+   -0.335999995470047
+  ],
+  "tentacle5Segment2": [
+   0.0,
+   1.246000051498413,
+   -0.4129999876022339
+  ],
+  "tentacle5Segment3": [
+   0.0,
+   1.0219999551773071,
+   -0.4909999966621399
+  ],
+  "tentacle5Segment4": [
+   0.0,
+   0.7910000085830688,
+   -0.5400000214576721
+  ],
+  "tentacle5Segment5": [
+   0.0,
+   0.5580000281333923,
+   -0.5839999914169312
+  ],
+  "tentacle5Segment6": [
+   0.0,
+   0.32499998807907104,
+   -0.628000020980835
+  ],
+  "tentacle6Segment1": [
+   0.2370000034570694,
+   1.4700000286102295,
+   -0.2370000034570694
+  ],
+  "tentacle6Segment2": [
+   0.2919999957084656,
+   1.246000051498413,
+   -0.2919999957084656
+  ],
+  "tentacle6Segment3": [
+   0.34700000286102295,
+   1.0219999551773071,
+   -0.34700000286102295
+  ],
+  "tentacle6Segment4": [
+   0.38199999928474426,
+   0.7910000085830688,
+   -0.38199999928474426
+  ],
+  "tentacle6Segment5": [
+   0.4129999876022339,
+   0.5580000281333923,
+   -0.4129999876022339
+  ],
+  "tentacle6Segment6": [
+   0.4429999887943268,
+   0.32499998807907104,
+   -0.4429999887943268
+  ],
+  "tentacle7Segment1": [
+   0.335999995470047,
+   1.4700000286102295,
+   0.0
+  ],
+  "tentacle7Segment2": [
+   0.4129999876022339,
+   1.246000051498413,
+   0.0
+  ],
+  "tentacle7Segment3": [
+   0.4909999966621399,
+   1.0219999551773071,
+   0.0
+  ],
+  "tentacle7Segment4": [
+   0.5400000214576721,
+   0.7910000085830688,
+   0.0
+  ],
+  "tentacle7Segment5": [
+   0.5839999914169312,
+   0.5580000281333923,
+   0.0
+  ],
+  "tentacle7Segment6": [
+   0.628000020980835,
+   0.32499998807907104,
+   0.0
+  ],
+  "tentacle8Segment1": [
+   0.2370000034570694,
+   1.4700000286102295,
+   0.2370000034570694
+  ],
+  "tentacle8Segment2": [
+   0.2919999957084656,
+   1.246000051498413,
+   0.2919999957084656
+  ],
+  "tentacle8Segment3": [
+   0.34700000286102295,
+   1.0219999551773071,
+   0.34700000286102295
+  ],
+  "tentacle8Segment4": [
+   0.38199999928474426,
+   0.7910000085830688,
+   0.38199999928474426
+  ],
+  "tentacle8Segment5": [
+   0.4129999876022339,
+   0.5580000281333923,
+   0.4129999876022339
+  ],
+  "tentacle8Segment6": [
+   0.4429999887943268,
+   0.32499998807907104,
+   0.4429999887943268
+  ]
+ },
+ "kind": {
+  "abilities": [
+   {
+    "key": "wait",
+    "parameters": {}
+   },
+   {
+    "key": "say",
+    "parameters": {}
+   }
+  ],
+  "body": {
+   "extent_mm": {
+    "height": 3000,
+    "length": 1600,
+    "span": 0,
+    "width": 1600
+   },
+   "plan": "fixture_floating_eight/v1",
+   "plan_sha256": "d178090209031df4938f80dce1e350ccacfee60bbf35e9fe820a961b27c5e65e"
+  },
+  "class": "being",
+  "deciders": {
+   "allowed": [
+    "routine",
+    "model",
+    "person"
+   ],
+   "default": "routine"
+  },
+  "ext": {},
+  "kind": "fixture_floating_eight",
+  "label": "fixture floating eight",
+  "looks": [
+   {
+    "look": "fixture-floating-eight-sketch",
+    "sha256": "17a80c109747e4f2272caaf6a0605e2e252a2b3e316b085dca65b8a8c586cbc3",
+    "version": 1
+   }
+  ],
+  "moves": [],
+  "offers": [
+   {
+    "key": "talk_to",
+    "parameters": {}
+   },
+   {
+    "key": "hear",
+    "parameters": {}
+   },
+   {
+    "key": "be_followed",
+    "parameters": {}
+   }
+  ],
+  "origin": {
+   "authors": [],
+   "by": {
+    "execution_sha256": null,
+    "kind": "model",
+    "model_id": "fixture/hand-written",
+    "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prompt_version": "creature-drafting-1",
+    "provider": "nebius_token_factory",
+    "words_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+   },
+   "class": "drafted",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1",
+     "d178090209031df4938f80dce1e350ccacfee60bbf35e9fe820a961b27c5e65e"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.thing-kind/v1",
+  "routine": {
+   "follow_holders_of": [],
+   "reason": "Drafted with the creature: the weights the drafting model gave its abilities, which its routine draws among whenever no mind is choosing for it.",
+   "weights": {
+    "wait": 300
+   }
+  },
+  "summary": "A creature built from a hand-written body recipe for the page's tests.",
+  "version": 1
+ },
+ "look": {
+  "body_plan": "fixture_floating_eight/v1",
+  "container": {
+   "bytes": 142804,
+   "media_type": "model/gltf-binary",
+   "sha256": "ed1b0566bb1f5fc1e34dbf7ce3fe4aaf892ca07de402dbc3dedfc04442b4f59b"
+  },
+  "height_mm": 3000,
+  "label": "a sketch of its body",
+  "light": null,
+  "look": "fixture-floating-eight-sketch",
+  "look_kind": "rigid_on_bones",
+  "origin": {
+   "authors": [],
+   "by": {
+    "kind": "project"
+   },
+   "class": "authored",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "CC0-1.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1",
+     "d178090209031df4938f80dce1e350ccacfee60bbf35e9fe820a961b27c5e65e"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.look/v1",
+  "rig": null,
+  "role": null,
+  "sampling": "linear",
+  "version": 1
+ },
+ "plan": {
+  "bones": [
+   {
+    "name": "hips",
+    "parent": null,
+    "required": true
+   },
+   {
+    "name": "spine1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "spine2",
+    "parent": "spine1",
+    "required": true
+   },
+   {
+    "name": "head1",
+    "parent": "spine2",
+    "required": true
+   },
+   {
+    "name": "tentacle1Segment1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "tentacle1Segment2",
+    "parent": "tentacle1Segment1",
+    "required": true
+   },
+   {
+    "name": "tentacle1Segment3",
+    "parent": "tentacle1Segment2",
+    "required": true
+   },
+   {
+    "name": "tentacle1Segment4",
+    "parent": "tentacle1Segment3",
+    "required": true
+   },
+   {
+    "name": "tentacle1Segment5",
+    "parent": "tentacle1Segment4",
+    "required": true
+   },
+   {
+    "name": "tentacle1Segment6",
+    "parent": "tentacle1Segment5",
+    "required": true
+   },
+   {
+    "name": "tentacle2Segment1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "tentacle2Segment2",
+    "parent": "tentacle2Segment1",
+    "required": true
+   },
+   {
+    "name": "tentacle2Segment3",
+    "parent": "tentacle2Segment2",
+    "required": true
+   },
+   {
+    "name": "tentacle2Segment4",
+    "parent": "tentacle2Segment3",
+    "required": true
+   },
+   {
+    "name": "tentacle2Segment5",
+    "parent": "tentacle2Segment4",
+    "required": true
+   },
+   {
+    "name": "tentacle2Segment6",
+    "parent": "tentacle2Segment5",
+    "required": true
+   },
+   {
+    "name": "tentacle3Segment1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "tentacle3Segment2",
+    "parent": "tentacle3Segment1",
+    "required": true
+   },
+   {
+    "name": "tentacle3Segment3",
+    "parent": "tentacle3Segment2",
+    "required": true
+   },
+   {
+    "name": "tentacle3Segment4",
+    "parent": "tentacle3Segment3",
+    "required": true
+   },
+   {
+    "name": "tentacle3Segment5",
+    "parent": "tentacle3Segment4",
+    "required": true
+   },
+   {
+    "name": "tentacle3Segment6",
+    "parent": "tentacle3Segment5",
+    "required": true
+   },
+   {
+    "name": "tentacle4Segment1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "tentacle4Segment2",
+    "parent": "tentacle4Segment1",
+    "required": true
+   },
+   {
+    "name": "tentacle4Segment3",
+    "parent": "tentacle4Segment2",
+    "required": true
+   },
+   {
+    "name": "tentacle4Segment4",
+    "parent": "tentacle4Segment3",
+    "required": true
+   },
+   {
+    "name": "tentacle4Segment5",
+    "parent": "tentacle4Segment4",
+    "required": true
+   },
+   {
+    "name": "tentacle4Segment6",
+    "parent": "tentacle4Segment5",
+    "required": true
+   },
+   {
+    "name": "tentacle5Segment1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "tentacle5Segment2",
+    "parent": "tentacle5Segment1",
+    "required": true
+   },
+   {
+    "name": "tentacle5Segment3",
+    "parent": "tentacle5Segment2",
+    "required": true
+   },
+   {
+    "name": "tentacle5Segment4",
+    "parent": "tentacle5Segment3",
+    "required": true
+   },
+   {
+    "name": "tentacle5Segment5",
+    "parent": "tentacle5Segment4",
+    "required": true
+   },
+   {
+    "name": "tentacle5Segment6",
+    "parent": "tentacle5Segment5",
+    "required": true
+   },
+   {
+    "name": "tentacle6Segment1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "tentacle6Segment2",
+    "parent": "tentacle6Segment1",
+    "required": true
+   },
+   {
+    "name": "tentacle6Segment3",
+    "parent": "tentacle6Segment2",
+    "required": true
+   },
+   {
+    "name": "tentacle6Segment4",
+    "parent": "tentacle6Segment3",
+    "required": true
+   },
+   {
+    "name": "tentacle6Segment5",
+    "parent": "tentacle6Segment4",
+    "required": true
+   },
+   {
+    "name": "tentacle6Segment6",
+    "parent": "tentacle6Segment5",
+    "required": true
+   },
+   {
+    "name": "tentacle7Segment1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "tentacle7Segment2",
+    "parent": "tentacle7Segment1",
+    "required": true
+   },
+   {
+    "name": "tentacle7Segment3",
+    "parent": "tentacle7Segment2",
+    "required": true
+   },
+   {
+    "name": "tentacle7Segment4",
+    "parent": "tentacle7Segment3",
+    "required": true
+   },
+   {
+    "name": "tentacle7Segment5",
+    "parent": "tentacle7Segment4",
+    "required": true
+   },
+   {
+    "name": "tentacle7Segment6",
+    "parent": "tentacle7Segment5",
+    "required": true
+   },
+   {
+    "name": "tentacle8Segment1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "tentacle8Segment2",
+    "parent": "tentacle8Segment1",
+    "required": true
+   },
+   {
+    "name": "tentacle8Segment3",
+    "parent": "tentacle8Segment2",
+    "required": true
+   },
+   {
+    "name": "tentacle8Segment4",
+    "parent": "tentacle8Segment3",
+    "required": true
+   },
+   {
+    "name": "tentacle8Segment5",
+    "parent": "tentacle8Segment4",
+    "required": true
+   },
+   {
+    "name": "tentacle8Segment6",
+    "parent": "tentacle8Segment5",
+    "required": true
+   }
+  ],
+  "key": "fixture_floating_eight",
+  "limbs": [
+   {
+    "bones": [
+     "spine1",
+     "spine2"
+    ],
+    "key": "spine",
+    "order": 0,
+    "role": "spine",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "tentacle1Segment1",
+     "tentacle1Segment2",
+     "tentacle1Segment3",
+     "tentacle1Segment4",
+     "tentacle1Segment5",
+     "tentacle1Segment6"
+    ],
+    "key": "tentacle1",
+    "order": 0,
+    "role": "tentacle",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "tentacle2Segment1",
+     "tentacle2Segment2",
+     "tentacle2Segment3",
+     "tentacle2Segment4",
+     "tentacle2Segment5",
+     "tentacle2Segment6"
+    ],
+    "key": "tentacle2",
+    "order": 1,
+    "role": "tentacle",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "tentacle3Segment1",
+     "tentacle3Segment2",
+     "tentacle3Segment3",
+     "tentacle3Segment4",
+     "tentacle3Segment5",
+     "tentacle3Segment6"
+    ],
+    "key": "tentacle3",
+    "order": 2,
+    "role": "tentacle",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "tentacle4Segment1",
+     "tentacle4Segment2",
+     "tentacle4Segment3",
+     "tentacle4Segment4",
+     "tentacle4Segment5",
+     "tentacle4Segment6"
+    ],
+    "key": "tentacle4",
+    "order": 3,
+    "role": "tentacle",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "tentacle5Segment1",
+     "tentacle5Segment2",
+     "tentacle5Segment3",
+     "tentacle5Segment4",
+     "tentacle5Segment5",
+     "tentacle5Segment6"
+    ],
+    "key": "tentacle5",
+    "order": 4,
+    "role": "tentacle",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "tentacle6Segment1",
+     "tentacle6Segment2",
+     "tentacle6Segment3",
+     "tentacle6Segment4",
+     "tentacle6Segment5",
+     "tentacle6Segment6"
+    ],
+    "key": "tentacle6",
+    "order": 5,
+    "role": "tentacle",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "tentacle7Segment1",
+     "tentacle7Segment2",
+     "tentacle7Segment3",
+     "tentacle7Segment4",
+     "tentacle7Segment5",
+     "tentacle7Segment6"
+    ],
+    "key": "tentacle7",
+    "order": 6,
+    "role": "tentacle",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "tentacle8Segment1",
+     "tentacle8Segment2",
+     "tentacle8Segment3",
+     "tentacle8Segment4",
+     "tentacle8Segment5",
+     "tentacle8Segment6"
+    ],
+    "key": "tentacle8",
+    "order": 7,
+    "role": "tentacle",
+    "side": "centre"
+   }
+  ],
+  "motions": {
+   "optional": [],
+   "required": [
+    "idle"
+   ]
+  },
+  "moves": [],
+  "origin": {
+   "authors": [],
+   "by": {
+    "execution_sha256": null,
+    "kind": "model",
+    "model_id": "fixture/hand-written",
+    "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prompt_version": "creature-drafting-1",
+    "provider": "nebius_token_factory",
+    "words_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+   },
+   "class": "drafted",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.body-plan/v1",
+  "reach_mm": null,
+  "reason": "Built by exulanica-body-builder/v1 from a floating body recipe (sha256 8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1): every bone, chain, socket and range follows from the recipe and the body grammar version 1.",
+  "size": {
+   "extent_mm": {
+    "height": {
+     "maximum": 3750,
+     "minimum": 2400
+    },
+    "length": {
+     "maximum": 2000,
+     "minimum": 1280
+    },
+    "span": {
+     "maximum": 1,
+     "minimum": 0
+    },
+    "width": {
+     "maximum": 2000,
+     "minimum": 1280
+    }
+   }
+  },
+  "sockets": [],
+  "title": "the body of a fixture floating eight",
+  "version": 1
+ },
+ "profile": "exulanica.creature-plan-fixture/v1",
+ "recipe_sha256": "8f6b01878b3210eb1f315e536aa860c7630579921bbc5ce988d43201ebeddee1",
+ "written_by": "scripts/things/creature_plan_fixtures.py"
+}

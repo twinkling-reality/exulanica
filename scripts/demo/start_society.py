@@ -81,7 +81,9 @@ def gate_of(scene: Mapping[str, Any], things: Sequence[Mapping[str, Any]]) -> st
     if gate is None:
         return None
     kind = next(thing["kind"]["kind"] for thing in scene["things"] if thing["thing_id"] == gate)
-    gates = [thing["thing_id"] for thing in things if thing["kind"]["kind"] == kind]
+    # A thing of a kind its workspace keeps (a creature made from words) is named by digest alone
+    # and states no kind key: it is nobody's gate.
+    gates = [thing["thing_id"] for thing in things if thing["kind"].get("kind") == kind]
     if len(gates) != 1:
         raise SceneRefused(
             f"travellers come through a {kind}, and the world holds {len(gates)} of them"

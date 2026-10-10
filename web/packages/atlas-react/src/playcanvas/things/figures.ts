@@ -14,6 +14,7 @@
  * is turned a half turn inside its root.
  */
 
+import type { Footprint } from './body-motion.js';
 import * as pc from 'playcanvas';
 import type { Grip, LookKind } from './documents.js';
 import { IDENTITY, axisAngle, fromTo, mul, rotate, slerp, type Quat } from './motion.js';
@@ -54,6 +55,13 @@ export interface ThingFigure {
    * not that the figure cannot walk: whoever walks it then chooses the pace.
    */
   readonly walkSpeed?: number | null;
+  /**
+   * Optional: the ground a body whose kind states its extent covers, and the fastest it turns,
+   * radians a second (`./body-motion.ts`). Absent or null for a figure that states no extent: it is
+   * picked as a standing figure is and turns at once.
+   */
+  readonly footprint?: Footprint | null;
+  readonly turnRate?: number | null;
   pose(pose: ThingPose): void;
   /** After the engine's animation step, for a look whose clips play there. */
   afterAnimation?(): void;

@@ -23,6 +23,7 @@ import type {
   OwnedSocietyState,
   SocietyInhabitantSnapshot,
 } from './types.js';
+import { pickReach } from './types.js';
 
 /**
  * The whole synthetic population, drawn by distance.
@@ -971,7 +972,10 @@ export class SocietyCrowd {
       if (!walker) continue;
       const [x, y, z] = walker.drawn;
       const height = renderable?.standingHeight ?? this.far.appearanceOf(id).heightMetres;
-      const distance = hit([x - 0.34, y, z - 0.34], [x + 0.34, y + height, z + 0.34]);
+      // A body that states its size is picked over the ground it covers, turned as it is drawn
+      // (`pickReach`); anyone else, by a person's box.
+      const [hx, hz] = pickReach(renderable?.footprint ?? null, renderable?.facing ?? 0);
+      const distance = hit([x - hx, y, z - hz], [x + hx, y + height, z + hz]);
       if (distance !== null && distance < nearest) {
         nearest = distance;
         selected = id;

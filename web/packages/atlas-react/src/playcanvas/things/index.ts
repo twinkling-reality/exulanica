@@ -43,10 +43,12 @@ export { FLOAT_HEIGHT, LookRoleFigure, NoFigure, PresenceFigure, StaticFigure, f
 export { RigidOnBonesFigure } from './rigid-on-bones.js';
 export type { SkinnedMiss } from './skinned.js';
 export { CLIP_SPEED_LIMIT, SkinnedFigure } from './skinned.js';
-export type { BodyPlanEntry, DressedSkeleton, Limb, LimbRole, PlanBone, PlanSocket, SkeletonRefusal, Vec3 } from './skeleton.js';
-export { SkeletonRefused, dressSkeleton } from './skeleton.js';
+export type { BodyPlanEntry, ChainRole, ChainSide, DressedSkeleton, Gait, Limb, LimbRole, PlanBone, PlanChain, PlanSocket, SkeletonRefusal, Vec3 } from './skeleton.js';
+export { CHAIN_ROLES, CHAIN_SIDES, SkeletonRefused, dressSkeleton } from './skeleton.js';
+export type { BodyMotion } from './body-motion.js';
+export { BODY_MOTION_PROFILE, readBodyMotion } from './body-motion.js';
 export type { JointPose, MotionInput, Pose, Quat } from './motion.js';
-export { DUTY, gaitOf, solvePose } from './motion.js';
+export { DUTY, bodyTravel, gaitOf, solvePose } from './motion.js';
 export { PickRing, rayMeets, ringRadius } from './ring.js';
 export type { DrawnSociety, DrawnThing, PlacedKind, PlacedThingRecord, SocietyPoint, ThingLayerOptions, ThingMiss, ThingPick } from './thing-layer.js';
 export { DESTINATION_RING_RADIUS, PLAYED_RING_RADIUS, ThingLayer } from './thing-layer.js';

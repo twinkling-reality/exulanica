@@ -25,6 +25,7 @@ import {
   type ThingPick,
 } from '@exulanica/atlas-react/things';
 import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
+import { BODY_MOTION } from '../body-motion.js';
 import type { Credentials } from '../config.js';
 import { openThingLibrary } from '../things-library.js';
 import { tokenBlock } from '../ui/system/token-values.js';
@@ -188,6 +189,7 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
     personEdge: worldMarkPersonInk(),
     invalidate: deps.invalidate,
     reducedMotion: deps.reducedMotion,
+    bodyMotion: BODY_MOTION,
     ...(deps.society ? { society: deps.society } : {}),
   });
   // The ring follows the event, whoever raises it: a pick here, a card closing, a mark.
@@ -213,7 +215,11 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
     async setPlaced(things) {
       if (destroyed) return;
       placedYaw = new Map(things.map((thing) => [thing.thingId, thing.transform.yawMicroradians]));
-      // A thing whose workspace kind is gone (its creature erased) is drawn nowhere.
+      // A thing whose workspace kind is gone (its creature erased) is drawn nowhere, and what the
+      // page kept of that kind is forgotten with it.
+      for (const thing of things) {
+        if (thing.gone === true && thing.kind.source === 'workspace') void library.forgetHeldKind(thing.kind.sha256);
+      }
       await layer.setPlaced(things.filter((thing) => !thing.gone).map(placedThingRecord));
     },
     setSociety(state) {

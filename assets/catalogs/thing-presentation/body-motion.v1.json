@@ -1,0 +1,111 @@
+{
+  "profile": "exulanica.body-motion/v1",
+  "note": "How a page draws the motion of a drafted body's stated chains, and how fast a long body turns. Every value here is presentation: no recorded position, path, ability or event is changed by it, and a page that reads none of it draws a drafted body's legs and arms as it draws anyone's, holds its other chains at rest and turns it at once. Each value is a chosen default with its reason, not a measured cost or a safety bound; a later version is another file beside this one.",
+  "entries": [
+    {
+      "key": "full_walk_strides_per_second",
+      "value": 0.8,
+      "unit": "per_second",
+      "class": "chosen_default",
+      "reason": "A drafted body walking slower than this many of its own strides a second is drawn with shorter steps, blending down to standing, so a walk starts and stops without a jump. The shipped figures use one speed for every body, 0.5 m a second, which is 0.8 strides a second of a 1.7 m figure's 0.63 m stride. A drafted body may be a hand long or a street long, so the same blend is stated in strides and each body's own stride sets the speed."
+    },
+    {
+      "key": "look_about_rad",
+      "value": 0.12,
+      "unit": "radian",
+      "class": "chosen_default",
+      "reason": "How far a neck and its head turn to each side, in all, as a standing or walking being looks about: the turn is shared equally by the neck's bones and the head, so a long neck curves and a short one turns. It equals what a shipped figure's neck and head turn together (0.06 each), about 7 degrees: enough to read as alive from across a street, too little to look away from where the being walks."
+    },
+    {
+      "key": "look_about_period_seconds",
+      "value": 17,
+      "unit": "second",
+      "class": "chosen_default",
+      "reason": "How long one look to both sides takes. The shipped figures look about at 0.37 radians of phase a second, a 17 second period, which reads as idle attention and never as a shake of the head. Each further head of one body runs a share of a cycle behind (wave_lag_cycles), so several heads do not move as one."
+    },
+    {
+      "key": "nod_rad",
+      "value": 0.12,
+      "unit": "radian",
+      "class": "chosen_default",
+      "reason": "How far a head nods on each beat while its being speaks, so a watcher can see who is speaking when a line is drawn over a crowd. A drafted head is one bone, so it nods a little more than each of a shipped figure's two (0.09 each, 0.18 together) and less than both: its jaw moves too."
+    },
+    {
+      "key": "speech_beats_per_second",
+      "value": 2.1,
+      "unit": "per_second",
+      "class": "chosen_default",
+      "reason": "How many beats a second a speaking being's head nods and its jaw opens. The shipped figures nod at 2.1 beats a second, near the rate of stressed syllables in unhurried speech, and a drafted body keeps that beat so a person and a creature talking together move to one rhythm."
+    },
+    {
+      "key": "jaw_open_rad",
+      "value": 0.3,
+      "unit": "radian",
+      "class": "chosen_default",
+      "reason": "How far a jaw opens on a beat of speech, about 17 degrees: a jaw is short beside its head, so less than this is lost at the distance beings are watched from, and much more reads as a bite. A jaw whose socket carries something stays shut on it, whatever the being says."
+    },
+    {
+      "key": "wave_rad",
+      "value": 0.1,
+      "unit": "radian",
+      "class": "chosen_default",
+      "reason": "How far each joint of a tail or of a tentacle that hangs bends at the height of its wave. The bend adds up along the chain, so a tail of five joints swings its tip about half a radian in all and a tail of one barely moves, as a longer tail does. A shipped figure's appendage bends 0.12 a joint the same way."
+    },
+    {
+      "key": "wave_period_seconds",
+      "value": 2,
+      "unit": "second",
+      "class": "chosen_default",
+      "reason": "How long one wave of a tail, a hanging tentacle or a fin takes: the shipped figures sway appendages once every 2 seconds, slow enough to read as a body at ease."
+    },
+    {
+      "key": "wave_lag_cycles",
+      "value": 0.1,
+      "unit": "cycle",
+      "class": "chosen_default",
+      "reason": "How far behind each next joint of a waving chain runs, as a share of a cycle, which is what makes the bend travel outward along a tail instead of swinging it as a stick; the shipped figures lag each joint 0.6 radians of phase, which is 0.095 of a cycle, and this rounds it to a tenth. Each next chain of the same role (a second tail, the next tentacle, the next head looking about) runs the same share behind the one before, so they do not move as one."
+    },
+    {
+      "key": "wing_fold_share",
+      "value": 0.95,
+      "unit": "share",
+      "class": "chosen_default",
+      "reason": "A being on the ground carries its wings folded: each segment is turned from where the look drew it spread toward the body's back by this share of the way, so the wing lies along the flank inside the body's width and a winged being fits a street. The last twentieth is left so the two wings and the back do not lie in one plane. Flight, when a body flies, is another motion and not this one."
+    },
+    {
+      "key": "wing_settle_rad",
+      "value": 0.03,
+      "unit": "radian",
+      "class": "chosen_default",
+      "reason": "How far a folded wing lifts and settles on each step of a walk, under 2 degrees: a wing is not held rigid against a walking body, and more than this reads as flapping."
+    },
+    {
+      "key": "fin_sway_rad",
+      "value": 0.15,
+      "unit": "radian",
+      "class": "chosen_default",
+      "reason": "How far a fin sways about the body's length, about 9 degrees to each side, on the period every waving chain keeps: a fin is short, so it needs a wider turn than a tail's joint to be seen."
+    },
+    {
+      "key": "spine_wave_rad",
+      "value": 0.5,
+      "unit": "radian",
+      "class": "chosen_default",
+      "reason": "The steepest a legless body's spine turns from the way it is going, about 29 degrees, in the wave it moves by. The wave is fixed to the ground the body has covered and not to a clock, so every part follows the part ahead of it along one path and the body moves forward as it bends: it does not glide, and it lies still, curved, when it stops. A steeper wave than this makes a body a few joints long kink at each joint."
+    },
+    {
+      "key": "spine_wavelength_share",
+      "value": 0.67,
+      "unit": "share",
+      "class": "chosen_default",
+      "reason": "The length of one wave of a legless body, as a share of its spine's length: two thirds, so a body shows one and a half waves, the least that reads as a body winding and not as one bend. With spine_wave_rad it sets how far the body swings to each side: the wave's length times the angle over two pi, about 0.24 m for a 4.5 m spine."
+    },
+    {
+      "key": "turn_end_speed_mm_per_second",
+      "value": 3000,
+      "unit": "millimetre_per_second",
+      "class": "chosen_default",
+      "reason": "A walker whose kind states its body's extent turns toward the way it walks at a bounded rate: the rate at which the ends of its longer side sweep sideways at this speed, about twice a walking pace. A body half a metre long turns a quarter in about a tenth of a second, as people are drawn turning at once, and a body 12 m long takes about 3 seconds over a quarter turn instead of swinging 6 m of itself through a street in one frame."
+    }
+  ]
+}

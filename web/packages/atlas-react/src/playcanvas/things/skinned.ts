@@ -22,9 +22,10 @@
 
 import * as pc from 'playcanvas';
 import { STANDING_SPEED, gaitFor } from '../character/person.js';
-import type { Grip, SkinnedRig } from './documents.js';
+import type { BodyExtent, Grip, SkinnedRig } from './documents.js';
 import { HALF_TURN, bodyCarry, nodeCarry, placeHeld, quat, quatOf, type PickVolume, type ThingFigure, type ThingPose } from './figures.js';
-import { axisAngle, gaitTravel, mul, rotate, solvePose } from './motion.js';
+import { bodyGround, type BodyMotion, type Footprint } from './body-motion.js';
+import { axisAngle, bodyTravel, mul, rotate, solvePose } from './motion.js';
 import { dressSkeleton, type BodyPlanEntry, type DressedSkeleton, type Vec3 } from './skeleton.js';
 
 const LOCOMOTION = 'locomotion';
@@ -45,6 +46,8 @@ export class SkinnedFigure implements ThingFigure {
   readonly lookKind = 'skinned' as const;
   readonly standingHeight: number;
   readonly pickVolume: PickVolume;
+  readonly footprint: Footprint | null;
+  readonly turnRate: number | null;
   private readonly figure: pc.Entity;
   private readonly joints = new Map<string, pc.Entity>();
   private readonly restLocal = new Map<string, pc.Quat>();
@@ -86,6 +89,10 @@ export class SkinnedFigure implements ThingFigure {
     name: string,
     lookHeightMm: number,
     heightMm: number,
+    /** The table a body whose plan states its chains is posed by where it has no clip (`./body-motion.ts`). */
+    private readonly motion: BodyMotion | null = null,
+    /** The extent the figure's kind states, for a kind that states one. */
+    extentMm: BodyExtent | null = null,
   ) {
     this.root = new pc.Entity(name);
     parent.addChild(this.root);
@@ -96,7 +103,13 @@ export class SkinnedFigure implements ThingFigure {
     this.figure.setLocalRotation(quat(HALF_TURN));
     this.standingHeight = heightMm / 1000;
     const w = PICK_HALF_WIDTH * this.standingHeight;
-    this.pickVolume = { kind: 'box', min: [-w, 0, -w], max: [w, this.standingHeight, w] };
+    // A body whose kind states its extent is picked over the ground it covers and turns as fast as its size lets it.
+    const ground = extentMm === null ? null : bodyGround(extentMm, heightMm / lookHeightMm, motion);
+    this.footprint = ground?.footprint ?? null;
+    this.turnRate = ground?.turnRate ?? null;
+    this.pickVolume = ground === null
+      ? { kind: 'box', min: [-w, 0, -w], max: [w, this.standingHeight, w] }
+      : { kind: 'box', min: [-ground.footprint.halfAcross, 0, -ground.footprint.halfAlong], max: [ground.footprint.halfAcross, this.standingHeight, ground.footprint.halfAlong] };
     const planBones = new Set(plan.bones.map((bone) => bone.name));
     for (const [bone, joint] of Object.entries(rig.bones)) {
       if (!planBones.has(bone)) throw new TypeError(`The look's rig maps "${bone}", which ${plan.key}/v${plan.version} has no bone for.`);
@@ -200,7 +213,7 @@ export class SkinnedFigure implements ThingFigure {
       this.speed = 0;
     }
     if (this.procedural !== null && this.previous !== null && !pose.discontinuity && dt > 0) {
-      this.travelled += gaitTravel(Math.hypot(x - this.previous[0], z - this.previous[2]) / this.scale, this.speed / this.scale);
+      this.travelled += bodyTravel(this.skeleton, Math.hypot(x - this.previous[0], z - this.previous[2]) / this.scale, this.speed / this.scale, this.motion);
     }
     this.previous = pose.position;
     this.time += pose.reducedMotion ? 0 : dt;
@@ -242,7 +255,7 @@ export class SkinnedFigure implements ThingFigure {
       reach: pose.reach ?? null,
       talking: pose.talking === true,
       ...(pose.reducedMotion ? { reducedMotion: true } : {}),
-    });
+    }, this.motion);
     for (const bone of this.skeleton.order) this.joints.get(bone)!.setLocalRotation(quat(solved.local.get(bone)!));
     const at = solved.rootPosition, rest = procedural.rootLook, local = procedural.rootLocal;
     this.joints.get(this.skeleton.root)!.setLocalPosition(local.x + at[0] - rest[0], local.y + at[1] - rest[1], local.z + at[2] - rest[2]);

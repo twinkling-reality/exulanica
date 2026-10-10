@@ -626,6 +626,30 @@ export function mountEnvironmentSelection(
   const documentLabels = new Map<string, string | null>();
   /** Those kinds whose documents are being read now. */
   const kindsReading = new Set<string>();
+  /** Each kind its workspace keeps that a being here has been of, by its key, to its digest. */
+  const madeKindsSeen = new Map<string, string>();
+  /**
+   * A kind its workspace keeps is named by its maker's own word, read from the workspace. The page
+   * keeps that word, and what its library read of the kind, only while a being of the kind is
+   * among the people or a notice of one waits to be told. Once none is (the being was removed, or
+   * its maker erased the creature and it left), both are forgotten, and asked of the workspace
+   * again if one comes back: an erased creature's name is not kept to say again.
+   */
+  function forgetAbsentKinds(people: readonly { readonly kind?: KindReference }[]): void {
+    const here = new Set<string>();
+    const noticed = heldNotices.flatMap((held) => noticeKinds(held.event));
+    for (const kind of [...people.flatMap((one) => (one.kind === undefined ? [] : [one.kind])), ...noticed]) {
+      if (!isMadeKind(kind)) continue;
+      here.add(kindKey(kind));
+      madeKindsSeen.set(kindKey(kind), kind.sha256);
+    }
+    for (const [key, digest] of [...madeKindsSeen]) {
+      if (here.has(key) || kindsReading.has(key)) continue;
+      madeKindsSeen.delete(key);
+      documentLabels.delete(key);
+      void things?.layer.maker.library.forgetHeldKind(digest);
+    }
+  }
   let authoredWorldFailure: string | null = null;
   let chosen: NYCLocalFeature | null = null;
   let admittedFeaturesByProvider = new Map<string, NYCLocalFeature>();
@@ -2075,6 +2099,7 @@ export function mountEnvironmentSelection(
         tellVisitors();
         showLines(society.societyId, view.events, society.state);
       }
+      forgetAbsentKinds(society.state.inhabitants);
       canvas.dataset.societyPopulation = String(society.populationSize);
       canvas.dataset.societyRendered = String(runtime.drawnInhabitantCount);
       canvas.dataset.societyTick = String(society.currentTick);
@@ -2622,6 +2647,10 @@ export function mountEnvironmentSelection(
         leaving: (id) => atlas.authoredSociety?.isLeaving(id) ?? false,
       });
       if ((phase as string) === 'disposed') { things.destroy(); things = null; return; }
+      // A creature erased since it was placed: its maker's name for it is not kept to say again.
+      for (const thing of placed) {
+        if (thing.gone === true && thing.kind.source === 'workspace') documentLabels.set(kindKey({ source: 'workspace', sha256: thing.kind.sha256 }), null);
+      }
       await things.setPlaced(placed);
       if (deps.env.canvas) deps.env.canvas.dataset['thingsDrawn'] = String(things.layer.drawn.length);
       if (deps.env.canvas) deps.env.canvas.dataset['thingsMissed'] = String(things.misses.length);
@@ -3064,6 +3093,7 @@ export function mountEnvironmentSelection(
       heldNotices = [];
       documentLabels.clear();
       kindsReading.clear();
+      madeKindsSeen.clear();
       if (deps.env.canvas) delete deps.env.canvas.dataset['thingMarks'];
       if (deps.env.canvas) for (const key of ['thingsDrawn', 'thingsMissed', 'thingsFailure']) delete deps.env.canvas.dataset[key];
       savedWorldActions.clear();

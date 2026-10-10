@@ -12,7 +12,7 @@
  * Pure: no renderer.
  */
 
-import type { BodyPlanEntry, PlanBone, PlanSocket } from './skeleton.js';
+import { CHAIN_ROLES, CHAIN_SIDES, type BodyPlanEntry, type ChainRole, type ChainSide, type PlanBone, type PlanChain, type PlanSocket } from './skeleton.js';
 
 export const THING_LIBRARY_PROFILE = 'exulanica.thing-library/v1';
 export const LOOK_PROFILE = 'exulanica.look/v1';
@@ -85,6 +85,14 @@ export interface Grip {
 }
 
 /** What drawing reads of a kind: its body and how it is held. */
+/** A body's extent as its kind states it, millimetres: along the way it faces, across, up, and its wings' span. */
+export interface BodyExtent {
+  readonly length: number;
+  readonly width: number;
+  readonly height: number;
+  readonly span: number;
+}
+
 export interface KindDrawing {
   readonly kind: string;
   readonly version: number;
@@ -96,6 +104,8 @@ export interface KindDrawing {
   readonly heightMm: { readonly from: number; readonly to: number } | null;
   readonly radiusMm: number | null;
   readonly boxMm: { readonly width: number; readonly depth: number; readonly height: number } | null;
+  /** The extent a drafted body's kind states (its length is along the way it faces), or null for a kind that states none. */
+  readonly extentMm: BodyExtent | null;
   /** How a holdable thing is gripped, or null for a thing nobody holds. */
   readonly grip: Grip | null;
   readonly looks: readonly DocumentReference[];
@@ -217,6 +227,15 @@ export function readKindDrawing(value: unknown): KindDrawing {
     return Object.freeze({ width: r.whole(b['width'], 'body.box_mm.width', 1), depth: r.whole(b['depth'], 'body.box_mm.depth', 1), height: r.whole(b['height'], 'body.box_mm.height', 1) });
   })();
   const radius = bodyRow['radius_mm'] === undefined ? null : r.whole(bodyRow['radius_mm'], 'body.radius_mm', 1);
+  const extent = bodyRow['extent_mm'] === undefined ? null : (() => {
+    const e = r.object(bodyRow['extent_mm'], 'body.extent_mm');
+    return Object.freeze({
+      length: r.whole(e['length'], 'body.extent_mm.length', 1),
+      width: r.whole(e['width'], 'body.extent_mm.width', 1),
+      height: r.whole(e['height'], 'body.extent_mm.height', 1),
+      span: r.whole(e['span'], 'body.extent_mm.span'),
+    });
+  })();
   let grip: Grip | null = null;
   for (const [i, offer] of r.list(body['offers'] ?? [], 'offers').entries()) {
     const row = r.object(offer, `offers[${i}]`);
@@ -243,6 +262,7 @@ export function readKindDrawing(value: unknown): KindDrawing {
     heightMm: height,
     radiusMm: radius,
     boxMm: box,
+    extentMm: extent,
     grip,
     looks: Object.freeze(r.list(body['looks'], 'looks').map((look, i) => r.reference(look, `looks[${i}]`, 'look'))),
   });
@@ -343,7 +363,33 @@ function planEntry(r: ReturnType<typeof reader>, entry: unknown, at: string): Bo
   if (names.size !== bones.length) r.fail(`${at}.bones`, 'names a bone twice');
   for (const [j, b] of bones.entries()) if (b.parent !== null && !names.has(b.parent)) r.fail(`${at}.bones[${j}].parent`, `names no bone of ${key}/v${version}`);
   for (const [j, s] of sockets.entries()) if (s.bone !== null && !names.has(s.bone)) r.fail(`${at}.sockets[${j}].bone`, `names no bone of ${key}/v${version}`);
-  return Object.freeze({ key, version, bones: Object.freeze(bones), sockets: Object.freeze(sockets) });
+  // The chains a drafted plan states (the things contract, "Chains"); a shipped catalog plan states
+  // none, and its limbs are read from its shape.
+  if (row['limbs'] === undefined) return Object.freeze({ key, version, bones: Object.freeze(bones), sockets: Object.freeze(sockets) });
+  const parents = new Map(bones.map((b) => [b.name, b.parent]));
+  const claimed = new Set<string>();
+  const keys = new Set<string>();
+  const limbs = r.list(row['limbs'], `${at}.limbs`).map((limb, j): PlanChain => {
+    const here = `${at}.limbs[${j}]`;
+    const l = r.object(limb, here);
+    const chainKey = r.text(l['key'], `${here}.key`);
+    if (keys.has(chainKey)) r.fail(`${here}.key`, 'names a chain twice');
+    keys.add(chainKey);
+    const role = r.text(l['role'], `${here}.role`);
+    if (!(CHAIN_ROLES as readonly string[]).includes(role)) r.fail(`${here}.role`, `is not one of ${CHAIN_ROLES.join(', ')}`);
+    const side = r.text(l['side'], `${here}.side`);
+    if (!(CHAIN_SIDES as readonly string[]).includes(side)) r.fail(`${here}.side`, `is not one of ${CHAIN_SIDES.join(', ')}`);
+    const chain = r.list(l['bones'], `${here}.bones`).map((bone, k) => r.text(bone, `${here}.bones[${k}]`));
+    if (chain.length === 0) r.fail(`${here}.bones`, 'names no bone');
+    for (const [k, bone] of chain.entries()) {
+      if (!parents.has(bone)) r.fail(`${here}.bones[${k}]`, `names no bone of ${key}/v${version}`);
+      if (claimed.has(bone)) r.fail(`${here}.bones[${k}]`, 'names a bone another chain names');
+      if (k > 0 && parents.get(bone) !== chain[k - 1]) r.fail(`${here}.bones[${k}]`, 'is not a child of the bone before it in the chain');
+      claimed.add(bone);
+    }
+    return Object.freeze({ key: chainKey, role: role as ChainRole, side: side as ChainSide, order: r.whole(l['order'], `${here}.order`), bones: Object.freeze(chain) });
+  });
+  return Object.freeze({ key, version, bones: Object.freeze(bones), sockets: Object.freeze(sockets), limbs: Object.freeze(limbs) });
 }
 
 /**

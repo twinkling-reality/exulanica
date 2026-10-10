@@ -32,6 +32,7 @@ const thingKey = (thing: { readonly id: string; readonly placed_id: string | nul
 
 /** Who holds a thing and in which socket, or null for a thing on the ground. */
 const holderOf = (thing: HeldThing): string | null => (thing.held_by == null ? null : `${thing.held_by}|${thing.socket ?? ''}`);
+import type { BodyMotion } from './body-motion.js';
 import type { ThingCrowdFigures } from './crowd-figures.js';
 import type { Grip, LookDrawing } from './documents.js';
 import type { InstancedContainer } from './dispatch.js';
@@ -108,6 +109,8 @@ export interface ThingLayerOptions {
   readonly personEdge?: string;
   /** The society drawn now, which Play this one's rings stand in, or null while none is. */
   readonly society?: () => DrawnSociety | null;
+  /** The table a drafted body's stated chains are posed by (`./body-motion.ts`); at rest when left out. */
+  readonly bodyMotion?: BodyMotion;
 }
 
 /** Where the society's people stand as its crowd draws them (`AuthoredSociety`). */
@@ -126,6 +129,8 @@ export interface SocietyPoint {
 
 /** The ring at the feet of the being a person plays, and around where its next walk goes, metres. */
 export const PLAYED_RING_RADIUS = 0.45;
+/** How far outside a person the played ring stands: its radius less the quarter metre a person is from middle to side. */
+const PLAYED_RING_CLEAR = PLAYED_RING_RADIUS - 0.25;
 export const DESTINATION_RING_RADIUS = 0.35;
 
 interface Entry {
@@ -175,6 +180,7 @@ export class ThingLayer {
       app: options.app,
       library: options.library,
       ...(options.instantiate ? { instantiate: options.instantiate } : {}),
+      ...(options.bodyMotion ? { bodyMotion: options.bodyMotion } : {}),
     });
     // After the engine's animation step, so a rigged look's arm is posed over its clip.
     options.app.on('update', this.onUpdate);
@@ -311,7 +317,9 @@ export class ThingLayer {
       this.options.app.root.addChild(this.playedAt);
     }
     this.playedAt.setPosition(this.feet);
-    this.playedRing.place(this.playedAt, PLAYED_RING_RADIUS);
+    // Around a body that states its size the ring stands as far outside its flanks as it stands outside a person.
+    const body = this.society?.figures?.renderableOf(this.played!)?.footprint ?? null;
+    this.playedRing.place(this.playedAt, body === null ? PLAYED_RING_RADIUS : Math.max(PLAYED_RING_RADIUS, body.halfAcross + PLAYED_RING_CLEAR));
   }
 
   /** The destination's ring on the society's ground, in the crowd's own frame; none without a society. */

@@ -842,6 +842,12 @@ its workspace still holds but whose run form cannot be built (its plan or recipe
 is left out of the input too and is not named among those gone: a being that was it leaves as a
 removed one does.
 
+An open page forgets the creature too. It keeps the name its maker gave the kind, and what its
+library read of the kind (its document, its drafted plan, its looks and their containers), only
+while a being of that kind is among the people it draws or a notice of one waits to be told. Once
+none is, and when it reads a placed thing as gone, it drops them; were a being of that kind listed
+again it would ask the workspace, which answers that it holds none, and say no name.
+
 ## A workspace's own things
 
 A workspace keeps the things it made or admitted as the documents they were read as
@@ -1046,6 +1052,45 @@ look's height the steps are drawn shorter and come as often as at that pace, the
 shortened stride down to a tenth of the full one. No thing's figure steps for a turn, so a thing
 that is going nowhere stands however it is turned; under reduced motion they stand still.
 
+A plan that states its chains, as every drafted body's does, is not read from its shape: each
+chain is a limb with the role, side and order its plan states, and a bone outside every chain is a
+head where a neck chain ends at its parent or a jaw chain hangs from it, and otherwise keeps its
+rest turn. Each role is posed by one rule, written once for every body:
+
+| Role | How it is posed |
+|---|---|
+| `leg` | Steps in the gait, its place taken from its chain's order and side: left and right in turn, each rank against the next, for any number of pairs. A planted foot keeps its point of the ground and its height. A leg of one segment cannot bend to reach, so it swings about its hip like a paddle |
+| `arm` | Hangs and swings against the legs, carries what its sockets hold and reaches, as any figure's arm does |
+| `spine` | The hips sway with the legs and the spine turns that sway back twice over, so the shoulders sway against the hips. A body lying along the ground does not lean into its walk |
+| `neck` and the head | The neck returns what the body turned, so the head faces where the being goes; neck and head share a slow look to each side, and the head nods on each beat while the being speaks |
+| `jaw` | Opens on each beat of speech; stays shut on what its socket carries, and otherwise |
+| `tail`, and a `tentacle` that hangs | A wave that travels outward, each joint a lag behind the one before: about the upright for a chain along the ground, about the body's length for one that hangs |
+| `wing` | Folded along the body: each segment turned from where its look drew it spread toward the body's back, so the wing lies inside the body's width. It settles a little on each step. Nothing flies |
+| `fin` | A slow sway about the body's length |
+| `tentacle`, on a body with no leg | The body steps on its tentacles, alternate ones together; while it stands they hang and wave |
+
+A body with neither leg nor tentacle whose spine lies along the ground moves by a wave down that
+spine. The wave is fixed to the ground the body has covered and not to a clock: each joint comes to
+where the joint ahead of it was, so the body moves forward as it bends and does not glide, and it
+lies still and curved when it stops. Its neck keeps its head to the front.
+
+Every angle, period and share those rules use is data, one entry each with its class and its
+reason, in [`body-motion.v1.json`](../assets/catalogs/thing-presentation/body-motion.v1.json)
+(`exulanica.body-motion/v1`), which the page reads and hands its figures. It is presentation only:
+no recorded position, path, ability or event changes with it. A drafted body draws its full walk
+from a speed its own stride sets (`full_walk_strides_per_second`), where a shipped figure uses
+0.5 m/s whatever its size. A figure handed no table poses a drafted body's legs and arms and holds
+its other chains at rest. Under reduced motion nothing waves, sways, nods or looks about; a wing
+stays folded and a legless body keeps the curve it lies in.
+
+A kind that states its body's extent (`body.extent_mm`, as a drafted kind does) is drawn at that
+size on the ground. Its pick volume is its width by its length to its look's height, so the ring
+around a picked or played one takes its body in, and in a society's crowd it is picked over that
+footprint turned as it is drawn. It turns toward the way it walks no faster than its ends may
+sweep (`turn_end_speed_mm_per_second`): a body half a metre long turns a quarter in about a tenth
+of a second, one 12 m long in about three seconds, the shorter way round. A jump in the drawn
+minute faces it at once. A kind that states no extent is picked and turned as before.
+
 A version's placed things stand where it places them, in the frame their region is drawn in: the
 region a saved world's people live in, or an authored object's region root. A thing in a region
 the world does not draw, a document the library does not hold at its digest, a look kind the page
@@ -1191,11 +1236,11 @@ These are material limits of the boundary above, not partial behaviour:
   its body: no society reads a pace from a body yet. Its routine is the purposeful routine held to
   the abilities its kind lists; the weights drafted with it are read by nothing, so a creature
   whose kind lists none of rest, visit, stand and talk waits where it is. A decider is told its
-  body, never a temperament: nothing drafts or carries one. The page poses its sketch by guessing
-  each limb's role from its shape, not from the chains its plan states: a chain that carries a
-  socket is read as an arm, so a jawed head and its neck are posed as an arm is; no role is a
-  wing, a tail or a tentacle; a body with no legs has no walk; and a being faces along its last
-  step with no turning rate, so a long body turns about its middle at once. It wears only its sketch: a
+  body, never a temperament: nothing drafts or carries one. Because the society moves every body at
+  the people's pace, a small body's legs step as often as that pace asks of its short stride, and a
+  large body's seldom. A leg of one segment does not lift as it swings forward. A sketch is posed
+  in full at any distance within the crowd's far radius; how many the page poses in a frame is not
+  measured. It wears only its sketch: a
   choice of another look for it is refused (`look_unfit`). A creature placed in a world whose
   society is not a society of things (a living town already made) is taken in by nothing and
   stands where it was placed.

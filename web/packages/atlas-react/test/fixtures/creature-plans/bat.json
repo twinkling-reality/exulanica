@@ -1,0 +1,493 @@
+{
+ "joints_m": {
+  "head1": [
+   0.0,
+   0.09200000017881393,
+   0.0989999994635582
+  ],
+  "head1Jaw": [
+   0.0,
+   0.0820000022649765,
+   0.10899999737739563
+  ],
+  "head1Neck1": [
+   0.0,
+   0.08100000023841858,
+   0.07900000363588333
+  ],
+  "hips": [
+   0.0,
+   0.07199999690055847,
+   -0.12600000202655792
+  ],
+  "leg1Left1": [
+   0.020999999716877937,
+   0.05700000002980232,
+   -0.023000000044703484
+  ],
+  "leg1Left2": [
+   0.06499999761581421,
+   0.03700000047683716,
+   -0.017999999225139618
+  ],
+  "leg1Right1": [
+   -0.020999999716877937,
+   0.05700000002980232,
+   -0.023000000044703484
+  ],
+  "leg1Right2": [
+   -0.06499999761581421,
+   0.03700000047683716,
+   -0.017999999225139618
+  ],
+  "spine1": [
+   0.0,
+   0.07199999690055847,
+   -0.057999998331069946
+  ],
+  "spine2": [
+   0.0,
+   0.07199999690055847,
+   0.009999999776482582
+  ],
+  "tail1": [
+   0.0,
+   0.07199999690055847,
+   -0.12600000202655792
+  ],
+  "wing1Left1": [
+   0.017999999225139618,
+   0.09300000220537186,
+   0.03799999877810478
+  ],
+  "wing1Left2": [
+   0.17299999296665192,
+   0.10599999874830246,
+   0.04600000008940697
+  ],
+  "wing1Left3": [
+   0.3269999921321869,
+   0.11800000071525574,
+   0.035999998450279236
+  ],
+  "wing1Right1": [
+   -0.017999999225139618,
+   0.09300000220537186,
+   0.03799999877810478
+  ],
+  "wing1Right2": [
+   -0.17299999296665192,
+   0.10599999874830246,
+   0.04600000008940697
+  ],
+  "wing1Right3": [
+   -0.3269999921321869,
+   0.11800000071525574,
+   0.035999998450279236
+  ]
+ },
+ "kind": {
+  "abilities": [
+   {
+    "key": "wait",
+    "parameters": {}
+   },
+   {
+    "key": "stand",
+    "parameters": {}
+   },
+   {
+    "key": "follow",
+    "parameters": {}
+   },
+   {
+    "key": "say",
+    "parameters": {}
+   }
+  ],
+  "body": {
+   "extent_mm": {
+    "height": 120,
+    "length": 300,
+    "span": 900,
+    "width": 150
+   },
+   "plan": "fixture_bat/v1",
+   "plan_sha256": "2517c687655f12e3353f3e2c50d8c0e351a0f78071c5bf8d2251028af6640660"
+  },
+  "class": "being",
+  "deciders": {
+   "allowed": [
+    "routine",
+    "model",
+    "person"
+   ],
+   "default": "routine"
+  },
+  "ext": {},
+  "kind": "fixture_bat",
+  "label": "fixture bat",
+  "looks": [
+   {
+    "look": "fixture-bat-sketch",
+    "sha256": "9f6cc00d8ba2934318f8761ed362b90ded99840520ec6a1d97304aa54f22a590",
+    "version": 1
+   }
+  ],
+  "moves": [
+   "exulanica-movement/walking/v1"
+  ],
+  "offers": [
+   {
+    "key": "talk_to",
+    "parameters": {}
+   },
+   {
+    "key": "hear",
+    "parameters": {}
+   },
+   {
+    "key": "be_followed",
+    "parameters": {}
+   }
+  ],
+  "origin": {
+   "authors": [],
+   "by": {
+    "execution_sha256": null,
+    "kind": "model",
+    "model_id": "fixture/hand-written",
+    "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prompt_version": "creature-drafting-1",
+    "provider": "nebius_token_factory",
+    "words_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+   },
+   "class": "drafted",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "e97dbb5cb2e27d4c5403d4e8604bfbd8970b4fbd3b7b2f95808713c452594288",
+     "2517c687655f12e3353f3e2c50d8c0e351a0f78071c5bf8d2251028af6640660"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.thing-kind/v1",
+  "routine": {
+   "follow_holders_of": [],
+   "reason": "Drafted with the creature: the weights the drafting model gave its abilities, which its routine draws among whenever no mind is choosing for it.",
+   "weights": {
+    "wait": 300
+   }
+  },
+  "summary": "A creature built from a hand-written body recipe for the page's tests.",
+  "version": 1
+ },
+ "look": {
+  "body_plan": "fixture_bat/v1",
+  "container": {
+   "bytes": 53376,
+   "media_type": "model/gltf-binary",
+   "sha256": "b8456c70ec6178c2279e69ef4b6f06f5e5584ca7f88cd2c37528e7c834afe061"
+  },
+  "height_mm": 120,
+  "label": "a sketch of its body",
+  "light": null,
+  "look": "fixture-bat-sketch",
+  "look_kind": "rigid_on_bones",
+  "origin": {
+   "authors": [],
+   "by": {
+    "kind": "project"
+   },
+   "class": "authored",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "CC0-1.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "e97dbb5cb2e27d4c5403d4e8604bfbd8970b4fbd3b7b2f95808713c452594288",
+     "2517c687655f12e3353f3e2c50d8c0e351a0f78071c5bf8d2251028af6640660"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.look/v1",
+  "rig": null,
+  "role": null,
+  "sampling": "linear",
+  "version": 1
+ },
+ "plan": {
+  "bones": [
+   {
+    "name": "hips",
+    "parent": null,
+    "required": true
+   },
+   {
+    "name": "spine1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "spine2",
+    "parent": "spine1",
+    "required": true
+   },
+   {
+    "name": "head1Neck1",
+    "parent": "spine2",
+    "required": true
+   },
+   {
+    "name": "head1",
+    "parent": "head1Neck1",
+    "required": true
+   },
+   {
+    "name": "head1Jaw",
+    "parent": "head1",
+    "required": true
+   },
+   {
+    "name": "tail1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "leg1Left1",
+    "parent": "spine1",
+    "required": true
+   },
+   {
+    "name": "leg1Left2",
+    "parent": "leg1Left1",
+    "required": true
+   },
+   {
+    "name": "leg1Right1",
+    "parent": "spine1",
+    "required": true
+   },
+   {
+    "name": "leg1Right2",
+    "parent": "leg1Right1",
+    "required": true
+   },
+   {
+    "name": "wing1Left1",
+    "parent": "spine2",
+    "required": true
+   },
+   {
+    "name": "wing1Left2",
+    "parent": "wing1Left1",
+    "required": true
+   },
+   {
+    "name": "wing1Left3",
+    "parent": "wing1Left2",
+    "required": true
+   },
+   {
+    "name": "wing1Right1",
+    "parent": "spine2",
+    "required": true
+   },
+   {
+    "name": "wing1Right2",
+    "parent": "wing1Right1",
+    "required": true
+   },
+   {
+    "name": "wing1Right3",
+    "parent": "wing1Right2",
+    "required": true
+   }
+  ],
+  "key": "fixture_bat",
+  "limbs": [
+   {
+    "bones": [
+     "spine1",
+     "spine2"
+    ],
+    "key": "spine",
+    "order": 0,
+    "role": "spine",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "head1Neck1"
+    ],
+    "key": "head1Neck",
+    "order": 0,
+    "role": "neck",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "head1Jaw"
+    ],
+    "key": "head1Jaw",
+    "order": 0,
+    "role": "jaw",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "tail1"
+    ],
+    "key": "tail",
+    "order": 0,
+    "role": "tail",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "leg1Left1",
+     "leg1Left2"
+    ],
+    "key": "leg1Left",
+    "order": 0,
+    "role": "leg",
+    "side": "left"
+   },
+   {
+    "bones": [
+     "leg1Right1",
+     "leg1Right2"
+    ],
+    "key": "leg1Right",
+    "order": 0,
+    "role": "leg",
+    "side": "right"
+   },
+   {
+    "bones": [
+     "wing1Left1",
+     "wing1Left2",
+     "wing1Left3"
+    ],
+    "key": "wing1Left",
+    "order": 0,
+    "role": "wing",
+    "side": "left"
+   },
+   {
+    "bones": [
+     "wing1Right1",
+     "wing1Right2",
+     "wing1Right3"
+    ],
+    "key": "wing1Right",
+    "order": 0,
+    "role": "wing",
+    "side": "right"
+   }
+  ],
+  "motions": {
+   "optional": [
+    "talk",
+    "hold"
+   ],
+   "required": [
+    "idle",
+    "walk"
+   ]
+  },
+  "moves": [
+   "exulanica-movement/walking/v1"
+  ],
+  "origin": {
+   "authors": [],
+   "by": {
+    "execution_sha256": null,
+    "kind": "model",
+    "model_id": "fixture/hand-written",
+    "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prompt_version": "creature-drafting-1",
+    "provider": "nebius_token_factory",
+    "words_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+   },
+   "class": "drafted",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "e97dbb5cb2e27d4c5403d4e8604bfbd8970b4fbd3b7b2f95808713c452594288"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.body-plan/v1",
+  "reach_mm": 500,
+  "reason": "Built by exulanica-body-builder/v1 from a horizontal body recipe (sha256 e97dbb5cb2e27d4c5403d4e8604bfbd8970b4fbd3b7b2f95808713c452594288): every bone, chain, socket and range follows from the recipe and the body grammar version 1.",
+  "size": {
+   "extent_mm": {
+    "height": {
+     "maximum": 150,
+     "minimum": 96
+    },
+    "length": {
+     "maximum": 375,
+     "minimum": 240
+    },
+    "span": {
+     "maximum": 1125,
+     "minimum": 720
+    },
+    "width": {
+     "maximum": 187,
+     "minimum": 120
+    }
+   }
+  },
+  "sockets": [
+   {
+    "bone": "head1Jaw",
+    "grip_section_mm_maximum": 25,
+    "holds": 1,
+    "key": "mouth",
+    "length_mm_maximum": 75
+   }
+  ],
+  "title": "the body of a fixture bat",
+  "version": 1
+ },
+ "profile": "exulanica.creature-plan-fixture/v1",
+ "recipe_sha256": "e97dbb5cb2e27d4c5403d4e8604bfbd8970b4fbd3b7b2f95808713c452594288",
+ "written_by": "scripts/things/creature_plan_fixtures.py"
+}

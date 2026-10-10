@@ -22,6 +22,7 @@ import type { CrowdPose, CrowdRenderable, CrowdRenderableFactory, InhabitantIden
 import { isMadeKind } from '../society/types.js';
 import type { ThingFigureMaker } from './figure-maker.js';
 import { refusalOf } from './figure-maker.js';
+import type { Footprint } from './body-motion.js';
 import { PresenceFigure, facingOfYaw, type ThingFigure } from './figures.js';
 import type { Named } from './library.js';
 
@@ -76,14 +77,19 @@ export class ThingCrowdRenderable implements CrowdRenderable {
     return this.figureMade?.walkSpeed ?? null;
   }
 
+  /** The ground the figure's body covers, for a body whose kind states its extent; null until made or for none. */
+  get footprint(): Footprint | null {
+    return this.figureMade?.footprint ?? null;
+  }
+
   /** The sockets holding something now, as the society's state says. */
   setHolding(sockets: ReadonlySet<string>): void {
     this.holding = sockets;
   }
 
   pose(pose: CrowdPose & { readonly yaw?: number }): void {
+    if (pose.yaw !== undefined) this.facing = this.turned(pose.yaw, pose);
     this.last = pose;
-    if (pose.yaw !== undefined) this.facing = pose.yaw;
     this.figureMade?.pose({
       position: pose.position,
       facing: this.facing,
@@ -93,6 +99,19 @@ export class ThingCrowdRenderable implements CrowdRenderable {
       ...(pose.reducedMotion ? { reducedMotion: true } : {}),
       ...(pose.discontinuity ? { discontinuity: true } : {}),
     });
+  }
+
+  /**
+   * The facing drawn this frame on the way to `wanted`. A body whose kind states its extent turns
+   * no faster than its size lets it (`ThingFigure.turnRate`), the shorter way round; anyone else,
+   * a figure not yet made and a pose that is a jump face `wanted` at once.
+   */
+  private turned(wanted: number, pose: CrowdPose): number {
+    const rate = this.figureMade?.turnRate ?? null;
+    if (rate === null || pose.discontinuity || this.last === null) return wanted;
+    const turn = Math.atan2(Math.sin(wanted - this.facing), Math.cos(wanted - this.facing));
+    const most = rate * Math.max(0, pose.deltaSeconds);
+    return Math.abs(turn) <= most ? wanted : this.facing + Math.sign(turn) * most;
   }
 
   setVisible(visible: boolean): void {

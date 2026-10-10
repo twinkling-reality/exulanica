@@ -22,13 +22,23 @@ import type { AppEnvironment, SessionState } from '../src/composition/session-st
 const KNIGHT = { kind: 'knight', version: 1, sha256: 'a'.repeat(64) };
 const QWEN = { provider: 'nebius', modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507', name: 'Qwen3 235B Instruct' };
 
-const { FakeLayer, FakeMarks, marksMade, layersMade, bridgeReads } = vi.hoisted(() => {
+const { FakeLayer, FakeMarks, marksMade, layersMade, bridgeReads, workspace } = vi.hoisted(() => {
   const layers: InstanceType<typeof Layer>[] = [];
+  /** The workspace's own kinds, as the library reads them: what was asked for, and what was forgotten. */
+  const workspace = { asked: [] as string[], forgotten: [] as string[], label: 'ember drake' as string | null };
   class Layer {
     placed: readonly PlacedThingRecord[] = [];
     /** Each being the page has said the viewer plays, in order (null: nobody). */
     readonly played: (string | null)[] = [];
-    readonly maker = { library: { list: { kinds: [{ kind: 'knight', version: 1, sha256: 'a'.repeat(64), label: 'knight' }], looks: [] } } };
+    readonly maker = { library: {
+      list: { kinds: [{ kind: 'knight', version: 1, sha256: 'a'.repeat(64), label: 'knight' }], looks: [] },
+      async kindDocument(named: { readonly sha256: string }) {
+        workspace.asked.push(named.sha256);
+        if (workspace.label === null) throw new Error('The workspace holds no kind at that digest.');
+        return { label: workspace.label };
+      },
+      async forgetHeldKind(sha256: string) { workspace.forgotten.push(sha256); },
+    } };
     constructor(readonly options: ThingLayerOptions) { layers.push(this); }
     setSociety() {}
     setPlayed(subjectId: string | null) { this.played.push(subjectId); }
@@ -48,7 +58,7 @@ const { FakeLayer, FakeMarks, marksMade, layersMade, bridgeReads } = vi.hoisted(
     set(subjects: ReadonlyMap<string, MarkedSubject>) { (this.sets as ReadonlyMap<string, MarkedSubject>[]).push(subjects); }
     destroy() { this.destroyed = true; }
   }
-  return { FakeLayer: Layer, FakeMarks: Marks, marksMade: made, layersMade: layers, bridgeReads: { count: 0 } };
+  return { FakeLayer: Layer, FakeMarks: Marks, marksMade: made, layersMade: layers, bridgeReads: { count: 0 }, workspace };
 });
 vi.mock('@exulanica/atlas-react/things', async (original) => ({
   ...(await original<typeof import('@exulanica/atlas-react/things')>()),
@@ -83,6 +93,10 @@ const person = (id: string, extra: Record<string, unknown>) => ({
 /** The minute the society is read at, and whether the knight is played (and by whom), as a test sets them. */
 let tick = 3;
 let knightPlayed: { readonly byYou: boolean } | null = null;
+/** What the model's person is a being of, and whether it is among the people, as a test sets them. */
+const DRAKE = { source: 'workspace', sha256: 'd'.repeat(64) } as const;
+let modelsPersonKind: typeof KNIGHT | typeof DRAKE = KNIGHT;
+let modelsPersonHere = true;
 
 /** A society of things: a knight a model runs, a person their routine runs, and two visitors. */
 const society = (): SocietySnapshot => parseSociety({
@@ -91,7 +105,7 @@ const society = (): SocietySnapshot => parseSociety({
   state: { profile: 'exulanica-society/v7', society_id: 'society', branch_id: 'version', tick, input_seq: 1,
     input_sha256: 'b'.repeat(64),
     inhabitants: [
-      person('knight-0', { kind: KNIGHT, came_by: 'placed', placed_id: 'knight-1' }),
+      ...(modelsPersonHere ? [person('knight-0', { kind: modelsPersonKind, came_by: 'placed', placed_id: 'knight-1' })] : []),
       person('routine-0', { came_by: 'populated' }),
       person('player-0', { came_by: 'crossed', crossing: { arrival_id: 'arrival-1', bridge: 'blockgame', grant_id: 'grant-1' } }),
       person('stranger-0', { came_by: 'crossed', crossing: { arrival_id: 'arrival-2', bridge: 'elsewhere', grant_id: 'grant-2' } }),
@@ -234,6 +248,47 @@ describe('marks over the people of a saved world\'s society', () => {
     expect(layer.played.at(-1)).toBeNull();
     mounted.dispose();
     knightPlayed = null;
+    tick = 3;
+  });
+
+  it('names a being of a kind its workspace keeps by its maker\'s word while it is here, and forgets the word when it has gone', async () => {
+    tick = 3;
+    modelsPersonKind = DRAKE;
+    workspace.asked.length = 0;
+    workspace.forgotten.length = 0;
+    const refresh = async () => {
+      [...document.querySelectorAll('button')].find((button) => button.textContent === 'Refresh persisted society')!.click();
+      await settle();
+    };
+    const { mounted } = mount();
+    await mounted.begin();
+    await settle();
+    const marks = marksMade.at(-1)!;
+    // Read once from the workspace, by the kind's digest, and said over the being.
+    expect(marks.sets.at(-1)!.get('knight-0')!.label).toBe('ember drake');
+    expect(workspace.asked).toEqual([DRAKE.sha256]);
+    tick = 4;
+    await refresh();
+    // Still here: nothing is asked again and nothing forgotten.
+    expect(workspace.asked).toEqual([DRAKE.sha256]);
+    expect(workspace.forgotten).toEqual([]);
+    // Its maker erases the creature: the workspace no longer holds the kind, and the being has left.
+    workspace.label = null;
+    modelsPersonHere = false;
+    tick = 5;
+    await refresh();
+    expect(marks.sets.at(-1)!.has('knight-0')).toBe(false);
+    expect(workspace.forgotten).toEqual([DRAKE.sha256]);
+    // Were a being of that kind listed again, the page has no word of its own left to say:
+    // it asks the workspace, which holds none, and says no name.
+    modelsPersonHere = true;
+    tick = 6;
+    await refresh();
+    expect(workspace.asked).toEqual([DRAKE.sha256, DRAKE.sha256]);
+    expect(marks.sets.at(-1)!.get('knight-0')!.label).toBeNull();
+    mounted.dispose();
+    modelsPersonKind = KNIGHT;
+    workspace.label = 'ember drake';
     tick = 3;
   });
 });

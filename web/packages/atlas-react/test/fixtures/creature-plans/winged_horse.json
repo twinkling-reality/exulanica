@@ -1,0 +1,633 @@
+{
+ "joints_m": {
+  "head1": [
+   0.0,
+   1.9019999504089355,
+   0.9750000238418579
+  ],
+  "head1Neck1": [
+   0.0,
+   1.5119999647140503,
+   0.5849999785423279
+  ],
+  "head1Neck2": [
+   0.0,
+   1.6410000324249268,
+   0.7139999866485596
+  ],
+  "head1Neck3": [
+   0.0,
+   1.7710000276565552,
+   0.843999981880188
+  ],
+  "hips": [
+   0.0,
+   1.440000057220459,
+   -0.7149999737739563
+  ],
+  "leg1Left1": [
+   0.1679999977350235,
+   1.3200000524520874,
+   0.25999999046325684
+  ],
+  "leg1Left2": [
+   0.3070000112056732,
+   0.8840000033378601,
+   0.29100000858306885
+  ],
+  "leg1Left3": [
+   0.36000001430511475,
+   0.4359999895095825,
+   0.26100000739097595
+  ],
+  "leg1Right1": [
+   -0.1679999977350235,
+   1.3200000524520874,
+   0.25999999046325684
+  ],
+  "leg1Right2": [
+   -0.3070000112056732,
+   0.8840000033378601,
+   0.29100000858306885
+  ],
+  "leg1Right3": [
+   -0.36000001430511475,
+   0.4359999895095825,
+   0.26100000739097595
+  ],
+  "leg2Left1": [
+   0.1679999977350235,
+   1.3200000524520874,
+   -0.38999998569488525
+  ],
+  "leg2Left2": [
+   0.3070000112056732,
+   0.8840000033378601,
+   -0.35899999737739563
+  ],
+  "leg2Left3": [
+   0.36000001430511475,
+   0.4359999895095825,
+   -0.3889999985694885
+  ],
+  "leg2Right1": [
+   -0.1679999977350235,
+   1.3200000524520874,
+   -0.38999998569488525
+  ],
+  "leg2Right2": [
+   -0.3070000112056732,
+   0.8840000033378601,
+   -0.35899999737739563
+  ],
+  "leg2Right3": [
+   -0.36000001430511475,
+   0.4359999895095825,
+   -0.3889999985694885
+  ],
+  "spine1": [
+   0.0,
+   1.440000057220459,
+   -0.38999998569488525
+  ],
+  "spine2": [
+   0.0,
+   1.440000057220459,
+   -0.06499999761581421
+  ],
+  "spine3": [
+   0.0,
+   1.440000057220459,
+   0.25999999046325684
+  ],
+  "tail1": [
+   0.0,
+   1.440000057220459,
+   -0.7149999737739563
+  ],
+  "tail2": [
+   0.0,
+   1.3769999742507935,
+   -0.8610000014305115
+  ],
+  "tail3": [
+   0.0,
+   1.187999963760376,
+   -1.0069999694824219
+  ],
+  "tail4": [
+   0.0,
+   0.8730000257492065,
+   -1.152999997138977
+  ],
+  "wing1Left1": [
+   0.14399999380111694,
+   1.6080000400543213,
+   0.32499998807907104
+  ],
+  "wing1Left2": [
+   1.1629999876022339,
+   1.7949999570846558,
+   0.38100001215934753
+  ],
+  "wing1Left3": [
+   2.187000036239624,
+   1.9539999961853027,
+   0.30799999833106995
+  ],
+  "wing1Right1": [
+   -0.14399999380111694,
+   1.6080000400543213,
+   0.32499998807907104
+  ],
+  "wing1Right2": [
+   -1.1629999876022339,
+   1.7949999570846558,
+   0.38100001215934753
+  ],
+  "wing1Right3": [
+   -2.187000036239624,
+   1.9539999961853027,
+   0.30799999833106995
+  ]
+ },
+ "kind": {
+  "abilities": [
+   {
+    "key": "wait",
+    "parameters": {}
+   },
+   {
+    "key": "stand",
+    "parameters": {}
+   },
+   {
+    "key": "follow",
+    "parameters": {}
+   },
+   {
+    "key": "say",
+    "parameters": {}
+   }
+  ],
+  "body": {
+   "extent_mm": {
+    "height": 2400,
+    "length": 2600,
+    "span": 6000,
+    "width": 800
+   },
+   "plan": "fixture_winged_horse/v1",
+   "plan_sha256": "a3f7618a2f65c1563ec3c567091fb9bb0626f1e5be7bf55489e5f520cc558693"
+  },
+  "class": "being",
+  "deciders": {
+   "allowed": [
+    "routine",
+    "model",
+    "person"
+   ],
+   "default": "routine"
+  },
+  "ext": {},
+  "kind": "fixture_winged_horse",
+  "label": "fixture winged horse",
+  "looks": [
+   {
+    "look": "fixture-winged-horse-sketch",
+    "sha256": "e05e7e4feaaf9cc309b3783064d4a358fa8bd4611b13457ac324e82432ee8f2d",
+    "version": 1
+   }
+  ],
+  "moves": [
+   "exulanica-movement/walking/v1"
+  ],
+  "offers": [
+   {
+    "key": "talk_to",
+    "parameters": {}
+   },
+   {
+    "key": "hear",
+    "parameters": {}
+   },
+   {
+    "key": "be_followed",
+    "parameters": {}
+   }
+  ],
+  "origin": {
+   "authors": [],
+   "by": {
+    "execution_sha256": null,
+    "kind": "model",
+    "model_id": "fixture/hand-written",
+    "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prompt_version": "creature-drafting-1",
+    "provider": "nebius_token_factory",
+    "words_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+   },
+   "class": "drafted",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "1aba9e0d14a857f2f11e3792cd7335f90ad766e36836bc4234353a2c24eb41c8",
+     "a3f7618a2f65c1563ec3c567091fb9bb0626f1e5be7bf55489e5f520cc558693"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.thing-kind/v1",
+  "routine": {
+   "follow_holders_of": [],
+   "reason": "Drafted with the creature: the weights the drafting model gave its abilities, which its routine draws among whenever no mind is choosing for it.",
+   "weights": {
+    "wait": 300
+   }
+  },
+  "summary": "A creature built from a hand-written body recipe for the page's tests.",
+  "version": 1
+ },
+ "look": {
+  "body_plan": "fixture_winged_horse/v1",
+  "container": {
+   "bytes": 88040,
+   "media_type": "model/gltf-binary",
+   "sha256": "b29abc002ce2b144e5a6cb88a627d39a548b01504759f2d6188d2dc3bcf2e709"
+  },
+  "height_mm": 2400,
+  "label": "a sketch of its body",
+  "light": null,
+  "look": "fixture-winged-horse-sketch",
+  "look_kind": "rigid_on_bones",
+  "origin": {
+   "authors": [],
+   "by": {
+    "kind": "project"
+   },
+   "class": "authored",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "CC0-1.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "1aba9e0d14a857f2f11e3792cd7335f90ad766e36836bc4234353a2c24eb41c8",
+     "a3f7618a2f65c1563ec3c567091fb9bb0626f1e5be7bf55489e5f520cc558693"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.look/v1",
+  "rig": null,
+  "role": null,
+  "sampling": "linear",
+  "version": 1
+ },
+ "plan": {
+  "bones": [
+   {
+    "name": "hips",
+    "parent": null,
+    "required": true
+   },
+   {
+    "name": "spine1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "spine2",
+    "parent": "spine1",
+    "required": true
+   },
+   {
+    "name": "spine3",
+    "parent": "spine2",
+    "required": true
+   },
+   {
+    "name": "head1Neck1",
+    "parent": "spine3",
+    "required": true
+   },
+   {
+    "name": "head1Neck2",
+    "parent": "head1Neck1",
+    "required": true
+   },
+   {
+    "name": "head1Neck3",
+    "parent": "head1Neck2",
+    "required": true
+   },
+   {
+    "name": "head1",
+    "parent": "head1Neck3",
+    "required": true
+   },
+   {
+    "name": "tail1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "tail2",
+    "parent": "tail1",
+    "required": true
+   },
+   {
+    "name": "tail3",
+    "parent": "tail2",
+    "required": true
+   },
+   {
+    "name": "tail4",
+    "parent": "tail3",
+    "required": true
+   },
+   {
+    "name": "leg1Left1",
+    "parent": "spine3",
+    "required": true
+   },
+   {
+    "name": "leg1Left2",
+    "parent": "leg1Left1",
+    "required": true
+   },
+   {
+    "name": "leg1Left3",
+    "parent": "leg1Left2",
+    "required": true
+   },
+   {
+    "name": "leg1Right1",
+    "parent": "spine3",
+    "required": true
+   },
+   {
+    "name": "leg1Right2",
+    "parent": "leg1Right1",
+    "required": true
+   },
+   {
+    "name": "leg1Right3",
+    "parent": "leg1Right2",
+    "required": true
+   },
+   {
+    "name": "leg2Left1",
+    "parent": "spine1",
+    "required": true
+   },
+   {
+    "name": "leg2Left2",
+    "parent": "leg2Left1",
+    "required": true
+   },
+   {
+    "name": "leg2Left3",
+    "parent": "leg2Left2",
+    "required": true
+   },
+   {
+    "name": "leg2Right1",
+    "parent": "spine1",
+    "required": true
+   },
+   {
+    "name": "leg2Right2",
+    "parent": "leg2Right1",
+    "required": true
+   },
+   {
+    "name": "leg2Right3",
+    "parent": "leg2Right2",
+    "required": true
+   },
+   {
+    "name": "wing1Left1",
+    "parent": "spine3",
+    "required": true
+   },
+   {
+    "name": "wing1Left2",
+    "parent": "wing1Left1",
+    "required": true
+   },
+   {
+    "name": "wing1Left3",
+    "parent": "wing1Left2",
+    "required": true
+   },
+   {
+    "name": "wing1Right1",
+    "parent": "spine3",
+    "required": true
+   },
+   {
+    "name": "wing1Right2",
+    "parent": "wing1Right1",
+    "required": true
+   },
+   {
+    "name": "wing1Right3",
+    "parent": "wing1Right2",
+    "required": true
+   }
+  ],
+  "key": "fixture_winged_horse",
+  "limbs": [
+   {
+    "bones": [
+     "spine1",
+     "spine2",
+     "spine3"
+    ],
+    "key": "spine",
+    "order": 0,
+    "role": "spine",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "head1Neck1",
+     "head1Neck2",
+     "head1Neck3"
+    ],
+    "key": "head1Neck",
+    "order": 0,
+    "role": "neck",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "tail1",
+     "tail2",
+     "tail3",
+     "tail4"
+    ],
+    "key": "tail",
+    "order": 0,
+    "role": "tail",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "leg1Left1",
+     "leg1Left2",
+     "leg1Left3"
+    ],
+    "key": "leg1Left",
+    "order": 0,
+    "role": "leg",
+    "side": "left"
+   },
+   {
+    "bones": [
+     "leg1Right1",
+     "leg1Right2",
+     "leg1Right3"
+    ],
+    "key": "leg1Right",
+    "order": 0,
+    "role": "leg",
+    "side": "right"
+   },
+   {
+    "bones": [
+     "leg2Left1",
+     "leg2Left2",
+     "leg2Left3"
+    ],
+    "key": "leg2Left",
+    "order": 1,
+    "role": "leg",
+    "side": "left"
+   },
+   {
+    "bones": [
+     "leg2Right1",
+     "leg2Right2",
+     "leg2Right3"
+    ],
+    "key": "leg2Right",
+    "order": 1,
+    "role": "leg",
+    "side": "right"
+   },
+   {
+    "bones": [
+     "wing1Left1",
+     "wing1Left2",
+     "wing1Left3"
+    ],
+    "key": "wing1Left",
+    "order": 0,
+    "role": "wing",
+    "side": "left"
+   },
+   {
+    "bones": [
+     "wing1Right1",
+     "wing1Right2",
+     "wing1Right3"
+    ],
+    "key": "wing1Right",
+    "order": 0,
+    "role": "wing",
+    "side": "right"
+   }
+  ],
+  "motions": {
+   "optional": [],
+   "required": [
+    "idle",
+    "walk"
+   ]
+  },
+  "moves": [
+   "exulanica-movement/walking/v1"
+  ],
+  "origin": {
+   "authors": [],
+   "by": {
+    "execution_sha256": null,
+    "kind": "model",
+    "model_id": "fixture/hand-written",
+    "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prompt_version": "creature-drafting-1",
+    "provider": "nebius_token_factory",
+    "words_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+   },
+   "class": "drafted",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "1aba9e0d14a857f2f11e3792cd7335f90ad766e36836bc4234353a2c24eb41c8"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.body-plan/v1",
+  "reach_mm": null,
+  "reason": "Built by exulanica-body-builder/v1 from a horizontal body recipe (sha256 1aba9e0d14a857f2f11e3792cd7335f90ad766e36836bc4234353a2c24eb41c8): every bone, chain, socket and range follows from the recipe and the body grammar version 1.",
+  "size": {
+   "extent_mm": {
+    "height": {
+     "maximum": 3000,
+     "minimum": 1920
+    },
+    "length": {
+     "maximum": 3250,
+     "minimum": 2080
+    },
+    "span": {
+     "maximum": 7500,
+     "minimum": 4800
+    },
+    "width": {
+     "maximum": 1000,
+     "minimum": 640
+    }
+   }
+  },
+  "sockets": [],
+  "title": "the body of a fixture winged horse",
+  "version": 1
+ },
+ "profile": "exulanica.creature-plan-fixture/v1",
+ "recipe_sha256": "1aba9e0d14a857f2f11e3792cd7335f90ad766e36836bc4234353a2c24eb41c8",
+ "written_by": "scripts/things/creature_plan_fixtures.py"
+}

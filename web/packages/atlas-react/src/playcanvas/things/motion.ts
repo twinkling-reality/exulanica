@@ -8,6 +8,16 @@
  * the head nods while the thing speaks, and anything else sways. No bone is named, so a body plan
  * with ten legs steps all ten.
  *
+ * A body whose plan states its chains (`DressedSkeleton.stated`) is posed one rule a role, by the
+ * figures of the body motion table (`./body-motion.ts`): legs step and arms carry as anyone's do;
+ * the hips' sway is turned back along the spine, so the shoulders sway against the hips and the
+ * neck returns the head to the front; a neck and its head look about and the head nods while the
+ * being speaks; a jaw opens on each beat of speech and stays shut on what its socket carries; a
+ * tail and a tentacle that hangs bend in a wave that travels outward; a wing lies folded along
+ * the body; a fin sways; a body with no leg steps on its tentacles; and a body with neither,
+ * lying along the ground, moves by a wave down its spine that is fixed to the ground it has
+ * covered. With no table, every stated chain but a leg and an arm holds its rest pose.
+ *
  * The gait is clocked by distance walked, never by time, so feet stay planted while a figure moves:
  * one cycle covers the stride divided by the share of the cycle a foot is on the ground.
  *
@@ -15,6 +25,7 @@
  * left. Rotations are quaternions `[x, y, z, w]`. Pure: no renderer.
  */
 
+import type { BodyMotion } from './body-motion.js';
 import type { DressedSkeleton, Limb, Vec3 } from './skeleton.js';
 
 export type Quat = readonly [number, number, number, number];
@@ -149,12 +160,21 @@ const SHORTEST_CLOCKED_STRIDE = 0.1;
 /**
  * How far the gait's clock advances for `moved` metres of ground walked at ground speed `speed`,
  * metres a second. At a full walk it is the ground itself. Slower, the stride is drawn shorter by
- * the same share (`FULL_WALK_SPEED`), so each metre counts for more: the steps come as often as at a
- * full walk and each is shorter, and a planted foot stays where it stands instead of being dragged
- * over the ground at the full stride's slower beat.
+ * the same share (`fullSpeed`, the speed a full walk is drawn from), so each metre counts for more:
+ * the steps come as often as at a full walk and each is shorter, and a planted foot stays where it
+ * stands instead of being dragged over the ground at the full stride's slower beat.
  */
-export function gaitTravel(moved: number, speed: number): number {
-  return moved / clamp(speed / FULL_WALK_SPEED, SHORTEST_CLOCKED_STRIDE, 1);
+export function gaitTravel(moved: number, speed: number, fullSpeed: number = FULL_WALK_SPEED): number {
+  return moved / clamp(speed / fullSpeed, SHORTEST_CLOCKED_STRIDE, 1);
+}
+
+/**
+ * How far `skeleton`'s own clock advances for `moved` metres walked at `speed`: the gait's clock for
+ * a body that steps, and the ground itself for one that moves by a wave down its spine, whose wave
+ * is fixed to the ground.
+ */
+export function bodyTravel(skeleton: DressedSkeleton, moved: number, speed: number, motion: BodyMotion | null = null): number {
+  return skeleton.gait === 'wave' ? moved : gaitTravel(moved, speed, gaitOf(skeleton, motion).fullSpeed);
 }
 
 function chainLength(skeleton: DressedSkeleton, bones: readonly string[]): number {
@@ -169,17 +189,23 @@ const BOB = 0.03;
 /** The share of a leg's reach a planted foot may use at either end of its stance. */
 const REACH_USED = 0.92;
 
-/** Gait figures for a skeleton: the stride, the distance one cycle covers, the lift of a step. */
-export function gaitOf(skeleton: DressedSkeleton): {
+/**
+ * Gait figures for a skeleton: the stride, the distance one cycle covers, the lift of a step. A
+ * body whose plan states its chains draws its full walk from a speed its own stride sets
+ * (`BodyMotion.fullWalkCadence`); any other, and any body with no table, from one speed.
+ */
+export function gaitOf(skeleton: DressedSkeleton, motion: BodyMotion | null = null): {
   readonly stride: number;
   readonly cycle: number;
   readonly lift: number;
   /** How far the hips sink while walking, and their bob's depth, metres at full walk. */
   readonly crouch: number;
   readonly bob: number;
+  /** The ground speed, metres a second, from which the walk is drawn at its full stride. */
+  readonly fullSpeed: number;
 } {
-  const legs = skeleton.limbs.filter((limb) => limb.role === 'leg');
-  if (legs.length === 0) return { stride: 0, cycle: 0, lift: 0, crouch: 0, bob: 0 };
+  const legs = skeleton.steps;
+  if (legs.length === 0) return { stride: 0, cycle: 0, lift: 0, crouch: 0, bob: 0, fullSpeed: FULL_WALK_SPEED };
   const lengths = legs.map((leg) => chainLength(skeleton, leg.bones));
   const mean = lengths.reduce((sum, value) => sum + value, 0) / legs.length;
   const drops = legs.map((leg) => skeleton.rest.get(leg.bones[0]!)![1] - skeleton.rest.get(leg.bones.at(-1)!)![1]);
@@ -200,7 +226,35 @@ export function gaitOf(skeleton: DressedSkeleton): {
   const gaps = hung.slice(1).map((z, i) => z - hung[i]!).filter((gap) => gap > 1e-3);
   const room = gaps.length === 0 ? Number.POSITIVE_INFINITY : 0.9 * Math.min(...gaps);
   const stride = Math.min(STRIDE_PER_LEG * mean, room, 2 * REACH_USED * reach);
-  return { stride, cycle: stride > 0 ? stride / DUTY : 0, lift: 0.14 * mean, crouch, bob };
+  const fullSpeed = skeleton.stated && motion !== null && stride > 0 ? motion.fullWalkCadence * stride : FULL_WALK_SPEED;
+  return { stride, cycle: stride > 0 ? stride / DUTY : 0, lift: 0.14 * mean, crouch, bob, fullSpeed };
+}
+
+/** How far the hips yaw with the legs and how far an upright body leans into its walk, radians at full walk. */
+const SWAY = 0.07;
+const LEAN = 0.05;
+const UP: Vec3 = [0, 1, 0];
+const ACROSS: Vec3 = [1, 0, 0];
+const ALONG: Vec3 = [0, 0, 1];
+
+/**
+ * The wave a legless body moves by, where it lies along the ground and a table states the wave:
+ * each bone of the spine from the root, how far along the spine its segment's middle is, and the
+ * wave's length and steepest turn.
+ */
+function spineWave(skeleton: DressedSkeleton, motion: BodyMotion | null): { readonly limb: Limb; readonly rootMiddle: number; readonly middles: readonly number[]; readonly length: number; readonly steepest: number } | null {
+  if (skeleton.gait !== 'wave' || motion === null) return null;
+  const limb = skeleton.limbs.find((one) => one.role === 'spine' && one.from === skeleton.root);
+  if (limb === undefined) return null;
+  const joints = [skeleton.root, ...limb.bones].map((bone) => skeleton.rest.get(bone)!);
+  const along: number[] = [0];
+  for (let i = 1; i < joints.length; i += 1) along.push(along[i - 1]! + length(sub(joints[i]!, joints[i - 1]!)));
+  const total = along.at(-1)!;
+  if (total < 1e-6) return null;
+  // The last bone's segment runs past the last joint; it is taken as long as the one before it.
+  const last = total + (total - along.at(-2)!) / 2;
+  const middles = limb.bones.map((_bone, k) => (k + 2 < along.length ? (along[k + 1]! + along[k + 2]!) / 2 : last));
+  return { limb, rootMiddle: along[1]! / 2, middles, length: motion.spineWavelength * total, steepest: motion.spineWave };
 }
 
 /**
@@ -225,11 +279,12 @@ function footStep(phase: number, stride: number, lift: number): { forward: numbe
 }
 
 /** Solve one pose of `skeleton` for `input`. */
-export function solvePose(skeleton: DressedSkeleton, input: MotionInput): Pose {
+export function solvePose(skeleton: DressedSkeleton, input: MotionInput, motion: BodyMotion | null = null): Pose {
   const quiet = input.reducedMotion === true;
-  const walk = clamp(input.speed / FULL_WALK_SPEED, 0, 1);
-  const { stride, cycle, lift, crouch, bob: bobDepth } = gaitOf(skeleton);
-  const legs = skeleton.limbs.filter((limb) => limb.role === 'leg');
+  const { stride, cycle, lift, crouch, bob: bobDepth, fullSpeed } = gaitOf(skeleton, motion);
+  const walk = clamp(input.speed / fullSpeed, 0, 1);
+  const legs = skeleton.steps;
+  const stepping = new Set(legs);
   const phaseOf = (leg: Limb) => (cycle > 0 ? frac(input.travelled / cycle + leg.phase) : leg.phase);
   const lead = legs[0];
   const leadPhase = lead === undefined ? 0 : phaseOf(lead);
@@ -238,13 +293,22 @@ export function solvePose(skeleton: DressedSkeleton, input: MotionInput): Pose {
   // The hips sink into the walk and bob twice a cycle, lowest with the feet apart and highest over a
   // planted foot; the body leans into the walk and its yaw sways with the legs.
   const bob = -walk * (crouch + bobDepth * Math.abs(Math.cos(2 * Math.PI * leadPhase)));
-  const lean = axisAngle([1, 0, 0], 0.05 * walk);
-  const sway = axisAngle([0, 1, 0], 0.07 * walk * Math.sin(2 * Math.PI * leadPhase));
+  const swayAngle = SWAY * walk * Math.sin(2 * Math.PI * leadPhase);
+  // A body lying along the ground does not lean into its walk: its length is already forward.
+  const lean = skeleton.lying ? IDENTITY : axisAngle([1, 0, 0], LEAN * walk);
+  const sway = axisAngle([0, 1, 0], swayAngle);
   const rootRest = skeleton.rest.get(skeleton.root)!;
-  const rootPosition = add(rootRest, [0, bob, 0]);
+  // A legless body's wave is fixed to the ground: a point `s` along the spine is over the ground
+  // at `travelled + s`, turned as the wave is there, and the root swings to the side with it.
+  const wave = spineWave(skeleton, motion);
+  const waveTurn = (s: number) => (wave === null ? 0 : wave.steepest * Math.cos((2 * Math.PI * (s + input.travelled)) / wave.length));
+  const waveAside = wave === null ? 0 : ((wave.steepest * wave.length) / (2 * Math.PI)) * Math.sin((2 * Math.PI * input.travelled) / wave.length);
+  const rootPosition = add(rootRest, [waveAside, bob, 0]);
+  /** How far each bone is turned about the upright by the body's sway or its wave, radians. */
+  const turned = new Map<string, number>([[skeleton.root, wave === null ? swayAngle : waveTurn(wave.rootMiddle)]]);
 
   const figure = new Map<string, JointPose>();
-  figure.set(skeleton.root, { position: rootPosition, rotation: mul(sway, lean) });
+  figure.set(skeleton.root, { position: rootPosition, rotation: wave === null ? mul(sway, lean) : axisAngle(UP, turned.get(skeleton.root)!) });
   const limbOf = new Map<string, Limb>();
   for (const limb of skeleton.limbs) limbOf.set(limb.bones[0]!, limb);
 
@@ -291,11 +355,35 @@ export function solvePose(skeleton: DressedSkeleton, input: MotionInput): Pose {
       return turns;
     };
 
-    if (limb.role === 'leg' && bones.length >= 2) {
+    if (stepping.has(limb) && bones.length >= 2) {
       const step = steps.get(limb)!;
       const restEnd = skeleton.rest.get(bones.at(-1)!)!;
       const target: Vec3 = [restEnd[0], restEnd[1] + step.up, restEnd[2] + step.forward];
+      if (skeleton.stated && bones.length === 2) {
+        // One segment cannot bend to reach. It swings about its hip like a paddle: its foot keeps
+        // its height and stays over its point along the way the body goes, and moves in or out
+        // across the body by what the swing leaves, which is the least seen of the three.
+        const startAt = childPosition(bones[0]!, limb.from);
+        const reach = chainLength(skeleton, bones);
+        const drop = clamp(startAt[1] - target[1], -reach, reach);
+        const radius = Math.sqrt(Math.max(0, reach * reach - drop * drop));
+        const forward = clamp(target[2] - startAt[2], -0.999 * radius, 0.999 * radius);
+        const outward = restEnd[0] >= skeleton.rest.get(bones[0]!)![0] ? 1 : -1;
+        const across = outward * Math.sqrt(Math.max(0, radius * radius - forward * forward));
+        place(0, aim(bones[0]!, bones[1]!, parent.rotation, [across, -drop, forward]));
+        place(1, sway);
+        return;
+      }
       const turns = reachTo(target, rotate(parent.rotation, restBend(skeleton, bones)));
+      if (limb.role === 'tentacle' && walk < 1) {
+        // A tentacle a body steps on hangs and waves while the body stands, and comes to its
+        // step as the walk is drawn.
+        const hung: Quat[] = [];
+        solveStated(limb, parent.rotation, (i, rotation) => { hung[i] = rotation; }, quiet ? 0 : input.time);
+        const share = smoothstep(walk);
+        [...turns, sway].forEach((turn, i) => place(i, slerp(hung[i]!, turn, share)));
+        return;
+      }
       turns.forEach((turn, i) => place(i, turn));
       // The foot stays level with the ground, turned only with the body.
       place(bones.length - 1, sway);
@@ -324,8 +412,12 @@ export function solvePose(skeleton: DressedSkeleton, input: MotionInput): Pose {
       place(bones.length - 1, turns.at(-1) ?? parent.rotation);
       return;
     }
-    // A head nods while it speaks; a trunk breathes; anything else sways.
     const t = quiet ? 0 : input.time;
+    if (skeleton.stated) {
+      solveStated(limb, parent.rotation, place, t);
+      return;
+    }
+    // A head nods while it speaks; a trunk breathes; anything else sways.
     bones.forEach((_bone, i) => {
       const before = i === 0 ? parent.rotation : at(i - 1).rotation;
       let turn: Quat = IDENTITY;
@@ -338,6 +430,104 @@ export function solvePose(skeleton: DressedSkeleton, input: MotionInput): Pose {
         turn = axisAngle([1, 0, 0], 0.12 * Math.sin(2 * Math.PI * (0.5 * t) - i * 0.6));
       }
       place(i, mul(before, turn));
+    });
+  };
+
+  /** One rule a role, for a chain a plan states (not a leg that steps or an arm, solved above). */
+  const solveStated = (limb: Limb, parentRotation: Quat, place: (i: number, rotation: Quat) => void, t: number) => {
+    const bones = limb.bones;
+    const n = bones.length;
+    const carried = turned.get(limb.from) ?? 0;
+    const live = motion !== null && !quiet;
+    /** Where this chain is in a slow cycle of `period` seconds, each next chain of its role a lag behind. */
+    const cycleAt = (period: number, order: number, joint = 0) => 2 * Math.PI * (t / period - (order + joint) * motion!.waveLag);
+    const local: Quat[] = bones.map(() => IDENTITY);
+    const after: number[] = bones.map(() => carried);
+    switch (limb.role) {
+      case 'spine': {
+        if (wave !== null && limb === wave.limb) {
+          bones.forEach((_bone, k) => {
+            after[k] = waveTurn(wave.middles[k]!);
+            local[k] = axisAngle(UP, after[k]! - (k === 0 ? carried : after[k - 1]!));
+          });
+        } else if (limb.from === skeleton.root && wave === null) {
+          // The hips' sway is turned back twice over along the spine: the shoulders sway against the hips.
+          bones.forEach((_bone, k) => {
+            after[k] = carried * (1 - (2 * (k + 1)) / n);
+            local[k] = axisAngle(UP, (-2 * carried) / n);
+          });
+        }
+        break;
+      }
+      case 'neck': {
+        // The neck returns what the body turned, so the head faces where the being goes, and looks about.
+        const look = live ? (motion.lookAbout * Math.sin(cycleAt(motion.lookAboutPeriod, limb.order))) / (n + 1) : 0;
+        bones.forEach((_bone, k) => {
+          after[k] = carried * (1 - (k + 1) / n);
+          local[k] = axisAngle(UP, -carried / n + look);
+        });
+        break;
+      }
+      case 'skull': {
+        const neck = skeleton.limbs.find((one) => one.role === 'neck' && one.bones.at(-1) === limb.from);
+        const share = neck === undefined ? 1 : 1 / (neck.bones.length + 1);
+        const look = live ? motion.lookAbout * Math.sin(cycleAt(motion.lookAboutPeriod, neck?.order ?? 0)) * share : 0;
+        const nod = live && input.talking ? motion.nod * Math.sin(2 * Math.PI * motion.speechBeats * t) : 0;
+        after[0] = 0;
+        local[0] = mul(axisAngle(UP, look - carried), axisAngle(ACROSS, nod));
+        break;
+      }
+      case 'jaw': {
+        const holding = limb.sockets.some((key) => input.holding.has(key));
+        const open = live && input.talking && !holding ? motion.jawOpen * 0.5 * (1 - Math.cos(2 * Math.PI * motion.speechBeats * t)) : 0;
+        local[0] = axisAngle(ACROSS, open);
+        break;
+      }
+      case 'tail':
+      case 'tentacle': {
+        if (!live) break;
+        // Side to side: about the upright for a chain that runs along the ground, about the body's
+        // length for one that hangs.
+        const own = sub(skeleton.rest.get(bones.at(-1)!)!, skeleton.rest.get(bones[0]!)!);
+        const run = length(own) > 1e-6 ? own : sub(skeleton.rest.get(bones[0]!)!, skeleton.rest.get(limb.from)!);
+        const side = cross(run, ACROSS);
+        const axis = length(side) < 1e-3 * Math.max(length(run), 1e-6) || length(run) < 1e-6 ? UP : normalise(side);
+        bones.forEach((_bone, k) => {
+          local[k] = axisAngle(axis, motion.wave * Math.sin(cycleAt(motion.wavePeriod, limb.order, k)));
+        });
+        break;
+      }
+      case 'fin': {
+        if (live) local[0] = axisAngle(ALONG, motion.finSway * Math.sin(cycleAt(motion.wavePeriod, limb.order)));
+        break;
+      }
+      case 'wing': {
+        if (motion === null) break;
+        // Folded: each segment turned from where the look drew it toward the body's back.
+        const back = rotate(parentRotation, [0, 0, -1]);
+        const settle = quiet ? IDENTITY : axisAngle(ALONG, limb.side * motion.wingSettle * walk * Math.sin(4 * Math.PI * leadPhase));
+        let before = parentRotation;
+        let drawn: Vec3 = normalise(sub(skeleton.rest.get(bones[0]!)!, skeleton.rest.get(limb.from)!));
+        bones.forEach((bone, k) => {
+          // The last segment runs past the last joint; it is taken to run on as the one before it.
+          if (k + 1 < n) drawn = normalise(sub(skeleton.rest.get(bones[k + 1]!)!, skeleton.rest.get(bone)!));
+          const now = normalise(rotate(before, drawn));
+          const to = normalise(add(scale(now, 1 - motion.wingFold), scale(back, motion.wingFold)));
+          const rotation = mul(k === 0 ? settle : IDENTITY, mul(fromTo(now, to), before));
+          place(k, rotation);
+          before = rotation;
+        });
+        bones.forEach((bone) => turned.set(bone, carried));
+        return;
+      }
+      default:
+        break;
+    }
+    let before = parentRotation;
+    bones.forEach((bone, k) => {
+      before = mul(before, local[k]!);
+      place(k, before);
+      turned.set(bone, after[k]!);
     });
   };
 

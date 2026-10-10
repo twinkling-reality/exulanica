@@ -227,7 +227,11 @@ def build(api: Api, scene: Mapping[str, Any], entry_id: str | None = None) -> di
         already = _placed(version).get(thing["thing_id"])
         wanted = {"kind": thing["kind"]["kind"], "version": thing["kind"]["version"]}
         if already is not None:
-            stored = {"kind": already["kind"]["kind"], "version": already["kind"]["version"]}
+            # A thing of a workspace's own kind states neither: it is something else.
+            stored = {
+                "kind": already["kind"].get("kind"),
+                "version": already["kind"].get("version"),
+            }
             if stored != wanted or _stored_pose(already) != poses[thing["thing_id"]]:
                 raise SceneRefused(f"{thing['thing_id']} is placed already, as something else")
             continue
@@ -254,7 +258,7 @@ def build(api: Api, scene: Mapping[str, Any], entry_id: str | None = None) -> di
         stored = placed.get(thing["thing_id"])
         if stored is None:
             raise SceneRefused(f"{thing['thing_id']} is not in the version read back")
-        if (stored["kind"]["kind"], stored["kind"]["version"]) != (
+        if (stored["kind"].get("kind"), stored["kind"].get("version")) != (
             thing["kind"]["kind"],
             thing["kind"]["version"],
         ):

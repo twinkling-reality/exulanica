@@ -253,7 +253,9 @@ class _Server:
                     "came_by": "placed",
                 }
                 for thing in self.things
-                if thing["kind"]["kind"] in self.beings
+                # A shipped being, or a creature its workspace keeps (always a being).
+                if thing["kind"].get("kind") in self.beings
+                or thing["kind"].get("source") == "workspace"
             ]
             villager = {"id": "person:villager", "placed_id": None, "came_by": "populated"}
             return {
@@ -401,6 +403,46 @@ def test_a_society_started_on_a_world_a_person_placed_places_nothing_and_takes_i
     server.things.append(second_gate)
     with pytest.raises(starter.SceneRefused, match=f"a {gate_kind}, and the world holds 2"):
         starter.start(server, scene)
+
+
+def test_a_world_that_holds_a_creature_made_from_words_is_dressed_and_started_as_any_other():
+    """A thing of a kind its workspace keeps is named by its digest alone
+    (``{source: workspace, sha256}``), with no kind key. The builder leaves it be, the society is
+    started over it, it is nobody's gate, and the record lists it as the version stores it."""
+    builder = _builder()
+    starter = _starter()
+    scene = builder.read_scene(
+        next(
+            path
+            for path in reversed(_newest_scenes())
+            if path.parent == CATALOG
+            and json.loads(path.read_text(encoding="utf-8"))["ground"]["kind"] == "starter"
+        )
+    )
+    assert scene["travellers"]["gate"], "the positive control: the scene lets travellers in"
+    creature = {
+        "thing_id": "creature:0123abcd",
+        "kind": {"source": "workspace", "sha256": "c" * 64},
+        "region_id": "region:starter",
+        "transform": {"x_mm": 7_000, "y_mm": 0, "z_mm": 9_000, "yaw_microradians": 0},
+        "removed": False,
+    }
+    server = _Server()
+    server.things.append(copy.deepcopy(creature))
+    built = builder.build(server, scene)
+    assert built["things_added"] == len(scene["things"])
+    record = starter.start(server, scene)
+    assert [t["kind"] for t in record["things"] if t["thing_id"] == creature["thing_id"]] == [
+        creature["kind"]
+    ]
+    # The society's record names it among the beings, as the server lists it among the people.
+    assert creature["thing_id"] in [mind["thing_id"] for mind in record["society"]["minds"]]
+    assert record["travellers"]["gate"] == scene["travellers"]["gate"]
+    # A scene thing's own id already taken by a made creature is something else, said so.
+    taken = _Server()
+    taken.things.append({**copy.deepcopy(creature), "thing_id": scene["things"][0]["thing_id"]})
+    with pytest.raises(builder.SceneRefused, match="is placed already, as something else"):
+        builder.build(taken, scene)
 
 
 def test_a_refusal_names_its_code_or_what_the_request_check_refused():

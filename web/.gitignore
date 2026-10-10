@@ -10,6 +10,11 @@ fixtures/
 # ...and the places the society turns, which `tests/test_society_seating_fixture.py` writes from
 # the server's own code for the page's seating test to read, and fails on when they drift.
 !packages/atlas-react/test/fixtures/society-seating.json
+# ...and the drafted bodies the page's pose tests read, which
+# `scripts/things/creature_plan_fixtures.py` writes from the server's own builder and
+# `tests/test_creature_plan_fixtures.py` fails on when they drift.
+!packages/atlas-react/test/fixtures/creature-plans/
+!packages/atlas-react/test/fixtures/creature-plans/*.json
 # ...and except the world-objects contract fixture, which is hand written rather than generated:
 # it is 4 KB of wire shapes that `world-objects-api.test.ts` parses, and losing it would leave the
 # client's tests reading a file that is not in the repository.

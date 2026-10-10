@@ -11,9 +11,10 @@
  */
 
 import * as pc from 'playcanvas';
-import type { Grip } from './documents.js';
+import type { BodyExtent, Grip } from './documents.js';
 import { HALF_TURN, bodyCarry, nodeCarry, placeHeld, quat, quatOf, type PickVolume, type ThingFigure, type ThingPose } from './figures.js';
-import { gaitTravel, mul, solvePose, type Pose } from './motion.js';
+import { bodyGround, type BodyMotion, type Footprint } from './body-motion.js';
+import { bodyTravel, mul, solvePose, type Pose } from './motion.js';
 import { dressSkeleton, type BodyPlanEntry, type DressedSkeleton, type Vec3 } from './skeleton.js';
 
 /** How wide a standing figure is to a pick, as a share of its height on each side. */
@@ -25,6 +26,8 @@ export class RigidOnBonesFigure implements ThingFigure {
   readonly skeleton: DressedSkeleton;
   readonly standingHeight: number;
   readonly pickVolume: PickVolume;
+  readonly footprint: Footprint | null;
+  readonly turnRate: number | null;
   private readonly figure: pc.Entity;
   private readonly joints = new Map<string, pc.Entity>();
   private readonly sockets = new Map<string, pc.Entity>();
@@ -39,9 +42,11 @@ export class RigidOnBonesFigure implements ThingFigure {
 
   /**
    * `model` is the look's container instantiated for this figure; `lookHeightMm` the look's natural
-   * height and `heightMm` the height it is drawn at (the look's, kept inside its kind's range).
+   * height and `heightMm` the height it is drawn at (the look's, kept inside its kind's range);
+   * `motion` the table a body whose plan states its chains is posed by (`./body-motion.ts`), and
+   * `extentMm` the extent its kind states, for a kind that states one.
    */
-  constructor(parent: pc.Entity, model: pc.Entity, plan: BodyPlanEntry, name: string, lookHeightMm: number, heightMm: number) {
+  constructor(parent: pc.Entity, model: pc.Entity, plan: BodyPlanEntry, name: string, lookHeightMm: number, heightMm: number, private readonly motion: BodyMotion | null = null, extentMm: BodyExtent | null = null) {
     this.root = new pc.Entity(name);
     parent.addChild(this.root);
     this.figure = model;
@@ -72,7 +77,13 @@ export class RigidOnBonesFigure implements ThingFigure {
     this.figure.setLocalScale(this.scale, this.scale, this.scale);
     this.figure.setLocalRotation(quat(HALF_TURN));
     const w = PICK_HALF_WIDTH * this.standingHeight;
-    this.pickVolume = { kind: 'box', min: [-w, 0, -w], max: [w, this.standingHeight, w] };
+    // A body whose kind states its extent is picked over the ground it covers and turns as fast as its size lets it.
+    const ground = extentMm === null ? null : bodyGround(extentMm, this.scale, motion);
+    this.footprint = ground?.footprint ?? null;
+    this.turnRate = ground?.turnRate ?? null;
+    this.pickVolume = ground === null
+      ? { kind: 'box', min: [-w, 0, -w], max: [w, this.standingHeight, w] }
+      : { kind: 'box', min: [-ground.footprint.halfAcross, 0, -ground.footprint.halfAlong], max: [ground.footprint.halfAcross, this.standingHeight, ground.footprint.halfAlong] };
     this.solve({ position: [0, 0, 0], facing: 0, deltaSeconds: 0 });
   }
 
@@ -82,7 +93,7 @@ export class RigidOnBonesFigure implements ThingFigure {
     if (this.previous !== null && !pose.discontinuity && dt > 0) {
       const moved = Math.hypot(x - this.previous[0], z - this.previous[2]);
       this.speed += (moved / dt / this.scale - this.speed) * Math.min(1, dt * 6);
-      this.travelled += gaitTravel(moved / this.scale, this.speed);
+      this.travelled += bodyTravel(this.skeleton, moved / this.scale, this.speed, this.motion);
     } else if (pose.discontinuity) {
       this.speed = 0;
     }
@@ -104,7 +115,7 @@ export class RigidOnBonesFigure implements ThingFigure {
       reach,
       talking: pose.talking === true,
       ...(pose.reducedMotion ? { reducedMotion: true } : {}),
-    });
+    }, this.motion);
     for (const bone of this.skeleton.order) this.joints.get(bone)!.setLocalRotation(quat(this.solved.local.get(bone)!));
     const at = this.solved.rootPosition;
     this.joints.get(this.skeleton.root)!.setLocalPosition(at[0], at[1], at[2]);

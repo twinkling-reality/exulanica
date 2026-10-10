@@ -1,0 +1,486 @@
+{
+ "joints_m": {
+  "head1": [
+   0.0,
+   0.5429999828338623,
+   3.9000000953674316
+  ],
+  "head1Jaw": [
+   0.0,
+   0.42899999022483826,
+   4.019999980926514
+  ],
+  "head1Neck1": [
+   0.0,
+   0.30000001192092896,
+   3.630000114440918
+  ],
+  "hips": [
+   0.0,
+   0.30000001192092896,
+   -4.5
+  ],
+  "spine1": [
+   0.0,
+   0.30000001192092896,
+   -4.021999835968018
+  ],
+  "spine10": [
+   0.0,
+   0.30000001192092896,
+   0.28200000524520874
+  ],
+  "spine11": [
+   0.0,
+   0.30000001192092896,
+   0.7599999904632568
+  ],
+  "spine12": [
+   0.0,
+   0.30000001192092896,
+   1.2380000352859497
+  ],
+  "spine13": [
+   0.0,
+   0.30000001192092896,
+   1.7170000076293945
+  ],
+  "spine14": [
+   0.0,
+   0.30000001192092896,
+   2.194999933242798
+  ],
+  "spine15": [
+   0.0,
+   0.30000001192092896,
+   2.6730000972747803
+  ],
+  "spine16": [
+   0.0,
+   0.30000001192092896,
+   3.1510000228881836
+  ],
+  "spine2": [
+   0.0,
+   0.30000001192092896,
+   -3.5439999103546143
+  ],
+  "spine3": [
+   0.0,
+   0.30000001192092896,
+   -3.065999984741211
+  ],
+  "spine4": [
+   0.0,
+   0.30000001192092896,
+   -2.5880000591278076
+  ],
+  "spine5": [
+   0.0,
+   0.30000001192092896,
+   -2.1089999675750732
+  ],
+  "spine6": [
+   0.0,
+   0.30000001192092896,
+   -1.63100004196167
+  ],
+  "spine7": [
+   0.0,
+   0.30000001192092896,
+   -1.152999997138977
+  ],
+  "spine8": [
+   0.0,
+   0.30000001192092896,
+   -0.675000011920929
+  ],
+  "spine9": [
+   0.0,
+   0.30000001192092896,
+   -0.19599999487400055
+  ]
+ },
+ "kind": {
+  "abilities": [
+   {
+    "key": "wait",
+    "parameters": {}
+   },
+   {
+    "key": "stand",
+    "parameters": {}
+   },
+   {
+    "key": "follow",
+    "parameters": {}
+   },
+   {
+    "key": "say",
+    "parameters": {}
+   }
+  ],
+  "body": {
+   "extent_mm": {
+    "height": 900,
+    "length": 9000,
+    "span": 0,
+    "width": 600
+   },
+   "plan": "fixture_serpent/v1",
+   "plan_sha256": "360ebe606c25f5f72fce5029adaac111fa3156c35a515be09acb8276210ccbdd"
+  },
+  "class": "being",
+  "deciders": {
+   "allowed": [
+    "routine",
+    "model",
+    "person"
+   ],
+   "default": "routine"
+  },
+  "ext": {},
+  "kind": "fixture_serpent",
+  "label": "fixture serpent",
+  "looks": [
+   {
+    "look": "fixture-serpent-sketch",
+    "sha256": "72683e6257353d8d5dccec28cfcf1a7c739d865e7f4e38d44383817ca6e55b2e",
+    "version": 1
+   }
+  ],
+  "moves": [
+   "exulanica-movement/walking/v1"
+  ],
+  "offers": [
+   {
+    "key": "talk_to",
+    "parameters": {}
+   },
+   {
+    "key": "hear",
+    "parameters": {}
+   },
+   {
+    "key": "be_followed",
+    "parameters": {}
+   }
+  ],
+  "origin": {
+   "authors": [],
+   "by": {
+    "execution_sha256": null,
+    "kind": "model",
+    "model_id": "fixture/hand-written",
+    "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prompt_version": "creature-drafting-1",
+    "provider": "nebius_token_factory",
+    "words_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+   },
+   "class": "drafted",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1",
+     "360ebe606c25f5f72fce5029adaac111fa3156c35a515be09acb8276210ccbdd"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.thing-kind/v1",
+  "routine": {
+   "follow_holders_of": [],
+   "reason": "Drafted with the creature: the weights the drafting model gave its abilities, which its routine draws among whenever no mind is choosing for it.",
+   "weights": {
+    "wait": 300
+   }
+  },
+  "summary": "A creature built from a hand-written body recipe for the page's tests.",
+  "version": 1
+ },
+ "look": {
+  "body_plan": "fixture_serpent/v1",
+  "container": {
+   "bytes": 56000,
+   "media_type": "model/gltf-binary",
+   "sha256": "dc0e743dc3bd0cbfd3acc81743fff74ce4701f2046d9e95d010af171115a0155"
+  },
+  "height_mm": 900,
+  "label": "a sketch of its body",
+  "light": null,
+  "look": "fixture-serpent-sketch",
+  "look_kind": "rigid_on_bones",
+  "origin": {
+   "authors": [],
+   "by": {
+    "kind": "project"
+   },
+   "class": "authored",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "CC0-1.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1",
+     "360ebe606c25f5f72fce5029adaac111fa3156c35a515be09acb8276210ccbdd"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.look/v1",
+  "rig": null,
+  "role": null,
+  "sampling": "linear",
+  "version": 1
+ },
+ "plan": {
+  "bones": [
+   {
+    "name": "hips",
+    "parent": null,
+    "required": true
+   },
+   {
+    "name": "spine1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "spine2",
+    "parent": "spine1",
+    "required": true
+   },
+   {
+    "name": "spine3",
+    "parent": "spine2",
+    "required": true
+   },
+   {
+    "name": "spine4",
+    "parent": "spine3",
+    "required": true
+   },
+   {
+    "name": "spine5",
+    "parent": "spine4",
+    "required": true
+   },
+   {
+    "name": "spine6",
+    "parent": "spine5",
+    "required": true
+   },
+   {
+    "name": "spine7",
+    "parent": "spine6",
+    "required": true
+   },
+   {
+    "name": "spine8",
+    "parent": "spine7",
+    "required": true
+   },
+   {
+    "name": "spine9",
+    "parent": "spine8",
+    "required": true
+   },
+   {
+    "name": "spine10",
+    "parent": "spine9",
+    "required": true
+   },
+   {
+    "name": "spine11",
+    "parent": "spine10",
+    "required": true
+   },
+   {
+    "name": "spine12",
+    "parent": "spine11",
+    "required": true
+   },
+   {
+    "name": "spine13",
+    "parent": "spine12",
+    "required": true
+   },
+   {
+    "name": "spine14",
+    "parent": "spine13",
+    "required": true
+   },
+   {
+    "name": "spine15",
+    "parent": "spine14",
+    "required": true
+   },
+   {
+    "name": "spine16",
+    "parent": "spine15",
+    "required": true
+   },
+   {
+    "name": "head1Neck1",
+    "parent": "spine16",
+    "required": true
+   },
+   {
+    "name": "head1",
+    "parent": "head1Neck1",
+    "required": true
+   },
+   {
+    "name": "head1Jaw",
+    "parent": "head1",
+    "required": true
+   }
+  ],
+  "key": "fixture_serpent",
+  "limbs": [
+   {
+    "bones": [
+     "spine1",
+     "spine2",
+     "spine3",
+     "spine4",
+     "spine5",
+     "spine6",
+     "spine7",
+     "spine8",
+     "spine9",
+     "spine10",
+     "spine11",
+     "spine12",
+     "spine13",
+     "spine14",
+     "spine15",
+     "spine16"
+    ],
+    "key": "spine",
+    "order": 0,
+    "role": "spine",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "head1Neck1"
+    ],
+    "key": "head1Neck",
+    "order": 0,
+    "role": "neck",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "head1Jaw"
+    ],
+    "key": "head1Jaw",
+    "order": 0,
+    "role": "jaw",
+    "side": "centre"
+   }
+  ],
+  "motions": {
+   "optional": [
+    "talk",
+    "hold"
+   ],
+   "required": [
+    "idle",
+    "walk"
+   ]
+  },
+  "moves": [
+   "exulanica-movement/walking/v1"
+  ],
+  "origin": {
+   "authors": [],
+   "by": {
+    "execution_sha256": null,
+    "kind": "model",
+    "model_id": "fixture/hand-written",
+    "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prompt_version": "creature-drafting-1",
+    "provider": "nebius_token_factory",
+    "words_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+   },
+   "class": "drafted",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.body-plan/v1",
+  "reach_mm": 900,
+  "reason": "Built by exulanica-body-builder/v1 from a serpentine body recipe (sha256 1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1): every bone, chain, socket and range follows from the recipe and the body grammar version 1.",
+  "size": {
+   "extent_mm": {
+    "height": {
+     "maximum": 1125,
+     "minimum": 720
+    },
+    "length": {
+     "maximum": 11250,
+     "minimum": 7200
+    },
+    "span": {
+     "maximum": 1,
+     "minimum": 0
+    },
+    "width": {
+     "maximum": 750,
+     "minimum": 480
+    }
+   }
+  },
+  "sockets": [
+   {
+    "bone": "head1Jaw",
+    "grip_section_mm_maximum": 100,
+    "holds": 1,
+    "key": "mouth",
+    "length_mm_maximum": 2250
+   }
+  ],
+  "title": "the body of a fixture serpent",
+  "version": 1
+ },
+ "profile": "exulanica.creature-plan-fixture/v1",
+ "recipe_sha256": "1d89333a7c4fc8196aeadd46fbbe5938dd996bf6f4efff37eeacce761650b2f1",
+ "written_by": "scripts/things/creature_plan_fixtures.py"
+}

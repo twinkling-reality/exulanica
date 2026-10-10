@@ -12,6 +12,7 @@ import { inhabitantRenderable } from '../character/inhabitant.js';
 import type { CharacterRenderable } from '../character/renderable.js';
 import { drawnHeightMm, type KindDrawing, type LookDrawing } from './documents.js';
 import { LookRoleFigure, NoFigure, PresenceFigure, StaticFigure, type PickVolume, type ThingFigure, type ThingPose } from './figures.js';
+import type { BodyMotion } from './body-motion.js';
 import { RigidOnBonesFigure } from './rigid-on-bones.js';
 import { SkinnedFigure } from './skinned.js';
 import type { BodyPlanEntry } from './skeleton.js';
@@ -49,6 +50,8 @@ export interface FigureRequest {
   readonly container: InstancedContainer | null;
   /** The material of the engine's primitive, for a look role no pack dresses here. */
   readonly primitive: pc.Material;
+  /** The table a body whose plan states its chains is posed by; none poses those chains at rest. */
+  readonly motion?: BodyMotion | null;
 }
 
 /** Make the figure that draws `request.look`, or refuse it by name. */
@@ -77,7 +80,7 @@ export function makeFigure(request: FigureRequest): ThingFigure {
       const plan = request.plan ?? needs('body plan');
       const height = drawnHeightMm(kind, look) ?? needs('height');
       try {
-        return new RigidOnBonesFigure(request.parent, (request.container ?? needs('container')).model, plan, request.name, look.heightMm ?? height, height);
+        return new RigidOnBonesFigure(request.parent, (request.container ?? needs('container')).model, plan, request.name, look.heightMm ?? height, height, request.motion ?? null, kind.extentMm);
       } catch (error) {
         if (error instanceof FigureRefused) throw error;
         throw new FigureRefused('skeleton_refused', error instanceof Error ? error.message : String(error));
@@ -88,7 +91,7 @@ export function makeFigure(request: FigureRequest): ThingFigure {
       const height = drawnHeightMm(kind, look) ?? needs('height');
       const container = request.container ?? needs('container');
       try {
-        return new SkinnedFigure(request.parent, container.model, container.tracks, plan, look.rig ?? needs('rig'), request.name, look.heightMm ?? height, height);
+        return new SkinnedFigure(request.parent, container.model, container.tracks, plan, look.rig ?? needs('rig'), request.name, look.heightMm ?? height, height, request.motion ?? null, kind.extentMm);
       } catch (error) {
         if (error instanceof FigureRefused) throw error;
         throw new FigureRefused('skeleton_refused', error instanceof Error ? error.message : String(error));

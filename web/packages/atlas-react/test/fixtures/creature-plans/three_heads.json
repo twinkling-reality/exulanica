@@ -1,0 +1,702 @@
+{
+ "joints_m": {
+  "head1": [
+   0.23399999737739563,
+   1.0180000066757202,
+   0.9580000042915344
+  ],
+  "head1Jaw": [
+   0.23399999737739563,
+   0.921999990940094,
+   1.0260000228881836
+  ],
+  "head1Neck1": [
+   0.07800000160932541,
+   0.8610000014305115,
+   0.6850000023841858
+  ],
+  "head1Neck2": [
+   0.1550000011920929,
+   0.9390000104904175,
+   0.8209999799728394
+  ],
+  "head2": [
+   0.0,
+   1.0180000066757202,
+   0.9580000042915344
+  ],
+  "head2Jaw": [
+   0.0,
+   0.921999990940094,
+   1.0260000228881836
+  ],
+  "head2Neck1": [
+   0.0,
+   0.8610000014305115,
+   0.6850000023841858
+  ],
+  "head2Neck2": [
+   0.0,
+   0.9390000104904175,
+   0.8209999799728394
+  ],
+  "head3": [
+   -0.23399999737739563,
+   1.0180000066757202,
+   0.9580000042915344
+  ],
+  "head3Jaw": [
+   -0.23399999737739563,
+   0.921999990940094,
+   1.0260000228881836
+  ],
+  "head3Neck1": [
+   -0.07800000160932541,
+   0.8610000014305115,
+   0.6850000023841858
+  ],
+  "head3Neck2": [
+   -0.1550000011920929,
+   0.9390000104904175,
+   0.8209999799728394
+  ],
+  "hips": [
+   0.0,
+   0.7799999713897705,
+   -0.6830000281333923
+  ],
+  "leg1Left1": [
+   0.1889999955892563,
+   0.6449999809265137,
+   0.34299999475479126
+  ],
+  "leg1Left2": [
+   0.35499998927116394,
+   0.44999998807907104,
+   0.37700000405311584
+  ],
+  "leg1Left3": [
+   0.4050000011920929,
+   0.21699999272823334,
+   0.33799999952316284
+  ],
+  "leg1Right1": [
+   -0.1889999955892563,
+   0.6449999809265137,
+   0.34299999475479126
+  ],
+  "leg1Right2": [
+   -0.35499998927116394,
+   0.44999998807907104,
+   0.37700000405311584
+  ],
+  "leg1Right3": [
+   -0.4050000011920929,
+   0.21699999272823334,
+   0.33799999952316284
+  ],
+  "leg2Left1": [
+   0.1889999955892563,
+   0.6449999809265137,
+   -0.3409999907016754
+  ],
+  "leg2Left2": [
+   0.35499998927116394,
+   0.44999998807907104,
+   -0.3070000112056732
+  ],
+  "leg2Left3": [
+   0.4050000011920929,
+   0.21699999272823334,
+   -0.34599998593330383
+  ],
+  "leg2Right1": [
+   -0.1889999955892563,
+   0.6449999809265137,
+   -0.3409999907016754
+  ],
+  "leg2Right2": [
+   -0.35499998927116394,
+   0.44999998807907104,
+   -0.3070000112056732
+  ],
+  "leg2Right3": [
+   -0.4050000011920929,
+   0.21699999272823334,
+   -0.34599998593330383
+  ],
+  "spine1": [
+   0.0,
+   0.7799999713897705,
+   -0.3409999907016754
+  ],
+  "spine2": [
+   0.0,
+   0.7799999713897705,
+   0.0010000000474974513
+  ],
+  "spine3": [
+   0.0,
+   0.7799999713897705,
+   0.34299999475479126
+  ],
+  "tail1": [
+   0.0,
+   0.7799999713897705,
+   -0.6830000281333923
+  ],
+  "tail2": [
+   0.0,
+   0.7459999918937683,
+   -0.8370000123977661
+  ],
+  "tail3": [
+   0.0,
+   0.6439999938011169,
+   -0.9909999966621399
+  ],
+  "tail4": [
+   0.0,
+   0.4729999899864197,
+   -1.1449999809265137
+  ]
+ },
+ "kind": {
+  "abilities": [
+   {
+    "key": "wait",
+    "parameters": {}
+   },
+   {
+    "key": "stand",
+    "parameters": {}
+   },
+   {
+    "key": "follow",
+    "parameters": {}
+   },
+   {
+    "key": "say",
+    "parameters": {}
+   }
+  ],
+  "body": {
+   "extent_mm": {
+    "height": 1300,
+    "length": 2600,
+    "span": 0,
+    "width": 900
+   },
+   "plan": "fixture_three_heads/v1",
+   "plan_sha256": "ebb6316d56596a567900c099d76ad02e5b581fd47b23472b6b1e38f3673759b8"
+  },
+  "class": "being",
+  "deciders": {
+   "allowed": [
+    "routine",
+    "model",
+    "person"
+   ],
+   "default": "routine"
+  },
+  "ext": {},
+  "kind": "fixture_three_heads",
+  "label": "fixture three heads",
+  "looks": [
+   {
+    "look": "fixture-three-heads-sketch",
+    "sha256": "4f288a9e30ec1b84c66182c7492ca2d299c3415acb32781addca033a3b2d1723",
+    "version": 1
+   }
+  ],
+  "moves": [
+   "exulanica-movement/walking/v1"
+  ],
+  "offers": [
+   {
+    "key": "talk_to",
+    "parameters": {}
+   },
+   {
+    "key": "hear",
+    "parameters": {}
+   },
+   {
+    "key": "be_followed",
+    "parameters": {}
+   }
+  ],
+  "origin": {
+   "authors": [],
+   "by": {
+    "execution_sha256": null,
+    "kind": "model",
+    "model_id": "fixture/hand-written",
+    "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prompt_version": "creature-drafting-1",
+    "provider": "nebius_token_factory",
+    "words_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+   },
+   "class": "drafted",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "0ba74ec4357708e724ec0e82ee3236b4a9c62620949e72da669d37743b683b33",
+     "ebb6316d56596a567900c099d76ad02e5b581fd47b23472b6b1e38f3673759b8"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.thing-kind/v1",
+  "routine": {
+   "follow_holders_of": [],
+   "reason": "Drafted with the creature: the weights the drafting model gave its abilities, which its routine draws among whenever no mind is choosing for it.",
+   "weights": {
+    "wait": 300
+   }
+  },
+  "summary": "A creature built from a hand-written body recipe for the page's tests.",
+  "version": 1
+ },
+ "look": {
+  "body_plan": "fixture_three_heads/v1",
+  "container": {
+   "bytes": 93888,
+   "media_type": "model/gltf-binary",
+   "sha256": "85104aaa61e3311b8f3f565c48f24b9cba424b9b4e3e7238cf40821ff3bef1c9"
+  },
+  "height_mm": 1300,
+  "label": "a sketch of its body",
+  "light": null,
+  "look": "fixture-three-heads-sketch",
+  "look_kind": "rigid_on_bones",
+  "origin": {
+   "authors": [],
+   "by": {
+    "kind": "project"
+   },
+   "class": "authored",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "CC0-1.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "0ba74ec4357708e724ec0e82ee3236b4a9c62620949e72da669d37743b683b33",
+     "ebb6316d56596a567900c099d76ad02e5b581fd47b23472b6b1e38f3673759b8"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.look/v1",
+  "rig": null,
+  "role": null,
+  "sampling": "linear",
+  "version": 1
+ },
+ "plan": {
+  "bones": [
+   {
+    "name": "hips",
+    "parent": null,
+    "required": true
+   },
+   {
+    "name": "spine1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "spine2",
+    "parent": "spine1",
+    "required": true
+   },
+   {
+    "name": "spine3",
+    "parent": "spine2",
+    "required": true
+   },
+   {
+    "name": "head1Neck1",
+    "parent": "spine3",
+    "required": true
+   },
+   {
+    "name": "head1Neck2",
+    "parent": "head1Neck1",
+    "required": true
+   },
+   {
+    "name": "head1",
+    "parent": "head1Neck2",
+    "required": true
+   },
+   {
+    "name": "head1Jaw",
+    "parent": "head1",
+    "required": true
+   },
+   {
+    "name": "head2Neck1",
+    "parent": "spine3",
+    "required": true
+   },
+   {
+    "name": "head2Neck2",
+    "parent": "head2Neck1",
+    "required": true
+   },
+   {
+    "name": "head2",
+    "parent": "head2Neck2",
+    "required": true
+   },
+   {
+    "name": "head2Jaw",
+    "parent": "head2",
+    "required": true
+   },
+   {
+    "name": "head3Neck1",
+    "parent": "spine3",
+    "required": true
+   },
+   {
+    "name": "head3Neck2",
+    "parent": "head3Neck1",
+    "required": true
+   },
+   {
+    "name": "head3",
+    "parent": "head3Neck2",
+    "required": true
+   },
+   {
+    "name": "head3Jaw",
+    "parent": "head3",
+    "required": true
+   },
+   {
+    "name": "tail1",
+    "parent": "hips",
+    "required": true
+   },
+   {
+    "name": "tail2",
+    "parent": "tail1",
+    "required": true
+   },
+   {
+    "name": "tail3",
+    "parent": "tail2",
+    "required": true
+   },
+   {
+    "name": "tail4",
+    "parent": "tail3",
+    "required": true
+   },
+   {
+    "name": "leg1Left1",
+    "parent": "spine3",
+    "required": true
+   },
+   {
+    "name": "leg1Left2",
+    "parent": "leg1Left1",
+    "required": true
+   },
+   {
+    "name": "leg1Left3",
+    "parent": "leg1Left2",
+    "required": true
+   },
+   {
+    "name": "leg1Right1",
+    "parent": "spine3",
+    "required": true
+   },
+   {
+    "name": "leg1Right2",
+    "parent": "leg1Right1",
+    "required": true
+   },
+   {
+    "name": "leg1Right3",
+    "parent": "leg1Right2",
+    "required": true
+   },
+   {
+    "name": "leg2Left1",
+    "parent": "spine1",
+    "required": true
+   },
+   {
+    "name": "leg2Left2",
+    "parent": "leg2Left1",
+    "required": true
+   },
+   {
+    "name": "leg2Left3",
+    "parent": "leg2Left2",
+    "required": true
+   },
+   {
+    "name": "leg2Right1",
+    "parent": "spine1",
+    "required": true
+   },
+   {
+    "name": "leg2Right2",
+    "parent": "leg2Right1",
+    "required": true
+   },
+   {
+    "name": "leg2Right3",
+    "parent": "leg2Right2",
+    "required": true
+   }
+  ],
+  "key": "fixture_three_heads",
+  "limbs": [
+   {
+    "bones": [
+     "spine1",
+     "spine2",
+     "spine3"
+    ],
+    "key": "spine",
+    "order": 0,
+    "role": "spine",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "head1Neck1",
+     "head1Neck2"
+    ],
+    "key": "head1Neck",
+    "order": 0,
+    "role": "neck",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "head1Jaw"
+    ],
+    "key": "head1Jaw",
+    "order": 0,
+    "role": "jaw",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "head2Neck1",
+     "head2Neck2"
+    ],
+    "key": "head2Neck",
+    "order": 1,
+    "role": "neck",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "head2Jaw"
+    ],
+    "key": "head2Jaw",
+    "order": 1,
+    "role": "jaw",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "head3Neck1",
+     "head3Neck2"
+    ],
+    "key": "head3Neck",
+    "order": 2,
+    "role": "neck",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "head3Jaw"
+    ],
+    "key": "head3Jaw",
+    "order": 2,
+    "role": "jaw",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "tail1",
+     "tail2",
+     "tail3",
+     "tail4"
+    ],
+    "key": "tail",
+    "order": 0,
+    "role": "tail",
+    "side": "centre"
+   },
+   {
+    "bones": [
+     "leg1Left1",
+     "leg1Left2",
+     "leg1Left3"
+    ],
+    "key": "leg1Left",
+    "order": 0,
+    "role": "leg",
+    "side": "left"
+   },
+   {
+    "bones": [
+     "leg1Right1",
+     "leg1Right2",
+     "leg1Right3"
+    ],
+    "key": "leg1Right",
+    "order": 0,
+    "role": "leg",
+    "side": "right"
+   },
+   {
+    "bones": [
+     "leg2Left1",
+     "leg2Left2",
+     "leg2Left3"
+    ],
+    "key": "leg2Left",
+    "order": 1,
+    "role": "leg",
+    "side": "left"
+   },
+   {
+    "bones": [
+     "leg2Right1",
+     "leg2Right2",
+     "leg2Right3"
+    ],
+    "key": "leg2Right",
+    "order": 1,
+    "role": "leg",
+    "side": "right"
+   }
+  ],
+  "motions": {
+   "optional": [
+    "talk",
+    "hold"
+   ],
+   "required": [
+    "idle",
+    "walk"
+   ]
+  },
+  "moves": [
+   "exulanica-movement/walking/v1"
+  ],
+  "origin": {
+   "authors": [],
+   "by": {
+    "execution_sha256": null,
+    "kind": "model",
+    "model_id": "fixture/hand-written",
+    "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prompt_version": "creature-drafting-1",
+    "provider": "nebius_token_factory",
+    "words_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+   },
+   "class": "drafted",
+   "distribution": "private",
+   "licence": {
+    "attribution": null,
+    "licence_text_sha256": null,
+    "licence_url": null,
+    "share_alike": false,
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+   },
+   "lineage": {
+    "ingredients": [
+     "0ba74ec4357708e724ec0e82ee3236b4a9c62620949e72da669d37743b683b33"
+    ],
+    "receipts": [],
+    "translation_manifest_sha256": null
+   },
+   "profile": "exulanica.origin/v1",
+   "sources": []
+  },
+  "profile": "exulanica.body-plan/v1",
+  "reach_mm": 1300,
+  "reason": "Built by exulanica-body-builder/v1 from a horizontal body recipe (sha256 0ba74ec4357708e724ec0e82ee3236b4a9c62620949e72da669d37743b683b33): every bone, chain, socket and range follows from the recipe and the body grammar version 1.",
+  "size": {
+   "extent_mm": {
+    "height": {
+     "maximum": 1625,
+     "minimum": 1040
+    },
+    "length": {
+     "maximum": 3250,
+     "minimum": 2080
+    },
+    "span": {
+     "maximum": 1,
+     "minimum": 0
+    },
+    "width": {
+     "maximum": 1125,
+     "minimum": 720
+    }
+   }
+  },
+  "sockets": [
+   {
+    "bone": "head1Jaw",
+    "grip_section_mm_maximum": 150,
+    "holds": 1,
+    "key": "mouth",
+    "length_mm_maximum": 650
+   },
+   {
+    "bone": "head2Jaw",
+    "grip_section_mm_maximum": 150,
+    "holds": 1,
+    "key": "mouth.head2",
+    "length_mm_maximum": 650
+   },
+   {
+    "bone": "head3Jaw",
+    "grip_section_mm_maximum": 150,
+    "holds": 1,
+    "key": "mouth.head3",
+    "length_mm_maximum": 650
+   }
+  ],
+  "title": "the body of a fixture three heads",
+  "version": 1
+ },
+ "profile": "exulanica.creature-plan-fixture/v1",
+ "recipe_sha256": "0ba74ec4357708e724ec0e82ee3236b4a9c62620949e72da669d37743b683b33",
+ "written_by": "scripts/things/creature_plan_fixtures.py"
+}

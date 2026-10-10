@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { ThingLibrary, readThingLibrary, type PlacedThingRecord, type ThingLayerOptions, type ThingPick } from '@exulanica/atlas-react/things';
+import { BODY_MOTION } from '../src/body-motion.js';
 import { THING_PICK_EVENT, mountThings, signalColour, worldMarkPersonColour, type ThingPickDetail } from '../src/composition/things.js';
 
 // The layer draws and picks in the renderer, tested beside it (atlas-react things-layer.test.ts);
@@ -139,6 +140,8 @@ describe('drawing the placed things and raising a pick', () => {
     const layer = layers.at(-1)!;
     expect(layer.options.library).toBe(library);
     expect(layer.options.ringColour).toBe(signalColour());
+    // The layer's figures are posed by the catalog's table, the one the page reads.
+    expect(layer.options.bodyMotion).toBe(BODY_MOTION);
     const version = parseVersion({
       schema_version: 5, version_id: 'v', world_id: 'w', source_snapshot_id: 's', parent_version_id: null, title: 't',
       origin: 'authored', style_version_id: null, state_sha256: '1'.repeat(64), edit_seq: 1, source_invalidated: false,
@@ -160,8 +163,11 @@ describe('drawing the placed things and raising a pick', () => {
         { ...placedRow('creature-1', { source: 'workspace', sha256: 'c'.repeat(64) } as never, 0, 0), gone: true },
       ],
     });
+    const forgotten = vi.spyOn(library, 'forgetHeldKind');
     await things.setPlaced(gone.things!);
     expect(layer.placed.map((one) => one.thingId)).toEqual(['spirit-1']);
+    // And what the page kept of that kind is forgotten: asked of the library once, for that kind alone.
+    expect(forgotten.mock.calls).toEqual([['c'.repeat(64)]]);
     await things.setPlaced(version.things!);
     const heard: ThingPickDetail[] = [];
     shell.addEventListener(THING_PICK_EVENT, (event) => heard.push((event as CustomEvent<ThingPickDetail>).detail));
