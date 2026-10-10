@@ -133,10 +133,11 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # body recipe is read against, the names and sentence a society says a drafted body by, the
     # gaits a drafted body's pace is read by, the
     # generated piece recipes in two versions, what generating a piece costs and the style
-    # words a piece request carries for each pack, and the materials a made place's surfaces are
+    # words a piece request carries for each pack, the materials a made place's surfaces are
     # drawn in by the words of their look roles, in two versions (the second moved six colours),
-    # and the forms a roof of each material takes.
-    assert len(found[ENTRY_SHAPE]) == 128
+    # the forms a roof of each material takes, and the actions a person may take on a world and
+    # what is in it, by their stable ids.
+    assert len(found[ENTRY_SHAPE]) == 129
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
     # mappings, the road derivation and the signal placement.
     assert len(found[CITED_SHAPE]) == 7

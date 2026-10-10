@@ -8,6 +8,15 @@ on it, with its state. Each operation is a descriptor of :mod:`exulanica.api.cap
 route that performs it, the permissions that route declares and whether this caller holds them, its
 state and the code of any refusal, its stale-base tokens, and the reads that list its options.
 
+The version's read also lists ``actions``: every offered action of the action catalog
+(:mod:`exulanica.world.action_catalog`), by its stable id, with its words, what it acts on, what
+it costs and destroys, how it runs (its route and bind, and the plan step where the Companion
+plans it), the permissions its route declares and whether this caller holds them, and, where an
+operation above projects its route, that operation's state and code (``projected``). An action
+whose subject is one being or thing, or the world apart from any version, is projected by no
+version operation: it says ``projected: false`` and no state, which means "ask where its subject
+is read" and never "not permitted".
+
 Neither read writes, asks a model or decides anything its domain does not. A domain's adapter
 states each state from the check its own write path makes: the regions are the one check every
 placement makes (``WorldObjectRepository.source_facts``), a society's operations are the engine
@@ -119,6 +128,7 @@ from exulanica.api.world_scope import WorldId
 from exulanica.graph.personal_sources import personal_sources
 from exulanica.selection.validation import Session
 from exulanica.traffic.errors import UnsupportedNetworkError
+from exulanica.world import action_catalog
 from exulanica.world.arrangements import version_refusal
 from exulanica.world.composition_preview import SOURCE_INVALIDATED
 from exulanica.world.errors import InvalidatedSourceVersion, InvalidStructuralData
@@ -767,6 +777,38 @@ def version_context(
     )
 
 
+def _actions(operations: list[dict[str, Any]], held: frozenset[Permission]) -> list[dict[str, Any]]:
+    """Every offered action of the catalog for a caller holding ``held``: what the catalog states
+    of it, its route's own permissions, and the state of the operation among ``operations`` (the
+    version's descriptors, as served) that projects its route and bind, where one does."""
+    served = []
+    for action in action_catalog.offered():
+        assert action.route is not None  # an offered action names its route
+        method, _, path = action.route.partition(" ")
+        rule = rule_for(method, path)
+        required = rule.permissions if isinstance(rule, Requires) else frozenset()
+        projecting = next(
+            (
+                described
+                for described in operations
+                if described["operation"] == action.route
+                and all(described["bind"].get(key) == value for key, value in action.bind.items())
+            ),
+            None,
+        )
+        served.append(
+            {
+                **action.view(),
+                "requires": sorted(str(permission) for permission in required),
+                "permitted": required <= held,
+                "projected": projecting is not None,
+                "state": None if projecting is None else projecting["state"],
+                "code": None if projecting is None else projecting["code"],
+            }
+        )
+    return served
+
+
 def version_capabilities_document(
     version_id: uuid.UUID,
     *,
@@ -782,6 +824,11 @@ def version_capabilities_document(
     routes = surface(request.app)
     facts = installation_facts_of(context.services)
     source = context.source
+    operations = [
+        describe(operation, routes, held, facts)
+        for adapter in VERSION_ADAPTERS
+        for operation in adapter(context)
+    ]
     return {
         "profile": VERSION_PROFILE,
         "world_id": world_id,
@@ -797,11 +844,8 @@ def version_capabilities_document(
             "held": context.society is not None,
             "engine": None if context.engine is None else context.engine.engine,
         },
-        "operations": [
-            describe(operation, routes, held, facts)
-            for adapter in VERSION_ADAPTERS
-            for operation in adapter(context)
-        ],
+        "operations": operations,
+        "actions": _actions(operations, held),
     }
 
 

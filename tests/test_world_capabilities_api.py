@@ -22,6 +22,7 @@ import exulanica.api.routes.world_models as world_models_module
 import pytest
 from exulanica.api.authorisation import load_token_directory
 from exulanica.traffic.signal_actuation import signal_actuation
+from exulanica.world import action_catalog
 from exulanica.world.arrangements import arrangement_catalog
 from exulanica.world.assets import reviewed_assets
 from exulanica.world.decision_roles import RoleRegistry, decision_roles
@@ -270,6 +271,56 @@ def test_a_starter_world_lists_its_region_and_takes_an_edit_there_and_nowhere_el
     reread = api.version(entry)
     assert reread["state_sha256"] == placed.json()["state_sha256"]
     assert [obj["object_id"] for obj in reread["objects"]] == ["object:bench"]
+
+
+def test_the_read_lists_every_offered_action_by_its_id_with_its_operation_s_state(api):
+    """The action catalog as the version's read serves it: every offered id once, each with the
+    state, code, permissions and holding of the one operation of this same read that projects its
+    route and bind, and an action no operation projects saying so with no state."""
+    entry = _starter(api)
+    document = _capabilities(api, entry)
+    actions = {action["id"]: action for action in document["actions"]}
+    assert list(actions) == [action.id for action in action_catalog.offered()]
+    unprojected = set()
+    for ident, action in actions.items():
+        run = action["runs_by"]
+        rows = [
+            row
+            for row in document["operations"]
+            if row["operation"] == run["route"]
+            and all(row["bind"].get(key) == value for key, value in run["bind"].items())
+        ]
+        if not rows:
+            unprojected.add(ident)
+            assert (action["projected"], action["state"], action["code"]) == (False, None, None)
+            continue
+        # One operation, and the action says what it says.
+        [row] = rows
+        assert action["projected"] is True, ident
+        assert (action["state"], action["code"]) == (row["state"], row["code"]), ident
+        assert (action["requires"], action["permitted"]) == (row["requires"], row["permitted"])
+    # The four whose subject is one being, or the world apart from any version: "ask where its
+    # subject is read", never "not permitted" (the owner here holds every permission).
+    assert unprojected == {
+        "pieces.request",
+        "beings.play",
+        "beings.give-back",
+        "world.make",
+    }
+    assert all(actions[ident]["permitted"] for ident in unprojected)
+    # A starter world holds no society: the clock's three actions share one operation's refusal.
+    states = {actions[ident]["state"] for ident in ("clock.play", "clock.pause", "clock.speed")}
+    assert len(states) == 1 and states != {"available"}
+    # No reserved id is served, and none of a later version's.
+    assert not {a.id for a in action_catalog.actions() if a.status != "offered"} & set(actions)
+
+    # A caller who may only read is shown the same list, permitted nothing.
+    reader = _capabilities(api, entry, token=_with_grant(api, ["world.read"]))
+    assert [action["id"] for action in reader["actions"]] == list(actions)
+    assert not any(action["permitted"] for action in reader["actions"])
+    assert [action["state"] for action in reader["actions"]] == [
+        action["state"] for action in actions.values()
+    ]
 
 
 def test_a_starter_arrangement_is_previewed_then_applied_as_the_read_says(api):

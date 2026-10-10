@@ -248,6 +248,32 @@ provenance read gives the authored `edit_seq` it followed and the version's stat
 edit (`delta_sha256`), which is the `result_state_sha256` of that edit in the version's history, so
 an event joins to the edit, and the object, it followed.
 
+### Actions by their ids
+
+A version's read also lists `actions`: every action the action catalog offers
+(`assets/catalogs/actions/`, read by `exulanica/world/action_catalog.py`), so that a page's list
+of options, a Companion plan's steps and the actions a role grants name one action by one id.
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The action's stable id, such as `minds.choose`. An id is never renamed or reused: a later version of the catalog holds every id an earlier one held, retired where it is no longer offered |
+| `words` | Its `label` and `hint` |
+| `family`, `subjects` | How it runs (`workshop`: a person changes or runs a world; `being`: a person acts as a being; `visit`: a person is in a world) and what it acts on (`workspace`, `world`, `being`, `thing`, `object`, `part`) |
+| `cost_class`, `world_cost_class` | What it costs the one who acts (`none`; `model_calls`, bounded by a sheet served before the yes; `generation`) and what it may cost the world it is taken in |
+| `destroys` | Codes of what it destroys; empty where it destroys nothing |
+| `protected` | Whether every role holds it |
+| `runs_by` | The `route` that performs it with the `bind` that picks it where one route performs several, and `plan_step`, the word a Companion plan holds it by, or null where no plan does |
+| `requires`, `permitted` | The permissions its route declares, and whether this caller's grant holds them all |
+| `projected`, `state`, `code` | Whether an operation of this read projects its route and bind, and that operation's state and code |
+
+An action that costs anything or destroys anything always names a `plan_step`: it runs under a
+plan's one confirmation, whose sheet states the cost or the loss first, and a client does not send
+its route from a list. `projected: false` carries no state and does not mean "not permitted": the
+action's subject is one being or thing, or the world apart from any version, and no version
+operation enumerates it; whether it can be done is said where that subject is read. The figures of
+a cost are never in this list; they are on the plan step. An id the catalog reserves for a route
+that does not exist yet is not served.
+
 ## Making an edit from another tool
 
 Every mutation names the version state it was made against. Read the version, take its
