@@ -173,6 +173,36 @@
         "reason": "The route graph a society's input or a living society's place states: a district's sidewalk graph, a saved world's declared lattice, the walking surfaces a generated world's records state, or a living place's walking graph."
       },
       "status": "built"
+    },
+    {
+      "agents": {
+        "catalog": "society-engines",
+        "kinds": ["exulanica-society/v7"],
+        "reason": "Everybody in a society of things whose first input records this module among its movement modules. A society of things that records none walks by the first version, as it always did, and no other engine records one."
+      },
+      "clock": {
+        "kind": "society",
+        "reason": "One tick is one simulated minute of the society's persisted history, advanced by a person's request or the host's playback.",
+        "step_ms": 60000
+      },
+      "module": "exulanica-movement/walking/v2",
+      "output": {
+        "profile": "exulanica.motion-path/v1",
+        "reason": "Every being's motion_path_mm, as the first version hands it: each segment traversed in the tick, start and end included, or one stationary point. A slower walker's path is shorter in the same minute, so a renderer that plays a path over its minute shows the pace."
+      },
+      "parameters": [
+        {"maximum": 1000000000, "minimum": 1, "name": "budget_mm_per_tick", "reason": "The travel one tick spends along a route at the society's own pace: the movement budget its state records. The first version's bounds.", "unit": "mm/tick", "value": null},
+        {"maximum": 10000, "minimum": 1, "name": "pace_permille", "reason": "A walker's own pace in thousandths of the society's, stated by its kind with the walking it moves by (a drafted body's is computed from the height it stands at, assets/catalogs/things/gaits.v1.json, which holds it between 100 and 3,000). The bounds are a guard on a stored figure, ten times the society's pace at most, wider than any body the grammar admits.", "unit": "permille", "value": null},
+        {"maximum": 1000, "minimum": 1000, "name": "reference_pace_permille", "reason": "The pace of a walker whose kind states none: the society's own, a thousand in a thousand. Every shipped kind and every run form written before paces were stated walks at it, so such a walker moves exactly as the first version moves it.", "unit": "permille", "value": 1000}
+      ],
+      "reason": "Walking at each body's own pace: the first version's routes and its budgeted traversal, unchanged, with the budget each walker spends in a tick scaled by its pace, a whole number of millimetres by integer floor division and never less than one. It reads the route it is handed and the two figures, and nothing of the ground the route was found on.",
+      "refusal": null,
+      "space": {
+        "kind": "ground-lattice",
+        "profiles": ["authored-ground-lattice/v1", "city-walking-surfaces/v1"],
+        "reason": "The route graph an input of the society of things states: a saved world's declared lattice, or the walking surfaces a generated world's records state."
+      },
+      "status": "built"
     }
   ],
   "profile": "exulanica.movement-modules/v1"

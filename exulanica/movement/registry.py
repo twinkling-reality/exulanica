@@ -13,25 +13,34 @@ Every lookup of a module goes through :func:`movement_module`, which refuses a m
 does not state by name, and :func:`built_module`, which also refuses a row that is not built with
 the refusal the row states. Nothing guesses that an unknown module behaves like a known one.
 
+**What a society records.** A row whose agents are society engines (``agents.catalog`` is
+:data:`ENGINE_AGENTS`) moves the people of each engine it lists. A new society of an engine records
+:func:`current_engine_modules`, the newest built version of each kind of movement that moves its
+people, and runs exactly those for its whole life (:func:`recorded_movement`), whatever a later
+table adds; :func:`check_recorded` holds a recorded list to that shape.
+
 Pure: no connection, no store, no world. The table is read once per process.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Final, Literal
 
 __all__ = [
+    "ENGINE_AGENTS",
     "FLIGHT",
     "FLIGHT_V2",
     "MODULES",
     "MODULES_PATH",
     "ROADS",
     "WALKING",
+    "WALKING_V2",
     "MovementError",
     "MovementModule",
     "MovementModuleNotConnected",
@@ -40,8 +49,11 @@ __all__ = [
     "UnknownMovementModule",
     "UnknownParameter",
     "built_module",
+    "check_recorded",
+    "current_engine_modules",
     "load_movement_modules",
     "movement_module",
+    "recorded_movement",
 ]
 
 MODULES_PATH: Final = Path(__file__).with_name("movement-modules.v1.json")
@@ -49,9 +61,14 @@ TABLE_PROFILE: Final = "exulanica.movement-modules/v1"
 #: The module identities this package's own code names. Each is a row of the table, and a test
 #: holds the code's step table to the rows that are built.
 WALKING: Final = "exulanica-movement/walking/v1"
+WALKING_V2: Final = "exulanica-movement/walking/v2"
 FLIGHT: Final = "exulanica-movement/flight/v1"
 FLIGHT_V2: Final = "exulanica-movement/flight/v2"
 ROADS: Final = "exulanica-movement/roads/v1"
+#: The agents catalog of a row that moves a society engine's people: such a row lists the engines.
+ENGINE_AGENTS: Final = "society-engines"
+#: A module's identity: the kind of movement and its version.
+_IDENTITY: Final = re.compile(r"exulanica-movement/([a-z][a-z0-9-]*)/v([1-9][0-9]*)")
 
 Status = Literal["built", "not_connected"]
 _STATUSES: Final = ("built", "not_connected")
@@ -285,3 +302,53 @@ def built_module(name: object) -> MovementModule:
         assert module.refusal is not None
         raise MovementModuleNotConnected(module.module, module.refusal)
     return module
+
+
+def _moves_engine(module: MovementModule, engine: str) -> bool:
+    return module.agents_catalog == ENGINE_AGENTS and engine in (module.agents_kinds or ())
+
+
+def _identity(module: str) -> tuple[str, int]:
+    match = _IDENTITY.fullmatch(module)
+    if match is None:
+        raise UnknownMovementModule(f"unknown movement module {module!r}")
+    return match.group(1), int(match.group(2))
+
+
+def current_engine_modules(engine: str) -> tuple[str, ...]:
+    """What a new society of ``engine`` records: of the built rows that move its people, the
+    newest version of each kind of movement, in module order."""
+    newest: dict[str, tuple[int, str]] = {}
+    for module in MODULES:
+        if module.status != "built" or not _moves_engine(module, engine):
+            continue
+        kind, version = _identity(module.module)
+        if kind not in newest or version > newest[kind][0]:
+            newest[kind] = (version, module.module)
+    return tuple(sorted(name for _version, name in newest.values()))
+
+
+def check_recorded(modules: object, engine: str) -> tuple[str, ...]:
+    """``modules`` as a society of ``engine`` records them: a list that names at least one module,
+    each once, in order, each a built row that moves that engine's people, one version of each
+    kind of movement. Anything else is refused, naming what was wrong."""
+    if not isinstance(modules, list) or not modules or modules != sorted(set(modules)):
+        raise MovementError("movement modules are recorded once each, in order, at least one")
+    kinds = []
+    for name in modules:
+        if not _moves_engine(built_module(name), engine):
+            raise MovementError(f"movement module {name!r} does not move the people of {engine}")
+        kinds.append(_identity(name)[0])
+    if len(kinds) != len(set(kinds)):
+        raise MovementError("a society records one version of each kind of movement")
+    return tuple(modules)
+
+
+def recorded_movement(modules: Sequence[str] | None, kind: str) -> MovementModule | None:
+    """The built row of the ``kind`` of movement (``walking``) a society recorded among
+    ``modules``, at the version it recorded, or None where it recorded none of that kind: its
+    figures are that version's, whatever later rows state."""
+    for name in modules or ():
+        if _identity(name)[0] == kind:
+            return built_module(name)
+    return None

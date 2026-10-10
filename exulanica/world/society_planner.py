@@ -13,7 +13,7 @@ from itertools import pairwise
 from typing import Any, Final
 
 from exulanica.grammar.errors import CatalogError
-from exulanica.movement.registry import WALKING
+from exulanica.movement.registry import WALKING, recorded_movement
 from exulanica.movement.steps import step_of
 from exulanica.movement.walking import WALKING_MODULE
 from exulanica.movement.walking import routes_from as _paths
@@ -61,7 +61,7 @@ from exulanica.world.society_input_policy import (
 )
 from exulanica.world.society_legacy import initial_society
 from exulanica.world.society_summaries import summary_name
-from exulanica.world.society_thing_inputs import validate_input_things
+from exulanica.world.society_thing_inputs import MOVEMENT_MODULES_FIELD, validate_input_things
 
 PURPOSEFUL_PROFILE = "exulanica-society/v2"
 INPUT_PROFILE = "exulanica.society-input/v1"
@@ -298,6 +298,9 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         # The modules a society runs: recorded by its first input alone, absent before they were.
         if "modules" in document:
             fields.add("modules")
+        # The movement modules that move its people: the same, and absent before they were.
+        if MOVEMENT_MODULES_FIELD in document:
+            fields.add(MOVEMENT_MODULES_FIELD)
         # What a town's people are made from: recorded by its first input alone, where it is.
         if "people" in document:
             fields.add("people")
@@ -1766,6 +1769,49 @@ def _talk_pairs(
     return pairs
 
 
+def walker_paces(state: Mapping[str, Any]) -> Callable[[Mapping[str, Any]], int] | None:
+    """How a society's walkers are paced. None where its minutes run the first walking, which
+    spends one budget for everybody: every society whose first input recorded no movement module.
+    Where it recorded a walking that declares a pace, what answers each walker's own, in
+    thousandths of the society's: the one its kind states with the walking it moves by, or the
+    module's reference pace where its kind states none or it states no kind. A kind is read once
+    a call, from the run forms the state keeps."""
+    from exulanica.movement.walking_v2 import PACE_PARAMETER
+
+    row = recorded_movement(state.get(MOVEMENT_MODULES_FIELD), "walking")
+    if row is None or PACE_PARAMETER not in row.parameters:
+        return None
+    from exulanica.world.society_kinds import pace_permille_of
+
+    reference = row.value("reference_pace_permille")
+    held: dict[tuple[object, object], int] = {}
+
+    def pace(person: Mapping[str, Any]) -> int:
+        kind = person.get("kind")
+        if kind is None:
+            return reference
+        key = (kind.get("source"), kind["sha256"])
+        if key not in held:
+            stated = pace_permille_of(state, kind)
+            held[key] = reference if stated is None else stated
+        return held[key]
+
+    return pace
+
+
+def tick_budgets(state: Mapping[str, Any]) -> Callable[[Mapping[str, Any]], int]:
+    """What each walker of a society may spend along its route in one tick, in millimetres: the
+    budget its state records, for everybody where its minutes run the first walking, and scaled
+    by the walker's own pace where they run one that declares it (:func:`walker_paces`)."""
+    budget = state["movement_budget_mm_per_tick"]
+    pace = walker_paces(state)
+    if pace is None:
+        return lambda person: budget
+    from exulanica.movement.walking_v2 import own_budget_mm
+
+    return lambda person: own_budget_mm(budget, pace(person))
+
+
 def advance_purposeful_society(
     state: dict[str, Any],
     seed: str,
@@ -1818,8 +1864,12 @@ def _advance_purposeful_society(
     _require(
         WALKING_MODULE.admits("budget_mm_per_tick", budget_per_tick), "invalid movement budget"
     )
-    # Everybody walks by the walking module's step, looked up through the movement dispatcher.
-    walk = step_of(WALKING)
+    # Everybody walks by a walking module's step, looked up through the movement dispatcher: the
+    # one the society's first input recorded, or the first where it recorded none. A step that
+    # declares a pace is handed each walker's own after the budget.
+    recorded = recorded_movement(state.get(MOVEMENT_MODULES_FIELD), "walking")
+    walk = step_of(WALKING if recorded is None else recorded.module)
+    pace = walker_paces(state)
     result = deepcopy(state)
     tick = state["tick"] + 1
     result["tick"] = tick
@@ -2390,7 +2440,8 @@ def _advance_purposeful_society(
                 emit(person, "action_completed", "reviewed_duration_elapsed", outcome, doc)
             continue
         route = person["route"]
-        for leg in walk(route, nodes, edges, budget_per_tick):
+        figures = (budget_per_tick,) if pace is None else (budget_per_tick, pace(person))
+        for leg in walk(route, nodes, edges, *figures):
             point = leg.point
             person["position_mm"] = point
             if point != person["motion_path_mm"][-1]:

@@ -25,6 +25,7 @@ from types import MappingProxyType
 from typing import Any, Final
 
 from exulanica.things.catalogs import Socket, thing_catalogs
+from exulanica.things.gaits import PACE_PERMILLE
 from exulanica.things.kinds import ThingKind
 from exulanica.things.run_forms import (
     RUN_FORM_PROFILE,
@@ -47,6 +48,7 @@ __all__ = [
     "kind_here",
     "kinds_of",
     "made_reference",
+    "pace_permille_of",
     "reference_of",
     "reference_shape",
     "sockets_of",
@@ -167,6 +169,24 @@ def kind_here(record: Mapping[str, Any] | None, reference: Mapping[str, Any]) ->
         form = kinds_of(record).get(sha256)
         return _gone(sha256) if form is None else MadeKind(form, sha256)
     return shipped_kind(ThingKindReference(**reference))
+
+
+def pace_permille_of(record: Mapping[str, Any] | None, reference: Mapping[str, Any]) -> int | None:
+    """The pace the kind ``reference`` names states with the walking it moves by, in thousandths
+    of a society's own, or None where it states none: a shipped kind's moves name their modules
+    alone, a run form written before paces were stated holds none, and so does a made kind the
+    records at hand no longer state. Only a walking move declares the figure
+    (:mod:`exulanica.things.run_forms`), so the first move that states one is the walking."""
+    if not is_made(reference):
+        return None
+    form = kinds_of(record).get(str(reference["sha256"]))
+    if form is None:
+        return None
+    for move in form["moves"]:
+        pace = move["parameters"].get(PACE_PERMILLE)
+        if pace is not None:
+            return int(pace)
+    return None
 
 
 def sockets_of(kind: Any) -> tuple[Socket, ...]:

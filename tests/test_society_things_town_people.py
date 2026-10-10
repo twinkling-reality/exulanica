@@ -176,6 +176,10 @@ def test_a_later_input_that_states_no_people_reads_the_same_as_the_first():
 def test_an_input_with_no_frame_and_its_society_are_the_bytes_they_were(things: str):
     placed = town._scene_things() if things == "scene" else []
     document = town._compose(*placed)
+    # The bytes were recorded before a first input recorded its movement modules: the same input
+    # without that list, whose society walks by the first walking, as every stored one does.
+    del document["movement_modules"]
+    document = _resealed(document)
     assert "people" not in document
     genesis = _genesis(document)
     assert "people" not in genesis

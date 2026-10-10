@@ -95,6 +95,7 @@ from exulanica.world.society_planner import (
     input_sha256,
     validate_society_input,
 )
+from exulanica.world.society_thing_inputs import record_modules
 
 __all__ = [
     "SEAT_NODE_PREFIX",
@@ -1004,17 +1005,13 @@ def build_walking_surfaces_input(
         if kind is None:
             raise ValueError("the ground's catalog entry names no kind its population is made of")
         document["population_kind"] = dict(kind)
-        if input_seq == 1:
-            # A society's first input records the ability modules it runs, by version, and its
-            # minute runs exactly those for its whole life, whatever a later table adds.
-            from exulanica.abilities.registry import current_modules
-
-            document["modules"] = list(current_modules())
-            if people is not None and reason is None:
-                # What the town's people are made from, before any draw: genesis completes it
-                # with the society's seed, and replay reads it from this input. A later input
-                # is given the frame for its population alone and records none.
-                document["people"] = dict(people)
+        # A society's first input records the modules its minutes run, by version.
+        record_modules(document)
+        if input_seq == 1 and people is not None and reason is None:
+            # What the town's people are made from, before any draw: genesis completes it
+            # with the society's seed, and replay reads it from this input. A later input
+            # is given the frame for its population alone and records none.
+            document["people"] = dict(people)
     if living is not None:
         document["living"] = {
             "routine": living.binding(),

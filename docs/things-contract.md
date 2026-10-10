@@ -824,7 +824,12 @@ default. The reference is the 900 mm at which the hips of the 1,700 mm figure st
 whole number of thousandths of the society's own, the whole root of a whole quotient so it is the
 same on any machine, held between 100 and 3,000: hips at 1,235 mm give 1,171, at 57 mm 251. The run
 form states it with the walking the body moves by; a reader takes any whole number from 1 to
-10,000 there and no other figure.
+10,000 there and no other figure. A society of things whose first input records the second
+walking module moves each being by its own pace's share of the society's budget, floored to a
+whole millimetre: at 60 m a minute a body at 251 walks 15,060 mm in a minute and one at 1,171
+walks 70,260 mm ([movement modules contract](movement-modules-contract.md#walking)). A hand-over
+is timed by what each party spends. A society whose first input records no movement module walks
+every body at the one budget, whatever its run form states.
 
 **Its card.** The card of such a being
 (`GET /world/versions/{version_id}/society/things/{thing_id}`) states what it can do here, where
@@ -1249,14 +1254,17 @@ These are material limits of the boundary above, not partial behaviour:
   made elsewhere by the operator's command, and a route erases a drafted creature). A thing may
   wear a look the workspace keeps, by its digest; nothing yet shows a picture of one (`preview` is
   null).
-- A creature in a society ([above](#a-creature-in-a-society)) walks at the people's pace whatever
-  its body: its run form states its body's own pace, and no society reads it yet (the walking
-  module spends one budget for every walker). Its routine is the purposeful routine held to
+- A creature in a society ([above](#a-creature-in-a-society)) walks at its body's own pace
+  only in a society whose first input records the second walking module; in one made before, it
+  walks at the people's pace. The pace changes how far it walks in a minute and nothing else: a
+  route is still the shortest by length whoever walks it, a follower slower than the one it
+  follows falls behind, and the minutes a hands act may take to reach its thing are the same for
+  every body, so a slow one may not reach it in time. Its routine is the purposeful routine held to
   the abilities its kind lists; the weights drafted with it are read by nothing, so a creature
   whose kind lists none of rest, visit, stand and talk waits where it is. A decider is told its
-  body, never a temperament: nothing drafts or carries one. Because the society moves every body at
-  the people's pace, a small body's legs step as often as that pace asks of its short stride, and a
-  large body's seldom. A leg of one segment does not lift as it swings forward. A sketch is posed
+  body, never a temperament: nothing drafts or carries one. In a society made before paces were
+  read, which moves every body at the people's pace, a small body's legs step as often as that
+  pace asks of its short stride, and a large body's seldom. A leg of one segment does not lift as it swings forward. A sketch is posed
   in full at any distance within the crowd's far radius; how many the page poses in a frame is not
   measured. It wears only its sketch: a
   choice of another look for it is refused (`look_unfit`). A creature placed in a world whose

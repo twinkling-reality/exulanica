@@ -83,10 +83,12 @@ from exulanica.world.society_planner import (
     open_node_near,
     routine_of,
     routine_withheld,
+    tick_budgets,
     validate_society_input,
 )
 from exulanica.world.society_summaries import SIMULATED, crossing_name, summary_name
 from exulanica.world.society_thing_inputs import (
+    MOVEMENT_MODULES_FIELD,
     arrival_points,
     placed_beings,
     placed_objects,
@@ -1124,6 +1126,9 @@ def initial_things_society(
     if "modules" in document:
         # The modules its first input records, which its minutes run for its whole life.
         state["modules"] = list(document["modules"])
+    if MOVEMENT_MODULES_FIELD in document:
+        # And the movement modules that move its people, kept the same way.
+        state[MOVEMENT_MODULES_FIELD] = list(document[MOVEMENT_MODULES_FIELD])
     if "people" in document:
         _house_the_population(state, seed, document["people"])
     state["things"] = _things_of(document, hands=_runs_hands(state))
@@ -1517,8 +1522,9 @@ def _hands(minute: _Minute, previous: Mapping[str, Any]) -> None:
     ended; dropped, by name, when the thing or the other
     being is gone (``thing_gone``) or the module's minutes of walking pass first
     (``out_of_reach``). An act done names the moment within the minute (``at_ms``) the later of
-    its parties' walks ended, at the society's recorded pace: 0 where both stood within reach as
-    the minute began (the hand-over rule agreed with the renderer)."""
+    its parties' walks ended, each at what that party spends in a tick (the society's recorded
+    pace, or its own body's where the society's walking declares one): 0 where both stood within
+    reach as the minute began (the hand-over rule agreed with the renderer)."""
     from exulanica.world.society_hands import (
         acts_open,
         carry_out,
@@ -1529,7 +1535,7 @@ def _hands(minute: _Minute, previous: Mapping[str, Any]) -> None:
 
     state = minute.state
     began = {person["id"]: person for person in previous["inhabitants"]}
-    budget = state["movement_budget_mm_per_tick"]
+    budget_of = tick_budgets(state)
     taken: set[str] = set()
     for person in sorted(state["inhabitants"], key=lambda p: p["ordinal"]):
         intent = person.get("hands")
@@ -1583,8 +1589,14 @@ def _hands(minute: _Minute, previous: Mapping[str, Any]) -> None:
             already
             and _distance_mm(started["position_mm"], _target_point(previous, found)) <= within
         ):
-            walked = max(_walked_mm(party) for party in parties)
-            at_ms = min(59_999, -(-walked * 60_000 // budget)) if budget > 0 else 0
+            # The later of the parties' walks: each one's millimetres over what it spends a tick.
+            at_ms = min(
+                59_999,
+                max(
+                    -(-_walked_mm(party) * 60_000 // spends) if (spends := budget_of(party)) else 0
+                    for party in parties
+                ),
+            )
         details = carry_out(state, found, at=person["position_mm"])
         taken.add(found.thing_id)
         put = next(thing for thing in state["things"] if thing["id"] == found.thing_id)
@@ -1926,6 +1938,13 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
             recorded_modules(state)
         except AbilityError as exc:
             raise ValueError(f"a society of things runs built modules only: {exc}") from exc
+    if MOVEMENT_MODULES_FIELD in state:
+        from exulanica.movement.registry import MovementError, check_recorded
+
+        try:
+            check_recorded(state[MOVEMENT_MODULES_FIELD], THINGS_PROFILE)
+        except MovementError as exc:
+            raise ValueError(f"a society of things' movement modules: {exc}") from exc
     people = state["inhabitants"]
     # The run forms it keeps are exactly those of the made kinds somebody or something here is of.
     validate_kinds(

@@ -102,6 +102,7 @@ from exulanica.world.society_planner import (
     input_sha256,
     validate_society_input,
 )
+from exulanica.world.society_thing_inputs import record_modules
 from exulanica.world.starter import AUTHORED_STARTER_COMPOSER
 
 #: The descriptor profile. It names the ground a saved world states, the area the society walks,
@@ -1359,12 +1360,8 @@ def _authored_ground_with_routine(
         if kind is None:
             raise ValueError("the ground's catalog entry names no kind its population is made of")
         document["population_kind"] = dict(kind)
-        if input_seq == 1:
-            # A society's first input records the ability modules it runs, by version, and its
-            # minute runs exactly those for its whole life, whatever a later table adds.
-            from exulanica.abilities.registry import current_modules
-
-            document["modules"] = list(current_modules())
+        # A society's first input records the modules its minutes run, by version.
+        record_modules(document)
     document["document_sha256"] = input_sha256(document)
     validate_society_input(document)
     return document

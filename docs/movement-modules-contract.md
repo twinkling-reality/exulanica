@@ -97,6 +97,33 @@ engines take (`tests/test_movement_modules.py`). Every recorded history walks ed
 one axis, where the division is exact, so the floor division itself is held by a walk that stops
 part way along a diagonal edge, in the same file.
 
+**At a body's own pace.** The second version (`exulanica-movement/walking/v2`,
+[`walking_v2.py`](../exulanica/movement/walking_v2.py)) spends, for each walker, the society's
+budget scaled by the walker's pace: `budget * pace_permille // 1000` millimetres a tick, a whole
+number by floor division and never less than one, so the slowest walker on the smallest budget
+still arrives. Routes and the traversal are the first version's, called and not copied, so a
+walker at 1,000 in a thousand moves exactly as the first version moves it. The row declares
+`pace_permille`, from 1 to 10,000, which a walker's kind states with the walking it moves by (a
+drafted body's is computed from the height it stands at, the
+[things contract](things-contract.md#a-creature-in-a-society)), and `reference_pace_permille`,
+1,000, the pace of a walker whose kind states none: every shipped kind. The step reads the route
+it is handed and those two figures, and nothing of the ground the route was found on. It moves
+the society of things (`exulanica-society/v7`) and no other engine.
+
+**What a society records.** A row whose agents are society engines moves the people of each
+engine it lists. A society of things records, in its first input alone, the movement modules that
+move its people (`movement_modules`: sorted, each once, each a built row that lists its engine,
+one version of each kind of movement), beside the ability modules it runs, and its minutes walk
+by exactly those for its whole life, whatever a later table adds. A new one records the newest
+built version of each kind (`current_engine_modules`): today the second walking. One whose first
+input records none, every society made before the field, walks by the first version at the one
+budget, whatever pace its creatures' run forms state, and its minutes replay as they ran. The
+planner looks the step up through `step_of` by the recorded name and hands a step that declares a
+pace each walker's own after the budget. One function writes both lists into a first input
+(`record_modules` in
+[`society_thing_inputs.py`](../exulanica/world/society_thing_inputs.py)), and every composer of a
+things input calls it, so a society on any ground records the same.
+
 ## Flight
 
 ### The air
@@ -561,6 +588,7 @@ viewers could share them.
 | --- | --- | --- |
 | Registry, dispatch | `exulanica/movement/registry.py`, `steps.py`, `movement-modules.v1.json` | `tests/test_movement_modules.py` |
 | Walking | `exulanica/movement/walking.py` | `tests/test_movement_modules.py`, the society replay pins above, `tests/test_society_living_crossings_unchanged.py` |
+| Walking at a body's own pace, what a society records | `exulanica/movement/walking_v2.py`, `registry.py` (`current_engine_modules`, `check_recorded`, `recorded_movement`), `exulanica/world/society_thing_inputs.py` (`record_modules`), `society_planner.py` (`walker_paces`, `tick_budgets`) | `tests/test_society_walking_paces.py` (budgets worked by hand from the paces `tests/test_creature_gaits.py` works by hand; each walker's progress read from its route; a society of shipped kinds the same hour either way; a society that records none walking by the first module) |
 | Air, grid, perches | `exulanica/movement/air.py`, `fixed.py` | `tests/test_flight.py` |
 | Flight step, choices, episodes, search bounds | `exulanica/movement/flight.py` | `tests/test_flight.py`, `tests/test_flight_search_bounds.py` |
 | Episodes and their worker | `exulanica/movement/flight_episodes.py`, `exulanica/world/episode_worker.py`, `exulanica/world/flight_worker.py` | `tests/test_flight_worker.py` (a real worker process, killed), `tests/test_world_flight_api.py` |

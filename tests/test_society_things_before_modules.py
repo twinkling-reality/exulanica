@@ -29,9 +29,10 @@ KNIGHT = thing("knight", "knight", 1, 3_000, 3_000)
 
 
 def _stored_input():
-    """The input as it was stored: the same composition, recording no modules."""
+    """The input as it was stored: the same composition, recording no modules of either kind."""
     document = compose((GATE, KNIGHT))
     document.pop("modules", None)
+    document.pop("movement_modules", None)
     document.pop("document_sha256")
     document["document_sha256"] = input_sha256(document)
     return document

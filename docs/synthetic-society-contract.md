@@ -787,7 +787,8 @@ initializer that every creation and every replay passes through.
 Each relevant accepted authored edit appends a full immutable input snapshot in its transaction,
 even if several edits happen between simulation ticks. An edit is relevant when the input composed
 after it differs from the last one in anything but its sequence number, the authored edit cursor
-and the ability modules only a society's first input records: an edit that changes nothing the
+and what only a society's first input records (its ability modules, its movement modules and what
+a town's people are made from): an edit that changes nothing the
 society reads appends nothing (`_reads_the_same` in
 `exulanica/api/society_runtime.py`), such as an object in another region of a made world, a
 photograph hidden, or an environment piece moved, which an input names only as a placement it does
@@ -1871,6 +1872,16 @@ hearers keep no model and no speaker's name, and nobody keeps what it said. Its 
 replay byte for byte (`tests/test_society_things_before_modules.py`, a history recorded before
 modules were).
 
+The first input records, the same way, the movement modules that move the society's people
+(`movement_modules`: sorted, each once, each a built row of
+[`movement-modules.v1.json`](../exulanica/movement/movement-modules.v1.json) that lists the
+engine, one version of each kind of movement), and the state keeps the list. A new society
+records the second walking (`exulanica-movement/walking/v2`), which moves each being at the pace
+its kind states and every other at the society's own
+([movement modules contract](movement-modules-contract.md#walking)). A society whose first input
+records none walks by the first walking, at one budget for everybody, as it always did
+(`tests/test_society_walking_paces.py`).
+
 **The routine held to each kind.** Under the purposeful module's second version
 (`exulanica-ability/purposeful/v2`), a being does only the routine's activities its kind lists. The
 routine never sets out for it to rest, visit, stand or talk where its kind does not list that
@@ -1890,7 +1901,8 @@ second version recorded, a spirit resting, standing, visiting and talking in it)
 `exulanica.society-input/walking-surfaces-v3` (migration 0169): the town's walking-surfaces-v1
 input, its surfaces, premises and furniture, its residents and the purposeful routine, with the same
 `things` list and `population_kind` (the town's catalog entry names the villager), and, in a
-society's first input, the `modules` it runs and `people`, what the town's people are made from
+society's first input, the `modules` it runs, the `movement_modules` that move its people and
+`people`, what the town's people are made from
 (the frame of [a town's people](#a-towns-people-as-a-document), made over the town's place under
 the routine a living town is made under, as many as the input's population). At genesis the
 society completes the frame with its seed: each of the ground's population states `resident`,
@@ -2162,8 +2174,8 @@ to_kind, line}`), so its decider is shown what it already said. A visitor its pr
 `quiet_minutes` only while that program has been quiet, and a being states `hands` only while a
 hands act its decider chose or the world's owner asked for waits to be done (`{ability, thing, with,
 since}`, with `asked` true for one asked for). A society states
-`modules` only where its first input recorded them, and `kinds` only while a being of a kind its
-workspace keeps is here.
+`modules` and `movement_modules` only where its first input recorded them, and `kinds` only while
+a being of a kind its workspace keeps is here.
 
 It runs no experiment, and its people are not sent away. A comparison of models runs an hour of it
 from its genesis, where nobody has crossed in, so it compares the world's own beings, scored by the

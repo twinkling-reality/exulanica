@@ -294,9 +294,9 @@ def _site_read(
 #: place in the sequence, the version's edit cursor, and the digest over both.
 _EDIT_CURSOR_FIELDS: Final = frozenset({"input_seq", "authored_state", "document_sha256"})
 #: What only a society's first input states (the ability modules its minutes run for its whole
-#: life, and what a town's people are made from), so a later input's not stating it is no
-#: difference.
-_FIRST_INPUT_ONLY: Final = frozenset({"modules", "people"})
+#: life, the movement modules that move its people, and what a town's people are made from), so
+#: a later input's not stating it is no difference.
+_FIRST_INPUT_ONLY: Final = frozenset({"modules", "movement_modules", "people"})
 
 
 def _reads_the_same(previous: Mapping[str, Any], current: Mapping[str, Any]) -> bool:

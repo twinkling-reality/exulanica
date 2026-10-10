@@ -50,8 +50,10 @@ ACTOR = uuid.UUID(int=0xAC7)
 
 def _first_version(document, modules=None):
     """The same input as a society made before the second version records it: purposeful/v1
-    beside today's other modules, or exactly ``modules``."""
+    beside today's other modules, or exactly ``modules``, and no movement modules, which no first
+    input recorded then."""
     first = dict(document)
+    first.pop("movement_modules", None)
     first["modules"] = (
         list(modules)
         if modules is not None

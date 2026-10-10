@@ -158,6 +158,8 @@ def test_a_society_made_before_follow_was_built_replays_as_it_ran():
     # The positive control: a society composed now records the module the stored one did not.
     assert FOLLOW_KEEPING_NEAR in document["modules"] and FOLLOW_KEEPING_NEAR in current_modules()
     document["modules"] = history["modules"]
+    # Stored before a first input recorded its movement modules: it walks by the first walking.
+    del document["movement_modules"]
     document["document_sha256"] = input_sha256(document)
     assert document["document_sha256"] == history["input_sha256"]
     state = initial_things_society(

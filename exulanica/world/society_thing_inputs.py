@@ -14,6 +14,13 @@ states how high above the ground's elevation it stands (``height_mm``); one on t
 none. A kind's semantics or run form rides in the input, so a stored society replays from its
 inputs alone and never reads the kind library or a workspace's store again.
 
+A society's first input, and no later one, records what its minutes run for its whole life:
+the ability modules (``modules``) and the movement modules that move its people
+(``movement_modules``), each by version. :func:`record_modules` writes both, and every composer of
+a things input calls it, so a society on any ground records the same. An input made before
+either was recorded states none, and its society runs as it did: no ability module, or the first
+walking.
+
 What the society does with them is :mod:`exulanica.world.society_things`'s: a placed being lives
 there, a placed object is one of the society's things, and its obstacle and activity are already
 the input's navigation and targets, composed by :mod:`exulanica.world.society_authored_ground`.
@@ -38,12 +45,15 @@ from exulanica.world.society_kinds import (
 
 __all__ = [
     "ENTRY_FIELDS",
+    "MOVEMENT_MODULES_FIELD",
     "SEMANTIC_FIELDS",
     "THINGS_BOUND",
     "arrival_points",
     "input_things",
     "placed_beings",
     "placed_objects",
+    "record_modules",
+    "things_engine",
     "validate_input_things",
 ]
 
@@ -70,6 +80,8 @@ SEMANTIC_FIELDS: Final = frozenset(
         "reference",
     }
 )
+#: Where a first input and its society's state record the movement modules its people move by.
+MOVEMENT_MODULES_FIELD: Final = "movement_modules"
 #: The most things one input states, the bound every list of an input shares.
 THINGS_BOUND: Final = 4096
 _PLACED_ID: Final = re.compile(PLACED_THING_ID_PATTERN)
@@ -129,6 +141,29 @@ def _check_kind(kind: Any) -> None:
         raise ValueError("a placed thing's kind states its offers")
 
 
+def things_engine() -> str:
+    """The engine that reads a things input: the engine table's one society of things."""
+    from exulanica.world.society_engines import ENGINES
+
+    [engine] = [row.engine for row in ENGINES if row.state_family == "things"]
+    return engine
+
+
+def record_modules(document: dict[str, Any]) -> None:
+    """Write into a things input what a society's first input alone records, and nothing into a
+    later one: the ability modules its minutes run, each built module at its newest version, and
+    the movement modules that move its people, the newest of each kind of movement. The society
+    runs exactly these for its whole life, whatever a later table adds. Every composer of a things
+    input calls this before it seals the document."""
+    if document["input_seq"] != 1:
+        return
+    from exulanica.abilities.registry import current_modules
+    from exulanica.movement.registry import current_engine_modules
+
+    document["modules"] = list(current_modules())
+    document[MOVEMENT_MODULES_FIELD] = list(current_engine_modules(things_engine()))
+
+
 def validate_input_things(document: Mapping[str, Any]) -> None:
     """The things a v5 input carries, held to their shape: each placed thing once, in id order,
     with its kind's semantics, a ground position, a yaw within one turn, and an arrival point
@@ -149,6 +184,15 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
             recorded_modules(document)
         except AbilityError as exc:
             raise ValueError(f"a things input records built modules only: {exc}") from exc
+    if MOVEMENT_MODULES_FIELD in document:
+        from exulanica.movement.registry import MovementError, check_recorded
+
+        if document["input_seq"] != 1:
+            raise ValueError("a society's first input alone records its movement modules")
+        try:
+            check_recorded(document[MOVEMENT_MODULES_FIELD], things_engine())
+        except MovementError as exc:
+            raise ValueError(f"a things input's movement modules: {exc}") from exc
     if "people" in document:
         from exulanica.world.town_people import TownPeopleRefused, validate_people_frame
 

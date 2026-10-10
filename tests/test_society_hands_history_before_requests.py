@@ -53,8 +53,10 @@ RECORDED_MODULES = (
 
 
 def recorded(document: dict[str, Any]) -> dict[str, Any]:
-    """``document`` naming the modules the history was recorded with, sealed again."""
+    """``document`` naming the modules the history was recorded with, and no movement modules,
+    which no first input recorded then, sealed again."""
     document = {**document, "modules": list(RECORDED_MODULES)}
+    document.pop("movement_modules", None)
     document.pop("document_sha256")
     document["document_sha256"] = input_sha256(document)
     return document
