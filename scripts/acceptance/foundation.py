@@ -4114,7 +4114,10 @@ THINGS_ROWS = (
         "In the same session, a town whose premises all stand (candidate-36, A-138): of up to a "
         "dozen nearby people's cards, at least one is read and no Now line uses the catalog's "
         "words for a place that is gone (phrase.place_gone); how many name a premises in its "
-        "plain words (phrase.place_listed) is recorded. Run whether or not a line was taken.",
+        "plain words (phrase.place_listed) is recorded. A-143 (CARD 12, 13): at least one names a "
+        "premises as its town calls it, the <label> at number N from the input's place label and "
+        "address number (its use class's own words where the catalog states them); blocked when "
+        "nobody read is heading to such a premises. Run whether or not a line was taken.",
     ),
 )
 #: The steps of the things session that show a line, and so are blocked when none was taken.
@@ -4674,6 +4677,14 @@ def browser(arguments: argparse.Namespace) -> int:
             outcome.get("status") == "passed",
             f"{step}: {outcome.get('status') or 'not reached'} {outcome.get('reason') or ''}".strip(),
         )
+        # A clause a step could not judge says why in its observation (A-143); a step that failed
+        # stays failed.
+        for observation in (
+            (outcome.get("observations") or []) if outcome.get("status") == "passed" else []
+        ):
+            why = (observation.get("observed") or {}).get("blocked")
+            if isinstance(why, str):
+                worlds_row.blocked_by.append(f"{observation.get('id')}: {why}")
         worlds_row.observed = {
             "step": outcome.get("status"),
             "observations": outcome.get("observations"),

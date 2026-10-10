@@ -113,11 +113,21 @@ function whyWords() {
 
 /** A phrase or reason's words in the society words catalog, by its key. */
 function catalogWords(key) {
+  const words = optionalCatalogWords(key);
+  if (words === null) throw new Error(`the society words catalog has no ${key} entry`);
+  return words;
+}
+
+/** A society words catalog entry's words, or null where the catalog states none. */
+function optionalCatalogWords(key) {
   const catalog = JSON.parse(readFileSync(join(REPOSITORY, 'assets', 'catalogs', 'society-words',
     'society-inhabitant-words.v1.json'), 'utf8'));
-  const entry = catalog.entries.find((e) => e.key === key);
-  if (entry === undefined) throw new Error(`the society words catalog has no ${key} entry`);
-  return entry.words;
+  return catalog.entries.find((e) => e.key === key)?.words ?? null;
+}
+
+/** A catalog phrase with its {name} slots filled. */
+function filled(words, values) {
+  return words.replace(/\{(\w+)\}/g, (whole, name) => (values[name] === undefined ? whole : String(values[name])));
 }
 
 const plan = JSON.parse(readFileSync(process.argv[2], 'utf8'));
@@ -737,6 +747,23 @@ const STEP_HANDLERS = {
     ctx.observe('no-place-said-gone', read.length > 0 && read.every((n) => !n.now.includes(gone)),
       { read: read.length, gone_lines: read.filter((n) => n.now.includes(gone)), gone, listed,
         listed_lines: read.filter((n) => n.now.includes(listed)).length });
+    // A-143 (CARD 12, 13): a premises is said by what its town calls it, "the <label> at number N",
+    // from the input's place label and address number, in its use class's own words where the
+    // catalog states them. At least one card read names a premises so; blocked if none read is
+    // heading to a premises the input names with a number.
+    const entry = (await ctx.api('GET', `/world-entries/${ctx.facts.things_world}`)).body ?? {};
+    const placesPath = `/world/versions/${entry.authored_version_id}/society?world_id=${encodeURIComponent(entry.world_id)}&places=true`;
+    const targets = (await ctx.api('GET', placesPath)).body?.places?.targets ?? [];
+    const numbered = [...new Set(targets.map((t) => t.place).filter((p) => p && p.label !== null && p.address_number !== null)
+      .map((p) => filled(optionalCatalogWords(`phrase.place_named_at_${p.use_class}`) ?? catalogWords('phrase.place_named_at'),
+        { label: p.label, number: p.address_number })))];
+    const atNumber = read.filter((n) => numbered.some((words) => n.now.includes(words)));
+    const unnumbered = numbered.length === 0 ? 'the input names no premises with a label and a number'
+      : read.every((n) => !n.now.includes(listed) && !/ at number /.test(n.now)) && atNumber.length === 0
+        ? 'nobody read is heading to a premises' : null;
+    ctx.observe('premises-named-at-number', unnumbered !== null || atNumber.length > 0,
+      { numbered: numbered.length, examples: numbered.slice(0, 4), at_number: atNumber,
+        listed_lines: read.filter((n) => n.now.includes(listed)), ...(unnumbered ? { blocked: unnumbered } : {}) });
     await ctx.screenshot('premises', "a town's people and where they are going");
   },
   async 'outside-deciders'(ctx) {

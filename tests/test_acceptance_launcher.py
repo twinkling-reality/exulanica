@@ -1124,3 +1124,33 @@ def test_references_reach_the_api_only_when_asked_and_name_the_runs_workspaces_a
             LAUNCH.references_environment(workspaces, environ)
         assert refused.value.name == expected
         assert key not in str(refused.value)
+
+
+def test_workspace_style_packs_turn_uploads_on_by_the_products_own_setting():
+    from exulanica.api.routes.workspace_style_packs import UPLOADS_SETTING
+
+    exports = {
+        "EXULANICA_DATABASE_URL": "postgresql://exulanica_app@localhost:19200/exulanica",
+        "EXULANICA_READONLY_DATABASE_URL": "postgresql://exulanica_ro@localhost:19200/exulanica",
+        "EXULANICA_PURGE_DATABASE_URL": "postgresql://exulanica_purge@localhost:19200/exulanica",
+    }
+
+    def environment(on):
+        return LAUNCH.api_environment(
+            exports=exports,
+            grant={"token": {"permissions": []}},
+            data_dir=Path("run/data"),
+            model=False,
+            derivative_worker=False,
+            society_playback={},
+            workspace_style_packs=on,
+            environ={},
+        )
+
+    assert environment(True)[UPLOADS_SETTING] == "on"
+    assert UPLOADS_SETTING not in environment(False)
+    assert (
+        LAUNCH.build_parser()
+        .parse_args(["up", "--worktree", ".", "--workspace-style-packs"])
+        .workspace_style_packs
+    )

@@ -565,3 +565,40 @@ def test_the_kind_draft_plan_answers_the_manifests_drafter_with_the_fixture_farm
     assert json.loads(ready["content"]) == held_to_form(brief_of(fixture_kind("farm")))
     assert json.loads(by_words[plan["descriptions"]["refused"]]["content"]) == {"zones": []}
     assert by_words[plan["descriptions"]["failed"]]["status"] == 500
+
+
+def test_v2_crosses_on_the_newest_luanti_mapping_by_its_version_number(tmp_path):
+    # A-142: the mapping is read from the directory, so v10 is newer than v9 and v3.
+    mappings = tmp_path / DRIVE.LUANTI_MAPPINGS
+    mappings.mkdir(parents=True)
+    for version in (2, 3, 9, 10):
+        (mappings / f"luanti-minetest-game.v{version}.json").write_text("{}")
+
+    assert DRIVE.newest_mapping(tmp_path).name == "luanti-minetest-game.v10.json"
+    shipped = sorted((ROOT / DRIVE.LUANTI_MAPPINGS).glob("luanti-minetest-game.v*.json"))
+    assert DRIVE.LUANTI_MAPPING in [path.relative_to(ROOT) for path in shipped]
+
+
+def test_ln1_reads_the_labels_an_ask_offers_from_the_products_own_choice_function():
+    from exulanica.models.choice import ChoiceRequest
+
+    choice = ChoiceRequest(
+        description="Choose what to do.", options=("wait", "say hello"), line_characters_maximum=80
+    )
+
+    assert DRIVE.offered_labels(choice.tool()) == ["wait", "say hello"]
+
+
+def test_s5_uploads_the_committed_pack_as_canonical_json_the_product_reads_back():
+    from exulanica.world import style_packs
+
+    manifest, files = DRIVE.s5_upload(ROOT)
+    raw = DRIVE.canonical_json(manifest)
+    declaration = DRIVE.s5_declaration(raw)
+
+    assert raw == style_packs.canonical_json(manifest).encode("ascii")
+    assert declaration["manifest_sha256"] == hashlib.sha256(raw).hexdigest()
+    assert {f["path"]: f["sha256"] for f in manifest["files"]} == {
+        path: hashlib.sha256(data).hexdigest() for path, data in files.items()
+    }
+    assert not manifest["pack_id"].startswith("exulanica.")

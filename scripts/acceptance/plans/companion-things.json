@@ -1,0 +1,71 @@
+{
+ "profile": "q10-scripted-model-plan/v1",
+ "bounds": {
+  "ceiling_usd": "0.50",
+  "max_calls": 200
+ },
+ "utterances": {
+  "evening": "set a lantern down, have the knight go to the well and use it, pick up the sword, put it down again and pick up the lantern",
+  "nine": "have the knight walk to the well nine times over",
+  "other": "make the knight twice as tall",
+  "take": "let the lantern spirit take the sword from the knight"
+ },
+ "rules": [
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "The request:\\n\\\"\\\"\\\"set a lantern down, have the knight go to the well and use it, pick up the sword, put it down again and pick up the lantern"
+   },
+   "content": "{\"steps\": [{\"operation\": \"place_thing\", \"options\": [\"lantern\"]}, {\"operation\": \"send_to\", \"options\": [\"knight\", \"well\"]}, {\"operation\": \"use\", \"options\": [\"knight\", \"well\"]}, {\"operation\": \"pick_up\", \"options\": [\"knight\", \"sword\"]}, {\"operation\": \"put_down\", \"options\": [\"knight\", \"sword\"]}, {\"operation\": \"pick_up\", \"options\": [\"knight\", \"lantern\"]}]}"
+  },
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "The request:\\n\\\"\\\"\\\"have the knight walk to the well nine times over"
+   },
+   "content": "{\"steps\": [{\"operation\": \"send_to\", \"options\": [\"knight\", \"well\"]}, {\"operation\": \"send_to\", \"options\": [\"knight\", \"well\"]}, {\"operation\": \"send_to\", \"options\": [\"knight\", \"well\"]}, {\"operation\": \"send_to\", \"options\": [\"knight\", \"well\"]}, {\"operation\": \"send_to\", \"options\": [\"knight\", \"well\"]}, {\"operation\": \"send_to\", \"options\": [\"knight\", \"well\"]}, {\"operation\": \"send_to\", \"options\": [\"knight\", \"well\"]}, {\"operation\": \"send_to\", \"options\": [\"knight\", \"well\"]}, {\"operation\": \"send_to\", \"options\": [\"knight\", \"well\"]}]}"
+  },
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "The request:\\n\\\"\\\"\\\"make the knight twice as tall"
+   },
+   "content": "{\"steps\": [{\"operation\": \"other\", \"options\": []}]}"
+  },
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "The request:\\n\\\"\\\"\\\"let the lantern spirit take the sword from the knight"
+   },
+   "content": "{\"steps\": [{\"operation\": \"take\", \"options\": [\"lantern_spirit\", \"sword\", \"knight\"]}]}"
+  },
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "The sentence:\\n\\\"\\\"\\\"set a lantern down, have the knight go to the well and use it, pick up the sword, put it down again and pick up the lantern"
+   },
+   "content": "{\"kind\": \"world_edit\"}"
+  },
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "The sentence:\\n\\\"\\\"\\\"have the knight walk to the well nine times over"
+   },
+   "content": "{\"kind\": \"world_edit\"}"
+  },
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "The sentence:\\n\\\"\\\"\\\"make the knight twice as tall"
+   },
+   "content": "{\"kind\": \"world_edit\"}"
+  },
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "The sentence:\\n\\\"\\\"\\\"let the lantern spirit take the sword from the knight"
+   },
+   "content": "{\"kind\": \"world_edit\"}"
+  }
+ ]
+}

@@ -91,7 +91,9 @@ import argparse
 import ast
 import datetime as dt
 import hashlib
+import http.client
 import importlib.util
+import io
 import json
 import os
 import re
@@ -100,6 +102,7 @@ import ssl
 import struct
 import subprocess
 import sys
+import tarfile
 import time
 import tomllib
 import urllib.error
@@ -1647,6 +1650,87 @@ def row_d3(stack: Stack, transcripts: Any, out: Path, log: Path) -> Row:
     return row.close()
 
 
+#: POST /intake's body bound (docs/workspace-asset-admission.md and the deployment guide: "POST /intake
+#: holds at most 256 MiB, framing included").
+INTAKE_BOUND_BYTES = 256 * 1024 * 1024
+
+
+def intake_raw(
+    stack: Stack, headers: Mapping[str, str], body: bytes, declared: int | None = None
+) -> tuple[int | None, Any]:
+    """POST /intake with exactly these headers and bytes; ``declared`` states a Content-Length
+    other than the bytes sent, to see whether the route answers before it reads the body."""
+    url = urllib.parse.urlsplit(stack.base_url)
+    connection = http.client.HTTPConnection(url.hostname, url.port, timeout=30)
+    try:
+        connection.putrequest("POST", "/intake")
+        for name, value in {**headers, "Content-Length": str(declared or len(body))}.items():
+            connection.putheader(name, value)
+        connection.endheaders()
+        connection.send(body)
+        answer = connection.getresponse()
+        raw = answer.read()
+        try:
+            return answer.status, json.loads(raw or b"null")
+        except ValueError:
+            return answer.status, None
+    except (TimeoutError, OSError) as failed:
+        return None, {"failed": type(failed).__name__}
+    finally:
+        connection.close()
+
+
+def row_in1(stack: Stack) -> Row:
+    row = Row(
+        "IN1",
+        "intake.body_after_admission",
+        "An intake body is read only after its caller is admitted, under its own bound "
+        "(candidate-37): POST /intake with no credential and a 2 MiB multipart body is 401; with a "
+        "credential, a body the multipart parser cannot read, and one with no part named files, "
+        f"are each 422 invalid_intake_body; a declared length over {INTAKE_BOUND_BYTES} bytes is "
+        "413 without the body being sent.",
+    )
+    token = stack.token_file("token").read_text().strip()
+    boundary = "q10boundary"
+    part = (
+        (
+            f'--{boundary}\r\nContent-Disposition: form-data; name="files"; filename="a.jpg"\r\n'
+            "Content-Type: image/jpeg\r\n\r\n"
+        ).encode()
+        + b"\0" * (2 * 1024 * 1024)
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
+    form = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    bearer = {**form, "Authorization": f"Bearer {token}"}
+    status_anonymous, _ = intake_raw(stack, form, part)
+    status_garbage, garbage = intake_raw(stack, bearer, b"this is not a multipart body")
+    other = (
+        f'--{boundary}\r\nContent-Disposition: form-data; name="notes"\r\n\r\nhello\r\n'
+        f"--{boundary}--\r\n"
+    ).encode()
+    status_other, other_answer = intake_raw(stack, bearer, other)
+    status_over, over = intake_raw(stack, bearer, b"--", declared=INTAKE_BOUND_BYTES + 1)
+    row.expect(status_anonymous == 401, f"the anonymous upload answered {status_anonymous}")
+    row.expect(
+        status_garbage == 422 and F.problem_code(garbage) == "invalid_intake_body",
+        f"the unreadable body answered {status_garbage} {F.problem_code(garbage)}",
+    )
+    row.expect(
+        status_other == 422 and F.problem_code(other_answer) == "invalid_intake_body",
+        f"the body with no files part answered {status_other} {F.problem_code(other_answer)}",
+    )
+    row.expect(
+        status_over == 413, f"the declared length over the bound answered {status_over} {over}"
+    )
+    row.observed = {
+        "anonymous": status_anonymous,
+        "unreadable": [status_garbage, F.problem_code(garbage)],
+        "no_files_part": [status_other, F.problem_code(other_answer)],
+        "over_the_bound": [status_over, over],
+    }
+    return row.close()
+
+
 def assets(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -1657,7 +1741,11 @@ def assets(arguments: argparse.Namespace) -> int:
     transcripts = Transcripts(out / "transcripts")
     log = out / "transcripts" / "admissions.jsonl"
     started = dt.datetime.now(dt.UTC).isoformat()
-    rows = [row_d2(stack, transcripts, out, log), row_d3(stack, transcripts, out, log)]
+    rows = [
+        row_d2(stack, transcripts, out, log),
+        row_d3(stack, transcripts, out, log),
+        row_in1(stack),
+    ]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
 
@@ -4199,6 +4287,308 @@ def row_s1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
     return row.close()
 
 
+# -- S5: a workspace keeps its own style pack ---------------------------------------------------------
+
+WORKSPACE_PACKS = "/workspace-style-packs"
+#: The committed pack S5's upload is made from, its pieces byte for byte.
+S5_SOURCE_PACK = Path("assets") / "style-packs" / "packs" / "exulanica.cozy-town"
+S5_PACK_ID = "q10.cozy-barn"
+#: The admission's declaration profile and the rights statement a creator affirms
+#: (docs/style-pack-contract.md, 11.1), and the own-work licence an upload may state.
+S5_DECLARATION = "exulanica.workspace-style-pack-admission/v1"
+S5_STATEMENT = "exulanica.workspace-style-pack-rights-statement/v1"
+S5_OWN_WORK = "LicenseRef-Exulanica-Own-Work"
+#: How long S5 runs the asset preparation process for the version's check to end.
+S5_CHECK_SECONDS = 300
+
+
+def canonical_json(value: Any) -> bytes:
+    """Canonical JSON as the style pack contract states it: keys sorted, no whitespace, ASCII with
+    lowercase escapes."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
+        "ascii"
+    )
+
+
+def still_jpeg(width: int = 64, height: int = 40) -> bytes:
+    """A plain JPEG with no embedded profile, as an uploaded preview may be (the committed
+    preview carries an ICC profile)."""
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height), (200, 160, 120)).save(buffer, "JPEG", quality=80)
+    return buffer.getvalue()
+
+
+def s5_upload(worktree: Path, pack_id: str = S5_PACK_ID) -> tuple[dict[str, Any], dict[str, bytes]]:
+    """The committed cozy pack as a creator's own upload: its manifest re-identified, origin
+    uploaded, own work, and a fresh JPEG preview; every file listed at its bytes, in path order."""
+    source = worktree / S5_SOURCE_PACK
+    manifest = json.loads((source / "manifest.json").read_text("utf-8"))
+    files = {f["path"]: (source / f["path"]).read_bytes() for f in manifest["files"]}
+    files[manifest["preview"]] = still_jpeg()
+    manifest.update(
+        pack_id=pack_id,
+        version=1,
+        origin="uploaded",
+        provenance={"kind": "uploaded"},
+        licence={"id": S5_OWN_WORK, "attribution": None},
+        authors=["Q10 acceptance"],
+    )
+    listed = {f["path"]: f for f in manifest["files"]}
+    for path, data in files.items():
+        entry = listed[path]
+        entry["bytes"] = len(data)
+        entry["sha256"] = hashlib.sha256(data).hexdigest()
+    manifest["files"] = [listed[p] for p in sorted(listed)]
+    return manifest, files
+
+
+def s5_declaration(manifest_bytes: bytes, **changes: Any) -> dict[str, Any]:
+    return {
+        "profile": S5_DECLARATION,
+        "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "byte_size": len(manifest_bytes),
+        "rights": {
+            "basis": "own_work",
+            "licence_id": None,
+            "attribution": None,
+            "source_reference": None,
+            "statement": S5_STATEMENT,
+        },
+        **changes,
+    }
+
+
+def problem_code_of(answer: bytes) -> str | None:
+    """A problem's code from a byte answer, or None when the answer is no JSON problem."""
+    try:
+        return F.problem_code(json.loads(answer or b"null"))
+    except ValueError:
+        return None
+
+
+def s5_post(
+    stack: Stack,
+    log: Path,
+    token_file: str,
+    declaration: Mapping[str, Any],
+    manifest_bytes: bytes,
+    files: Mapping[str, bytes],
+) -> tuple[int, Any]:
+    """POST /workspace-style-packs: the declaration and manifest as fields, a file part a path."""
+    boundary = f"q10-{uuid.uuid4().hex}"
+    parts = [
+        f'--{boundary}\r\nContent-Disposition: form-data; name="declaration"\r\n\r\n'.encode()
+        + json.dumps(declaration).encode(),
+        f'--{boundary}\r\nContent-Disposition: form-data; name="manifest"\r\n\r\n'.encode()
+        + manifest_bytes,
+    ]
+    for path, data in files.items():
+        parts.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{path}"; '
+            f'filename="{path.rsplit("/", 1)[-1]}"\r\nContent-Type: application/octet-stream'
+            "\r\n\r\n".encode()
+            + data
+        )
+    body = b"\r\n".join(parts) + f"\r\n--{boundary}--\r\n".encode()
+    status, _, answer = raw_call(
+        stack,
+        token_file,
+        "POST",
+        WORKSPACE_PACKS,
+        body=body,
+        content_type=f"multipart/form-data; boundary={boundary}",
+    )
+    try:
+        parsed = json.loads(answer or b"null")
+    except ValueError:
+        parsed = {"unparsed": answer[:200].decode("utf-8", "replace")}
+    with log.open("a") as handle:
+        handle.write(
+            json.dumps(
+                {
+                    "at": dt.datetime.now(dt.UTC).isoformat(),
+                    "token": token_file,
+                    "declaration": declaration,
+                    "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+                    "files": {
+                        path: hashlib.sha256(data).hexdigest() for path, data in files.items()
+                    },
+                    "status": status,
+                    "answer": parsed,
+                }
+            )
+            + "\n"
+        )
+    return status, parsed
+
+
+def row_s5(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
+    row = Row(
+        "S5",
+        "packs.workspace_pack",
+        "A workspace keeps its own style pack (candidate-37): the committed cozy pack re-identified "
+        f"as {S5_PACK_ID}, the creator's own work with a fresh JPEG preview, uploaded as multipart is "
+        "201 and again 200; the asset preparation process checks it ready; the workspace list and "
+        "the version read state it; a listed file reads back at its digest; the archive is a tar of "
+        "manifest.json and every file; the library listing names it under workspace_packs; another "
+        "workspace reads it 404; another person's publish request is 403 style_pack_not_creator and "
+        "the creator's 201; withdraw answers withdrew and a read after is 410. Refused: a JSON body "
+        "415; a declared manifest digest that is not the manifest's 422 content_digest_mismatch; an "
+        "exulanica. id 422 invalid_style_data.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    peer = F.client(stack, transcripts, "peer", "token-peer")
+    log = out / "evidence" / "s5-uploads.jsonl"
+    manifest, files = s5_upload(worktree)
+    raw = canonical_json(manifest)
+    digest = hashlib.sha256(raw).hexdigest()
+    status_json, _, json_answer = raw_call(
+        stack, "token", "POST", WORKSPACE_PACKS, body=b"{}", content_type="application/json"
+    )
+    status_mismatch, mismatch = s5_post(
+        stack, log, "token", s5_declaration(raw, manifest_sha256="0" * 64), raw, files
+    )
+    bad_manifest, _ = s5_upload(worktree, "exulanica.q10-barn")
+    bad_raw = canonical_json(bad_manifest)
+    status_bad_id, bad_id = s5_post(stack, log, "token", s5_declaration(bad_raw), bad_raw, files)
+    status_up, uploaded_answer = s5_post(stack, log, "token", s5_declaration(raw), raw, files)
+    if status_up == 503:
+        row.blocked_by.append(
+            "uploads are off on this stack (start it with --workspace-style-packs)"
+        )
+        row.observed = {"upload": [status_up, F.problem_code(uploaded_answer)]}
+        return row.close()
+    status_again, _ = s5_post(stack, log, "token", s5_declaration(raw), raw, files)
+    read = {}
+    deadline = time.monotonic() + S5_CHECK_SECONDS
+    while time.monotonic() < deadline:
+        prepare_once(stack, out, stack.state["workspace_id"], "S5")
+        _, read = w1.call("S5", "GET", f"{WORKSPACE_PACKS}/{digest}")
+        if (read or {}).get("state") in ("ready", "failed", "cancelled"):
+            break
+        time.sleep(5)
+    state = (read or {}).get("state")
+    _, listed = w1.call("S5", "GET", WORKSPACE_PACKS)
+    in_list = [
+        v for v in (listed or {}).get("versions") or [] if v.get("manifest_sha256") == digest
+    ]
+    piece = next(f for f in manifest["files"] if f["path"] != manifest["preview"])
+    status_file, _, file_bytes = raw_call(
+        stack, "token", "GET", f"{WORKSPACE_PACKS}/{digest}/files/{piece['sha256']}"
+    )
+    status_tar, _, tar_bytes = raw_call(
+        stack, "token", "GET", f"{WORKSPACE_PACKS}/{digest}/archive"
+    )
+    try:
+        with tarfile.open(fileobj=io.BytesIO(tar_bytes)) as archive:
+            names = sorted(archive.getnames())
+    except tarfile.TarError:
+        names = []
+    _, library = w1.call("S5", "GET", "/world/style-packs")
+    in_library = [
+        p
+        for p in (library or {}).get("workspace_packs") or []
+        if p.get("manifest_sha256") == digest
+    ]
+    status_foreign, foreign = w2.call("S5 w2", "GET", f"{WORKSPACE_PACKS}/{digest}")
+    publish = {
+        "licence_id": "CC0-1.0",
+        "attribution": None,
+        "statement": "Q10 acceptance: my own work.",
+    }
+    status_peer, peer_answer = peer.call(
+        "S5 peer", "POST", f"{WORKSPACE_PACKS}/{digest}/publish-request", body=publish
+    )
+    status_publish, published = w1.call(
+        "S5", "POST", f"{WORKSPACE_PACKS}/{digest}/publish-request", body=publish
+    )
+    status_withdraw, withdrew = w1.call("S5", "POST", f"{WORKSPACE_PACKS}/{digest}/withdraw")
+    status_after, after = w1.call("S5 after", "GET", f"{WORKSPACE_PACKS}/{digest}")
+    status_file_after, _, file_after = raw_call(
+        stack, "token", "GET", f"{WORKSPACE_PACKS}/{digest}/files/{piece['sha256']}"
+    )
+    status_tar_after, _, tar_after = raw_call(
+        stack, "token", "GET", f"{WORKSPACE_PACKS}/{digest}/archive"
+    )
+    expected_names = sorted(["manifest.json", *files])
+    row.expect(status_json == 415, f"a JSON body answered {status_json}")
+    row.expect(
+        status_mismatch == 422 and F.problem_code(mismatch) == "content_digest_mismatch",
+        f"a mismatched digest answered {status_mismatch} {F.problem_code(mismatch)}",
+    )
+    row.expect(
+        status_bad_id == 422 and F.problem_code(bad_id) == "invalid_style_data",
+        f"an exulanica. id answered {status_bad_id} {F.problem_code(bad_id)}",
+    )
+    row.expect(
+        status_up == 201 and status_again == 200,
+        f"the upload answered {status_up} {F.problem_code(uploaded_answer)}, again {status_again}",
+    )
+    row.expect(
+        state == "ready", f"the version's check ended {state}: {(read or {}).get('failure')}"
+    )
+    row.expect(bool(in_list), "the workspace list does not hold the version")
+    row.expect(
+        status_file == 200 and hashlib.sha256(file_bytes).hexdigest() == piece["sha256"],
+        f"the file read answered {status_file}",
+    )
+    row.expect(status_tar == 200 and names == expected_names, f"the archive holds {names[:6]}")
+    row.expect(bool(in_library), "the library listing names no such workspace pack")
+    row.expect(
+        status_foreign == 404 and F.problem_code(foreign) == "unknown_reference",
+        f"another workspace read it {status_foreign} {F.problem_code(foreign)}",
+    )
+    row.expect(
+        status_peer == 403 and F.problem_code(peer_answer) == "style_pack_not_creator",
+        f"another person's publish request answered {status_peer} {F.problem_code(peer_answer)}",
+    )
+    row.expect(
+        status_publish == 201,
+        f"the creator's publish request answered {status_publish} {F.problem_code(published)}",
+    )
+    row.expect(
+        status_withdraw == 200 and (withdrew or {}).get("withdrew") is True,
+        f"the withdrawal answered {status_withdraw} {(withdrew or {}).get('withdrew')}",
+    )
+    gone = [problem_code_of(file_after), problem_code_of(tar_after)]
+    row.expect(
+        status_after == 200
+        and (after or {}).get("withdrawn") is True
+        and [status_file_after, status_tar_after] == [410, 410]
+        and gone == ["withdrawn", "withdrawn"],
+        f"after the withdrawal the version read {status_after} withdrawn "
+        f"{(after or {}).get('withdrawn')}, its file {status_file_after} and archive "
+        f"{status_tar_after} {gone}",
+    )
+    row.observed = {
+        "manifest_sha256": digest,
+        "refusals": {
+            "json": [status_json, json_answer[:120].decode("utf-8", "replace")],
+            "mismatch": [status_mismatch, F.problem_code(mismatch)],
+            "exulanica_id": [status_bad_id, F.problem_code(bad_id)],
+        },
+        "upload": [status_up, status_again],
+        "state": state,
+        "failure": (read or {}).get("failure"),
+        "file": status_file,
+        "archive": [status_tar, len(names)],
+        "library": bool(in_library),
+        "other_workspace": status_foreign,
+        "publish": [status_peer, F.problem_code(peer_answer), status_publish],
+        "withdraw": [status_withdraw, (withdrew or {}).get("withdrew")],
+        "after": [
+            status_after,
+            (after or {}).get("withdrawn"),
+            status_file_after,
+            status_tar_after,
+        ],
+    }
+    return row.close()
+
+
 def packs(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -4214,6 +4604,11 @@ def packs(arguments: argparse.Namespace) -> int:
         s1,
         row_s2(stack, transcripts, listing or {}, worktree),
         row_s3(stack, transcripts, listing or {}, worktree),
+        *(
+            [row_s5(stack, transcripts, worktree, out)]
+            if stack.token_file("token-peer").exists()
+            else []
+        ),
     ]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
@@ -5680,7 +6075,18 @@ def row_t4(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
 #: crossing exactly as the mod does (bridges/luanti/tools/cross_once.py).
 LUANTI = Path("bridges") / "luanti"
 LUANTI_MOD = LUANTI / "mod" / "exulanica_gate"
-LUANTI_MAPPING = LUANTI_MOD / "mapping" / "luanti-minetest-game.v2.json"
+LUANTI_MAPPINGS = LUANTI_MOD / "mapping"
+
+
+def newest_mapping(root: Path = HERE.parents[1]) -> Path:
+    """The newest Luanti mapping the gate mod ships (A-142), by its file's version number."""
+    return max(
+        (root / LUANTI_MAPPINGS).glob("luanti-minetest-game.v*.json"),
+        key=lambda path: int(path.name.split(".v")[1].split(".")[0]),
+    ).relative_to(root)
+
+
+LUANTI_MAPPING = newest_mapping()
 LUANTI_STANDIN = LUANTI / "tools" / "cross_once.py"
 #: What the mapping admits and carries both ways, and a look it names that is not shipped.
 CROSSING_TYPE, CROSSING_LOOK, CROSSING_ITEM = "player", "cc0-traveller", "default:torch"
@@ -5739,9 +6145,20 @@ def frames_until(
 ) -> tuple[str, list[dict[str, Any]], int]:
     """Read the channel's frames after ``cursor`` until one is ``wanted`` or the bound passes; the
     cursor after them, every frame read, and the last status."""
+    return frames_until_bound(stack, credential, cursor, wanted, CROSSING_FRAME_SECONDS)
+
+
+def frames_until_bound(
+    stack: Stack,
+    credential: str,
+    cursor: str,
+    wanted: Callable[[Mapping[str, Any]], bool],
+    seconds: float,
+) -> tuple[str, list[dict[str, Any]], int]:
+    """:func:`frames_until` within a bound of ``seconds``."""
     seen: list[dict[str, Any]] = []
     status = 0
-    deadline = time.monotonic() + CROSSING_FRAME_SECONDS
+    deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         status, read = door_call(
             stack,
@@ -5762,6 +6179,170 @@ def step(c: Any, label: str, entry: Mapping[str, Any]) -> int:
     """One minute of the society, stepped by its owner."""
     _, now = F.society(c, label, entry)
     return F.advance(c, label, entry, now or {})[0]
+
+
+def row_hm1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
+    row = Row(
+        "HM1",
+        "door.call_home",
+        "A player calls a visitor home through its bridge (candidate-37): on workspace 2's own build "
+        "of the newest locked scene, a Luanti visitor crosses in carrying a torch under a grant that "
+        "lets things be carried out; the bridge's POST /door/channel/home for it is 202 recorded "
+        "true, and again before the minute 202 with the same departure, recorded false; after a "
+        "step a departed frame says sent_home carrying the torch, the society's departure event "
+        "says called_by player, and the world holds the torch no more (A-144); a call home once "
+        "gone is 202 with the same departure, recorded false, and one for a thing that was never "
+        "the grant's visitor is 404 unknown_reference.",
+    )
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    record_path = out / "evidence" / "hm1-scene-build.json"
+    built = build_scene(stack, worktree, record_path, token_file="token-2")
+    (out / "evidence" / "hm1-scene-build.txt").write_text(built.stdout + built.stderr)
+    if not record_path.exists():
+        row.expect(False, f"the scene build exited {built.returncode}")
+        return row.close()
+    record = json.loads(record_path.read_text())
+    entry = F.read_entry(w2, "HM1", record["entry_id"])
+    query = F.world_query(entry)
+    status_society, _ = w2.call(
+        "HM1",
+        "POST",
+        F.version_path(entry, "/society"),
+        query=query,
+        body={"region_id": record["arrival"]["region_id"], "profile": THINGS_ENGINE},
+    )
+    gate = next(t["thing_id"] for t in record["things"] if t["kind"]["kind"] == "gate")
+    status_grant, granted = w2.call(
+        "HM1",
+        "POST",
+        "/door/grants",
+        query=query,
+        body={
+            "idempotency_key": str(uuid.uuid4()),
+            "bridge": "luanti",
+            "version_id": entry["authored_version_id"],
+            "minutes": 60,
+            "channel_credential": True,
+            "visitors_maximum": 1,
+            "kinds": [CROSSING_TYPE],
+            "gate": gate,
+            "may_carry_in": True,
+            "may_carry_out": True,
+        },
+    )
+    credential = ((granted or {}).get("channel_credential") or {}).get("credential")
+    row.expect(
+        status_society == 200 and status_grant == 201 and bool(credential),
+        f"the society answered {status_society}, the grant {status_grant} {F.problem_code(granted)}",
+    )
+    if not credential:
+        return row.close()
+    status_hello, said = channel(
+        stack, credential, "POST", "/door/channel/hello", raw=luanti_hello(worktree)
+    )
+    cursor = (said or {}).get("cursor") or ""
+    arrival_id = str(uuid.uuid4())
+    status_in, came = channel(
+        stack,
+        credential,
+        "POST",
+        "/door/channel/arrivals",
+        {
+            "arrival_id": arrival_id,
+            "game_type": CROSSING_TYPE,
+            "look_key": CROSSING_LOOK,
+            "carried": [{"game_item": CROSSING_ITEM, "count": 1}],
+        },
+    )
+    thing_id = (came or {}).get("thing_id")
+    step(w2, "HM1", entry)
+    cursor, seen, _ = frames_until(
+        stack,
+        credential,
+        cursor,
+        lambda f: f.get("kind") == "arrived" and f.get("arrival_id") == arrival_id,
+    )
+    _, society = F.society(w2, "HM1", entry)
+    held = [
+        t.get("id")
+        for t in ((society or {}).get("state") or {}).get("things") or []
+        if t.get("held_by") == thing_id
+    ]
+    row.expect(
+        status_hello == 200 and status_in == 201 and bool(thing_id) and len(held) == 1,
+        f"the hello {status_hello}, the arrival {status_in}; the visitor holds {held}",
+    )
+    status_home, home = channel(
+        stack, credential, "POST", "/door/channel/home", {"thing_id": thing_id}
+    )
+    status_home_2, home_2 = channel(
+        stack, credential, "POST", "/door/channel/home", {"thing_id": thing_id}
+    )
+    row.expect(
+        status_home == 202
+        and (home or {}).get("recorded") is True
+        and status_home_2 == 202
+        and (home_2 or {}).get("recorded") is False
+        and (home_2 or {}).get("departure_id") == (home or {}).get("departure_id"),
+        f"the call home answered {status_home} {home}, again {status_home_2} {home_2}",
+    )
+    step(w2, "HM1", entry)
+    cursor, seen, _ = frames_until(
+        stack,
+        credential,
+        cursor,
+        lambda f: f.get("kind") == "departed" and f.get("thing_id") == thing_id,
+    )
+    departed = next(
+        (f for f in seen if f.get("kind") == "departed" and f.get("thing_id") == thing_id), {}
+    )
+    carried = [c.get("thing_id") for c in departed.get("carried") or []]
+    _, after = F.society(w2, "HM1 after", entry)
+    left = [
+        t.get("id")
+        for t in ((after or {}).get("state") or {}).get("things") or []
+        if t.get("id") in held
+    ]
+    row.expect(
+        departed.get("why") == "sent_home" and carried == held and not left,
+        f"the departed frame read {departed}; still in the world {left}",
+    )
+    # A-144: who called the visitor home is the departure's, recorded in the society's event.
+    called = [
+        e
+        for e in society_events(w2, "HM1 events", entry)
+        if thing_id and thing_id in json.dumps(e) and '"called_by": "player"' in json.dumps(e)
+    ]
+    row.expect(bool(called), "no society event says the visitor's player called it home")
+    status_gone, gone = channel(
+        stack, credential, "POST", "/door/channel/home", {"thing_id": thing_id}
+    )
+    row.expect(
+        status_gone == 202
+        and (gone or {}).get("recorded") is False
+        and (gone or {}).get("departure_id") == (home or {}).get("departure_id"),
+        f"a call home once gone answered {status_gone} {gone}",
+    )
+    status_never, never = channel(
+        stack, credential, "POST", "/door/channel/home", {"thing_id": str(uuid.uuid4())}
+    )
+    row.expect(
+        status_never == 404 and F.problem_code(never) == "unknown_reference",
+        f"a call home for a thing never its visitor answered {status_never} "
+        f"{F.problem_code(never)}",
+    )
+    row.observed = {
+        "mapping": str(LUANTI_MAPPING),
+        "grant": [status_grant],
+        "arrival": [status_hello, status_in, thing_id, held],
+        "home": [status_home, home, status_home_2, home_2],
+        "departed": departed,
+        "left_in_world": left,
+        "called_by_events": [e.get("event_kind") for e in called],
+        "home_after": [status_gone, gone],
+        "home_never": [status_never, F.problem_code(never)],
+    }
+    return row.close()
 
 
 def row_v2(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
@@ -6379,6 +6960,7 @@ def crossings(arguments: argparse.Namespace) -> int:
         row_v2(stack, transcripts, worktree, out),
         row_v3(stack, transcripts, worktree, out),
         row_v6(stack, transcripts, worktree, credential),
+        row_hm1(stack, transcripts, worktree, out),
     ]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
@@ -6921,6 +7503,314 @@ def row_dr2(stack: Stack, transcripts: Any, worktree: Path) -> Row:
     return row.close()
 
 
+# -- LN1: lines both ways through the door ----------------------------------------------------------
+
+#: How long LN1 waits for an ask of the knight that offers a line, and for its line to be said.
+LINE_ASK_SECONDS = 300
+LINE_SAID_SECONDS = 180
+#: The line LN1's program says, and one holding a placeholder-shaped token only the policy
+#: boundary writes (docs/door-contract.md, Answers).
+LN1_LINE = "Well met, traveller."
+LN1_PLACEHOLDER_LINE = "Well met, [person A]."
+
+
+def agent_hello(worktree: Path) -> dict[str, Any]:
+    """The hello the shipped agent library sends: its own version, the mapping file its body names
+    and the reads its body states, each read from the library's source, not imported."""
+    library = worktree / AGENT_LIBRARY / "exulanica_agent"
+    version = re.search(r'VERSION: Final = "([^"]+)"', (library / "_version.py").read_text())
+    mapping = re.search(r'MAPPING_FILE: Final = "([^"]+)"', (library / "body.py").read_text())
+    assert version and mapping, "the agent library names no version or mapping file"
+    return {
+        "adapter_version": version.group(1),
+        "mapping": json.loads((library / mapping.group(1)).read_text()),
+        "reads": list(DOOR_READS),
+    }
+
+
+def offered_labels(act: Any) -> list[str]:
+    """Every label an ask's forced function offers: the enum of its parameters' one property that
+    has one (exulanica/models/choice.py states one such property, whatever its name)."""
+    if isinstance(act, dict):
+        for value in (act.get("properties") or {}).values():
+            if isinstance(value, dict) and isinstance(value.get("enum"), list):
+                return [str(label) for label in value["enum"]]
+        for value in act.values():
+            found = offered_labels(value)
+            if found:
+                return found
+    return []
+
+
+def ask_offering_a_line(
+    stack: Stack, credential: str, cursor: str, subject: str, seconds: int
+) -> tuple[str, dict[str, Any] | None, list[dict[str, Any]]]:
+    """Poll the channel until an ask of ``subject`` offers line labels, answering every other ask
+    with its label that changes nothing (else its first label that says nothing) so the society
+    moves on; the cursor, that ask, and every frame read."""
+    seen: list[dict[str, Any]] = []
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        status, read = door_call(
+            stack,
+            credential,
+            "GET",
+            f"/door/channel/frames?{urllib.parse.urlencode({'after': cursor})}",
+        )
+        if status != 200:
+            return cursor, None, seen
+        cursor = (read or {}).get("cursor", cursor)
+        for frame in (read or {}).get("frames") or []:
+            seen.append(frame)
+            if frame.get("kind") != "asked":
+                continue
+            if frame.get("subject_id") == subject and frame.get("line_labels"):
+                return cursor, frame, seen
+            quiet = frame.get("idle_label") or next(
+                (
+                    label
+                    for label in offered_labels(frame.get("act"))
+                    if label not in (frame.get("line_labels") or [])
+                ),
+                None,
+            )
+            if quiet is not None:
+                door_call(
+                    stack,
+                    credential,
+                    "POST",
+                    "/door/channel/answers",
+                    {
+                        "request_id": frame["request_id"],
+                        "request_sha256": frame["request_sha256"],
+                        "label": quiet,
+                    },
+                )
+    return cursor, None, seen
+
+
+def knight_grant(
+    c: Any, entry: Mapping[str, Any], bridge: str, knight: str, *, may_speak: bool
+) -> tuple[int, str | None, str | None]:
+    status, granted = c.call(
+        "LN1",
+        "POST",
+        "/door/grants",
+        query=F.world_query(entry),
+        body={
+            "idempotency_key": str(uuid.uuid4()),
+            "bridge": bridge,
+            "things": [knight],
+            "version_id": entry["authored_version_id"],
+            "minutes": 30,
+            "channel_credential": True,
+            "may_speak": may_speak,
+        },
+    )
+    grant = (granted or {}).get("grant") or {}
+    credential = ((granted or {}).get("channel_credential") or {}).get("credential")
+    return status, grant.get("grant_id"), credential
+
+
+def row_ln1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
+    declared = json.loads((worktree / DOOR_BRIDGE_ENTRY).read_text())
+    row = Row(
+        "LN1",
+        "door.lines",
+        "Lines both ways through the door (candidate-37): on workspace 1's own build of the newest "
+        "locked scene, playing, AGENTS' bridge decides for the knight, saying hello as the shipped "
+        "agent library does. Under a grant with may_speak false, an answer naming one of an ask's "
+        "line labels is 403 speaking_not_allowed. Under one that lets it speak, on an ask offering "
+        "line labels with their bound: a label that says nothing, sent with a line, is 422 "
+        "line_not_offered; a line label without a line 422 line_missing; a line holding "
+        "[person A] 422 line_refused; a line label with a short line within the bound is taken, "
+        f"and a second answer is 409 answer_already_given. Within {LINE_SAID_SECONDS} s the "
+        "society's events hold the knight's line (A-146: said frames carry a grant's visitors' "
+        "lines; this grant names the knight and brings no visitor in, so any said frame read is "
+        "recorded, not judged). A grant's lines closing on a saved "
+        "name is not judged: a name is saved only for a person found in a photograph, which this "
+        "stack does not take.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    record_path = out / "evidence" / "ln1-scene-build.json"
+    built = build_scene(stack, worktree, record_path, token_file="token")
+    (out / "evidence" / "ln1-scene-build.txt").write_text(built.stdout + built.stderr)
+    if not record_path.exists():
+        row.expect(False, f"the scene build exited {built.returncode}")
+        return row.close()
+    record = json.loads(record_path.read_text())
+    entry = F.read_entry(w1, "LN1", record["entry_id"])
+    query = F.world_query(entry)
+    status_society, society = w1.call(
+        "LN1",
+        "POST",
+        F.version_path(entry, "/society"),
+        query=query,
+        body={"region_id": record["arrival"]["region_id"], "profile": THINGS_ENGINE},
+    )
+    placed = {
+        p.get("placed_id"): p.get("id")
+        for p in ((society or {}).get("state") or {}).get("inhabitants") or []
+    }
+    knight = placed.get("knight")
+    row.expect(
+        status_society in (200, 201) and bool(knight), f"the society answered {status_society}"
+    )
+    if not knight:
+        return row.close()
+    hello = agent_hello(worktree)
+    phases: dict[str, Any] = {}
+
+    def open_grant(may_speak: bool) -> tuple[str | None, str | None, str]:
+        status, grant_id, credential = knight_grant(
+            w1, entry, declared["bridge"], knight, may_speak=may_speak
+        )
+        status_hello, said = (
+            door_call(stack, credential, "POST", "/door/channel/hello", hello)
+            if credential
+            else (None, None)
+        )
+        phases[f"grant may_speak {may_speak}"] = [status, status_hello, F.problem_code(said)]
+        row.expect(
+            status == 201 and status_hello == 200,
+            f"the grant (may_speak {may_speak}) answered {status}, its hello {status_hello} "
+            f"{F.problem_code(said)}",
+        )
+        return grant_id, credential, (said or {}).get("cursor") or ""
+
+    def answer(credential: str, frame: Mapping[str, Any], **body: Any) -> tuple[int, Any]:
+        return door_call(
+            stack,
+            credential,
+            "POST",
+            "/door/channel/answers",
+            {
+                "request_id": frame["request_id"],
+                "request_sha256": frame["request_sha256"],
+                **body,
+            },
+        )
+
+    status_play, _ = control(w1, "LN1", entry, "playing")
+    row.expect(status_play == 200, f"playing the society answered {status_play}")
+
+    # A grant that does not let its bridge's people speak: a line label is refused.
+    grant_id, credential, cursor = open_grant(False)
+    if credential:
+        cursor, asked, _ = ask_offering_a_line(stack, credential, cursor, knight, LINE_ASK_SECONDS)
+        if asked is None:
+            row.blocked_by.append(
+                f"no ask of the knight offered a line within {LINE_ASK_SECONDS} s (may_speak false)"
+            )
+        else:
+            got, refused = answer(credential, asked, label=asked["line_labels"][0], line=LN1_LINE)
+            phases["silent"] = [got, F.problem_code(refused)]
+            row.expect(
+                got == 403 and F.problem_code(refused) == "speaking_not_allowed",
+                f"a line under may_speak false answered {got} {F.problem_code(refused)}",
+            )
+        w1.call("LN1", "POST", f"/door/grants/{grant_id}/revoke", query=query, body={})
+
+    # A grant that lets it speak.
+    grant_id, credential, cursor = open_grant(True)
+    asked = None
+    if credential:
+        cursor, asked, _ = ask_offering_a_line(stack, credential, cursor, knight, LINE_ASK_SECONDS)
+    if asked is None:
+        row.blocked_by.append(f"no ask of the knight offered a line within {LINE_ASK_SECONDS} s")
+        control(w1, "LN1", entry, "paused")
+        row.observed = {"phases": phases, "play": status_play}
+        return row.close()
+    line_label = asked["line_labels"][0]
+    bound = asked.get("line_characters_maximum")
+    plain = asked.get("idle_label") or next(
+        (label for label in offered_labels(asked.get("act")) if label not in asked["line_labels"]),
+        None,
+    )
+    attempts = {}
+    for name, body, wanted in (
+        (
+            "a plain label with a line",
+            {"label": plain, "line": LN1_LINE},
+            (422, "line_not_offered"),
+        ),
+        ("a line label without a line", {"label": line_label}, (422, "line_missing")),
+        (
+            "a placeholder in the line",
+            {"label": line_label, "line": LN1_PLACEHOLDER_LINE},
+            (422, "line_refused"),
+        ),
+        ("the line", {"label": line_label, "line": LN1_LINE}, (202, None)),
+        ("the line again", {"label": line_label, "line": LN1_LINE}, (409, "answer_already_given")),
+    ):
+        if body["label"] is None:
+            attempts[name] = ["blocked", "the ask offered no label that says nothing"]
+            continue
+        got, said = answer(credential, asked, **body)
+        attempts[name] = [got, F.problem_code(said)]
+        row.expect(
+            got == wanted[0] and F.problem_code(said) == wanted[1],
+            f"{name} answered {got} {F.problem_code(said)}, not {wanted}",
+        )
+    row.expect(
+        isinstance(bound, int) and len(LN1_LINE) <= bound,
+        f"the ask's line bound is {bound}, below the driver's {len(LN1_LINE)}-character line",
+    )
+    # A-146: a said frame carries a line one of the grant's visitors said or heard, and this grant
+    # brings no visitor in, so the knight's line is judged in the society's events. Any said
+    # frame the channel sends in the bound is recorded, not judged.
+    held: list[dict[str, Any]] = []
+    seen: list[dict[str, Any]] = []
+    deadline = time.monotonic() + LINE_SAID_SECONDS
+    while time.monotonic() < deadline and not held:
+        cursor, read, _ = frames_until_bound(
+            stack, credential, cursor, lambda f: f.get("kind") == "said", 5
+        )
+        seen += read
+        events = society_events(w1, "LN1 events", entry)
+        held = [e for e in events if e.get("subject_id") == knight and LN1_LINE in json.dumps(e)]
+    said = [f for f in seen if f.get("kind") == "said"]
+    control(w1, "LN1", entry, "paused")
+    row.expect(
+        bool(held), f"no society event of the knight held the line within {LINE_SAID_SECONDS} s"
+    )
+    w1.call("LN1", "POST", f"/door/grants/{grant_id}/revoke", query=query, body={})
+    row.observed = {
+        "knight": knight,
+        "hello": {k: hello[k] for k in ("adapter_version", "reads")},
+        "phases": phases,
+        "ask": {
+            "minute": asked.get("minute"),
+            "line_labels": asked["line_labels"],
+            "line_characters_maximum": bound,
+            "idle_label": asked.get("idle_label"),
+        },
+        "answers": attempts,
+        "said": said,
+        "events": [e.get("event_kind") for e in held],
+        "saved_name": "not judged: no route on this stack saves a name",
+    }
+    return row.close()
+
+
+def lines(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if not stack.state.get("society_of_things") or "door_bridges" not in stack.state:
+        raise SystemExit(
+            "lines needs a fresh database and a stack started with --workspaces 2 "
+            "--no-derivative-worker --society-of-things --society-playback --door-bridges FILE "
+            "(AGENTS' example entry)"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_ln1(stack, transcripts, worktree, out)]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
 def door(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -7058,7 +7948,9 @@ def row_v1(stack: Stack, transcripts: Any) -> Row:
         f'code is refused 403 guest_entry_code_wrong with the words "{GUEST_WRONG_DETAIL}" and '
         "no session; the run's code enters (201) with role guest, a workspace of its own, an "
         "allowance on every provider the guest policy names with money and calls available and no "
-        "more than the policy grants, and no incomplete step; GET /auth/session reads the same "
+        "more than the policy grants, and no incomplete step but, on a host that does not offer "
+        "societies of things, the scene's own (society_engine_not_offered, A-147); GET "
+        "/auth/session reads the same "
         "allowance; the guest makes a town of its own through Create a world (201); in the "
         "arrival world its entry made, the "
         "people it chooses a model for are decided by that model once the society plays; the "
@@ -7102,8 +7994,16 @@ def row_v1(stack: Stack, transcripts: Any) -> Row:
         bool(entered.get("workspace_id")) and entered.get("workspace_id") not in synthetic,
         "the guest's workspace is not its own",
     )
+    # A-147: the arrival town names a scene; a host that does not offer its engine says so and
+    # gives the town its own living society (deployment.md, arrival worlds).
+    left = (
+        []
+        if stack.state.get("society_of_things")
+        else [{"step": "scene", "code": "society_engine_not_offered"}]
+    )
     row.expect(
-        entered.get("incomplete") == [], f"the entry left incomplete {entered.get('incomplete')}"
+        entered.get("incomplete") == left,
+        f"the entry left incomplete {entered.get('incomplete')}, not {left}",
     )
     row.expect(
         sorted(granted) == providers
@@ -8203,6 +9103,7 @@ def row_tc1(stack: Stack, transcripts: Any, worktree: Path, hn1: Mapping[str, An
     # A-140: an ability is listed when a module the society runs serves it, by the module table's
     # own lists (a newer module version, purposeful/v2, serves what the catalog names under v1);
     # each is said in the abilities catalog's words and names a module the society runs.
+    # A-148: follow is listed by that rule too, where the society runs the follow module.
     serves = {
         key
         for m in json.loads((worktree / ABILITY_MODULES).read_text())["modules"]
@@ -8233,8 +9134,7 @@ def row_tc1(stack: Stack, transcripts: Any, worktree: Path, hn1: Mapping[str, An
     row.expect(
         [{"key": a.get("key"), "words": a.get("words")} for a in card.get("abilities") or []]
         == expected_abilities
-        and all(a.get("module") in runs for a in card.get("abilities") or [])
-        and "follow" not in [a["key"] for a in card.get("abilities") or []],
+        and all(a.get("module") in runs for a in card.get("abilities") or []),
         f"the card's abilities are {[a.get('key') for a in card.get('abilities') or []]}, "
         f"expected {[a['key'] for a in expected_abilities]}",
     )
@@ -8526,7 +9426,72 @@ def row_hr1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
         ],
         "requested": len(requested),
         "town": [status_town, F.problem_code(town_answer), town_reason],
+        "beings_society": {"entry_id": record["entry_id"], "knight": knight, "spirit": spirit},
         "float_socket_mm": float_most,
+    }
+    return row.close()
+
+
+def row_kg1(stack: Stack, transcripts: Any, worktree: Path, hr1: Mapping[str, Any]) -> Row:
+    row = Row(
+        "KG1",
+        "things.kind_activities",
+        "An activity a being's kind withholds is never offered (candidate-37): on HR1's society, a "
+        "direct request that the lantern spirit, whose kind lists no rest, rest at a place the "
+        "input offers rest at is refused 409 invalid_society_action naming activity_not_offered; "
+        "the knight's request for the same place is recorded beside it.",
+    )
+    society = hr1.get("beings_society") or {}
+    if not society.get("entry_id") or not society.get("spirit"):
+        row.blocked_by.append("HR1 left no society with the lantern spirit")
+        return row.close()
+    kinds = THING_CATALOGS / "kinds"
+    spirit_kind = json.loads((worktree / kinds / "lantern_spirit.v1.json").read_text())
+    withholds = "rest" not in {a["key"] for a in spirit_kind.get("abilities") or []}
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    entry = F.read_entry(w2, "KG1", society["entry_id"])
+    # The places the society's consumed input offers, as the page reads them (places=true).
+    _, now = F.society(w2, "KG1", entry, places=True)
+    targets = ((now or {}).get("places") or {}).get("targets") or []
+    rest = next(
+        (t for t in targets if t.get("affordance") == "rest" and t.get("enabled") is not False),
+        None,
+    )
+    if rest is None:
+        row.blocked_by.append("the society's input offers no place to rest")
+        row.observed = {"targets": len(targets)}
+        return row.close()
+
+    def ask(subject: str, label: str) -> tuple[int, Any]:
+        _, current = F.society(w2, label, entry)
+        return w2.call(
+            label,
+            "POST",
+            F.version_path(entry, "/society/actions"),
+            query=F.world_query(entry),
+            body={
+                "idempotency_key": str(uuid.uuid4()),
+                "base_tick": (current or {}).get("current_tick"),
+                "base_state_sha256": (current or {}).get("state_sha256"),
+                "subject_id": subject,
+                "intent": {"kind": "perform", "target_id": rest["target_id"], "affordance": "rest"},
+            },
+        )
+
+    status_spirit, spirit = ask(society["spirit"], "KG1 spirit")
+    status_knight, knight = ask(society["knight"], "KG1 knight")
+    row.expect(withholds, "the lantern spirit's kind lists rest")
+    row.expect(
+        status_spirit == 409
+        and F.problem_code(spirit) == "invalid_society_action"
+        and (spirit or {}).get("detail") == "activity_not_offered",
+        f"the spirit's rest answered {status_spirit} {F.problem_code(spirit)} "
+        f"{(spirit or {}).get('detail')}",
+    )
+    row.observed = {
+        "target": {k: rest.get(k) for k in ("target_id", "affordance")},
+        "spirit": [status_spirit, F.problem_code(spirit), (spirit or {}).get("detail")],
+        "knight": [status_knight, F.problem_code(knight), (knight or {}).get("detail")],
     }
     return row.close()
 
@@ -8553,8 +9518,9 @@ def hands(arguments: argparse.Namespace) -> int:
         hn1,
         mm1,
         row_tc1(stack, transcripts, worktree, hn1.observed),
-        row_hr1(stack, transcripts, worktree, out),
     ]
+    hr1 = row_hr1(stack, transcripts, worktree, out)
+    rows += [hr1, row_kg1(stack, transcripts, worktree, hr1.observed)]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
 
@@ -8869,6 +9835,9 @@ def build_parser() -> argparse.ArgumentParser:
     declaring = commands.add_parser("declare-luanti")
     declaring.add_argument("--worktree", required=True)
     declaring.add_argument("--out", required=True)
+    spoken = commands.add_parser("lines")
+    spoken.add_argument("--worktree", required=True)
+    spoken.add_argument("--out", required=True)
     lived = commands.add_parser("society-of-things")
     lived.add_argument("--worktree", required=True)
     lived.add_argument("--out", required=True)
@@ -8913,6 +9882,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "guests": guests,
         "society-of-things": society_of_things,
         "crossings": crossings,
+        "lines": lines,
         "guest-places": guest_places,
         "guest-allowance": guest_allowance,
         "drafts": drafts,

@@ -1,0 +1,41 @@
+{
+ "profile": "q10-scripted-model-plan/v1",
+ "bounds": {
+  "ceiling_usd": "0.05",
+  "max_calls": 200
+ },
+ "utterances": {
+  "pieces": "make new pieces for how the well and the gate look here",
+  "mixed": "add a lantern and make new pieces for the well and the gate"
+ },
+ "rules": [
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "The request:\\n\\\"\\\"\\\"make new pieces for how the well and the gate look here"
+   },
+   "content": "{\"steps\": [{\"operation\": \"request_pieces\", \"options\": [\"well\", \"gate\"]}]}"
+  },
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "The request:\\n\\\"\\\"\\\"add a lantern and make new pieces for the well and the gate"
+   },
+   "content": "{\"steps\": [{\"operation\": \"place_thing\", \"options\": [\"lantern\"]}, {\"operation\": \"request_pieces\", \"options\": [\"well\", \"gate\"]}]}"
+  },
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "The sentence:\\n\\\"\\\"\\\"make new pieces for how the well and the gate look here"
+   },
+   "content": "{\"kind\": \"world_edit\"}"
+  },
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "The sentence:\\n\\\"\\\"\\\"add a lantern and make new pieces for the well and the gate"
+   },
+   "content": "{\"kind\": \"world_edit\"}"
+  }
+ ]
+}

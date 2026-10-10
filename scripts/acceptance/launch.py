@@ -77,6 +77,7 @@ starts exactly what it always did:
   (``EXULANICA_DOOR_BRIDGES``, digests only, never a credential), so an adapter can be run against
   the slot's API. An entry's ``"workspaces": "synthetic"`` becomes the run's synthetic workspace
   ids, which the file cannot know before the run makes them; the API's own loader checks the rest.
+- ``--workspace-style-packs`` lets a workspace upload its own style packs.
 - ``--reference-pictures`` serves references to the first workspace with a person's own pictures
   turned on, so ``GET /worlds/references`` states the consent a picture's reading right is granted
   against.
@@ -822,6 +823,7 @@ def api_environment(
     society_of_things: bool = False,
     accounts: Mapping[str, str] | None = None,
     reference_pictures: Sequence[str] | None = None,
+    workspace_style_packs: bool = False,
     environ: Mapping[str, str] | None = None,
     references: Mapping[str, str] | None = None,
     creatures: Sequence[str] | None = None,
@@ -851,6 +853,9 @@ def api_environment(
         # list states the consent a picture's reading right is granted against.
         environment["EXULANICA_REFERENCE_WORKSPACES"] = json.dumps(list(reference_pictures))
         environment["EXULANICA_REFERENCE_PICTURES"] = "on"
+    if workspace_style_packs:
+        # A workspace may upload its own style packs (off unless the installation turns it on).
+        environment["EXULANICA_WORKSPACE_STYLE_PACK_UPLOADS"] = "on"
     if accounts is not None:
         environment.update(accounts)
     if references:
@@ -1721,6 +1726,8 @@ def up(arguments: argparse.Namespace) -> None:
     if arguments.references:
         # The workspaces only: the credential is read from the environment at each start.
         state["references"] = [workspace_id, *(other["workspace_id"] for other in others)]
+    if arguments.workspace_style_packs:
+        state["workspace_style_packs"] = True
 
     accounts = None
     if arguments.accounts_guest_code:
@@ -1778,6 +1785,7 @@ def up(arguments: argparse.Namespace) -> None:
         reference_pictures=state.get("reference_pictures"),
         references=references_environment(state.get("references")),
         creatures=state.get("creatures"),
+        workspace_style_packs=bool(state.get("workspace_style_packs")),
     )
     environment.update(model_witness_environment(environment, run_dir))
     plan = None
@@ -2100,6 +2108,7 @@ def restart_api(arguments: argparse.Namespace) -> None:
         reference_pictures=state.get("reference_pictures"),
         references=references_environment(state.get("references")),
         creatures=state.get("creatures"),
+        workspace_style_packs=bool(state.get("workspace_style_packs")),
     )
     environment.update(model_witness_environment(environment, run_dir))
     scripted = state.get("scripted_model")
@@ -2301,6 +2310,12 @@ def build_parser() -> argparse.ArgumentParser:
                 help="admit the outside programs a JSON array of bridge declarations names "
                 '(EXULANICA_DOOR_BRIDGES; an entry\'s "workspaces": "synthetic" becomes the '
                 "run's synthetic workspaces) (default: no bridge)",
+            )
+            command.add_argument(
+                "--workspace-style-packs",
+                action="store_true",
+                help="let a workspace upload its own style packs "
+                "(EXULANICA_WORKSPACE_STYLE_PACK_UPLOADS=on) (default: off)",
             )
             command.add_argument(
                 "--reference-pictures",
