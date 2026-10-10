@@ -91,6 +91,25 @@ export interface WorldStylePackBinding {
   readonly manifestSha256: string;
   /** Present only for the workspace's own pack: the library version it is drawn on, and whether it may still be worn. */
   readonly own?: WorldOwnLook;
+  /** The world's own setting drawn over the pack, as the server states it; absent for a world drawn as its pack states. */
+  readonly setting?: WorldSettingStated;
+  /**
+   * In a request only: a named part for an axis (`sky`, `ground`, `cover`), which the host composes
+   * into the setting for this pack. A request naming a pack with neither this nor `setting` asks for
+   * the pack as it states.
+   */
+  readonly settingParts?: Readonly<Record<string, string>>;
+}
+
+/**
+ * A world's setting as the server states it: the document (`exulanica.world-setting/v1`, read and
+ * applied by `@exulanica/atlas-core` when the world is drawn), the SHA-256 of its canonical bytes,
+ * and the named parts it was composed from.
+ */
+export interface WorldSettingStated {
+  readonly document: unknown;
+  readonly sha256: string;
+  readonly parts: readonly { readonly axis: string; readonly key: string }[];
 }
 
 /** A version of the workspace's own pack, as a world's appearance names it. */
@@ -831,6 +850,9 @@ export class WorldStyleClient {
             packId: request.stylePack.packId,
             version: request.stylePack.version,
             manifestSha256: request.stylePack.manifestSha256,
+            // Named parts ask the host to compose; else the setting the binding already states is kept.
+            ...(request.stylePack.settingParts !== undefined ? { settingParts: request.stylePack.settingParts }
+              : request.stylePack.setting !== undefined ? { setting: request.stylePack.setting.document } : {}),
           },
         }),
       },
@@ -1056,6 +1078,29 @@ function parseVersion(value: unknown, historical = false): WorldStyleVersionReco
   });
 }
 
+/** The setting a pack's answer states, or nothing for a pack drawn as it states (or a host from before settings). */
+function parseSetting(pack: Record<string, unknown>): { readonly setting?: WorldSettingStated } {
+  const document = pack['setting'];
+  if (document === undefined || document === null) return {};
+  const stated = record(document, 'world setting');
+  const sha256 = text(pack['setting_sha256'], 'world setting digest');
+  if (!/^[0-9a-f]{64}$/.test(sha256)) {
+    throw new WorldStyleContractError('invalid_style_pack', 'A world setting is not named by a SHA-256.');
+  }
+  const parts = Array.isArray(stated['parts']) ? stated['parts'] : [];
+  return {
+    setting: Object.freeze({
+      document: stated,
+      sha256,
+      parts: Object.freeze(parts.flatMap((part) => {
+        const one = part as { axis?: unknown; key?: unknown } | null;
+        return one !== null && typeof one === 'object' && typeof one.axis === 'string' && typeof one.key === 'string'
+          ? [Object.freeze({ axis: one.axis, key: one.key })] : [];
+      })),
+    }),
+  };
+}
+
 /** A style pack binding as the server states it, or null when it names none (or predates them). */
 function parseStylePack(value: unknown): WorldStylePackBinding | null {
   if (value === undefined || value === null) return null;
@@ -1068,6 +1113,7 @@ function parseStylePack(value: unknown): WorldStylePackBinding | null {
     packId: text(pack['pack_id'], 'style pack ID'),
     version: positiveInteger(pack['version'], 'style pack version'),
     manifestSha256,
+    ...parseSetting(pack),
   };
   if (pack['source'] === undefined) return Object.freeze(named);
   if (pack['source'] !== 'workspace') {

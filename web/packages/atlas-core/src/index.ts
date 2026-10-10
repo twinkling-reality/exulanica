@@ -690,5 +690,23 @@ export {
   swatchKeyOf,
   variantIndex,
 } from './style-pack.js';
+export type {
+  WorldSetting,
+  WorldSettingProvenance,
+  WorldSettingRefusalReason,
+  WorldSettingRules,
+} from './world-setting.js';
+export {
+  WORLD_SETTING_PROFILE,
+  WORLD_SETTING_RULES_PROFILE,
+  WorldSettingRefusal,
+  applyWorldSetting,
+  canonicalWorldSettingBytes,
+  contrastPermille,
+  drawnWorldSettingBytes,
+  openLight,
+  readWorldSetting,
+  readWorldSettingRules,
+} from './world-setting.js';
 export type { StylePiece, StylePieceGroup } from './style-piece.js';
 export { StylePieceRefusal, readStylePiece } from './style-piece.js';

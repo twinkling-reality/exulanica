@@ -74,9 +74,10 @@ import { button, errorState } from './ui/system/components.js';
 import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system/layout.js';
 import { mountActions, type MountedActions } from './composition/actions.js';
 import { redrawWorldLook } from './composition/world-look-redraw.js';
-import { buildLookSheet } from './ui/look-sheet.js';
+import { buildLookSheet, type LookSettingNow } from './ui/look-sheet.js';
 import type { WorldStylePackBinding } from './world-style-api.js';
 import { readLookLibrary, type LookLibrary } from './composition/look-library.js';
+import { lookToUse } from './composition/look-use.js';
 import { buildTownLook } from './composition/town-look.js';
 import { fill, say } from './ui/copy.js';
 import { actionState, perform } from './ui/actions/surfaces.js';
@@ -1313,6 +1314,11 @@ async function mountWorld(): Promise<void> {
     shell.querySelector('section.look-sheet')?.remove();
     const offered = looks.options;
     const bindingOf = (packId: string): WorldStylePackBinding | null => looks.binding(packId);
+    /** The world's setting as the sheet shows it: what the host offers, and the part the world states for each axis. */
+    const settingNow = (): LookSettingNow | null => (looks.settings === null ? null : {
+      offered: looks.settings,
+      chosen: Object.fromEntries((boundLook()?.setting?.parts ?? []).map((part) => [part.axis, part.key])),
+    });
     // Whether the world behind the sheet is drawn in a look other than its own, from browsing.
     let browsedAway = false;
     const sheet = buildLookSheet({
@@ -1326,20 +1332,24 @@ async function mountWorld(): Promise<void> {
           if (!done.drawn) sheet.setLive(false);
         });
       },
-      onUse: async (option, say) => {
-        const binding = bindingOf(option.packId)!;
-        // Moving from an earlier version of the same pack is said by its number.
-        const named = now.how.earlier?.packId === option.packId ? `version ${binding.version} of ${option.title}` : option.title;
+      onUse: async (option, say, setting, isNow) => {
+        // Which card was pressed decides: the Now card keeps the version the world names and takes
+        // a changed setting; any other asks for the pack as the host lists it (look-use.ts).
+        const { binding, named } = lookToUse({
+          option, isNow: isNow === true, setting, worn: boundLook(), listed: bindingOf(option.packId)!,
+          earlierPackId: now.how.earlier?.packId ?? null,
+        });
         const result = await appearance.useStylePack(binding);
         if (!result.saved) return result.words;
         browsedAway = false;
         now = await looks.now(boundLook());
-        sheet.show(offered, now.packId, now.how);
+        sheet.show(offered, now.packId, now.how, settingNow());
         reflectLook();
         // Saving names the pack; drawing the open world in it is the redraw's (LOOK's
         // composition/world-look-redraw.ts), which keeps the old look up until the new one is ready.
         say(`${result.words} Drawing the world in ${named}…`);
-        const drawn = await redrawWorldLook(binding);
+        // Drawn as the world now names it: the pack, and the setting the host composed over it.
+        const drawn = await redrawWorldLook(boundLook() ?? binding);
         return drawn.drawn
           ? `${result.words} The world is now drawn in ${named}.`
           : `${result.words} It could not be drawn now${drawn.reason === null ? '' : ` (${drawn.reason})`}, so it is drawn in ${named} the next time the world opens.`;
@@ -1352,7 +1362,7 @@ async function mountWorld(): Promise<void> {
       },
     });
     shell.append(sheet.root);
-    sheet.show(offered, now.packId, now.how);
+    sheet.show(offered, now.packId, now.how, settingNow());
     sheet.focus();
   };
 

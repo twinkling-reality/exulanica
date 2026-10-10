@@ -169,6 +169,16 @@ sent (`{"pack": ...}`, or null when it named none), and each version, preview ca
 view states it (`style_pack`, with `style_pack_stated` on a proposal). A pack states no structure,
 so naming one never touches the topology digest.
 
+**The setting.** A version that names a pack may also state the world's own setting drawn over it
+([style pack contract](style-pack-contract.md#12-a-worlds-setting)): one nullable column holding
+the document (migration `a_world_states_its_own_setting`), stated inside `style_pack` on every
+request, candidate, proposal and version that has one. It is checked against the manifests of
+exactly the pack version named, at preview, Apply and Rollback, and one the pack cannot be drawn in
+is `invalid_style_data`. A preview that names no pack keeps its base version's pack and setting; a
+pack named with no setting clears it. Like the pack it states no structure. An appearance version
+is history no erasure rewrites, so a setting holds nothing of a person: no words and no digest of
+words.
+
 **Transactions.** A style mutation locks the world's state row and compares both tokens:
 
 ```text
@@ -394,7 +404,9 @@ The problem codes are distinct because the recovery differs:
   source behavior. `tests/test_world_style_pack_binding_postgres.py` and
   `tests/test_world_style_pack_api_postgres.py` hold a version's style pack through preview, apply,
   rollback and reads, and `tests/test_style_pack_binding_migration_postgres.py` holds 0141 over
-  earlier rows and its checks.
+  earlier rows and its checks. `tests/test_world_setting_binding_postgres.py` and
+  `tests/test_world_setting_api_postgres.py` hold a version's setting the same way, with the
+  migration that adds it over earlier rows.
 - `tests/test_interaction_policy_postgres.py` covers registry parity, deterministic candidates,
   state-neutral discard, immutable apply, origin, model, prompt and refinement records, transcript
   exclusion, stale policy and structural bases, append-only rollback and recommendation

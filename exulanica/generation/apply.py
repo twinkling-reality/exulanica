@@ -42,7 +42,7 @@ import json
 import logging
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Any, Final
 
@@ -537,6 +537,11 @@ def _write(
         for entry in entries.entries()
         if entry.world_id == request.world_id and entry.style_version_id == current.version_id
     ]
+    # A world's own setting stays with it when its look takes generated pieces in or gives them
+    # back: such a look states pieces alone, so the setting is drawn over it as over its base.
+    worn = current.style_pack
+    if target is not None and worn is not None and worn.setting is not None:
+        target = replace(target, setting=worn.setting)
     preview = styles.preview(
         StyleProposal(
             proposal_id=uuid.uuid4(),

@@ -13,7 +13,7 @@
  */
 
 import type { Credentials } from '../config.js';
-import type { LookNow, LookOption } from '../ui/look-sheet.js';
+import type { LookNow, LookOption, LookSettings } from '../ui/look-sheet.js';
 import type { ListedStylePack } from '../world-look.js';
 import type { WorldStylePackBinding } from '../world-style-api.js';
 
@@ -23,6 +23,8 @@ export interface LookLibrary {
   readonly options: readonly LookOption[];
   /** The pack a world naming none is drawn in, or null where there is none to name. */
   readonly defaultId: string | null;
+  /** The named parts a world's setting is chosen from, or null from a host that lists none. */
+  readonly settings: LookSettings | null;
   /** The exact pack to ask for, by the list's version and digest; null for one not listed. */
   binding(packId: string): WorldStylePackBinding | null;
   /**
@@ -66,7 +68,7 @@ function picture(
 /** The host's looks, with their pictures and default; a list that cannot be read rejects. */
 export async function readLookLibrary(access: Credentials): Promise<LookLibrary> {
   const look = await import('../world-look.js');
-  const packs = await look.listedStylePacks(access);
+  const [packs, settings] = await Promise.all([look.listedStylePacks(access), look.listedSettings(access).catch(() => null)]);
   const shown = await Promise.all(packs.map((pack) => picture(access, pack)));
   const options: readonly LookOption[] = packs.map((pack, index) => ({
     packId: pack.pack_id, title: pack.title, description: pack.description, authors: pack.authors,
@@ -77,6 +79,7 @@ export async function readLookLibrary(access: Credentials): Promise<LookLibrary>
     packs,
     options,
     defaultId,
+    settings,
     binding(packId) {
       const listed = packs.find((pack) => pack.pack_id === packId);
       return listed === undefined ? null : { packId: listed.pack_id, version: listed.version, manifestSha256: listed.manifest_sha256 };

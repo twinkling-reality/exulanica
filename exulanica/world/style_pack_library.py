@@ -68,6 +68,7 @@ __all__ = [
     "StylePackLibrary",
     "StylePackLibraryRefused",
     "load_style_pack_library",
+    "style_pack_context",
     "style_pack_library",
 ]
 
@@ -184,6 +185,20 @@ class StylePackLibrary:
         held = [(pack.version, pack.manifest_sha256)]
         held.extend((old.version, old.manifest_sha256) for old in pack.earlier_versions)
         return (version, manifest_sha256) in held
+
+    def chain(self, manifest_sha256: str) -> tuple[dict[str, Any], ...] | None:
+        """The manifest ``manifest_sha256`` names and each base it is drawn on, nearest first, as
+        the library holds them; None when it holds no such manifest."""
+        found: list[dict[str, Any]] = []
+        digest: str | None = manifest_sha256
+        while digest is not None:
+            item = self.content.get(digest)
+            if item is None or item.media_type != MANIFEST_MEDIA_TYPE:
+                return None
+            manifest = json.loads(item.data)
+            found.append(manifest)
+            digest = None if manifest["base"] is None else manifest["base"]["manifest_sha256"]
+        return tuple(found)
 
     @property
     def default_pack(self) -> LibraryPack:
@@ -465,6 +480,12 @@ def load_style_pack_library(
         ),
         default=default,
     )
+
+
+@functools.cache
+def style_pack_context() -> StylePackContext:
+    """The look families and texture sets every manifest of this tree is read against, read once."""
+    return load_context(_ROOT)
 
 
 @functools.cache

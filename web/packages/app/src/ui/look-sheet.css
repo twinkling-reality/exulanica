@@ -181,3 +181,20 @@
   border: 1px solid var(--color-border-strong);
   cursor: pointer;
 }
+
+/* The world's own setting: one choice an axis, under the look's words. */
+#shell section.look-sheet .look-sheet-setting { display: grid; gap: 0.55rem; max-width: 30rem; margin: 0; padding: 0; border: 0; }
+#shell section.look-sheet .look-sheet-setting[hidden] { display: none; }
+#shell section.look-sheet .look-sheet-setting-legend { padding: 0; margin-bottom: 0.2rem; font: 500 0.68rem/1.4 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); }
+#shell section.look-sheet .look-sheet-setting-axis { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 0.2rem 0.8rem; align-items: center; font-size: 0.9rem; color: var(--color-text); }
+#shell section.look-sheet .look-sheet-setting-choice {
+  min-height: 2.2rem;
+  padding: 0 0.6rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  font: 500 0.9rem/1 var(--font-ui);
+}
+#shell section.look-sheet .look-sheet-setting-about { grid-column: 2; font-size: 0.82rem; line-height: 1.45; color: var(--color-text-muted); }
+#shell section.look-sheet .look-sheet-setting-about:empty { display: none; }

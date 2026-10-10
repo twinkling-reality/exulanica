@@ -28,6 +28,7 @@ from exulanica.api.dependencies import CurrentSession, ScopedSessions, get_servi
 from exulanica.api.routes.workspace_style_packs import workspace_listing
 from exulanica.world.committed_content import DIGEST
 from exulanica.world.style_pack_library import style_pack_library
+from exulanica.world.world_settings import settings_listing
 
 router = APIRouter(prefix="/world", tags=["world"])
 
@@ -41,6 +42,8 @@ _LIST_HEADERS = {"Cache-Control": "private, no-store", "X-Content-Type-Options":
 def style_packs(request: Request, sessions: ScopedSessions, session: CurrentSession) -> Any:
     listing = style_pack_library().listing()
     listing["packs"] = [{**pack, "source": "library"} for pack in listing["packs"]]
+    # The named parts a world's setting is chosen from, drawn over any pack of this list.
+    listing["settings"] = settings_listing()
     listing["workspace_packs"] = []
     # An instance started without workspace style pack namespaces lists the library alone and
     # opens no connection for it.

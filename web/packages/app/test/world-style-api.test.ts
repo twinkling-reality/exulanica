@@ -1060,6 +1060,59 @@ describe('the style pack a world is drawn in', () => {
   });
 });
 
+describe('the setting a world states over its pack', () => {
+  const pack = { pack_id: 'exulanica.cozy-town', version: 1, manifest_sha256: 'c'.repeat(64) };
+  const document = {
+    profile: 'exulanica.world-setting/v1', origin: 'authored', provenance: { kind: 'authored' },
+    parts: [{ axis: 'sky', key: 'dusk' }], light: { from: 'evening', changes: {} }, surfaces: {}, up: {}, swatches: {}, edge: null,
+  };
+  const served = { ...pack, setting: document, setting_sha256: 'e'.repeat(64) };
+  const connected = (style_pack: unknown, bodies: Record<string, unknown>[] = []) => new WorldStyleClient({
+    baseUrl: 'https://exulanica.test/api', token: 'private', worldId: TEST_WORLD,
+    fetch: connectedFetch((url, init) => {
+      if (url.pathname.endsWith('/world/styles/current')) return json({ ...state('v1', 1), current: { ...version('v1', 1), style_pack } });
+      if (url.pathname.endsWith('/world/styles/versions')) return json([{ ...version('v1', 1), style_pack }]);
+      if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        bodies.push(body);
+        return json(preview(`preview-${bodies.length}`, String(body['proposalId'])), 201);
+      }
+      if (url.pathname.includes('/world/styles/previews/') && init.method === 'DELETE') return new Response(null, { status: 204 });
+      return undefined;
+    }),
+  });
+
+  it('is read with its digest and its named parts, and is absent for a pack drawn as it states', async () => {
+    const opened = await connected(served).connect('v1');
+    expect(opened.state.current.stylePack).toEqual({
+      packId: 'exulanica.cozy-town', version: 1, manifestSha256: 'c'.repeat(64),
+      setting: { document, sha256: 'e'.repeat(64), parts: [{ axis: 'sky', key: 'dusk' }] },
+    });
+    const plain = await connected(pack).connect('v1');
+    expect('setting' in plain.state.current.stylePack!).toBe(false);
+  });
+
+  it('is refused when it is not named by a SHA-256', async () => {
+    await expect(connected({ ...served, setting_sha256: 'not-a-digest' }).connect('v1')).rejects.toMatchObject({ code: 'invalid_style_pack' });
+    await expect(connected({ ...pack, setting: document }).connect('v1')).rejects.toBeDefined();
+  });
+
+  it('is asked for by named parts, kept as stated by a binding that carries it, and left out by a pack alone', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const client = connected(served, bodies);
+    const opened = await client.connect('v1');
+    const named = { packId: 'exulanica.cozy-town', version: 1, manifestSha256: 'c'.repeat(64) };
+    await client.previewStylePack({ ...named, settingParts: { sky: 'night', cover: 'snow' } });
+    await client.previewStylePack(opened.state.current.stylePack!);
+    await client.previewStylePack(named);
+    expect(bodies.map((body) => body['stylePack'])).toEqual([
+      { ...named, settingParts: { sky: 'night', cover: 'snow' } },
+      { ...named, setting: document },
+      named,
+    ]);
+  });
+});
+
 describe('naming the style pack a world is drawn in', () => {
   it('previews the pack with the current look unchanged, and names none with null', async () => {
     const bodies: Record<string, unknown>[] = [];

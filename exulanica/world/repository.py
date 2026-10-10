@@ -8,6 +8,7 @@ the same transaction.  Every optimistic check happens after locking that pointer
 from __future__ import annotations
 
 import datetime as dt
+import json
 import re
 import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -52,7 +53,12 @@ from exulanica.world.models import (
 )
 from exulanica.world.registry import STYLE_REGISTRY, StyleRegistry
 from exulanica.world.reviewed_sources import lapsed_personal_captures
-from exulanica.world.style_pack_library import StylePackLibrary, style_pack_library
+from exulanica.world.style_pack_library import (
+    StylePackLibrary,
+    style_pack_context,
+    style_pack_library,
+)
+from exulanica.world.style_packs import StylePackRefused, canonical_json
 from exulanica.world.style_structure import (
     AuthoredVersionRef,
     CompatibilityIntent,
@@ -65,6 +71,7 @@ from exulanica.world.style_structure import (
     classify_structure_style_compatibility,
     raise_for_incompatible_structure_style,
 )
+from exulanica.world.world_settings import CHAIN_MAXIMUM, SettingRefused, bound_setting
 from exulanica.world.worlds import world_kind
 
 __all__ = [
@@ -996,6 +1003,8 @@ class WorldStyleRepository:
                 row["style_pack_version"],
                 row["style_pack_manifest_sha256"],
                 row.get("style_pack_source") or "library",
+                # Absent from a row written before a world could state a setting: none.
+                setting=_setting_text(row.get("style_pack_setting")),
             )
         )
         if style_pack is not None and style_pack.source == "workspace":
@@ -1339,6 +1348,7 @@ class WorldStyleRepository:
         theirs: the appearance routes build only library bindings."""
         if binding.source == "library":
             self._require_library_pack(binding)
+            self._require_setting(binding)
             return
         if binding.source == "workspace":
             # The last question before the write: no withdrawal commits between it and the commit.
@@ -1351,6 +1361,55 @@ class WorldStyleRepository:
                 f"{binding.manifest_sha256} is not a version of this workspace's own pack that "
                 "may be worn"
             )
+        self._require_setting(binding)
+
+    def _require_setting(self, binding: StylePackBinding) -> None:
+        """A setting new state may name: one its pack, as the host holds it, can be drawn in. It is
+        read and applied to the pack's manifests exactly as a page applies it
+        (:func:`~exulanica.world.world_settings.bound_setting`), and must be stored as it reads,
+        so the setting a version states is the one that was checked."""
+        if binding.setting is None:
+            return
+        chain = self._pack_chain(binding)
+        if chain is None:
+            raise InvalidStyleData(
+                f"the manifests of style pack {binding.pack_id} version {binding.version} are not "
+                "all held here, so no setting can be checked against it"
+            )
+        try:
+            checked = bound_setting(
+                chain, style_pack_context(), document=json.loads(binding.setting)
+            )
+        except (SettingRefused, StylePackRefused) as refused:
+            raise InvalidStyleData(f"the world's setting is refused: {refused}") from refused
+        if checked != binding.setting:
+            raise InvalidStyleData(
+                "the world's setting is not stated as its canonical JSON, or changes nothing"
+            )
+
+    def _pack_chain(self, binding: StylePackBinding) -> tuple[Mapping[str, Any], ...] | None:
+        """The manifest ``binding`` names and each base it is drawn on, nearest first: the
+        library's, or this workspace's own versions down to the library version they end at."""
+        library = self._style_packs if self._style_packs is not None else style_pack_library()
+        if binding.source == "library":
+            return library.chain(binding.manifest_sha256)
+        found: list[Mapping[str, Any]] = []
+        digest: str | None = binding.manifest_sha256
+        while digest is not None and len(found) < CHAIN_MAXIMUM:
+            held = library.chain(digest)
+            if held is not None:
+                return (*found, *held)
+            row = self.connection.execute(
+                "select manifest_canonical from workspace_style_pack_version "
+                "where workspace_id = %s and manifest_sha256 = %s and erased_at is null",
+                (self.workspace_id, digest),
+            ).fetchone()
+            if row is None or row["manifest_canonical"] is None:
+                return None
+            manifest = json.loads(bytes(row["manifest_canonical"]))
+            found.append(manifest)
+            digest = None if manifest["base"] is None else manifest["base"]["manifest_sha256"]
+        return tuple(found) if digest is None and found else None
 
     def _resolved_pack(self, binding: StylePackBinding | None) -> StylePackBinding | None:
         """``binding`` with its base and whether it may be worn now, when it names this
@@ -1383,6 +1442,7 @@ class WorldStyleRepository:
                 binding.manifest_sha256,
                 binding.source,
                 wearable=False if resolve else None,
+                setting=binding.setting,
             )
         base = (
             None
@@ -1400,6 +1460,7 @@ class WorldStyleRepository:
             binding.source,
             base=base,
             wearable=None if not resolve else bool(row["wearable"]),
+            setting=binding.setting,
         )
 
     def _validate_proposal_style_pack(self, proposal: StyleProposal) -> None:
@@ -2052,7 +2113,11 @@ def _inherited(pack: StylePackBinding | None) -> StylePackBinding | None:
         return pack
     base = pack.base
     return (
-        None if base is None else StylePackBinding(base.pack_id, base.version, base.manifest_sha256)
+        None
+        if base is None
+        else StylePackBinding(
+            base.pack_id, base.version, base.manifest_sha256, setting=pack.setting
+        )
     )
 
 
@@ -2065,6 +2130,8 @@ def _style_pack_document(value: StylePackBinding | None) -> dict[str, Any] | Non
         "version": value.version,
         "manifest_sha256": value.manifest_sha256,
         **({} if value.source == "library" else {"source": value.source}),
+        # Only when the pack is drawn in a setting, so a document naming none is as it was.
+        **({} if value.setting is None else {"setting": json.loads(value.setting)}),
     }
 
 
@@ -2076,7 +2143,13 @@ def _style_pack_from_document(value: Mapping[str, Any] | None) -> StylePackBindi
         int(value["version"]),
         str(value["manifest_sha256"]),
         str(value.get("source", "library")),
+        setting=_setting_text(value.get("setting")),
     )
+
+
+def _setting_text(value: Any) -> str | None:
+    """A stored setting as the canonical JSON a binding holds, or None for none."""
+    return None if value is None else canonical_json(value)
 
 
 def _stated_style_pack(value: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -2090,14 +2163,20 @@ def _style_pack_columns(value: StylePackBinding | None) -> tuple[str, tuple[obje
     """The columns and values naming a version's pack: none for a version that names no pack."""
     if value is None:
         return "", ()
+    # Written only for a pack drawn in a setting, so every other version is written as before.
+    columns, values = (
+        ("", ())
+        if value.setting is None
+        else (",style_pack_setting", (Jsonb(json.loads(value.setting)),))
+    )
     if value.source == "library":
         return (
-            ",style_pack_id,style_pack_version,style_pack_manifest_sha256",
-            (value.pack_id, value.version, value.manifest_sha256),
+            f",style_pack_id,style_pack_version,style_pack_manifest_sha256{columns}",
+            (value.pack_id, value.version, value.manifest_sha256, *values),
         )
     return (
-        ",style_pack_id,style_pack_version,style_pack_manifest_sha256,style_pack_source",
-        (value.pack_id, value.version, value.manifest_sha256, value.source),
+        f",style_pack_id,style_pack_version,style_pack_manifest_sha256,style_pack_source{columns}",
+        (value.pack_id, value.version, value.manifest_sha256, value.source, *values),
     )
 
 

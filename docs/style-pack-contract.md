@@ -3,7 +3,8 @@
 This contract owns the style pack: the data object that decides how a world looks. It owns the
 manifest, the look roles a pack dresses and how each is resolved and fitted to a slot, the palette and
 its colour encoding, the light presets, the budgets a piece is held to, and the readers that check a
-manifest. Which values of a world are protected, and how an appearance is proposed, previewed,
+manifest, and a world's own setting drawn over its pack (section 12). Which values of a world are
+protected, and how an appearance is proposed, previewed,
 applied and rolled back, is the [customization contract](atlas-world-customization-contract.md);
 the light and finish a preset becomes is the [render look](generated-tile-runtime.md#61-the-render-look-a-style-chooses).
 
@@ -13,7 +14,8 @@ reading of a palette piece, drawing a generated town in a pack (section 7), thre
 pack (section 10) are built, as are a creator's own packs in their workspace: kept, uploaded,
 checked, served, downloaded as an archive, offered for publication and withdrawn (section 11), and
 looks made of generated pieces, recorded, checked, served and worn by the world they were made for
-(sections 10 and 11.2). A person choosing their own workspace pack for a world, publishing one to
+(sections 10 and 11.2), and a world's own setting, chosen from named parts, checked, stored and
+drawn (section 12). A person choosing their own workspace pack for a world, publishing one to
 the library, the page's upload control, and drafting a pack with a model are planned and not built.
 
 ## 1. In plain words
@@ -274,7 +276,7 @@ packs rather than in their manifests, so writing a note never moves a digest.
 
 | Route | Answer |
 | --- | --- |
-| `GET /world/style-packs` | `exulanica.style-pack-list/v1`, each pack at its current version: its id, version and manifest digest, title, description and tags, origin, licence with the attribution it requires, authors, file count and bytes, its preview picture's digest and media type (`preview_sha256`, `preview_media_type`, or null), whether it is the default (`default`), the note on what this version changed (`changes`, or null), and its earlier versions the host still serves (`earlier_versions`, oldest first, each its `version`, `manifest_sha256`, `preview_sha256` and `preview_media_type`) |
+| `GET /world/style-packs` | `exulanica.style-pack-list/v1`, with the named parts a world's setting is chosen from (`settings`, section 12), and each pack at its current version: its id, version and manifest digest, title, description and tags, origin, licence with the attribution it requires, authors, file count and bytes, its preview picture's digest and media type (`preview_sha256`, `preview_media_type`, or null), whether it is the default (`default`), the note on what this version changed (`changes`, or null), and its earlier versions the host still serves (`earlier_versions`, oldest first, each its `version`, `manifest_sha256`, `preview_sha256` and `preview_media_type`) |
 | `GET /world/style-packs/{content_sha256}` | A manifest of any version the library holds, as its canonical bytes (`application/json`), or a file a manifest lists (its stated media type), named by the SHA-256 of exactly those bytes and cached as immutable; any other digest is 404 `unknown_reference` |
 
 Both need a session holding `world.read`. A request names a digest and nothing else, so no request
@@ -578,3 +580,114 @@ version's base a library one and closes publication to it, and
   says. An erased version's file rows keep each piece's digest and source, as every erased
   version's rows keep digests and sizes; they name nothing of anybody, so a sweep of the shared store
   that keeps a piece while a row names it does not count them.
+
+## 12. A world's setting
+
+A pack is shared and says how a world is drawn. A **setting** is one world's own, drawn over the
+pack it wears: the hour and sky, the colours it restates, what lies on its roofs and ground, and the
+ground beyond it. Like a pack it never says where anything is, so stating one moves nothing a
+person walks on and nothing traffic drives. A world that states none is drawn as its pack states,
+as every world was before settings.
+
+A setting is a document, profile `exulanica.world-setting/v1`, of whole numbers and identifiers, and
+its identity is the SHA-256 of its canonical bytes, written as a manifest's are.
+
+| Field | What it holds |
+| --- | --- |
+| `origin`, `provenance` | `authored`, or `drafted` with the model id, prompt version and execution id of the call that drafted it |
+| `parts` | The named parts it was composed from, one an axis, in the axes' order; none for a setting stated outright |
+| `light` | Changes to one of the pack's own presets (`from`), each a dotted path of a preset replaced whole, such as `sun.elevation_mdeg` or `fog`; or none |
+| `surfaces` | The colour a look role's surfaces are drawn in, with an emission, whatever the pack dresses the role with |
+| `up` | The colour a look role's upward faces take, or null for none |
+| `swatches` | Swatches of the pack restated: a colour, an emission, or both |
+| `edge` | The colour of the ground beyond the world; or none |
+
+**Nothing of a person.** A world's appearance versions are history no erasure rewrites, and a
+setting is stored on one. So a setting holds no words and no digest of words: every value is a
+whole number, a colour, a look role, a key or an identifier of a shape that holds no sentence, and
+both readers refuse any other key. The shapes are held, not only the keys: a drafted setting's
+execution id is a UUID, none of its three identifiers may be 64 hexadecimal characters (the shape
+of a digest), and `parts` names only axes and parts the rules file lists, so a part's name is
+never a caller's own word. A request states only an authored setting: a drafted one says which
+call drafted it, which only the host's own drafting step can say, so one a caller states is
+refused (`invalid_style_data`, `reference` at `origin`). The words a person typed stay with the
+draft that read them.
+
+**Checked against the pack it is drawn over.** `exulanica/world/world_settings.py` is the
+authoritative reader and `web/packages/atlas-core/src/world-setting.ts` the browser's. Each reads a
+setting's shape, then applies it to the pack with its base chain resolved, and applying it is the
+check:
+
+| Rule | Refused as |
+| --- | --- |
+| The preset a setting changes is read again by the pack reader's own rule for a preset, so a setting states no light a pack could not | the reader's own reason, `shape` or `range`, at `light.changes.<path>` |
+| A path a setting may not change: the tone mapping, the sun's shadow filter, contact shadowing, the sky's face size and temporal anti-aliasing are a look's finish and its measured frame cost | `reference` |
+| A preset, a swatch or the ground beyond that the pack does not state; a role of a family no surface dresses; an upward face of a role nothing dresses | `reference` |
+| A person standing in the open is lit enough to be seen: the sun on level ground plus the sky's image light, through the exposure, at least the rules' floor | `legibility` at `light` |
+| A footway, and a crossing's paint, stay lighter or darker than the carriageway beside them by at least a quarter, where the setting changed either colour and both are drawn as colours | `legibility` at `surfaces` |
+
+What a setting may change, both floors with the pictures and figures they were judged from, the
+names a setting's `parts` may state, and the bounds (64 roles, 64 upward faces, 64 swatches, 8
+parts: a safety bound of storage, since a setting is stored with each appearance version) are
+data, `assets/style-packs/settings/setting-rules.v1.json`, which both readers read. A stored
+setting is checked against these rules again whenever its world's appearance is written, and the
+page draws by the rules it was built with. So under this rules profile a floor is only ever
+lowered, a bound only ever raised and a name only ever added: a setting that was accepted is
+never refused or left undrawn by a later edit of the file. A tighter figure is a new rules
+profile, which new settings state and old ones do not. `setting-cases.v1.json` beside it holds
+both readers to the same verdict on
+every case: the same refusal by reason and path, or the same digest of the setting and of the pack
+as drawn (`tests/test_world_settings.py`, `web/packages/atlas-core/test/world-setting.test.ts`).
+Every look the library holds stands in light its own setting rule accepts, in every version it
+still serves.
+
+**Named parts.** `setting-parts.v1.json` lists parts a person or a model chooses by name, one an
+axis, each stated for any pack:
+
+| Axis | Parts |
+| --- | --- |
+| Hour and sky | Dawn mist, clear noon, dusk, overcast, thick fog, night |
+| Ground and beyond | By the sea, desert sand, snowfields, wheat fields |
+| Cover | Snow |
+
+The host composes the chosen parts into the exact setting for one pack (`compose_setting`), in the
+axes' order, a later part's colour for a role replacing an earlier one's: a part's swatch the pack
+does not state is left out, its colour for a family's upward faces becomes one entry for each
+surface of that family the pack dresses, and its light is the first of its alternatives whose
+preset the pack states, so dusk is a pack's own evening preset where it has one. The setting stores
+the figures and the parts' keys, so a later version of the parts file never changes a world. Each
+part, composed for every look of the library, is drawn by the browser's reader and held to the bound
+every look's own light is held to, a surface in shade lit at most twice as blue as red
+(`web/packages/atlas-react/test/world-setting-parts.test.ts`, over
+`setting-composed.v1.json`, which `scripts/style_packs/composed_settings.py` writes).
+
+**Stored and asked for.** A world's style version states its setting beside its pack: one nullable
+column (migration `a_world_states_its_own_setting`), a document only while the version names a
+pack. A request names it with the pack: `style_pack.setting`, the document outright, or
+`style_pack.setting_parts`, a part for an axis, which the host composes; both together are refused.
+It is checked against the manifests of exactly the pack version the request names, when it is
+previewed and again when it is applied or rolled back to, and one the pack cannot be drawn in is
+`invalid_style_data` with the reader's reason and path. A preview that names no pack keeps its base
+version's pack and the setting drawn over it; a pack named with no setting is drawn as it states.
+`POST /worlds/generated` takes the same `style_pack`, so a town is made already in its setting, and
+a setting that is refused makes no town. A version's answer states `setting` and `setting_sha256`
+inside `style_pack` only for a world that has one. When a world's look takes generated pieces in or
+gives them back (section 11.2), the world's setting stays with it. `GET /world/style-packs` lists
+the parts (`settings`: the axes in order and each part's title and description, never its figures).
+
+**Drawn.** The page applies the setting to the resolved pack before anything is drawn
+(`prepareWorldLook` in `web/packages/app/src/world-look.ts`), and the result is a resolved pack, so
+the light, the surfaces, the pieces' swatches and the ground beyond are drawn by the code that draws
+any pack. A setting the pack cannot be drawn in is never stood in for: the world is drawn as its
+pack states, and the shell's `data-world-look` says the setting was not drawn and why. The Look
+sheet shows one choice an axis under a look's words, "As the look has it" or a named part, and
+saves a changed setting over the look the world wears or with another look.
+
+**Limits.** A person chooses among the named parts; nothing drafts a setting from a description
+yet, and no route previews a setting on the open world before it is saved. The sea is the flat
+ground beyond the world in a sea's colour, with no shore. The ground beyond is drawn in its own
+colour whatever the light, so at night it reads lighter than the town. Lit windows are a look's
+own pieces: night raises their glow where a look has them, and a look with none shows dark
+windows. A look draws a tree's leaves from its own texture, which a setting cannot colour, so no
+part turns leaves. Two legibility floors were judged from pictures of generated towns and the
+shipped looks, not measured with people.

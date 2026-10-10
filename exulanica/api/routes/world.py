@@ -20,9 +20,11 @@ and transaction in :mod:`exulanica.api.world_edit` and the version document in
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import json
 import uuid
 from collections.abc import Callable
-from typing import Annotated, Literal, TypeAlias
+from typing import Annotated, Any, Literal, TypeAlias
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from fastapi.responses import JSONResponse
@@ -67,6 +69,10 @@ from exulanica.world import (
     WorldSourceMedia,
     WorldStyleRepository,
 )
+from exulanica.world.errors import InvalidStyleData
+from exulanica.world.style_pack_library import style_pack_context, style_pack_library
+from exulanica.world.style_packs import StylePackRefused
+from exulanica.world.world_settings import SettingRefused, bound_setting
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world", tags=["world"])
@@ -131,6 +137,20 @@ class StylePackBody(BaseModel):
             validation_alias=AliasChoices("manifest_sha256", "manifestSha256"),
         ),
     ]
+    #: The world's own setting drawn over the pack (``exulanica.world-setting/v1``), stated
+    #: outright; or ``setting_parts``, a named part for an axis, which the host composes for this
+    #: pack. Neither, and the world is drawn as the pack states.
+    setting: dict[str, JsonValue] | None = None
+    setting_parts: Annotated[
+        dict[str, str] | None,
+        Field(max_length=8, validation_alias=AliasChoices("setting_parts", "settingParts")),
+    ] = None
+
+    @model_validator(mode="after")
+    def one_setting(self) -> StylePackBody:
+        if self.setting is not None and self.setting_parts is not None:
+            raise ValueError("state a setting or its parts, not both")
+        return self
 
 
 class PreviewBody(BaseModel):
@@ -277,6 +297,10 @@ class StylePackView(BaseModel):
     source: Literal["workspace"] | None = Field(default=None, exclude_if=_absent)
     base: StylePackBaseView | None = Field(default=None, exclude_if=_absent)
     wearable: bool | None = Field(default=None, exclude_if=_absent)
+    # The world's own setting drawn over the pack, and the SHA-256 of its canonical bytes; both
+    # left out of a pack drawn as it states, so its answer reads as before.
+    setting: dict[str, JsonValue] | None = Field(default=None, exclude_if=_absent)
+    setting_sha256: str | None = Field(default=None, exclude_if=_absent)
 
 
 class StyleReferenceView(BaseModel):
@@ -781,24 +805,57 @@ def _version_view(version: StyleVersion) -> StyleVersionView:
 
 
 def _style_pack(body: StylePackBody | None) -> StylePackBinding | None:
-    return (
-        None if body is None else StylePackBinding(body.pack_id, body.version, body.manifest_sha256)
-    )
+    return None if body is None else stated_style_pack(body)
+
+
+def stated_style_pack(body: StylePackBody) -> StylePackBinding:
+    """The library pack a request names, with the setting it states or the one its parts compose
+    for that pack (:func:`~exulanica.world.world_settings.bound_setting`). A setting the pack
+    cannot be drawn in is refused by reason and path; a pack the library does not hold is named as
+    asked and refused where every pack is, when the appearance is written.
+
+    A request states only an authored setting. A drafted one says which call drafted it, and only
+    the host's own drafting step can say that truthfully, so one a caller states is refused."""
+    if isinstance(body.setting, dict) and body.setting.get("origin", "authored") != "authored":
+        raise InvalidStyleData(
+            "the world's setting is refused: origin: a request states only an authored setting"
+        )
+    library = style_pack_library()
+    chain = library.chain(body.manifest_sha256)
+    setting: str | None = None
+    if chain is not None and (body.setting is not None or body.setting_parts is not None):
+        try:
+            setting = bound_setting(
+                chain, style_pack_context(), document=body.setting, chosen=body.setting_parts
+            )
+        except (SettingRefused, StylePackRefused) as refused:
+            raise InvalidStyleData(f"the world's setting is refused: {refused}") from refused
+    return StylePackBinding(body.pack_id, body.version, body.manifest_sha256, setting=setting)
 
 
 def _style_pack_view(binding: StylePackBinding | None) -> StylePackView | None:
     if binding is None:
         return None
+    setting: dict[str, Any] = (
+        {}
+        if binding.setting is None
+        else {
+            "setting": json.loads(binding.setting),
+            "setting_sha256": hashlib.sha256(binding.setting.encode("ascii")).hexdigest(),
+        }
+    )
     if binding.source == "library":
         return StylePackView(
             pack_id=binding.pack_id,
             version=binding.version,
             manifest_sha256=binding.manifest_sha256,
+            **setting,
         )
     return StylePackView(
         pack_id=binding.pack_id,
         version=binding.version,
         manifest_sha256=binding.manifest_sha256,
+        **setting,
         source="workspace",
         base=(
             None

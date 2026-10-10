@@ -73,6 +73,8 @@ export interface WorldLookState {
   readonly source: 'address' | 'world' | 'default' | 'redraw';
   readonly drawn: boolean;
   readonly reason: string | null;
+  /** The world's own setting, stated only for a world that has one: whether it was drawn over the pack, and why not. */
+  readonly setting?: { readonly drawn: boolean; readonly reason: string | null };
 }
 
 /** What can be drawn on a host and taken down again: a generated world's tiles, or a site. */
@@ -115,7 +117,10 @@ export function swappableDrawing<T extends { readonly look: WorldLookState }>(
         try {
           next = await relook(pack === null
             ? { packId, manifestSha256: null, source: 'default' }
-            : { packId: pack.packId, manifestSha256: pack.manifestSha256, source: 'redraw' });
+            : {
+              packId: pack.packId, manifestSha256: pack.manifestSha256, source: 'redraw',
+              ...(pack.setting === undefined ? {} : { setting: pack.setting.document }),
+            });
         } catch (error) {
           return result(false, error instanceof Error ? error.message : String(error));
         }

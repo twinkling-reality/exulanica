@@ -1,0 +1,88 @@
+{
+ "profile": "exulanica.world-setting-rules/v1",
+ "about": "What a world's setting may change of the look it is drawn over and what it is held to. Read by the server's reader (exulanica/world/world_settings.py) and the browser's (web/packages/atlas-core/src/world-setting.ts), so neither restates a figure. Under this profile a floor is only ever lowered, a bound only ever raised and a name only ever added, so a setting stored under it is never refused or left undrawn by a later edit of this file; a tighter figure is a new rules profile, for new settings.",
+ "light_changes": {
+  "paths": [
+   "exposure_permille",
+   "sky.zenith",
+   "sky.horizon",
+   "sky.ground",
+   "sky.bounce_ground",
+   "sky.intensity_permille",
+   "sky.sun_glow_permille",
+   "sky.sun_disc_permille",
+   "sky.clouds",
+   "fog",
+   "sun.elevation_mdeg",
+   "sun.azimuth_mdeg",
+   "sun.colour",
+   "sun.intensity_permille",
+   "environment.intensity_permille",
+   "post.bloom",
+   "post.grading.brightness_permille",
+   "post.grading.contrast_permille",
+   "post.grading.saturation_permille",
+   "post.grading.tint",
+   "post.enhance.shadows_permille",
+   "post.enhance.highlights_permille",
+   "post.enhance.midtones_permille",
+   "post.enhance.vibrance_permille",
+   "post.enhance.dehaze_permille",
+   "post.vignette"
+  ],
+  "reason": "Each path is a value of a light preset, replaced whole. Left to the look: the tone mapping, the sun's shadow filter, contact shadowing, the sky's face size and temporal anti-aliasing, which are a look's finish and its measured frame cost, so a setting cannot make a world cost more to draw than its look does."
+ },
+ "open_light": {
+  "minimum": 16000,
+  "class": "A legibility floor judged from pictures, not a measured cost: it bounds no size and no count.",
+  "reason": "A person standing in the open must be lit enough to be seen. The figure is the sun on level ground plus the sky's image light, through the exposure, in the reader's own whole-number measure.",
+  "source": "Between two drawn towns: a night drawn at 11,926 on the three shipped looks was too dark to see a person in, and the darkest preset a shipped look states, Cozy town's evening, stands at 21,032 and reads plainly. A study with people looking would replace the figure."
+ },
+ "ground_contrast": {
+  "pairs": [
+   [
+    "path.footway_paving",
+    "road.carriageway_asphalt"
+   ],
+   [
+    "road.road_paint_white",
+    "road.carriageway_asphalt"
+   ]
+  ],
+  "minimum_permille": 1250,
+  "class": "A legibility floor judged from the shipped looks, not a measured cost.",
+  "reason": "A footway and a crossing's paint must still be told from the carriageway beside them once a setting restates colours. Held only where both are drawn as colours; a look that draws either from a texture set is left as it is.",
+  "source": "The least a shipped look leaves between a footway and its carriageway is 2,556 per mille (Cozy town) and between crossing paint and carriageway 3,569; a setting may bring either nearer, to a quarter lighter, the figure below which the kerb's line alone separates them."
+ },
+ "part_names": {
+  "names": {
+   "sky": [
+    "dawn_mist",
+    "clear_noon",
+    "dusk",
+    "overcast",
+    "thick_fog",
+    "night"
+   ],
+   "ground": [
+    "sea",
+    "sand",
+    "snowfield",
+    "wheat_fields"
+   ],
+   "cover": [
+    "snow"
+   ]
+  },
+  "class": "A closed list, so a stored setting states no word of a caller's own: its parts are these names or it is refused.",
+  "reason": "The axes and parts of setting-parts.v1.json, which is refused if it names any other. Under this profile the list only grows: a name is never removed or renamed, so a setting stored with one is always read."
+ },
+ "bounds": {
+  "parts": 8,
+  "surfaces": 64,
+  "up": 64,
+  "swatches": 64,
+  "class": "A safety bound of storage: a setting is stored with each appearance version of a world and sent with each read of it.",
+  "reason": "A look states at most 64 swatches, and a town's tiles take 16 look roles, so 64 entries hold every surface and swatch of any look shipped with room for a world kind's own roles; eight parts are more axes than the parts file states."
+ }
+}

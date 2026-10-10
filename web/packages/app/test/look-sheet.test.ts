@@ -242,3 +242,84 @@ describe('a world drawn in an earlier version of its look', () => {
     expect(use(root).hidden).toBe(false);
   });
 });
+
+describe('a world\'s own setting in the Look sheet', () => {
+  const OFFERED = {
+    axes: [{ key: 'sky', title: 'Hour and sky' }, { key: 'ground', title: 'Ground and beyond' }],
+    parts: [
+      { axis: 'sky', key: 'dusk', title: 'Dusk', description: 'Evening: a low orange sun.' },
+      { axis: 'sky', key: 'night', title: 'Night', description: 'Night under a moon.' },
+      { axis: 'ground', key: 'sea', title: 'By the sea', description: 'Open sea beyond the last street.' },
+    ],
+  };
+  const choice = (root: HTMLElement, axis: string) => root.querySelector<HTMLSelectElement>(`select[data-setting-axis="${axis}"]`)!;
+  const pick = (root: HTMLElement, axis: string, key: string): void => {
+    const select = choice(root, axis);
+    select.value = key;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  it('is not shown by a sheet given none, which uses a look as it always did', async () => {
+    const { root, onUse } = sheet();
+    expect(root.querySelector<HTMLElement>('.look-sheet-setting')!.hidden).toBe(true);
+    expect(root.querySelectorAll('select')).toHaveLength(0);
+    press(root, 'ArrowRight');
+    press(root, 'Enter');
+    await vi.waitFor(() => expect(onUse).toHaveBeenCalledTimes(1));
+    // No setting: a host that lists no parts is asked for the look alone, and told which card it was.
+    expect((onUse.mock.calls[0] as unknown[]).slice(2)).toEqual([undefined, false]);
+  });
+
+  it('offers one choice an axis, the look\'s own first, and shows what the world states now', () => {
+    const { root, show } = sheet();
+    show(PACKS, 'cozy', {}, { offered: OFFERED, chosen: { sky: 'dusk' } });
+    expect(root.querySelector<HTMLElement>('.look-sheet-setting')!.hidden).toBe(false);
+    expect([...root.querySelectorAll('.look-sheet-setting-title')].map((node) => node.textContent)).toEqual(['Hour and sky', 'Ground and beyond']);
+    expect([...choice(root, 'sky').options].map((option) => option.textContent)).toEqual(['As the look has it', 'Dusk', 'Night']);
+    expect(choice(root, 'sky').value).toBe('dusk');
+    expect(choice(root, 'ground').value).toBe('');
+    expect([...root.querySelectorAll('.look-sheet-setting-about')].map((node) => node.textContent)).toEqual(['Evening: a low orange sun.', '']);
+    // Nothing is changed yet, so the look the world wears offers nothing to use.
+    expect(use(root).hidden).toBe(true);
+  });
+
+  it('saves a changed setting over the look the world wears, with the part chosen for each axis that has one', async () => {
+    const onUse = vi.fn(async () => 'Saved.');
+    const { root, show } = sheet(onUse as never);
+    show(PACKS, 'cozy', {}, { offered: OFFERED, chosen: { sky: 'dusk' } });
+    pick(root, 'ground', 'sea');
+    expect(use(root).hidden).toBe(false);
+    expect(text(root, '[data-action="look.use"] span')).toBe('Use this setting');
+    expect(text(root, '.look-sheet-setting-axis:nth-of-type(2) .look-sheet-setting-about')).toBe('Open sea beyond the last street.');
+    use(root).click();
+    await vi.waitFor(() => expect(onUse).toHaveBeenCalledTimes(1));
+    const [option, , setting] = onUse.mock.calls[0] as unknown as [LookOption, unknown, Record<string, string>];
+    expect(option.packId).toBe('cozy');
+    expect(setting).toEqual({ sky: 'dusk', ground: 'sea' });
+    // Back to what the world states, and there is nothing to use again.
+    pick(root, 'ground', '');
+    expect(use(root).hidden).toBe(true);
+  });
+
+  it('sends the setting chosen with another look, and an axis left to the look is not named', async () => {
+    const onUse = vi.fn(async () => 'Saved.');
+    const { root, show } = sheet(onUse as never);
+    show(PACKS, 'cozy', {}, { offered: OFFERED, chosen: { sky: 'dusk', ground: 'sea' } });
+    pick(root, 'sky', '');
+    press(root, 'ArrowRight');
+    expect(text(root, '[data-action="look.use"] span')).toBe('Use this look');
+    use(root).click();
+    await vi.waitFor(() => expect(onUse).toHaveBeenCalledTimes(1));
+    const [option, , setting] = onUse.mock.calls[0] as unknown as [LookOption, unknown, Record<string, string>];
+    expect(option.packId).toBe('finished');
+    expect(setting).toEqual({ ground: 'sea' });
+  });
+
+  it('shows a part the host no longer lists as the look\'s own, and no key moves the looks while a choice has the keyboard', () => {
+    const { root, show } = sheet();
+    show(PACKS, 'cozy', {}, { offered: OFFERED, chosen: { sky: 'aurora' } });
+    expect(choice(root, 'sky').value).toBe('');
+    press(choice(root, 'sky'), 'ArrowRight');
+    expect(text(root, '.look-sheet-title')).toBe('Cozy town');
+  });
+});

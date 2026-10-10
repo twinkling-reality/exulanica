@@ -98,3 +98,21 @@ def test_every_file_the_style_pack_check_and_upload_read_ships_in_the_api_image(
     assert "assets/colour/srgb8-linear16.v1.json" in read, read
     missing = [path for path in read if not (image.allowlisted(path) and image.shipped(path))]
     assert missing == []
+
+
+def test_every_file_a_worlds_setting_is_checked_against_ships_in_the_api_image():
+    # Read the first time a world states a setting or a page lists the named parts: the rules, the
+    # parts and the colour table the legibility rules read.
+    image = IMAGES["api"]
+    read = startup_reads(
+        "from exulanica.world.world_settings import load_setting_parts, load_setting_rules\n"
+        "load_setting_parts(rules=load_setting_rules())"
+    )
+    # A positive control: each of the three files was opened.
+    assert {
+        "assets/style-packs/settings/setting-rules.v1.json",
+        "assets/style-packs/settings/setting-parts.v1.json",
+        "assets/colour/srgb8-linear16.v1.json",
+    } <= set(read), read
+    missing = [path for path in read if not (image.allowlisted(path) and image.shipped(path))]
+    assert missing == []

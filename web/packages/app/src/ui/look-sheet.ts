@@ -15,6 +15,11 @@
  * A world drawn in an earlier version of a pack keeps it: the host still serves every version it
  * published, and a newer one is only ever a choice. The sheet then shows that version as Now, its
  * own card, beside the pack's current version, which says what changed and offers itself by number.
+ *
+ * Under a look's words is the world's own setting: one choice for each axis the host lists (the
+ * hour and sky, the ground and what lies beyond, a cover such as snow), each "As the look has it" or
+ * one of the host's named parts. A setting is the world's own and is drawn over whichever look is
+ * used, so the primary action also saves a changed setting over the look the world already wears.
  */
 
 import { el, replace, setText } from './dom.js';
@@ -51,17 +56,33 @@ export interface LookNow {
   readonly notice?: string | null;
 }
 
+/** The named parts a world's setting is chosen from, as the host lists them. */
+export interface LookSettings {
+  /** Each axis in the host's order: its key and what a person reads for it. */
+  readonly axes: readonly { readonly key: string; readonly title: string }[];
+  readonly parts: readonly { readonly axis: string; readonly key: string; readonly title: string; readonly description: string }[];
+}
+
+/** The setting choices a sheet shows: what the host offers, and the part the world states now for each axis that has one. */
+export interface LookSettingNow {
+  readonly offered: LookSettings;
+  readonly chosen: Readonly<Record<string, string>>;
+}
+
 export interface LookSheet {
   readonly root: HTMLElement;
   /** Show the world itself behind the sheet (true) or the packs' pictures (false). */
   setLive(live: boolean): void;
   /**
    * The packs, with the one the world is drawn in now (null where none of them), and, where it is
-   * an earlier version of one, which.
+   * an earlier version of one, which; and the world's setting, where the host lists parts for one.
    */
-  show(options: readonly LookOption[], current: string | null, now?: LookNow): void;
+  show(options: readonly LookOption[], current: string | null, now?: LookNow, setting?: LookSettingNow | null): void;
   focus(): void;
 }
+
+/** Said for an axis a world leaves to its look. */
+export const AS_THE_LOOK_HAS_IT = 'As the look has it';
 
 /** A licence in words: CC0 says what it means; any other is named by its identifier. */
 export function licenceWords(licence: LookOption['licence']): string {
@@ -88,9 +109,13 @@ export function buildLookSheet(options: {
   readonly worldTitle: string;
   /**
    * Use a pack; resolves to what happened in words, said in the sheet's status line. `say` puts
-   * words there while it works, such as that the world is being drawn in the new look.
+   * words there while it works, such as that the world is being drawn in the new look. `setting`
+   * is the part chosen for each axis that has one (none: the look as it states), given only by a
+   * sheet shown a setting. `isNow` says the card pressed is the one the world is drawn in now: a
+   * pack offered at a later version than the world wears has two cards naming one pack, and only
+   * the card says which is meant.
    */
-  readonly onUse: (option: LookOption, say: (words: string) => void) => Promise<string>;
+  readonly onUse: (option: LookOption, say: (words: string) => void, setting?: Readonly<Record<string, string>>, isNow?: boolean) => Promise<string>;
   readonly onClose: () => void;
   /**
    * Draw the world behind the sheet in the look being looked at, while a person moves through
@@ -116,6 +141,7 @@ export function buildLookSheet(options: {
     el('span'), el('kbd', { text: 'Esc' }),
   ]) as HTMLButtonElement;
   const meta = el('p', { class: 'look-sheet-meta' });
+  const settingRow = el('fieldset', { class: 'look-sheet-setting', hidden: true });
   const status = el('p', { class: 'look-sheet-status', role: 'status', 'aria-live': 'polite' });
   const strip = el('div', { class: 'look-sheet-strip', role: 'listbox', 'aria-label': 'Looks' });
   const keys = el('p', { class: 'look-sheet-keys', 'aria-hidden': 'true' }, [
@@ -133,6 +159,7 @@ export function buildLookSheet(options: {
     ]),
     el('section', { class: 'look-sheet-lede' }, [
       overline, title, about,
+      settingRow,
       el('div', { class: 'look-sheet-actions' }, [use, keep]),
       meta, status,
     ]),
@@ -158,6 +185,13 @@ export function buildLookSheet(options: {
   let chosen = 0;
   let busy = false;
   const cards: HTMLButtonElement[] = [];
+  /** The setting the host offers, the part the world states now for each axis, and the part picked here. */
+  let offered: LookSettings | null = null;
+  let stated: Readonly<Record<string, string>> = {};
+  let picked: Record<string, string> = {};
+  /** Whether the setting picked here is another than the one the world states now. */
+  const settingChanged = (): boolean => offered !== null
+    && offered.axes.some((axis) => (picked[axis.key] ?? '') !== (stated[axis.key] ?? ''));
 
   /** Whether a card is the look the world is drawn in now. */
   const isNowCard = (card: Card): boolean => card.option.packId === current && (earlier === null || card.earlier !== null);
@@ -186,11 +220,13 @@ export function buildLookSheet(options: {
     replace(about, versionLine === null ? [option.description] : [
       option.description, el('span', { class: 'look-sheet-version', text: versionLine }),
     ]);
-    use.hidden = isNow;
+    // The look the world wears offers the action only for a setting changed over it.
+    use.hidden = isNow && !settingChanged();
     use.disabled = busy;
     use.querySelector('span')!.textContent = busy ? 'Working…'
-      : versioned(card) && option.version !== undefined ? `Use version ${option.version}`
-        : options.choosing?.use ?? 'Use this look';
+      : isNow && settingChanged() ? 'Use this setting'
+        : versioned(card) && option.version !== undefined ? `Use version ${option.version}`
+          : options.choosing?.use ?? 'Use this look';
     keep.querySelector('span')!.textContent = nowWords();
     replace(meta, [
       el('span', { text: licenceWords(option.licence) }),
@@ -222,12 +258,15 @@ export function buildLookSheet(options: {
 
   const run = async (): Promise<void> => {
     const card = entries[chosen];
-    if (card === undefined || busy || isNowCard(card)) return;
+    if (card === undefined || busy || (isNowCard(card) && !settingChanged())) return;
     busy = true;
     status.textContent = '';
     render();
     try {
-      status.textContent = await options.onUse(card.option, (words) => { status.textContent = words; });
+      const say = (words: string): void => { status.textContent = words; };
+      status.textContent = offered === null
+        ? await options.onUse(card.option, say, undefined, isNowCard(card))
+        : await options.onUse(card.option, say, Object.fromEntries(Object.entries(picked).filter(([, key]) => key !== '')), isNowCard(card));
     } finally {
       busy = false;
       render();
@@ -258,9 +297,34 @@ export function buildLookSheet(options: {
 
   return {
     root,
-    show(next, now, how) {
+    show(next, now, how, setting) {
       shown = next;
       current = now;
+      offered = setting == null || setting.offered.axes.length === 0 ? null : setting.offered;
+      stated = setting?.chosen ?? {};
+      picked = { ...stated };
+      settingRow.hidden = offered === null;
+      replace(settingRow, offered === null ? [] : [
+        el('legend', { class: 'look-sheet-setting-legend', text: 'This world\'s own setting' }),
+        ...offered.axes.map((axis) => {
+          const parts = offered!.parts.filter((part) => part.axis === axis.key);
+          const about = el('span', { class: 'look-sheet-setting-about' });
+          const select = el('select', { class: 'look-sheet-setting-choice', 'data-setting-axis': axis.key }, [
+            el('option', { value: '', text: AS_THE_LOOK_HAS_IT }),
+            ...parts.map((part) => el('option', { value: part.key, text: part.title })),
+          ]) as HTMLSelectElement;
+          const describe = (): void => setText(about, parts.find((part) => part.key === select.value)?.description ?? '');
+          // A part the host no longer lists is shown as the look's own: it cannot be chosen again.
+          select.value = parts.some((part) => part.key === picked[axis.key]) ? picked[axis.key]! : '';
+          describe();
+          select.addEventListener('change', () => {
+            picked[axis.key] = select.value;
+            describe();
+            render();
+          });
+          return el('label', { class: 'look-sheet-setting-axis' }, [el('span', { class: 'look-sheet-setting-title', text: axis.title }), select, about]);
+        }),
+      ]);
       earlier = how?.earlier != null && how.earlier.packId === now && next.some((option) => option.packId === now) ? how.earlier : null;
       // The earlier version the world keeps comes just before its pack's current version.
       entries = next.flatMap((option, index): Card[] => {

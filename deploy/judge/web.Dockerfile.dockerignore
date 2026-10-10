@@ -9,6 +9,7 @@ web/**/dist
 !assets/colour/srgb8-linear16.v1.json
 !assets/characters
 !assets/owned-world
+!assets/style-packs/settings/setting-rules.v1.json
 !assets/style-packs/town-look-roles.v1.json
 !assets/textures/manifest.json
 !assets/textures/blobs

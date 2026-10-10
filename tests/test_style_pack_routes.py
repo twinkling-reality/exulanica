@@ -90,6 +90,21 @@ def test_the_list_names_every_committed_pack_with_its_licence_and_attribution(cl
     }
 
 
+def test_the_list_states_the_named_parts_a_worlds_setting_is_chosen_from(client) -> None:
+    """Read from the committed parts file: the axes in its order and each part's words, and none
+    of a part's figures, which the host keeps and composes."""
+    stated = json.loads((PACKS.parent / "settings" / "setting-parts.v1.json").read_text("utf-8"))
+    listed = _get(client, "/world/style-packs").json()["settings"]
+    assert listed["profile"] == "exulanica.world-setting-part-list/v1"
+    assert listed["version"] == stated["version"]
+    assert listed["axes"] == stated["axes"]
+    assert listed["parts"] == [
+        {key: part[key] for key in ("axis", "key", "title", "description")}
+        for part in stated["parts"]
+    ]
+    assert {part["axis"] for part in listed["parts"]} == {axis["key"] for axis in stated["axes"]}
+
+
 def test_a_manifest_and_a_piece_are_served_as_the_bytes_their_digest_names(client) -> None:
     manifest, canonical = _cozy()
     digest = hashlib.sha256(canonical).hexdigest()

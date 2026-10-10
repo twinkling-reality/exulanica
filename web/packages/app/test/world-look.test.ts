@@ -10,6 +10,7 @@ import {
   WORLD_LOOKS,
   addressedWorldLook,
   listedDefault,
+  listedSettings,
   listedVersion,
   prepareWorldLook,
   worldLookChoice,
@@ -343,5 +344,91 @@ describe('a listed version', () => {
     expect(listedVersion(packs, 'b'.repeat(64))).toEqual({ pack: packs[0], version: 2, current: false });
     expect(listedVersion(packs, 'f'.repeat(64))).toEqual({ pack: packs[1], version: 3, current: true });
     expect(listedVersion(packs, 'e'.repeat(64))).toBeUndefined();
+  });
+});
+
+describe('a world\'s own setting', () => {
+  // Written out by hand, for Cozy town as committed: its own evening preset, the sea beyond, and
+  // lit glass at full emission.
+  const SETTING = {
+    profile: 'exulanica.world-setting/v1', origin: 'authored', provenance: { kind: 'authored' },
+    parts: [{ axis: 'sky', key: 'dusk' }, { axis: 'ground', key: 'sea' }],
+    light: { from: 'evening', changes: {} },
+    surfaces: { 'ground.default': { srgb8: [228, 208, 164] } },
+    up: {},
+    swatches: { glass_lit: { emission_permille: 1000 } },
+    edge: { ground: [70, 134, 160] },
+  };
+  const cozy = JSON.parse(readFileSync(`${PACKS}/exulanica.cozy-town/manifest.json`, 'utf8')) as {
+    light: { presets: Record<string, { sun: { elevation_mdeg: number } }> };
+  };
+  const stated = { document: SETTING, sha256: 'e'.repeat(64), parts: SETTING.parts };
+
+  it('goes with the pack the world names, and with nothing the address or the default chose', () => {
+    const bound = { packId: 'exulanica.cozy-town', version: 3, manifestSha256: 'a'.repeat(64), setting: stated };
+    expect(worldLookChoice('', bound)).toEqual({ packId: 'exulanica.cozy-town', manifestSha256: 'a'.repeat(64), source: 'world', setting: SETTING });
+    expect(worldLookChoice('?look=toon', bound)).toEqual({ packId: 'exulanica.toon-town', manifestSha256: null, source: 'address' });
+    // A world drawn as its pack states names no setting at all.
+    expect('setting' in worldLookChoice('', { packId: 'exulanica.cozy-town', version: 3, manifestSha256: 'a'.repeat(64) })).toBe(false);
+    // An own look that may no longer be worn is drawn in its base, and the setting goes with it.
+    const base = { packId: 'exulanica.cozy-town', version: 3, manifestSha256: 'c'.repeat(64) };
+    const own = { packId: 'generated.cozy-town', version: 2, manifestSha256: 'd'.repeat(64), own: { base, wearable: false }, setting: stated };
+    expect(worldLookChoice('', own)).toEqual({ packId: base.packId, manifestSha256: base.manifestSha256, source: 'world', setting: SETTING });
+  });
+
+  it('is drawn over the pack: its light, the ground beyond, the roles it colours and the swatches it restates', async () => {
+    vi.stubGlobal('fetch', host(committedLibrary(), []));
+    const plain = await prepareWorldLook(ACCESS, 'exulanica.cozy-town', TEXTURES, []);
+    const prepared = await prepareWorldLook(ACCESS, 'exulanica.cozy-town', TEXTURES, [], null, null, SETTING);
+    expect(plain.setting).toBeNull();
+    expect(prepared.setting).toEqual({ drawn: true, reason: null });
+    // The committed evening preset's sun, read from the file, not the day's.
+    expect(cozy.light.presets['evening']!.sun.elevation_mdeg).not.toBe(cozy.light.presets['day']!.sun.elevation_mdeg);
+    expect(prepared.look.sun.elevationDeg).toBe(cozy.light.presets['evening']!.sun.elevation_mdeg / 1000);
+    expect(plain.look.sun.elevationDeg).toBe(cozy.light.presets['day']!.sun.elevation_mdeg / 1000);
+    expect(prepared.pack.edge!.ground).toEqual([70, 134, 160]);
+    expect(prepared.pack.swatches.get('glass_lit')!.emission_permille).toBe(1000);
+    const ground = prepared.pack.surfaces['ground.default']!;
+    expect('swatch' in ground && prepared.pack.swatches.get(ground.swatch)!.srgb8).toEqual([228, 208, 164]);
+    // The pieces are the pack's own: a setting states none.
+    expect(prepared.pieces.pieces.size).toBe(plain.pieces.pieces.size);
+  });
+
+  it('is never stood in for: one the pack cannot be drawn in leaves the world as its pack states, and says why', async () => {
+    vi.stubGlobal('fetch', host(committedLibrary(), []));
+    const refused = await prepareWorldLook(ACCESS, 'exulanica.finished-town', TEXTURES, [], null, null, SETTING);
+    // Finished town states no lit glass, so Cozy town's setting does not read over it.
+    expect(refused.setting!.drawn).toBe(false);
+    expect(refused.setting!.reason).toContain('swatches.glass_lit');
+    const plain = await prepareWorldLook(ACCESS, 'exulanica.finished-town', TEXTURES, []);
+    expect(refused.look).toEqual(plain.look);
+    expect(refused.pack.edge).toEqual(plain.pack.edge);
+  });
+});
+
+describe('the named parts a host lists for a setting', () => {
+  const list = (settings: unknown) => vi.fn(async () => new Response(JSON.stringify({ profile: STYLE_PACK_LIST_PROFILE, packs: [], settings }), { status: 200 }));
+  const SETTINGS = {
+    profile: 'exulanica.world-setting-part-list/v1', version: 1,
+    axes: [{ key: 'sky', title: 'Hour and sky' }],
+    parts: [
+      { axis: 'sky', key: 'dusk', title: 'Dusk', description: 'Evening.' },
+      { axis: 'weather', key: 'rain', title: 'Rain', description: 'An axis the list does not state.' },
+      { axis: 'sky', key: 'untitled' },
+    ],
+  };
+
+  it('are read with their words, a part of no listed axis or with no title passed over', async () => {
+    vi.stubGlobal('fetch', list(SETTINGS));
+    expect(await listedSettings(ACCESS)).toEqual({
+      version: 1, axes: [{ key: 'sky', title: 'Hour and sky' }], parts: [{ axis: 'sky', key: 'dusk', title: 'Dusk', description: 'Evening.' }],
+    });
+  });
+
+  it('are none from a host that lists none, or lists them in another profile', async () => {
+    vi.stubGlobal('fetch', list(undefined));
+    expect(await listedSettings(ACCESS)).toBeNull();
+    vi.stubGlobal('fetch', list({ ...SETTINGS, profile: 'exulanica.world-setting-part-list/v2' }));
+    expect(await listedSettings(ACCESS)).toBeNull();
   });
 });

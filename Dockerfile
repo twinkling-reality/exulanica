@@ -93,11 +93,13 @@ COPY assets/textures/blobs /app/assets/textures/blobs
 COPY assets/catalogs /app/assets/catalogs
 # The committed style pack library, every earlier version included, which the API reads and holds
 # to its digests when it starts and serves at /world/style-packs
-# (exulanica/world/style_pack_library.py). About 2.2 MiB.
-# `tests/test_image_ships_startup_reads.py` holds this line to what loading the library reads.
+# (exulanica/world/style_pack_library.py), and beside it the rules and named parts a world's
+# setting is checked against and composed from (exulanica/world/world_settings.py). About 2.4 MiB.
+# `tests/test_image_ships_startup_reads.py` holds this line to what loading each reads.
 COPY assets/style-packs /app/assets/style-packs
 # The colour table a style pack's pieces encode their swatches in, which the asset preparation
-# process's style pack check reads when it starts (exulanica/world/style_pack_checks.py). 1.6 KiB.
+# process's style pack check reads when it starts (exulanica/world/style_pack_checks.py) and the
+# API reads to hold a world's setting to its legibility rules. 1.6 KiB.
 COPY assets/colour /app/assets/colour
 # The character catalogs the image publishes (`exulanica-character-catalog publish --apply`, which
 # every serving database runs after `exulanica-db`, as the `catalogs` jobs do): the people and the

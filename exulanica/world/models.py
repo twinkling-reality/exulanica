@@ -67,6 +67,11 @@ class StylePackBinding:
     ``base`` and ``wearable`` are read beside a workspace version and are not part of what the
     appearance names: the library version it is drawn on, and whether it may still be worn. A world
     whose own version may no longer be worn is drawn in that base.
+
+    ``setting`` is the world's own setting drawn over the pack
+    (:mod:`exulanica.world.world_settings`), as its canonical JSON, or None for a world drawn as
+    the pack states. It is part of what the appearance names and is kept apart from the pack's
+    identity: two bindings of one pack are the same pack whatever setting each states.
     """
 
     pack_id: str
@@ -75,6 +80,7 @@ class StylePackBinding:
     source: str = "library"
     base: StylePackBinding | None = field(default=None, compare=False)
     wearable: bool | None = field(default=None, compare=False)
+    setting: str | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True, slots=True)

@@ -122,6 +122,8 @@ export interface GeneratedWorld {
     readonly source: 'address' | 'world' | 'default' | 'redraw';
     readonly drawn: boolean;
     readonly reason: string | null;
+    /** The world's own setting, stated only for a world that has one: whether it was drawn, and why not. */
+    readonly setting?: { readonly drawn: boolean; readonly reason: string | null };
   };
   /** The bodies its traffic takes from its pack while its tiles are attached, if any. */
   readonly bodies: () => VehicleBodies | null;
@@ -283,7 +285,7 @@ export async function loadGeneratedWorld(
       ? Promise.resolve(null)
       : worldLook.prepareWorldLook(
         access, choice.packId, library.textureManifest, containers.map((one) => one.bytes), choice.manifestSha256,
-        choice.ownBase ?? null,
+        choice.ownBase ?? null, choice.setting ?? null,
       )
   );
   /** The world's tiles in a prepared pack's light and dressed by it, or in the tile look. */
@@ -291,6 +293,10 @@ export async function loadGeneratedWorld(
     const dressed = prepared === null ? null : worldLook.inWorldLook(plain, prepared);
     return { tile: dressed?.tile ?? plain, bodies: dressed?.bodies ?? (() => null) };
   };
+  /** What a prepared look says of the world's own setting, for the look's state; nothing for a world with none. */
+  const settingOf = (one: Prepared | null): { readonly setting?: { readonly drawn: boolean; readonly reason: string | null } } => (
+    one === null || one.setting === null ? {} : { setting: one.setting }
+  );
   let choice = worldLook.worldLookChoice(search, bound);
   let prepared: Prepared | null = null;
   let reason: string | null = null;
@@ -336,7 +342,7 @@ export async function loadGeneratedWorld(
   return {
     tile: { ...loaded, start },
     ground,
-    look: { pack: choice.packId, source: choice.source, drawn: prepared !== null, reason },
+    look: { pack: choice.packId, source: choice.source, drawn: prepared !== null, reason, ...settingOf(prepared) },
     bodies: drawn.bodies,
     async relook(asked) {
       const next = await resolved(asked);
@@ -347,7 +353,7 @@ export async function loadGeneratedWorld(
       return {
         tile: { ...again.tile, start },
         bodies: again.bodies,
-        look: { pack: next.packId, source: next.source, drawn: nextPrepared !== null, reason: null },
+        look: { pack: next.packId, source: next.source, drawn: nextPrepared !== null, reason: null, ...settingOf(nextPrepared) },
       };
     },
   };

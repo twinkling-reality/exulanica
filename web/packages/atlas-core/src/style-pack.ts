@@ -358,6 +358,12 @@ function lightPreset(value: Json, path: string): StylePackLightPreset {
   }) as unknown as StylePackLightPreset;
 }
 
+/**
+ * The reader's own rules, for the world setting reader (`world-setting.ts`), which holds a setting
+ * to them rather than restating a range. Not for any other caller.
+ */
+export const stylePackReading = { object, optional, integer, oneOf, literal, pattern, text, nullable, srgb8, list, record, lightPreset, KEY } as const;
+
 function provenance(value: Json, path: string): StylePackProvenance {
   const kind = value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>)['kind'] : undefined;
   switch (kind) {

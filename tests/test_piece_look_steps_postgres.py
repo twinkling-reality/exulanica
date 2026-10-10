@@ -31,14 +31,20 @@ import pytest
 from exulanica.generation import apply, store
 from exulanica.generation.apply import REFERENCE_PREFIX, LookStepper
 from exulanica.generation.looks import GeneratedVariant, build_derived_look
-from exulanica.world import InvalidStyleData, ProposalOrigin, ProposalProvenance, StyleScope
+from exulanica.world import (
+    InvalidStyleData,
+    ProposalOrigin,
+    ProposalProvenance,
+    StyleScope,
+    world_settings,
+)
 from exulanica.world.errors import StyleWriteBusy
 from exulanica.world.models import StylePackBinding
 from exulanica.world.repository import WorldStyleRepository
 from exulanica.world.saved_entries import SavedWorldEntryRepository
 from exulanica.world.style_pack_checks import StylePackCheckWorker, colour_table, library_palettes
 from exulanica.world.style_pack_library import style_pack_library
-from exulanica.world.style_packs import load_context, read_manifest
+from exulanica.world.style_packs import canonical_json, load_context, read_manifest
 from exulanica.world.workspace_style_packs import (
     StylePackQuotaExceeded,
     WorkspaceStylePackRepository,
@@ -330,6 +336,46 @@ def test_passed_pieces_enter_the_world_s_look_once_checked_and_leave_on_request(
     )
     assert again is not None and again.document()["look_step"]["kind"] == "taken_back"
     assert len(world.packs.owner_rows("select 1 from piece_output")) == 2
+
+
+def test_a_world_keeps_its_own_setting_when_its_look_takes_pieces_in_and_gives_them_back(
+    world,
+) -> None:
+    """A setting is the world's own, not its look's: a look made of generated pieces states pieces
+    alone, so the setting is checked against the own look's manifests and drawn over it."""
+    cozy = json.loads(
+        (ROOT / "assets/style-packs/packs/exulanica.cozy-town/manifest.json").read_text("utf-8")
+    )
+    setting = canonical_json(
+        world_settings.compose_setting(
+            {"sky": "night", "cover": "snow"},
+            world_settings.resolve_chain([cozy]),
+            load_context(ROOT),
+            world_settings.setting_parts(),
+        )
+    )
+    world.wear(dataclasses.replace(COZY, setting=setting))
+    assert world.styles.current().style_pack.setting == setting
+
+    plant = world.made("plant.default")
+    world.step()
+    world.check()
+    assert world.step() == [world.world_id]
+    own = world.styles.current().style_pack
+    assert own is not None and (own.source, own.base) == ("workspace", COZY)
+    assert own.setting == setting
+    stored = world.packs.connection.execute(
+        "select style_pack_source, style_pack_setting from world_style_version "
+        "where version_id = %s",
+        (world.styles.current().version_id,),
+    ).fetchone()
+    assert stored["style_pack_source"] == "workspace"
+    assert stored["style_pack_setting"] == json.loads(setting)
+
+    store.ask_take_back(world.packs.connection, world.packs.workspace_id, plant, world.packs.actor)
+    assert world.step() == [world.world_id]
+    back = world.styles.current().style_pack
+    assert back == COZY and back.setting == setting
 
 
 def test_a_take_back_of_replaced_pieces_leaves_the_newer_ones(world) -> None:

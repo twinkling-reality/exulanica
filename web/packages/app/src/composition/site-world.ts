@@ -147,7 +147,7 @@ async function siteInLook(
       import('../texture-library.js').then((module) => module.committedTextureLibrary()),
       import('@exulanica/atlas-react/style-pack'),
     ]);
-    const prepared = await worldLook.prepareWorldLook(access, choice.packId, library.textureManifest, [], choice.manifestSha256);
+    const prepared = await worldLook.prepareWorldLook(access, choice.packId, library.textureManifest, [], choice.manifestSha256, null, choice.setting ?? null);
     const dress = packSiteDresser({ pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading });
     return siteMount(drawing, { servedBytes, look: prepared.look, dress });
   };

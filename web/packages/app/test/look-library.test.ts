@@ -4,10 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Credentials } from '../src/config.js';
 import type { ListedStylePack } from '../src/world-look.js';
 
-const listed = vi.hoisted(() => ({ packs: [] as ListedStylePack[], fetched: [] as string[] }));
+const listed = vi.hoisted(() => ({ packs: [] as ListedStylePack[], fetched: [] as string[], settings: null as unknown, settingsFail: false }));
 vi.mock('../src/world-look.js', async (original) => ({
   ...await original<typeof import('../src/world-look.js')>(),
   listedStylePacks: async () => listed.packs,
+  listedSettings: async () => {
+    if (listed.settingsFail) throw new Error('the list could not be read');
+    return listed.settings;
+  },
   stylePackContent: async (_access: Credentials, sha: string) => {
     listed.fetched.push(sha);
     return new Uint8Array([1, 2, 3]);
@@ -35,6 +39,8 @@ const bound = (packId: string, version: number, digest: string) => ({ packId, ve
 beforeEach(() => {
   listed.packs = [COZY, TOON];
   listed.fetched = [];
+  listed.settings = null;
+  listed.settingsFail = false;
 });
 
 describe('the looks the host serves', () => {
@@ -44,6 +50,20 @@ describe('the looks the host serves', () => {
       ['exulanica.cozy-town', 3, 'Shaded roads are grey again.'], ['exulanica.toon-town', 1, null],
     ]);
     expect(library.binding('exulanica.cozy-town')).toEqual(bound('exulanica.cozy-town', 3, sha('c')));
+  });
+});
+
+describe('the parts a setting is chosen from', () => {
+  const SETTINGS = { version: 1, axes: [{ key: 'sky', title: 'Hour and sky' }], parts: [{ axis: 'sky', key: 'dusk', title: 'Dusk', description: 'Evening.' }] };
+
+  it('are the host\'s, none from a host that lists none, and never the reason the looks cannot be read', async () => {
+    expect((await readLookLibrary(ACCESS)).settings).toBeNull();
+    listed.settings = SETTINGS;
+    expect((await readLookLibrary(ACCESS)).settings).toEqual(SETTINGS);
+    listed.settingsFail = true;
+    const library = await readLookLibrary(ACCESS);
+    expect(library.settings).toBeNull();
+    expect(library.options).toHaveLength(2);
   });
 });
 

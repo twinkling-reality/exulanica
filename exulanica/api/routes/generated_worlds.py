@@ -37,7 +37,7 @@ from exulanica.api.dependencies import (
     ScopedConnection,
     get_services,
 )
-from exulanica.api.routes.world import StylePackBody
+from exulanica.api.routes.world import StylePackBody, stated_style_pack
 from exulanica.api.routes.world_entries import SavedWorldEntryView, _view
 from exulanica.api.sayable import sayable
 from exulanica.api.services import Services
@@ -52,7 +52,7 @@ from exulanica.world.baked_tiles import (
 )
 from exulanica.world.composers import GeneratedWorldRefused, UnknownWorldComposer
 from exulanica.world.creation_look import name_creation_look
-from exulanica.world.errors import InvalidStructuralData, StyleWriteBusy
+from exulanica.world.errors import InvalidStructuralData, InvalidStyleData, StyleWriteBusy
 from exulanica.world.generated_worlds import generated_tiles
 from exulanica.world.models import StylePackBinding
 from exulanica.world.saved_entries import InvalidSavedWorldTitle, SavedWorldEntryRepository
@@ -159,15 +159,19 @@ def create_generated_world(
         return _problem(403, exc.code, str(exc))
     library = style_pack_library()
     named = body.style_pack
-    pack = (
-        StylePackBinding(
-            library.default_pack.pack_id,
-            library.default_pack.version,
-            library.default_pack.manifest_sha256,
+    try:
+        pack = (
+            StylePackBinding(
+                library.default_pack.pack_id,
+                library.default_pack.version,
+                library.default_pack.manifest_sha256,
+            )
+            if named is None
+            else stated_style_pack(named)
         )
-        if named is None
-        else StylePackBinding(named.pack_id, named.version, named.manifest_sha256)
-    )
+    except InvalidStyleData as refused:
+        # Before anything is made: a setting the named look cannot be drawn in makes no world.
+        return _problem(422, "invalid_style_data", str(refused))
     if not library.holds(pack.pack_id, pack.version, pack.manifest_sha256):
         return _problem(
             422,

@@ -1,0 +1,3400 @@
+{
+ "profile": "exulanica.world-setting-cases/v1",
+ "about": "Every case the world setting readers run: the Python reader (exulanica/world/world_settings.py) and the browser's (web/packages/atlas-core/src/world-setting.ts) read each setting and apply it to its pack, and must reach the same verdict: the same refusal reason and path, or the same digest of the setting and of the pack as drawn. The look families and texture sets are the style pack cases' (assets/style-packs/manifest-cases.v1.json context).",
+ "packs": {
+  "town": [
+   {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-town",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": null,
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       }
+      },
+      "evening": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         74,
+         91,
+         145
+        ],
+        "horizon": [
+         255,
+         185,
+         138
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 8000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         176,
+         112
+        ],
+        "intensity_permille": 1600,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": {
+     "ground": [
+      134,
+      196,
+      106
+     ],
+     "drop_mm": 600,
+     "reach_mm": 3000000
+    },
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "paving",
+       "srgb8": [
+        221,
+        211,
+        194
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "asphalt",
+       "srgb8": [
+        94,
+        92,
+        89
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "paint",
+       "srgb8": [
+        255,
+        255,
+        255
+       ],
+       "roughness_permille": 800,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "glass_lit",
+       "srgb8": [
+        255,
+        207,
+        138
+       ],
+       "roughness_permille": 300,
+       "metalness_permille": 0,
+       "emission_permille": 450
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway_paving": {
+      "swatch": "paving",
+      "up": null
+     },
+     "road.carriageway_asphalt": {
+      "swatch": "asphalt",
+      "up": null
+     },
+     "road.road_paint_white": {
+      "swatch": "paint",
+      "up": null
+     },
+     "ground.tree_pit_soil": {
+      "texture_set": "cc0.brick-running-bond",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     }
+    ]
+   }
+  ],
+  "edgeless": [
+   {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-edgeless",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": null,
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       }
+      },
+      "evening": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         74,
+         91,
+         145
+        ],
+        "horizon": [
+         255,
+         185,
+         138
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 8000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         176,
+         112
+        ],
+        "intensity_permille": 1600,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": null,
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "paving",
+       "srgb8": [
+        221,
+        211,
+        194
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "asphalt",
+       "srgb8": [
+        94,
+        92,
+        89
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "paint",
+       "srgb8": [
+        255,
+        255,
+        255
+       ],
+       "roughness_permille": 800,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "glass_lit",
+       "srgb8": [
+        255,
+        207,
+        138
+       ],
+       "roughness_permille": 300,
+       "metalness_permille": 0,
+       "emission_permille": 450
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway_paving": {
+      "swatch": "paving",
+      "up": null
+     },
+     "road.carriageway_asphalt": {
+      "swatch": "asphalt",
+      "up": null
+     },
+     "road.road_paint_white": {
+      "swatch": "paint",
+      "up": null
+     },
+     "ground.tree_pit_soil": {
+      "texture_set": "cc0.brick-running-bond",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     }
+    ]
+   }
+  ],
+  "taken": [
+   {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-taken",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": null,
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       }
+      },
+      "evening": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         74,
+         91,
+         145
+        ],
+        "horizon": [
+         255,
+         185,
+         138
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 8000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         176,
+         112
+        ],
+        "intensity_permille": 1600,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": {
+     "ground": [
+      134,
+      196,
+      106
+     ],
+     "drop_mm": 600,
+     "reach_mm": 3000000
+    },
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "paving",
+       "srgb8": [
+        221,
+        211,
+        194
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "asphalt",
+       "srgb8": [
+        94,
+        92,
+        89
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "paint",
+       "srgb8": [
+        255,
+        255,
+        255
+       ],
+       "roughness_permille": 800,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "glass_lit",
+       "srgb8": [
+        255,
+        207,
+        138
+       ],
+       "roughness_permille": 300,
+       "metalness_permille": 0,
+       "emission_permille": 450
+      },
+      {
+       "key": "setting_surface_0",
+       "srgb8": [
+        1,
+        2,
+        3
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "setting_up_7",
+       "srgb8": [
+        3,
+        2,
+        1
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway_paving": {
+      "swatch": "paving",
+      "up": null
+     },
+     "road.carriageway_asphalt": {
+      "swatch": "asphalt",
+      "up": null
+     },
+     "road.road_paint_white": {
+      "swatch": "paint",
+      "up": null
+     },
+     "ground.tree_pit_soil": {
+      "texture_set": "cc0.brick-running-bond",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     }
+    ]
+   }
+  ],
+  "flat": [
+   {
+    "profile": "exulanica.style-pack/v1",
+    "pack_id": "exulanica.case-flat",
+    "version": 1,
+    "title": "Case town",
+    "description": "A pack the readers' shared cases are built from.",
+    "tags": [
+     "toon",
+     "case"
+    ],
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "licence": {
+     "id": "CC0-1.0",
+     "attribution": null
+    },
+    "authors": [
+     "Exulanica"
+    ],
+    "preview": null,
+    "base": null,
+    "light": {
+     "default_preset": "day",
+     "presets": {
+      "day": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         59,
+         130,
+         220
+        ],
+        "horizon": [
+         207,
+         233,
+         251
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 50000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         245,
+         230
+        ],
+        "intensity_permille": 2100,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       }
+      },
+      "evening": {
+       "exposure_permille": 920,
+       "tone_mapping": "neutral",
+       "sky": {
+        "zenith": [
+         74,
+         91,
+         145
+        ],
+        "horizon": [
+         255,
+         185,
+         138
+        ],
+        "ground": [
+         134,
+         196,
+         106
+        ],
+        "bounce_ground": [
+         181,
+         178,
+         168
+        ],
+        "intensity_permille": 1000,
+        "sun_glow_permille": 250,
+        "sun_disc_permille": 30000,
+        "clouds": {
+         "cover_permille": 420,
+         "colour": [
+          255,
+          255,
+          255
+         ],
+         "shade": [
+          205,
+          220,
+          240
+         ],
+         "scale_permille": 1200,
+         "seed": 3
+        },
+        "face_texels": 128
+       },
+       "fog": {
+        "kind": "exp2",
+        "density_micro": 300,
+        "colour": [
+         214,
+         236,
+         250
+        ]
+       },
+       "sun": {
+        "elevation_mdeg": 8000,
+        "azimuth_mdeg": 150000,
+        "colour": [
+         255,
+         176,
+         112
+        ],
+        "intensity_permille": 1600,
+        "shadow": {
+         "filter": "pcf1"
+        }
+       },
+       "environment": {
+        "intensity_permille": 850
+       },
+       "contact_shadow": {
+        "mode": "lighting",
+        "radius_mm": 600,
+        "intensity_permille": 50
+       },
+       "post": {
+        "bloom": {
+         "intensity_permille": 12,
+         "blur_level": 16
+        },
+        "grading": {
+         "brightness_permille": 1000,
+         "contrast_permille": 1050,
+         "saturation_permille": 1060,
+         "tint": [
+          255,
+          255,
+          255
+         ]
+        },
+        "enhance": {
+         "shadows_permille": 60,
+         "highlights_permille": -50,
+         "midtones_permille": 0,
+         "vibrance_permille": 80,
+         "dehaze_permille": 0
+        },
+        "vignette": {
+         "intensity_permille": 160,
+         "inner_permille": 550,
+         "outer_permille": 1250,
+         "curvature_permille": 600,
+         "colour": [
+          0,
+          0,
+          0
+         ]
+        },
+        "taa": false
+       }
+      }
+     }
+    },
+    "shading": {
+     "model": "toon",
+     "toon": {
+      "shadow_edge_permille": 110,
+      "light_edge_permille": 570,
+      "band_share_permille": 720,
+      "softness_permille": 60
+     },
+     "ink": [
+      39,
+      48,
+      74
+     ]
+    },
+    "edge": {
+     "ground": [
+      134,
+      196,
+      106
+     ],
+     "drop_mm": 600,
+     "reach_mm": 3000000
+    },
+    "palette": {
+     "encoding": "exulanica.srgb8-linear16/v1",
+     "swatches": [
+      {
+       "key": "brick",
+       "srgb8": [
+        216,
+        105,
+        75
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "cream",
+       "srgb8": [
+        243,
+        226,
+        194
+       ],
+       "roughness_permille": 850,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "roof_tile",
+       "srgb8": [
+        242,
+        230,
+        208
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "paving",
+       "srgb8": [
+        221,
+        211,
+        194
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "asphalt",
+       "srgb8": [
+        94,
+        92,
+        89
+       ],
+       "roughness_permille": 900,
+       "metalness_permille": 0,
+       "emission_permille": 0
+      },
+      {
+       "key": "glass_lit",
+       "srgb8": [
+        255,
+        207,
+        138
+       ],
+       "roughness_permille": 300,
+       "metalness_permille": 0,
+       "emission_permille": 450
+      }
+     ]
+    },
+    "surfaces": {
+     "wall.brick_running_bond": {
+      "swatch": "brick",
+      "up": "roof_tile"
+     },
+     "wall.default": {
+      "swatch": "cream",
+      "up": null
+     },
+     "path.footway_paving": {
+      "swatch": "paving",
+      "up": null
+     },
+     "ground.tree_pit_soil": {
+      "texture_set": "cc0.brick-running-bond",
+      "up": null
+     },
+     "road.default": {
+      "swatch": "asphalt",
+      "up": null
+     }
+    },
+    "modules": {
+     "vehicle.car": {
+      "variants": [
+       {
+        "file": "pieces/car-a.glb",
+        "lod1": "pieces/car-a-far.glb",
+        "size_mm": [
+         4200,
+         1800,
+         1500
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       },
+       {
+        "file": "pieces/car-b.glb",
+        "lod1": null,
+        "size_mm": [
+         4600,
+         1900,
+         1600
+        ],
+        "stretch_mm": [
+         null,
+         null,
+         null
+        ]
+       }
+      ]
+     },
+     "window.default": {
+      "variants": [
+       {
+        "file": "pieces/window.glb",
+        "lod1": null,
+        "size_mm": [
+         1000,
+         120,
+         1600
+        ],
+        "stretch_mm": [
+         [
+          60,
+          940
+         ],
+         [
+          40,
+          80
+         ],
+         [
+          60,
+          1540
+         ]
+        ]
+       }
+      ]
+     }
+    },
+    "files": [
+     {
+      "path": "pieces/car-a-far.glb",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bytes": 8000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-a.glb",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bytes": 120000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/car-b.glb",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "bytes": 130000,
+      "media_type": "model/gltf-binary"
+     },
+     {
+      "path": "pieces/window.glb",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "bytes": 30000,
+      "media_type": "model/gltf-binary"
+     }
+    ]
+   }
+  ]
+ },
+ "cases": [
+  {
+   "name": "a setting that changes nothing",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "sha256": "3bd4f2bb730abf66611c940fa14d5cd3ddb971bdd375689968d3b8de47127041",
+    "drawn_sha256": "6e5777301a365c27e61e47bac8ddf1b5fa7608c41d2664ebb70c1497177317f4"
+   }
+  },
+  {
+   "name": "a sky: the day preset with its sun, sky, clouds and fog changed",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 980,
+      "sun.elevation_mdeg": 7000,
+      "sun.azimuth_mdeg": 96000,
+      "sun.colour": [
+       255,
+       190,
+       150
+      ],
+      "sun.intensity_permille": 1300,
+      "sky.zenith": [
+       140,
+       162,
+       202
+      ],
+      "sky.clouds": {
+       "cover_permille": 420,
+       "colour": [
+        255,
+        226,
+        214
+       ],
+       "shade": [
+        170,
+        150,
+        170
+       ],
+       "scale_permille": 1100,
+       "seed": 21
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        228,
+        212,
+        214
+       ],
+       "density_micro": 5200
+      },
+      "post.bloom": null,
+      "post.grading.tint": [
+       255,
+       240,
+       240
+      ]
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "sha256": "fabde8a75fc74f4d058f2d952fdaede16b80875cceb7cfc5cc5f29a0a83cc024",
+    "drawn_sha256": "83ff3d329544dcbd936b1aa8dd420207eb1e248278d355d0c5a313d3e4b373cb"
+   }
+  },
+  {
+   "name": "the look's own evening preset, unchanged",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": {
+     "from": "evening",
+     "changes": {}
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "sha256": "d78c3810b4b5d0ec2c2b989fc5e8cd8b1c3b1faf58f674d3224ec6ae688f555a",
+    "drawn_sha256": "528cd89a73f98b6d17b2705ed3ed698bc5b98fc863319d7528dfcb2bbcae0b3b"
+   }
+  },
+  {
+   "name": "roles coloured: one the look colours, one it draws from a texture set, one it leaves undressed",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {
+     "wall.default": {
+      "srgb8": [
+       244,
+       176,
+       170
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       228,
+       208,
+       164
+      ]
+     },
+     "ground.default": {
+      "srgb8": [
+       228,
+       208,
+       164
+      ],
+      "emission_permille": 0
+     },
+     "roof.default": {
+      "srgb8": [
+       240,
+       244,
+       250
+      ],
+      "emission_permille": 120
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "sha256": "484a7b9e315d9e10b01d29f6fcd98415f5667c012fd9ff0b07083ebd52752330",
+    "drawn_sha256": "7490961542d62a2c86377656782b0733f57bcc9fde271409972bb660aad6d1e1"
+   }
+  },
+  {
+   "name": "upward faces: snow on one wall, none on another, snow on a role the setting itself colours",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     }
+    },
+    "up": {
+     "wall.default": [
+      240,
+      244,
+      250
+     ],
+     "wall.brick_running_bond": null,
+     "path.footway_paving": [
+      240,
+      244,
+      250
+     ]
+    },
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "sha256": "f7aeae7f5594a4f4488ae3871479a5bc51a72a14b3c7fc842e16a7ead4601936",
+    "drawn_sha256": "4885f47163c7f11e51a9cf7a4f0575ba071f44884a84702303b772113732fd3b"
+   }
+  },
+  {
+   "name": "swatches restated: an emission alone, a colour alone, both",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {
+     "glass_lit": {
+      "emission_permille": 1000
+     },
+     "brick": {
+      "srgb8": [
+       128,
+       84,
+       74
+      ]
+     },
+     "paint": {
+      "srgb8": [
+       200,
+       255,
+       250
+      ],
+      "emission_permille": 300
+     }
+    },
+    "edge": null
+   },
+   "expect": {
+    "sha256": "9e45e664498567101d45bfacca119c52ac862cf2a6c8c47d226e2356906c9515",
+    "drawn_sha256": "80c056a80aaed97be34494c53d3497c5676ed3373f7994384f6858c7b00b5214"
+   }
+  },
+  {
+   "name": "the ground beyond the world",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      70,
+      134,
+      160
+     ]
+    }
+   },
+   "expect": {
+    "sha256": "fb3b5ee24ae63fbd2df4d486d9a15315e382b7ab548e0ed94ba5c004bf0e500e",
+    "drawn_sha256": "2d29133bfab8645eb1a4f8613970921c97989349fa1b736089e1c7fa873df23c"
+   }
+  },
+  {
+   "name": "a drafted setting of two named parts",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "drafted",
+    "provenance": {
+     "kind": "drafted",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "prompt_version": "setting-choosing-1",
+     "execution_id": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "dusk"
+     },
+     {
+      "axis": "ground",
+      "key": "sea"
+     }
+    ],
+    "light": {
+     "from": "evening",
+     "changes": {}
+    },
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       228,
+       208,
+       164
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      70,
+      134,
+      160
+     ]
+    }
+   },
+   "expect": {
+    "sha256": "ae50ab1fdb8b21529d89b2c7ca9f1063c26258cb4b2988bd8e819a135c8d9575",
+    "drawn_sha256": "e256516c435c28f21989a67247c5b848faf5b20f65867376d86ba34a452f8405"
+   }
+  },
+  {
+   "name": "a wall coloured over a look that draws crossing paint as its carriageway",
+   "pack": "flat",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {
+     "wall.default": {
+      "srgb8": [
+       244,
+       176,
+       170
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "sha256": "1638d4f9f46ca318f68de0d8ef2763676c180d59e60acb5258bc5c014d454871",
+    "drawn_sha256": "b6235e517d3b07bdf8f8d8ec647888c28d49bb8e14a7dd209a2770aecfe30a90"
+   }
+  },
+  {
+   "name": "a swatch restated as the colour it has, over a look that draws crossing paint as its carriageway",
+   "pack": "flat",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {
+     "asphalt": {
+      "srgb8": [
+       94,
+       92,
+       89
+      ]
+     }
+    },
+    "edge": null
+   },
+   "expect": {
+    "sha256": "d22eac98bf22e896790ed730bae08f1a3ce4b35e6c0e20393aa1f6661d68a623",
+    "drawn_sha256": "d521425e5597465ecefe815a6dc8cc37d40f058752f34812d710c85757f45fbc"
+   }
+  },
+  {
+   "name": "a footway and a carriageway a quarter apart, the least a setting may leave",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {
+     "paving": {
+      "srgb8": [
+       107,
+       107,
+       107
+      ]
+     }
+    },
+    "edge": null
+   },
+   "expect": {
+    "sha256": "9e0958608937adb4d194d5c6acf7f58b1c3c959f80c99b20960581f3dd3d6102",
+    "drawn_sha256": "44499e04593e20686b9ab0ef5841ed756678e6b54f74dfaace560e5a262139eb"
+   }
+  },
+  {
+   "name": "an unknown key at the top",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null,
+    "weather": "rain"
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": ""
+   }
+  },
+  {
+   "name": "another profile",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v2",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "profile"
+   }
+  },
+  {
+   "name": "no edge field",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {}
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": ""
+   }
+  },
+  {
+   "name": "an origin a setting cannot have",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "uploaded",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "range",
+    "path": "origin"
+   }
+  },
+  {
+   "name": "a provenance that is not the origin",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "drafted",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "provenance.kind"
+   }
+  },
+  {
+   "name": "a drafted setting that keeps a digest of the person's words",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "drafted",
+    "provenance": {
+     "kind": "drafted",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "prompt_version": "setting-choosing-1",
+     "execution_id": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+     "words_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "provenance"
+   }
+  },
+  {
+   "name": "a drafted setting whose model id is a sentence",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "drafted",
+    "provenance": {
+     "kind": "drafted",
+     "model_id": "a pink seaside town at dawn",
+     "prompt_version": "setting-choosing-1",
+     "execution_id": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "provenance.model_id"
+   }
+  },
+  {
+   "name": "a drafted setting whose prompt version is a sentence",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "drafted",
+    "provenance": {
+     "kind": "drafted",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "prompt_version": "Pink houses",
+     "execution_id": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "provenance.prompt_version"
+   }
+  },
+  {
+   "name": "a drafted setting whose execution id is a sentence",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "drafted",
+    "provenance": {
+     "kind": "drafted",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "prompt_version": "setting-choosing-1",
+     "execution_id": "my own words"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "provenance.execution_id"
+   }
+  },
+  {
+   "name": "a drafted setting whose execution id is not the shape the host writes one in",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "drafted",
+    "provenance": {
+     "kind": "drafted",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "prompt_version": "setting-choosing-1",
+     "execution_id": "run-7"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "provenance.execution_id"
+   }
+  },
+  {
+   "name": "a drafted setting whose model id has the shape of a digest",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "drafted",
+    "provenance": {
+     "kind": "drafted",
+     "model_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "prompt_version": "setting-choosing-1",
+     "execution_id": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "provenance.model_id"
+   }
+  },
+  {
+   "name": "a drafted setting whose prompt version has the shape of a digest",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "drafted",
+    "provenance": {
+     "kind": "drafted",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "prompt_version": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "execution_id": "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "provenance.prompt_version"
+   }
+  },
+  {
+   "name": "a part of an axis the rules do not list",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "weather",
+      "key": "rain"
+     }
+    ],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "parts[0].axis"
+   }
+  },
+  {
+   "name": "a part the rules do not list for its axis",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "aurora"
+     }
+    ],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "parts[0].key"
+   }
+  },
+  {
+   "name": "a part named by something that is no part: a caller's own word",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "sea"
+     },
+     {
+      "axis": "sky",
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    ],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "parts[1].key"
+   }
+  },
+  {
+   "name": "two parts of one axis",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "dusk"
+     },
+     {
+      "axis": "sky",
+      "key": "night"
+     }
+    ],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "duplicate",
+    "path": "parts[1].axis"
+   }
+  },
+  {
+   "name": "nine parts",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "axis_0",
+      "key": "one"
+     },
+     {
+      "axis": "axis_1",
+      "key": "one"
+     },
+     {
+      "axis": "axis_2",
+      "key": "one"
+     },
+     {
+      "axis": "axis_3",
+      "key": "one"
+     },
+     {
+      "axis": "axis_4",
+      "key": "one"
+     },
+     {
+      "axis": "axis_5",
+      "key": "one"
+     },
+     {
+      "axis": "axis_6",
+      "key": "one"
+     },
+     {
+      "axis": "axis_7",
+      "key": "one"
+     },
+     {
+      "axis": "axis_8",
+      "key": "one"
+     }
+    ],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "range",
+    "path": "parts"
+   }
+  },
+  {
+   "name": "a change to the sun's shadow filter, which is the look's",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": {
+     "from": "day",
+     "changes": {
+      "sun.shadow": {
+       "filter": "pcf1"
+      }
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "light.changes.sun.shadow"
+   }
+  },
+  {
+   "name": "a change to a whole section",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": {
+     "from": "day",
+     "changes": {
+      "sun": {}
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "light.changes.sun"
+   }
+  },
+  {
+   "name": "a preset the look does not state",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": {
+     "from": "noon",
+     "changes": {}
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "light.from"
+   }
+  },
+  {
+   "name": "a sun below the horizon a look may state",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": {
+     "from": "day",
+     "changes": {
+      "sun.elevation_mdeg": 1000
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "range",
+    "path": "light.changes.sun.elevation_mdeg"
+   }
+  },
+  {
+   "name": "a fog of no kind",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": {
+     "from": "day",
+     "changes": {
+      "fog": {
+       "kind": "smoke",
+       "colour": [
+        1,
+        2,
+        3
+       ]
+      }
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "range",
+    "path": "light.changes.fog.kind"
+   }
+  },
+  {
+   "name": "a fraction",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 980.5
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "light.changes.exposure_permille"
+   }
+  },
+  {
+   "name": "clouds missing their seed",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": {
+     "from": "day",
+     "changes": {
+      "sky.clouds": {
+       "cover_permille": 1,
+       "colour": [
+        1,
+        1,
+        1
+       ],
+       "shade": [
+        2,
+        2,
+        2
+       ],
+       "scale_permille": 900
+      }
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "light.changes.sky.clouds"
+   }
+  },
+  {
+   "name": "a night too dark to see a person in",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1150,
+      "sun.elevation_mdeg": 42000,
+      "sun.colour": [
+       150,
+       176,
+       255
+      ],
+      "sun.intensity_permille": 520,
+      "sky.zenith": [
+       8,
+       12,
+       34
+      ],
+      "sky.horizon": [
+       34,
+       42,
+       78
+      ],
+      "sky.intensity_permille": 450,
+      "environment.intensity_permille": 420
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "legibility",
+    "path": "light"
+   }
+  },
+  {
+   "name": "a swatch the look does not state",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {
+     "neon": {
+      "emission_permille": 900
+     }
+    },
+    "edge": null
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "swatches.neon"
+   }
+  },
+  {
+   "name": "a swatch restated as nothing",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {
+     "brick": {}
+    },
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "swatches.brick"
+   }
+  },
+  {
+   "name": "a swatch key that is no key",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {
+     "Brick": {
+      "emission_permille": 1
+     }
+    },
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "swatches.Brick"
+   }
+  },
+  {
+   "name": "a role of a family pieces dress",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {
+     "door.default": {
+      "srgb8": [
+       1,
+       2,
+       3
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "surfaces.door.default"
+   }
+  },
+  {
+   "name": "a role of no family",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {
+     "cloud.default": {
+      "srgb8": [
+       1,
+       2,
+       3
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "surfaces.cloud.default"
+   }
+  },
+  {
+   "name": "a key that is no look role",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {
+     "wall": {
+      "srgb8": [
+       1,
+       2,
+       3
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "surfaces.wall"
+   }
+  },
+  {
+   "name": "an emission past its range",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {
+     "wall.default": {
+      "srgb8": [
+       1,
+       2,
+       3
+      ],
+      "emission_permille": 1001
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "range",
+    "path": "surfaces.wall.default.emission_permille"
+   }
+  },
+  {
+   "name": "a colour of four bytes",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {
+     "wall.default": [
+      1,
+      2,
+      3,
+      4
+     ]
+    },
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "shape",
+    "path": "up.wall.default"
+   }
+  },
+  {
+   "name": "an upward face of a role nothing dresses",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {
+     "water.default": [
+      1,
+      2,
+      3
+     ]
+    },
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "up.water.default"
+   }
+  },
+  {
+   "name": "a footway one step nearer its carriageway than a setting may leave",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {
+     "paving": {
+      "srgb8": [
+       106,
+       106,
+       106
+      ]
+     }
+    },
+    "edge": null
+   },
+   "expect": {
+    "refusal": "legibility",
+    "path": "surfaces"
+   }
+  },
+  {
+   "name": "a footway the colour of its carriageway",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {
+     "path.footway_paving": {
+      "srgb8": [
+       94,
+       92,
+       89
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "legibility",
+    "path": "surfaces"
+   }
+  },
+  {
+   "name": "crossing paint the colour of its carriageway",
+   "pack": "town",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {
+     "paint": {
+      "srgb8": [
+       100,
+       98,
+       95
+      ]
+     }
+    },
+    "edge": null
+   },
+   "expect": {
+    "refusal": "legibility",
+    "path": "surfaces"
+   }
+  },
+  {
+   "name": "ground beyond a world whose look draws none",
+   "pack": "edgeless",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      70,
+      134,
+      160
+     ]
+    }
+   },
+   "expect": {
+    "refusal": "reference",
+    "path": "edge"
+   }
+  },
+  {
+   "name": "a coloured role over a look that states a setting's own swatch key",
+   "pack": "taken",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {
+     "wall.default": {
+      "srgb8": [
+       1,
+       2,
+       3
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "duplicate",
+    "path": "surfaces"
+   }
+  },
+  {
+   "name": "an upward face over a look that states a setting's own swatch key",
+   "pack": "taken",
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [],
+    "light": null,
+    "surfaces": {},
+    "up": {
+     "wall.default": [
+      1,
+      2,
+      3
+     ]
+    },
+    "swatches": {},
+    "edge": null
+   },
+   "expect": {
+    "refusal": "duplicate",
+    "path": "up"
+   }
+  }
+ ]
+}

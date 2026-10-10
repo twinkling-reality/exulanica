@@ -35,6 +35,7 @@ import type { WorldStylePackBinding } from './world-style-api.js';
 import lookFamilyText from '../../../../assets/catalogs/world-kinds/look-family.v1.json?raw';
 import townRolesText from '../../../../assets/style-packs/town-look-roles.v1.json?raw';
 import colourTableText from '../../../../assets/colour/srgb8-linear16.v1.json?raw';
+import settingRulesText from '../../../../assets/style-packs/settings/setting-rules.v1.json?raw';
 
 /** The profile of the host's list of committed packs. */
 export const STYLE_PACK_LIST_PROFILE = 'exulanica.style-pack-list/v1';
@@ -72,6 +73,8 @@ export interface WorldLookChoice {
   readonly source: 'address' | 'world' | 'default' | 'redraw';
   /** For the workspace's own look: the library pack it is drawn on. */
   readonly ownBase?: OwnLookBase;
+  /** The world's own setting drawn over the pack (`exulanica.world-setting/v1`), as its appearance states it. */
+  readonly setting?: unknown;
 }
 
 /** The library pack an own look is drawn on, exactly. */
@@ -85,15 +88,18 @@ export interface OwnLookBase {
 export function worldLookChoice(search: string, bound: WorldStylePackBinding | null): WorldLookChoice {
   const addressed = addressedWorldLook(search);
   if (addressed !== undefined) return { packId: addressed, manifestSha256: null, source: 'address' };
+  // The world's own setting goes with the pack its appearance names, and with that pack's base
+  // when its own look may no longer be worn; the address's look and the default state none.
+  const setting = bound?.setting === undefined ? {} : { setting: bound.setting.document };
   if (bound !== null && bound.own !== undefined) {
     const base = bound.own.base;
     if (bound.own.wearable && base !== null) {
-      return { packId: bound.packId, manifestSha256: bound.manifestSha256, source: 'world', ownBase: base };
+      return { packId: bound.packId, manifestSha256: bound.manifestSha256, source: 'world', ownBase: base, ...setting };
     }
-    if (base !== null) return { packId: base.packId, manifestSha256: base.manifestSha256, source: 'world' };
+    if (base !== null) return { packId: base.packId, manifestSha256: base.manifestSha256, source: 'world', ...setting };
     return { packId: DEFAULT_WORLD_LOOK, manifestSha256: null, source: 'default' };
   }
-  if (bound !== null) return { packId: bound.packId, manifestSha256: bound.manifestSha256, source: 'world' };
+  if (bound !== null) return { packId: bound.packId, manifestSha256: bound.manifestSha256, source: 'world', ...setting };
   return { packId: DEFAULT_WORLD_LOOK, manifestSha256: null, source: 'default' };
 }
 
@@ -163,6 +169,12 @@ export interface PreparedWorldLook {
   readonly slots: readonly OpeningSlot[];
   readonly style: typeof import('@exulanica/atlas-react/style-pack');
   readonly attachTileInk: typeof import('@exulanica/atlas-react/generated-tile').attachTileInk;
+  /**
+   * The world's own setting: null when it states none; else whether it was drawn, and when it was
+   * not, the reader's refusal. A setting the pack cannot be drawn in is never stood in for: the
+   * world is drawn as its pack states.
+   */
+  readonly setting: { readonly drawn: boolean; readonly reason: string | null } | null;
 }
 
 function lookFamilies(): ReadonlyMap<string, LookFamily> {
@@ -185,6 +197,34 @@ async function hostGet(access: Credentials, path: string, what: string): Promise
   });
   if (!response.ok) throw new Error(`${what} unavailable: HTTP ${response.status}`);
   return response;
+}
+
+/** The named parts a world's setting is chosen from, as the host lists them beside its packs. */
+export interface ListedSettings {
+  readonly version: number;
+  readonly axes: readonly { readonly key: string; readonly title: string }[];
+  readonly parts: readonly { readonly axis: string; readonly key: string; readonly title: string; readonly description: string }[];
+}
+
+/** The profile of the parts as the pack list states them. */
+export const SETTING_PART_LIST_PROFILE = 'exulanica.world-setting-part-list/v1';
+
+/**
+ * The named parts the host lists for a world's setting, or null from a host that lists none (one
+ * from before settings) or lists them in a profile this page does not read. Read leniently: a part
+ * missing its words is passed over, and nothing here refuses the pack list.
+ */
+export async function listedSettings(access: Credentials): Promise<ListedSettings | null> {
+  const list = await (await hostGet(access, '/world/style-packs', 'The style pack list')).json() as { settings?: unknown };
+  const stated = list.settings as { profile?: unknown; version?: unknown; axes?: unknown; parts?: unknown } | null | undefined;
+  if (stated == null || stated.profile !== SETTING_PART_LIST_PROFILE || !Array.isArray(stated.axes) || !Array.isArray(stated.parts)) return null;
+  const words = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
+  const axes = (stated.axes as { key?: unknown; title?: unknown }[]).filter((axis) => axis !== null && words(axis.key) && words(axis.title))
+    .map((axis) => ({ key: axis.key as string, title: axis.title as string }));
+  const parts = (stated.parts as { axis?: unknown; key?: unknown; title?: unknown; description?: unknown }[])
+    .filter((part) => part !== null && words(part.axis) && words(part.key) && words(part.title) && axes.some((axis) => axis.key === part.axis))
+    .map((part) => ({ axis: part.axis as string, key: part.key as string, title: part.title as string, description: words(part.description) ? part.description : '' }));
+  return { version: typeof stated.version === 'number' ? stated.version : 0, axes, parts };
 }
 
 /** The host's committed packs. */
@@ -240,6 +280,8 @@ export async function ownLookContent(access: Credentials, manifestSha256: string
  * check its pieces, and find the windows of the world's tile `containers`. `manifestSha256` names
  * the exact manifest a world's appearance names; without it the host's list names the current one.
  * With `ownBase`, `packId` is a version of the workspace's own pack drawn on that library pack.
+ * With `setting`, the world's own setting is read and applied over the resolved pack, so the light,
+ * the colours and the ground beyond are the setting's wherever it states them.
  */
 export async function prepareWorldLook(
   access: Credentials,
@@ -248,6 +290,7 @@ export async function prepareWorldLook(
   containers: readonly Uint8Array[],
   manifestSha256: string | null = null,
   ownBase: OwnLookBase | null = null,
+  setting: unknown = null,
 ): Promise<PreparedWorldLook> {
   let digest = manifestSha256;
   if (digest === null) {
@@ -260,7 +303,9 @@ export async function prepareWorldLook(
     ? [stylePackContent(access, digest, `${packId} manifest`).then((bytes) => JSON.parse(new TextDecoder().decode(bytes)) as unknown), Promise.resolve(null)]
     : [ownLookManifest(access, digest, packId), stylePackContent(access, ownBase.manifestSha256, `${ownBase.packId} manifest`)
       .then((bytes) => JSON.parse(new TextDecoder().decode(bytes)) as unknown)]);
-  const [style, { attachTileInk }, { canonicalJson, parseTextureSetManifest, readStylePackManifest, resolveStylePack }] = await Promise.all([
+  const [style, { attachTileInk }, {
+    canonicalJson, parseTextureSetManifest, readStylePackManifest, resolveStylePack, applyWorldSetting, readWorldSetting, readWorldSettingRules,
+  }] = await Promise.all([
     import('@exulanica/atlas-react/style-pack'),
     import('@exulanica/atlas-react/generated-tile'),
     import('@exulanica/atlas-core'),
@@ -286,7 +331,17 @@ export async function prepareWorldLook(
     }
     chain.push(base);
   }
-  const pack = resolveStylePack(chain);
+  let pack = resolveStylePack(chain);
+  let drawnSetting: PreparedWorldLook['setting'] = null;
+  if (setting !== null && setting !== undefined) {
+    try {
+      const rules = readWorldSettingRules(JSON.parse(settingRulesText), JSON.parse(colourTableText));
+      pack = applyWorldSetting(pack, readWorldSetting(setting, rules), families, rules);
+      drawnSetting = { drawn: true, reason: null };
+    } catch (error) {
+      drawnSetting = { drawn: false, reason: error instanceof Error ? error.message : String(error) };
+    }
+  }
   const look = renderLookOfPreset(pack.light.presets[pack.light.default_preset]!, pack.shading, pack.edge);
   const table = (JSON.parse(colourTableText) as { values: number[] }).values;
   const own = new Set(ownBase === null ? [] : read.files.map((file) => file.sha256));
@@ -296,7 +351,7 @@ export async function prepareWorldLook(
       : stylePackContent(access, file.sha256, `${packId} ${file.path}`)
   ));
   const slots = style.containerOpeningSlots(containers);
-  return { packId, pack, look, families, roles: JSON.parse(townRolesText) as TownLookRoles, pieces, slots, style, attachTileInk };
+  return { packId, pack, look, families, roles: JSON.parse(townRolesText) as TownLookRoles, pieces, slots, style, attachTileInk, setting: drawnSetting };
 }
 
 /** A world's tile drawn in a prepared pack, and the vehicle bodies its traffic takes while attached. */

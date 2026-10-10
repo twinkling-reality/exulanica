@@ -1,0 +1,679 @@
+{
+ "profile": "exulanica.world-setting-parts/v1",
+ "version": 1,
+ "about": "Named parts a person or a model chooses a world's setting from, one an axis, each stated for any look: a sky, the ground and what lies beyond, and a cover. The server composes the chosen parts into the exact setting for one look (exulanica/world/world_settings.py compose_setting), and the setting stores the figures, so a later version of this file never changes a world.",
+ "licence": {
+  "id": "CC0-1.0",
+  "origin": "authored",
+  "by": "Exulanica"
+ },
+ "axes": [
+  {
+   "key": "sky",
+   "title": "Hour and sky"
+  },
+  {
+   "key": "ground",
+   "title": "Ground and beyond"
+  },
+  {
+   "key": "cover",
+   "title": "Cover"
+  }
+ ],
+ "parts": [
+  {
+   "axis": "sky",
+   "key": "dawn_mist",
+   "title": "Dawn mist",
+   "description": "Early morning: a low pink sun and mist that hides the far end of a street.",
+   "reason": "Authored: figures judged from pictures of generated towns in the three shipped looks.",
+   "light": [
+    {
+     "from": null,
+     "changes": {
+      "exposure_permille": 980,
+      "sun.elevation_mdeg": 7000,
+      "sun.azimuth_mdeg": 96000,
+      "sun.colour": [
+       255,
+       190,
+       150
+      ],
+      "sun.intensity_permille": 1300,
+      "sky.zenith": [
+       140,
+       162,
+       202
+      ],
+      "sky.horizon": [
+       252,
+       204,
+       186
+      ],
+      "sky.ground": [
+       150,
+       160,
+       170
+      ],
+      "sky.bounce_ground": [
+       150,
+       140,
+       135
+      ],
+      "sky.intensity_permille": 800,
+      "sky.sun_glow_permille": 1500,
+      "sky.clouds": {
+       "cover_permille": 420,
+       "colour": [
+        255,
+        226,
+        214
+       ],
+       "shade": [
+        170,
+        150,
+        170
+       ],
+       "scale_permille": 1100,
+       "seed": 21
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        228,
+        212,
+        214
+       ],
+       "density_micro": 5200
+      },
+      "environment.intensity_permille": 700,
+      "post.bloom": {
+       "intensity_permille": 70,
+       "blur_level": 16
+      },
+      "post.grading.saturation_permille": 920,
+      "post.grading.tint": [
+       255,
+       240,
+       240
+      ]
+     }
+    }
+   ],
+   "surfaces": {},
+   "up_families": {},
+   "swatches": {},
+   "edge": null
+  },
+  {
+   "axis": "sky",
+   "key": "clear_noon",
+   "title": "Clear noon",
+   "description": "Midday under a clear blue sky: a high white sun and short hard shadows.",
+   "reason": "Authored: figures judged from pictures of generated towns in the three shipped looks.",
+   "light": [
+    {
+     "from": null,
+     "changes": {
+      "exposure_permille": 720,
+      "sun.elevation_mdeg": 76000,
+      "sun.azimuth_mdeg": 170000,
+      "sun.colour": [
+       255,
+       250,
+       238
+      ],
+      "sun.intensity_permille": 2400,
+      "sky.zenith": [
+       120,
+       160,
+       222
+      ],
+      "sky.horizon": [
+       236,
+       232,
+       222
+      ],
+      "sky.intensity_permille": 1000,
+      "sky.sun_glow_permille": 500,
+      "sky.clouds": {
+       "cover_permille": 60,
+       "colour": [
+        255,
+        255,
+        255
+       ],
+       "shade": [
+        205,
+        212,
+        224
+       ],
+       "scale_permille": 900,
+       "seed": 3
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        228,
+        226,
+        216
+       ],
+       "density_micro": 350
+      },
+      "environment.intensity_permille": 950,
+      "post.grading.saturation_permille": 1100,
+      "post.grading.contrast_permille": 1080
+     }
+    }
+   ],
+   "surfaces": {},
+   "up_families": {},
+   "swatches": {},
+   "edge": null
+  },
+  {
+   "axis": "sky",
+   "key": "dusk",
+   "title": "Dusk",
+   "description": "Evening: a low orange sun, long shadows and a sky turning pink.",
+   "reason": "Authored: the evening preset each shipped look states, and for a look that states none, figures judged from pictures of generated towns.",
+   "light": [
+    {
+     "from": "evening",
+     "changes": {}
+    },
+    {
+     "from": null,
+     "changes": {
+      "exposure_permille": 1000,
+      "sun.elevation_mdeg": 8000,
+      "sun.azimuth_mdeg": 250000,
+      "sun.colour": [
+       255,
+       176,
+       112
+      ],
+      "sun.intensity_permille": 1600,
+      "sky.zenith": [
+       74,
+       91,
+       145
+      ],
+      "sky.horizon": [
+       255,
+       185,
+       138
+      ],
+      "sky.intensity_permille": 900,
+      "sky.sun_glow_permille": 1400,
+      "sky.clouds": {
+       "cover_permille": 380,
+       "colour": [
+        255,
+        217,
+        191
+       ],
+       "shade": [
+        176,
+        127,
+        138
+       ],
+       "scale_permille": 900,
+       "seed": 11
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        232,
+        191,
+        163
+       ],
+       "density_micro": 1100
+      },
+      "environment.intensity_permille": 650
+     }
+    }
+   ],
+   "surfaces": {},
+   "up_families": {},
+   "swatches": {},
+   "edge": null
+  },
+  {
+   "axis": "sky",
+   "key": "overcast",
+   "title": "Overcast",
+   "description": "A grey day: the whole sky is cloud, the light is flat and colours are muted.",
+   "reason": "Authored: figures judged from pictures of generated towns in the three shipped looks.",
+   "light": [
+    {
+     "from": null,
+     "changes": {
+      "exposure_permille": 1000,
+      "sun.elevation_mdeg": 48000,
+      "sun.azimuth_mdeg": 200000,
+      "sun.colour": [
+       226,
+       230,
+       236
+      ],
+      "sun.intensity_permille": 450,
+      "sky.zenith": [
+       138,
+       146,
+       158
+      ],
+      "sky.horizon": [
+       186,
+       192,
+       198
+      ],
+      "sky.ground": [
+       120,
+       124,
+       122
+      ],
+      "sky.bounce_ground": [
+       128,
+       126,
+       122
+      ],
+      "sky.intensity_permille": 1000,
+      "sky.sun_glow_permille": 0,
+      "sky.sun_disc_permille": 0,
+      "sky.clouds": {
+       "cover_permille": 1000,
+       "colour": [
+        196,
+        200,
+        206
+       ],
+       "shade": [
+        118,
+        124,
+        136
+       ],
+       "scale_permille": 1400,
+       "seed": 44
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        178,
+        184,
+        190
+       ],
+       "density_micro": 2200
+      },
+      "environment.intensity_permille": 1050,
+      "post.grading.saturation_permille": 820,
+      "post.grading.contrast_permille": 980,
+      "post.grading.tint": [
+       236,
+       242,
+       255
+      ]
+     }
+    }
+   ],
+   "surfaces": {},
+   "up_families": {},
+   "swatches": {},
+   "edge": null
+  },
+  {
+   "axis": "sky",
+   "key": "thick_fog",
+   "title": "Thick fog",
+   "description": "Fog so thick the buildings across the street fade into white.",
+   "reason": "Authored: figures judged from pictures of generated towns in the three shipped looks.",
+   "light": [
+    {
+     "from": null,
+     "changes": {
+      "exposure_permille": 1000,
+      "sun.elevation_mdeg": 40000,
+      "sun.colour": [
+       236,
+       236,
+       232
+      ],
+      "sun.intensity_permille": 500,
+      "sky.zenith": [
+       176,
+       180,
+       184
+      ],
+      "sky.horizon": [
+       200,
+       202,
+       204
+      ],
+      "sky.ground": [
+       150,
+       152,
+       152
+      ],
+      "sky.bounce_ground": [
+       150,
+       150,
+       148
+      ],
+      "sky.intensity_permille": 1000,
+      "sky.sun_glow_permille": 200,
+      "sky.sun_disc_permille": 0,
+      "sky.clouds": {
+       "cover_permille": 1000,
+       "colour": [
+        206,
+        208,
+        210
+       ],
+       "shade": [
+        150,
+        154,
+        160
+       ],
+       "scale_permille": 1400,
+       "seed": 5
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        200,
+        202,
+        204
+       ],
+       "density_micro": 6000
+      },
+      "environment.intensity_permille": 1000,
+      "post.grading.saturation_permille": 780
+     }
+    }
+   ],
+   "surfaces": {},
+   "up_families": {},
+   "swatches": {},
+   "edge": null
+  },
+  {
+   "axis": "sky",
+   "key": "night",
+   "title": "Night",
+   "description": "Night under a moon: a dark blue sky, street lamps and windows glowing.",
+   "reason": "Authored: figures judged from pictures of generated towns in the three shipped looks. A first set of figures was too dark to see a person in and is the rules' failing case.",
+   "light": [
+    {
+     "from": null,
+     "changes": {
+      "exposure_permille": 1400,
+      "sun.elevation_mdeg": 38000,
+      "sun.azimuth_mdeg": 205000,
+      "sun.colour": [
+       206,
+       214,
+       236
+      ],
+      "sun.intensity_permille": 1100,
+      "sky.zenith": [
+       30,
+       36,
+       56
+      ],
+      "sky.horizon": [
+       70,
+       76,
+       100
+      ],
+      "sky.ground": [
+       44,
+       48,
+       62
+      ],
+      "sky.bounce_ground": [
+       92,
+       96,
+       110
+      ],
+      "sky.intensity_permille": 900,
+      "sky.sun_glow_permille": 400,
+      "sky.sun_disc_permille": 20000,
+      "sky.clouds": {
+       "cover_permille": 240,
+       "colour": [
+        96,
+        104,
+        130
+       ],
+       "shade": [
+        32,
+        36,
+        54
+       ],
+       "scale_permille": 1200,
+       "seed": 9
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        38,
+        44,
+        66
+       ],
+       "density_micro": 1400
+      },
+      "environment.intensity_permille": 900,
+      "post.bloom": {
+       "intensity_permille": 200,
+       "blur_level": 16
+      },
+      "post.grading.saturation_permille": 880,
+      "post.grading.contrast_permille": 1060,
+      "post.grading.tint": [
+       206,
+       220,
+       255
+      ],
+      "post.vignette": {
+       "intensity_permille": 380,
+       "inner_permille": 520,
+       "outer_permille": 1250,
+       "curvature_permille": 600,
+       "colour": [
+        0,
+        0,
+        0
+       ]
+      }
+     }
+    }
+   ],
+   "surfaces": {},
+   "up_families": {},
+   "swatches": {
+    "glass_lit": {
+     "emission_permille": 1000
+    },
+    "lamp": {
+     "emission_permille": 1000
+    },
+    "tail": {
+     "emission_permille": 700
+    }
+   },
+   "edge": null
+  },
+  {
+   "axis": "ground",
+   "key": "sea",
+   "title": "By the sea",
+   "description": "Sand underfoot where the ground is bare, and open sea beyond the last street.",
+   "reason": "Authored: figures judged from pictures of generated towns in the three shipped looks. The sea is the flat ground beyond the world in a sea's colour: it reads at a distance and has no shore.",
+   "light": [],
+   "surfaces": {
+    "ground.default": {
+     "srgb8": [
+      228,
+      208,
+      164
+     ]
+    },
+    "ground.tree_pit_soil": {
+     "srgb8": [
+      228,
+      208,
+      164
+     ]
+    }
+   },
+   "up_families": {},
+   "swatches": {},
+   "edge": [
+    70,
+    134,
+    160
+   ]
+  },
+  {
+   "axis": "ground",
+   "key": "sand",
+   "title": "Desert sand",
+   "description": "Bare ground and everything beyond the town is pale sand.",
+   "reason": "Authored: figures judged from pictures of generated towns in the three shipped looks.",
+   "light": [],
+   "surfaces": {
+    "ground.default": {
+     "srgb8": [
+      216,
+      182,
+      128
+     ]
+    },
+    "ground.tree_pit_soil": {
+     "srgb8": [
+      216,
+      182,
+      128
+     ]
+    }
+   },
+   "up_families": {},
+   "swatches": {},
+   "edge": [
+    216,
+    182,
+    128
+   ]
+  },
+  {
+   "axis": "ground",
+   "key": "snowfield",
+   "title": "Snowfields",
+   "description": "White snowfields beyond the town and snow where the ground is bare.",
+   "reason": "Authored: figures judged from pictures of generated towns in the three shipped looks.",
+   "light": [],
+   "surfaces": {
+    "ground.default": {
+     "srgb8": [
+      236,
+      240,
+      246
+     ]
+    },
+    "ground.tree_pit_soil": {
+     "srgb8": [
+      236,
+      240,
+      246
+     ]
+    }
+   },
+   "up_families": {},
+   "swatches": {},
+   "edge": [
+    226,
+    232,
+    242
+   ]
+  },
+  {
+   "axis": "ground",
+   "key": "wheat_fields",
+   "title": "Wheat fields",
+   "description": "Golden fields beyond the town and dry earth where the ground is bare.",
+   "reason": "Authored: figures judged from pictures of generated towns in the three shipped looks.",
+   "light": [],
+   "surfaces": {
+    "ground.default": {
+     "srgb8": [
+      176,
+      150,
+      96
+     ]
+    },
+    "ground.tree_pit_soil": {
+     "srgb8": [
+      176,
+      150,
+      96
+     ]
+    }
+   },
+   "up_families": {},
+   "swatches": {},
+   "edge": [
+    204,
+    180,
+    98
+   ]
+  },
+  {
+   "axis": "cover",
+   "key": "snow",
+   "title": "Snow",
+   "description": "Snow lying on every roof, wall top and footway and on bare ground.",
+   "reason": "Authored: figures judged from pictures of generated towns in the three shipped looks.",
+   "light": [],
+   "surfaces": {
+    "roof.default": {
+     "srgb8": [
+      240,
+      244,
+      250
+     ]
+    },
+    "path.footway_paving": {
+     "srgb8": [
+      228,
+      232,
+      240
+     ]
+    },
+    "ground.default": {
+     "srgb8": [
+      238,
+      242,
+      248
+     ]
+    },
+    "ground.tree_pit_soil": {
+     "srgb8": [
+      238,
+      242,
+      248
+     ]
+    }
+   },
+   "up_families": {
+    "wall": [
+     240,
+     244,
+     250
+    ]
+   },
+   "swatches": {},
+   "edge": null
+  }
+ ]
+}

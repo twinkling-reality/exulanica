@@ -1,0 +1,2971 @@
+{
+ "profile": "exulanica.world-setting-composed/v1",
+ "about": "Each named part of a world's setting composed for every look of the library at its current version, and one part of every axis together: what exulanica.world.world_settings.compose_setting returns, written by scripts/style_packs/composed_settings.py and held to it by tests/test_world_settings.py. The page's tests draw these.",
+ "parts_version": 1,
+ "composed": [
+  {
+   "pack_id": "exulanica.cozy-town",
+   "version": 3,
+   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+   "parts": {
+    "sky": "dawn_mist"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "dawn_mist"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 980,
+      "sun.elevation_mdeg": 7000,
+      "sun.azimuth_mdeg": 96000,
+      "sun.colour": [
+       255,
+       190,
+       150
+      ],
+      "sun.intensity_permille": 1300,
+      "sky.zenith": [
+       140,
+       162,
+       202
+      ],
+      "sky.horizon": [
+       252,
+       204,
+       186
+      ],
+      "sky.ground": [
+       150,
+       160,
+       170
+      ],
+      "sky.bounce_ground": [
+       150,
+       140,
+       135
+      ],
+      "sky.intensity_permille": 800,
+      "sky.sun_glow_permille": 1500,
+      "sky.clouds": {
+       "cover_permille": 420,
+       "colour": [
+        255,
+        226,
+        214
+       ],
+       "shade": [
+        170,
+        150,
+        170
+       ],
+       "scale_permille": 1100,
+       "seed": 21
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        228,
+        212,
+        214
+       ],
+       "density_micro": 5200
+      },
+      "environment.intensity_permille": 700,
+      "post.bloom": {
+       "intensity_permille": 70,
+       "blur_level": 16
+      },
+      "post.grading.saturation_permille": 920,
+      "post.grading.tint": [
+       255,
+       240,
+       240
+      ]
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.cozy-town",
+   "version": 3,
+   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+   "parts": {
+    "sky": "clear_noon"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "clear_noon"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 720,
+      "sun.elevation_mdeg": 76000,
+      "sun.azimuth_mdeg": 170000,
+      "sun.colour": [
+       255,
+       250,
+       238
+      ],
+      "sun.intensity_permille": 2400,
+      "sky.zenith": [
+       120,
+       160,
+       222
+      ],
+      "sky.horizon": [
+       236,
+       232,
+       222
+      ],
+      "sky.intensity_permille": 1000,
+      "sky.sun_glow_permille": 500,
+      "sky.clouds": {
+       "cover_permille": 60,
+       "colour": [
+        255,
+        255,
+        255
+       ],
+       "shade": [
+        205,
+        212,
+        224
+       ],
+       "scale_permille": 900,
+       "seed": 3
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        228,
+        226,
+        216
+       ],
+       "density_micro": 350
+      },
+      "environment.intensity_permille": 950,
+      "post.grading.saturation_permille": 1100,
+      "post.grading.contrast_permille": 1080
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.cozy-town",
+   "version": 3,
+   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+   "parts": {
+    "sky": "dusk"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "dusk"
+     }
+    ],
+    "light": {
+     "from": "evening",
+     "changes": {}
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.cozy-town",
+   "version": 3,
+   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+   "parts": {
+    "sky": "overcast"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "overcast"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1000,
+      "sun.elevation_mdeg": 48000,
+      "sun.azimuth_mdeg": 200000,
+      "sun.colour": [
+       226,
+       230,
+       236
+      ],
+      "sun.intensity_permille": 450,
+      "sky.zenith": [
+       138,
+       146,
+       158
+      ],
+      "sky.horizon": [
+       186,
+       192,
+       198
+      ],
+      "sky.ground": [
+       120,
+       124,
+       122
+      ],
+      "sky.bounce_ground": [
+       128,
+       126,
+       122
+      ],
+      "sky.intensity_permille": 1000,
+      "sky.sun_glow_permille": 0,
+      "sky.sun_disc_permille": 0,
+      "sky.clouds": {
+       "cover_permille": 1000,
+       "colour": [
+        196,
+        200,
+        206
+       ],
+       "shade": [
+        118,
+        124,
+        136
+       ],
+       "scale_permille": 1400,
+       "seed": 44
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        178,
+        184,
+        190
+       ],
+       "density_micro": 2200
+      },
+      "environment.intensity_permille": 1050,
+      "post.grading.saturation_permille": 820,
+      "post.grading.contrast_permille": 980,
+      "post.grading.tint": [
+       236,
+       242,
+       255
+      ]
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.cozy-town",
+   "version": 3,
+   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+   "parts": {
+    "sky": "thick_fog"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "thick_fog"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1000,
+      "sun.elevation_mdeg": 40000,
+      "sun.colour": [
+       236,
+       236,
+       232
+      ],
+      "sun.intensity_permille": 500,
+      "sky.zenith": [
+       176,
+       180,
+       184
+      ],
+      "sky.horizon": [
+       200,
+       202,
+       204
+      ],
+      "sky.ground": [
+       150,
+       152,
+       152
+      ],
+      "sky.bounce_ground": [
+       150,
+       150,
+       148
+      ],
+      "sky.intensity_permille": 1000,
+      "sky.sun_glow_permille": 200,
+      "sky.sun_disc_permille": 0,
+      "sky.clouds": {
+       "cover_permille": 1000,
+       "colour": [
+        206,
+        208,
+        210
+       ],
+       "shade": [
+        150,
+        154,
+        160
+       ],
+       "scale_permille": 1400,
+       "seed": 5
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        200,
+        202,
+        204
+       ],
+       "density_micro": 6000
+      },
+      "environment.intensity_permille": 1000,
+      "post.grading.saturation_permille": 780
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.cozy-town",
+   "version": 3,
+   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+   "parts": {
+    "sky": "night"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "night"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1400,
+      "sun.elevation_mdeg": 38000,
+      "sun.azimuth_mdeg": 205000,
+      "sun.colour": [
+       206,
+       214,
+       236
+      ],
+      "sun.intensity_permille": 1100,
+      "sky.zenith": [
+       30,
+       36,
+       56
+      ],
+      "sky.horizon": [
+       70,
+       76,
+       100
+      ],
+      "sky.ground": [
+       44,
+       48,
+       62
+      ],
+      "sky.bounce_ground": [
+       92,
+       96,
+       110
+      ],
+      "sky.intensity_permille": 900,
+      "sky.sun_glow_permille": 400,
+      "sky.sun_disc_permille": 20000,
+      "sky.clouds": {
+       "cover_permille": 240,
+       "colour": [
+        96,
+        104,
+        130
+       ],
+       "shade": [
+        32,
+        36,
+        54
+       ],
+       "scale_permille": 1200,
+       "seed": 9
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        38,
+        44,
+        66
+       ],
+       "density_micro": 1400
+      },
+      "environment.intensity_permille": 900,
+      "post.bloom": {
+       "intensity_permille": 200,
+       "blur_level": 16
+      },
+      "post.grading.saturation_permille": 880,
+      "post.grading.contrast_permille": 1060,
+      "post.grading.tint": [
+       206,
+       220,
+       255
+      ],
+      "post.vignette": {
+       "intensity_permille": 380,
+       "inner_permille": 520,
+       "outer_permille": 1250,
+       "curvature_permille": 600,
+       "colour": [
+        0,
+        0,
+        0
+       ]
+      }
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {
+     "glass_lit": {
+      "emission_permille": 1000
+     },
+     "lamp": {
+      "emission_permille": 1000
+     },
+     "tail": {
+      "emission_permille": 700
+     }
+    },
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.cozy-town",
+   "version": 3,
+   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+   "parts": {
+    "ground": "sea"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "sea"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       228,
+       208,
+       164
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       228,
+       208,
+       164
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      70,
+      134,
+      160
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.cozy-town",
+   "version": 3,
+   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+   "parts": {
+    "ground": "sand"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "sand"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       216,
+       182,
+       128
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       216,
+       182,
+       128
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      216,
+      182,
+      128
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.cozy-town",
+   "version": 3,
+   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+   "parts": {
+    "ground": "snowfield"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "snowfield"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       236,
+       240,
+       246
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       236,
+       240,
+       246
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      226,
+      232,
+      242
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.cozy-town",
+   "version": 3,
+   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+   "parts": {
+    "ground": "wheat_fields"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "wheat_fields"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       176,
+       150,
+       96
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       176,
+       150,
+       96
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      204,
+      180,
+      98
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.cozy-town",
+   "version": 3,
+   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+   "parts": {
+    "cover": "snow"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "cover",
+      "key": "snow"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "roof.default": {
+      "srgb8": [
+       240,
+       244,
+       250
+      ]
+     },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     },
+     "ground.default": {
+      "srgb8": [
+       238,
+       242,
+       248
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       238,
+       242,
+       248
+      ]
+     }
+    },
+    "up": {
+     "wall.awning_canvas": [
+      240,
+      244,
+      250
+     ],
+     "wall.brick_running_bond": [
+      240,
+      244,
+      250
+     ],
+     "wall.cast_concrete": [
+      240,
+      244,
+      250
+     ],
+     "wall.default": [
+      240,
+      244,
+      250
+     ],
+     "wall.limestone_ashlar": [
+      240,
+      244,
+      250
+     ],
+     "wall.painted_render": [
+      240,
+      244,
+      250
+     ],
+     "wall.painted_timber": [
+      240,
+      244,
+      250
+     ],
+     "wall.storefront_metal": [
+      240,
+      244,
+      250
+     ]
+    },
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.cozy-town",
+   "version": 3,
+   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+   "parts": {
+    "sky": "night",
+    "ground": "wheat_fields",
+    "cover": "snow"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "night"
+     },
+     {
+      "axis": "ground",
+      "key": "wheat_fields"
+     },
+     {
+      "axis": "cover",
+      "key": "snow"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1400,
+      "sun.elevation_mdeg": 38000,
+      "sun.azimuth_mdeg": 205000,
+      "sun.colour": [
+       206,
+       214,
+       236
+      ],
+      "sun.intensity_permille": 1100,
+      "sky.zenith": [
+       30,
+       36,
+       56
+      ],
+      "sky.horizon": [
+       70,
+       76,
+       100
+      ],
+      "sky.ground": [
+       44,
+       48,
+       62
+      ],
+      "sky.bounce_ground": [
+       92,
+       96,
+       110
+      ],
+      "sky.intensity_permille": 900,
+      "sky.sun_glow_permille": 400,
+      "sky.sun_disc_permille": 20000,
+      "sky.clouds": {
+       "cover_permille": 240,
+       "colour": [
+        96,
+        104,
+        130
+       ],
+       "shade": [
+        32,
+        36,
+        54
+       ],
+       "scale_permille": 1200,
+       "seed": 9
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        38,
+        44,
+        66
+       ],
+       "density_micro": 1400
+      },
+      "environment.intensity_permille": 900,
+      "post.bloom": {
+       "intensity_permille": 200,
+       "blur_level": 16
+      },
+      "post.grading.saturation_permille": 880,
+      "post.grading.contrast_permille": 1060,
+      "post.grading.tint": [
+       206,
+       220,
+       255
+      ],
+      "post.vignette": {
+       "intensity_permille": 380,
+       "inner_permille": 520,
+       "outer_permille": 1250,
+       "curvature_permille": 600,
+       "colour": [
+        0,
+        0,
+        0
+       ]
+      }
+     }
+    },
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       238,
+       242,
+       248
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       238,
+       242,
+       248
+      ]
+     },
+     "roof.default": {
+      "srgb8": [
+       240,
+       244,
+       250
+      ]
+     },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     }
+    },
+    "up": {
+     "wall.awning_canvas": [
+      240,
+      244,
+      250
+     ],
+     "wall.brick_running_bond": [
+      240,
+      244,
+      250
+     ],
+     "wall.cast_concrete": [
+      240,
+      244,
+      250
+     ],
+     "wall.default": [
+      240,
+      244,
+      250
+     ],
+     "wall.limestone_ashlar": [
+      240,
+      244,
+      250
+     ],
+     "wall.painted_render": [
+      240,
+      244,
+      250
+     ],
+     "wall.painted_timber": [
+      240,
+      244,
+      250
+     ],
+     "wall.storefront_metal": [
+      240,
+      244,
+      250
+     ]
+    },
+    "swatches": {
+     "glass_lit": {
+      "emission_permille": 1000
+     },
+     "lamp": {
+      "emission_permille": 1000
+     },
+     "tail": {
+      "emission_permille": 700
+     }
+    },
+    "edge": {
+     "ground": [
+      204,
+      180,
+      98
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.finished-town",
+   "version": 3,
+   "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444",
+   "parts": {
+    "sky": "dawn_mist"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "dawn_mist"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 980,
+      "sun.elevation_mdeg": 7000,
+      "sun.azimuth_mdeg": 96000,
+      "sun.colour": [
+       255,
+       190,
+       150
+      ],
+      "sun.intensity_permille": 1300,
+      "sky.zenith": [
+       140,
+       162,
+       202
+      ],
+      "sky.horizon": [
+       252,
+       204,
+       186
+      ],
+      "sky.ground": [
+       150,
+       160,
+       170
+      ],
+      "sky.bounce_ground": [
+       150,
+       140,
+       135
+      ],
+      "sky.intensity_permille": 800,
+      "sky.sun_glow_permille": 1500,
+      "sky.clouds": {
+       "cover_permille": 420,
+       "colour": [
+        255,
+        226,
+        214
+       ],
+       "shade": [
+        170,
+        150,
+        170
+       ],
+       "scale_permille": 1100,
+       "seed": 21
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        228,
+        212,
+        214
+       ],
+       "density_micro": 5200
+      },
+      "environment.intensity_permille": 700,
+      "post.bloom": {
+       "intensity_permille": 70,
+       "blur_level": 16
+      },
+      "post.grading.saturation_permille": 920,
+      "post.grading.tint": [
+       255,
+       240,
+       240
+      ]
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.finished-town",
+   "version": 3,
+   "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444",
+   "parts": {
+    "sky": "clear_noon"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "clear_noon"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 720,
+      "sun.elevation_mdeg": 76000,
+      "sun.azimuth_mdeg": 170000,
+      "sun.colour": [
+       255,
+       250,
+       238
+      ],
+      "sun.intensity_permille": 2400,
+      "sky.zenith": [
+       120,
+       160,
+       222
+      ],
+      "sky.horizon": [
+       236,
+       232,
+       222
+      ],
+      "sky.intensity_permille": 1000,
+      "sky.sun_glow_permille": 500,
+      "sky.clouds": {
+       "cover_permille": 60,
+       "colour": [
+        255,
+        255,
+        255
+       ],
+       "shade": [
+        205,
+        212,
+        224
+       ],
+       "scale_permille": 900,
+       "seed": 3
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        228,
+        226,
+        216
+       ],
+       "density_micro": 350
+      },
+      "environment.intensity_permille": 950,
+      "post.grading.saturation_permille": 1100,
+      "post.grading.contrast_permille": 1080
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.finished-town",
+   "version": 3,
+   "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444",
+   "parts": {
+    "sky": "dusk"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "dusk"
+     }
+    ],
+    "light": {
+     "from": "evening",
+     "changes": {}
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.finished-town",
+   "version": 3,
+   "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444",
+   "parts": {
+    "sky": "overcast"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "overcast"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1000,
+      "sun.elevation_mdeg": 48000,
+      "sun.azimuth_mdeg": 200000,
+      "sun.colour": [
+       226,
+       230,
+       236
+      ],
+      "sun.intensity_permille": 450,
+      "sky.zenith": [
+       138,
+       146,
+       158
+      ],
+      "sky.horizon": [
+       186,
+       192,
+       198
+      ],
+      "sky.ground": [
+       120,
+       124,
+       122
+      ],
+      "sky.bounce_ground": [
+       128,
+       126,
+       122
+      ],
+      "sky.intensity_permille": 1000,
+      "sky.sun_glow_permille": 0,
+      "sky.sun_disc_permille": 0,
+      "sky.clouds": {
+       "cover_permille": 1000,
+       "colour": [
+        196,
+        200,
+        206
+       ],
+       "shade": [
+        118,
+        124,
+        136
+       ],
+       "scale_permille": 1400,
+       "seed": 44
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        178,
+        184,
+        190
+       ],
+       "density_micro": 2200
+      },
+      "environment.intensity_permille": 1050,
+      "post.grading.saturation_permille": 820,
+      "post.grading.contrast_permille": 980,
+      "post.grading.tint": [
+       236,
+       242,
+       255
+      ]
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.finished-town",
+   "version": 3,
+   "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444",
+   "parts": {
+    "sky": "thick_fog"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "thick_fog"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1000,
+      "sun.elevation_mdeg": 40000,
+      "sun.colour": [
+       236,
+       236,
+       232
+      ],
+      "sun.intensity_permille": 500,
+      "sky.zenith": [
+       176,
+       180,
+       184
+      ],
+      "sky.horizon": [
+       200,
+       202,
+       204
+      ],
+      "sky.ground": [
+       150,
+       152,
+       152
+      ],
+      "sky.bounce_ground": [
+       150,
+       150,
+       148
+      ],
+      "sky.intensity_permille": 1000,
+      "sky.sun_glow_permille": 200,
+      "sky.sun_disc_permille": 0,
+      "sky.clouds": {
+       "cover_permille": 1000,
+       "colour": [
+        206,
+        208,
+        210
+       ],
+       "shade": [
+        150,
+        154,
+        160
+       ],
+       "scale_permille": 1400,
+       "seed": 5
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        200,
+        202,
+        204
+       ],
+       "density_micro": 6000
+      },
+      "environment.intensity_permille": 1000,
+      "post.grading.saturation_permille": 780
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.finished-town",
+   "version": 3,
+   "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444",
+   "parts": {
+    "sky": "night"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "night"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1400,
+      "sun.elevation_mdeg": 38000,
+      "sun.azimuth_mdeg": 205000,
+      "sun.colour": [
+       206,
+       214,
+       236
+      ],
+      "sun.intensity_permille": 1100,
+      "sky.zenith": [
+       30,
+       36,
+       56
+      ],
+      "sky.horizon": [
+       70,
+       76,
+       100
+      ],
+      "sky.ground": [
+       44,
+       48,
+       62
+      ],
+      "sky.bounce_ground": [
+       92,
+       96,
+       110
+      ],
+      "sky.intensity_permille": 900,
+      "sky.sun_glow_permille": 400,
+      "sky.sun_disc_permille": 20000,
+      "sky.clouds": {
+       "cover_permille": 240,
+       "colour": [
+        96,
+        104,
+        130
+       ],
+       "shade": [
+        32,
+        36,
+        54
+       ],
+       "scale_permille": 1200,
+       "seed": 9
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        38,
+        44,
+        66
+       ],
+       "density_micro": 1400
+      },
+      "environment.intensity_permille": 900,
+      "post.bloom": {
+       "intensity_permille": 200,
+       "blur_level": 16
+      },
+      "post.grading.saturation_permille": 880,
+      "post.grading.contrast_permille": 1060,
+      "post.grading.tint": [
+       206,
+       220,
+       255
+      ],
+      "post.vignette": {
+       "intensity_permille": 380,
+       "inner_permille": 520,
+       "outer_permille": 1250,
+       "curvature_permille": 600,
+       "colour": [
+        0,
+        0,
+        0
+       ]
+      }
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {
+     "lamp": {
+      "emission_permille": 1000
+     },
+     "tail": {
+      "emission_permille": 700
+     }
+    },
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.finished-town",
+   "version": 3,
+   "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444",
+   "parts": {
+    "ground": "sea"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "sea"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       228,
+       208,
+       164
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       228,
+       208,
+       164
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      70,
+      134,
+      160
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.finished-town",
+   "version": 3,
+   "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444",
+   "parts": {
+    "ground": "sand"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "sand"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       216,
+       182,
+       128
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       216,
+       182,
+       128
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      216,
+      182,
+      128
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.finished-town",
+   "version": 3,
+   "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444",
+   "parts": {
+    "ground": "snowfield"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "snowfield"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       236,
+       240,
+       246
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       236,
+       240,
+       246
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      226,
+      232,
+      242
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.finished-town",
+   "version": 3,
+   "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444",
+   "parts": {
+    "ground": "wheat_fields"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "wheat_fields"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       176,
+       150,
+       96
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       176,
+       150,
+       96
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      204,
+      180,
+      98
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.finished-town",
+   "version": 3,
+   "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444",
+   "parts": {
+    "cover": "snow"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "cover",
+      "key": "snow"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "roof.default": {
+      "srgb8": [
+       240,
+       244,
+       250
+      ]
+     },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     },
+     "ground.default": {
+      "srgb8": [
+       238,
+       242,
+       248
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       238,
+       242,
+       248
+      ]
+     }
+    },
+    "up": {
+     "wall.awning_canvas": [
+      240,
+      244,
+      250
+     ],
+     "wall.brick_running_bond": [
+      240,
+      244,
+      250
+     ],
+     "wall.cast_concrete": [
+      240,
+      244,
+      250
+     ],
+     "wall.default": [
+      240,
+      244,
+      250
+     ],
+     "wall.limestone_ashlar": [
+      240,
+      244,
+      250
+     ],
+     "wall.painted_render": [
+      240,
+      244,
+      250
+     ],
+     "wall.painted_timber": [
+      240,
+      244,
+      250
+     ],
+     "wall.storefront_metal": [
+      240,
+      244,
+      250
+     ]
+    },
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.finished-town",
+   "version": 3,
+   "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444",
+   "parts": {
+    "sky": "night",
+    "ground": "wheat_fields",
+    "cover": "snow"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "night"
+     },
+     {
+      "axis": "ground",
+      "key": "wheat_fields"
+     },
+     {
+      "axis": "cover",
+      "key": "snow"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1400,
+      "sun.elevation_mdeg": 38000,
+      "sun.azimuth_mdeg": 205000,
+      "sun.colour": [
+       206,
+       214,
+       236
+      ],
+      "sun.intensity_permille": 1100,
+      "sky.zenith": [
+       30,
+       36,
+       56
+      ],
+      "sky.horizon": [
+       70,
+       76,
+       100
+      ],
+      "sky.ground": [
+       44,
+       48,
+       62
+      ],
+      "sky.bounce_ground": [
+       92,
+       96,
+       110
+      ],
+      "sky.intensity_permille": 900,
+      "sky.sun_glow_permille": 400,
+      "sky.sun_disc_permille": 20000,
+      "sky.clouds": {
+       "cover_permille": 240,
+       "colour": [
+        96,
+        104,
+        130
+       ],
+       "shade": [
+        32,
+        36,
+        54
+       ],
+       "scale_permille": 1200,
+       "seed": 9
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        38,
+        44,
+        66
+       ],
+       "density_micro": 1400
+      },
+      "environment.intensity_permille": 900,
+      "post.bloom": {
+       "intensity_permille": 200,
+       "blur_level": 16
+      },
+      "post.grading.saturation_permille": 880,
+      "post.grading.contrast_permille": 1060,
+      "post.grading.tint": [
+       206,
+       220,
+       255
+      ],
+      "post.vignette": {
+       "intensity_permille": 380,
+       "inner_permille": 520,
+       "outer_permille": 1250,
+       "curvature_permille": 600,
+       "colour": [
+        0,
+        0,
+        0
+       ]
+      }
+     }
+    },
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       238,
+       242,
+       248
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       238,
+       242,
+       248
+      ]
+     },
+     "roof.default": {
+      "srgb8": [
+       240,
+       244,
+       250
+      ]
+     },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     }
+    },
+    "up": {
+     "wall.awning_canvas": [
+      240,
+      244,
+      250
+     ],
+     "wall.brick_running_bond": [
+      240,
+      244,
+      250
+     ],
+     "wall.cast_concrete": [
+      240,
+      244,
+      250
+     ],
+     "wall.default": [
+      240,
+      244,
+      250
+     ],
+     "wall.limestone_ashlar": [
+      240,
+      244,
+      250
+     ],
+     "wall.painted_render": [
+      240,
+      244,
+      250
+     ],
+     "wall.painted_timber": [
+      240,
+      244,
+      250
+     ],
+     "wall.storefront_metal": [
+      240,
+      244,
+      250
+     ]
+    },
+    "swatches": {
+     "lamp": {
+      "emission_permille": 1000
+     },
+     "tail": {
+      "emission_permille": 700
+     }
+    },
+    "edge": {
+     "ground": [
+      204,
+      180,
+      98
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.toon-town",
+   "version": 3,
+   "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37",
+   "parts": {
+    "sky": "dawn_mist"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "dawn_mist"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 980,
+      "sun.elevation_mdeg": 7000,
+      "sun.azimuth_mdeg": 96000,
+      "sun.colour": [
+       255,
+       190,
+       150
+      ],
+      "sun.intensity_permille": 1300,
+      "sky.zenith": [
+       140,
+       162,
+       202
+      ],
+      "sky.horizon": [
+       252,
+       204,
+       186
+      ],
+      "sky.ground": [
+       150,
+       160,
+       170
+      ],
+      "sky.bounce_ground": [
+       150,
+       140,
+       135
+      ],
+      "sky.intensity_permille": 800,
+      "sky.sun_glow_permille": 1500,
+      "sky.clouds": {
+       "cover_permille": 420,
+       "colour": [
+        255,
+        226,
+        214
+       ],
+       "shade": [
+        170,
+        150,
+        170
+       ],
+       "scale_permille": 1100,
+       "seed": 21
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        228,
+        212,
+        214
+       ],
+       "density_micro": 5200
+      },
+      "environment.intensity_permille": 700,
+      "post.bloom": {
+       "intensity_permille": 70,
+       "blur_level": 16
+      },
+      "post.grading.saturation_permille": 920,
+      "post.grading.tint": [
+       255,
+       240,
+       240
+      ]
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.toon-town",
+   "version": 3,
+   "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37",
+   "parts": {
+    "sky": "clear_noon"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "clear_noon"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 720,
+      "sun.elevation_mdeg": 76000,
+      "sun.azimuth_mdeg": 170000,
+      "sun.colour": [
+       255,
+       250,
+       238
+      ],
+      "sun.intensity_permille": 2400,
+      "sky.zenith": [
+       120,
+       160,
+       222
+      ],
+      "sky.horizon": [
+       236,
+       232,
+       222
+      ],
+      "sky.intensity_permille": 1000,
+      "sky.sun_glow_permille": 500,
+      "sky.clouds": {
+       "cover_permille": 60,
+       "colour": [
+        255,
+        255,
+        255
+       ],
+       "shade": [
+        205,
+        212,
+        224
+       ],
+       "scale_permille": 900,
+       "seed": 3
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        228,
+        226,
+        216
+       ],
+       "density_micro": 350
+      },
+      "environment.intensity_permille": 950,
+      "post.grading.saturation_permille": 1100,
+      "post.grading.contrast_permille": 1080
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.toon-town",
+   "version": 3,
+   "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37",
+   "parts": {
+    "sky": "dusk"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "dusk"
+     }
+    ],
+    "light": {
+     "from": "evening",
+     "changes": {}
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.toon-town",
+   "version": 3,
+   "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37",
+   "parts": {
+    "sky": "overcast"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "overcast"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1000,
+      "sun.elevation_mdeg": 48000,
+      "sun.azimuth_mdeg": 200000,
+      "sun.colour": [
+       226,
+       230,
+       236
+      ],
+      "sun.intensity_permille": 450,
+      "sky.zenith": [
+       138,
+       146,
+       158
+      ],
+      "sky.horizon": [
+       186,
+       192,
+       198
+      ],
+      "sky.ground": [
+       120,
+       124,
+       122
+      ],
+      "sky.bounce_ground": [
+       128,
+       126,
+       122
+      ],
+      "sky.intensity_permille": 1000,
+      "sky.sun_glow_permille": 0,
+      "sky.sun_disc_permille": 0,
+      "sky.clouds": {
+       "cover_permille": 1000,
+       "colour": [
+        196,
+        200,
+        206
+       ],
+       "shade": [
+        118,
+        124,
+        136
+       ],
+       "scale_permille": 1400,
+       "seed": 44
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        178,
+        184,
+        190
+       ],
+       "density_micro": 2200
+      },
+      "environment.intensity_permille": 1050,
+      "post.grading.saturation_permille": 820,
+      "post.grading.contrast_permille": 980,
+      "post.grading.tint": [
+       236,
+       242,
+       255
+      ]
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.toon-town",
+   "version": 3,
+   "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37",
+   "parts": {
+    "sky": "thick_fog"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "thick_fog"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1000,
+      "sun.elevation_mdeg": 40000,
+      "sun.colour": [
+       236,
+       236,
+       232
+      ],
+      "sun.intensity_permille": 500,
+      "sky.zenith": [
+       176,
+       180,
+       184
+      ],
+      "sky.horizon": [
+       200,
+       202,
+       204
+      ],
+      "sky.ground": [
+       150,
+       152,
+       152
+      ],
+      "sky.bounce_ground": [
+       150,
+       150,
+       148
+      ],
+      "sky.intensity_permille": 1000,
+      "sky.sun_glow_permille": 200,
+      "sky.sun_disc_permille": 0,
+      "sky.clouds": {
+       "cover_permille": 1000,
+       "colour": [
+        206,
+        208,
+        210
+       ],
+       "shade": [
+        150,
+        154,
+        160
+       ],
+       "scale_permille": 1400,
+       "seed": 5
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        200,
+        202,
+        204
+       ],
+       "density_micro": 6000
+      },
+      "environment.intensity_permille": 1000,
+      "post.grading.saturation_permille": 780
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.toon-town",
+   "version": 3,
+   "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37",
+   "parts": {
+    "sky": "night"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "night"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1400,
+      "sun.elevation_mdeg": 38000,
+      "sun.azimuth_mdeg": 205000,
+      "sun.colour": [
+       206,
+       214,
+       236
+      ],
+      "sun.intensity_permille": 1100,
+      "sky.zenith": [
+       30,
+       36,
+       56
+      ],
+      "sky.horizon": [
+       70,
+       76,
+       100
+      ],
+      "sky.ground": [
+       44,
+       48,
+       62
+      ],
+      "sky.bounce_ground": [
+       92,
+       96,
+       110
+      ],
+      "sky.intensity_permille": 900,
+      "sky.sun_glow_permille": 400,
+      "sky.sun_disc_permille": 20000,
+      "sky.clouds": {
+       "cover_permille": 240,
+       "colour": [
+        96,
+        104,
+        130
+       ],
+       "shade": [
+        32,
+        36,
+        54
+       ],
+       "scale_permille": 1200,
+       "seed": 9
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        38,
+        44,
+        66
+       ],
+       "density_micro": 1400
+      },
+      "environment.intensity_permille": 900,
+      "post.bloom": {
+       "intensity_permille": 200,
+       "blur_level": 16
+      },
+      "post.grading.saturation_permille": 880,
+      "post.grading.contrast_permille": 1060,
+      "post.grading.tint": [
+       206,
+       220,
+       255
+      ],
+      "post.vignette": {
+       "intensity_permille": 380,
+       "inner_permille": 520,
+       "outer_permille": 1250,
+       "curvature_permille": 600,
+       "colour": [
+        0,
+        0,
+        0
+       ]
+      }
+     }
+    },
+    "surfaces": {},
+    "up": {},
+    "swatches": {
+     "lamp": {
+      "emission_permille": 1000
+     },
+     "tail": {
+      "emission_permille": 700
+     }
+    },
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.toon-town",
+   "version": 3,
+   "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37",
+   "parts": {
+    "ground": "sea"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "sea"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       228,
+       208,
+       164
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       228,
+       208,
+       164
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      70,
+      134,
+      160
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.toon-town",
+   "version": 3,
+   "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37",
+   "parts": {
+    "ground": "sand"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "sand"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       216,
+       182,
+       128
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       216,
+       182,
+       128
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      216,
+      182,
+      128
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.toon-town",
+   "version": 3,
+   "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37",
+   "parts": {
+    "ground": "snowfield"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "snowfield"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       236,
+       240,
+       246
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       236,
+       240,
+       246
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      226,
+      232,
+      242
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.toon-town",
+   "version": 3,
+   "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37",
+   "parts": {
+    "ground": "wheat_fields"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "ground",
+      "key": "wheat_fields"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       176,
+       150,
+       96
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       176,
+       150,
+       96
+      ]
+     }
+    },
+    "up": {},
+    "swatches": {},
+    "edge": {
+     "ground": [
+      204,
+      180,
+      98
+     ]
+    }
+   }
+  },
+  {
+   "pack_id": "exulanica.toon-town",
+   "version": 3,
+   "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37",
+   "parts": {
+    "cover": "snow"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "cover",
+      "key": "snow"
+     }
+    ],
+    "light": null,
+    "surfaces": {
+     "roof.default": {
+      "srgb8": [
+       240,
+       244,
+       250
+      ]
+     },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     },
+     "ground.default": {
+      "srgb8": [
+       238,
+       242,
+       248
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       238,
+       242,
+       248
+      ]
+     }
+    },
+    "up": {
+     "wall.awning_canvas": [
+      240,
+      244,
+      250
+     ],
+     "wall.brick_running_bond": [
+      240,
+      244,
+      250
+     ],
+     "wall.cast_concrete": [
+      240,
+      244,
+      250
+     ],
+     "wall.default": [
+      240,
+      244,
+      250
+     ],
+     "wall.limestone_ashlar": [
+      240,
+      244,
+      250
+     ],
+     "wall.painted_render": [
+      240,
+      244,
+      250
+     ],
+     "wall.painted_timber": [
+      240,
+      244,
+      250
+     ],
+     "wall.storefront_metal": [
+      240,
+      244,
+      250
+     ]
+    },
+    "swatches": {},
+    "edge": null
+   }
+  },
+  {
+   "pack_id": "exulanica.toon-town",
+   "version": 3,
+   "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37",
+   "parts": {
+    "sky": "night",
+    "ground": "wheat_fields",
+    "cover": "snow"
+   },
+   "setting": {
+    "profile": "exulanica.world-setting/v1",
+    "origin": "authored",
+    "provenance": {
+     "kind": "authored"
+    },
+    "parts": [
+     {
+      "axis": "sky",
+      "key": "night"
+     },
+     {
+      "axis": "ground",
+      "key": "wheat_fields"
+     },
+     {
+      "axis": "cover",
+      "key": "snow"
+     }
+    ],
+    "light": {
+     "from": "day",
+     "changes": {
+      "exposure_permille": 1400,
+      "sun.elevation_mdeg": 38000,
+      "sun.azimuth_mdeg": 205000,
+      "sun.colour": [
+       206,
+       214,
+       236
+      ],
+      "sun.intensity_permille": 1100,
+      "sky.zenith": [
+       30,
+       36,
+       56
+      ],
+      "sky.horizon": [
+       70,
+       76,
+       100
+      ],
+      "sky.ground": [
+       44,
+       48,
+       62
+      ],
+      "sky.bounce_ground": [
+       92,
+       96,
+       110
+      ],
+      "sky.intensity_permille": 900,
+      "sky.sun_glow_permille": 400,
+      "sky.sun_disc_permille": 20000,
+      "sky.clouds": {
+       "cover_permille": 240,
+       "colour": [
+        96,
+        104,
+        130
+       ],
+       "shade": [
+        32,
+        36,
+        54
+       ],
+       "scale_permille": 1200,
+       "seed": 9
+      },
+      "fog": {
+       "kind": "exp2",
+       "colour": [
+        38,
+        44,
+        66
+       ],
+       "density_micro": 1400
+      },
+      "environment.intensity_permille": 900,
+      "post.bloom": {
+       "intensity_permille": 200,
+       "blur_level": 16
+      },
+      "post.grading.saturation_permille": 880,
+      "post.grading.contrast_permille": 1060,
+      "post.grading.tint": [
+       206,
+       220,
+       255
+      ],
+      "post.vignette": {
+       "intensity_permille": 380,
+       "inner_permille": 520,
+       "outer_permille": 1250,
+       "curvature_permille": 600,
+       "colour": [
+        0,
+        0,
+        0
+       ]
+      }
+     }
+    },
+    "surfaces": {
+     "ground.default": {
+      "srgb8": [
+       238,
+       242,
+       248
+      ]
+     },
+     "ground.tree_pit_soil": {
+      "srgb8": [
+       238,
+       242,
+       248
+      ]
+     },
+     "roof.default": {
+      "srgb8": [
+       240,
+       244,
+       250
+      ]
+     },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     }
+    },
+    "up": {
+     "wall.awning_canvas": [
+      240,
+      244,
+      250
+     ],
+     "wall.brick_running_bond": [
+      240,
+      244,
+      250
+     ],
+     "wall.cast_concrete": [
+      240,
+      244,
+      250
+     ],
+     "wall.default": [
+      240,
+      244,
+      250
+     ],
+     "wall.limestone_ashlar": [
+      240,
+      244,
+      250
+     ],
+     "wall.painted_render": [
+      240,
+      244,
+      250
+     ],
+     "wall.painted_timber": [
+      240,
+      244,
+      250
+     ],
+     "wall.storefront_metal": [
+      240,
+      244,
+      250
+     ]
+    },
+    "swatches": {
+     "lamp": {
+      "emission_permille": 1000
+     },
+     "tail": {
+      "emission_permille": 700
+     }
+    },
+    "edge": {
+     "ground": [
+      204,
+      180,
+      98
+     ]
+    }
+   }
+  }
+ ]
+}
