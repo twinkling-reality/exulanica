@@ -14,7 +14,7 @@
 #     receiver's own pick-up only past the departures before each run's first visitor has left;
 #   - "agent": take_agent.sh, an outside agent's beat, once the crossing has ended;
 # and creates <run folder>/crossed, so the take goes on to the card: at once when the guard pauses the world
-# (a running check is interrupted), else when the above has ended.
+# (a running check is ended, with its game server), else when the above has ended.
 #
 #   [TAKE_GAME_PORT=<the game server's UDP port; default the stack's spare port>]
 #   zsh scripts/demo/take_hold.sh <take document> <run folder> [stand-in]
@@ -49,8 +49,21 @@ GAME_PORT=${TAKE_GAME_PORT:-$(field $RUN/stack-up.json ports.spare)}
 SCENE=$(field $DOC scene)
 log "hold-start seen; the stack's run directory $STACK"
 cd $ROOT
+# The take's own world among the workspace's saved worlds is the one it named (a take that made its town
+# leaves the first world beside it); with no single world of that title, the workspace's only one.
+ENTRY=$(python3 - $STACK/token $API "$(field $DOC title)" <<'ENTRY'
+import json, sys, urllib.request
+token = open(sys.argv[1]).read().strip()
+request = urllib.request.Request(sys.argv[2] + "/world-entries", headers={"Authorization": "Bearer " + token})
+body = json.load(urllib.request.urlopen(request, timeout=30))
+entries = body if isinstance(body, list) else body.get("entries", [])
+named = [entry["entry_id"] for entry in entries if entry.get("title") == sys.argv[3]]
+print(named[0] if len(named) == 1 else "")
+ENTRY
+)
+log "the take's world: ${ENTRY:-the workspace's only one}"
 EXULANICA_TOKEN="$(cat $STACK/token)" python3 scripts/demo/start_society.py $SCENE --base-url $API \
-  --record $RUN/hold-record.json >> $RUN/hold.log.txt 2>&1
+  --record $RUN/hold-record.json ${ENTRY:+--entry} $ENTRY >> $RUN/hold.log.txt 2>&1
 if [ ! -e $RUN/hold-record.json ]; then
   log "no record of the world: nothing runs in this hold"
   touch $RUN/crossed
@@ -102,8 +115,14 @@ if [ -n "$(field $DOC hold.crossing)" ]; then
     log "crossing check run $run (lives ${LIVES:-30} s, called home by ${LIMIT:-360} s; requests past $after departures)"
     while kill -0 $CHECK 2>/dev/null; do
       if [ -e $RUN/stop-rule.json ]; then
-        log "STOP RULE: the guard paused the world; the check is interrupted"
-        kill -INT $CHECK
+        # A command started in the background by a script ignores an interrupt, so the check is ended
+        # outright, and the game server it started with it (the check would have stopped it itself).
+        log "STOP RULE: the guard paused the world; the check is ended"
+        game=($(pgrep -P $CHECK 2>/dev/null))
+        kill $CHECK 2>/dev/null
+        for tries in {1..10}; do kill -0 $CHECK 2>/dev/null || break; sleep 1; done
+        kill -0 $CHECK 2>/dev/null && kill -KILL $CHECK 2>/dev/null
+        for child in $game; do kill $child 2>/dev/null; done
         break
       fi
       sleep 3

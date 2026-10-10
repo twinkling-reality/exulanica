@@ -8,15 +8,20 @@
     departures before the run's first visitor has left, none again before its wait or past its
     count;
 *   an outside agent's allocation is what its run records sum to, in the runs' own order, and the
-    provider errors in a row are those after its last answered call;
-*   the film's take document names a scene, a game mapping, an agents' bridge entry and a mind the
-    tree holds, and frames by keys the driver accepts.
+    provider errors in a row are those after its last answered call; a call is refused when one as
+    dear as the dearest so far would pass the dollars; a run keeps each tool its mind called with
+    the arguments it gave, or its words;
+*   the film's take documents name a scene, a game mapping, an agents' bridge entry and a mind the
+    tree holds, and move the viewer by keys the driver accepts; the take in a made town says the
+    town in words, stands before its sentence and names the scene laid out for a town, and the
+    opening alone ends at a mark the driver makes.
 """
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import re
 from decimal import Decimal
 from pathlib import Path
 
@@ -140,18 +145,92 @@ def test_an_agent_allocation_is_what_its_run_records_sum_to_in_their_own_order(t
     assert runs.used(tmp_path) == (15, Decimal("0.0070"), 0)
 
 
-def test_the_film_take_document_names_what_the_tree_holds():
-    take = json.loads(FILM_TAKE.read_text())
-    assert take["profile"] == "exulanica.film-take/v1"
-    assert (ROOT / take["scene"]).is_file()
-    mapping = ROOT / "bridges/luanti/mod/exulanica_gate/mapping" / take["doors"]["game"]["mapping"]
-    assert mapping.is_file()
-    assert json.loads((ROOT / take["doors"]["agents"]).read_text())["bridge"] == "agents"
+def test_an_agent_call_is_refused_when_one_as_dear_as_the_dearest_would_pass_the_dollars():
+    runs = _tool("agent_toolkit_run")
+
+    def may(calls: int, spent: str, dearest: str) -> bool:
+        bound = {"max_calls": 5, "max_usd": Decimal("0.010")}
+        return runs.may_call(calls, Decimal(spent), Decimal(dearest), **bound)
+
+    assert may(0, "0", "0")
+    assert may(4, "0.006", "0.004")
+    # Room for the dollars spent, none for another call as dear as the dearest so far.
+    assert not may(4, "0.007", "0.004")
+    assert not may(1, "0.010", "0")
+    assert not may(5, "0.001", "0.001")
+
+
+def test_a_run_keeps_what_its_mind_called_and_said():
+    runs = _tool("agent_toolkit_run")
+    said = {"turn": "t-7", "action": "say something to everyone near", "line": "Hello everyone!"}
+    called = {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [
+            {"function": {"name": "world__act", "arguments": json.dumps(said)}},
+            {"function": {"name": "world__wait_for_turn", "arguments": "not json"}},
+        ],
+    }
+    assert runs.answers_of(called, "2026-10-09T23:27:02+00:00") == [
+        {"at": "2026-10-09T23:27:02+00:00", "tool": "world__act", "arguments": said},
+        {
+            "at": "2026-10-09T23:27:02+00:00",
+            "tool": "world__wait_for_turn",
+            "arguments": {"unread": "not json"},
+        },
+    ]
+    words = {"role": "assistant", "content": "I took my turns."}
+    assert runs.answers_of(words, "t") == [{"at": "t", "words": "I took my turns."}]
+    assert runs.answers_of({"role": "assistant", "content": None}, "t") == []
+
+
+def test_the_film_take_documents_name_what_the_tree_holds():
     manifest = json.loads((ROOT / "exulanica/models/models.manifest.json").read_text())
-    agent = take["hold"]["agent"]
-    assert agent["mind"] in manifest["models"]
-    assert "enter" in agent["task"].lower()
-    assert Decimal(agent["max_usd"]) > 0 and agent["max_calls"] > 0
     driver = (DEMO / "film_take.mjs").read_text()
-    for held in take["frame"]:
-        assert f"{held['key']}:" in driver and held["ms"] > 0
+    for name in ("three-strangers-film.take.json", "three-strangers-in-town.take.json"):
+        take = json.loads((DEMO / "takes" / name).read_text())
+        assert take["profile"] == "exulanica.film-take/v1"
+        assert (ROOT / take["scene"]).is_file()
+        mapping = ROOT / "bridges/luanti/mod/exulanica_gate/mapping"
+        assert (mapping / take["doors"]["game"]["mapping"]).is_file()
+        assert json.loads((ROOT / take["doors"]["agents"]).read_text())["bridge"] == "agents"
+        agent = take["hold"]["agent"]
+        assert agent["mind"] in manifest["models"]
+        assert "enter" in agent["task"].lower()
+        assert Decimal(agent["max_usd"]) > 0 and agent["max_calls"] > 0
+        for held in [*take["frame"], *take.get("stand", [])]:
+            assert f"{held['key']}:" in driver and held["ms"] > 0
+
+
+def test_a_take_in_a_made_town_says_the_town_and_stands_before_its_sentence():
+    town = json.loads((DEMO / "takes/three-strangers-in-town.take.json").read_text())
+    # A town of the person's own words, the scene laid out for a generated town, and a step
+    # before the sentence: in a town a thing asked for lands ahead of where the person stands.
+    assert town["world"]["describe"].strip() and town["stand"]
+    scene = json.loads((ROOT / town["scene"]).read_text())
+    assert scene["ground"]["kind"] == "generated" and scene["engine"] == "exulanica-society/v7"
+    # The opening alone: a town from words, ended at a mark the driver makes before the story.
+    opening = json.loads((DEMO / "takes/a-town-from-words.take.json").read_text())
+    assert opening["profile"] == town["profile"] and opening["world"]["describe"].strip()
+    assert opening["world"]["describe"] != town["world"]["describe"]
+    driver = (DEMO / "film_take.mjs").read_text()
+    assert f"'{opening['until']}'" in driver and f"mark('{opening['until']}')" in driver
+    assert set(opening) == {"profile", "title", "world", "stand", "until"}
+
+
+def test_the_driver_and_its_page_file_name_the_same_words_and_selectors():
+    # The app's words and selectors live in one file so a changed interface is re-pointed there:
+    # the driver uses nothing the file lacks, and the file holds nothing the driver stopped using.
+    page = json.loads((DEMO / "film_page.json").read_text())
+    assert page["profile"] == "exulanica.film-page/v1"
+    driver = (DEMO / "film_take.mjs").read_text()
+    for part in ("words", "selectors"):
+        used = set(re.findall(rf"\b{part}\.([a-z_]+)", driver))
+        assert used == set(page[part]), (part, used ^ set(page[part]))
+    for value in page["words"].values():
+        assert value and all(
+            isinstance(word, str) and word
+            for word in ([value] if isinstance(value, str) else value)
+        )
+    # No word of the app is left in the driver's own element lookups.
+    assert not re.search(r"(?:button|buttonStarting|anyWords|shownWords)\('", driver)

@@ -8,11 +8,15 @@
     python3 scripts/demo/agent_toolkit_run.py --used <a folder of such records>
 
 The run is ``bridges/agents/checks/nat_run.py``'s (its relay, its configuration, its record's
-fields), with what a bounded allocation needs: the relay refuses a call once N calls were made or
-their price at the manifest's per-token prices reached X (the toolkit run then ends); the toolkit
+fields), with what a bounded allocation needs: the relay refuses a call once N calls were made, or
+once their price at the manifest's per-token prices reached X or would pass X if the next call
+cost as much as the dearest so far (a call's price is known only when it is answered, so the
+first call is the only one that can pass X); the toolkit run then ends. The toolkit
 and the facade it started are stopped together after S seconds; and the record lists, in order,
 each call's outcome (``ok``, the provider error's type, or ``refused: the bound``), so a stop
-rule (a third provider error in a row) can be read across runs. With ``--stand-in`` the mind is a
+rule (a third provider error in a row) can be read across runs. The record's ``answers`` are the
+agent's own side of the run: each tool its mind called with the arguments it gave, or the words it
+answered with, each with its time. With ``--stand-in`` the mind is a
 stand-in built on the check's own (no provider, no key, no cost): it enters the world when the
 grant offers a body, then waits for turns and answers up to three with the first action offered.
 The model key comes from this process's ``NEBIUS_API_KEY`` only; the toolkit holds a stand-in key;
@@ -33,6 +37,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -60,6 +65,30 @@ def used(folder: Path) -> tuple[int, Decimal, int]:
             break
         row += 1
     return calls, usd, row
+
+
+def may_call(
+    calls: int, spent: Decimal, dearest: Decimal, *, max_calls: int, max_usd: Decimal
+) -> bool:
+    """Whether the allocation has room for one more call: a call left, the dollars not reached, and
+    room for a call as dear as the dearest answered so far."""
+    return calls < max_calls and spent < max_usd and spent + dearest <= max_usd
+
+
+def answers_of(message: Mapping[str, Any], at: str) -> list[dict[str, Any]]:
+    """What a mind's answer did, as the run's own account: each tool called with the arguments it
+    gave (arguments that are not JSON are kept as text), or the words it answered with."""
+    kept: list[dict[str, Any]] = []
+    for call in message.get("tool_calls") or []:
+        function = call.get("function") or {}
+        try:
+            arguments = json.loads(function.get("arguments") or "{}")
+        except (TypeError, ValueError):
+            arguments = {"unread": str(function.get("arguments"))[:400]}
+        kept.append({"at": at, "tool": function.get("name"), "arguments": arguments})
+    if not kept and message.get("content"):
+        kept.append({"at": at, "words": str(message["content"])[:600]})
+    return kept
 
 
 def main() -> int:
@@ -92,11 +121,26 @@ def main() -> int:
         print("set NEBIUS_API_KEY in this process's environment", file=sys.stderr)
         return 2
     outcomes: list[str] = []
+    answers: list[dict[str, Any]] = []
+
+    def now() -> str:
+        return dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
 
     class CappedRelay(_TimedRelay):
+        dearest = Decimal(0)
+
+        def priced(self) -> Decimal:
+            return Decimal(_usd(MANIFEST, args.mind, self.prompt_tokens, self.completion_tokens))
+
         def answer(self, request: dict[str, Any]) -> dict[str, Any]:
-            spent = Decimal(_usd(MANIFEST, args.mind, self.prompt_tokens, self.completion_tokens))
-            if len(self.per_call) >= args.max_calls or spent >= args.max_usd:
+            spent = self.priced()
+            if not may_call(
+                len(self.per_call),
+                spent,
+                self.dearest,
+                max_calls=args.max_calls,
+                max_usd=args.max_usd,
+            ):
                 outcomes.append(REFUSED)
                 raise RuntimeError("the agent's allocation is reached")
             try:
@@ -104,7 +148,9 @@ def main() -> int:
             except Exception as error:
                 outcomes.append(type(error).__name__)
                 raise
+            self.dearest = max(self.dearest, self.priced() - spent)
             outcomes.append("ok")
+            answers.extend(answers_of(message, now()))
             return message
 
     class StandIn(_Mind):
@@ -115,6 +161,11 @@ def main() -> int:
             self.acts = 0
 
         def answer(self, request: dict[str, Any]) -> dict[str, Any]:
+            message = self.decide(request)
+            answers.extend(answers_of(message, now()))
+            return message
+
+        def decide(self, request: dict[str, Any]) -> dict[str, Any]:
             if len(self.per_call) >= args.max_calls:
                 outcomes.append(REFUSED)
                 raise RuntimeError("the agent's allocation is reached")
@@ -122,7 +173,7 @@ def main() -> int:
             self.tool_names = tools or self.tool_names
             self.per_call.append(
                 {
-                    "at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+                    "at": now(),
                     "ms": 0,
                     "model": request.get("model"),
                     "prompt_tokens": 0,
@@ -209,6 +260,7 @@ def main() -> int:
         "price_source": "the manifest's input_usd_per_mtok and output_usd_per_mtok",
         "bound": {"max_calls": args.max_calls, "max_usd": str(args.max_usd)},
         "outcomes": outcomes,
+        "answers": answers,
         "nat_exit": exit_code,
         "per_call": relay.per_call,
     }

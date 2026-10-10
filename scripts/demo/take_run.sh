@@ -7,6 +7,7 @@
 #   [TAKE_PLAN=<a scripted model plan>] [TAKE_HOLD=yes] [TAKE_PORT_BASE=19200]
 #   [EXULANICA_DEMO_ENV_FILE=<a file with a NEBIUS_API_KEY= line>] [TAKE_BUDGET_USD=0.50]
 #   [TAKE_BUDGET_CALLS=300] [TAKE_OWN_LOOK=<a look document a game's visitors arrive in>]
+#   [TAKE_TICK_INTERVAL_MS=<the base wait between world minutes; the stack's own default without it>]
 #   zsh scripts/demo/take_run.sh <take document> <new run folder> [film_take.mjs options...]
 #
 # The take document (scripts/demo/takes/, profile exulanica.film-take/v1) is data; beside what
@@ -61,11 +62,17 @@ doors.write_text(json.dumps(bridges, indent=1) + "\n")
 print("bridges:", [bridge["bridge"] for bridge in bridges])' $RUN/bridges.json $AGENTS_ENTRY >> $RUN/run.log.txt 2>&1
 fi
 [ -e $RUN/bridges.json ] && DOORS=(--door-bridges $RUN/bridges.json)
+# The world's clock: how long a world minute lasts at 1x (the launcher's own option; the API checks it).
+CLOCK=()
+if [ -n "${TAKE_TICK_INTERVAL_MS:-}" ]; then
+  CLOCK=(--society-tick-interval-ms $TAKE_TICK_INTERVAL_MS)
+  log "a world minute every $TAKE_TICK_INTERVAL_MS ms at 1x"
+fi
 if [ -n "${TAKE_PLAN:-}" ]; then
   log "scripted plan ${TAKE_PLAN:A} ($(shasum -a 256 < $TAKE_PLAN | cut -c1-16)); no key, no provider"
   env -u NEBIUS_API_KEY -u EXULANICA_EGRESS_ALLOWLIST .venv/bin/python scripts/acceptance/launch.py up \
     --worktree $ROOT --slot 0 --port-base $BASE --society-of-things --society-playback \
-    --scripted-model ${TAKE_PLAN:A} "${DOORS[@]}" > $RUN/stack-up.json 2>> $RUN/run.log.txt
+    --scripted-model ${TAKE_PLAN:A} "${DOORS[@]}" "${CLOCK[@]}" > $RUN/stack-up.json 2>> $RUN/run.log.txt
 else
   ENV_FILE=${EXULANICA_DEMO_ENV_FILE:?a live take reads its model key from EXULANICA_DEMO_ENV_FILE}
   log "live minds on Nebius Token Factory, at most USD ${TAKE_BUDGET_USD:-0.50} and ${TAKE_BUDGET_CALLS:-300} calls"
@@ -75,7 +82,7 @@ else
     export EXULANICA_BUDGET_USD=${TAKE_BUDGET_USD:-0.50} EXULANICA_BUDGET_MAX_CALLS=${TAKE_BUDGET_CALLS:-300}
     export EXULANICA_SPENDING=process
     .venv/bin/python scripts/acceptance/launch.py up --worktree $ROOT --slot 0 --port-base $BASE \
-      --society-of-things --society-playback --model "${DOORS[@]}" > $RUN/stack-up.json 2>> $RUN/run.log.txt
+      --society-of-things --society-playback --model "${DOORS[@]}" "${CLOCK[@]}" > $RUN/stack-up.json 2>> $RUN/run.log.txt
   )
 fi
 STACK=$(field $RUN/stack-up.json run_dir)
@@ -111,8 +118,21 @@ node scripts/demo/film_take.mjs $DOC --out $RUN/take --url http://localhost:$(fi
 # The receipts live in this stack's database: read them before it goes down.
 SCENE=$(field $DOC scene)
 if [ -n "$SCENE" ]; then
+  # The take's own world among the workspace's saved worlds is the one it named (a take that made its town
+  # leaves the first world beside it); with no single world of that title, the workspace's only one.
+  ENTRY=$(python3 - $STACK/token $API "$(field $DOC title)" <<'ENTRY'
+import json, sys, urllib.request
+token = open(sys.argv[1]).read().strip()
+request = urllib.request.Request(sys.argv[2] + "/world-entries", headers={"Authorization": "Bearer " + token})
+body = json.load(urllib.request.urlopen(request, timeout=30))
+entries = body if isinstance(body, list) else body.get("entries", [])
+named = [entry["entry_id"] for entry in entries if entry.get("title") == sys.argv[3]]
+print(named[0] if len(named) == 1 else "")
+ENTRY
+)
   EXULANICA_TOKEN="$(cat $STACK/token)" python3 scripts/demo/start_society.py $SCENE --base-url $API \
-    --record $RUN/take-record.json >> $RUN/run.log.txt 2>&1 || log "no record of the world (exit $?)"
+    --record $RUN/take-record.json ${ENTRY:+--entry} $ENTRY >> $RUN/run.log.txt 2>&1 \
+    || log "no record of the world (exit $?)"
   # A world a stop rule paused (provider_failure_guard.py's stop-rule.json) is read as it stands.
   MINUTES=1
   if [ -e $RUN/stop-rule.json ]; then MINUTES=0; log "the stop rule paused the world: read without playing"; fi

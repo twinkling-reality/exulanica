@@ -21,6 +21,11 @@
       "scene": "three-strangers-in-town",
       "version": 1,
       "sha256": "f5e1b614710642b3bff1d89181a412bcde9f56263aea0d41ed8175199eeb8ddd"
+    },
+    {
+      "scene": "three-strangers-in-town",
+      "version": 2,
+      "sha256": "2d7fa623b2a06ceed958581163e64d8b44d8a246049124afc8e787c5d2bbe3e3"
     }
   ]
 }

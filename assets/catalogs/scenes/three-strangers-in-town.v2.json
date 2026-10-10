@@ -1,0 +1,135 @@
+{
+  "profile": "exulanica.scene/v1",
+  "scene": "three-strangers-in-town",
+  "version": 2,
+  "title": "Three strangers in town",
+  "summary": "A stone well and a gate for travellers on the far footway of a town street, where an armoured knight and a lantern spirit meet a traveller who comes in through the gate, each with an open model for a mind; laid out for a generated town and placed from where a person arrives in it.",
+  "ground": {
+    "kind": "generated",
+    "frame": "each thing is placed from where a person arrives: right_mm to their right, forward_mm ahead, turn_microradians counterclockwise seen from above, where a turn of 0 faces the person arriving (as an object placed in front of a person turns to face them) and a turn of pi faces the way they face"
+  },
+  "words": "Across the street from where a person arrives: a stone well and a gate for travellers on the footway, a knight on guard by the well, a lantern spirit, and a sword and a lantern left by the well.",
+  "things": [
+    {
+      "thing_id": "well",
+      "kind": {
+        "kind": "well",
+        "version": 2
+      },
+      "place": {
+        "right_mm": 6300,
+        "forward_mm": 15700,
+        "turn_microradians": 1570796
+      }
+    },
+    {
+      "thing_id": "gate",
+      "kind": {
+        "kind": "gate",
+        "version": 1
+      },
+      "place": {
+        "right_mm": -1400,
+        "forward_mm": 17200,
+        "turn_microradians": 3141593
+      }
+    },
+    {
+      "thing_id": "sword",
+      "kind": {
+        "kind": "sword",
+        "version": 3
+      },
+      "place": {
+        "right_mm": 7600,
+        "forward_mm": 16300,
+        "turn_microradians": 0
+      }
+    },
+    {
+      "thing_id": "lantern",
+      "kind": {
+        "kind": "lantern",
+        "version": 1
+      },
+      "place": {
+        "right_mm": 5100,
+        "forward_mm": 15400,
+        "turn_microradians": 0
+      }
+    },
+    {
+      "thing_id": "knight",
+      "kind": {
+        "kind": "knight",
+        "version": 2
+      },
+      "place": {
+        "right_mm": 3300,
+        "forward_mm": 16000,
+        "turn_microradians": 0
+      }
+    },
+    {
+      "thing_id": "lantern-spirit",
+      "kind": {
+        "kind": "lantern_spirit",
+        "version": 1
+      },
+      "place": {
+        "right_mm": -5000,
+        "forward_mm": 16000,
+        "turn_microradians": 0
+      }
+    }
+  ],
+  "travellers": {
+    "gate": "gate",
+    "model": {
+      "provider": "nebius_token_factory",
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b"
+    }
+  },
+  "minds": [
+    {
+      "thing_id": "knight",
+      "decider": {
+        "kind": "model",
+        "provider": "nebius_token_factory",
+        "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      }
+    },
+    {
+      "thing_id": "lantern-spirit",
+      "decider": {
+        "kind": "model",
+        "provider": "nebius_token_factory",
+        "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+      }
+    }
+  ],
+  "engine": "exulanica-society/v7",
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

@@ -1,0 +1,18 @@
+{
+ "profile": "exulanica.film-take/v1",
+ "title": "A stone town",
+ "world": {
+  "describe": "An old town of stone and brick with slate roofs, tall apartment blocks and offices."
+ },
+ "stand": [
+  {
+   "key": "ArrowRight",
+   "ms": 1160
+  },
+  {
+   "key": "KeyW",
+   "ms": 250
+  }
+ ],
+ "until": "stood"
+}
