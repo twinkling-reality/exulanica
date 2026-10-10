@@ -85,7 +85,7 @@ import { buildPlanSheet } from './ui/companion-plan.js';
 import { CompanionActionsClient, type ActionPageContext } from './companion-actions-api.js';
 import { PieceRequestsClient, watchPieceRequests } from './composition/piece-requests.js';
 import { CreatureDraftsClient } from './creature-drafts-api.js';
-import { mountCreatureMaker, placementInGeneratedRegion } from './composition/creature-maker.js';
+import { mountCreatureMaker, placementInGeneratedRegion, planPlacement } from './composition/creature-maker.js';
 import { buildCreatureSheet } from './ui/creature-sheet.js';
 import { mountCompanionPlans, type CompanionPlans } from './composition/companion-plan.js';
 import { openWorldPath } from './world-scope.js';
@@ -1647,13 +1647,21 @@ async function mountWorld(): Promise<void> {
       const active = state.activeWorldEntry;
       if (active === null) return null;
       const here = objects.selectionContext();
+      // Where the objects panel would put a thing; in a saved world drawn from a recipe or a world
+      // kind, where that panel places nothing, the same distance ahead in the region drawn here.
+      const placement = planPlacement(
+        here.placement,
+        active.generatedGround ?? active.generatedSite,
+        state.atlas?.binding.authoredSociety?.root.parent?.name,
+        state.atlas?.binding.playerPose(),
+      );
       return {
         versionId: active.authoredVersionId,
         baseStateSha256: active.authoredStateSha256,
         // The person's own choice for anything added, never inferred: the plan asks them.
         originRole: null,
         context: {
-          ...(here.placement === null ? {} : { placement: here.placement }),
+          ...(placement === null ? {} : { placement }),
           ...(here.viewer === null ? {} : { viewer: here.viewer }),
           ...(here.selected_object_id === null ? {} : { selected_object_id: here.selected_object_id }),
         },

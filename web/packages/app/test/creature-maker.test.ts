@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { atlasVec3 } from '@exulanica/atlas-core';
 import { DEFAULT_PLACEMENT_DISTANCE_MM, generatedRegionName } from '@exulanica/atlas-react/playcanvas';
 import { ApiError } from '@exulanica/graph-client';
-import { mountCreatureMaker, offerWords, placementInGeneratedRegion } from '../src/composition/creature-maker.js';
+import { mountCreatureMaker, offerWords, placementInGeneratedRegion, planPlacement } from '../src/composition/creature-maker.js';
 import type { CreatureDraft, CreatureDraftsClient, CreatureOffer } from '../src/creature-drafts-api.js';
 import type { CreatureSheet, CreatureSheetOffer } from '../src/ui/creature-sheet.js';
 
@@ -104,6 +104,27 @@ describe('making a creature from the open world', () => {
     // Never where this page would not show it: another region drawn, or no town at all.
     expect(placementInGeneratedRegion(town, generatedRegionName('region:other'), pose)).toBeNull();
     expect(placementInGeneratedRegion(null, generatedRegionName('region:city'), pose)).toBeNull();
+  });
+
+  it('gives a Companion plan that ground in a made town, and the objects panel\'s own placement untouched', () => {
+    const town = { regionId: 'region:city', arrivalMm: [0, 2_000, 0] };
+    const pose = { position: atlasVec3(10, 3.6, -20), forward: atlasVec3(0, 0, -1) };
+    const drawn = generatedRegionName('region:city');
+    // A world drawn from a recipe or a world kind: the objects panel offers no placement there.
+    const planned = planPlacement(null, town, drawn, pose);
+    expect(planned?.region_id).toBe('region:city');
+    expect(planned?.transform).toEqual({ ...placementInGeneratedRegion(town, drawn, pose)?.transform, scale_milli: 1000 });
+    // The request's transform is refused without each of its five whole numbers.
+    expect(Object.keys(planned?.transform ?? {}).sort()).toEqual(['scale_milli', 'x_mm', 'y_mm', 'yaw_microradians', 'z_mm']);
+    for (const value of Object.values(planned?.transform ?? {})) expect(Number.isInteger(value)).toBe(true);
+    // The objects panel's own placement is the one sent, as it gave it.
+    const panel = { region_id: 'region:authored', transform: { x_mm: 1, y_mm: 2, z_mm: 3, yaw_microradians: 4, scale_milli: 1_500 } };
+    expect(planPlacement(panel, town, drawn, pose)).toBe(panel);
+    expect(JSON.stringify(planPlacement(panel, null, null, undefined))).toBe(JSON.stringify(panel));
+    // Nothing drawn here to stand on: no placement, and the plan asks where the thing should go.
+    expect(planPlacement(null, town, generatedRegionName('region:other'), pose)).toBeNull();
+    expect(planPlacement(null, null, drawn, pose)).toBeNull();
+    expect(planPlacement(null, town, drawn, undefined)).toBeNull();
   });
 
   it('follows a draft still running when the sheet opens, so a reload never loses it', async () => {

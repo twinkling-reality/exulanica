@@ -117,6 +117,34 @@ export function placementInGeneratedRegion(
   };
 }
 
+/** The ground a Companion plan would add a thing on, as its request's `context.placement` takes it. */
+export interface PlanPlacement {
+  readonly region_id: string;
+  readonly transform: {
+    readonly x_mm: number; readonly y_mm: number; readonly z_mm: number;
+    readonly yaw_microradians: number; readonly scale_milli: number;
+  };
+}
+
+/**
+ * Where a Companion plan would put a thing it adds: the objects panel's own placement where that
+ * panel has one, exactly as it gave it; in a saved world drawn from a recipe or a world kind, where
+ * that panel places nothing, the ground a made creature would stand on (`placementInGeneratedRegion`)
+ * at a scale of one, which the request's transform requires and a thing's pose does not carry. Null
+ * where neither is drawn here: the plan then asks the person where the thing should go.
+ */
+export function planPlacement(
+  panel: PlanPlacement | null,
+  generated: { readonly regionId: string; readonly arrivalMm: readonly number[] } | null | undefined,
+  drawnRegion: string | null | undefined,
+  pose: CameraPose | undefined,
+): PlanPlacement | null {
+  if (panel !== null) return panel;
+  const ahead = placementInGeneratedRegion(generated, drawnRegion, pose);
+  if (ahead === null) return null;
+  return { region_id: ahead.region_id, transform: { ...ahead.transform, scale_milli: 1000 } };
+}
+
 export function offerWords(offer: CreatureOffer): { readonly unavailable: string | null; readonly timing: string } {
   return {
     unavailable: offer.offered ? null : UNAVAILABLE[offer.code ?? ''] ?? 'Creatures are not made here.',
