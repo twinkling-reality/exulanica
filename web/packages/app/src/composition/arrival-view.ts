@@ -235,8 +235,10 @@ interface SeenLife { readonly toward: readonly [number, number]; readonly weight
 
 /**
  * What of a town's life is seen from a spot, whichever way one looks: every seat and door within
- * the far distance whose sight line nothing at eye height crosses, each with what it counts for at
- * its distance (a seat for `seatWeight` doors; whole up to the near distance, then less).
+ * the far distance, and not nearer than the least, whose sight line nothing at eye height crosses,
+ * each with what it counts for at its distance (a seat for `seatWeight` doors; whole up to the near
+ * distance, then less). One at the viewer's feet counts nothing, so no view is taken for standing
+ * behind a bench.
  */
 function lifeSeenFrom(
   from: readonly [number, number], life: TownLife, rings: readonly SightBlocker[], rule: LifeViewRule,
@@ -245,7 +247,7 @@ function lifeSeenFrom(
   for (const [points, worth] of [[life.seats, rule.seatWeight], [life.doors, 1]] as const) {
     for (const point of points) {
       const distance = Math.hypot(point[0] - from[0], point[1] - from[1]);
-      if (distance > rule.farMm || distance === 0) continue;
+      if (distance > rule.farMm || distance < rule.leastMm || distance === 0) continue;
       const toward = [(point[0] - from[0]) / distance, (point[1] - from[1]) / distance] as const;
       if (openDistance(from, toward, rings, distance) < distance - rule.sightMarginMm) continue;
       const fade = distance <= rule.nearMm ? 1 : (rule.farMm - distance) / (rule.farMm - rule.nearMm);
@@ -292,11 +294,13 @@ function distanceToRing(point: readonly [number, number], ring: SightBlocker): n
  * (back from the kerb, off the line people walk, and along the footway), looking along the street
  * at a slant one way or the other. It never looks straight across at the wall opposite.
  *
- * Under a rule that states how life is judged (version 2 of the catalog), the view taken has nothing
- * at eye height dead ahead nearer than the rule's floor (where every view has something there, the
- * one whose nearest is farthest), and of those the most of the town's life in view; of equally alive
- * views the most open, and of equally open ones the nearest the served spot, the first found. Only
- * what the caller hands of the town's own records is read: `rings` holds no parked vehicle.
+ * Under a rule that states how life is judged (version 2 of the catalog and later), the view taken
+ * has nothing at eye height dead ahead nearer than the rule's floor and, where the rule states a
+ * least distance (version 3), no seat nearer than that inside its fan (where every view has one or
+ * the other, the one with the most room before it, each against what the rule asks); of those the
+ * most of the town's life in view; of equally alive views the most open, and of equally open ones
+ * the nearest the served spot, the first found. Only what the caller hands of the town's own
+ * records is read: `rings` holds no parked vehicle.
  *
  * Under a rule that does not (version 1), whichever spot and way is most open, a view with something
  * in its face only when every view has one. Standing off the walking line is preferred where the
@@ -343,11 +347,33 @@ function openView(
   return best!.view;
 }
 
+/**
+ * How near the nearest seat stands inside the fan `fanHalf` either side of `toward`, or infinity
+ * where none does: a seat that near is furniture at the viewer's feet, whatever stands beyond it.
+ */
+export function nearestSeatInFan(
+  from: readonly [number, number], toward: readonly [number, number], fanHalf: number,
+  seats: readonly (readonly [number, number])[],
+): number {
+  const inFan = Math.cos(fanHalf);
+  let nearest = Number.POSITIVE_INFINITY;
+  for (const seat of seats) {
+    const distance = Math.hypot(seat[0] - from[0], seat[1] - from[1]);
+    if (distance === 0 || distance >= nearest) continue;
+    if (((seat[0] - from[0]) * toward[0] + (seat[1] - from[1]) * toward[1]) / distance >= inFan) nearest = distance;
+  }
+  return nearest;
+}
+
 /** One spot and way the first view could take, with what it is judged by. */
 interface JudgedView {
   readonly view: ArrivalView;
-  /** How near anything stands dead ahead, and whether that is at or beyond the rule's floor. */
-  readonly centreMm: number;
+  /**
+   * How much room the view has before it, as a share of what the rule asks: the nearest thing at
+   * eye height dead ahead against the centre floor, and the nearest seat in the fan against the
+   * least distance, whichever is the less. Clear at 1 or more.
+   */
+  readonly room: number;
   readonly clear: boolean;
   readonly life: number;
   readonly open: number;
@@ -372,7 +398,7 @@ function liveliestView(
   const rings = every.filter((ring) => distanceToRing([input.eastMm, input.southMm], ring) <= within);
   const better = (a: JudgedView, b: JudgedView): boolean => {
     if (a.clear !== b.clear) return a.clear;
-    if (!a.clear && a.centreMm !== b.centreMm) return a.centreMm > b.centreMm;
+    if (!a.clear && a.room !== b.room) return a.room > b.room;
     if (Math.abs(a.life - b.life) > rule.life.tie) return a.life > b.life;
     if (Math.abs(a.open - b.open) > rule.tie) return a.open > b.open;
     return a.moved < b.moved;
@@ -392,11 +418,16 @@ function liveliestView(
         const seen = lifeSeenFrom(spot, life, rings, rule.life);
         for (const way of [1, -1]) {
           const toward = turned(way * rule.slant);
-          const centreMm = nearestInWedge(spot, toward, rule.life.centreHalf, rings);
+          const centre = nearestInWedge(spot, toward, rule.life.centreHalf, rings) / rule.life.centreFloorMm;
+          // A seat nearer than the least distance does not count as life, and a view that has one
+          // inside its fan stands behind a bench: it is passed over as one with a post dead ahead is.
+          const feet = rule.life.leastMm > 0
+            ? nearestSeatInFan(spot, toward, rule.fanHalf, life.seats) / rule.life.leastMm : Number.POSITIVE_INFINITY;
+          const room = Math.min(centre, feet);
           const judged: JudgedView = {
             view: { eastMm: spot[0], southMm: spot[1], yaw: Math.atan2(-toward[0], -toward[1]), moved: back > 0 || step > 0 },
-            centreMm,
-            clear: centreMm >= rule.life.centreFloorMm,
+            room,
+            clear: room >= 1,
             life: lifeInFan(seen, toward, rule.fanHalf),
             // Off the line people walk is worth a little: walkers then cross the view, not the viewer.
             open: viewOpenness(spot, toward, rings, rule) + (back > 0 ? 0.05 : 0),

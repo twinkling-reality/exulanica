@@ -116,6 +116,42 @@ PLAY_POLICY = Path("assets") / "catalogs" / "society" / "society-decision-policy
 QUIET_MINUTES = 5
 #: What a person's line holds so that the erasure can be searched for it afterwards.
 TYPED_LINE = "Good evening from the acceptance run."
+#: How a society that is made opens on a host that sets nothing: the opening policy in force.
+OPENING_POLICY = Path("exulanica") / "world" / "society-opening-policy.v2.json"
+
+
+def opened_as_the_policy_says(made: Any, policy: Mapping[str, Any]) -> tuple[bool, str]:
+    """Whether a society of things that was just made stands at a minute the opening policy
+    yields, and what was read, in words.
+
+    A society that is made opens awake: the server advances it, minute by ordinary minute, until
+    the policy's share of its beings is doing something (an action whose kind is not ``idle``). So
+    a society of things made again is first read at the first minute that share holds, which is
+    minute 1 for one born with every being idle, and never at a bare minute 0 with everyone idle.
+    It may stand short of the share only where the opening ran out of budget: at the policy's most
+    minutes, or at or past its least minutes, where the seconds stopped it.
+    """
+    values = policy["values"]
+    tick = made.get("current_tick") if isinstance(made, Mapping) else None
+    state = made.get("state") if isinstance(made, Mapping) else None
+    beings = state.get("inhabitants") if isinstance(state, Mapping) else None
+    if (
+        isinstance(tick, bool)
+        or not isinstance(tick, int)
+        or not isinstance(beings, list)
+        or not beings
+    ):
+        return False, f"minute {tick!r} with no beings read"
+    kinds = [
+        (b.get("action") or {}).get("kind") if isinstance(b, Mapping) else None for b in beings
+    ]
+    doing = sum(1 for kind in kinds if isinstance(kind, str) and kind != "idle")
+    said = f"minute {tick} with {doing} of {len(beings)} beings doing something"
+    if not 0 <= tick <= values["minutes_maximum"]:
+        return False, said
+    awake = 1000 * doing // len(beings) >= values["active_share_milli"]
+    out_of_budget = tick == values["minutes_maximum"] or tick >= values["minutes_minimum"]
+    return awake or out_of_budget, said
 
 
 def play_path(entry: Mapping[str, Any], suffix: str = "") -> str:
@@ -590,8 +626,11 @@ def row_er1(stack: Stack, transcripts: Any, pl1: Mapping[str, Any]) -> Row:
         "A society is erased whole (candidate-38; synthetic-society-contract.md, erasing a "
         "society): PL1's society holds a line a person typed. DELETE on it is 204. Then the "
         "society, its events, its replay and the played being's turn answer 404, and a second "
-        "DELETE is 404 society_unavailable. A society made again on the same version starts at "
-        "its first minute and none of its events holds the typed line. The town's society PL1 "
+        "DELETE is 404 society_unavailable. A society made again on the same version opens "
+        "awake, as every society that is made does: it is first read at the minute the opening "
+        "policy in force yields, the first at which its share of beings is doing something, and "
+        "not at a bare minute 0 with every being idle. None of its events holds the typed line. "
+        "The town's society PL1 "
         "made in the same workspace still reads 200 with its people. Evidence read as the "
         "database owner: one tombstone of scope society for the workspace.",
     )
@@ -637,9 +676,13 @@ def row_er1(stack: Stack, transcripts: Any, pl1: Mapping[str, Any]) -> Row:
         query=query,
         body={"region_id": record["arrival"]["region_id"], "profile": D.THINGS_ENGINE},
     )
+    opened, opening_read = opened_as_the_policy_says(
+        made, json.loads((stack.worktree / OPENING_POLICY).read_text(encoding="utf-8"))
+    )
     row.expect(
-        made_status in (200, 201) and (made or {}).get("current_tick") == 0,
-        f"a society made again answered {made_status} at minute {(made or {}).get('current_tick')}",
+        made_status in (200, 201) and opened,
+        f"a society made again answered {made_status} at {opening_read}, which is not a minute "
+        "the opening policy yields",
     )
     step_once(c, "ER1 new step", entry)
     fresh = D.society_events(c, "ER1 after", entry)
@@ -660,7 +703,7 @@ def row_er1(stack: Stack, transcripts: Any, pl1: Mapping[str, Any]) -> Row:
     row.observed = {
         "erase": [status, answered(*again)],
         "reads_after": reads,
-        "remade": [made_status, (made or {}).get("current_tick")],
+        "remade": [made_status, (made or {}).get("current_tick"), opening_read],
         "events_before": len(before),
         "events_after": len(fresh),
         "town": town_status,

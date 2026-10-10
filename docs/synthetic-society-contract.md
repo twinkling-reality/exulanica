@@ -1060,7 +1060,8 @@ programs with their answers and its crossings with their bindings; and the compa
 experiments started from it. The route answers 204, 404 `society_unavailable` for a version that
 holds no society and 409 `restore_sealed` while the installation is sealed for a restore.
 Afterwards every read of the society answers 404, nothing is left to replay, and the world may make
-a new society, which starts at its first minute. A workspace tombstone erases every society of the
+a new society, which starts at its first minute and opens awake as any society that is made does
+(below, "It opens awake"). A workspace tombstone erases every society of the
 workspace the same way. Only the erasure deletes these rows: each table refuses a delete by anyone
 but `exulanica_definer`. A restore carries the erasure before it replays any tombstone
 (`exulanica/deletion/withdrawals.v2.json`), so a society erased after a backup is erased again.
@@ -1104,7 +1105,8 @@ and the Companion's answers about it. An erasure also removes whether everyone w
 requests a person directed at people, which a living town never holds (its engine takes neither).
 The people's identities continue, so a look or a model can be chosen again for the same person. What
 stays is the world, its version, everything placed, door grants and programs, and the world's look.
-The society of things starts at its first minute. There is no way back: a society of things is not
+The society of things starts at its first minute and, once the request's transaction is committed,
+opens awake as any society that is made does. There is no way back: a society of things is not
 made a living town again. Carrying the day and the clock across would need the living society's
 state read into the society of things' genesis, which no engine does; the loss is this route's
 behavior, stated wherever it is offered.

@@ -1,13 +1,15 @@
 /**
  * How the first view of a generated town is chosen where nothing is placed in it, read from the
- * data files that state each value with its reason, `assets/catalogs/arrival/town-first-view.v2.json`
- * and the version before it. Presentation only.
+ * data files that state each value with its reason, `assets/catalogs/arrival/town-first-view.v3.json`
+ * and the versions before it. Presentation only.
  *
  * Version 1 chooses the most open view. Version 2 chooses by what of the town's life lies in view
- * (its seats and doors), with openness to break a tie and nothing at eye height dead ahead; it is
- * the version the page opens a town by. Both stay readable: `firstViewRule` reads either file.
+ * (its seats and doors), with openness to break a tie and nothing at eye height dead ahead. Version
+ * 3 is version 2 with a least distance under which a seat or a door does not count, so the view
+ * does not walk up to a bench to stand behind it; it is the version the page opens a town by. All
+ * stay readable: `firstViewRule` reads any of the three files.
  */
-import catalogText from '../../../../assets/catalogs/arrival/town-first-view.v2.json?raw';
+import catalogText from '../../../../assets/catalogs/arrival/town-first-view.v3.json?raw';
 
 /**
  * How a view is judged by the town's life, as version 2 of the catalog states it: angles in
@@ -17,6 +19,8 @@ export interface LifeViewRule {
   /** A seat or a door in view counts whole up to `nearMm`, then less, down to nothing at `farMm`. */
   readonly nearMm: number;
   readonly farMm: number;
+  /** Nearer than this a seat or a door is at the viewer's feet and does not count. 0 in version 2. */
+  readonly leastMm: number;
   /** How many doors one seat in view is worth. */
   readonly seatWeight: number;
   /** Views whose life differs by less than this are equally alive; the more open is taken. */
@@ -65,11 +69,11 @@ interface FirstViewEntry {
   readonly reason: string;
 }
 
-const PROFILES: ReadonlyMap<unknown, 1 | 2> = new Map([
-  ['exulanica.town-first-view/v1', 1], ['exulanica.town-first-view/v2', 2],
+const PROFILES: ReadonlyMap<unknown, 1 | 2 | 3> = new Map([
+  ['exulanica.town-first-view/v1', 1], ['exulanica.town-first-view/v2', 2], ['exulanica.town-first-view/v3', 3],
 ]);
 
-/** The rule a town first-view catalog file states, of either version; a file that is neither is refused. */
+/** The rule a town first-view catalog file states, of any version; a file of none of them is refused. */
 export function firstViewRule(text: string): OpenViewRule {
   const document = JSON.parse(text) as { readonly profile?: unknown; readonly entries?: readonly FirstViewEntry[] };
   const version = PROFILES.get(document.profile);
@@ -107,6 +111,7 @@ export function firstViewRule(text: string): OpenViewRule {
   const life: LifeViewRule = Object.freeze({
     nearMm: millimetres('life_near_mm'),
     farMm: millimetres('life_far_mm'),
+    leastMm: version === 2 ? 0 : millimetres('life_least_mm'),
     seatWeight: thousandths('seat_weight_milli'),
     tie: thousandths('life_tie_milli'),
     sightMarginMm: millimetres('sight_margin_mm'),
@@ -116,7 +121,8 @@ export function firstViewRule(text: string): OpenViewRule {
     seatTopMaximumMm: millimetres('seat_top_maximum_mm'),
     seatSpanMinimumMm: millimetres('seat_span_minimum_mm'),
   });
-  if (!(life.farMm > life.nearMm) || !(life.seatTopMaximumMm >= life.seatTopMinimumMm) || !(life.centreHalf < Math.PI / 2)) {
+  if (!(life.farMm > life.nearMm) || !(life.nearMm > life.leastMm) || !(life.seatTopMaximumMm >= life.seatTopMinimumMm)
+    || !(life.centreHalf < Math.PI / 2)) {
     throw new Error('the town first-view catalog states distances or an angle that cannot be held together');
   }
   return Object.freeze({ ...rule, life });

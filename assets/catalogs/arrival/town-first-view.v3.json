@@ -1,0 +1,146 @@
+{
+  "profile": "exulanica.town-first-view/v3",
+  "note": "How the first view of a generated town is chosen where nothing is placed in it: by what of the town's life lies in view (its seats and its doors, from its own tiles), with openness to break a tie and nothing at eye height dead ahead. It is chosen from the town's tiles and its served arrival alone, so a town opens the same way every time. Version 3 is version 2 with one value more, life_least_mm: a seat or a door at the viewer's feet no longer counts and a view with a seat there is passed over, so the view does not walk up to a bench to stand behind it. Every value is a chosen default with its reason: presentation only, changeable by a later version beside this one. Nothing here is a measured cost or a safety bound. Versions 1 and 2 stay beside this file and are read as before.",
+  "entries": [
+    {
+      "key": "slant_degrees",
+      "value": 60,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "A town is served facing straight across its road, at the wall opposite. The first view is turned this far from that toward one way along the street: far enough that the footways run away into the picture and people on them are in it for many seconds, near enough to across that the opposite frontage stays in frame. At a 102 degree horizontal field (70 degrees vertical at 16:9) a view turned 60 degrees holds both the far side opposite and the street's length."
+    },
+    {
+      "key": "fan_half_degrees",
+      "value": 40,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "A view is judged by what lies this far either side of where it looks: most of the 51 degree half field, leaving out its edges, where what is seen is least looked at. A seat or a door counts as in view inside this fan, and openness is the mean over sight lines spread across it."
+    },
+    {
+      "key": "sight_lines",
+      "value": 9,
+      "unit": "count",
+      "class": "chosen_default",
+      "reason": "Nine lines across the fan are ten degrees apart, which at ten metres is under two metres: narrower than a building's front, so openness sees every frontage. A thin post can slip between two lines, so what stands dead ahead is not judged by these lines but by the whole of the middle (centre_half_degrees)."
+    },
+    {
+      "key": "reach_mm",
+      "value": 40000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A sight line is followed this far and no farther when openness is judged: a person 1.7 m tall stands about 33 px high at 40 m on a 1080 px frame at this field, and a view open beyond that shows nobody a person would notice."
+    },
+    {
+      "key": "life_near_mm",
+      "value": 25000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A seat or a door in view counts whole up to this distance: a person 1.7 m tall there stands 52 px high on a 1080 px frame at a 70 degree vertical field, large enough that what they are doing is read at a glance."
+    },
+    {
+      "key": "life_far_mm",
+      "value": 60000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Beyond the near distance a seat or a door counts for less, in a straight line down to nothing at this distance, where a person stands 22 px high on the same frame: seen to be there, too small to read."
+    },
+    {
+      "key": "life_least_mm",
+      "value": 6000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A seat or a door nearer than this is at the viewer's feet: it does not count as life in view, and a view with a seat that near inside its fan is passed over as one with a post dead ahead is, unless every view has one. Without it the view walks along the footway toward a town's benches and can stand behind one: under version 2 one town of five looked at opened 3.4 m behind a bench, which spans 410 px of a 1920 px frame there with its back 160 px below the middle, and with whatever is parked beyond it fills the lower middle of the picture. At 6 m the same bench spans 230 px and its back stands 90 px below the middle: furniture in the street, not in the way. Run on that town's tiles, the least distance alone left the view behind the bench at 6 m and at 10 m, because the other benches still called it to that spot; passing such a view over moved it 4.5 m along, to where the nearest seat in its fan is 21.7 m off."
+    },
+    {
+      "key": "seat_weight_milli",
+      "value": 4000,
+      "unit": "thousandth",
+      "class": "chosen_default",
+      "reason": "How many doors one seat in view is worth. A person who sits stays for minutes, and a person at a door is in view for the seconds of a walk beginning or ending. On the recorded first ten minutes of two towns made from a sentence (34 and 36 people, a minute in 8 s), 82 percent of the figure-seconds spent standing still within 60 m of the arrival were within 1.5 m of a seat: 220 to 280 figure-seconds a seat, against 18 to 21 moving figure-seconds a door, a ratio near 12 at that head count. Seats fill and walkers grow as a town holds more people, so the weight is set below that ratio: one seat outweighs the few doors by which two ways along a street differ, and doors still decide between views that hold the same seats."
+    },
+    {
+      "key": "life_tie_milli",
+      "value": 500,
+      "unit": "thousandth",
+      "class": "chosen_default",
+      "reason": "Two views whose life differs by less than half of one near door are equally alive, and the more open of them is taken: a difference that small is a door at the far edge of sight, not a street with more on it."
+    },
+    {
+      "key": "sight_margin_mm",
+      "value": 500,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A door's threshold lies on its building's face and a seat stands on its own base, so a sight line to either ends on what it belongs to: something standing in the line within this distance of the point is the thing itself and does not hide it."
+    },
+    {
+      "key": "centre_half_degrees",
+      "value": 12,
+      "unit": "degree",
+      "class": "chosen_default",
+      "reason": "Dead ahead is this far either side of where the view looks: the middle sixth of a 102 degree frame. The whole of it is tested against what stands at eye height, not sampled lines, so a post 60 mm wide is found."
+    },
+    {
+      "key": "centre_floor_mm",
+      "value": 10000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Nothing at a standing person's eye height (a building, a trunk, a post) may stand dead ahead nearer than this: at 10 m a trunk or post 170 to 300 mm wide is 13 to 23 px of a 1920 px frame, a line in the picture and not a thing in the face; at 4 m, the distance version 1 held, it is 33 to 58 px and stands in the middle of the view. A view with something nearer is taken only when every view has one, and then the one whose nearest is farthest."
+    },
+    {
+      "key": "seat_top_minimum_mm",
+      "value": 350,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A part of street furniture is a seat by its shape, not its name: its top at least this far above the furniture's base, the height of a low wall a person sits on."
+    },
+    {
+      "key": "seat_top_maximum_mm",
+      "value": 600,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "And at most this far above it: higher is a ledge to lean on or the top of a bin, not a seat. The street furniture catalog's bench has its board's top at 480 mm."
+    },
+    {
+      "key": "seat_span_minimum_mm",
+      "value": 400,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A seat is at least this long and this deep in plan, a little under a seated person's width: a bollard's cap and a hydrant's top are at seat height and are not seats."
+    },
+    {
+      "key": "back_step_mm",
+      "value": 750,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A town is served standing on the line its people walk, so walkers pass through the viewer. The first view may step back from the kerb in steps of this length: a little over a standing body's width, so one step is off the line."
+    },
+    {
+      "key": "back_maximum_mm",
+      "value": 2250,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Never farther back than three such steps: a footway is seldom wider behind its walking line, and drawn ground decides each step anyway."
+    },
+    {
+      "key": "along_step_mm",
+      "value": 1500,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "The step along the footway the first view already takes past a parked car (ARRIVAL_STEP_MM)."
+    },
+    {
+      "key": "along_maximum_mm",
+      "value": 6000,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Never farther along the footway than this from where the town says a person arrives: far enough to clear a tree, a lamp post and a sign in a row, near enough that the first view is still the place the town chose."
+    },
+    {
+      "key": "tie_milli",
+      "value": 20,
+      "unit": "thousandth",
+      "class": "chosen_default",
+      "reason": "Two equally alive views whose openness differs by less than this many thousandths are equally open, and the one nearer where the town says a person arrives is taken: without it the view backs to the wall behind for a gain of under one part in a hundred."
+    }
+  ]
+}

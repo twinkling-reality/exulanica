@@ -163,14 +163,18 @@ footway). It takes the spot and the way that hold most of the town's life: its s
 street furniture by shape, and its doors onto a footway, each counted where nothing at eye height
 hides it, a seat for more than a door and both for less with distance. Nothing at eye height stands
 dead ahead of it nearer than a stated distance (the whole middle of the view is tested, so a thin post
-is found), unless every view has something there; of equally alive views it takes the most open over a
-fan of sight lines, and of those the nearest the served spot. That choice reads the town's own tiles and
+is found), and no seat stands at its feet: a seat or a door nearer than a stated least distance does not
+count, and a view with a seat that near inside its fan is passed over, so the view does not walk up to a
+bench to stand behind it. Where every view has one or the other, the one with the most room before it is
+taken. Of equally alive views it takes the most open over a fan of sight lines, and of those the nearest
+the served spot. That choice reads the town's own tiles and
 its served arrival and nothing that arrives later: parked vehicles do not enter it, so a town opens the
 same way when it is made and each time it is opened again. Whether anything is placed is read from the
 world's version and waited for; only a town with things placed asks what is parked, with a time limit,
 so a dressed town's standpoint can still differ by what is parked when it opens. Each figure of the rule
-is a chosen default stated with its reason in `assets/catalogs/arrival/town-first-view.v2.json`; version
-1 of that catalog, which chose by openness alone, stays beside it and is read by the same reader. A world
+is a chosen default stated with its reason in `assets/catalogs/arrival/town-first-view.v3.json`; versions
+1 and 2 of that catalog (by openness alone; by life with no least distance) stay beside it and are read by
+the same reader. A world
 with people in it that opens paused keeps "The world is paused. Press Play to let it
 run." in the status place until it plays or closes, and once a browser has seen the world play the line is
 not said for it again; the world never plays by itself. Where nothing is placed in it and none of its

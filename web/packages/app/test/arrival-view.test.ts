@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  arrivalView, crosses, nearestInWedge, openDistance, parkedFootprint, seatsOf, viewLife, viewOpenness,
+  arrivalView, crosses, nearestInWedge, nearestSeatInFan, openDistance, parkedFootprint, seatsOf, viewLife, viewOpenness,
   type LifeViewRule, type OpenViewRule, type SightBlocker,
 } from '../src/composition/arrival-view.js';
 
@@ -206,7 +206,7 @@ describe('the first view of a dressed town, with what else stands at eye height'
  */
 const DEGREE = Math.PI / 180;
 const LIFE: LifeViewRule = {
-  nearMm: 25_000, farMm: 60_000, seatWeight: 4, tie: 0.5, sightMarginMm: 500,
+  nearMm: 25_000, farMm: 60_000, leastMm: 0, seatWeight: 4, tie: 0.5, sightMarginMm: 500,
   centreHalf: 12 * DEGREE, centreFloorMm: 10_000, seatTopMinimumMm: 350, seatTopMaximumMm: 600, seatSpanMinimumMm: 400,
 };
 const LIVELY = { ...RULE, faceMm: 0, life: LIFE };
@@ -404,5 +404,69 @@ describe('the first view of a town with nothing placed, chosen by its life', () 
   it('changes nothing where things are placed', () => {
     const dressed = { eastMm: 0, southMm: 0, facing: [0, -1] as const, targets: scene, parked: [car], ground: everywhere };
     expect(arrivalView({ ...dressed, open: LIVELY, life: { seats: [[-12_000, -1_500]], doors: [] } })).toEqual(arrivalView(dressed));
+  });
+});
+
+/*
+ * The same street under version 3 of the rule: a seat or a door nearer than 6 m does not count, and
+ * a view with a seat that near inside its fan is passed over.
+ */
+const NOT_AT_ITS_FEET = { ...LIVELY, life: { ...LIFE, leastMm: 6_000 } };
+
+describe('a seat at the viewer\'s feet', () => {
+  const town = { eastMm: 0, southMm: 0, facing: [0, -1] as const, targets: [], parked: [], ground: footway };
+  const street = [opposite, behind];
+  const eastward = [Math.sin(Math.PI / 3), -Math.cos(Math.PI / 3)] as const;
+
+  it('is the nearest seat inside the fan, and none beside or behind it', () => {
+    const at = (metres: number, degrees: number): [number, number] =>
+      [metres * 1000 * Math.cos(degrees * DEGREE), metres * 1000 * Math.sin(degrees * DEGREE)];
+    expect(nearestSeatInFan([0, 0], [1, 0], 40 * DEGREE, [at(9, 10), at(4, -30), at(7, 0)])).toBeCloseTo(4_000, 6);
+    expect(nearestSeatInFan([0, 0], [1, 0], 40 * DEGREE, [at(3, 50), at(2, 180)])).toBe(Infinity);
+    expect(nearestSeatInFan([0, 0], [1, 0], 40 * DEGREE, [])).toBe(Infinity);
+  });
+
+  it('does not count as life, where one a little farther does', () => {
+    const alive = (seats: [number, number][], doors: [number, number][] = []) =>
+      viewLife([0, 0], [1, 0], { seats, doors }, [], NOT_AT_ITS_FEET);
+    expect(alive([[3_400, 0]])).toBe(0);
+    expect(alive([[6_500, 0]])).toBe(4);
+    expect(alive([], [[3_400, 0]])).toBe(0);
+    expect(alive([], [[6_500, 0]])).toBe(1);
+    // Under version 2, which states no least distance, the near seat counts whole.
+    expect(viewLife([0, 0], [1, 0], { seats: [[3_400, 0]], doors: [] }, [], LIVELY)).toBe(4);
+  });
+
+  it('is not stood behind where another spot or way has none', () => {
+    // The eastward benches: one 3.4 m along the eastward slant from the spot one step back, and
+    // three more beyond it, 14 to 30 m off. To the west, one bench 20 m off.
+    const near: [number, number] = [3_400 * eastward[0], 750 + 3_400 * eastward[1]];
+    const life = { seats: [near, [14_000, -1_500], [22_000, -1_500], [30_000, -1_500], [-20_000, -1_500]] as [number, number][], doors: [] };
+    // Positive control: version 2 looks east from where that bench is at its feet.
+    const before = arrivalView({ ...town, blockers: street, open: LIVELY, life });
+    expect(looks(before.yaw)[0]).toBeGreaterThan(0);
+    expect(nearestSeatInFan([before.eastMm, before.southMm], looks(before.yaw), LIVELY.fanHalf, life.seats)).toBeLessThan(6_000);
+    const view = arrivalView({ ...town, blockers: street, open: NOT_AT_ITS_FEET, life });
+    expect(nearestSeatInFan([view.eastMm, view.southMm], looks(view.yaw), LIVELY.fanHalf, life.seats)).toBeGreaterThanOrEqual(6_000);
+    // It still looks toward the many benches, from a few steps along the footway: the near one is
+    // then a bench in the street, 6 m or more off, or behind the viewer.
+    expect(looks(view.yaw)[0]).toBeGreaterThan(0);
+    expect([view.eastMm, view.southMm]).not.toEqual([before.eastMm, before.southMm]);
+  });
+
+  it('is stood behind only where every view has one, and then the one with the most room', () => {
+    // One spot to stand on; a bench 2 m along the eastward slant and one 4 m along the westward.
+    const life = { seats: [[2_000 * eastward[0], 2_000 * eastward[1]], [-4_000 * eastward[0], 4_000 * eastward[1]]] as [number, number][], doors: [] };
+    const view = arrivalView({ ...town, ground: () => false, blockers: street, open: NOT_AT_ITS_FEET, life });
+    expect(view).toMatchObject({ eastMm: 0, southMm: 0, moved: false });
+    expect(looks(view.yaw)[0]).toBeLessThan(0);
+    // A post 5 m dead ahead to the west (half the centre floor) is less room than a bench 4 m off
+    // (two thirds of the least distance): the view turns east only when the west is the tighter.
+    const post5 = post(-5_000 * eastward[0], 5_000 * eastward[1]);
+    const tighter = arrivalView({ ...town, ground: () => false, blockers: [...street, post5], open: NOT_AT_ITS_FEET, life });
+    expect(looks(tighter.yaw)[0]).toBeLessThan(0);
+    const post2 = post(-2_000 * eastward[0], 2_000 * eastward[1]);
+    const tightest = arrivalView({ ...town, ground: () => false, blockers: [...street, post2], open: NOT_AT_ITS_FEET, life });
+    expect(looks(tightest.yaw)[0]).toBeGreaterThan(0);
   });
 });
