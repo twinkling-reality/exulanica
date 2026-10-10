@@ -191,9 +191,9 @@ def test_the_people_taken_in_are_opened_awake_after_the_transaction_and_not_insi
     api = made
     _offering_things(api)
     # As a deployment opens a society: the policy in force, with seconds that do not run out here.
+    opening = dataclasses.replace(opening_setting("on"), seconds_maximum=3600)
     api.client.app.state.services = dataclasses.replace(
-        api.client.app.state.services,
-        society_opening=dataclasses.replace(opening_setting("on"), seconds_maximum=3600),
+        api.client.app.state.services, society_opening=opening
     )
     entry, society, take_in = _town(api, "A town that wakes when it takes a knight in")
     created = api.post(
@@ -216,10 +216,13 @@ def test_the_people_taken_in_are_opened_awake_after_the_transaction_and_not_insi
     assert taken.status_code in (200, 201), taken.text
     after = taken.json()
     assert seen == [("IDLE", 0)]
-    # Born idle at minute 0, it is answered at the minute half its beings are doing something.
+    # Born idle at minute 0, it is answered at the minute half its beings are doing something, or
+    # at the policy's last minute. The town is another town each run (its identity is drawn), so
+    # the rule is asserted and not the minute one town came to it.
     beings = after["state"]["inhabitants"]
-    assert after["profile"] == V7 and after["current_tick"] >= 1
-    assert 2 * sum(being["action"]["kind"] != "idle" for being in beings) >= len(beings)
+    doing = 1000 * sum(being["action"]["kind"] != "idle" for being in beings) // len(beings)
+    assert after["profile"] == V7 and 1 <= after["current_tick"] <= opening.minutes_maximum
+    assert doing >= opening.active_share_milli or after["current_tick"] == opening.minutes_maximum
     held = _held(api, entry)
     assert held["society"]["current_tick"] == after["current_tick"]
     assert held["society"]["state_sha256"] == after["state_sha256"]

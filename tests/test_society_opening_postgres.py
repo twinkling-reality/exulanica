@@ -24,6 +24,7 @@ made through ``make_society`` by the arrival step, as a guest's is. What is show
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 from datetime import UTC, datetime
 
 import pytest
@@ -32,6 +33,7 @@ from exulanica.world import arrival_worlds
 from exulanica.world.arrival_worlds import load_arrival_worlds
 
 import personal_world_support as personal
+from society_seed_support import choose_society_seed
 from test_arrival_dressing_postgres import _enter_arrival, _offer, _society, _version
 from test_society_made_world import made as imported_made  # noqa: F401
 
@@ -41,9 +43,17 @@ pytestmark = pytest.mark.postgres
 OPENING = SocietyOpening(outdoors_share_milli=150, minutes_maximum=60, seconds_maximum=3600)
 
 
+#: The society every test here makes starts from this seed, not from its workspace's own (a fresh
+#: workspace each test): the arrival town is one town in every workspace, so with one seed each
+#: test meets the same people on the same ground every run.
+SEED = hashlib.sha256(b"the opening tests' one society").hexdigest()
+
+
 @pytest.fixture(name="made")
 def _made_alias(request):
-    return request.getfixturevalue("imported_made")
+    api = request.getfixturevalue("imported_made")
+    choose_society_seed(api.client.app, SEED)
+    return api
 
 
 @pytest.fixture(name="town")
@@ -206,8 +216,14 @@ def test_a_town_living_in_a_society_of_things_opens_when_half_its_beings_are_doi
     # Born with every being idle, and none of them says whether it is indoors.
     assert body["current_tick"] == 0 and _doing_milli(body["state"]) == 0
     assert all("indoors" not in being["location"] for being in body["state"]["inhabitants"])
-    while _doing_milli(body["state"]) < 500:
-        assert body["current_tick"] < 60, "the society never came to be doing something"
+    assert body["seed_digest"] == hashlib.sha256(SEED.encode()).hexdigest()
+    opening = dataclasses.replace(opening_setting("on"), seconds_maximum=3600)
+    assert opening.active_share_milli == 500 and opening.active_state_families == {"things"}
+    # The rule, by hand: the first minute half are doing something, or the policy's last minute.
+    while (
+        _doing_milli(body["state"]) < opening.active_share_milli
+        and body["current_tick"] < opening.minutes_maximum
+    ):
         stepped = api.post(
             f"{base}/steps?{scope}",
             {"base_tick": body["current_tick"], "base_state_sha256": body["state_sha256"]},
@@ -215,15 +231,15 @@ def test_a_town_living_in_a_society_of_things_opens_when_half_its_beings_are_doi
         assert stepped.status_code == 200, stepped.text
         body = stepped.json()
     by_hand = body
-    assert by_hand["current_tick"] >= 1
+    # Positive control: this society, of one seed over one town, does come to it and is not
+    # stopped at the last minute with nobody doing anything.
+    assert by_hand["current_tick"] >= 1 and _doing_milli(by_hand["state"]) >= 500
     erased = api.client.delete(
         f"{base}?{scope}", headers={"Authorization": f"Bearer {personal.OWNER_TOKEN}"}
     )
     assert erased.status_code == 204, erased.text
     # Made again as the policy in force opens a society: time is not the subject, so its seconds
     # are an hour here and its other values are the host's own reading of the setting.
-    opening = dataclasses.replace(opening_setting("on"), seconds_maximum=3600)
-    assert opening.active_share_milli == 500 and opening.active_state_families == {"things"}
     _open_as(api, opening)
     before = _model_rows(api)
     made_again = api.post(
@@ -233,7 +249,6 @@ def test_a_town_living_in_a_society_of_things_opens_when_half_its_beings_are_doi
     opened = made_again.json()
     assert opened["current_tick"] == by_hand["current_tick"]
     assert opened["state_sha256"] == by_hand["state_sha256"]
-    assert _doing_milli(opened["state"]) >= 500
     assert _model_rows(api) == before
     # The scene's own beings are among them still. Where each stands is the routine's minute, as
     # for anyone else: a placed being may have walked.
