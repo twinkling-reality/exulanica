@@ -52,7 +52,7 @@ const RULE: DeciderMarkRule = {
   nameLeastPx: 14, beingLeastPx: 22, screenShare: 0.08, linesAtOnce: 4,
   lineBaseMs: 2000, linePerCharacterMs: 55, lineMostMs: 9000,
 };
-const NOTHING_UNNAMED = { small: 0, beyondShare: 0 };
+const NOTHING_UNNAMED = { small: 0, beyondShare: 0, collides: 0 };
 
 const AI: ThingMark = { kind: 'ai', name: 'Qwen3 235B Instruct', full: 'Qwen3 235B Instruct' };
 const AGENT: ThingMark = { kind: 'ai', name: 'Scout', full: 'An outside AI agent, Scout', outside: true };
@@ -74,6 +74,8 @@ function shown(stage: HTMLElement) {
       const said = node.querySelector<HTMLElement>('.thing-mark-said')!;
       return {
         subject: pill.dataset['subject'],
+        // 'name' where the whole name shows beside the mark, 'mark' where the being wears the mark alone.
+        form: pill.dataset['form'],
         word: node.querySelector('.thing-mark-word')!.textContent,
         name: name.hidden ? null : name.textContent,
         origin: origin.hidden ? null : origin.textContent,
@@ -87,13 +89,27 @@ function shown(stage: HTMLElement) {
     });
 }
 
-/** This page lays nothing out, so every mark states the size a browser would give it: 80 by 24. */
+/**
+ * This page lays nothing out, so every mark states the size a browser would give it: a model's mark
+ * alone 26 by 24, and with its name in the row over it 80 by 48 (so a name adds 80 by 24); any
+ * other mark, one row, 80 by 24. `reads` counts how often a size is asked of the page.
+ */
+const layout = { reads: 0 };
 function sized(): () => void {
   const width = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
   const height = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
   const is = (node: HTMLElement) => node.classList.contains('thing-mark');
-  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get(this: HTMLElement) { return is(this) ? 80 : 0; } });
-  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get(this: HTMLElement) { return is(this) ? 24 : 0; } });
+  const wide = (node: HTMLElement) => (node.classList.contains('thing-mark-alone') ? 26 : 80);
+  const tall = (node: HTMLElement) =>
+    (node.querySelector('.thing-mark-ai') !== null && !node.classList.contains('thing-mark-alone') ? 48 : 24);
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+    configurable: true,
+    get(this: HTMLElement) {
+      layout.reads += 1;
+      return is(this) ? wide(this) : 0;
+    },
+  });
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get(this: HTMLElement) { return is(this) ? tall(this) : 0; } });
   return () => {
     if (width) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', width);
     if (height) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', height);
@@ -124,7 +140,7 @@ describe('marks over the beings a model or someone outside decides for', () => {
     expect(marks.find((one) => one.subject === 'visitor')).toMatchObject({ word: 'from Block Game', name: null, aria: 'A person playing Block Game' });
     // The page's words for a screen reader where it gives them, the mark's full words where not.
     expect(marks.find((one) => one.subject === 'knight')).toMatchObject({ word: 'AI', aria: 'knight: run by an AI model, Qwen3 235B Instruct' });
-    expect(overlay.counts).toEqual({ marks: 2, aiMarks: 1, lines: 0, decisions: 0, unnamed: NOTHING_UNNAMED });
+    expect(overlay.counts).toEqual({ marks: 2, aiMarks: 1, named: 2, lines: 0, decisions: 0, unnamed: NOTHING_UNNAMED });
   });
 
   it('writes a model\'s whole name over its being, never under the floor, without its being picked or near', () => {
@@ -145,35 +161,54 @@ describe('marks over the beings a model or someone outside decides for', () => {
     expect(stage.querySelector<HTMLElement>('.thing-marks')!.style.getPropertyValue('--thing-mark-name-least')).toBe('14px');
   });
 
-  it('names a being that stands tall enough on the screen, counts the ones that do not, and always names a held one', () => {
+  it('names a being that stands tall enough on the screen, leaves a smaller one a model decides for its mark alone, and always names a held one and the nearest', () => {
     const { camera, stage } = setup();
     const overlay = new ThingMarks(stage, () => undefined, RULE);
     const ids = ['a', 'b', 'c', 'd', 'unmeasured', 'behind'];
-    overlay.setMarks(marked(ids.map((id) => [id, AI, `kind ${id}`])));
+    overlay.setMarks(new Map<string, MarkedSubject>([
+      ...marked(ids.map((id) => [id, AI, `kind ${id}`])),
+      // A game's player, as small as d: its pill has no shorter form, so it wears nothing.
+      ...marked([['player', BLOCK_GAME, null]]),
+    ]));
     const anchors = new Map<string, pc.Vec3>([
       ['a', new pc.Vec3(-6, 1, -5)], ['b', new pc.Vec3(-2, 1, -20)], ['c', new pc.Vec3(4, 1, -23.5)],
       ['d', new pc.Vec3(10, 1, -40)], ['unmeasured', new pc.Vec3(-20, 1, -40)], ['behind', new pc.Vec3(0, 1, 5)],
+      ['player', new pc.Vec3(20, 1, -40)],
     ]);
     // Each 1.7 m tall where the society says: 102 px at 5 m, 25.5 px at 20 m, 21.7 px at 23.5 m
     // and 12.75 px at 40 m. The floor is 22 px.
-    const tall = new Map(['a', 'b', 'c', 'd', 'behind'].map((id) => [id, 1.7]));
+    const tall = new Map(['a', 'b', 'c', 'd', 'behind', 'player'].map((id) => [id, 1.7]));
     overlay.update(camera, anchors, null, 0, tall);
-    // A being whose height the society does not state is named: nothing says it is small.
-    expect(shown(stage).map((one) => one.subject).sort()).toEqual(['a', 'b', 'unmeasured']);
+    const formOf = () => Object.fromEntries(shown(stage).map((one) => [one.subject, one.form]));
+    // A being whose height the society does not state is named: nothing says it is small. The two
+    // too small to name still wear the AI mark, on their own heads; the player too small wears nothing.
+    expect(formOf()).toEqual({ a: 'name', b: 'name', unmeasured: 'name', c: 'mark', d: 'mark' });
+    const [dx, dy] = screenOf(40, 1, 10);
+    expect(shown(stage).find((one) => one.subject === 'd')).toMatchObject({
+      word: 'AI', transform: `translate3d(${dx.toFixed(1)}px, ${dy.toFixed(1)}px, 0) translate(-50%, -100%)`,
+      // The name is still the mark's, for a screen reader and for the pointer.
+      name: 'Qwen3 235B Instruct', aria: 'kind d: Qwen3 235B Instruct',
+    });
     // One behind the eye takes no name and is not a name missed.
-    expect(overlay.counts.unnamed).toEqual({ small: 2, beyondShare: 0 });
+    expect(overlay.counts).toMatchObject({ marks: 5, named: 3, unnamed: { small: 3, beyondShare: 0, collides: 0 } });
     // The picked one and a speaking one are named however small they stand, with their labels.
     overlay.showLine({ subjectId: 'd', text: 'Who goes there?', mark: AI, header: 'kind d · Qwen3 235B Instruct' }, 0);
     overlay.update(camera, anchors, 'c', 0, tall);
     const marks = shown(stage);
-    expect(marks.map((one) => one.subject).sort()).toEqual(['a', 'b', 'c', 'd', 'unmeasured']);
+    expect(formOf()).toEqual({ a: 'name', b: 'name', unmeasured: 'name', c: 'name', d: 'name' });
     expect(marks.find((one) => one.subject === 'c')).toMatchObject({ name: 'Qwen3 235B Instruct', label: 'kind c' });
     expect(marks.find((one) => one.subject === 'd')).toMatchObject({ label: 'kind d' });
     expect(marks.find((one) => one.subject === 'a')).toMatchObject({ label: null });
-    expect(overlay.counts.unnamed.small).toBe(0);
+    expect(overlay.counts.unnamed.small).toBe(1);
+    // Where everyone a model decides for is small, the nearest of them is named all the same.
+    anchors.delete('a');
+    anchors.delete('b');
+    anchors.delete('unmeasured');
+    overlay.update(camera, anchors, null, 10_000, tall);
+    expect(formOf()).toEqual({ c: 'name', d: 'mark' });
   });
 
-  it('stands a name that would cover a nearer one just above it, so two beings side by side are both named', () => {
+  it('keeps the nearer name where two would cover each other and leaves the other its mark alone, on its own head', () => {
     const restore = sized();
     try {
       const { camera, stage } = setup();
@@ -188,65 +223,117 @@ describe('marks over the beings a model or someone outside decides for', () => {
       overlay.update(camera, anchors, null, 0);
       const [sx, sy] = screenOf(5, 1);
       const [tx, ty] = screenOf(9, 1.4);
-      // Over its own being the traveller's name would cover the spirit's (both 80 wide at x 400, 13 px apart).
-      expect(Math.abs(ty - sy)).toBeLessThan(24);
-      // All three are named: the nearest stays over its being, and the traveller's stands over its
-      // own being too, just above the spirit's, 2 px clear. Neither is hidden.
-      expect(shown(stage).map((one) => one.subject).sort()).toEqual(['knight', 'spirit', 'traveller']);
-      expect(overlay.counts.unnamed).toEqual(NOTHING_UNNAMED);
-      expect(placedAt(stage, 'spirit')).toEqual([Number(sx.toFixed(1)), Number(sy.toFixed(1))]);
-      expect(placedAt(stage, 'traveller')).toEqual([Number(tx.toFixed(1)), Number((sy - 24 - 2).toFixed(1))]);
       const [kx, ky] = screenOf(9, 1, 4);
-      expect(placedAt(stage, 'knight')).toEqual([Number(kx.toFixed(1)), Number(ky.toFixed(1))]);
-      // Two on one bench, 0.6 m apart 5 m off (36 px on the screen): each name is centred over its
-      // own being, one above the other.
-      overlay.setMarks(marked([['left', AI, null], ['right', AI, null]]));
-      overlay.update(camera, new Map([['left', new pc.Vec3(-0.3, 1, -5)], ['right', new pc.Vec3(0.3, 1, -5.01)]]), null, 0);
+      const at = (x: number, y: number) => [Number(x.toFixed(1)), Number(y.toFixed(1))];
+      const formOf = () => Object.fromEntries(shown(stage).map((one) => [one.subject, one.form]));
+      // Over its own being the traveller's name would cover the spirit's (both 80 by 24 at x 400, in
+      // the row over each one's mark, 13 px apart).
+      expect(Math.abs(ty - sy)).toBeLessThan(24);
+      // The nearer keeps its name. The traveller keeps its mark, and nothing is lifted: every one
+      // of the three stands on its own being's head.
+      expect(formOf()).toEqual({ spirit: 'name', traveller: 'mark', knight: 'name' });
+      expect(placedAt(stage, 'spirit')).toEqual(at(sx, sy));
+      expect(placedAt(stage, 'traveller')).toEqual(at(tx, ty));
+      expect(placedAt(stage, 'knight')).toEqual(at(kx, ky));
+      expect(overlay.counts).toMatchObject({ marks: 3, aiMarks: 3, named: 2, unnamed: { small: 0, beyondShare: 0, collides: 1 } });
+      const root = stage.querySelector<HTMLElement>('.thing-marks')!;
+      expect([root.dataset['named'], JSON.parse(root.dataset['unnamed']!)]).toEqual(['2', { small: 0, beyondShare: 0, collides: 1 }]);
+      // The mark alone is marked so on its node, which is what the page's stylesheet hides the name by.
+      const alone = Array.from(stage.querySelectorAll<HTMLElement>('.thing-mark-alone')).filter((node) => node.style.display !== 'none');
+      expect(alone.map((node) => node.querySelector<HTMLElement>('.thing-mark-pill')!.dataset['subject'])).toEqual(['traveller']);
+      // Picked, the traveller is named whatever stands by, on its own head still, and drawn over the
+      // rest; the spirit's name would cover the picked one's now, so the spirit wears its mark alone.
+      overlay.update(camera, anchors, 'traveller', 0);
+      expect(formOf()).toEqual({ spirit: 'mark', traveller: 'name', knight: 'name' });
+      expect(placedAt(stage, 'traveller')).toEqual(at(tx, ty));
+      expect(overlay.counts.unnamed).toEqual({ small: 0, beyondShare: 0, collides: 1 });
+      const held = Array.from(stage.querySelectorAll<HTMLElement>('.thing-mark-held')).filter((node) => node.style.display !== 'none');
+      expect(held.map((node) => node.querySelector<HTMLElement>('.thing-mark-pill')!.dataset['subject'])).toEqual(['traveller']);
+      // One sits on a bench and one stands just behind, 30 cm taller: the stander's mark is in the
+      // row a name over the sitter would take (14 px up the screen, 11 px across). A name is never
+      // drawn over somebody else's mark, the nearest's no more than another's: the sitter wears the
+      // mark alone and the stander, whose name covers nothing, is the one named.
+      overlay.setMarks(marked([['sitter', AI, null], ['stander', AI, null]]));
+      const pair = new Map([['sitter', new pc.Vec3(0, 1, -5)], ['stander', new pc.Vec3(0.2, 1.3, -5.3)]]);
+      overlay.update(camera, pair, null, 0);
+      const [, sitY] = screenOf(5, 1);
+      const [standX, standY] = screenOf(5.3, 1.3, 0.2);
+      expect([Math.round(sitY - standY), Math.round(standX - 400)]).toEqual([14, 11]);
+      expect(formOf()).toEqual({ sitter: 'mark', stander: 'name' });
+      expect(overlay.counts).toMatchObject({ marks: 2, named: 1, unnamed: { collides: 1 } });
+      // Three near a bench 5 m off. The middle one's name would cover the nearest's, so it wears the
+      // mark alone (26 by 24, on its head). The third sits 20 cm lower, 12 px down the screen: its
+      // name (from x 426) clears the nearest's name (to x 422) and would cover only the middle
+      // one's mark (to x 431, and 12 px into its row). A mark is its being's too, so the third
+      // wears the mark alone as well.
+      overlay.setMarks(marked([['left', AI, null], ['middle', AI, null], ['right', AI, null]]));
+      const bench = new Map([['left', new pc.Vec3(-0.3, 1, -5)], ['middle', new pc.Vec3(0.3, 1, -5.01)], ['right', new pc.Vec3(1.1, 0.8, -5.02)]]);
+      overlay.update(camera, bench, null, 0);
       const [lx, ly] = screenOf(5, 1, -0.3);
-      const [rx] = screenOf(5.01, 1, 0.3);
-      expect(placedAt(stage, 'left')).toEqual([Number(lx.toFixed(1)), Number(ly.toFixed(1))]);
-      expect(placedAt(stage, 'right')).toEqual([Number(rx.toFixed(1)), Number((ly - 24 - 2).toFixed(1))]);
+      const [mx, my] = screenOf(5.01, 1, 0.3);
+      const [rx, ry] = screenOf(5.02, 0.8, 1.1);
+      expect([lx + 40, mx + 13, rx - 40, ry - my].map((v) => Math.round(v))).toEqual([422, 431, 426, 12]);
+      expect(formOf()).toEqual({ left: 'name', middle: 'mark', right: 'mark' });
+      expect(placedAt(stage, 'left')).toEqual(at(lx, ly));
+      expect(placedAt(stage, 'middle')).toEqual(at(mx, my));
+      expect(placedAt(stage, 'right')).toEqual(at(rx, ry));
+      expect(overlay.counts.unnamed.collides).toBe(2);
+      // Sitting as high as the others, its name stands in the row over the marks and covers none of
+      // them: three in a row wear three marks side by side and two names.
+      bench.get('right')!.set(1.1, 1, -5.02);
+      overlay.update(camera, bench, null, 0);
+      expect(formOf()).toEqual({ left: 'name', middle: 'mark', right: 'name' });
     } finally {
       restore();
     }
   });
 
-  it('spends a share of the view on names, nearest first, and counts every name beyond it', () => {
+  it('spends a share of the view on names, nearest first, and leaves every being beyond it its mark alone, counted', () => {
     const restore = sized();
     try {
       const { camera, stage } = setup();
       const overlay = new ThingMarks(stage, () => undefined, RULE);
-      // Thirty beings in thirty directions, 3 m apart across and 1 m apart up at 10 m ahead (90 px
-      // by 30 px between names of 80 by 24, so none covers another), each 5 cm farther from the eye
-      // than the one before along its own direction, which leaves it where it is on the screen.
+      // Thirty beings in thirty directions, 3 m apart across and 2 m apart up at 10 m ahead (90 px
+      // by 60 px between marks 26 by 24 with names 80 by 24 over them, so no name covers a name or
+      // a mark), each 5 cm farther from the eye than the one before along its own direction, which
+      // leaves it where it is on the screen.
       const ids = Array.from({ length: 30 }, (_, i) => `p${String(i).padStart(2, '0')}`);
       overlay.setMarks(marked(ids.map((id) => [id, AI, null])));
       const anchors = new Map(ids.map((id, i) => {
-        const toward = new pc.Vec3(-12 + 3 * (i % 9), -1 + Math.floor(i / 9), -10).normalize();
+        const toward = new pc.Vec3(-12 + 3 * (i % 9), -3 + 2 * Math.floor(i / 9), -10).normalize();
         return [id, toward.mulScalar(10 + 0.05 * i)];
       }));
       overlay.update(camera, anchors, null, 0);
-      // The view is 800 by 600 and the share 0.08: 38,400 px of it, which is twenty names of 1,920 px.
-      const drawn = shown(stage).map((one) => one.subject).sort();
-      expect(drawn).toEqual(ids.slice(0, 20));
-      expect(overlay.counts).toMatchObject({ marks: 20, unnamed: { small: 0, beyondShare: 10 } });
+      const names = () => shown(stage).filter((one) => one.form === 'name').map((one) => one.subject).sort();
+      // The view is 800 by 600 and the share 0.08: 38,400 px of it, which is twenty names of 1,920 px
+      // (what a name adds over its mark; the marks themselves are no part of the share).
+      // All thirty wear their mark; the nearest twenty their name with it.
+      expect(shown(stage).map((one) => one.subject).sort()).toEqual(ids);
+      expect(names()).toEqual(ids.slice(0, 20));
+      expect(overlay.counts).toMatchObject({ marks: 30, named: 20, unnamed: { small: 0, beyondShare: 10, collides: 0 } });
       // The overlay says the same on its root, for a page that tells a person how many more there are.
       const root = stage.querySelector<HTMLElement>('.thing-marks')!;
-      expect([root.dataset['named'], JSON.parse(root.dataset['unnamed']!)]).toEqual(['20', { small: 0, beyondShare: 10 }]);
+      expect([root.dataset['named'], JSON.parse(root.dataset['unnamed']!)]).toEqual(['20', { small: 0, beyondShare: 10, collides: 0 }]);
       // The picked one is named outside the share, and takes none of it from the near.
       overlay.update(camera, anchors, 'p29', 0);
-      expect(shown(stage).map((one) => one.subject).sort()).toEqual([...ids.slice(0, 20), 'p29']);
+      expect(names()).toEqual([...ids.slice(0, 20), 'p29']);
       expect(overlay.counts.unnamed.beyondShare).toBe(9);
       expect([root.dataset['named'], JSON.parse(root.dataset['unnamed']!).beyondShare]).toEqual(['21', 9]);
       // Picked among the nearest, it still takes none of the share: twenty others are named with it.
       overlay.update(camera, anchors, 'p00', 0);
-      expect(shown(stage).map((one) => one.subject).sort()).toEqual(ids.slice(0, 21));
+      expect(names()).toEqual(ids.slice(0, 21));
+      // A game's player beyond the share has no shorter form: it wears nothing and is counted.
+      overlay.setMarks(new Map([...marked(ids.map((id) => [id, AI, null])), ...marked([['player', BLOCK_GAME, null]])]));
+      anchors.set('player', new pc.Vec3(-12, 4.5, -10).normalize().mulScalar(12));
+      overlay.update(camera, anchors, null, 0);
+      expect(shown(stage).some((one) => one.subject === 'player')).toBe(false);
+      expect(overlay.counts).toMatchObject({ marks: 30, named: 20, unnamed: { beyondShare: 11 } });
     } finally {
       restore();
     }
   });
 
-  it('makes a node only when more names fit the view than ever did, and none to draw the same again', () => {
+  it('makes a node only when more marks are in view than ever were, and writes and reads nothing to draw the same again', () => {
     const restore = sized();
     try {
       const { camera, stage } = setup();
@@ -254,23 +341,33 @@ describe('marks over the beings a model or someone outside decides for', () => {
       const ids = Array.from({ length: 200 }, (_, i) => `p${String(i).padStart(3, '0')}`);
       overlay.setMarks(marked(ids.map((id) => [id, AI, null])));
       const anchors = new Map(ids.map((id, i) => [id, new pc.Vec3((i % 20) - 10, 1, -5 - Math.floor(i / 20))]));
+      layout.reads = 0;
       overlay.update(camera, anchors, null, 0);
-      const { marks, unnamed } = overlay.counts;
-      // Every marked being on the screen (within the overlay's 40 px margin) is either named or
-      // counted, and the share bounds the named.
+      const { marks, named, unnamed } = overlay.counts;
+      // Every marked being on the screen (within the overlay's 40 px margin) wears its mark, each
+      // is either named or counted, and the share bounds the named.
       const onScreen = ids.filter((_, i) => {
         const [x, y] = screenOf(5 + Math.floor(i / 20), 1, (i % 20) - 10);
         return x >= -40 && x <= WIDTH + 40 && y >= -40 && y <= HEIGHT + 40;
       }).length;
       expect(onScreen).toBeGreaterThan(100);
-      expect(marks).toBeGreaterThan(0);
-      expect(marks).toBeLessThanOrEqual(20);
-      expect(marks + unnamed.small + unnamed.beyondShare).toBe(onScreen);
-      // No more nodes than the names drawn and the one last tried.
-      expect(stage.querySelectorAll('.thing-mark').length).toBeLessThanOrEqual(marks + 1);
+      expect(marks).toBe(onScreen);
+      expect(named).toBeGreaterThan(0);
+      expect(named).toBeLessThanOrEqual(20);
+      expect(named + unnamed.small + unnamed.beyondShare + unnamed.collides).toBe(onScreen);
+      // A node for each, and no more.
+      expect(stage.querySelectorAll('.thing-mark').length).toBe(marks);
+      // One mark alone and one with its name were measured: two sizes, however many wear them.
+      expect(layout.reads).toBe(2);
       const nodes = stage.querySelectorAll('*').length;
+      // The same frame again: no node made, no size read, and nothing written into a mark (every
+      // write of a mark's words sets its spoken words too).
+      const written = vi.spyOn(HTMLElement.prototype, 'setAttribute');
       overlay.update(camera, anchors, null, 16);
       expect(stage.querySelectorAll('*').length).toBe(nodes);
+      expect(layout.reads).toBe(2);
+      expect(written.mock.calls.length).toBe(0);
+      written.mockRestore();
     } finally {
       restore();
     }
@@ -426,6 +523,30 @@ describe('marks over the beings a model or someone outside decides for', () => {
     expect([...overlay.speaking(9010)].sort()).toEqual(['s2', 's3', 's4', 's5']);
   });
 
+  it('stands a line of speech over all its speaker wears, and over the head of a speaker who wears nothing', () => {
+    const restore = sized();
+    try {
+      const { camera, stage } = setup();
+      const overlay = new ThingMarks(stage, () => undefined, RULE);
+      overlay.setMarks(marked([['knight', AI, 'knight'], ['baker', null, 'baker']]));
+      const anchors = new Map([['knight', new pc.Vec3(0, 1, -5)], ['baker', new pc.Vec3(3, 1, -5)]]);
+      overlay.showLine({ subjectId: 'knight', text: 'Halt!', mark: AI, header: 'knight · Qwen3 235B Instruct' }, 0);
+      overlay.showLine({ subjectId: 'baker', text: 'Bread!', mark: ROUTINE, header: 'baker' }, 0);
+      overlay.update(camera, anchors, null, 0);
+      const lines = Array.from(stage.querySelectorAll<HTMLElement>('.thing-line')).filter((node) => node.style.display !== 'none');
+      const at = (header: string) => /translate3d\(([-\d.]+)px, ([-\d.]+)px/
+        .exec(lines.find((node) => node.querySelector('.thing-line-speaker')!.textContent === header)!.style.transform)!.slice(1).map(Number);
+      const [kx, ky] = screenOf(5, 1);
+      const [bx, by] = screenOf(5, 1, 3);
+      // The knight speaks, so it is held and named: mark and name stand 48 px, and the line 3 px over them.
+      expect(at('knight · Qwen3 235B Instruct')).toEqual([Number(kx.toFixed(1)), Number((ky - 48 - 3).toFixed(1))]);
+      // The baker wears nothing: its line stands 34 px over its head.
+      expect(at('baker')).toEqual([Number(bx.toFixed(1)), Number((by - 34).toFixed(1))]);
+    } finally {
+      restore();
+    }
+  });
+
   it('places the marks in every engine frame where the society stands them, by how tall it says they stand, and stops when destroyed', () => {
     const { app, camera, stage } = setup();
     // Frames are run by the engine's own tick; nothing is drawn (the null device has nothing to draw to).
@@ -456,13 +577,14 @@ describe('marks over the beings a model or someone outside decides for', () => {
     picked = 'baker';
     app.tick(8);
     expect(asked.sort()).toEqual(['baker', 'indoors', 'knight', 'speck']);
-    expect(shown(stage).map((one) => one.subject).sort()).toEqual(['baker', 'knight']);
+    // The one 40 m off stands 12.75 px: too small to name, and it wears its mark alone.
+    expect(shown(stage).map((one) => [one.subject, one.form]).sort()).toEqual([['baker', 'name'], ['knight', 'name'], ['speck', 'mark']]);
     picked = null;
     asked.length = 0;
     app.tick(16);
     expect(asked.sort()).toEqual(['indoors', 'knight', 'speck']);
     // The one the society does not draw wears nothing; the one too small to name is counted.
-    expect(attached.counts).toMatchObject({ marks: 1, unnamed: { small: 1, beyondShare: 0 } });
+    expect(attached.counts).toMatchObject({ marks: 2, named: 1, unnamed: { small: 1, beyondShare: 0, collides: 0 } });
     attached.showDecision({ subjectId: 'knight', chose: 'Chose “wait”.' });
     at.get('knight')!.set(0, 1, -10);
     now = 16;

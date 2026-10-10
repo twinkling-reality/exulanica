@@ -3,11 +3,15 @@
  * and the same pill at the start of every line it says. Its colours are the world-mark tokens,
  * fixed in every scheme: it sits over the world, whose colours no theme sets. The marks follow the
  * anchor overlay in the stage, so they paint over it with no layer of their own.
+ *
+ * A mark is built up from its being's head: the pill on the head, the being's own word over it
+ * while it is held, and what it chose over that while a decision is open. So the pill never moves
+ * off the head, whatever opens.
  */
 
 .thing-mark {
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   align-items: center;
   gap: 0.16rem;
   white-space: nowrap;
@@ -79,6 +83,126 @@
   font-size: max(var(--thing-mark-name-least, 14px), 1em);
 }
 
+/*
+ * A being a model decides for wears two things. The mark, a small pill that says AI, stands on its
+ * head always, the same near or far, alone or in a crowd. The model's name is a second pill in the
+ * row over the mark, drawn wherever it covers no other name and nobody else's mark (the overlay
+ * decides, and says so with `thing-mark-alone` where the name is not drawn). So in a crowd every
+ * mark is still on its own head and no name has a neighbour's mark over it. The name stays in the
+ * mark and takes no room; pointing at the mark, or reaching it by keyboard, gives it at once.
+ */
+.thing-mark > .thing-mark-ai {
+  flex-direction: column-reverse;
+  gap: 0.14rem;
+  min-height: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.thing-mark > .thing-mark-ai > .thing-mark-word,
+.thing-mark-plate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 1.15rem;
+  padding: 0.1rem 0.4rem;
+  background: var(--color-world-mark);
+  border: 1px solid var(--color-world-mark-edge);
+  border-radius: var(--radius-full);
+  box-shadow: var(--elevation-world-mark);
+}
+
+/* The mark is read from as far as a name is: its letters keep the same floor. */
+.thing-mark > .thing-mark-ai > .thing-mark-word {
+  font-size: max(var(--thing-mark-name-least, 14px), 1em);
+}
+
+.thing-mark > .thing-mark-outside > .thing-mark-word,
+.thing-mark-outside > .thing-mark-plate {
+  border-style: dashed;
+}
+
+.thing-mark-plate[hidden],
+.thing-mark-alone .thing-mark-plate {
+  display: none;
+}
+
+/*
+ * A name is joined to its own mark by a neck as wide as the mark, so the two read as one tag
+ * growing from that head, and a neighbour's mark standing beside it, which has no neck, is plainly
+ * not what the name is of.
+ */
+.thing-mark > .thing-mark-ai > .thing-mark-word {
+  position: relative;
+}
+
+.thing-mark:not(.thing-mark-alone) > .thing-mark-ai > .thing-mark-word::before {
+  content: '';
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: 100%;
+  height: calc(0.14rem + 2px);
+  background: var(--color-world-mark);
+  border-inline: 1px solid var(--color-world-mark-edge);
+}
+
+.thing-mark-alone:hover > .thing-mark-ai > .thing-mark-word::before,
+.thing-mark-alone:focus-within > .thing-mark-ai > .thing-mark-word::before {
+  content: '';
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: 100%;
+  height: calc(0.14rem + 2px);
+  background: var(--color-world-mark);
+  border-inline: 1px solid var(--color-world-mark-edge);
+}
+
+/*
+ * A mark alone paints over names; the held one (picked, speaking or at a decision) over those, since
+ * it is named whatever stands by; and the one pointed at over all, so its name is read whole.
+ */
+.thing-mark {
+  z-index: var(--z-local-1);
+}
+
+.thing-mark-alone {
+  z-index: var(--z-local-2);
+}
+
+.thing-mark-held {
+  z-index: var(--z-local-3);
+}
+
+.thing-mark-alone:hover,
+.thing-mark-alone:focus-within {
+  z-index: var(--z-local-4);
+}
+
+.thing-mark-alone:hover .thing-mark-plate:not([hidden]),
+.thing-mark-alone:focus-within .thing-mark-plate:not([hidden]) {
+  display: inline-flex;
+  /* It opens over whatever name stands there: ringed, so it is plainly the one on top. */
+  box-shadow: 0 0 0 2px var(--color-world-mark-ink), var(--elevation-world-mark);
+}
+
+/*
+ * The keyboard's ring goes round the mark itself, not round the row its name stands in, which may
+ * hold a neighbour's mark. The shell rings every button of a region; this is said as firmly.
+ */
+#shell .thing-marks .thing-mark > button.thing-mark-ai:focus-visible,
+.thing-mark > .thing-mark-ai:focus-visible {
+  outline: none;
+}
+
+.thing-mark > .thing-mark-ai:focus-visible > .thing-mark-word {
+  outline: 2px solid var(--color-world-mark-ink);
+  outline-offset: 2px;
+}
+
 /* Their own routine decides: said only while the being is picked, quieter than a decider's name. */
 .thing-mark-routine {
   /* Read from as far as a decider's name is: its letters keep the same floor. */
@@ -88,7 +212,7 @@
   background: var(--color-world-mark-soft);
 }
 
-/* What the decider chose, opening under its name at a decision; its own words after, where any are served. */
+/* What the decider chose, opening over its name at a decision; its own words after, where any are served. */
 .thing-mark-decision {
   display: grid;
   gap: 0.14rem;
@@ -122,7 +246,7 @@
 }
 
 .thing-mark-label {
-  /* The being's own word under a held name is read from as far as the name is: the same floor. */
+  /* The being's own word over a held name is read from as far as the name is: the same floor. */
   font: 500 max(var(--thing-mark-name-least, 14px), 0.66rem) / 1.1 var(--font-ui);
   color: var(--color-world-mark-ink);
   text-shadow: 0 0 3px var(--color-world-mark-halo), 0 1px 2px var(--color-world-mark-halo);

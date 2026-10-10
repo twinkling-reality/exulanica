@@ -1,8 +1,9 @@
 /**
  * Who decides for each being, marked over it in the world, what it chose, and the lines it says.
  *
- * Every being a model decides for wears the model's whole name over its head, never in letters
- * smaller than the rule's floor, with a small "AI" word before it; every line a model writes is
+ * Every being a model decides for wears a small "AI" mark on its own head, always, and the model's
+ * whole name in a row over the mark wherever the name can be tied to its being without doubt, never
+ * in letters smaller than the rule's floor; every line a model writes is
  * drawn in a bubble that starts with the same word. An outside AI agent wears the name it gave,
  * outlined as a visitor's; a being a person runs from outside (a game's player) wears that game's
  * pill instead ("from Block Game"), and a visitor the world's own model runs wears the model's name
@@ -14,22 +15,32 @@
  * never disagree. It reads nothing of the kind of world it is drawn over: a point over each being
  * and how tall the being stands, from the society drawn, are all it asks.
  *
- * WHEN A DECISION IS TAKEN UP the page hands its words (`showDecision`): a second row opens under
- * the name, saying what was chosen, stays as long as a line of speech of that length would, and
+ * WHEN A DECISION IS TAKEN UP the page hands its words (`showDecision`): a row opens with
+ * the name (over it, as the page's stylesheet builds a mark up from the head), saying what was chosen, stays as long as a line of speech of that length would, and
  * closes. It has a place for the decider's own stated words, which stays empty and takes no room
  * until a decision serves any.
  *
- * WHAT IS DRAWN IS BOUNDED BY WHAT CAN BE READ, never by how many beings a model decides for
- * (`DeciderMarkRule`, the page's catalog): a name is drawn over a being that stands tall enough on
- * the screen to be worth naming, nearest first, until the names cover a stated share of the view.
- * Every name not drawn is counted (`counts`, and `data-named` and `data-unnamed` on the overlay's
- * root), so a page can say how many more there are. Each name stands over its own being, the
- * nearest lowest: one that would cover a nearer name stands just above it, so two beings side by
- * side are both named. A being that is picked, speaking or at a decision is named outside the share.
+ * EVERY MARK STANDS ON ITS OWN BEING'S HEAD and is never lifted off it. A NAME is bounded by what
+ * can be read, never by how many beings a model decides for (`DeciderMarkRule`, the page's
+ * catalog). Nearest first, a model's name is drawn over its mark where its being stands tall enough
+ * on the screen to be worth naming, while the names cover no more than a stated share of the view
+ * (what a name adds over its mark; the marks are no part of the share), and where it would cover no
+ * name already drawn and nobody else's mark. Where any of the three fails the being wears the mark
+ * alone, which is still its own and still a button, and pointing at it or reaching it by keyboard
+ * gives the whole name at once (the page's stylesheet). So in a pile one keeps its name and the
+ * others keep their marks, and no name stands where nobody can tell whose it is. The nearest being
+ * a model decides for is named however small it stands, though not over somebody else's mark. A
+ * being that is picked, speaking or at a decision is named whatever stands by, outside the share,
+ * and is said to be held on its node so the page draws it over the rest. A marked being no model
+ * decides for (a game's player, a person's) has no shorter form: too small or beyond the share it
+ * wears nothing. Every name not drawn is counted by why (`counts`, and `data-named` and
+ * `data-unnamed` on the overlay's root), so a page can say how many more there are.
  *
  * The overlay is DOM, placed each frame by projecting world points, as the anchor overlay is
- * (`../anchor-overlay.ts`): nodes are kept and reused, and a new one is made only when more names
- * fit the view than ever did before, which the share of the view bounds. The marks stay readable by
+ * (`../anchor-overlay.ts`): nodes are kept and reused, a new one is made only when more marks are
+ * in view than ever were before, and a frame that shows the same as the last writes nothing but
+ * where each mark stands. The nodes are as many as the marked beings in view: the share of the view
+ * bounds the names, not the marks. The marks stay readable by
  * a screen reader and checkable in the page. A line's words are set only as text: lines are written
  * by models and players and are never markup. A name is a button: clicking it picks its being as
  * aiming does.
@@ -107,12 +118,14 @@ export const lineSeconds = (text: string, rule: DeciderMarkRule): number =>
   Math.min(rule.lineMostMs, rule.lineBaseMs + rule.linePerCharacterMs * [...text].length) / 1000;
 /** The custom property the overlay states the floor of a name's letters in, for the page's stylesheet. */
 export const NAME_LEAST_PROPERTY = '--thing-mark-name-least';
-/** How far over its speaker's mark a bubble stands, in CSS pixels. */
+/** How far over its speaker's head a bubble stands where the speaker wears no mark, in CSS pixels. */
 const LINE_LIFT_PX = 34;
+/** How far over all its speaker wears a bubble stands, in CSS pixels: the gap between a mark's own rows. */
+const LINE_GAP_PX = 3;
+/** Two boxes that overlap by no more than this, in CSS pixels, only touch: neither covers the other. */
+const TOUCH_PX = 1;
 /** A point this far off screen, in CSS pixels, is not drawn. */
 const SCREEN_MARGIN_PX = 40;
-/** The room between a pill and the nearer one it stands on, in CSS pixels. */
-export const MARK_STACK_GAP_PX = 2;
 
 interface MarkNode {
   readonly root: HTMLDivElement;
@@ -121,8 +134,10 @@ interface MarkNode {
   readonly pillName: HTMLSpanElement;
   /** Where a visitor a model runs came from, after the name, in the quieter weight. */
   readonly pillFrom: HTMLSpanElement;
+  /** The name and where it came from, in the row over the mark; hidden where the mark has no name. */
+  readonly plate: HTMLSpanElement;
   readonly label: HTMLSpanElement;
-  /** The row under the name that opens at a decision: what was chosen, and the decider's own words. */
+  /** The row that opens with the name at a decision: what was chosen, and the decider's own words. */
   readonly decision: HTMLDivElement;
   readonly chose: HTMLSpanElement;
   readonly said: HTMLSpanElement;
@@ -132,18 +147,93 @@ interface MarkNode {
   at: string;
   /** What it shows now, joined: the key its size is kept under. */
   words: string;
+  /** Everything last written into it, joined, so a frame that shows the same writes nothing. */
+  filled: string;
   /** Its size while a decision is open under it, and the words that size was read for. */
   open: { readonly words: string; readonly size: Size } | null;
 }
 
 interface Size { readonly width: number; readonly height: number }
+interface Box { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number }
 
-/** Why a marked being in view wears no name this frame. */
+/** A box of a size standing centred over a point of the screen, from `from` pixels over it up. */
+const boxAt = (x: number, y: number, size: Size, from: number): Box =>
+  ({ left: x - size.width / 2, right: x + size.width / 2, top: y - size.height, bottom: y - from });
+
+/** A marked being in view this frame: where its head is on the screen, and its mark's box where a model's. */
+interface Seen {
+  readonly id: string;
+  readonly subject: MarkedSubject;
+  readonly mark: ThingMark;
+  readonly held: boolean;
+  readonly x: number;
+  readonly y: number;
+  readonly small: boolean;
+  readonly alone: MarkContent | null;
+  readonly size: Size | null;
+  readonly box: Box | null;
+}
+
+/** What a mark node is to show, worked out before anything is written into it. */
+interface MarkContent {
+  readonly alone: boolean;
+  /** Its being is picked, speaking or at a decision: it is drawn over every other mark. */
+  readonly held: boolean;
+  readonly pillClass: string;
+  readonly kind: ThingMark['kind'];
+  readonly word: string;
+  readonly name: string | null;
+  readonly from: string | null;
+  readonly label: string | null;
+  readonly chose: string | null;
+  readonly said: string;
+  readonly aria: string;
+  /** What decides its size: the key its size is kept under. */
+  readonly words: string;
+}
+
+/**
+ * What a being's mark shows. `alone` is the mark with no name beside it: the name stays in the node
+ * for a screen reader and for the pointer (the stylesheet shows it while the mark is pointed at or
+ * focused), and takes no room, so the mark alone has one size whatever the name.
+ */
+function contentOf(
+  subject: MarkedSubject, mark: ThingMark, held: boolean,
+  decision: { readonly chose: string; readonly said: string | null } | null, alone: boolean,
+): MarkContent {
+  const ai = mark.kind === 'ai';
+  // The model's whole name, always: never a word of it, never hidden for being far.
+  const name = ai ? mark.name : null;
+  const from = ai && mark.from !== undefined ? `· from ${mark.from}` : null;
+  const word = ai ? 'AI' : mark.label;
+  // The page's spoken words are for the mark worn at rest; one worn only while picked says its own.
+  const spoken = mark === subject.mark ? subject.spoken ?? mark.full : mark.full;
+  const chose = decision?.chose ?? null;
+  const said = decision?.said ?? '';
+  const named = subject.label === null ? spoken : `${subject.label}: ${spoken}`;
+  const label = held ? subject.label : null;
+  const classes = pillClass(mark);
+  return {
+    alone, held, pillClass: classes, kind: mark.kind, word, name, from, label, chose, said,
+    aria: chose === null ? named : `${named}. ${[chose, said].filter((part) => part !== '').join(' ')}`,
+    words: alone
+      ? ['alone', classes, word].join('\u0000')
+      : ['name', classes, word, name ?? '', from ?? '', label ?? '', chose === null ? '' : `\u0001${chose}\u0001${said}`].join('\u0000'),
+  };
+}
+
+/**
+ * Why a marked being in view wears its mark alone this frame and not its name. A being a model
+ * decides for is counted here and still drawn, as the small mark over its own head; any other
+ * marked being too small to name is counted and not drawn.
+ */
 export interface UnnamedCounts {
   /** It stands too small on the screen to be worth naming. */
   readonly small: number;
   /** The names nearer the viewer already cover the share of the view names may. */
   readonly beyondShare: number;
+  /** Its name would cover a name or a mark already standing over a nearer being, so nobody could tell whose it was. */
+  readonly collides: number;
 }
 
 interface LineNode {
@@ -182,7 +272,10 @@ export class ThingMarks {
   private readonly decisions = new Map<string, { readonly chose: string; readonly said: string | null; readonly until: number }>();
   /** The size of a mark by what it shows, read from the page once for each. */
   private readonly sizes = new Map<string, Size>();
-  private unnamed: UnnamedCounts = { small: 0, beyondShare: 0 };
+  private unnamed: UnnamedCounts = { small: 0, beyondShare: 0, collides: 0 };
+  private named = 0;
+  /** How tall all a being wears stands over its head this frame, in CSS pixels, for a line to stand over. */
+  private readonly tops = new Map<string, number>();
   /** What the overlay last stated of its counts, so it is stated again only when it changes. */
   private said = '';
   private readonly viewProjection = new pc.Mat4();
@@ -280,54 +373,96 @@ export class ThingMarks {
         id, subject, mark: worn(subject, id === selected)!, at: anchors.get(id)!, distance: anchors.get(id)!.distance(this.viewer),
         held: id === selected || speaking.has(id) || deciding.has(id),
       }))
-      // Nearest first: the nearest name stays over its own being, and the share of the view is spent on the near.
-      .sort((a, b) => a.distance - b.distance || (a.id < b.id ? -1 : 1));
+      // Whoever is held first (the picked one, one speaking, one at a decision), then nearest first: a
+      // held being and the nearest are always named, and after them a name is drawn only where it can
+      // be tied to its being without doubt.
+      .sort((a, b) => Number(b.held) - Number(a.held) || a.distance - b.distance || (a.id < b.id ? -1 : 1));
     const budget = this.rule.screenShare * width * height;
     let covered = 0;
     let used = 0;
-    const unnamed = { small: 0, beyondShare: 0 };
-    const placed: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number }[] = [];
+    let named = 0;
+    let nearest = true;
+    const unnamed = { small: 0, beyondShare: 0, collides: 0 };
+    // First where everything stands: a model's mark is on its being's head whatever else is drawn,
+    // so every one of them is known before any name is.
+    const seen: Seen[] = [];
     for (const one of marked) {
       const screen = this.project(one.at, width, height);
       // Only marks on screen are drawn: one behind the eye takes no name and is no name missed.
       if (screen === null) continue;
       const tall = heights.get(one.id);
-      if (!one.held && tall !== undefined && one.distance > 0 && tall * pixelsPerMetre / one.distance < this.rule.beingLeastPx) {
+      const small = !one.held && tall !== undefined && one.distance > 0 && tall * pixelsPerMetre / one.distance < this.rule.beingLeastPx;
+      // A being a model decides for always wears its mark; anything else too small to name wears nothing.
+      const alone = one.mark.kind === 'ai' ? contentOf(one.subject, one.mark, false, null, true) : null;
+      if (small && alone === null) {
         unnamed.small += 1;
         continue;
       }
+      // The mark is the same whatever is over it: its size is read once, from the mark alone.
+      let mark: Size | null = alone === null ? null : this.sizes.get(alone.words) ?? null;
+      if (alone !== null && mark === null) {
+        const node = this.marks[0] ?? this.markNode();
+        this.fill(node, one.id, alone);
+        mark = this.sizeOf(node);
+      }
+      const [x, y] = screen;
+      seen.push({ id: one.id, subject: one.subject, mark: one.mark, held: one.held, x, y, small, alone, size: mark, box: mark === null ? null : boxAt(x, y, mark, 0) });
+    }
+    const names: Box[] = [];
+    const overlap = (box: Box, other: Box): boolean =>
+      box.right - other.left > TOUCH_PX && other.right - box.left > TOUCH_PX && box.bottom - other.top > TOUCH_PX && other.bottom - box.top > TOUCH_PX;
+    this.tops.clear();
+    // Then the names, the held first and then nearest first.
+    for (const one of seen) {
       const node = this.marks[used] ?? this.markNode();
-      this.fillMark(node, one.id, one.subject, one.mark, one.held, deciding.has(one.id) ? this.decisions.get(one.id)! : null);
-      const size = this.sizeOf(node);
-      const x = screen[0];
-      let y = screen[1];
-      if (!one.held && covered + size.width * size.height > budget) {
+      const decision = deciding.has(one.id) ? this.decisions.get(one.id)! : null;
+      // The whole of it, name and all, from what was read before where it was: nothing is written to learn it.
+      const whole = contentOf(one.subject, one.mark, one.held, decision, false);
+      let size = decision === null ? this.sizes.get(whole.words) : undefined;
+      if (size === undefined) {
+        this.fill(node, one.id, whole);
+        size = this.sizeOf(node);
+      }
+      // What a name adds: the rows over the mark, which are what the share is spent on and what must
+      // cover nothing. A mark no model wears (a game's player, a person's) is all of it.
+      const over = boxAt(one.x, one.y, size, one.size?.height ?? 0);
+      const cost = (over.right - over.left) * (over.bottom - over.top);
+      let why: keyof typeof unnamed | null = null;
+      if (one.held) {
+        // The picked one, one speaking and one at a decision are named whatever stands by.
+      } else if (one.alone !== null) {
+        // The nearest a model decides for is named however small it stands; like every other, only
+        // where its name covers no name and nobody else's mark.
+        if (one.small && !nearest) why = 'small';
+        else if (covered + cost > budget) why = 'beyondShare';
+        else if (names.some((other) => overlap(over, other)) || seen.some((other) => other !== one && other.box !== null && overlap(over, other.box))) why = 'collides';
+        nearest = false;
+      } else if (covered + cost > budget) {
         unnamed.beyondShare += 1;
         continue;
       }
-      // Each name stands over its own being, the nearest lowest: one that would cover a name already
-      // placed stands just above it, so two beings side by side are both named and neither is hidden.
-      for (let moved = true; moved;) {
-        moved = false;
-        for (const box of placed) {
-          if (x + size.width / 2 > box.left && x - size.width / 2 < box.right && y > box.top && y - size.height < box.bottom) {
-            y = box.top - MARK_STACK_GAP_PX;
-            moved = true;
-          }
-        }
+      if (why !== null) {
+        unnamed[why] += 1;
+        this.fill(node, one.id, one.alone!);
+        size = one.size!;
+      } else {
+        this.fill(node, one.id, whole);
+        named += 1;
+        if (!one.held) covered += cost;
+        names.push(over);
       }
-      if (!one.held) covered += size.width * size.height;
-      placed.push({ left: x - size.width / 2, right: x + size.width / 2, top: y - size.height, bottom: y });
-      this.place(node, x, y);
+      this.tops.set(one.id, size.height);
+      this.place(node, one.x, one.y);
       used += 1;
     }
     this.unnamed = unnamed;
+    this.named = named;
     // Said on the overlay too, for a page that tells a person how many more there are: written only
     // when it changes, so a frame that draws the same writes nothing.
-    const said = `${used} ${unnamed.small} ${unnamed.beyondShare}`;
+    const said = `${named} ${unnamed.small} ${unnamed.beyondShare} ${unnamed.collides}`;
     if (said !== this.said) {
       this.said = said;
-      this.root.dataset['named'] = String(used);
+      this.root.dataset['named'] = String(named);
       this.root.dataset['unnamed'] = JSON.stringify(unnamed);
     }
     for (let i = used; i < this.marks.length; i += 1) {
@@ -342,22 +477,25 @@ export class ThingMarks {
         hide(line);
         continue;
       }
-      this.place(line, screen[0], screen[1] - LINE_LIFT_PX);
+      // Over all its speaker wears, or over its head where it wears nothing.
+      const stands = this.tops.get(line.subject!);
+      this.place(line, screen[0], screen[1] - (stands === undefined ? LINE_LIFT_PX : stands + LINE_GAP_PX));
     }
   }
 
   /**
-   * How many names, decisions and bubbles are drawn now, how many of the names are an AI's, and
-   * how many marked beings in view wear no name this frame, by why.
+   * How many marks, decisions and bubbles are drawn now, how many of the marks are an AI's and how
+   * many show their name whole, and how many marked beings in view show no name this frame, by why.
    */
   get counts(): {
-    readonly marks: number; readonly aiMarks: number; readonly lines: number; readonly decisions: number;
-    readonly unnamed: UnnamedCounts;
+    readonly marks: number; readonly aiMarks: number; readonly named: number; readonly lines: number;
+    readonly decisions: number; readonly unnamed: UnnamedCounts;
   } {
     const marks = this.marks.filter((node) => node.visible);
     return {
       marks: marks.length,
       aiMarks: marks.filter((node) => node.pill.dataset['mark'] === 'ai').length,
+      named: this.named,
       lines: this.lines.filter((node) => node.visible).length,
       decisions: marks.filter((node) => !node.decision.hidden).length,
       unnamed: this.unnamed,
@@ -419,50 +557,39 @@ export class ThingMarks {
     let size = this.sizes.get(node.words);
     if (size === undefined) {
       size = measured();
-      this.sizes.set(node.words, size);
+      // A mark alone that is pointed at shows its name for as long: that size is not the mark's.
+      if (!node.root.classList.contains('thing-mark-alone') || !node.root.matches(':hover, :focus-within')) this.sizes.set(node.words, size);
     }
     return size;
   }
 
-  private fillMark(
-    node: MarkNode, id: string, subject: MarkedSubject, mark: ThingMark, withLabel: boolean,
-    decision: { readonly chose: string; readonly said: string | null } | null,
-  ): void {
+  /** Write what a node shows, where it differs from what the node shows already. */
+  private fill(node: MarkNode, id: string, content: MarkContent): void {
+    const filled = [id, content.words, content.name ?? '', content.from ?? '', content.aria, content.held ? 'held' : ''].join('\u0000');
     node.subject = id;
-    node.pill.className = pillClass(mark);
+    if (filled === node.filled) return;
+    node.filled = filled;
+    node.words = content.words;
+    node.root.classList.toggle('thing-mark-alone', content.alone);
+    node.root.classList.toggle('thing-mark-held', content.held);
+    node.pill.className = content.pillClass;
+    node.pill.dataset['form'] = content.alone ? 'mark' : 'name';
     node.pill.dataset['subject'] = id;
-    node.pill.dataset['mark'] = mark.kind;
-    if (mark.kind === 'ai') {
-      // The model's whole name, always: never a word of it, never hidden for being far.
-      node.pillWord.textContent = 'AI';
-      node.pillName.textContent = mark.name;
-      node.pillName.hidden = false;
-      node.pillFrom.textContent = mark.from === undefined ? '' : `· from ${mark.from}`;
-      node.pillFrom.hidden = mark.from === undefined;
-    } else {
-      node.pillWord.textContent = mark.label;
-      node.pillName.textContent = '';
-      node.pillName.hidden = true;
-      node.pillFrom.textContent = '';
-      node.pillFrom.hidden = true;
-    }
-    // The page's spoken words are for the mark worn at rest; one worn only while picked says its own.
-    const spoken = mark === subject.mark ? subject.spoken ?? mark.full : mark.full;
-    const chose = decision?.chose ?? '';
-    const said = decision?.said ?? '';
-    node.decision.hidden = decision === null;
-    node.chose.textContent = chose;
+    node.pill.dataset['mark'] = content.kind;
+    node.pillWord.textContent = content.word;
+    node.pillName.textContent = content.name ?? '';
+    node.pillName.hidden = content.name === null;
+    node.pillFrom.textContent = content.from ?? '';
+    node.pillFrom.hidden = content.from === null;
+    node.plate.hidden = content.name === null;
+    node.decision.hidden = content.chose === null;
+    node.chose.textContent = content.chose ?? '';
     // The decider's own words: empty, hidden and taking no room unless a decision serves any.
-    node.said.textContent = said;
-    node.said.hidden = said === '';
-    const named = subject.label === null ? spoken : `${subject.label}: ${spoken}`;
-    node.pill.setAttribute('aria-label', decision === null ? named : `${named}. ${[chose, said].filter((part) => part !== '').join(' ')}`);
-    const label = withLabel ? subject.label : null;
-    node.label.textContent = label ?? '';
-    node.label.hidden = label === null;
-    // What it shows decides its size: the key its size is kept under.
-    node.words = [node.pill.className, node.pillWord.textContent, node.pillName.hidden ? '' : node.pillName.textContent,
-      node.pillFrom.hidden ? '' : node.pillFrom.textContent, label ?? '', decision === null ? '' : `\u0001${chose}\u0001${said}`].join('\u0000');
+    node.said.textContent = content.said;
+    node.said.hidden = content.said === '';
+    node.pill.setAttribute('aria-label', content.aria);
+    node.label.textContent = content.label ?? '';
+    node.label.hidden = content.label === null;
   }
 
   /** A new mark node, kept for reuse: made only when more names fit the view than ever did. */
@@ -481,7 +608,10 @@ export class ThingMarks {
     const pillFrom = document.createElement('span');
     pillFrom.className = 'thing-mark-origin';
     pillFrom.hidden = true;
-    pill.append(pillWord, pillName, pillFrom);
+    const plate = document.createElement('span');
+    plate.className = 'thing-mark-plate';
+    plate.append(pillName, pillFrom);
+    pill.append(pillWord, plate);
     const label = document.createElement('span');
     label.className = 'thing-mark-label';
     const decision = document.createElement('div');
@@ -495,7 +625,7 @@ export class ThingMarks {
     said.hidden = true;
     decision.append(chose, said);
     root.append(pill, label, decision);
-    const node: MarkNode = { root, pill, pillWord, pillName, pillFrom, label, decision, chose, said, subject: null, visible: false, at: '', words: '', open: null };
+    const node: MarkNode = { root, pill, pillWord, pillName, pillFrom, plate, label, decision, chose, said, subject: null, visible: false, at: '', words: '', filled: '', open: null };
     pill.addEventListener('click', () => {
       if (node.subject !== null) this.onPick(node.subject);
     });

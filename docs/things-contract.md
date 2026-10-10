@@ -1234,8 +1234,8 @@ the next time the world is opened.
 Who decides for each person of a saved world's society is marked over them, by one decision the thing card
 makes too ([`composition/thing-marks.ts`](../web/packages/app/src/composition/thing-marks.ts)): a
 person whose model is asked (chosen for them, and refused neither by the host nor for them) wears an
-`AI` mark with the model's whole served name, never a part of it and never in letters smaller than a
-stated floor, whether or not the person is picked or near; a visitor its own program decides for
+`AI` mark always, and with it the model's whole served name wherever the name can be tied to them
+(below), never a part of it and never in letters smaller than a stated floor; a visitor its own program decides for
 wears its bridge's mark as the door lists it here: `from` and the bridge's label for a game, read as
 decided from outside (no person is claimed, which nothing a game sends shows), an outlined `AI`
 pill for an outside agent, and `from outside` for a bridge the door does not list. An outside agent's pill names it in its own words, as its program last said them at the door
@@ -1256,22 +1256,33 @@ as by aiming. They read nothing of the kind of world they are drawn over: a poin
 how tall it stands, from the society drawn, are all they ask, so they are the same over a town, a
 farm or a site.
 
-What is drawn is bounded by what can be read, never by how many beings a model decides for
+Every mark stands on its own being's head and is never lifted off it. A being a model decides for
+wears two things: a small `AI` mark on its head, always, the same near or far, alone or in a crowd,
+and the model's whole name in a row over the mark, joined to it by a neck. A name is bounded by what
+can be read, never by how many beings a model decides for
 (`assets/catalogs/thing-presentation/decider-marks.v1.json`, each value with its class and reason,
-read by [`decider-marks.ts`](../web/packages/app/src/decider-marks.ts)). A name is drawn over a being
-that stands at least a stated height on the screen, nearest first, until the names cover a stated
-share of the view. Each name stands over its own being, the nearest lowest: one that would cover a
-nearer name stands just above it (2 px apart), so two beings side by side are both named; which name
-is whose is then read from its place across the screen alone. Every name not drawn is counted by why
-(too small, beyond the share) on the overlay (`data-named`, `data-unnamed`), and the canvas states who
-decides for how many beings and how many are indoors (`data-deciders`), read from each being's own
-state: one that states it is indoors (`indoors` true, or `location.indoors` true where the state
-keeps a location) is not drawn and is counted indoors, and one that states nothing of it is in the
-street. The picked person, a speaking one and one at a decision are named outside that share and
-however small they stand, with their kind beside the name. A name can show through a wall: nothing
-here tests what stands between the viewer and a being.
+read by [`decider-marks.ts`](../web/packages/app/src/decider-marks.ts)). Nearest first, a name is
+drawn where its being stands at least a stated height on the screen, while the names cover no more
+than a stated share of the view (what a name adds over its mark; the marks are no part of the share),
+and where it would cover no name already drawn and nobody else's mark. Where any of the three fails
+the being wears its mark alone, which is still a button that picks it, and pointing at the mark or
+reaching it by keyboard opens its name over whatever stands there. So of two people on a bench one
+is named and both are marked, and no name stands where a reader cannot tell whose it is. The nearest
+being a model decides for is named however small it stands, though not where its name would cover
+somebody else's mark. The picked person, a speaking one and one at a
+decision are named whatever stands by, outside the share, with their kind over the name, and are
+drawn over the other marks. A marked being no model decides for (a game's player, a person's) has no
+shorter form: too small or beyond the share it wears nothing. Every name not drawn is counted by why
+(too small, beyond the share, would cover another) on the overlay (`data-named`, `data-unnamed`), and
+the canvas states who decides for how many beings and how many are indoors (`data-deciders`), read
+from each being's own state: one that states it is indoors (`indoors` true, or `location.indoors`
+true where the state keeps a location) is not drawn and is counted indoors, and one that states
+nothing of it is in the street. Limits: marks are not kept off each other, so far off, where a mark
+is as tall as the being under it, the marks of a crowd overlap; a held being's name is drawn over
+the marks of those standing by it, which it hides for as long; and a name can show through a wall,
+since nothing here tests what stands between the viewer and a being.
 
-When a minute takes up a model's decision, what the model chose opens under its name, in the action's
+When a minute takes up a model's decision, what the model chose opens over its name, in the action's
 offered words as the models read serves them ("Chose “walk to the well”."), with what came of it where
 the minute did not act on it and why by its code's words, for as long as a line of speech of that length
 stays, and closes ([`thing-decisions.ts`](../web/packages/app/src/composition/thing-decisions.ts)). Each
