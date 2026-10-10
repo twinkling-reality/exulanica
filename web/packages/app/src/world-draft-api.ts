@@ -92,6 +92,23 @@ export interface OfferedLook {
  */
 export type LookOffer = OfferedLook | { readonly state: 'none' } | { readonly state: 'unavailable' };
 
+/** The setting the words ask for: a named part for each axis they speak of, and the person's own words for them. */
+export interface OfferedSetting {
+  readonly state: 'offered';
+  /** The part chosen for each axis that has one, by the host's own keys, in the axes' order. */
+  readonly parts: Readonly<Record<string, string>>;
+  /** The person's own words that chose the parts, as typed. */
+  readonly settingWords: readonly string[];
+  /** The name a person reads for the model that chose them, as the offer's own `execution` names the call that answered; null where it names none. */
+  readonly modelName: string | null;
+}
+
+/**
+ * A draft's setting offer: named parts, none (the words ask for no listed part), or unavailable
+ * (the step did not answer this time).
+ */
+export type SettingOffer = OfferedSetting | { readonly state: 'none' } | { readonly state: 'unavailable' };
+
 export interface WorldDraft {
   /** The words as the person typed them. */
   readonly description: string;
@@ -107,6 +124,8 @@ export interface WorldDraft {
   readonly modelName: string | null;
   /** The look the words ask for, if the answer carries an offer this page can read; else null. */
   readonly lookOffer: LookOffer | null;
+  /** The setting the words ask for, if the answer carries an offer this page can read; else null. */
+  readonly settingOffer: SettingOffer | null;
 }
 
 type Row = Readonly<Record<string, unknown>>;
@@ -254,6 +273,29 @@ export function parseLookOffer(value: unknown): LookOffer | null {
   };
 }
 
+/**
+ * A draft's setting offer, read leniently as its look offer is: an absent or null offer, a state
+ * this page does not know, or an offered setting with no part or no words is no offer; a field it
+ * does not know is passed over; and none of these refuses the draft.
+ */
+export function parseSettingOffer(value: unknown): SettingOffer | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const offer = value as Row;
+  const state = offer['state'];
+  if (state === 'none' || state === 'unavailable') return { state };
+  if (state !== 'offered') return null;
+  const parts = offer['parts'];
+  const words = offer['setting_words'];
+  if (parts === null || typeof parts !== 'object' || Array.isArray(parts)) return null;
+  const chosen = Object.entries(parts as Row);
+  if (chosen.length === 0 || !chosen.every(([axis, key]) => axis !== '' && typeof key === 'string' && key !== '')) return null;
+  if (!Array.isArray(words) || words.length === 0
+    || !words.every((word): word is string => typeof word === 'string' && word !== '')) return null;
+  return {
+    state, parts: Object.fromEntries(chosen) as Record<string, string>, settingWords: [...words], modelName: chooserName(offer['execution']),
+  };
+}
+
 /** A drafting answer as the server serves it; a field of the wrong shape is refused. */
 export function parseWorldDraft(value: unknown): WorldDraft {
   const body = row(value, 'world draft');
@@ -279,6 +321,7 @@ export function parseWorldDraft(value: unknown): WorldDraft {
     modelId: nullable(body['model_id'], text, 'model'),
     modelName: nullable(body['model_name'], text, 'model name'),
     lookOffer: parseLookOffer(body['look_offer']),
+    settingOffer: parseSettingOffer(body['setting_offer']),
   };
 }
 

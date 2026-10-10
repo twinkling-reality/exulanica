@@ -469,6 +469,13 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldRecipes.look.chosen': 'Your choice. You can change it any time later in Design.',
   'worldRecipes.look.fromWords':
     'From your words {phrases}. You can change it now, or any time later in Design.',
+  // The Setting row under the Look row: the hour, sky, ground and cover the town will be made in.
+  'worldRecipes.setting.label': 'Setting',
+  'worldRecipes.setting.none':
+    'As the look has it. You can choose the hour, the sky and the ground any time later in Design.',
+  'worldRecipes.setting.fromWords':
+    '{titles}. From your words {phrases}. You can change it any time later in Design.',
+  'worldRecipes.setting.clear': 'Draw it as the look has it',
   // Kinds of place (GET /worlds/kinds): the workspace's own kinds as cards under the recipes, and
   // the last card, a new kind of place drafted from a person's words (docs/world-kinds-contract.md).
   'worldKinds.heading': 'Or a kind of place',
@@ -590,6 +597,14 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldDescription.look.unknownModel': 'An open model',
   'worldDescription.look.unavailable':
     'No look was chosen from your words this time. The town will be drawn in the look shown.',
+  // The setting a draft's words ask for: the named parts, the open model that chose them, and the
+  // person's own words that chose them.
+  // An offered setting is shown, never taken with the values: its own press takes it.
+  'worldDescription.setting.offered': '{model} suggests the setting {titles}, from your words {phrases}.',
+  'worldDescription.setting.use': 'Use this setting',
+  'worldDescription.setting.unavailable':
+    'No setting was chosen from your words this time. The town will be drawn as its look has it.',
+  'worldDescription.setting.taken': 'The setting is now {titles}.',
   'worldDescription.unit.mm': '{metres} m',
   'worldDescription.unit.count': '{count}',
   'worldDescription.unit.permille': '{thousandths} of 1,000',

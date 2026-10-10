@@ -22,13 +22,14 @@ from exulanica.models.client import ModelClient
 from exulanica.models.errors import BudgetExceededError, TransportError
 from exulanica.models.manifest import load_manifest
 from exulanica.models.transport import HttpResponse
-from exulanica.selection import world_drafting
+from exulanica.selection import setting_choosing, world_drafting
 from exulanica.selection.look_choosing import CHOOSER_ROLE, LookOption, render_request
 from exulanica.selection.world_drafting import DRAFTER_ROLE
 from exulanica.world import specification_source
 from exulanica.world.specification_samples import Counted, TownSample
 from exulanica.world.specification_source import ValueRefusal
 from exulanica.world.style_pack_library import style_pack_library
+from exulanica.world.world_settings import SETTINGS_DIRECTORY, SettingParts, setting_parts
 from fastapi.testclient import TestClient
 
 from conftest import TEST_CEILING_USD, TEST_MAX_CALLS
@@ -43,6 +44,10 @@ TOKEN = "world-drafts-owner-token-at-least-32-chars"
 NO_MODEL_TOKEN = "world-drafts-no-model-token-at-least-32-chars"
 DRAFTER = load_manifest()[DRAFTER_ROLE].primary.model_id
 CHOOSER = load_manifest()[CHOOSER_ROLE].primary.model_id
+
+
+#: A host that lists no part of a setting, so the setting step asks nothing.
+NO_PARTS = SettingParts(version=0, sha256="0" * 64, axes=(), parts={})
 
 
 def _form(**changes: Any) -> dict[str, Any]:
@@ -123,6 +128,9 @@ def drafts(named, spine_schema, monkeypatch):
         ),
     )
     samples = _Samples()
+    # The setting step runs after the look step and has tests of its own below: with no part to
+    # choose it asks nothing, so every other test here holds the draft and the look step alone.
+    monkeypatch.setattr(world_drafts, "setting_parts", lambda: NO_PARTS)
     monkeypatch.setattr(specification_source, "served_document", specification_document)
     monkeypatch.setattr(specification_source, "value_refusal", _standin_refusal)
     monkeypatch.setattr(world_drafts, "sample_worker", lambda: samples)
@@ -464,3 +472,144 @@ def test_a_look_step_that_cannot_answer_leaves_the_draft_and_says_why(
     assert body["proposal"]["preset"] == "small_town"
     assert (body["look_offer"]["state"], body["look_offer"]["reason"]) == ("unavailable", reason)
     assert body["look_offer"]["pack_id"] is None
+
+
+# -- the setting offered after the draft and the look --------------------------------------------
+
+SETTING_ROLE = setting_choosing.CHOOSER_ROLE
+#: The host's named parts, read from the committed file, not through the loader under test.
+PARTS_FILE = json.loads((SETTINGS_DIRECTORY / "setting-parts.v1.json").read_text("utf-8"))
+
+
+def _setting(words: list[str], **parts: str | None) -> HttpResponse:
+    answer = {axis["key"]: parts.get(axis["key"]) for axis in PARTS_FILE["axes"]}
+    content = json.dumps({**answer, "words": words})
+    model = load_manifest()[SETTING_ROLE].primary.model_id
+    return HttpResponse(status_code=200, text=json.dumps(chat_body(content, model=model)))
+
+
+def _with_settings(monkeypatch) -> None:
+    monkeypatch.setattr(world_drafts, "setting_parts", setting_parts)
+
+
+def test_a_setting_the_words_ask_for_is_offered_in_the_persons_own_words(drafts, monkeypatch):
+    app, transport, _, _ = drafts
+    _with_settings(monkeypatch)
+    transport.responses += [
+        _reply(_form()),
+        _choice(None, []),
+        _setting(["at dusk", "by the sea near [place A]"], sky="dusk", ground="sea"),
+    ]
+    description = "A town by the sea near lantern house, at dusk"
+
+    with app() as client:
+        body = _draft(client, description).json()
+
+    offer = body["setting_offer"]
+    assert (offer["state"], offer["reason"]) == ("offered", None)
+    assert offer["parts"] == {"sky": "dusk", "ground": "sea"}
+    assert offer["parts_version"] == PARTS_FILE["version"]
+    # The person's own words, as typed: the saved name written back, never sent.
+    assert offer["setting_words"] == ["at dusk", "by the sea near lantern house"]
+    assert offer["prompt_version"] == "setting-choosing-1"
+    assert [call["role"] for call in offer["execution"]["calls"]] == [str(SETTING_ROLE)]
+    # The draft's and the look offer's executions list their own calls alone.
+    assert [call["role"] for call in body["execution"]["calls"]] == [str(DRAFTER_ROLE)]
+    assert [call["role"] for call in body["look_offer"]["execution"]["calls"]] == [
+        str(CHOOSER_ROLE)
+    ]
+    # The step was shown the description as the drafter was sent it, and the parts; no name.
+    _first, _second, third = transport.requests
+    axes = tuple(
+        setting_choosing.SettingAxis(axis["key"], axis["title"]) for axis in PARTS_FILE["axes"]
+    )
+    options = tuple(
+        setting_choosing.SettingOption(
+            part["axis"], part["key"], part["title"], part["description"]
+        )
+        for part in PARTS_FILE["parts"]
+    )
+    words = "A town by the sea near [place A], at dusk"
+    assert third["payload"]["messages"][1]["content"] == setting_choosing.render_request(
+        words, axes, options
+    )
+    assert "lantern" not in json.dumps(third["payload"]).lower()
+
+
+def test_the_drafters_and_the_look_choosers_requests_are_the_same_with_the_setting_step_on_and_off(
+    drafts, monkeypatch
+):
+    """Offering a setting never changes what the drafter or the look chooser is asked."""
+    app, transport, _, _ = drafts
+    description = "A cozy little market town at dusk"
+    transport.responses += [_reply(_form()), _choice(None, [])]
+    with app() as client:
+        off = _draft(client, description).json()
+    assert off["setting_offer"] is None and transport.call_count == 2
+    without_step = [_payload_bytes(request) for request in transport.requests]
+
+    _with_settings(monkeypatch)
+    transport.requests.clear()
+    transport.responses += [_reply(_form()), _choice(None, []), _setting([])]
+    with app() as client:
+        on = _draft(client, description).json()
+    assert on["setting_offer"]["state"] == "none" and transport.call_count == 3
+    assert [_payload_bytes(request) for request in transport.requests[:2]] == without_step
+    assert {k: v for k, v in on.items() if k != "setting_offer"} == {
+        k: v for k, v in off.items() if k != "setting_offer"
+    } | {"execution": on["execution"], "look_offer": on["look_offer"]}
+
+
+def test_a_refused_draft_is_offered_no_setting_and_the_step_asks_nothing(drafts, monkeypatch):
+    app, transport, _, _ = drafts
+    _with_settings(monkeypatch)
+    transport.responses.append(
+        _reply(_form(fit="none", not_supported=["a floating city in the clouds"]))
+    )
+    with app() as client:
+        body = _draft(client, "a floating city in the clouds").json()
+    assert body["refusal"]["code"] == "description_not_supported"
+    assert body["setting_offer"] is None and transport.call_count == 1
+
+
+def test_a_refused_setting_answer_offers_none_and_says_why(drafts, monkeypatch):
+    app, transport, _, _ = drafts
+    _with_settings(monkeypatch)
+    invented = _setting(["sunset"], sky="dusk")
+    transport.responses += [_reply(_form()), _choice(None, []), invented, invented]
+
+    with app() as client:
+        offer = _draft(client, "a town at dusk").json()["setting_offer"]
+
+    assert (offer["state"], offer["reason"], offer["parts"]) == ("none", "answer_refused", {})
+    assert offer["setting_words"] == [] and len(offer["execution"]["calls"]) == 2
+
+
+@pytest.mark.parametrize(
+    ("failure", "reason"),
+    [
+        (TransportError("no whole answer", timed_out=True), "timed_out"),
+        (TransportError("the provider failed", retryable=False), "failed"),
+        (BudgetExceededError("no allowance", spent_usd=1, ceiling_usd=1), "no_allowance"),
+    ],
+)
+def test_a_setting_step_that_cannot_answer_leaves_the_draft_and_the_look_and_says_why(
+    drafts, monkeypatch, failure, reason
+):
+    app, transport, _, _ = drafts
+    _with_settings(monkeypatch)
+    transport.responses += [_reply(_form()), _choice("exulanica.cozy-town", ["cozy"])]
+
+    def unanswered(*args: Any, **kwargs: Any) -> Any:
+        raise failure
+
+    monkeypatch.setattr(world_drafts, "choose_setting", unanswered)
+    with app() as client:
+        response = _draft(client, "a cozy little town at dusk")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["proposal"]["preset"] == "small_town"
+    assert body["look_offer"]["state"] == "offered"
+    offer = body["setting_offer"]
+    assert (offer["state"], offer["reason"], offer["parts"]) == ("unavailable", reason, {})

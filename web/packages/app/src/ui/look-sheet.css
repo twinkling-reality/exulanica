@@ -165,6 +165,8 @@
   border: 1px solid var(--color-border-strong);
   border-radius: 12px;
 }
+/* The Setting row under it has no picture: its words take the width and its button stays one line. */
+#shell section.world-recipes .town-setting-row .look-row-body { grid-template-columns: 1fr auto; }
 #shell section.world-recipes .look-row-picture { width: 6rem; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 8px; }
 #shell section.world-recipes .look-row-picture[hidden] { display: none; }
 #shell section.world-recipes .look-row-picture img { width: 100%; height: 100%; object-fit: cover; }

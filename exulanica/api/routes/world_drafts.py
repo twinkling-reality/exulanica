@@ -26,7 +26,13 @@ proposal document, the same for the page and for an agent calling the API:
     for, if any, chosen by a short step of its own after the draft
     (:mod:`exulanica.selection.look_choosing`), with the person's own words that chose it. The
     drafter's request is the same whether or not the step runs; whatever the step answers, the
-    person picks the look, and the library's default stands when it offers none.
+    person picks the look, and the library's default stands when it offers none;
+*   for a draft that is not refused, ``setting_offer``: which named part of a world's setting the
+    words ask for on each axis, if any (an hour and sky, a ground, a cover), chosen by a second
+    short step of its own (:mod:`exulanica.selection.setting_choosing`), with the person's own
+    words that chose them. It changes neither the draft nor the look offer; the person takes the
+    parts or leaves them, and a world made with them is composed and checked like any setting
+    (:mod:`exulanica.world.world_settings`).
 
 Nothing is written. Making the world is the person's ``POST /worlds/generated`` with the preset and
 values they confirm, the one gate every world passes. The route needs ``world.read`` and
@@ -52,6 +58,12 @@ from exulanica.models.manifest import load_manifest
 from exulanica.references.for_drafting import NOTES_REFUSALS, NotesRefused, notes_for_draft
 from exulanica.selection.calls import CallLog
 from exulanica.selection.look_choosing import LookOption, choose_look, chooser_prompt
+from exulanica.selection.setting_choosing import (
+    SettingAxis,
+    SettingOption,
+    choose_setting,
+)
+from exulanica.selection.setting_choosing import chooser_prompt as setting_prompt
 from exulanica.selection.world_drafting import (
     SentDescription,
     drafting_prompt,
@@ -62,6 +74,7 @@ from exulanica.selection.world_drafting import (
 from exulanica.world import specification_source
 from exulanica.world.specification_samples import TownSample, sample_worker
 from exulanica.world.style_pack_library import style_pack_library
+from exulanica.world.world_settings import setting_parts
 
 __all__ = ["router"]
 
@@ -186,6 +199,36 @@ class LookOfferView(BaseModel):
     execution: ExecutionView
 
 
+class SettingOfferView(BaseModel):
+    """The setting the words ask for, offered for the person to take or leave, or why there is none.
+
+    ``offered`` names a part for each axis the words speak of (``parts``, an axis's key to a
+    part's key, both of the host's own list at ``parts_version``; ``GET /world/style-packs`` gives
+    their titles) and the person's own words that chose them, as typed. ``none``: the step found
+    no listed part in the words, or its answer was refused twice (``reason``
+    ``answer_refused``). ``unavailable``: the step could not be asked or did not answer. Either
+    way the draft and its look offer are unchanged, and a world made with no setting is drawn as
+    its look states. The parts are keys only: a request that takes them names them with the look
+    it is made in (``style_pack.setting_parts`` on ``POST /worlds/generated``), and the host
+    composes and checks the setting then.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    state: Literal["offered", "none", "unavailable"]
+    reason: LookReason | None
+    #: The part chosen for each axis that has one, in the axes' order.
+    parts: dict[str, str]
+    #: The version of the host's list of named parts the keys are of.
+    parts_version: int
+    #: The person's own words that chose the parts, as typed: never a saved name.
+    setting_words: list[str]
+    prompt_version: str
+    prompt_sha256: str
+    #: What the step cost to produce, its own attempts only.
+    execution: ExecutionView
+
+
 #: Why a reference request's notes were not handed to the drafter.
 NotesReason = Literal[tuple(NOTES_REFUSALS)]  # type: ignore[valid-type]
 
@@ -233,6 +276,8 @@ class WorldDraftView(BaseModel):
     execution: ExecutionView
     #: Present for a draft that is not refused, while the library holds a look; absent otherwise.
     look_offer: LookOfferView | None = None
+    #: Present for a draft that is not refused; absent otherwise.
+    setting_offer: SettingOfferView | None = None
     #: Present when the request named a ``reference_id``; absent otherwise.
     references: ReferencesView | None = None
 
@@ -284,6 +329,50 @@ def _look_offer(client: ModelClient, sent: SentDescription) -> LookOfferView | N
         version=None if pack is None else pack.version,
         manifest_sha256=None if pack is None else pack.manifest_sha256,
         look_words=words,
+        prompt_version=prompt.prompt_version,
+        prompt_sha256=prompt.sha256,
+        execution=_execution(log.calls, (), prompt_version=prompt.prompt_version),
+    )
+
+
+def _setting_offer(client: ModelClient, sent: SentDescription) -> SettingOfferView | None:
+    """Ask which named part of a setting the words sent to the drafter ask for on each axis, after
+    the draft and the look offer. The step spends the same allowance the draft does, and its
+    failure never fails the draft."""
+    listed = setting_parts()
+    if not listed.parts:
+        return None
+    prompt = setting_prompt()
+    axes = tuple(SettingAxis(key, title) for key, title in listed.axes)
+    options = tuple(SettingOption(**part) for part in listed.listed())
+    log = CallLog()
+    state: Literal["offered", "none", "unavailable"]
+    reason: LookReason | None
+    parts: dict[str, str] = {}
+    words: list[str] = []
+    try:
+        choice = choose_setting(
+            client.with_attempts(log.attempt),
+            sent.text,
+            axes,
+            options,
+            prompt=prompt,
+            placeholders=sent.placeholders,
+            log=log,
+        )
+    except (ModelError, PrivacyAdmissionError) as failed:
+        state, reason = "unavailable", _unavailable(failed)
+    else:
+        reason = None if choice.refused is None else "answer_refused"
+        parts = dict(choice.parts)
+        state = "offered" if parts else "none"
+        words = [sent.typed_words(start, end) for start, end in choice.words_at]
+    return SettingOfferView(
+        state=state,
+        reason=reason,
+        parts=parts,
+        parts_version=listed.version,
+        setting_words=words,
         prompt_version=prompt.prompt_version,
         prompt_sha256=prompt.sha256,
         execution=_execution(log.calls, (), prompt_version=prompt.prompt_version),
@@ -412,5 +501,6 @@ def draft_world(
         else load_manifest().model_name(outcome.model_id),
         execution=_execution(outcome.calls, (), prompt_version=prompt.prompt_version),
         look_offer=None if draft is None else _look_offer(client, sent),
+        setting_offer=None if draft is None else _setting_offer(client, sent),
         references=references,
     )

@@ -79,6 +79,7 @@ import type { WorldStylePackBinding } from './world-style-api.js';
 import { readLookLibrary, type LookLibrary } from './composition/look-library.js';
 import { lookToUse } from './composition/look-use.js';
 import { buildTownLook } from './composition/town-look.js';
+import { buildTownSetting } from './composition/town-setting.js';
 import { fill, say } from './ui/copy.js';
 import { actionState, perform } from './ui/actions/surfaces.js';
 import { actionSpec, availability } from './ui/actions/registry.js';
@@ -369,11 +370,14 @@ function showWorldRecipes(
       const kinds = new WorldKindsClient(credentials);
       // The look the town is made in: the host's default until the person changes it or takes
       // the look a draft of their words offers, sent with the making so the town is bound to it
-      // (`style_pack` on POST /worlds/generated).
-      const look = buildTownLook({ library: readLookLibrary(credentials), host: shell });
+      // (`style_pack` on POST /worlds/generated). Its setting is its look's own until the person
+      // takes the parts a draft of their words offers, sent with the look for the host to compose.
+      const looks = readLookLibrary(credentials);
+      const look = buildTownLook({ library: looks, host: shell });
+      const setting = buildTownSetting({ library: looks });
       const panel = buildWorldRecipes({
         specification: () => specification.specification(),
-        make: (preset, values) => client.makeGenerated(preset.key, preset.label, values, look.binding()),
+        make: (preset, values) => client.makeGenerated(preset.key, preset.label, values, setting.madeIn(look.binding())),
         open: async (entry) => {
           panel.root.remove();
           state.savedWorldEntries = await client.entries();
@@ -400,10 +404,10 @@ function showWorldRecipes(
       current = panel.root;
       // Focus moves into the panel as it replaces the stand-in, which took it with it; Describe it
       // takes it once attached (composition/world-description.ts).
-      panel.lookSlot.append(look.row);
+      panel.lookSlot.append(look.row, setting.row);
       panel.focus();
       attachWorldDescription(panel, {
-        credentials, specification: () => specification.specification(), look: look.drafted,
+        credentials, specification: () => specification.specification(), look: look.drafted, setting: setting.drafted,
       });
       // A saved world's own values, loaded as a person's edit is: what is out of range now is said
       // by the panel's own check, and the world they came from never changes.

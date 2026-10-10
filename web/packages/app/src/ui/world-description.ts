@@ -27,7 +27,9 @@ import type {
   DraftRefusalCode,
   LookOffer,
   OfferedLook,
+  OfferedSetting,
   SampleStatus,
+  SettingOffer,
   TownSample,
   WorldDraft,
 } from '../world-draft-api.js';
@@ -209,6 +211,44 @@ export interface DraftLook {
   watch(changed: () => void): void;
 }
 
+/**
+ * The setting a town not made yet will be made in, as this panel needs it: the Setting row's side
+ * of a draft's offered setting (`../composition/town-setting.ts`).
+ */
+export interface DraftSetting {
+  /**
+   * The titles of an offered setting's parts as the host lists them, in the axes' order; null
+   * where the host lists none of them, or its list is not read yet: parts the page cannot name are
+   * not shown or taken.
+   */
+  offered(offer: OfferedSetting): readonly string[] | null;
+  /**
+   * The person pressed to use the offered setting: its parts become the town's. True when they are
+   * the town's setting after it; false, and nothing changes, for parts the page cannot name. This
+   * is the only way an offered setting is taken: "Use these values" never takes it.
+   */
+  take(offer: OfferedSetting): boolean;
+  /** Whether the town's setting is the offered one's parts already. */
+  holds(offer: OfferedSetting): boolean;
+  /** Run `changed` whenever the host's named parts arrive or the town's setting changes. */
+  watch(changed: () => void): void;
+}
+
+/**
+ * The line a usable draft says its setting offer in, or null for no line: an offer of none, no
+ * offer, or offered parts the page cannot name (`titles` null).
+ */
+export function settingLine(offer: SettingOffer | null, titles: readonly string[] | null): string | null {
+  if (offer === null || offer.state === 'none') return null;
+  if (offer.state === 'unavailable') return say('worldDescription.setting.unavailable');
+  if (titles === null || titles.length === 0) return null;
+  return fill('worldDescription.setting.offered', {
+    model: offer.modelName ?? say('worldDescription.look.unknownModel'),
+    titles: titles.join(', '),
+    phrases: offer.settingWords.map((phrase) => fill('worldDescription.quoted', { phrase })).join(', '),
+  });
+}
+
 /** A draft's look line: its words, and the words of the one press that takes the look instead. */
 export interface LookLine {
   readonly line: string;
@@ -251,6 +291,8 @@ export function buildWorldDescription(options: {
   readonly maximumCharacters: number;
   /** The town's look, shown and taken with a draft that offers one; absent, no look is said. */
   readonly look?: DraftLook;
+  /** The town's setting, shown and taken with a draft that offers one; absent, no setting is said. */
+  readonly setting?: DraftSetting;
 }): WorldDescriptionPanel {
   const input = el('textarea', {
     class: 'world-description-input', rows: 3, maxlength: options.maximumCharacters,
@@ -293,15 +335,25 @@ export function buildWorldDescription(options: {
       children.push(instead);
     }
     replace(lookBox, children);
-    sayLeftOut(known === null || offered === null ? null : offered.lookWords);
+    sayLeftOut();
   };
   // What the words did not reach, for a town that is proposed: first, where they set no value and
-  // chose no look shown above, that the town is its recipe's usual one; then, in one plain line,
-  // what of the words is not in the town yet, never the words the shown look was chosen from.
+  // neither a look nor a setting chosen from them is shown above, that the town is its recipe's
+  // usual one; then, in one plain line, what of the words is not in the town yet, never the words
+  // a shown look or setting was chosen from.
   const leftOutBox = el('div', { class: 'world-description-left-out' });
   let leftOut: readonly string[] | null = null;
   let usual: string | null = null;
-  const sayLeftOut = (taken: readonly string[] | null): void => {
+  /** The words each step shown above was chosen from; null where neither a look nor a setting is shown. */
+  const shownWords = (): readonly string[] | null => {
+    const lookOffered = offeredLook();
+    const lookShown = lookOffered !== null && look !== undefined && look.offered(lookOffered) !== null;
+    const settingShown = shownSetting();
+    if (!lookShown && settingShown === null) return null;
+    return [...(lookShown ? lookOffered.lookWords : []), ...(settingShown === null ? [] : settingShown.settingWords)];
+  };
+  const sayLeftOut = (): void => {
+    const taken = shownWords();
     const phrases = leftOut === null ? [] : leftOutPhrases(leftOut, taken ?? []);
     replace(leftOutBox, [
       ...(usual === null || taken !== null ? [] : [
@@ -314,6 +366,39 @@ export function buildWorldDescription(options: {
     ]);
   };
   look?.watch(sayLook);
+  // The setting the draft's words ask for is SHOWN under its look with the words it came from, and
+  // is the town's only by the person's own press on it: "Use these values" never takes it.
+  const setting = options.setting;
+  const settingBox = el('div', { class: 'world-description-look world-description-setting' });
+  let settingOffer: SettingOffer | null = null;
+  const offeredTitles = (): readonly string[] | null => (
+    setting === undefined || settingOffer === null || settingOffer.state !== 'offered' ? null : setting.offered(settingOffer));
+  /** The offered setting the page shows by name, or null: none offered, or parts it cannot name. */
+  function shownSetting(): OfferedSetting | null {
+    const titles = offeredTitles();
+    return settingOffer !== null && settingOffer.state === 'offered' && titles !== null && titles.length > 0 ? settingOffer : null;
+  }
+  const saySetting = (): void => {
+    if (setting === undefined) return;
+    const titles = offeredTitles();
+    const said = settingLine(settingOffer, titles);
+    settingBox.dataset['look'] = said === null || settingOffer === null ? '' : settingOffer.state;
+    const children: Node[] = said === null ? [] : [el('p', { text: said })];
+    const shown = shownSetting();
+    if (said !== null && shown !== null && titles !== null && !setting.holds(shown)) {
+      const take = el('button', { type: 'button', class: 'world-description-look-instead world-description-setting-use',
+        text: say('worldDescription.setting.use') });
+      take.addEventListener('click', () => {
+        if (setting.take(shown)) {
+          status.textContent = fill('worldDescription.setting.taken', { titles: titles.join(', ') });
+        }
+      });
+      children.push(take);
+    }
+    replace(settingBox, children);
+    sayLeftOut();
+  };
+  setting?.watch(saySetting);
   const show = (draft: WorldDraft): void => {
     const lines = draftLines(draft, options.words).map((line) => el('p', { text: line }));
     offer = draft.proposal !== null && draft.proposal.valid ? draft.lookOffer : null;
@@ -324,11 +409,14 @@ export function buildWorldDescription(options: {
     const from = draft.proposal;
     usual = from === null || from.setByWords.length > 0 ? null
       : options.words.presets.find((one) => one.key === from.preset)?.label ?? from.preset;
-    if (look === undefined) sayLeftOut(null);
-    else sayLook();
-    // The look comes right under the person's words, then what is not in the town yet, both
-    // before the long list of values.
-    const children: Node[] = [...lines.slice(0, 1), lookBox, leftOutBox, ...lines.slice(1)];
+    settingOffer = draft.proposal !== null && draft.proposal.valid ? draft.settingOffer : null;
+    // Each says its own line and then what the words did not reach.
+    sayLook();
+    saySetting();
+    sayLeftOut();
+    // The look and the setting come right under the person's words, then what is not in the town
+    // yet, all before the long list of values.
+    const children: Node[] = [...lines.slice(0, 1), lookBox, settingBox, leftOutBox, ...lines.slice(1)];
     const proposal = draft.proposal;
     if (proposal !== null && proposal.valid) {
       const use = el('button', { type: 'button', class: 'world-description-use',
@@ -339,9 +427,11 @@ export function buildWorldDescription(options: {
         // says, and answers whether the offered look is the town's.
         const offered = offeredLook();
         const known = offered === null || look === undefined ? null : look.offered(offered);
-        status.textContent = look?.take(offer) === true && known !== null
+        const used = look?.take(offer) === true && known !== null
           ? fill('worldDescription.usedWithLook', { title: known.title })
           : say('worldDescription.used');
+        // The setting is not taken here: it is the town's only by its own press, above.
+        status.textContent = used;
       });
       children.push(use);
     }

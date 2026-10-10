@@ -471,8 +471,8 @@ export class WorldEntryClient {
 
   /**
    * Generate a world from a preset, with `values` for any of its adjustable parameters, in the look
-   * `stylePack` names (a pack of the host's library; none, the host's default), and save it; its
-   * tiles are baked after this returns.
+   * `stylePack` names (a pack of the host's library; none, the host's default) and the setting
+   * its `settingParts` name, and save it; its tiles are baked after this returns.
    */
   async makeGenerated(
     recipe: string,
@@ -485,7 +485,11 @@ export class WorldEntryClient {
       title,
       ...(values === undefined ? {} : { values }),
       ...(stylePack === undefined || stylePack === null ? {} : {
-        style_pack: { pack_id: stylePack.packId, version: stylePack.version, manifest_sha256: stylePack.manifestSha256 },
+        style_pack: {
+          pack_id: stylePack.packId, version: stylePack.version, manifest_sha256: stylePack.manifestSha256,
+          // A named part for an axis, which the host composes into the town's setting for this look.
+          ...(stylePack.settingParts === undefined ? {} : { setting_parts: stylePack.settingParts }),
+        },
       }),
     }));
   }

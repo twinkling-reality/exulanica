@@ -1,0 +1,42 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "client_timeout_seconds": 30,
+  "kind": "exulanica.setting-chooser-timings/v1",
+  "max_tokens": 1024,
+  "measured": {
+   "roles": {
+    "setting_chooser": {
+     "primary": "nvidia/nemotron-3-super-120b-a12b",
+     "primary_measured": {
+      "longest_ms": 5761,
+      "p50_ms": 2832,
+      "p99_ms": 5761,
+      "rows": 36
+     }
+    }
+   }
+  },
+  "module_sha256": "6cb4612864185b9c66a44788871007145da071da763fe7237cf20386c8dbce09",
+  "note": "The setting chooser's primary's own calls in its pre-registered held-out measurement: 30 fixed descriptions of towns, each asked once and answered with one named part or none for each axis of a world's setting from the committed parts; rows are its completed calls, a repair being a call of its own. The manifest's timeout_rule sets the role's timeout from the longest call. A call past the timeout leaves the world with no setting offered and no error. The fallback serves under the same timeout when the primary is withdrawn. Nothing of any other model, and nothing of any answer, is published here.",
+  "parts_sha256": "00d325c1bbde5065206a075fda468f43f86ddba134d6316fb537f6ca72cffd1c",
+  "preregistration_sha256": "8e26e2d85a64785abaa8fbe065418f5b9fb98bb93a28268e2e43130389cc67de",
+  "prompt_sha256": "ea5efbf23095d1cbfd66a13ad8d19fba3956ad2aded6cf6c6c7e99fedb02485b",
+  "provider": "Nebius Token Factory",
+  "run_sha256": "b29f8582647f4dd781da57cbb029e0d0ae00dba3c4ea29abe6f8184a9d5a5ad3",
+  "script_sha256": "6d2ee23dfaa49814a6e83acf309e8491fa1d29272d0f5eec78cc0a2f4f0eeead",
+  "tree": {
+   "head": "f676d996808e7b54dc1564e68fe2a6fb8dbbf715",
+   "untracked_sha256": {
+    "assets/style-packs/settings/setting-parts.v1.json": "00d325c1bbde5065206a075fda468f43f86ddba134d6316fb537f6ca72cffd1c",
+    "exulanica/selection/setting-choosing.v1.json": "ea5efbf23095d1cbfd66a13ad8d19fba3956ad2aded6cf6c6c7e99fedb02485b",
+    "exulanica/selection/setting_choosing.py": "6cb4612864185b9c66a44788871007145da071da763fe7237cf20386c8dbce09"
+   }
+  },
+  "window": {
+   "ended": "2026-10-10T00:25:10-0400",
+   "started": "2026-10-10T00:22:42-0400"
+  }
+ },
+ "record_sha256": "f4ccdae4231398078d6af7a7dcf2863f69ef3b9cb7bf2139077676c0d882aa68"
+}

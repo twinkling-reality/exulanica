@@ -409,6 +409,23 @@
       "required_use_cases": ["text"],
       "rationale": "Chooses which listed look a person's description asks for, if any, after the specification drafter has drafted it (exulanica/selection/look_choosing.py): it is shown only the description as the drafter was sent it and each library pack's id, title and description, and answers one listed pack id or none with the description's own words that chose it, validated by code and repaired once. Kept apart from the drafter so offering looks can never move a draft. The drafter's model pair, so no new model or licence entry; a pre-registered measurement set its timeout. Model-unavailability errors select the fallback; a refused answer is repaired once and then answers none, never escalated to a larger model."
     },
+    "setting_chooser": {
+      "primary": "nvidia/nemotron-3-super-120b-a12b",
+      "fallback": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "timeout_seconds": 15,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-10-10-setting-chooser-timings.json",
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "rows": 36,
+        "p50_ms": 2832,
+        "p99_ms": 5761,
+        "longest_ms": 5761,
+        "note": "The primary's own calls in the pre-registered held-out measurement of the setting chooser: thirty fixed descriptions of towns, each asked once against the committed named parts; six answers were repaired once, each repair a call of its own. A call past the timeout leaves the world with no setting offered and no error. No retained public record measures the Qwen3 235B fallback, which serves under this timeout when the primary is withdrawn."
+      },
+      "max_tokens": {"value": 1024, "basis": "The look chooser's ceiling, for a call of the same shape by the same model, above the client's floor for a model that reasons before it answers; the measurement asked with it and no answer was cut short. A ceiling is not a spend; a low one costs a setting offer."},
+      "required_use_cases": ["text"],
+      "rationale": "Chooses which named part of a world's setting a person's description asks for on each axis, if any, after the specification drafter and the look chooser (exulanica/selection/setting_choosing.py): it is shown only the description as the drafter was sent it and each part's axis, key, title and description, and answers one listed key or none for each axis with the description's own words that chose them, validated by code and repaired once. Kept apart from the drafter and the look chooser so offering a setting can move neither. The drafter's model pair, so no new model or licence entry; a pre-registered measurement on held-out descriptions set its timeout. Model-unavailability errors select the fallback; a refused answer is repaired once and then answers none, never escalated to a larger model."
+    },
     "reference_drafting": {
       "primary": "Qwen/Qwen3-235B-A22B-Instruct-2507",
       "fallback": "deepseek-ai/DeepSeek-V4-Flash-0731",

@@ -39625,6 +39625,80 @@
     ],
     "title": "SetObjectBehaviourBody"
    },
+   "SettingOfferView": {
+    "properties": {
+     "state": {
+      "type": "string",
+      "enum": [
+       "offered",
+       "none",
+       "unavailable"
+      ],
+      "title": "State"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "answer_refused",
+         "timed_out",
+         "failed",
+         "request_refused",
+         "no_allowance"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "parts": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Parts"
+     },
+     "parts_version": {
+      "type": "integer",
+      "title": "Parts Version"
+     },
+     "setting_words": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Setting Words"
+     },
+     "prompt_version": {
+      "type": "string",
+      "title": "Prompt Version"
+     },
+     "prompt_sha256": {
+      "type": "string",
+      "title": "Prompt Sha256"
+     },
+     "execution": {
+      "$ref": "#/components/schemas/ExecutionView"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "state",
+     "reason",
+     "parts",
+     "parts_version",
+     "setting_words",
+     "prompt_version",
+     "prompt_sha256",
+     "execution"
+    ],
+    "title": "SettingOfferView",
+    "description": "The setting the words ask for, offered for the person to take or leave, or why there is none.\n\n``offered`` names a part for each axis the words speak of (``parts``, an axis's key to a\npart's key, both of the host's own list at ``parts_version``; ``GET /world/style-packs`` gives\ntheir titles) and the person's own words that chose them, as typed. ``none``: the step found\nno listed part in the words, or its answer was refused twice (``reason``\n``answer_refused``). ``unavailable``: the step could not be asked or did not answer. Either\nway the draft and its look offer are unchanged, and a world made with no setting is drawn as\nits look states. The parts are keys only: a request that takes them names them with the look\nit is made in (``style_pack.setting_parts`` on ``POST /worlds/generated``), and the host\ncomposes and checks the setting then."
+   },
    "SignalComparisonStartBody": {
     "properties": {
      "comparison_id": {
@@ -42628,6 +42702,16 @@
       "anyOf": [
        {
         "$ref": "#/components/schemas/LookOfferView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "setting_offer": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SettingOfferView"
        },
        {
         "type": "null"

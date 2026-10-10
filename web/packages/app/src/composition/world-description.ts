@@ -8,13 +8,15 @@
  * the controls' values, where they can change any of them and make the town. The words the
  * description panel shows a value in come from the same served specification the controls read.
  * Given the town's look (`./town-look.ts`), the description panel also says the look a draft's
- * words ask for and takes it with the values.
+ * words ask for and takes it with the values; given the town's setting (`./town-setting.ts`), the
+ * same for the setting.
  */
 
 import type { TransportOptions } from '@exulanica/graph-client';
 import {
   buildWorldDescription,
   type DraftLook,
+  type DraftSetting,
   type SpecificationValueWords,
   type SpecificationWords,
 } from '../ui/world-description.js';
@@ -82,6 +84,8 @@ export function attachWorldDescription(panel: SpecificationPanel, options: {
   readonly specification: () => Promise<ServedSpecification>;
   /** The town's look, where the panel shows one: a draft's offered look is said and taken by it. */
   readonly look?: DraftLook;
+  /** The town's setting, where the panel shows one: a draft's offered setting is said and taken by it. */
+  readonly setting?: DraftSetting;
 }): void {
   const client = new WorldDraftClient(options.credentials);
   void options.specification().then((specification) => {
@@ -91,6 +95,7 @@ export function attachWorldDescription(panel: SpecificationPanel, options: {
       words: specificationWords(specification),
       maximumCharacters: DESCRIPTION_CHARACTERS,
       ...(options.look === undefined ? {} : { look: options.look }),
+      ...(options.setting === undefined ? {} : { setting: options.setting }),
     });
     // Above the recipes and the line that introduces them: describing the town is the main way in.
     const presets = panel.root.querySelector('.world-recipes-list-label')

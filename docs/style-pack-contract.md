@@ -15,7 +15,7 @@ pack (section 10) are built, as are a creator's own packs in their workspace: ke
 checked, served, downloaded as an archive, offered for publication and withdrawn (section 11), and
 looks made of generated pieces, recorded, checked, served and worn by the world they were made for
 (sections 10 and 11.2), and a world's own setting, chosen from named parts, checked, stored and
-drawn (section 12). A person choosing their own workspace pack for a world, publishing one to
+drawn (section 12) and offered from a description (section 12.1). A person choosing their own workspace pack for a world, publishing one to
 the library, the page's upload control, and drafting a pack with a model are planned and not built.
 
 ## 1. In plain words
@@ -695,3 +695,71 @@ own pieces: night raises their glow where a look has them, and a look with none 
 windows. A look draws a tree's leaves from its own texture, which a setting cannot colour, so no
 part turns leaves. Two legibility floors were judged from pictures of generated towns and the
 shipped looks, not measured with people.
+
+### 12.1 A setting offered from a description
+
+A person who describes a world in words (`POST /worlds/specification/drafts`) is offered the
+setting the words ask for, if any. After a draft that is not refused, and after the look offer
+(section 10.1), the route makes one more short call of its own
+(`exulanica/selection/setting_choosing.py`, the manifest role `setting_chooser`), shown only the
+description as it was sent to the drafter, every saved name replaced, and each named part's axis,
+key, title and description. The answer is one listed part or none for each axis, with up to four
+phrases copied from the description that chose them. Code decides what is kept: a part the list
+does not hold is outside the answer's form, and a phrase not found word for word in the
+description, parts with no words or words with no part is refused, told why once, and on a second
+refusal the step answers none. The answer is the draft response's optional `setting_offer`:
+
+| `state` | Meaning |
+| --- | --- |
+| `offered` | `parts` names a part for each axis the words speak of, an axis's key to a part's key, both of the host's list at `parts_version`; `setting_words` are the person's own words that chose them, as typed, a saved name written back and never sent |
+| `none` | The words ask for no listed part, or the answer was refused twice (`reason` `answer_refused`) |
+| `unavailable` | The step did not answer: `reason` `timed_out`, `failed`, `request_refused` or `no_allowance`, as for a look |
+
+`setting_offer` is absent for a refused draft and while the host lists no part. The offer is keys
+and the person's words, never a setting: nothing is composed, checked or stored until a world is
+made naming the parts (`style_pack.setting_parts`, section 12), and the stored setting holds the
+parts' keys and figures and none of the words. The step never changes the draft or the look offer:
+it sees neither and neither sees it, the drafter's and the look chooser's requests are the same,
+byte for byte, with the step and without it, and its own calls are in `setting_offer.execution`. It
+spends the same allowance as the draft, through the same client.
+
+The step runs after the look step in the same request, so the answer comes that much later: a
+median of about 2.8 s in its measurement, and never more than the role's timeout, one deadline over
+the call and its repair together. The role's timeout, 15 s, follows the manifest's timeout rule
+(the primary's longest measured call times two, rounded up to 5 s) from its pre-registered
+measurement, whose record holds the primary's own calls
+([record](evaluation/2026-10-10-setting-chooser-timings.json)): 36 calls, longest 5,761 ms. A call
+past the timeout leaves the town drawn as its look states, with no error. Thirty descriptions by
+one author over eleven parts do not establish how well the step reads other words. The parts name
+no rain, no falling snow and no season, so words that ask for those are answered with the nearest
+listed part or none. The answer states one list of copied words for all its parts, so code holds
+that the words are the person's and that some stand behind some part, not that each part has
+words of its own: an offer may carry a part no word asked for, which is why the page shows an
+offer and never takes it for the person.
+
+The page shows the offer; the person takes it or leaves it. It reads `setting_offer` leniently
+(`web/packages/app/src/world-draft-api.ts`): an absent or null offer, a state it does not know, or
+an `offered` setting with no part or no words is no offer, a field it does not know is passed
+over, and none of these refuses the draft. Under Describe it, a draft that can be used says an
+`offered` setting in one line under the look's line
+(`web/packages/app/src/ui/world-description.ts`): the parts by the titles the host's list gives
+them, the name of the model whose call answered, and `setting_words` as typed, as a suggestion
+with one press beside it, "Use this setting". `unavailable` is one line saying that no setting was
+chosen this time and the town is drawn as its look has it; `none` and no offer are no line. The
+draft's lines of what the words did not reach (section 10.1) treat a shown setting as they treat a
+shown look: its words are not listed as not in the town yet, and the town is not said to be its
+recipe's usual one.
+
+An offered setting is the town's only by that press
+(`web/packages/app/src/composition/town-setting.ts`); "Use these values" takes the values and the
+look and never the setting. Once pressed, the Setting row under the Look row shows the parts and
+the words they came from, with one press to draw the town as its look has it instead, and Create
+this town sends the parts as `style_pack.setting_parts` with the look the town is made in, the
+host's default named exactly where the person chose none. The host composes the parts for that
+look and holds the result to the setting's rules, and a setting the look cannot be drawn in makes
+no town and is said in the words any refused making is. A setting the person took is theirs: it
+stays through later drafts until they press back to the look's own or take another. Parts the
+host's list does not hold have no title to say, so the page neither shows nor takes them. Once
+the town is made, its setting is changed in the Look sheet like any world's.
+`web/packages/app/test/town-setting.test.ts` holds the reader and the line to this section's
+table, the press, the left-out lines beside a shown setting, and the request.

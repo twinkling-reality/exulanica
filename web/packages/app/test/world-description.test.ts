@@ -475,7 +475,8 @@ describe('the Describe it panel', () => {
     }), side.look);
     expect(said(some.panel.root)).toBe('Not in this town yet: \u201ca harbour\u201d');
     const order = [...some.panel.root.querySelector('.world-description-result')!.children].map((node) => node.className);
-    expect(order.slice(1, 3)).toEqual(['world-description-look', 'world-description-left-out']);
+    // The look's line, the setting's (none here), then what is left out, all before the values.
+    expect(order.slice(1, 4)).toEqual(['world-description-look', 'world-description-look world-description-setting', 'world-description-left-out']);
     // A look the page cannot name is not shown, so its words stay in the line.
     const unnamed = await drafted(parseWorldDraft({
       ...body, not_supported: leftOut, look_offer: lookOffer({ look_words: chosenFrom }),
