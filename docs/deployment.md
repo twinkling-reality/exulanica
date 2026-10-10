@@ -1502,6 +1502,12 @@ a second disk for backups. The layout the systemd units name:
 - `/srv/exulanica/custody`: custody;
 - the second disk for backup sets, mounted apart from Docker's volumes.
 
+The backup and custody directories belong to the image's own user, uid and gid 10001
+(`chown 10001:10001`): the maintenance container writes backup sets and custody receipts into
+them as that user, and where they belong to another the first maintenance pass fails as
+`withdrawal_export_failed` (a permission error) and no backup set is written. Docker Desktop's
+shared folders hide this in a rehearsal on a workstation; a Linux host shows it.
+
 1. On the build host, from a clean checkout of the commit to serve:
    `deploy/public/public.sh build`, then `deploy/public/public.sh save public-images.tar.gz`.
    Copy the archive, `compose.yaml` and `deploy/public/` to the host. Then
