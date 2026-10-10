@@ -468,6 +468,14 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "model": None,
         },
     },
+    "POST /world/versions/{version_id}/models/{role_key}/budget": {
+        **_IN_WORLD,
+        "json": {
+            "idempotency_key": str(uuid.uuid4()),
+            "usd_per_hour": "0.25",
+            "decisions_per_hour": 600,
+        },
+    },
     "POST /world/versions/{version_id}/objects": {
         **_IN_WORLD,
         "json": {

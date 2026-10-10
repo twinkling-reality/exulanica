@@ -659,6 +659,11 @@ VERSION_ADAPTERS: Final[tuple[Callable[[VersionContext], list[Operation]], ...]]
 #: adapters to every mutating route under ``/world/versions/{version_id}/``.
 NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
     {
+        ("POST", "/world/versions/{version_id}/models/{role_key}/budget"): (
+            "sets the world's budget for its minds, which is the world's and no version's; read "
+            "with the world's models (GET /world/versions/{version_id}/models, the people's "
+            "role's budget), and a Companion plan step states its descriptor itself"
+        ),
         ("POST", "/world/versions/{version_id}/society/decisions"): (
             "retired: every request is refused by name (society_proposals_retired)"
         ),

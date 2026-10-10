@@ -16658,6 +16658,96 @@
     }
    }
   },
+  "/world/versions/{version_id}/models/{role_key}/budget": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Set World Minds Budget",
+    "description": "Set what this world may spend on the model minds of its beings, in any hour of real time.\n\nOne appended record of the world, naming who set it; the newest is the budget, and the same\nrequest asked again answers the record it made. It asks no model and spends nothing. The\nprocess's own budget, a deployment's allowance and the spending authority's grants still\nbound every call, so a budget only lowers what the host allows.",
+    "operationId": "set_world_minds_budget_world_versions__version_id__models__role_key__budget_post",
+    "parameters": [
+     {
+      "name": "role_key",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Role Key"
+      }
+     },
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MindsBudgetBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Set World Minds Budget World Versions  Version Id  Models  Role Key  Budget Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/worlds/capabilities": {
    "get": {
     "tags": [
@@ -31118,6 +31208,36 @@
      "target"
     ],
     "title": "MergeRequest"
+   },
+   "MindsBudgetBody": {
+    "properties": {
+     "idempotency_key": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Idempotency Key"
+     },
+     "usd_per_hour": {
+      "type": "string",
+      "maxLength": 13,
+      "minLength": 1,
+      "pattern": "^[0-9]{1,6}(\\.[0-9]{1,6})?$",
+      "title": "Usd Per Hour"
+     },
+     "decisions_per_hour": {
+      "type": "integer",
+      "maximum": 2147483647.0,
+      "minimum": 0.0,
+      "title": "Decisions Per Hour"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "idempotency_key",
+     "usd_per_hour",
+     "decisions_per_hour"
+    ],
+    "title": "MindsBudgetBody"
    },
    "ModelCallView": {
     "properties": {

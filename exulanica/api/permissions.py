@@ -497,6 +497,7 @@ _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     "POST /things/creatures",
     "POST /world/piece-requests",
     "POST /world/versions/{version_id}/models/{role_key}",
+    "POST /world/versions/{version_id}/models/{role_key}/budget",
     "POST /world/versions/{version_id}/society/comparisons",
     "POST /world/versions/{version_id}/society/comparisons/{comparison_id}/cancel",
     "POST /world/versions/{version_id}/society/models",

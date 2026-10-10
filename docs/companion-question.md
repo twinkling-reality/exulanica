@@ -940,7 +940,9 @@ playback host reserves for one answer of that model under the society's contract
 being named), no typical figure while no record holds one for the world (`usd_typical` null), and
 the world's own ceilings, in dollars and in decisions over any hour of real time (the host counts
 the hour just past, whatever the world's speed), past which the routine decides whatever was
-chosen. Where this host asks no model for the world, or none of the chosen model's provider, the
+chosen. The ceilings are the world's budget for its minds, with whether a person set it
+(`cost.ceilings.set_by_a_person`) or it is the policy's figures
+([a world's budget for its minds](decision-roles-contract.md#a-worlds-budget-for-its-minds)). Where this host asks no model for the world, or none of the chosen model's provider, the
 step says why by code (`mind.host_refusal`, `mind.model_refusal`): the choice is recorded and the
 routine decides until the host asks. The step still carries `cost`, the bound it would meet once
 the host asks, and the page shows no figure while nothing is asked. A step naming

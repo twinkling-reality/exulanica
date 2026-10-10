@@ -532,8 +532,8 @@ The bounds both policy versions state:
 | `answer_attempts_maximum` | 2 | Answers asked for one decision |
 | `decision_deadline_ms` | 20,000 | The time every ask of a minute ends by |
 | `concurrent_calls_maximum` | 8 | Asks under way at once |
-| `decisions_per_world_hour_maximum` | 600 | Decisions asked of models for one world in the last hour |
-| `spend_per_world_hour_microusd` | 250,000 | The cost of one world's decisions in the last hour |
+| `decisions_per_world_hour_maximum` | 600 | Decisions asked of models for one world in the last hour, where no person set the world's budget ([a world's budget for its minds](#a-worlds-budget-for-its-minds)) |
+| `spend_per_world_hour_microusd` | 250,000 | The cost of one world's decisions in the last hour, where no person set the world's budget |
 | `process_reserve_percent` | 50 | The share of the process's model budget decisions leave for other work |
 | `answer_rank_tool_call`, `answer_rank_json_schema` | 1, 2 | The contract's order of answering mechanisms |
 
@@ -655,7 +655,8 @@ In order:
    name happens to match, is left out of that person's options.
 4. **Reserve.** In one transaction for each role the host reserves a request
    (`exulanica.society-decision-request/v2`) for each person still due, bound to the state, the input
-   and the options offered. A request past the world's hourly bounds is answered at once with a
+   and the options offered. A request past the world's hourly bounds, which are its budget
+   ([a world's budget for its minds](#a-worlds-budget-for-its-minds)), is answered at once with a
    receipt naming the bound (`world_hour_decisions_spent` or `world_hour_spend_spent`), counted from
    the hour's receipts with an unknown cost at its bound and each ask admitted that minute at its
    bound.
@@ -678,7 +679,7 @@ recorded, besides the answers of the beings people play, which every step record
 ## Spend
 
 Two bounds hold whoever plays the world. Both bound model calls: an outside program's asks spend
-nothing and are bounded by its grant ([an outside program deciding](#an-outside-program-deciding)). The hourly bounds above hold each world. The process's
+nothing and are bounded by its grant ([an outside program deciding](#an-outside-program-deciding)). The hourly bounds hold each world, and are the world's budget. The process's
 model budget (`EXULANICA_BUDGET_USD`, `EXULANICA_BUDGET_MAX_CALLS`) is a ceiling for the life of the
 process that every model call it makes shares, the Companion, photograph ingestion, vision and
 caption search among them. People's decisions may use all of it but the contract's
@@ -721,6 +722,40 @@ world's hourly bounds do not apply to either, since a comparison writes nothing 
 asks each person a model decides for at most once a minute for 1440 minutes, 24 times what an
 hour's can, and its plan states that most for one decided person before anything starts
 ([running a comparison](society-experiments.md#running-a-comparison)).
+
+### A world's budget for its minds
+
+What a world may ask of models for its people, in any hour of real time, is its budget: US dollars
+and decisions. A person sets it; a world nobody set one for has the two figures the people's
+policy states (`spend_per_world_hour_microusd`, `decisions_per_world_hour_maximum`), so a world is
+bounded the same before and after a budget can be set. The hour is real time because that is how
+the host counts what a world asked (`world_hour`: the decisions recorded in the hour just past),
+whatever the world's speed.
+
+`POST /world/versions/{version_id}/models/{role_key}/budget`, with `world.write` and
+`model.invoke`, records one budget for the role that decides for people:
+`{idempotency_key, usd_per_hour, decisions_per_hour}`, the dollars a decimal with at most six
+decimals. It asks no model and spends nothing. Each setting is one appended row of
+`world_minds_budget` (`exulanica.world-minds-budget/v1`: the world, the role, the two figures,
+who set it, its digest), never changed or deleted; the newest is the budget and the history
+stays. The same request asked again answers the record it made; its key with other figures is
+refused (`budget_key_reused`). A budget names a world and no society, so it outlives the society
+of the day. Another role's asks are bounded by its own contract's figures, and a budget for one
+is refused (`budget_not_for_this_role`).
+
+A budget only lowers what the host allows: the process's budget and its reserve, a deployment's
+allowance and the spending authority's grants bound every call whatever a world's budget says, so
+no figure is refused for being large. A budget of nothing asks no model: every being decides by
+its routine and each choice point's receipt names the hour's bound.
+
+The host reads the world's budget once a claim, before it reserves a minute's asks
+(`MindsBudgetRepository.current`), and weighs each ask against it as it weighed the catalog's
+figures (`hour_refusal`). The world's models read (`GET /world/versions/{version_id}/models`)
+states the people's role's `budget` (the two figures, whether a person set them, who and when)
+and `hour_so_far` (the decisions asked and their cost in the hour just past), and a Companion
+plan step that chooses a mind states the same budget as its ceilings
+([world actions](companion-question.md#who-decides)). The route is not among a version's
+capabilities: the budget is the world's.
 
 ## What a decision does in its minute
 

@@ -17,11 +17,19 @@ listed as unsupported, and a choice of any role is refused with the status its c
 authority admits this process's calls, the descriptor's ``decisions`` effect also names the
 authority's refusal once the allowance of every provider the role's models are served by is spent
 (``Services.spending_refusals``): every ask would then be refused before anything is sent.
+
+The role that decides for people also carries the world's budget for its minds (``budget``: US
+dollars and decisions in any hour of real time, and whether a person set it or it is the policy
+catalog's figures) and what the world has asked in the hour just past (``hour_so_far``), which is
+what the host weighs before each ask. ``POST {role_key}/budget`` sets the budget: one appended
+record naming who set it (:mod:`exulanica.world.minds_budget`). It asks no model and spends
+nothing; it bounds what playing the world may then spend.
 """
 
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from typing import Annotated, Any, Final
 
 from fastapi import APIRouter, Request
@@ -39,7 +47,7 @@ from exulanica.api.capabilities import (
     unavailable,
     unsupported,
 )
-from exulanica.api.decision_host import offered_providers
+from exulanica.api.decision_host import offered_providers, world_hour
 from exulanica.api.dependencies import (
     CurrentSession,
     HeldPermissions,
@@ -59,12 +67,21 @@ from exulanica.models.manifest import load_manifest
 from exulanica.models.spending import SpendingRefused
 from exulanica.spending.status import SpendingRefusals
 from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
+from exulanica.world.minds_budget import (
+    DECISIONS_MAXIMUM,
+    MindsBudgetRefused,
+    MindsBudgetRepository,
+)
 from exulanica.world.traffic_host import traffic_clock
 from exulanica.world.worlds import require_world
 
-__all__ = ["PROFILE", "role_operations", "router"]
+__all__ = ["BUDGET_NOT_FOR_THIS_ROLE", "BUDGET_PROFILE", "PROFILE", "role_operations", "router"]
 
 PROFILE: Final = "exulanica.world-models/v1"
+BUDGET_PROFILE: Final = "exulanica.world-minds-budget-read/v1"
+#: A budget is set for the role whose host weighs it before each ask: the one that decides for
+#: people. Another role's asks are bounded by its own contract's figures.
+BUDGET_NOT_FOR_THIS_ROLE: Final = "budget_not_for_this_role"
 router = APIRouter(prefix="/world/versions/{version_id}/models", tags=["world"])
 
 
@@ -81,6 +98,17 @@ class RoleChoiceBody(BaseModel):
     model: ChosenModel | None
 
 
+class MindsBudgetBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    idempotency_key: uuid.UUID
+    #: US dollars in any hour of real time, as a decimal with at most six decimals.
+    usd_per_hour: Annotated[
+        str, Field(min_length=1, max_length=13, pattern=r"^[0-9]{1,6}(\.[0-9]{1,6})?$")
+    ]
+    #: Model decisions in any hour of real time.
+    decisions_per_hour: Annotated[int, Field(ge=0, le=DECISIONS_MAXIMUM)]
+
+
 def _version(
     connection: ScopedConnection, workspace_id: uuid.UUID, world_id: str, version_id: uuid.UUID
 ) -> dict[str, Any] | None:
@@ -89,6 +117,29 @@ def _version(
         "and world_id=%s and version_id=%s",
         (workspace_id, world_id, version_id),
     ).fetchone()
+
+
+def _budget_read(
+    connection: ScopedConnection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    role: DecisionRole,
+    engine: str | None,
+) -> dict[str, Any] | None:
+    """The world's budget for ``role``'s minds and what the world asked in the hour just past, as
+    the host weighs them; None for a role whose asks no budget bounds."""
+    if role.subject != "person":
+        return None
+    hosting = _hosting(engine, role)
+    contract = role.contract() if hosting is None else role.contract(role.terms(hosting).versions)
+    budget = MindsBudgetRepository(connection, workspace_id, world_id=world_id).current(
+        role, contract
+    )
+    asked, spent = world_hour(connection, workspace_id, world_id, role)
+    return {
+        "budget": budget.view(),
+        "hour_so_far": {"decisions": asked, "usd": str(spent.quantize(Decimal("0.000001")))},
+    }
 
 
 def _spent(role: DecisionRole, spending: SpendingRefusals | None) -> SpendingRefused | None:
@@ -202,6 +253,7 @@ def world_models(
                 "host_refusal": host_refusal,
                 "model_subjects_maximum": role.contract().value(role.subjects_bound),
                 "contract": role.contract().binding(),
+                **(_budget_read(connection, session.workspace_id, world_id, role, engine) or {}),
                 "capability": describe(
                     _operation(context, role, state, host_refusal, _spent(role, spending)),
                     routes,
@@ -266,3 +318,61 @@ def _hosting(engine: str | None, role: DecisionRole) -> str | None:
     """The version's society ``engine`` where it asks ``role``'s subjects, so their budget is judged
     under the contract it asks them under; else None (the role's own contract)."""
     return engine if engine is not None and role.hosted_by(engine) else None
+
+
+@router.post("/{role_key}/budget")
+def set_world_minds_budget(
+    role_key: str,
+    version_id: uuid.UUID,
+    body: MindsBudgetBody,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+) -> Any:
+    """Set what this world may spend on the model minds of its beings, in any hour of real time.
+
+    One appended record of the world, naming who set it; the newest is the budget, and the same
+    request asked again answers the record it made. It asks no model and spends nothing. The
+    process's own budget, a deployment's allowance and the spending authority's grants still
+    bound every call, so a budget only lowers what the host allows.
+    """
+    require_world(connection, session.workspace_id, world_id)
+    version = _version(connection, session.workspace_id, world_id, version_id)
+    if version is None:
+        return JSONResponse(
+            status_code=404, content={"code": "unknown_reference", "detail": "world version"}
+        )
+    try:
+        role = decision_roles().role(role_key)
+    except RoleRefused as exc:
+        return JSONResponse(status_code=404, content={"code": exc.code, "detail": str(exc)})
+    if role.subject != "person":
+        return JSONResponse(
+            status_code=409,
+            content={"code": BUDGET_NOT_FOR_THIS_ROLE, "detail": role.subject},
+        )
+    try:
+        MindsBudgetRepository(connection, session.workspace_id, world_id=world_id).record(
+            role,
+            request_id=body.idempotency_key,
+            usd_per_hour=body.usd_per_hour,
+            decisions_per_hour=body.decisions_per_hour,
+            set_by=session.actor,
+        )
+    except MindsBudgetRefused as exc:
+        return JSONResponse(
+            status_code=409 if exc.code == "budget_key_reused" else 422,
+            content={"code": exc.code, "detail": exc.detail},
+        )
+    context = RoleContext(
+        connection, session, request, world_id, version_id, version["source_snapshot_id"]
+    )
+    read = _budget_read(connection, session.workspace_id, world_id, role, version_engine(context))
+    return {
+        "profile": BUDGET_PROFILE,
+        "world_id": world_id,
+        "version_id": str(version_id),
+        "role_key": role.key,
+        **(read or {}),
+    }

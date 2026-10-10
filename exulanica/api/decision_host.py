@@ -68,6 +68,7 @@ from exulanica.world.decision_roles import (
     RoleOption,
     decision_roles,
 )
+from exulanica.world.minds_budget import MindsBudget, MindsBudgetRepository, default_budget
 from exulanica.world.role_decisions import check_role_result, names_its_listener
 from exulanica.world.society import asked_again_after_a_race, society_state_sha256
 from exulanica.world.society_controls import LEASE_SECONDS, ControlClaim
@@ -813,15 +814,22 @@ def world_hour(
 
 
 def hour_refusal(
-    asked: int, spent: Decimal, bound: Decimal, contract: DecisionContract
+    asked: int,
+    spent: Decimal,
+    bound: Decimal,
+    contract: DecisionContract,
+    budget: MindsBudget | None = None,
 ) -> str | None:
     """Why one more ask, needing ``bound``, is past the world's hour: ``world_hour_decisions_spent``
-    once the hour holds ``decisions_per_world_hour_maximum`` asked decisions, and
-    ``world_hour_spend_spent`` once its cost with this ask's bound passes
-    ``spend_per_world_hour_microusd``; else None."""
-    if asked >= contract.value("decisions_per_world_hour_maximum"):
+    once the hour holds as many asked decisions as the world's budget allows, and
+    ``world_hour_spend_spent`` once its cost with this ask's bound passes the budget's dollars;
+    else None. ``budget`` is the world's own (:mod:`exulanica.world.minds_budget`); without one
+    the two figures ``contract`` states hold (``decisions_per_world_hour_maximum``,
+    ``spend_per_world_hour_microusd``), which are also a world's budget until a person sets one."""
+    held = default_budget(contract) if budget is None else budget
+    if asked >= held.decisions_per_hour:
         return "world_hour_decisions_spent"
-    if (spent + bound) * 1_000_000 > contract.value("spend_per_world_hour_microusd"):
+    if spent + bound > held.usd_per_hour:
         return "world_hour_spend_spent"
     return None
 
@@ -1372,6 +1380,11 @@ class DecisionHost:
         refused: list[tuple[uuid.UUID, dict[str, Any]]] = []
         attempts = contract.value("answer_attempts_maximum")
         asked, spent = world_hour(connection, claim.workspace_id, claim.world_id, role)
+        # What this world may ask in its hour: the budget a person set for it, else the figures
+        # the contract states. Read once for the role's asks of this minute.
+        budget = MindsBudgetRepository(
+            connection, claim.workspace_id, world_id=claim.world_id
+        ).current(role, contract)
         # The names no line may carry, read once for the role's asks of this minute, and only when
         # some request takes a line.
         held: list[tuple[SavedName, ...]] = []
@@ -1428,7 +1441,7 @@ class DecisionHost:
                     prompt_chars=sum(len(str(message)) for message in messages),
                     max_tokens=answer_tokens(spec) or 0,
                 )
-                refusal = hour_refusal(asked, spent, bound, contract)
+                refusal = hour_refusal(asked, spent, bound, contract, budget)
                 if refusal is not None:
                     refused.append((request_id, _refused(refusal)))
                     continue

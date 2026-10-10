@@ -92,6 +92,7 @@ describe('what the sheet says of a mind before the yes', () => {
     expect(mindChoiceWords(step!.mind!, step!.cost, false)).toBe(
       'This is for 2 beings (1 left out because someone is playing them). Choosing asks no model. '
       + 'While the world plays, at most $0.0062 a simulated minute (at most $0.0031 each time a being is asked, at most once a minute). '
+      + 'An answer a model does not finish is still billed. '
       + 'No typical figure is measured for this world yet. '
       + 'This world stops asking models at $0.25 or 600 decisions in any hour of real time, whatever is chosen.',
     );

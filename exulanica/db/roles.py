@@ -295,6 +295,9 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0156 appends the look each thing of a version wears and refuses every update and
     # delete of one.
     "world_thing_look",
+    # Migration 0190 appends what a world may spend on its beings' model minds and refuses every
+    # update and delete of one.
+    "world_minds_budget",
     # The piece request migration records each ask under a caller's key once and refuses every
     # update of one.
     "piece_ask",

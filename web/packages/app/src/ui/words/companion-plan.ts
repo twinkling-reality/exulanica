@@ -198,6 +198,12 @@ export function midRunQuestionWords(code: string, facts: Readonly<Record<string,
   return { happened: `This step needs an answer first: ${question}`, next: 'Nothing more was changed. Ask for it on its own.' };
 }
 
+/**
+ * Said beside a model's cost: an answer the model does not finish (it runs to its length bound) is
+ * refused, the being's routine decides that turn, and the provider still bills it.
+ */
+export const MIND_UNFINISHED_BILLED = 'An answer a model does not finish is still billed.';
+
 /** A mind step's row: "Nemotron 3 Nano 30B decides for every villager", "Knight: their own routine". */
 export function mindDetailWords(whom: string, mind: string, routine: boolean): string {
   return routine ? `${whom.charAt(0).toUpperCase()}${whom.slice(1)}: ${mind}` : `${mind} decides for ${whom}`;
@@ -226,7 +232,8 @@ export function mindChoiceWords(facts: MindFacts, cost: MindCost | null, routine
   const typical = cost.usdTypical === null ? ' No typical figure is measured for this world yet.'
     : ` Typically about ${smallDollarsWords(cost.usdTypical)}.`;
   return `${who} Choosing asks no model. While the world plays, at most ${atMostDollarsWords(cost.usdAtMost)} a simulated minute `
-    + `(at most ${atMostDollarsWords(cost.usdPerAnswerAtMost)} each time a being is asked, at most once a minute).${typical}${ceiling}`;
+    + `(at most ${atMostDollarsWords(cost.usdPerAnswerAtMost)} each time a being is asked, at most once a minute). `
+    + `${MIND_UNFINISHED_BILLED}${typical}${ceiling}`;
 }
 
 export function planRefusalWords(code: string): RefusalWords {

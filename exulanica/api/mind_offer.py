@@ -21,7 +21,6 @@ import logging
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import Any
 
 import psycopg
@@ -34,6 +33,7 @@ from exulanica.models.usage import usd_string
 from exulanica.selection.action_minds import MindChoice
 from exulanica.spending.status import SpendingRefusals
 from exulanica.world.decision_roles import DecisionContract, DecisionRole, decision_roles
+from exulanica.world.minds_budget import MindsBudgetRepository
 from exulanica.world.society import UnknownSociety
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
 
@@ -155,7 +155,10 @@ class WorldMinds:
             return None
         contract = self._asked()
         one = ask_bound_usd(self.role, client.budget, spec, contract)
-        hour = Decimal(contract.value("spend_per_world_hour_microusd")) / Decimal(1_000_000)
+        # The world's own budget for its minds, or the contract's figures where nobody set one.
+        budget = MindsBudgetRepository(
+            self.connection, self.workspace_id, world_id=self.world_id
+        ).current(self.role, contract)
         return {
             # A being is asked at most once a simulated minute, at its own choice points.
             "per": "simulated_minute",
@@ -171,8 +174,9 @@ class WorldMinds:
                 "answers_per_ask_at_most": contract.value("answer_attempts_maximum"),
             },
             "ceilings": {
-                "usd_per_world_hour": usd_string(hour),
-                "decisions_per_world_hour": contract.value("decisions_per_world_hour_maximum"),
+                "usd_per_world_hour": budget.view()["usd_per_hour"],
+                "decisions_per_world_hour": budget.decisions_per_hour,
+                "set_by_a_person": budget.set_by_a_person,
             },
         }
 
