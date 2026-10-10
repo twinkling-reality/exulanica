@@ -1,5 +1,4 @@
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { readBodyMotion, type BodyMotion } from '../src/playcanvas/things/body-motion.js';
 import { ThingDocumentRefused, readBodyPlanDocument, readBodyPlans } from '../src/playcanvas/things/documents.js';
@@ -369,20 +368,50 @@ describe('a plan that states no chains', () => {
     expect(gaitOf(skeleton, MOTION).fullSpeed).toBe(0.5);
   });
 
-  it('is posed as it was before chains were read: 128 poses of the 1.7 m figure, by their digest', () => {
-    // The digest was taken from the solver as it stood before this module read a plan's chains,
-    // and the two solvers were compared pose for pose on the same inputs when it was taken.
-    const poses: string[] = [];
+  it('is posed as it was before chains were read: 128 recorded poses of the 1.7 m figure, number by number', () => {
+    // The recorded poses (things-humanoid-poses.json beside this file) were written by this test,
+    // run with EXULANICA_POSE_FIXTURE=write, from the solver as it stood when it was compared pose
+    // for pose with the solver before it read a plan's chains. Each number is compared within a
+    // hundred-millionth: the last bits of a sine or a square root differ between the runtimes this
+    // runs on, so nothing here is compared exactly or hashed.
+    const poses: number[][] = [];
     for (const speed of [0, 0.2, 0.5, 1.4]) for (const travelled of [0, 0.31, 1.7, 12.9]) for (const time of [0, 3.3]) for (const talking of [false, true]) {
       const moving: MotionInput = { travelled, speed, time, talking, holding: new Set(talking ? ['hand.right'] : []), reach: time > 0 && speed === 0 ? { socket: 'hand.right', target: [0.2, 1.1, 0.5], amount: 0.7 } : null };
       const still: MotionInput = { travelled, speed, time, talking, holding: new Set(), reach: null, reducedMotion: true };
       for (const one of [moving, still]) {
         const pose = solvePose(skeleton, one);
-        poses.push(JSON.stringify([[...pose.local], pose.rootPosition, [...pose.joints]]));
+        // For each bone in the skeleton's order: its turn from its parent, then where its joint is.
+        poses.push(skeleton.order.flatMap((bone) => [...pose.local.get(bone)!, ...pose.joints.get(bone)!.position]));
       }
     }
     expect(poses).toHaveLength(128);
-    expect(createHash('sha256').update(poses.join('\n')).digest('hex')).toBe('d05a3c63b48c76b6ea0bd4b617bcb9c517fbbbc2c9a69bd748b3a03982fff811');
+    const file = new URL('./things-humanoid-poses.json', import.meta.url);
+    if (process.env['EXULANICA_POSE_FIXTURE'] === 'write') {
+      const rounded = poses.map((pose) => pose.map((value) => Number(value.toFixed(10))));
+      writeFileSync(file, `${JSON.stringify({
+        profile: 'exulanica.pose-fixture/v1',
+        written_by: 'web/packages/atlas-react/test/things-stated-chains.test.ts with EXULANICA_POSE_FIXTURE=write',
+        note: 'The 1.7 m blocky figure on the shipped humanoid plan, posed for 128 inputs: for each bone in order, its turn from its parent (x, y, z, w) and its joint (x, y, z, metres), to ten decimals.',
+        bones: skeleton.order,
+        poses: rounded,
+      }).replace('"poses":[', '"poses":[\n').replaceAll('],[', '],\n[')}\n`);
+    }
+    const recorded = JSON.parse(readFileSync(file, 'utf8')) as { bones: string[]; poses: number[][] };
+    expect(recorded.bones).toEqual(skeleton.order);
+    expect(recorded.poses).toHaveLength(poses.length);
+    let worst = 0;
+    let moved = 0;
+    poses.forEach((pose, i) => {
+      expect(pose).toHaveLength(recorded.poses[i]!.length);
+      pose.forEach((value, k) => {
+        worst = Math.max(worst, Math.abs(value - recorded.poses[i]![k]!));
+        if (i > 0) moved = Math.max(moved, Math.abs(value - poses[0]![k]!));
+      });
+    });
+    expect(worst).toBeLessThan(1e-8);
+    // Positive control: the poses differ from one another by far more than that, so a pose that
+    // moved would be seen.
+    expect(moved).toBeGreaterThan(0.1);
   });
 
   it('draws its full walk from 0.8 of its own strides a second, which is where the catalog\'s cadence comes from', () => {
