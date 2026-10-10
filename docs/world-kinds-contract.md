@@ -402,7 +402,9 @@ town's receipt or digest depends on the adapter.
   dresses with a texture set takes its material where its words name one, and otherwise its
   family's `default`.
 - A surface is drawn in its material's colour with its material's pattern, courses or boards or a
-  grain, in colour only: it has no relief and is no photograph
+  grain, in colour only: it has no relief and is no photograph. The pattern is written for two
+  shader languages and has run in one: every page asks for WebGL 2, and the WGSL text has run on no
+  device, so a WebGPU page would be the first to run it
   ([style pack contract](style-pack-contract.md), sections 3 and 7.1). A roof is shaped by its material
   (thatch steep and overhanging, a canvas roof a tent's, an earth roof a slab with a parapet); the
   walls under it are not: every structure but a tent is a box of walls, and a tall thing standing

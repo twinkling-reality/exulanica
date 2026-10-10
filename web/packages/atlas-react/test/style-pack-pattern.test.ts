@@ -50,6 +50,15 @@ describe('a pattern\'s colour chunk', () => {
     const inked = patternChunks(of('stone'), [0.05, 0.04, 0.03]);
     expect(inked.glsl).toContain('mix(dAlbedo, vec3(0.050000, 0.040000, 0.030000), clamp(exuPattern, 0.0, 1.0)');
     expect(inked.wgsl).toContain('mix(dAlbedo, vec3f(0.050000, 0.040000, 0.030000), clamp(exuPattern, 0.0, 1.0)');
+    // A mottle and a ripple are shade, not line: they darken toward the colour itself whatever the ink.
+    for (const soft of ['sand', 'grass', 'lake']) {
+      const chunk = patternChunks(of(soft), [0.05, 0.04, 0.03]);
+      expect(chunk.glsl, soft).toContain('mix(dAlbedo, dAlbedo * 0.500000, clamp(exuPattern, 0.0, 1.0)');
+      expect(chunk.glsl + chunk.wgsl, soft).not.toContain('0.050000, 0.040000, 0.030000');
+    }
+    for (const line of ['timber', 'thatch', 'canvas']) {
+      expect(patternChunks(of(line), [0.05, 0.04, 0.03]).wgsl, line).toContain('vec3f(0.050000, 0.040000, 0.030000)');
+    }
     const plain = patternChunks(of('stone'), null);
     expect(plain.glsl).toContain('mix(dAlbedo, dAlbedo * 0.500000, clamp(exuPattern, 0.0, 1.0)');
     expect(plain.wgsl).toContain('mix(dAlbedo, dAlbedo * 0.500000, clamp(exuPattern, 0.0, 1.0)');

@@ -8,9 +8,10 @@ import type { Rgb } from '../generated-tile/look.js';
  * A pattern (`readSurfacePatterns`) is worked in the surface's colour chunk from where each point
  * of the surface is in the world, in metres, so it needs no texture image and no UV and is at
  * physical scale on every box, plane and roof: across the ground for a face that points up, and
- * along the wall and up it for any other. It darkens the colour toward the pack's ink where the
- * pack draws ink and toward the colour's own shade where it does not, before the pack's shading is
- * applied, so a toon pack bands it like any colour. Where a pattern would be finer than the picture
+ * along the wall and up it for any other. A pattern of lines (courses, boards, strokes, seams)
+ * darkens the colour toward the pack's ink where the pack draws ink; a mottle or a ripple, and any
+ * pattern where the pack draws none, darkens it toward the colour's own shade. It is worked before
+ * the pack's shading is applied, so a toon pack bands it like any colour. Where a pattern would be finer than the picture
  * can show it fades out to the plain colour instead of shimmering.
  *
  * The chunk text is this module's, in GLSL and WGSL; the only values that reach it are a pattern's
@@ -23,6 +24,9 @@ const UP_THRESHOLD = 0.72;
 const JOINT_M = 0.008;
 /** The shade a pattern darkens toward where the pack draws no ink: this share of the colour itself. */
 const OWN_SHADE = 0.5;
+
+/** The kinds that are lines (joints, board edges, streaks, seams), which a pack's ink draws; the others are shade. */
+const LINE_KINDS: ReadonlySet<SurfacePattern['kind']> = new Set(['courses', 'boards', 'strokes', 'seams']);
 
 const f = (value: number): string => value.toFixed(6);
 
@@ -52,7 +56,9 @@ function amount(pattern: SurfacePattern, vec2: string): string {
 /** The colour chunk that draws `pattern`, darkening toward `ink` (linear) or, with none, toward the colour's own shade. */
 export function patternChunks(pattern: SurfacePattern, ink: Rgb | null): { readonly glsl: string; readonly wgsl: string } {
   const strength = f(pattern.strengthPermille / 1000);
-  const toward = (vec3: string): string => (ink === null ? `dAlbedo * ${f(OWN_SHADE)}` : `${vec3}(${ink.map(f).join(', ')})`);
+  // Ink draws lines. A mottle and a ripple are shade, not line: drawn toward ink they blotch a toon pack's ground.
+  const inked = ink !== null && LINE_KINDS.has(pattern.kind);
+  const toward = (vec3: string): string => (inked ? `${vec3}(${ink.map(f).join(', ')})` : `dAlbedo * ${f(OWN_SHADE)}`);
   return {
     glsl: `
 uniform vec3 material_diffuse;
