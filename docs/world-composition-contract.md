@@ -177,7 +177,7 @@ the named place entity and does not traverse the canonical place.
 
 Those kinds are the literals [executor.py](../exulanica/selection/executor.py)
 selects. Inhabitant and event rows appear for a society whose engine takes no input
-(`takes_inputs: false` in `exulanica/world/society-engines.v3.json`), or whose input history
+(`takes_inputs: false` in `exulanica/world/society-engines.v4.json`), or whose input history
 the host authorizes for the named world. That projection is not a living-world loop.
 
 An undone environment addition is absent. A revoked or never-confirmed bridge

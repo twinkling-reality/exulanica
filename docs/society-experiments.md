@@ -458,7 +458,7 @@ may decide for all 30 people of a 30-person society, at most 29 of 44, 24 of 56 
 group under a model arm and anybody outside it whose owner chose a model counted together. This
 line reads every engine but the living town's, whose own line follows: a saved world's purposeful
 society, and a generated town's society made before the living town's engine, which the town keeps.
-For such a town it is the bound that applies, fewer than the 128 a generated town's ground allows.
+For such a town it is the bound that applies: a generated town's ground states no head count of its own.
 A larger
 society is refused by name (`population_over_comparison_bound`), and so is a comparison whose model
 would decide for more (`decided_over_comparison_bound`); the plan route serves both figures for the
@@ -489,9 +489,10 @@ least-margin line on or above every point, 8 ms for any run, 9994 µs for each o
 people, 1545 µs for each person a model decides for, and 45 µs more for each of those for each
 person of the society. By that line and the protocol's ten-second pair budget (half of it for each
 run), a model may decide for everybody in each measured town, up to the stress town's 128, whose
-everybody-decided run the line puts at 2222272 µs; and it would let a run hold 497 people where a
-model decides for one of them, more than the 128 a town's ground allows, so for a living town the
-ground is the bound that applies. The plan route and a start judge a living town's society by this
+everybody-decided run the line puts at 2222272 µs; and it lets a run hold 497 people where a
+model decides for one of them. A town's ground states no head count, so for a living town this
+line is the bound that applies; past the stress town's 128 it is read beyond the towns it was
+measured on. The plan route and a start judge a living town's society by this
 line, a society of things by its own (below), and a purposeful society by the protocol's, which
 stays at its third version and was measured on one. A society of any other family the reading
 catalog binds no line for is refused by name (`no_reading_line`, 409) rather than read by a line
@@ -555,9 +556,10 @@ those for each person of the society, so what a decided person adds grows with t
 set it: the town of 88 with 4 decided and the stress town with everybody decided, whose dearest
 reads were 1.39 and 3.16 s. By that line and the protocol's pair budget, a model may decide over a day for everybody
 in each measured town, up to the stress town's
-128, whose everybody-decided run the line puts at 3164288 µs; and it would let a run hold 320
-people where a model decides for one of them, so the ground's 128 is the bound on a day's
-population. The plan route and a start
+128, whose everybody-decided run the line puts at 3164288 µs; and it lets a run hold 320
+people where a model decides for one of them, which is the bound on a day's population, a town's
+ground stating no head count; past the stress town's 128 the line is read beyond the towns it was
+measured on. The plan route and a start
 judge a day of a living town's society by this line. A day's run is played hour by hour, each hour
 sealed as it ends ([records](#records)) once its inputs' rights are asked again, so a run whose
 inputs lost their rights fails as `input_unavailable` at the end of the hour it lost them in and

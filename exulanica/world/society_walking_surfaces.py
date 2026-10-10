@@ -916,8 +916,9 @@ def build_walking_surfaces_input(
             town=obstructions,
         )
         records_list.extend(refused)
-    # A world whose homes hold more people than a society over its ground may is refused by that
-    # name here, before the input is validated against the schema's own ceiling of 512.
+    # A world whose homes hold more people than the head count its ground states is refused by
+    # that name here, before the input is validated. A ground that states none refuses nothing
+    # here: its people are admitted by the cost of their minute where the society is made.
     refuse_population_over_budget(
         residents, society_ground_for_navigation(ground.navigation_profile)
     )

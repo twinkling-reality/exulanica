@@ -367,7 +367,9 @@ export function parseSociety(value: unknown): SocietySnapshot {
   // an engine it does not state is refused by name. A state that names no profile is the
   // default engine's, the one a society is created with when a request names none.
   const engine = societyEngine(state['profile'] ?? DEFAULT_SOCIETY_ENGINE);
-  if (!boundedInteger(row['population_size'], engine.populationMinimum, engine.populationMaximum)) {
+  // An engine that states no maximum holds as many people as its ground's rule gave it.
+  const most = engine.populationMaximum ?? Number.MAX_SAFE_INTEGER;
+  if (!boundedInteger(row['population_size'], engine.populationMinimum, most)) {
     throw new Error('Invalid society response');
   }
   if (engine.stateFamily === 'living') {
@@ -392,7 +394,7 @@ export function parseSociety(value: unknown): SocietySnapshot {
   // People come and go in a society of things (placed by its author, crossing in and out), so it
   // holds any number within its engine's bound rather than the population it began with.
   const counted = Array.isArray(inhabitants) && (things
-    ? inhabitants.length <= engine.populationMaximum
+    ? inhabitants.length <= most
     : inhabitants.length === holding);
   if (!textValue(row['society_id']) || !textValue(row['version_id']) || !textValue(row['place_id']) ||
       !integer(row['current_tick']) || state['tick'] !== row['current_tick'] ||

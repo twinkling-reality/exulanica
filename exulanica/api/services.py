@@ -32,6 +32,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import threading
 import time
 import uuid
@@ -146,8 +147,10 @@ from exulanica.world.society_controls import (
     BASE_TICK_INTERVAL_MAX_MS,
     BASE_TICK_INTERVAL_MIN_MS,
     DEFAULT_BASE_TICK_INTERVAL_MS,
+    SPEEDS,
     validate_settings,
 )
+from exulanica.world.society_minute_cost import COST_SCALE_UNIT_MILLI, HostMinute
 from exulanica.world.texture_assets import load_material_catalog
 from exulanica.world.workspace_assets import WorkspaceAssetRuntime
 from exulanica.world.workspace_preparations import RETAINED_BYTES_SETTING, retained_bytes_limit
@@ -165,6 +168,7 @@ __all__ = [
     "SOCIETY_AUTHORED_WORLDS_ENV",
     "SOCIETY_CONTROL_WORKER_ENV",
     "SOCIETY_CONTROL_WORKSPACES_ENV",
+    "SOCIETY_MINUTE_COST_SCALE_ENV",
     "SOCIETY_OF_THINGS_ENV",
     "SOCIETY_TICK_INTERVAL_MS_ENV",
     "Services",
@@ -221,6 +225,11 @@ _UNDECLARED: Final = "undeclared_installation"
 #: The base wait between simulated minutes, in whole milliseconds, within the bounds
 #: ``exulanica.world.society_controls`` declares. Absent means its declared default.
 SOCIETY_TICK_INTERVAL_MS_ENV: Final = env_name("SOCIETY_TICK_INTERVAL_MS")
+#: How this host's machine compares with the machines a society's minute was measured on (the
+#: society ground catalog's ``minute_cost``): a positive decimal with at most three places, such
+#: as ``2`` for a machine twice as slow or ``0.5`` for one twice as fast. One deployment's own
+#: figure, from a measurement on its machine; absent means 1, the measured machine.
+SOCIETY_MINUTE_COST_SCALE_ENV: Final = env_name("MINUTE_COST_SCALE")
 
 #: Every way a society setting is refused at startup, by the name the refusal carries.
 SOCIETY_SETTING_REFUSALS: Final = {
@@ -231,6 +240,9 @@ SOCIETY_SETTING_REFUSALS: Final = {
     "society_control_workspaces_not_uuid": "names an entry that is not a workspace id",
     "society_control_workspaces_duplicate": "names a workspace more than once",
     "society_tick_interval_not_integer": "must be a whole number of milliseconds",
+    "minute_cost_scale_not_decimal": (
+        "must be a positive decimal with at most three places, such as 1, 2.5 or 0.75"
+    ),
     "society_opening_not_recognised": (
         "must be absent, off, on or share:minutes:seconds, with :least-minutes and"
         " :active-share after them if stated"
@@ -393,6 +405,9 @@ class Services:
     runs_society_control_worker: bool = False
     #: ``build_services`` reads it from ``EXULANICA_SOCIETY_TICK_INTERVAL_MS``.
     society_base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS
+    #: How this host's machine compares with the measured ones, in thousandths
+    #: (:data:`SOCIETY_MINUTE_COST_SCALE_ENV`); ``build_services`` reads it from the environment.
+    society_minute_cost_scale_milli: int = COST_SCALE_UNIT_MILLI
     #: How many workspaces' claims a playback round runs at once (:data:`PLAYBACK_WORKERS_ENV`).
     society_playback_workers: int = 1
     #: Who plays the societies this host plays (:data:`PLAYBACK_WORKER_ENV`): ``here``, this
@@ -536,6 +551,15 @@ class Services:
             self.request_policy(
                 workspace_id, borrowing(connection), released_places=self.released_place_names
             )
+        )
+
+    def host_minute(self) -> HostMinute:
+        """What this host gives a simulated minute: the longest wait it leaves between two
+        minutes of a society at play, its base interval at its slowest speed, and its machine's
+        scale against the measured ones. Making a society admits its people by it."""
+        return HostMinute(
+            slowest_minute_ms=self.society_base_tick_interval_ms // min(SPEEDS),
+            cost_scale_milli=self.society_minute_cost_scale_milli,
         )
 
     def decision_host(self) -> DecisionHost | None:
@@ -1352,6 +1376,9 @@ def build_services(
         society_base_tick_interval_ms=_society_tick_interval_ms(
             env_get("SOCIETY_TICK_INTERVAL_MS", environ)
         ),
+        society_minute_cost_scale_milli=_minute_cost_scale_milli(
+            env_get("MINUTE_COST_SCALE", environ)
+        ),
         society_playback_workers=_playback_workers(env_get("PLAYBACK_WORKERS", environ)),
         playback_player=playback_player,
         societies_of_things=_explicitly_enabled(
@@ -1623,6 +1650,25 @@ def _society_tick_interval_ms(value: str | None) -> int:
     return interval
 
 
+_COST_SCALE: Final = re.compile(r"(\d+)(?:\.(\d{1,3}))?")
+
+
+def _minute_cost_scale_milli(value: str | None) -> int:
+    """The host's minute cost scale in thousandths, or a named refusal. Absence is the measured
+    machine. Read as written, digit by digit, so no host rounds another's figure."""
+    if value is None or not value.strip():
+        return COST_SCALE_UNIT_MILLI
+    stated = _COST_SCALE.fullmatch(value.strip()) if value.strip().isascii() else None
+    milli = (
+        0
+        if stated is None
+        else int(stated[1]) * COST_SCALE_UNIT_MILLI + int((stated[2] or "").ljust(3, "0"))
+    )
+    if milli < 1:
+        raise SocietySettingRefused("minute_cost_scale_not_decimal", SOCIETY_MINUTE_COST_SCALE_ENV)
+    return milli
+
+
 def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str, str]:
     """What an operator needs to set, and whether it is set. Never the values themselves."""
     environ = os.environ if environ is None else environ
@@ -1634,6 +1680,7 @@ def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str
         SOCIETY_CONTROL_WORKER_ENV,
         SOCIETY_CONTROL_WORKSPACES_ENV,
         SOCIETY_TICK_INTERVAL_MS_ENV,
+        SOCIETY_MINUTE_COST_SCALE_ENV,
         SOCIETY_OPENING_ENV,
         API_TOKENS_ENV,
         *AdmissionSettings.variables(),

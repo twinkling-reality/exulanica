@@ -180,8 +180,7 @@ REFUSALS: Final = (
         "generated_world_refused",
         409,
         "No seed candidate made a world from these values: the grammar refused each, or its homes "
-        "held nobody or more people than one tick of its society holds. Every candidate's refusal "
-        "is named.",
+        "housed nobody. Every candidate's refusal is named.",
     ),
     (
         "world_limit_reached",
@@ -975,8 +974,8 @@ def specification_document() -> dict[str, Any]:
     What ``GET /worlds/specification`` serves and the page renders, so a person, an open model
     drafting for them and an API client read one statement of what may be asked for: each value's
     key (the grammar's own parameter name), words, kind, unit, range and reason; the values each
-    preset sets; the bounds a world is also held to (its society's people, the workspace's count);
-    and every refusal by name.
+    preset sets; the bounds a world is also held to (how its society's people are admitted, the
+    workspace's count); and every refusal by name.
     """
     from exulanica.world.society_grounds import society_ground_for_composer
     from exulanica.world.worlds import GENERATED, current_world_count_policy
@@ -1007,8 +1006,17 @@ def specification_document() -> dict[str, Any]:
         ],
         "bounds": {
             "tiles_maximum": TILES_MAXIMUM,
+            # A ground that states a head count holds at most that many people. One that states
+            # none (``most`` null) is peopled by the town's own homes, and a host admits them by
+            # the measured cost of their minute where the society is made: at most this share of
+            # the host's slowest minute, in thousandths, a chosen budget.
             "people": [
-                {"ground": ground.key, "composer": ground.composer_key, "most": ground.population}
+                {
+                    "ground": ground.key,
+                    "composer": ground.composer_key,
+                    "most": ground.population or None,
+                    "minute_share_milli": ground.minute_share_milli or None,
+                }
                 for ground in grounds
             ],
             # The policy's own figures. A deployment may state others in its environment, and

@@ -1,6 +1,6 @@
 """The society engine table is the one statement of which engines exist and what each can do.
 
-Everything that used to restate a list of engines derives it from ``society-engines.v3.json``.
+Everything that used to restate a list of engines derives it from ``society-engines.v4.json``.
 These tests hold the places that cannot derive, because they are fixed text, to the table: the
 implemented engine modules, the live schema's checks, triggers and indexes, a SQL literal in a
 file another lane is restructuring, and the browser's generated copy. Each one fails when the
@@ -10,6 +10,7 @@ table and the copy differ, and names the copy.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import json
 import re
 from pathlib import Path
@@ -132,6 +133,12 @@ def test_an_engine_the_table_does_not_state_is_refused_by_name():
         (lambda d: d["engines"][0].update(playback=True), "invalid society engine row"),
         (lambda d: d["engines"][1].update(takes_inputs=False), "invalid society engine row"),
         (lambda d: d["engines"][3]["population"].update(minimum=0), "invalid society engine row"),
+        (lambda d: d["engines"][3]["population"].pop("minimum"), "invalid society engine row"),
+        (lambda d: d["engines"][1]["population"].update(most=9), "invalid society engine row"),
+        (
+            lambda d: d.update(profile="exulanica.society-engines/v3"),
+            "invalid society engine row",
+        ),
         (lambda d: d["engines"][2].pop("reason"), "capabilities and a reason"),
         (lambda d: d["engines"][3].update(owner_model_choice=True), "invalid society engine row"),
         (lambda d: d["engines"][1].update(owner_model_choice=False), "invalid society engine row"),
@@ -155,6 +162,9 @@ def test_an_engine_the_table_does_not_state_is_refused_by_name():
         "playable-without-inputs",
         "actions-without-inputs",
         "empty-population",
+        "no-minimum",
+        "another-population-figure",
+        "no-maximum-in-the-third-profile",
         "no-reason",
         "owner-choice-without-model-decisions",
         "comparisons-without-owner-choice",
@@ -225,6 +235,10 @@ SCHEMA_OBJECTS = {
     "tg_world_society_presence_binding": lambda: set(PRESENCE_ENGINES),
     "world_society_population_size_check": lambda: {e.engine for e in ENGINES},
 }
+POPULATION_FLOOR = re.compile(
+    r"engine_version = (?:'(?P<one>[^']+)'::text|ANY \(ARRAY\[(?P<many>[^\]]+)\]\))\) AND "
+    r"\(population_size >= (?P<low>\d+)\)\)"
+)
 POPULATION = re.compile(
     r"engine_version = (?:'(?P<one>[^']+)'::text|ANY \(ARRAY\[(?P<many>[^\]]+)\]\))\) AND "
     r"\(\(population_size >= (?P<low>\d+)\) AND \(population_size <= (?P<high>\d+)\)\)"
@@ -267,7 +281,43 @@ def test_the_population_check_states_each_engine_bounds_from_the_table(repositor
         bounds = (int(match["low"]), int(match["high"]))
         for engine in [match["one"]] if match["one"] else QUOTED_ENGINE.findall(match["many"]):
             stated[engine] = bounds
-    assert stated == {e.engine: (e.population_minimum, e.population_maximum) for e in ENGINES}, body
+    assert stated == {
+        e.engine: (e.population_minimum, e.population_maximum)
+        for e in ENGINES
+        if e.population_maximum is not None
+    }, body
+    # An engine that states no maximum is held to its minimum alone.
+    floors: dict[str, int] = {}
+    for match in POPULATION_FLOOR.finditer(body):
+        for engine in [match["one"]] if match["one"] else QUOTED_ENGINE.findall(match["many"]):
+            floors[engine] = int(match["low"])
+    assert floors == {
+        e.engine: e.population_minimum for e in ENGINES if e.population_maximum is None
+    }, body
+    assert floors, "the engines a town's society is made with state no maximum"
+
+
+@pytest.mark.postgres
+def test_an_input_records_a_population_of_any_size(repository):
+    """The input check holds a recorded population to its shape (a rule and a whole number of
+    people, nobody included) and to no ceiling, and the society check holds an engine that states
+    no maximum to its minimum."""
+    checks = {
+        row["name"]: row["body"]
+        for row in repository.connection.execute(
+            "select conname as name,pg_get_constraintdef(oid) as body from pg_constraint "
+            "where conname in ('world_society_input_population_check',"
+            "'world_society_population_size_check')"
+        ).fetchall()
+    }
+    assert set(checks) == {
+        "world_society_input_population_check",
+        "world_society_population_size_check",
+    }
+    recorded = checks["world_society_input_population_check"]
+    assert "512" not in recorded and "::numeric" not in recorded, recorded
+    assert "'^[0-9]+$'" in recorded, recorded
+    assert "512" in checks["world_society_population_size_check"], "the retired engine keeps it"
 
 
 def test_the_first_table_is_this_one_without_its_new_columns():
@@ -281,24 +331,65 @@ def test_the_first_table_is_this_one_without_its_new_columns():
     assert first["default_engine"] == current["default_engine"]
     added = {"creatable", "owner_model_choice"}
     stated = {row["engine"] for row in first["engines"]}
-    assert [{k: v for k, v in row.items() if k != "reason"} for row in first["engines"]] == [
-        {k: v for k, v in row.items() if k not in added | {"reason"}}
+    # The maximum population is the one figure a later table states differently: none, from the
+    # fourth, for the engines a town's society is made with.
+    assert [
+        {k: v for k, v in row.items() if k not in {"reason", "population"}}
+        for row in first["engines"]
+    ] == [
+        {k: v for k, v in row.items() if k not in added | {"reason", "population"}}
         for row in current["engines"]
         if row["engine"] in stated
     ]
+    assert [row["population"]["minimum"] for row in first["engines"]] == [
+        row["population"]["minimum"] for row in current["engines"] if row["engine"] in stated
+    ]
 
 
-def test_the_second_table_is_this_one_without_its_engine_for_a_world_holding_things():
-    """``society-engines.v2.json`` stays beside this one, read by the same loader: its engines,
-    default and grounds are this one's, and it states no engine for a world holding things."""
-    second = ENGINES_PATH.with_name("society-engines.v2.json")
-    engines, default, creates, holding = load_engine_table(second)
-    assert (engines, default, dict(creates)) == (ENGINES, DEFAULT_ENGINE, dict(CREATES))
-    assert holding is None
-    current = json.loads(ENGINES_PATH.read_text(encoding="utf-8"))
-    current.pop("creates_holding_things")
-    current["profile"] = "exulanica.society-engines/v2"
-    assert json.loads(second.read_text(encoding="utf-8")) == current
+def _without_maximum(engines):
+    return tuple(dataclasses.replace(engine, population_maximum=None) for engine in engines)
+
+
+def test_the_earlier_tables_are_this_one_but_for_the_maximum_an_engine_states():
+    """``society-engines.v2.json`` and ``society-engines.v3.json`` stay beside this one, read by
+    the same loader. The third is this one with a maximum of 512 people stated for the engines a
+    town's society is made with, which this one states none for; the second is the third without
+    its engine for a world holding things."""
+    third_path = ENGINES_PATH.with_name("society-engines.v3.json")
+    second_path = ENGINES_PATH.with_name("society-engines.v2.json")
+    engines, default, creates, holding = load_engine_table(third_path)
+    assert (default, dict(creates), holding) == (
+        DEFAULT_ENGINE,
+        dict(CREATES),
+        CREATES_HOLDING_THINGS,
+    )
+    assert _without_maximum(engines) == _without_maximum(ENGINES)
+    assert {e.engine: e.population_maximum for e in engines} == {
+        "exulanica-society/v1": 512,
+        "exulanica-society/v2": 512,
+        "exulanica-society/v3": 512,
+        "exulanica-society/v4": 65_536,
+        "exulanica-society/v5": 512,
+        "exulanica-society/v7": 512,
+    }
+    assert {e.engine for e in ENGINES if e.population_maximum is None} == {
+        "exulanica-society/v2",
+        "exulanica-society/v5",
+        "exulanica-society/v7",
+    }
+    assert all(
+        new.population_maximum in (None, old.population_maximum)
+        for old, new in zip(engines, ENGINES, strict=True)
+    )
+    assert society_engine("exulanica-society/v7").holds(100_000)
+    assert not society_engine("exulanica-society/v7").holds(0)
+    assert not society_engine("exulanica-society/v3").holds(513)
+    second = load_engine_table(second_path)
+    assert second == (engines, default, creates, None)
+    third = json.loads(third_path.read_text(encoding="utf-8"))
+    third.pop("creates_holding_things")
+    third["profile"] = "exulanica.society-engines/v2"
+    assert json.loads(second_path.read_text(encoding="utf-8")) == third
 
 
 def test_a_world_holding_things_is_a_society_of_things_only_over_grounds_one_stands_on():
@@ -323,7 +414,7 @@ def test_the_browser_copy_is_generated_from_the_table():
         ROOT / "web" / "packages" / "app" / "src" / "society-engines.generated.ts"
     ).read_text(encoding="utf-8")
     text = ENGINES_PATH.read_text(encoding="utf-8")
-    assert f"export const SOCIETY_ENGINES_V3_JSON = String.raw`{text}`;" in generated
+    assert f"export const SOCIETY_ENGINES_V4_JSON = String.raw`{text}`;" in generated
     names = " | ".join(f"'{engine.engine}'" for engine in ENGINES)
     assert f"export type SocietyEngineProfile = {names};" in generated
 

@@ -361,10 +361,7 @@ class SocietyRepository:
             else:
                 population = len(state["inhabitants"])
             if not engine.holds(population):
-                raise ValueError(
-                    f"{profile} holds {engine.population_minimum} to "
-                    f"{engine.population_maximum} inhabitants, not {population}"
-                )
+                raise ValueError(f"{profile} holds {engine.said()} inhabitants, not {population}")
             row = self.connection.execute(
                 "insert into world_society(workspace_id,society_id,world_id,version_id,place_id,"
                 "region_id,engine_version,seed,population_size,tick_seconds,"

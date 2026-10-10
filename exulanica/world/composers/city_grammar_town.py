@@ -4,8 +4,9 @@ The composer for recipes that name ``city-grammar-town``. It generates the recip
 through the one generation path (:mod:`exulanica.grammar.grammars.specified`), at the city grammar
 version the specification names, trying the recipe's seed candidates in order and keeping the first
 that generates, whose tile documents pass the grammar's own checks, and on which a society can
-start: its homes hold at least one person and no more than the society ground stated for this
-composer holds (``refuse_population`` in :mod:`exulanica.world.society_grounds`). It states the
+start: its homes hold at least one person, and no more than the head count the society ground
+stated for this composer states where it states one (``refuse_population`` in
+:mod:`exulanica.world.society_grounds`). It states the
 world it made as a structural snapshot and a receipt:
 
 * **One region**, :data:`REGION_ID`, whose frame is the city's own: the region origin is the
@@ -408,7 +409,9 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
                 else _arrival(place, tiles)
             )
             # A world is kept only if a society can start on it: someone lives there, and no more
-            # people than one tick of a society over its ground was measured to hold.
+            # people than the head count its ground states, where it states one. How many people a
+            # host runs is asked where a society is made, never here: a candidate is kept or
+            # refused the same on every host, so a town's seed never depends on one.
             refuse_population(place_residents(place), ground)
         except (InvalidParameterError, InvalidRecordError) as exc:
             sentence = f"{type(exc).__name__}: {exc}"

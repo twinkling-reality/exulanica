@@ -353,7 +353,10 @@ def _validate_society_input(document: dict[str, Any]) -> None:
             isinstance(population, dict)
             and set(population) == {"rule", "size"}
             and _text(population["rule"])
-            and _integer(population["size"], 0, 512),
+            # Nobody is a population an input may record (its society is then refused by name);
+            # the most is no figure of the input's: a ground states it, or the cost of a minute.
+            and type(population["size"]) is int
+            and population["size"] >= 0,
             "invalid population",
         )
     _require(

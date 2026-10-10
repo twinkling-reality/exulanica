@@ -37,9 +37,11 @@ from exulanica.world.society_erasure import SocietyErasureRefused, erase_society
 from exulanica.world.society_grounds import (
     SocietyPopulationRefused,
     UnknownSocietyGround,
+    admit_people_by_cost,
     created_engine,
     society_ground_for_composer,
 )
+from exulanica.world.society_input_policy import is_authored_ground
 from exulanica.world.society_planner import SocietyStartRefused
 from exulanica.world.society_repository import InvalidEventCursor, SocietyRepository
 from exulanica.world.workspace_lock import lock_workspace
@@ -269,7 +271,10 @@ def make_society(
     refused before anything is composed (:class:`SocietyEngineDiffers`). A saved world's place,
     its first input and its society are made in one transaction or not at all, so a refusal such
     as nothing reachable leaves nothing behind; every refusal is raised for the caller to answer
-    (:func:`society_refusal`).
+    (:func:`society_refusal`). Over a ground that states no head count, the people the first
+    input records are admitted by the cost of their minute on this host
+    (:func:`~exulanica.world.society_grounds.admit_people_by_cost`), refused as
+    ``people_over_cost`` with nothing made.
 
     A society this call makes is then opened awake, as the host's opening says
     (:func:`exulanica.api.society_opening.open_awake`): advanced by ordinary recorded minutes until
@@ -315,6 +320,10 @@ def make_society(
                 place_id = runtime.saved_world_place(connection, session, version_id, region_id)
             # The engine says how a world's own walking surfaces are composed for it.
             document = provider(connection, session, version_id, place_id, region_id, profile)
+            if is_authored_ground(document["profile"]):
+                # A saved world whose ground states no head count is peopled as far as this
+                # host runs their minute: refused by name here, before anything is written.
+                admit_people_by_cost(document, profile, services.host_minute())
         elif place_id is None:
             raise ValueError("a society without inputs needs a place_id")
         created = repo.create(

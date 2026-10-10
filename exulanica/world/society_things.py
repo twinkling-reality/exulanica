@@ -692,7 +692,9 @@ class _Minute:
         )
 
     def full(self) -> bool:
-        return len(self.state["inhabitants"]) >= self.maximum
+        """Whether the society holds as many as its engine's maximum; never where its engine
+        states none."""
+        return self.maximum is not None and len(self.state["inhabitants"]) >= self.maximum
 
 
 def _refusal_key(entry: Mapping[str, Any]) -> dict[str, Any]:

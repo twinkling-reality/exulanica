@@ -23,9 +23,10 @@ the process CPU time it took on this machine:
   model); and one simulated hour, ``--ticks`` minutes from genesis, at the median and the largest
   population the recipe produced. A comparison replays a run's hour from its receipts through the
   same step, so the hour is what one replayed run of that population costs, less its receipts.
-* **The bound**: one tick of the most people the town's society ground admits, on the largest
-  walking graph any world measured has, the worst case a specification of these values can reach
-  at play. A world none of whose candidates the composer keeps is counted as refused, with why.
+* **The bound**: one tick of ``--bound`` people (128 where it is not given, the population the
+  purposeful society's points in the society ground catalog were measured at), on the largest
+  walking graph any world measured has. A town's ground states no head count, so the population
+  to measure at is the caller's. A world none of whose candidates the composer keeps is counted as refused, with why.
 
 Before and after the whole run it samples the machine's CPU idle share over ten seconds (``top``),
 and writes both into the output, so a run made on a busy machine says so. Run it inside
@@ -64,8 +65,11 @@ from exulanica.world.society_walking_surfaces import (
 from exulanica.world.world_recipes import town_recipe
 
 #: The stated populations one tick is measured at on the median world's graph: the comparison
-#: protocol's eight and doublings of it up to the ground's bound.
+#: protocol's eight and doublings of it up to the population the bound is measured at by default.
 STATED_POPULATIONS = (8, 16, 32, 64, 128)
+#: The population the bound is measured at where ``--bound`` names none: the one the purposeful
+#: society's measured points in the society ground catalog were taken at.
+MEASURED_BOUND = 128
 #: How long the CPU idle share is sampled for, before and after the run, in seconds.
 IDLE_SAMPLE_SECONDS = 10
 _SEED = "5" * 64
@@ -143,10 +147,17 @@ def main() -> int:
     parser.add_argument("--values", default=None, help="a JSON object of the preset's values")
     parser.add_argument("--worlds", type=int, default=20)
     parser.add_argument("--ticks", type=int, default=60)
+    parser.add_argument(
+        "--bound",
+        type=int,
+        default=MEASURED_BOUND,
+        help="the population one tick is measured at on the largest walking graph",
+    )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     recipe = town_recipe(args.recipe, json.loads(args.values) if args.values else None)
-    bound = society_ground_for_composer(recipe.composer_key).population
+    # A ground that states a head count is measured at it; a town's states none.
+    bound = society_ground_for_composer(recipe.composer_key).population or args.bound
     module = composer_module(recipe.composer_key, recipe.composer_version)
     policy = current_routine().policy
     standing = StandingPolicy(policy["standing_spacing_mm"], policy["standing_radius_mm"])

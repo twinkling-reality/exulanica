@@ -95,13 +95,15 @@ def test_the_committed_bounds_are_the_ones_the_line_derives(population):
 
 
 def test_the_bound_that_applies_to_a_town_is_the_protocols():
-    """A generated town's ground holds at most its figure, the tick budget; the most people a
-    comparison runs is derived lower, so of the two it is the comparison's that bounds a town's
-    comparison, and the documents say so."""
+    """A generated town's ground states no head count, so the most people a comparison runs is
+    the one bound on a town's comparison; a ground whose people are its world's own and which
+    does state a head count (a world made from a world kind) states one above the comparison's,
+    so there too it is the comparison's that applies. The documents say so."""
     towns = [ground for ground in society_grounds() if ground.population_rule == "residents"]
-    assert towns, "a generated town's ground states its figure"
     most = population_maximum(load_comparison_catalogs())
-    assert all(most < ground.population for ground in towns)
+    stated = {ground.key: ground.population for ground in towns if ground.population}
+    assert {ground.key for ground in towns} - set(stated) == {"generated_town"}
+    assert stated and all(most < figure for figure in stated.values())
     assert f"at most {most} people" in (ROOT / "docs/society-experiments.md").read_text("utf-8")
 
 

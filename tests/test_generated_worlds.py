@@ -17,6 +17,7 @@ import itertools
 import json
 import math
 import pathlib
+import re
 import uuid
 from collections import OrderedDict
 from types import MappingProxyType
@@ -605,10 +606,15 @@ def test_a_receipt_is_append_only_and_a_town_s_population_is_checked_by_the_sche
     town = "exulanica.society-input/walking-surfaces-v1"
     assert admits({"profile": town, "population": {"rule": "residents", "size": 42}})
     assert admits({"profile": "exulanica.society-input/authored-v3"})
+    # A town records as many people as its homes house: the schema states no most (migration
+    # 0191), and nobody is a population an input may record.
+    for size in (0, 513, 100_000):
+        assert admits({"profile": town, "population": {"rule": "residents", "size": size}}), size
     for population in (
         {"rule": "residents", "size": 2.5},
         {"rule": "", "size": 4},
-        {"rule": "residents", "size": 513},
+        {"rule": "residents", "size": -1},
+        {"rule": "residents", "size": "513"},
         {"rule": "residents", "size": 4, "note": "more"},
         {"rule": "residents"},
         None,
@@ -1185,10 +1191,10 @@ def test_a_tile_names_its_current_bake_when_two_tessellators_baked_it(
         assert (tile["state"], tile["baked_tile_id"]) == ("baked", str(second.baked_tile_id))
 
 
-def test_a_town_whose_homes_hold_more_than_the_schema_allows_is_refused_by_name(made, monkeypatch):
-    """A town whose homes hold more people than any input may record (512) is refused as the
-    population past the ground's bound it is, by name, and not as a malformed input. The town is
-    made first, since its composer refuses a town whose homes hold more than its ground does."""
+def test_a_town_whose_homes_hold_more_than_this_host_runs_is_refused_by_name(made, monkeypatch):
+    """A town whose homes hold more people than this host runs a minute of is refused by that name
+    where its society is made, and not as a malformed input: an input records a population of any
+    size. The town is made first; what a server can run is no part of making one."""
     api = made
     entry = _town(api, "Crowded")
     make_place = walking_surfaces_module.place_from_city_records
@@ -1210,5 +1216,16 @@ def test_a_town_whose_homes_hold_more_than_the_schema_allows_is_refused_by_name(
     society = f"/world/versions/{entry['authored_version_id']}/society?world_id={entry['world_id']}"
     refused = api.post(society, {"region_id": "region:generated", "profile": PURPOSEFUL})
     assert refused.status_code == 409, refused.text
-    assert refused.json()["code"] == "population_over_tick_budget"
-    assert "at most 128" in refused.json()["detail"]
+    assert refused.json()["code"] == "people_over_cost"
+    detail = refused.json()["detail"]
+    # A hundred times the town's own people, past every measured point, against the people the
+    # refusal itself says this host runs.
+    said = re.fullmatch(
+        r"a minute of (\d+) people here takes about (\d+) ms \(an estimate, read past the last "
+        r"measured point\), and this server gives a minute 800 ms; it runs about (\d+) people "
+        r"\(an estimate, read past the last measured point\) here",
+        detail,
+    )
+    assert said is not None, detail
+    people, minute_ms, runs = (int(figure) for figure in said.groups())
+    assert people % 100 == 0 and people > runs and minute_ms > 800

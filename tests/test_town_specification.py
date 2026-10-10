@@ -161,8 +161,11 @@ def test_the_served_specification_states_every_value_its_range_its_reason_and_th
         384_000,
         130_000,
     )
+    # A town states no head count: its people are admitted by the measured cost of their minute,
+    # at most the share of a host's slowest minute its ground states, a tenth.
     [people] = document["bounds"]["people"]
-    assert people["most"] == society_ground_for_composer("city-grammar-town").population
+    assert society_ground_for_composer("city-grammar-town").minute_share_milli == 100
+    assert (people["most"], people["minute_share_milli"]) == (None, 100)
     # The count policy's own figures, a person's and a guest's, whatever a deployment states.
     bounds = document["bounds"]
     assert (

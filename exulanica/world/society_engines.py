@@ -1,6 +1,6 @@
 """The society engines and what each can do, stated once, as data.
 
-``society-engines.v3.json`` beside this module is the one statement of which engine profiles
+``society-engines.v4.json`` beside this module is the one statement of which engine profiles
 exist and which capabilities each has: whether a society may still be created with it, whether it
 consumes authorised inputs, whether the playback worker may play it, whether it takes directed
 actions, model decisions or experiments, whether the world's owner may choose a model for one of
@@ -8,7 +8,10 @@ its people, whether a comparison of the models that decide for its people may ru
 can stand on a saved world's own ground, which state shape it writes and how many people it may
 hold. It also states which engine a new society over each kind of ground is created with, and,
 from its third version, which engine a saved world takes instead where its version holds a thing
-its author placed and the host offers societies of things (``creates_holding_things``).
+its author placed and the host offers societies of things (``creates_holding_things``). From its
+fourth version an engine may state no maximum population: the engines a town's society is made
+with state none, because how many people a town holds is its homes', admitted by the measured
+cost of their minute on the host that makes the society (the society ground catalog).
 Everything that used to restate a list of engines derives it from here: the runtime's edit hook,
 the repositories, the routes, the selection query's bound parameters and, through a generated
 module, the browser's parser. Where a copy cannot derive, because a migration's CHECK or trigger
@@ -16,10 +19,10 @@ body is fixed SQL, a test reads the live schema and compares it with this table.
 asks what an engine can do asks the table; ``tests/test_society_engine_capabilities.py`` fails a
 module that compares an engine's identity where a capability decides.
 
-``society-engines.v1.json``, the table's first shape, and ``society-engines.v2.json``, its second,
-stay beside it because evaluation records and the comparison drawing of their day name them;
-tests hold each to this one's rows, and :func:`load_engine_table` reads the second as it reads
-this one.
+``society-engines.v1.json``, the table's first shape, ``society-engines.v2.json``, its second,
+and ``society-engines.v3.json``, its third, stay beside it because evaluation records and the
+comparison drawing of their day name them; tests hold each to this one's rows, and
+:func:`load_engine_table` reads the second and the third as it reads this one.
 
 An engine that is not in the table is refused by name everywhere it is looked up, never guessed
 to behave like one that is.
@@ -62,10 +65,12 @@ __all__ = [
     "society_engine",
 ]
 
-ENGINES_PATH: Final = Path(__file__).with_name("society-engines.v3.json")
-TABLE_PROFILE: Final = "exulanica.society-engines/v3"
-#: The profiles this module reads: the second, which states no ``creates_holding_things``, and this.
-_PROFILES: Final = ("exulanica.society-engines/v2", TABLE_PROFILE)
+ENGINES_PATH: Final = Path(__file__).with_name("society-engines.v4.json")
+TABLE_PROFILE: Final = "exulanica.society-engines/v4"
+#: The profiles this module reads: the second, which states no ``creates_holding_things``, the
+#: third, whose every engine states a maximum population, and this.
+_HOLDING_PROFILES: Final = ("exulanica.society-engines/v3", TABLE_PROFILE)
+_PROFILES: Final = ("exulanica.society-engines/v2", *_HOLDING_PROFILES)
 StateFamily = Literal["legacy", "purposeful", "living", "things"]
 _STATE_FAMILIES: Final = ("legacy", "purposeful", "living", "things")
 #: The kinds of ground a new society is created over, each with the engine the table names for it:
@@ -87,7 +92,8 @@ _CAPABILITIES: Final = (
     "saved_world",
     "takes_inputs",
 )
-#: The largest population any engine may state: the living society's bound since migration 0075.
+#: The largest maximum population any engine may state: the living society's bound since
+#: migration 0075. An engine that states no maximum states none.
 _POPULATION_CEILING: Final = 65_536
 #: A society ground's key, as the society ground catalog states one.
 _GROUND_KEY: Final = re.compile(r"[a-z][a-z0-9_]*")
@@ -126,14 +132,25 @@ class SocietyEngine:
     saved_world: bool
     state_family: StateFamily
     population_minimum: int
-    population_maximum: int
+    #: The most people it may hold; None where the table states no maximum.
+    population_maximum: int | None
 
     def holds(self, population: int) -> bool:
         """Whether this engine may hold a population of this size."""
-        return self.population_minimum <= population <= self.population_maximum
+        return population >= self.population_minimum and (
+            self.population_maximum is None or population <= self.population_maximum
+        )
+
+    def said(self) -> str:
+        """Its population bounds in a refusal's words."""
+        if self.population_maximum is None:
+            return f"{self.population_minimum} or more"
+        return f"{self.population_minimum} to {self.population_maximum}"
 
 
-def _engine(row: Any) -> SocietyEngine:
+def _engine(row: Any, *, unbounded: bool = False) -> SocietyEngine:
+    """One row, checked. ``unbounded`` says the table's profile lets an engine state no maximum
+    population (the fourth does); absent, the maximum is none."""
     fields = {"engine", "population", "playback_refusal", "reason", "state_family", *_CAPABILITIES}
     if not isinstance(row, dict) or set(row) != fields:
         raise ValueError("a society engine row states exactly its capabilities and a reason")
@@ -146,10 +163,14 @@ def _engine(row: Any) -> SocietyEngine:
         or not isinstance(row["reason"], str)
         or not row["reason"].strip()
         or not isinstance(population, dict)
-        or set(population) != {"minimum", "maximum"}
+        or not {"minimum"} <= set(population) <= {"minimum", "maximum"}
+        or ("maximum" not in population and not unbounded)
         or type(population["minimum"]) is not int
-        or type(population["maximum"]) is not int
-        or not 1 <= population["minimum"] <= population["maximum"] <= _POPULATION_CEILING
+        or type(population.get("maximum", population["minimum"])) is not int
+        or not 1
+        <= population["minimum"]
+        <= population.get("maximum", population["minimum"])
+        <= _POPULATION_CEILING
         or (row["playback"] == (row["playback_refusal"] is not None))
         or (row["playback_refusal"] is not None and not isinstance(row["playback_refusal"], str))
         or (row["saved_world"] and not row["takes_inputs"])
@@ -176,7 +197,7 @@ def _engine(row: Any) -> SocietyEngine:
         saved_world=row["saved_world"],
         state_family=row["state_family"],
         population_minimum=population["minimum"],
-        population_maximum=population["maximum"],
+        population_maximum=population.get("maximum"),
     )
 
 
@@ -249,7 +270,8 @@ def load_engine_table(
 ) -> tuple[tuple[SocietyEngine, ...], str, Mapping[GroundKind, str], HoldingThings | None]:
     """Read and check the table: every engine once, in order, a default that exists and may be
     created with, an engine for each kind of ground a new society is created over and, where the
-    table states it (its third version may), the engine a saved world holding things takes."""
+    table states it (from its third version it may), the engine a saved world holding things
+    takes."""
     document = json.loads(path.read_text(encoding="utf-8"))
     keys = {"profile", "creates", "default_engine", "engines"}
     if (
@@ -257,12 +279,13 @@ def load_engine_table(
         or document.get("profile") not in _PROFILES
         or not keys <= set(document)
         or not set(document) - keys
-        <= ({"creates_holding_things"} if document["profile"] == TABLE_PROFILE else set())
+        <= ({"creates_holding_things"} if document["profile"] in _HOLDING_PROFILES else set())
         or not isinstance(document["engines"], list)
         or not document["engines"]
     ):
         raise ValueError(f"{path.name} is not a society engine table of {_PROFILES}")
-    engines = tuple(_engine(row) for row in document["engines"])
+    unbounded = document["profile"] == TABLE_PROFILE
+    engines = tuple(_engine(row, unbounded=unbounded) for row in document["engines"])
     names = [engine.engine for engine in engines]
     if names != sorted(set(names)):
         raise ValueError("society engines are listed once each, in order")

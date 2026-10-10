@@ -85,14 +85,15 @@ owner's workspace and each guest's while the guest is there
 Implementation:
 
 - shared identity, draws, events and digests: `exulanica/world/society.py`;
-- which engines exist and what each can do: `exulanica/world/society-engines.v3.json`, read by
+- which engines exist and what each can do: `exulanica/world/society-engines.v4.json`, read by
   `exulanica/world/society_engines.py`;
 - the grounds a society stands on, with what people walk, the population rule, lattice and
   declared area of each, the dependency its input names its place under, the kinds of the
-  world's own records its people's activities may name and the thing kind its population is made
-  of:
-  `assets/catalogs/society-ground/society-ground.v5.json` (versions 1 to 4 kept beside it), read by
-  `exulanica/world/society_grounds.py`;
+  world's own records its people's activities may name, the thing kind its population is made
+  of and, for a town, the measured cost of a minute in place of a head count:
+  `assets/catalogs/society-ground/society-ground.v6.json` (versions 1 to 5 kept beside it), read by
+  `exulanica/world/society_grounds.py`; the reader of the measured points:
+  `exulanica/world/society_minute_cost.py`;
 - sending a society's people away and bringing them back:
   `exulanica/world/society_presence.py`;
 - the frozen v1 engine and the fixed tables stored v1 to v3 histories depend on:
@@ -127,7 +128,7 @@ Implementation:
 
 ## Engines and what each can do
 
-`exulanica/world/society-engines.v3.json` states which engine profiles exist and, for each,
+`exulanica/world/society-engines.v4.json` states which engine profiles exist and, for each,
 whether a society may still be created with it, whether it consumes authorised inputs, whether the
 playback worker may play it (and the refusal it gives when not), whether it takes directed actions,
 model decisions or experiments, whether the world's owner may choose a model that decides for one
@@ -154,18 +155,24 @@ engines that host each role and so where the owner's model choices are recorded 
 `tests/test_decision_roles.py` holds them equal to the engines whose `owner_model_choice` the table
 states. An engine the table does not state is refused by name wherever it is looked up, and a
 retired one is refused by name when a creation asks for it (`409 society_engine_retired`). The
-table's first shape, `society-engines.v1.json`, and its second, `society-engines.v2.json`, stay
-beside it because evaluation records and the comparison drawing of their day name them, each held
-to this one's rows by a test; the loader and the browser read the second as they read the third.
+table's first shape, `society-engines.v1.json`, its second, `society-engines.v2.json`, and its
+third, `society-engines.v3.json`, stay beside it because evaluation records and the comparison
+drawing of their day name them, each held to this one's rows by a test; the loader and the browser
+read the second and the third as they read the fourth. The fourth differs from the third in one
+thing: an engine may state no maximum population, and the three engines a town's society is made
+with state none. How many people a town holds is its homes' own number, admitted by the measured
+cost of their minute where the society is made ("A town's people and the cost of their minute",
+below); migration 0191 holds those engines to their minimum alone in the society row's check and
+lets a town's input record a population of any size.
 
 | Engine | Created | Inputs | Playback | Directed actions | Model decisions | Owner chooses models | Compared | Experiments | Sent away | Saved world | Population |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `exulanica-society/v1` | yes | no | no | no | no | no | no | no | no | no | 100 to 512 |
-| `exulanica-society/v2` | yes | yes | yes | yes | yes | yes | yes | no | yes | yes | 1 to 512 |
+| `exulanica-society/v2` | yes | yes | yes | yes | yes | yes | yes | no | yes | yes | 1 or more |
 | `exulanica-society/v3` | no (retired) | yes | yes | yes | yes | no | no | no | no | yes | 1 to 512 |
 | `exulanica-society/v4` | yes | yes | yes | no | no | no | no | yes | no | no | 1 to 65,536 |
-| `exulanica-society/v5` | yes | yes | yes | no | yes | yes | yes | no | no | yes | 1 to 512 |
-| `exulanica-society/v7` | by name | yes | yes | yes | yes | yes | no | no | no | yes | 1 to 512 |
+| `exulanica-society/v5` | yes | yes | yes | no | yes | yes | yes | no | no | yes | 1 or more |
+| `exulanica-society/v7` | by name | yes | yes | yes | yes | yes | no | no | no | yes | 1 or more |
 
 The browser reads the same file: `pnpm run society-engines:sync` writes it byte for byte, with the
 union of its profiles, into `web/packages/app/src/society-engines.generated.ts`, which
@@ -181,12 +188,62 @@ fails any comparison of an engine's identity under `exulanica/` outside an engin
 implementation and the dispatch to each engine's initializer, each listed with its count and why,
 and `web/packages/app/test/society-engine-literals.test.ts` does the same for the app's source.
 
+## A town's people and the cost of their minute
+
+A town's ground states no head count. Its entry in the society ground catalog
+(`generated_town`, version 6) states `population` 0, which says none, and in its place:
+
+- `minute_cost`: for each engine a town's society is made with, what one simulated minute was
+  measured to take. Each engine names what measured it, the record that holds the run by profile
+  and digest where one was kept, the machine and runtime, and, for each walking graph measured,
+  the 95th percentile minute in microseconds at each population. The living town
+  (`exulanica-society/v5`) and the society of things (`exulanica-society/v7`) were measured in one
+  run on the small town preset and on a market town 384 m long, at 50 to 1,000 and at 102 to 502
+  people; the purposeful society (`exulanica-society/v2`) at 128 people on two graphs, with no
+  record kept. The catalog refuses an entry that leaves out an engine a town's society is made
+  with, so a new engine is measured before a town can be made with it.
+- `minute_share_milli`: the thousandths of a host's slowest minute a society may take, 100. A
+  chosen budget, not a measurement: the minute is planned in the application's process, and a
+  tenth leaves the rest of the wait to everything else that process does.
+
+`exulanica/world/society_minute_cost.py` reads the points. A town is read on the smallest measured
+graph at or above its own walking nodes, between the nearest measured populations, in whole
+microseconds rounded up. Every reading carries its basis: `measured` between measured points (and
+at the first one for fewer people than any run held, which never understates), `estimate` past
+the last one, by people or by walking nodes. An estimate is served with that word beside the
+figure wherever it is served, the refusal included.
+
+A host states two things. Its slowest minute is its base wait between simulated minutes at the
+slowest speed (`EXULANICA_SOCIETY_TICK_INTERVAL_MS`, 8,000 ms where it states none).
+`EXULANICA_MINUTE_COST_SCALE` says how its machine compares with the measured ones, as a positive
+decimal with at most three places (2 for a machine twice as slow); it is one deployment's own
+figure, taken from a measurement on that machine, and 1 where the host states none.
+
+Making a society admits its people (`admit_people_by_cost`, called by `make_society`, the one way
+a society is made): the people the first input records, over the walking nodes it states, on the
+engine asked for. Where their minute, scaled to the host, is longer than the ground's share of
+the host's slowest minute, the creation is refused `409 people_over_cost` with nothing written,
+and the detail says the minute, what the server gives one, and how many people it runs there. On
+a host that states nothing, a tenth of 8 s is 800 ms: the society of things over the market
+town's graph runs about 1,385 people (an estimate, since the last measured point is 502), and the
+living town's minute is far cheaper. A society is admitted at the slowest speed and may be played
+at a faster one, where its minute takes a larger share of the wait.
+
+What a town holds and what a host runs are separate. The town's records, homes and the people
+its homes house are the world's and are never refused for what a server can simulate; the cost is
+asked only where a society is made, and a different host, a longer minute or a faster machine
+changes the answer without making the world again.
+
+A ground that states a head count keeps it: 8 for the starter and for a made world, and 128 for a
+world made from a world kind, whose minute has been measured at that population only
+(`409 population_over_tick_budget` past it).
+
 ## Identity, branches and compatibility
 
 The v1 to v3 population is 128 over a district; their pure initializer accepts 100 to 512 there.
 A society on a saved world's own ground starts with the population its ground's entry in the
-society ground catalog states, 8 for the built-in starter, or derives by its rule, one per place in
-a home for a generated town (below). V4 sizes its population to its
+society ground catalog states, 8 for the built-in starter, or derives by its rule, the people its
+homes house for a generated town (below). V4 sizes its population to its
 place (below). Each engine's bounds are stated once, in the engine table (above). The population
 is canonical state, independent of how many people a renderer draws. Inhabitant UUIDv5 identities derive from
 society identity and ordinal. The same society ID/seed/population preserves those identities across
@@ -506,15 +563,12 @@ is, because a ground module need not state an edge.
   placed to the world's surfaces. The population is the entry's rule, `residents`: one inhabitant
   per place in a home that is lived in, as the town's place states it for each premises under
   the routine the town was made under (below, "Its homes follow its floor"),
-  recorded in the input, and a world whose homes hold nobody, or more than the entry's figure of
-  128 (the town's tick budget, 200 ms at the 95th percentile, a tenth of the 2,000 ms fastest play
-  interval, within which one tick of 128 people on the largest walking graph measured for the
-  world specification, 962 nodes in a market town at the values whose towns hold the most places,
-  took 130.4 ms at the median and 159.4 ms at the 95th percentile, measured with
-  `scripts/measure_generated_world.py`), starts no
-  society (`409 world_holds_no_residents`, `409 population_over_tick_budget`). The town's composer
-  holds each seed candidate to the same rule before it keeps one (`refuse_population`), so a town
-  is made only if its society can start. A town of several tiles is one walking graph, read from
+  recorded in the input, and a world whose homes hold nobody starts no society
+  (`409 world_holds_no_residents`). The town's composer holds each seed candidate to that before it
+  keeps one (`refuse_population`), and asks nothing about what a server can run, so a town's seed
+  and records are the same on every host. The entry states no head count: how many people a host
+  runs is admitted where the society is made, by the measured cost of their minute ("A town's
+  people and the cost of their minute", below; `409 people_over_cost`). A town of several tiles is one walking graph, read from
   all its records, whose footways run on across the lines its tiles share, so its people walk from
   one tile to the next. The ground builder
   reads a ground by its entry's navigation and floor forms, never by the entry's name
@@ -540,7 +594,7 @@ about the person's world.
   that is not the built-in authored starter at a supported module version, and a ground kind the
   projection has no rule for are refused with the reason rather than guessed at.
 - Declared by the ground's entry in the society ground catalog
-  (`assets/catalogs/society-ground/society-ground.v5.json`, read by
+  (`assets/catalogs/society-ground/society-ground.v6.json`, read by
   `exulanica/world/society_grounds.py`): the walkable area on a ground that states none, and a
   route lattice at two metre spacing over the area, inset by the navigation clearance. A flat
   rectangle has no paths of its own, so a graph over it is a discretisation the entry fixes, not a
@@ -778,7 +832,8 @@ catalog versions, or that omits its `unread_placements`, is refused rather than 
 through anything: it asks `society_person_may_be_directed`, which admits exactly whom the
 society may direct ("Typed user-directed actions").
 Migration 0095 lets a v2 or v3 society hold 1 to 512 people, keeping
-v1 at 100 to 512 and v4 as 0075 left it. A row does
+v1 at 100 to 512 and v4 as 0075 left it; migration 0191 holds v2, v5 and v7 to one person or more
+and no maximum, and keeps the retired v3 at 1 to 512. A row does
 not say which kind of ground its society stands on, so the district's floor of 100 is held by the
 initializer that every creation and every replay passes through.
 
@@ -1962,8 +2017,8 @@ each standing on a footway station, on commit b9030943 with the planner describe
 256 blocking wells and 96 people a minute took 53 ms at the median (70 ms at the 95th percentile),
 of which the purposeful planner took 46 ms and the things phase 7 ms; with 128 wells and 128 placed
 beings, 224 people, a minute took 65 ms at the median (86 ms at the 95th percentile), of which the
-purposeful planner took 54 ms and the things phase 11 ms. Both are within the 200 ms tick budget at
-the 95th percentile. The planner builds what depends on the minute's input alone once a minute, not
+purposeful planner took 54 ms and the things phase 11 ms. Both are within 200 ms at the 95th
+percentile, a tenth of the wait between minutes at the fastest speed. The planner builds what depends on the minute's input alone once a minute, not
 once for each person who plans a route: the digest of the navigation that every route records, the
 walking graph, routes, and the standing exclusions, for which each node is held only to the places
 within a standing spacing of it. On commit b9030943 itself, without that, the same minutes, state
@@ -1984,7 +2039,9 @@ first, unchanged, and every event they record names v7; then the things phase:
   (`kind_erased`); one that cannot be placed is refused once while its placement stands
   (`arrival_refused`: `no_place_to_stand`, or `id_taken` where somebody or something here already
   has the id it would have) and tried again when it is moved; one refused because the society is
-  full (`society_full`) is tried again every minute, silently, and comes when there is room; an
+  full (`society_full`: it holds as many as its engine's stated maximum, which the engine table
+  states none of for this engine, so no society of it is full) is tried again every minute,
+  silently, and comes when there is room; an
   unavailable input changes nobody;
 * the crossings a door handed over, in the order it wrote them: a visitor arrives at the open node
   nearest a gate's arrival point, holding what it carried in, and leaves when its program calls it

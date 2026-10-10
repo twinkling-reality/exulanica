@@ -247,7 +247,8 @@ def run_people(
         _thing_id(str(frozen["world_id"]), str(entry["placed_id"]))
         for entry in placed_beings(frozen)
     }
-    most = min(society_engine(engine_profile).population_maximum, len(named | placed))
+    stated = society_engine(engine_profile).population_maximum
+    most = len(named | placed) if stated is None else min(stated, len(named | placed))
     return RunPeople(named=named, most=most)
 
 

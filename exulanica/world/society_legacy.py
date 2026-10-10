@@ -46,18 +46,21 @@ def initial_society(
     *,
     population: int = SOCIETY_POPULATION,
     minimum_population: int = _V1.population_minimum,
-    maximum_population: int = _V1.population_maximum,
+    maximum_population: int | None = _V1.population_maximum,
     profile: str = SOCIETY_ENGINE_VERSION,
 ) -> dict[str, Any]:
-    """The seeded population, held to the calling profile's own bounds from the engine table, with
-    the names, roles, weather and resources the identity catalog gives ``profile``."""
+    """The seeded population, held to the calling profile's own bounds from the engine table (no
+    maximum where the table states none for it), with the names, roles, weather and resources the
+    identity catalog gives ``profile``."""
     if (
         not isinstance(seed, str)
         or len(seed) != 64
         or any(c not in "0123456789abcdef" for c in seed)
     ):
         raise ValueError("society seed must be a lowercase SHA-256")
-    if population < minimum_population or population > maximum_population:
+    if population < minimum_population:
+        raise ValueError(f"society population must be at least {minimum_population}")
+    if maximum_population is not None and population > maximum_population:
         raise ValueError(
             f"society population must be between {minimum_population} and {maximum_population}"
         )

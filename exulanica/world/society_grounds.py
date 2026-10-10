@@ -1,4 +1,4 @@
-"""The grounds a society can stand on, and how many people each starts with, as one catalog.
+"""The grounds a society can stand on, and how many people each holds, as one catalog.
 
 ``assets/catalogs/society-ground/society-ground.v<N>.json`` states, once for each kind of ground a
 saved world's society is composed over, the facts about that ground which no world states: the
@@ -7,13 +7,18 @@ walking surfaces the world's own records state), where a person arrives on it (t
 states, or by rule the origin of the region the society lives in), what they stand on (a ground the
 world states, or a floor the society declares), the navigation profile its routes are recorded
 under, the lattice spacing, the area a society declares where the ground states no edge, and how
-many people a society over it starts with (a stated figure, or a rule over the world's own premises
-with the most people it may produce), each with the reason for its figure. A navigation profile
-names one discretisation and one population, so two grounds that share one state the same figures,
-and the catalog refuses two that do not. The society's ground builder
+many people a society over it holds, each with the reason for its figure. The people are a stated
+figure, or the people the world's own premises house: then the entry states the most the rule may
+produce, or no head count at all and, in its place, what a minute of a society over the ground was
+measured to take for each engine (``minute_cost``) and the share of a host's slowest minute a
+society may take (``minute_share_milli``, a chosen budget). A navigation profile names one
+discretisation and one population, so two grounds that share one state the same figures, and the
+catalog refuses two that do not. The society's ground builder
 (:mod:`exulanica.world.society_authored_ground`) reads a ground by its navigation and floor forms,
 never by its entry's name, and the spacing and declared area; the repository reads the population
-when it creates a society (:func:`society_population`); nothing else states them.
+when it creates a society (:func:`society_population`), and making a society admits its people by
+the cost of their minute on the host that makes it (:func:`admit_people_by_cost`); nothing else
+states them.
 
 A stored input records the navigation profile, the spacing and the area it was composed with, so
 replay never reads this catalog. A different figure for a ground is therefore a new entry with a
@@ -37,8 +42,23 @@ from typing import Any, Final
 from exulanica.grammar.catalogs import CatalogSchema, integer_field, load_catalog, text_field
 from exulanica.grammar.errors import CatalogError
 from exulanica.world.society_composition import REVIEWED_REACH_MM
-from exulanica.world.society_engines import CREATES, CREATES_HOLDING_THINGS, society_engine
-from exulanica.world.society_input_policy import UNREACHABLE
+from exulanica.world.society_engines import (
+    CREATES,
+    CREATES_HOLDING_THINGS,
+    ENGINES,
+    society_engine,
+)
+from exulanica.world.society_input_policy import UNREACHABLE, WALKING_SURFACES_BY_FAMILY
+from exulanica.world.society_minute_cost import (
+    ESTIMATE,
+    EngineMinuteCost,
+    HostMinute,
+    PeopleCeiling,
+    estimated_minute,
+    minute_cost_field,
+    minute_costs,
+    people_within,
+)
 from exulanica.world.society_planner import CLEARANCE_MM
 
 __all__ = [
@@ -53,6 +73,7 @@ __all__ = [
     "SocietyGroundKind",
     "SocietyPopulationRefused",
     "UnknownSocietyGround",
+    "admit_people_by_cost",
     "created_engine",
     "load_society_grounds",
     "place_dependencies",
@@ -60,6 +81,7 @@ __all__ = [
     "placed_affordance_refusal",
     "record_subjects_for",
     "refuse_population_over_budget",
+    "server_runs",
     "society_ground_for_composer",
     "society_ground_for_navigation",
     "society_grounds",
@@ -67,7 +89,7 @@ __all__ = [
 ]
 
 CATALOG_ID: Final = "society-ground"
-CATALOG_VERSION: Final = 5
+CATALOG_VERSION: Final = 6
 CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[2].joinpath("assets", "catalogs", CATALOG_ID)
 )
@@ -80,15 +102,19 @@ GROUND_FLOORS: Final = ("stated", "declared")
 #: What people walk: a square lattice over the area a ground states or declares, or the walking
 #: surfaces the world's own records state.
 GROUND_NAVIGATIONS: Final = ("lattice", "walking_surfaces")
-#: How many people a society over a ground starts with: the figure its entry states, or one for
-#: each place in a home the world's own premises offer, up to the figure its entry states.
+#: How many people a society over a ground holds: the figure its entry states, or the people the
+#: world's own premises house, up to the figure its entry states or, where it states none, as many
+#: as the measured cost of their minute lets a host run.
 POPULATION_RULES: Final = ("stated", "residents")
 #: The dependency an input over a ground names the place its people walk under: none for a
 #: lattice, else the kind of place the producer of the world's own surfaces makes.
 PLACE_DEPENDENCIES: Final = ("none", "city_place", "site_place")
 #: A figure a form states none of: a ground that walks its world's surfaces states no lattice and
-#: declares no area, and says so with this, which its entry check requires.
+#: declares no area, and one admitted by the measured cost of a minute states no head count; each
+#: says so with this, which its entry check requires.
 _STATES_NONE: Final = 0
+#: The whole of a minute, in the thousandths a share of it is stated in.
+_WHOLE_MILLI: Final = 1000
 #: A positive figure with no upper bound of its own: ``_entry_check`` bounds each figure against
 #: the others, the navigation clearance and the reviewed reach.
 _POSITIVE = integer_field(1, sys.maxsize)
@@ -120,8 +146,9 @@ class SocietyGroundKind:
     arrival: str
     #: What people stand on: one of :data:`GROUND_FLOORS`.
     floor: str
-    #: How many people a new society over this ground starts with: the stated figure, or under
-    #: the ``residents`` rule the most the rule may produce.
+    #: How many people a society over this ground holds: the stated figure, or under the
+    #: ``residents`` rule the most the rule may produce; 0 where the entry states no head count
+    #: and admits by ``minute_cost``.
     population: int
     lattice_mm: int
     #: The half extent of the square a society declares where the ground states no edge.
@@ -138,6 +165,12 @@ class SocietyGroundKind:
     #: The thing kind its population is made of, ``{kind, version, sha256}``: a shipped being the
     #: routine decides for. None below version 5, whose grounds stated no kind.
     population_kind: Mapping[str, Any] | None = None
+    #: What a minute of a society over this ground was measured to take, for each engine one is
+    #: made with; empty where the entry states a head count. None below version 6.
+    minute_cost: tuple[EngineMinuteCost, ...] = ()
+    #: The thousandths of a host's slowest minute a society over this ground may take: a chosen
+    #: budget; 0 where the entry states a head count.
+    minute_share_milli: int = 0
 
 
 def _figure(values: Mapping[str, object], name: str) -> int:
@@ -161,11 +194,14 @@ def _choice(options: tuple[str, ...]) -> Callable[[str, object], str]:
 
 def _entry_check(where: str, values: Mapping[str, Any]) -> None:
     saved_world = society_engine(CREATES["saved_world"])
-    if not saved_world.holds(_figure(values, "population")):
+    # Only a version whose schema lets a ground state no head count reads one; its own check
+    # holds such a ground to a measured cost.
+    if values["population"] != _STATES_NONE and not saved_world.holds(
+        _figure(values, "population")
+    ):
         raise CatalogError(
             f"{where}: population {values['population']} is outside what the engine a saved "
-            f"world is created with holds ({saved_world.population_minimum} to "
-            f"{saved_world.population_maximum})"
+            f"world is created with holds ({saved_world.said()})"
         )
     if values.get("navigation", "lattice") == "walking_surfaces":
         # A ground whose world states its own walking surfaces walks them: no lattice and no
@@ -306,6 +342,56 @@ _FIELDS_V5: Final = (
 )
 
 
+def _entry_check_v6(where: str, values: Mapping[str, Any]) -> None:
+    _entry_check_v5(where, values)
+    cost, share = values["minute_cost"], values["minute_share_milli"]
+    if values["population"] != _STATES_NONE:
+        if cost or share != _STATES_NONE:
+            raise CatalogError(
+                f"{where}: a ground that states a head count states no measured cost of a minute "
+                "and no share of one"
+            )
+        return
+    if values["population_rule"] != "residents":
+        raise CatalogError(
+            f"{where}: only a ground whose people are the world's own states no head count"
+        )
+    if not cost or not 1 <= share <= _WHOLE_MILLI:
+        raise CatalogError(
+            f"{where}: a ground that states no head count states the measured cost of a minute "
+            f"and the share of a host's slowest minute a society may take, 1 to {_WHOLE_MILLI} "
+            "thousandths"
+        )
+    # Every engine a society over a world's own walking surfaces is made with states its points,
+    # so an engine added to the table is measured before a town can be made with it.
+    made_with = {
+        engine.engine
+        for engine in ENGINES
+        if engine.creatable
+        and engine.saved_world
+        and engine.takes_inputs
+        and engine.state_family in WALKING_SURFACES_BY_FAMILY
+    }
+    measured = {engine["engine"] for engine in cost}
+    if measured != made_with:
+        raise CatalogError(
+            f"{where}: minute_cost states the engines a town's society is made with, "
+            f"{sorted(made_with)}, not {sorted(measured)}"
+        )
+
+
+#: Version 6 lets a ground whose people are the world's own state no head count (``population``
+#: 0) and, in its place, the measured cost of a minute for each engine and the share of a host's
+#: slowest minute a society may take, beside version 5's fields.
+_FIELDS_V6: Final = (
+    *((name, _NON_NEGATIVE if name == "population" else check) for name, check in _FIELDS_V5),
+    ("minute_cost", minute_cost_field),
+    ("minute_cost_reason", text_field),
+    ("minute_share_milli", integer_field(_STATES_NONE, _WHOLE_MILLI)),
+    ("minute_share_reason", text_field),
+)
+
+
 _SCHEMAS: Final = MappingProxyType(
     {
         1: CatalogSchema(
@@ -332,6 +418,7 @@ _SCHEMAS: Final = MappingProxyType(
         3: CatalogSchema(CATALOG_ID, 3, _FIELDS_V2, entry_check=_entry_check),
         4: CatalogSchema(CATALOG_ID, 4, _FIELDS_V4, entry_check=_entry_check_v4),
         5: CatalogSchema(CATALOG_ID, 5, _FIELDS_V5, entry_check=_entry_check_v5),
+        6: CatalogSchema(CATALOG_ID, 6, _FIELDS_V6, entry_check=_entry_check_v6),
     }
 )
 
@@ -371,6 +458,8 @@ def load_society_grounds(
                 if "population_kind" in values
                 else None
             ),
+            minute_cost=minute_costs(values.get("minute_cost", [])),
+            minute_share_milli=int(values.get("minute_share_milli", _STATES_NONE)),
         )
         for entry in catalog.entries
         for values in (dict(entry.values),)
@@ -389,6 +478,8 @@ def load_society_grounds(
             None
             if ground.population_kind is None
             else tuple(sorted(ground.population_kind.items())),
+            ground.minute_cost,
+            ground.minute_share_milli,
         )
         if figures.setdefault(ground.navigation_profile, stated) != stated:
             raise CatalogError(
@@ -477,13 +568,14 @@ def created_engine(ground: SocietyGroundKind, *, holding_things: bool = False) -
 
 
 def society_population(document: Mapping[str, Any]) -> int:
-    """How many people a society over a saved world's input starts with, by its ground's rule.
+    """How many people a society over a saved world's input holds, by its ground's rule.
 
     The ground is found by the navigation profile the input records. A stated figure is the
     entry's. Under the ``residents`` rule the input records the population its composition
-    derived from the world's premises, and a figure outside one to the entry's figure is refused
-    by name: a world whose homes hold nobody, or more people than one tick of the society was
-    measured to hold, starts no society rather than a different one.
+    derived from the world's premises, and a world whose homes house nobody, or more people than
+    the head count its ground states, starts no society rather than a different one: refused by
+    name. A ground that states no head count admits its people by the cost of their minute, which
+    is asked where the society is made (:func:`admit_people_by_cost`).
     """
     ground = society_ground_for_navigation(document["navigation"]["profile"])
     if ground.population_rule == "stated":
@@ -505,7 +597,7 @@ def society_population(document: Mapping[str, Any]) -> int:
 
 def refuse_population(size: int, ground: SocietyGroundKind) -> None:
     """Refuse, by name, a population no society over ``ground`` may start with: nobody
-    (``world_holds_no_residents``), or more than one of its ticks was measured to hold
+    (``world_holds_no_residents``), or more than the head count the ground states
     (``population_over_tick_budget``). A world's composer asks it of each candidate, so a world
     whose society could not start is never made."""
     if size < 1:
@@ -517,13 +609,77 @@ def refuse_population(size: int, ground: SocietyGroundKind) -> None:
 
 
 def refuse_population_over_budget(size: int, ground: SocietyGroundKind) -> None:
-    """Refuse, by name, a population past the most one tick of a society over ``ground`` was
-    measured to hold. A composition that derives a population asks it before its input is
-    validated, so a world whose homes hold more is refused by this name rather than as a
-    malformed input."""
-    if size > ground.population:
+    """Refuse, by name, a population past the head count ``ground`` states, the most one tick of
+    a society over it was measured to hold. A ground that states no head count refuses nothing
+    here: its people are admitted by the cost of their minute."""
+    if ground.population != _STATES_NONE and size > ground.population:
         raise SocietyPopulationRefused(
             "population_over_tick_budget",
             f"this world's homes hold {size} people, and a society over the {ground.key} ground "
             f"holds at most {ground.population}, the most one of its ticks was measured to hold",
         )
+
+
+def _engine_cost(ground: SocietyGroundKind, engine: str) -> EngineMinuteCost:
+    for cost in ground.minute_cost:
+        if cost.engine == engine:
+            return cost
+    raise SocietyPopulationRefused(
+        "minute_cost_not_measured",
+        f"no minute of {engine} was measured over the {ground.key} ground, so how many people "
+        "this server runs there cannot be said",
+    )
+
+
+def server_runs(
+    ground: SocietyGroundKind, engine: str, walking_nodes: int, host: HostMinute
+) -> PeopleCeiling | None:
+    """The most people ``host`` runs in a society of ``engine`` over a town of ``walking_nodes``
+    on ``ground``: the largest population whose minute, as measured and scaled to the host's
+    machine, fits the ground's share of the host's slowest minute. Its basis says whether that
+    minute was read between measured points or is an estimate past the last one. None for a
+    ground that states a head count."""
+    if not ground.minute_cost:
+        return None
+    return people_within(
+        _engine_cost(ground, engine),
+        walking_nodes,
+        host.budget_us(ground.minute_share_milli),
+        scale_milli=host.cost_scale_milli,
+    )
+
+
+def admit_people_by_cost(document: Mapping[str, Any], engine: str, host: HostMinute) -> None:
+    """Refuse, by name, the first input of a society whose minute ``host`` cannot run.
+
+    For an input over a ground that states no head count: the people it records, over the walking
+    nodes it states, are read against the measured cost of a minute of ``engine``, scaled to the
+    host's machine, and refused as ``people_over_cost`` where that minute is longer than the
+    ground's share of the host's slowest minute. The refusal says what the minute would take,
+    what this server gives one and how many people it runs there, each estimate named as one.
+    An input over any other ground, and one that states no walking graph (an unavailable one,
+    which making the society refuses for its own reason), is admitted here."""
+    ground = society_ground_for_navigation(document["navigation"]["profile"])
+    walking_nodes = len(document["navigation"]["nodes"])
+    if not ground.minute_cost or not walking_nodes:
+        return
+    people = society_population(document)
+    cost = _engine_cost(ground, engine)
+    budget_us = host.budget_us(ground.minute_share_milli)
+    minute = estimated_minute(cost, people, walking_nodes, scale_milli=host.cost_scale_milli)
+    if minute.microseconds <= budget_us:
+        return
+    runs = people_within(cost, walking_nodes, budget_us, scale_milli=host.cost_scale_milli)
+    raise SocietyPopulationRefused(
+        "people_over_cost",
+        f"a minute of {people} people here takes "
+        f"{_said(minute.document()['minute_ms'], 'ms', minute.basis)}, and this server gives a "
+        f"minute {budget_us // 1000} ms; it runs {_said(runs.people, 'people', runs.basis)} here",
+    )
+
+
+def _said(figure: int, unit: str, basis: str) -> str:
+    """A figure as a refusal says it: an estimate is named as one beside it."""
+    if basis == ESTIMATE:
+        return f"about {figure} {unit} (an estimate, read past the last measured point)"
+    return f"{figure} {unit}"

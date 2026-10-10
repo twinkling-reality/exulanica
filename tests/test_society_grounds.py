@@ -133,8 +133,7 @@ def _malformed(tmp_path, change) -> None:
 @pytest.mark.parametrize(
     ("change", "message"),
     [
-        (lambda entries: entries[0].update(population=0), "population is an int"),
-        (lambda entries: entries[0].update(population=513), "population 513"),
+        (lambda entries: entries[0].update(population=0), "people are the world's own"),
         (lambda entries: entries[0].update(lattice_mm=2_200), "reviewed reach"),
         (lambda entries: entries[0].update(declared_half_extent_mm=2_000), "clearance"),
         (lambda entries: entries[0].pop("population_reason"), "missing"),
@@ -144,7 +143,6 @@ def _malformed(tmp_path, change) -> None:
     ],
     ids=[
         "empty",
-        "beyond-the-engine",
         "beyond-reach",
         "no-room",
         "no-reason",
