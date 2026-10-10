@@ -113,6 +113,11 @@ export interface CompanionPlansDeps {
    * (`subjectId` for a play begun, null for one ended), so the person goes on in the world.
    */
   readonly onPlay?: (subjectId: string | null) => void;
+  /**
+   * A confirmed step chose who decides for some beings: the page reads who decides again now, so a
+   * card or Who decides opened the next second names the mind the step chose, not the one before it.
+   */
+  readonly onMinds?: () => void;
 }
 
 export interface CompanionPlans {
@@ -380,6 +385,7 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
         const played = step.action['subject_id'];
         if (step.action.operation === 'play_being' && typeof played === 'string') deps.onPlay?.(played);
         if (step.action.operation === 'give_back') deps.onPlay?.(null);
+        if (step.action.operation === 'choose_mind') deps.onMinds?.();
       } else if (result.kind === 'refused' && result.status !== null) {
         answers[step.index] = stepAnswer(operation, { status: result.status, code: result.code });
       }

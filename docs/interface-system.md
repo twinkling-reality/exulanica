@@ -539,8 +539,10 @@ then needs a question answered, is not sent and says so; nor is a mind step, fir
 count the sheet did not show. A later mind step the plan could not prepare turns Confirm off, and
 its row says it was checked as the world stands now, before the earlier steps of the plan; a step
 that names nobody draws no count line. The world's ceilings are said over any hour of real time,
-which is how the host counts them. Who decides and the thing card show the new mind at their next
-read of the world's models.
+which is how the host counts them. Once a mind step ran the page reads who decides again at once
+(`onMinds` in `composition/companion-plan.ts`, `rereadMinds` in the environment selection), so Who
+decides and the thing card name the new mind when they are opened next, not at the world's next
+minute.
 
 Six more exist only as plan steps and spend nothing: Move a thing and Remove a thing (`things.move`,
 `things.remove`, their rows naming the thing: "Well"), Play this being and Give it back

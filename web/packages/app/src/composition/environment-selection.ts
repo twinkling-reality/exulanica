@@ -307,6 +307,12 @@ export interface MountedEnvironmentSelection {
   /** Play one being of a society of things from the world (Play this one), or give it back. */
   play(subjectId: string): Promise<void>;
   giveBack(): Promise<void>;
+  /**
+   * Read who decides again now, after a choice this page's panels did not make (a Companion plan
+   * step sent to the models route): the card and Who decides then name the mind chosen at once,
+   * not at the world's next minute.
+   */
+  rereadMinds(): Promise<void>;
   /** G: give back the being played from this page, else play the person selected in the world. */
   togglePlay(): void;
 }
@@ -2942,6 +2948,7 @@ export function mountEnvironmentSelection(
     societyNames,
     play: async (subjectId) => { await playController()?.play(subjectId); },
     giveBack: async () => { await playThisOne?.giveBack(); },
+    rereadMinds: async () => { await societyModels?.refresh(society?.currentTick ?? null, societyPeople(), true); },
     togglePlay: () => {
       if (playThisOne?.playing() != null) { playThisOne.toggle(null); return; }
       playController()?.toggle(selectedInhabitant);

@@ -26,6 +26,8 @@ from exulanica.selection.action_plan import (
     THING_MOVE,
     THING_REMOVE,
 )
+from exulanica.world.decision_roles import decision_roles
+from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
 
 import test_companion_minds_postgres as minds
 import test_companion_things_postgres as things
@@ -166,6 +168,48 @@ def test_a_being_is_played_and_given_back_by_the_play_routes(companion):
     idle = things._ask(client, world, "give the knight back")
     assert idle["outcome"] == "refused"
     assert idle["steps"][0]["code"] == refused.json()["code"] == "not_played"
+
+
+def test_a_being_an_outside_program_decides_for_is_played_by_neither_the_plan_nor_the_route(
+    companion,
+):
+    """An owner's grant hands the knight to an outside program. The play route refuses a person
+    playing it, by name; the plan's preview, which records nothing, states the same code, so no
+    step is offered that the route would then refuse."""
+    world, client, _transport = companion
+    society = minds._town(client, world)
+    [knight] = minds._of_kind(society, "knight")
+    [role] = [found for found in decision_roles() if found.subject == "person"]
+    with client.app.state.services.database.session(world["workspace"]) as connection:
+        handed = SocietyModelChoiceRepository(
+            connection, world["workspace"], world_id=world["binding"].world_id
+        ).record_external_choice(
+            world["binding"].version_id,
+            role,
+            request_id=uuid.uuid4(),
+            subjects=[knight],
+            bridge="luanti",
+            grant_id=uuid.uuid4(),
+            chosen_by=world["session"].actor,
+            contract=role.contract(),
+        )
+    assert handed["decider"]["kind"] == "external"
+    before = minds._choices(world)
+    prepared = things._prepare(client, world, [{"operation": "play_being", "subject_id": knight}])
+    assert prepared["outcome"] == "refused", things._why(prepared)
+    [step] = prepared["steps"]
+    assert (step["operation"], step["state"]) == (PLAY, "blocked")
+    assert minds._choices(world) == before, "preparing recorded a choice"
+    # The route's own answer to the same play: the authority the plan's code is held to.
+    scope, root, _ = routes(world)
+    refused = client.post(
+        root + "/society/play",
+        headers=OWNER,
+        params=scope,
+        json={"idempotency_key": str(uuid.uuid4()), "subject_id": knight},
+    )
+    assert refused.status_code == 409, refused.text
+    assert step["code"] == refused.json()["code"] == "decided_from_outside"
 
 
 def test_everyone_is_sent_away_and_brought_back_by_the_presence_route(companion):

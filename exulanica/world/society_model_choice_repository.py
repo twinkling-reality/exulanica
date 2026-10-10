@@ -598,7 +598,11 @@ class SocietyModelChoiceRepository:
         recording nothing. ``code`` is why the play would be refused, by the name it is refused
         by, else None; ``playing`` whether this person plays ``subject`` already; ``played`` the
         beings this person plays now, which :meth:`give_back` would hand back; ``choice_seq`` the
-        society's newest choice. With no ``subject`` only ``played`` is answered."""
+        society's newest choice. With no ``subject`` only ``played`` is answered.
+
+        It checks as :meth:`record_play` records: with ``granted_away``, so a being an outside
+        program decides for under a grant is refused here (``decided_from_outside``) as the play
+        route refuses it. Without it a preview would offer a play the route then refuses."""
         played = decider({"kind": "person", "account_id": str(account_id)})
         society = self._society(version_id, lock=False)
         rows = self._rows(society["society_id"])

@@ -65,6 +65,7 @@ function harness(options: {
   readonly capabilities?: OperationDescriptors | null;
   readonly paused?: () => boolean;
   readonly onPlay?: (subjectId: string | null) => void;
+  readonly onMinds?: () => void;
 }): Harness {
   const sent: PlannedRequest[] = [];
   const host: ActionHost = {
@@ -106,6 +107,7 @@ function harness(options: {
     pause: async () => { whens.push(sheet.root.querySelector('.companion-plan-step-when')?.textContent ?? null); },
     ...(options.paused === undefined ? {} : { paused: options.paused }),
     ...(options.onPlay === undefined ? {} : { onPlay: options.onPlay }),
+    ...(options.onMinds === undefined ? {} : { onMinds: options.onMinds }),
   };
   const whens: (string | null)[] = [];
   plans = mountCompanionPlans(deps);
@@ -592,6 +594,37 @@ describe('two minds chosen under one Confirm', () => {
     await confirmAndWait(h);
     expect(h.sent.map((request) => request.actionId)).toEqual(['minds.choose', 'minds.choose']);
     expect(stepStates(h.sheet)).toEqual(['done', 'done']);
+  });
+
+  it('has the page read who decides again for each choice that was recorded, and for no other', async () => {
+    // Both choices recorded: the page reads again after each, never before the yes.
+    const read = vi.fn();
+    const h = harness({
+      plan: async () => fixture('mind-two-steps-plan'), prepare: async () => later(2),
+      send: async () => ({ choice_seq: 5 }), onMinds: read,
+    });
+    await h.plans.route('nano for the knight and for the villagers');
+    expect(read).not.toHaveBeenCalled();
+    await confirmAndWait(h);
+    expect(h.sent.length).toBe(2);
+    expect(read).toHaveBeenCalledTimes(2);
+    // The later choice grew and was not sent: one read, for the one choice recorded.
+    const once = vi.fn();
+    const grown = harness({
+      plan: async () => fixture('mind-two-steps-plan'), prepare: async () => later(3),
+      send: async () => ({ choice_seq: 5 }), onMinds: once,
+    });
+    await grown.plans.route('nano for the knight and for the villagers');
+    await confirmAndWait(grown);
+    expect(grown.sent.length).toBe(1);
+    expect(once).toHaveBeenCalledTimes(1);
+    // A plan that chooses no mind asks for no read.
+    const other = vi.fn();
+    const edit = harness({ onMinds: other });
+    await edit.plans.route('put a bench here');
+    await confirmAndWait(edit);
+    expect(edit.sent.length).toBeGreaterThan(0);
+    expect(other).not.toHaveBeenCalled();
   });
 
   it('does not send a later choice that would now name more beings than the sheet showed', async () => {

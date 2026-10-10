@@ -29,6 +29,7 @@ from exulanica.selection.action_plan import ACTION_PROMPT_VERSION, MIND
 from exulanica.world.decision_roles import decision_roles
 
 import test_companion_things_postgres as things
+import test_society_made_kinds_postgres as made
 from test_society_saved_world_api import OWNER, routes
 
 companion = things.companion
@@ -356,3 +357,64 @@ def test_a_being_that_is_not_here_is_refused_by_the_code_the_route_answers(compa
         client, world, [{"operation": "choose_mind", "whom": "kind:dragon", "mind": "routine"}]
     )
     assert unknown["refusal"]["code"] == "not_in_catalogue"
+
+
+def test_a_mind_is_chosen_for_a_being_of_a_made_kind_through_the_real_read(
+    companion, spine_schema, tmp_path
+):
+    """A creature its workspace keeps lives in the society beside a knight. Its kind is named in
+    the state by source and digest, not by a shipped kind: it is one of everyone, joins no kind's
+    group, and a mind chosen for it by name is the models route's own request, which the route
+    records for that being alone."""
+    world, client, transport = companion
+    creature = made._keep(world, spine_schema, tmp_path)
+    things._place(client, world, "well", "well", 2, -4_000, 2_000)
+    things._place(client, world, "knight", "knight", 2, 3_000, 3_000)
+    made._place_made(client, world, made.CREATURE, creature.kind.sha256, 1_000, 5_000)
+    things._society(client, world)
+    society = things._now(client, world)
+    people = society["state"]["inhabitants"]
+    [being] = [
+        person
+        for person in people
+        if person["kind"] == {"source": "workspace", "sha256": creature.kind.sha256}
+    ]
+    shipped = [person for person in people if "kind" in (person["kind"] or {})]
+    assert len(shipped) == len(people) - 1
+
+    offered = _models_read(client, world)["view"]["models"][0]
+    words = f"let {offered['name']} decide for {being['display_name']}"
+    labels = things._look(client, world, transport, words)
+    _routine, model_label = _mind_labels(labels, offered["name"])
+    _draft(transport, things._label(labels, being["display_name"], starts=True), model_label)
+    before = _choices(world)
+    plan = things._ask(client, world, words)
+
+    assert plan["outcome"] == "plan", things._why(plan)
+    assert _choices(world) == before, "planning recorded a choice"
+    [step] = plan["steps"]
+    assert (step["operation"], step["state"]) == (MIND, "prepared")
+    assert step["body"]["subjects"] == [being["id"]]
+    assert step["mind"]["subjects"] == 1 and step["mind"]["left_out"] == {}
+    # The groups the step states: everyone counts the made being; the kinds' groups hold the
+    # shipped beings only, counted from the society's own read.
+    counts = {group["value"]: group["count"] for group in step["mind"]["groups_here"]}
+    assert counts["everyone"] == len(people)
+    kinds: dict[str, int] = {}
+    for person in shipped:
+        kinds[person["kind"]["kind"]] = kinds.get(person["kind"]["kind"], 0) + 1
+    assert {
+        value.removeprefix("kind:"): count
+        for value, count in counts.items()
+        if value.startswith("kind:")
+    } == kinds
+    # Sent, it is the route's own choice for that being; the same choice sent directly agrees.
+    sent = things._send(client, step)
+    assert sent.status_code == 200, sent.text
+    assert sent.json()["people"] == [being["id"]]
+    # Everyone back to their routine names the made being with the rest.
+    everyone = things._prepare(
+        client, world, [{"operation": "choose_mind", "whom": "everyone", "mind": "routine"}]
+    )
+    assert everyone["outcome"] == "plan", things._why(everyone)
+    assert sorted(everyone["steps"][0]["body"]["subjects"]) == sorted(p["id"] for p in people)

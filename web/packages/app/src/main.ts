@@ -1680,6 +1680,9 @@ async function mountWorld(): Promise<void> {
         if (subjectId === null) void environmentSelection.giveBack();
         else void environmentSelection.play(subjectId);
       },
+      // A mind chosen by a confirmed step: who decides is read again now, so the card opened next
+      // names it.
+      onMinds: () => { void environmentSelection.rereadMinds(); },
       // New pieces asked for: their waiting line and outcomes, until each has one.
       onPieces: (ids) => {
         const active = state.activeWorldEntry;
