@@ -1,0 +1,131 @@
+{
+  "profile": "exulanica.companion-action-plan/v1",
+  "outcome": "plan",
+  "kind": "world_edit",
+  "world_id": "world:authored:test",
+  "version_id": "00000000-0000-0000-0000-000000000007",
+  "plan_sha256": "620e284e0d5764d4c55dcc2476ecbfeb3237ecd7912301fda73cbbbf987d4e76",
+  "atomic": false,
+  "steps": [
+    {
+      "index": 0,
+      "action": {
+        "operation": "choose_mind",
+        "whom": "kind:villager",
+        "mind": "model:nebius_token_factory/example/nano"
+      },
+      "state": "prepared",
+      "code": null,
+      "operation": "POST /world/versions/{version_id}/models/{role_key}",
+      "bind": {
+        "version_id": "00000000-0000-0000-0000-000000000007",
+        "role_key": "society_decision"
+      },
+      "bind_from": null,
+      "query": {
+        "world_id": "world:authored:test"
+      },
+      "body": {
+        "idempotency_key": "79699787-0f0f-5f30-b214-8f81867b962e",
+        "subjects": [
+          "00000000-0000-0000-0000-000000000001",
+          "00000000-0000-0000-0000-000000000004"
+        ],
+        "model": {
+          "provider": "nebius_token_factory",
+          "model_id": "example/nano"
+        }
+      },
+      "body_from": null,
+      "requires": [
+        "model.invoke",
+        "world.write"
+      ],
+      "permitted": true,
+      "spends": true,
+      "preview": null,
+      "pins": {
+        "choice_seq": 4
+      },
+      "effects": [
+        {
+          "on": "decisions",
+          "state": "available",
+          "code": null
+        }
+      ],
+      "confirmation": "required",
+      "titles": {
+        "whom": "every villager",
+        "mind": "Nano"
+      },
+      "estimate": null,
+      "mind": {
+        "subjects": 2,
+        "left_out": {
+          "being_played": 1
+        },
+        "run_now": 0,
+        "run_after": 2,
+        "bound": 8,
+        "host_refusal": null,
+        "model_refusal": null,
+        "groups_here": [
+          {
+            "value": "everyone",
+            "title": "everyone here",
+            "count": 5
+          },
+          {
+            "value": "kind:villager",
+            "title": "every villager",
+            "count": 3
+          },
+          {
+            "value": "kind:knight",
+            "title": "every knight",
+            "count": 1
+          },
+          {
+            "value": "kind:lantern_spirit",
+            "title": "every lantern spirit",
+            "count": 1
+          }
+        ]
+      },
+      "cost": {
+        "per": "simulated_minute",
+        "provider": "nebius_token_factory",
+        "provider_description": "Nebius Token Factory",
+        "subjects": 2,
+        "usd_per_answer_at_most": "0.003100",
+        "usd_at_most": "0.006200",
+        "usd_typical": null,
+        "basis": {
+          "kind": "reservation_bound",
+          "answers_per_ask_at_most": 2
+        },
+        "ceilings": {
+          "usd_per_world_hour": "0.250000",
+          "decisions_per_world_hour": 600
+        }
+      },
+      "replay": "same_key_returns_the_recorded_choice",
+      "receipt": "model_choice",
+      "compensation": null
+    }
+  ],
+  "spends": true,
+  "spends_by": [],
+  "clarification": null,
+  "refusal": null,
+  "capabilities": null,
+  "proposal_speech": null,
+  "clock": null,
+  "execution": {
+    "prompt_version": "action-plan-11",
+    "calls": [],
+    "rejections": []
+  },
+  "names": {}
+}

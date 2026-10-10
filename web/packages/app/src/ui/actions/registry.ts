@@ -71,6 +71,9 @@ const ARRANGEMENT_PLACE = 'POST /world/versions/{version_id}/arrangements/apply'
 const THING_PLACE = 'POST /world/versions/{version_id}/things';
 const DIRECT = 'POST /world/versions/{version_id}/society/actions';
 const PIECES = 'POST /world/piece-requests';
+/** Who decides for a society's people: the models route, bound to the people's role. */
+const MIND = 'POST /world/versions/{version_id}/models/{role_key}';
+const PEOPLE_ROLE = 'society_decision';
 /** Making a town, read from the workspace's creation descriptors (`GET /worlds/capabilities`). */
 const MAKE_GENERATED = 'POST /worlds/generated';
 
@@ -211,6 +214,59 @@ const PIECE_REFUSALS: Readonly<Record<string, RefusalWords>> = {
   },
 };
 
+/**
+ * What a choice of who decides can meet: the models route's own codes (said for one person as Who
+ * decides says them for the people ticked there) and the plan's, when a group or a mind is gone.
+ */
+const MIND_REFUSALS: Readonly<Record<string, RefusalWords>> = {
+  too_many_model_people: {
+    happened: 'That would put more beings under AI models than this world runs at once.',
+    next: 'Choose fewer of them, or give some their own routine back first.',
+  },
+  being_played: {
+    happened: 'Someone is playing them now.',
+    next: 'Ask again once they are given back.',
+  },
+  decided_from_outside: {
+    happened: 'A program from outside this world decides for them.',
+    next: 'A mind can be chosen for them once that program\'s grant ends.',
+  },
+  decider_not_allowed: {
+    happened: 'That kind of being cannot be given that kind of mind.',
+    next: 'Choose their own routine, or ask about someone else.',
+  },
+  person_not_in_this_world: {
+    happened: 'They are not in this world any more.',
+    next: 'Ask about someone who is here.',
+  },
+  subject_chosen_under_another_role: {
+    happened: 'A model already decides for them in another way.',
+    next: 'Change that choice in Who decides first.',
+  },
+  engine_takes_no_model_choice: {
+    happened: 'The people of this world cannot be run by an AI model.',
+    next: 'They keep their own routine.',
+  },
+  model_not_declared: { happened: 'That AI model is not one this server knows.', next: 'Ask for one of the minds listed in Who decides.' },
+  model_not_offered: { happened: 'That AI model is not offered for decisions here.', next: 'Ask for one of the minds listed in Who decides.' },
+  model_not_askable: { happened: 'That AI model cannot be asked for a decision in this world.', next: 'Ask for one of the minds listed in Who decides.' },
+  mind_not_offered: { happened: 'That mind is no longer offered here.', next: 'Ask again and I will list the ones there are.' },
+  group_not_here: { happened: 'This world no longer holds that group.', next: 'Ask again and I will list who is here.' },
+  too_many_subjects_for_one_choice: {
+    happened: 'That is more beings than one choice can name.',
+    next: 'Ask for a smaller group, one at a time.',
+  },
+  choice_key_reused: {
+    happened: 'This world changed while I was preparing that choice.',
+    next: 'Ask again and I will prepare it against what it is now.',
+  },
+  society_unavailable: NOBODY_HERE,
+  unavailable_society_input: {
+    happened: 'This world\'s people cannot be read right now.',
+    next: 'Something they were made from is not available. Nothing was changed.',
+  },
+};
+
 /** What every clock action can meet, whether a rail button or a Companion plan step sent it. */
 const CLOCK_REFUSALS: Readonly<Record<string, RefusalWords>> = {
   society_unavailable: NOBODY_HERE,
@@ -276,6 +332,12 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     id: 'people.direct', label: 'Ask someone', hint: 'Ask one of the beings here to go to a place or use it',
     icon: 'people', group: 'people', placement: ['companion'], operation: DIRECT,
     refusals: DIRECT_REFUSALS,
+  },
+  {
+    id: 'minds.choose', label: 'Choose who decides',
+    hint: 'Give a being, a kind, a role or everyone an AI model, or their own routine back, after seeing what it comes to',
+    icon: 'people', group: 'people', placement: ['companion'], operation: MIND, bind: { role_key: PEOPLE_ROLE },
+    refusals: MIND_REFUSALS,
   },
   {
     id: 'people.open', label: 'People', hint: 'See who lives here and what they are doing',

@@ -14,7 +14,10 @@ import { plannedEntry } from './actions/planned.js';
 import type { RefusalWords } from './actions/registry.js';
 import { button, panel, stateChip, technicalRecord, type InterfaceState } from './system/components.js';
 import { icon, type IconName } from './system/icon.js';
-import { PLAN_CLARIFY_SLOT_WORDS, PLAN_CLARIFY_WORDS, PLAN_HANDS_WORDS, PLAN_WORDS, pieceEstimateWords } from './words/companion-plan.js';
+import {
+  PLAN_CLARIFY_SLOT_WORDS, PLAN_CLARIFY_WORDS, PLAN_HANDS_WORDS, PLAN_WORDS, mindChoiceWords, mindDetailWords, pieceEstimateWords,
+  tooManyForModelsWords,
+} from './words/companion-plan.js';
 import { filled, isObjectActivity, objectActivity } from '../society-activity-words.js';
 
 /** A step's words before anything is sent: what it is and whether it can be sent now. */
@@ -84,6 +87,10 @@ export function thePlace(title: string): string {
 export function thingDetail(step: PlanStep): string | null {
   const titles = step.titles;
   const capital = (words: string): string => words.charAt(0).toUpperCase() + words.slice(1);
+  // A mind chosen: whom for and which, as the server's reads label them.
+  if (step.action.operation === 'choose_mind' && titles['whom'] !== undefined && titles['mind'] !== undefined) {
+    return mindDetailWords(titles['whom'], titles['mind'], step.action['mind'] === 'routine');
+  }
   // New pieces: the things they are for, as the server's reads label them ("gate, sword, well").
   if (step.action.operation === 'request_pieces' && titles['kinds'] !== undefined) return capital(titles['kinds']);
   if (step.action.operation === 'place_thing' && titles['kind'] !== undefined) {
@@ -185,6 +192,12 @@ export function buildPlanSheet(options: PlanSheetOptions): PlanSheet {
             icon('spends', 'sm'), pieceEstimateWords(step.estimate),
           ]),
         ])),
+        // What a mind chosen comes to and may cost, before the one Confirm.
+        ...plan.steps.flatMap((step) => (step.mind === null ? [] : [
+          el('p', { class: 'companion-plan-estimate', 'data-step': String(step.index), 'data-kind': 'mind' }, [
+            icon('spends', 'sm'), mindChoiceWords(step.mind, step.cost, step.action['mind'] === 'routine'),
+          ]),
+        ])),
         el('p', { class: 'companion-plan-summary', role: 'status', 'aria-live': 'polite' }),
         record(plan),
       );
@@ -211,8 +224,10 @@ export function buildPlanSheet(options: PlanSheetOptions): PlanSheet {
       cancel.dataset['action'] = 'plan.cancel';
       surface.body.replaceChildren(
         el('p', { class: 'companion-plan-utterance', text: `“${utterance}”` }),
-        el('p', { class: 'companion-plan-intro', text: PLAN_CLARIFY_SLOT_WORDS[`${clarification.code}:${clarification.slot ?? ''}`]
-          ?? PLAN_CLARIFY_WORDS[clarification.code] ?? PLAN_CLARIFY_WORDS['asset_ambiguous']! }),
+        el('p', { class: 'companion-plan-intro', text: clarification.code === 'too_many_people_for_models'
+          ? tooManyForModelsWords(clarification.facts)
+          : PLAN_CLARIFY_SLOT_WORDS[`${clarification.code}:${clarification.slot ?? ''}`]
+            ?? PLAN_CLARIFY_WORDS[clarification.code] ?? PLAN_CLARIFY_WORDS['asset_ambiguous']! }),
         ...(clarification.candidates.length === 0 ? [] : [choices]),
         record(plan, { clarification: clarification.code }),
       );

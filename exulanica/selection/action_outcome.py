@@ -61,6 +61,7 @@ from exulanica.selection.action_plan import (
     CONTROL,
     CONTROL_STEP,
     DIRECT,
+    MIND,
     MOVE,
     PIECES,
     PLACE,
@@ -74,8 +75,10 @@ from exulanica.selection.action_plan import (
     document_sha256,
 )
 from exulanica.selection.validation import Session
+from exulanica.world.decision_roles import decision_roles
 from exulanica.world.object_edit_preview import read_only_snapshot
 from exulanica.world.object_repository import WorldObjectRepository
+from exulanica.world.society_model_choice_repository import decider_of
 
 __all__ = ["OUTCOME_PROFILE", "STEP_STATES", "InvalidOutcomeStep", "action_outcome"]
 
@@ -180,7 +183,60 @@ def _one_step(
         return _direct_step(connection, session, world_id, version_id, step)
     if operation == PIECES:
         return _pieces_step(connection, session, world_id, step)
+    if operation == MIND:
+        return _mind_step(connection, session, world_id, version_id, step)
     raise InvalidOutcomeStep(f"{operation!r} is not an operation a Companion plan names")
+
+
+def _mind_step(
+    connection: psycopg.Connection,
+    session: Session,
+    world_id: str,
+    version_id: uuid.UUID,
+    step: Mapping[str, Any],
+) -> dict[str, Any]:
+    """A choice of who decides: ``applied`` when the choice its answer names is this version's
+    society's, recorded by the caller under the step's own key, for the subjects and the mind the
+    step's body named; ``not_applied`` when its answer names none or it is not so."""
+    with _client_shape(step):
+        body = step.get("body") or {}
+        key = uuid.UUID(str(body["idempotency_key"]))
+        subjects = sorted(str(subject) for subject in body["subjects"])
+        model = body["model"]
+        asked = None if model is None else (str(model["provider"]), str(model["model_id"]))
+        answer = _answer(step)
+        named = None if answer is None else answer.get("choice_seq")
+        sequence = None if named is None else int(named)
+    if sequence is None:
+        return _step(step, "not_applied")
+    row = connection.execute(
+        "select c.society_id,c.choice_seq,c.request_id,c.document,c.document_sha256,c.chosen_by "
+        "from world_society_model_choice c "
+        "join world_society s using(workspace_id,society_id) "
+        "where c.workspace_id=%s and s.world_id=%s and s.version_id=%s and c.request_id=%s",
+        (session.workspace_id, world_id, version_id, key),
+    ).fetchone()
+    if row is None or int(row["choice_seq"]) != sequence or row["chosen_by"] != session.actor:
+        return _step(step, "not_applied")
+    decider = decider_of(row["document"])
+    recorded = None if decider["kind"] != "model" else (decider["provider"], decider["model_id"])
+    if decider["kind"] not in ("model", "routine") or recorded != asked:
+        return _step(step, "not_applied")
+    [role] = [found for found in decision_roles() if found.subject == "person"]
+    chosen = sorted(str(subject) for subject in row["document"].get(role.choice_subjects) or ())
+    if chosen != subjects:
+        return _step(step, "not_applied")
+    receipt = {
+        "operation": step.get("operation"),
+        "world_id": world_id,
+        "version_id": str(version_id),
+        "society_id": str(row["society_id"]),
+        "request_id": str(row["request_id"]),
+        "choice_seq": int(row["choice_seq"]),
+        "document_sha256": row["document_sha256"],
+        "subjects": len(subjects),
+    }
+    return _step(step, "applied", receipts=[receipt])
 
 
 def _pieces_step(

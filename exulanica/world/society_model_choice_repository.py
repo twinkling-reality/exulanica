@@ -835,6 +835,159 @@ class SocietyModelChoiceRepository:
             handing_back=True,
         )
 
+    def _checked(
+        self,
+        society: Mapping[str, Any],
+        rows: Sequence[Mapping[str, Any]],
+        role: DecisionRole,
+        named: Sequence[str],
+        described: Any,
+        *,
+        granted_away: bool,
+        handing_back: bool,
+    ) -> dict[str, Any]:
+        """The decider a choice naming ``named`` records, as ``described()`` checks it, or the
+        refusal: every check of a choice but the bound on the subjects models run
+        (:meth:`_run_after`), in the order a choice is refused by. Reads only what it is handed, so
+        recording a choice (:meth:`_record`, under the society's lock) and previewing one
+        (:meth:`preview_choice`, with no lock) are refused by the same code for the same reason."""
+        chosen = sorted(set(named))
+        if not role.hosted_by(society["engine_version"]):
+            raise ModelChoiceRefused("engine_takes_no_model_choice")
+        if len(chosen) != len(named):
+            raise ModelChoiceRefused("person_named_twice")
+        record = described()
+        present = set(role.adapter.subjects(society["state"]))
+        # Who is here: everyone, but in a hand-back, whose subjects may have been sent away.
+        here = [subject for subject in chosen if subject in present]
+        if not chosen or (len(here) != len(chosen) and not handing_back):
+            raise ModelChoiceRefused("person_not_in_this_world")
+        if any(decided_from_outside(society["state"], subject) for subject in here):
+            raise ModelChoiceRefused("decided_from_outside")
+        if record["kind"] == "external" and any(
+            _came_from_outside(society["state"], subject) for subject in chosen
+        ):
+            # A visitor is never handed to another outside program: its own program, or the
+            # world, decides for it.
+            raise ModelChoiceRefused("decided_from_outside")
+        held = self._current(role, rows)
+        if any(is_played(held.get(subject, {}).get("decider", {})) for subject in chosen):
+            # While a person plays a being, only giving it back names it.
+            raise ModelChoiceRefused("being_played")
+        if granted_away and any(
+            held.get(subject, {}).get("decider", {}).get("kind") == "external" for subject in chosen
+        ):
+            raise ModelChoiceRefused("decided_from_outside")
+        state = society["state"]
+        if not all(kind_allows(state, subject, record["kind"]) for subject in here):
+            raise ModelChoiceRefused("decider_not_allowed")
+        if record["kind"] == "external" and not all(
+            kind_allows(state, subject, "routine") for subject in chosen
+        ):
+            # A grant ends, and whoever it decided for goes back to their routine then, so a
+            # thing whose kind takes no routine is never handed to an outside program.
+            raise ModelChoiceRefused("decider_not_allowed")
+        if record["kind"] != "routine":
+            occupied: dict[tuple[str, str], bool] = {}
+            for row in rows:
+                document = row["document"]
+                other = decision_roles().for_choice(document["profile"])
+                if other is None:
+                    raise ValueError("a model choice names no registered role")
+                if other.key == role.key:
+                    continue
+                for subject in document[other.choice_subjects]:
+                    if subject in chosen:
+                        occupied[(other.key, subject)] = decider_of(document)["kind"] != "routine"
+            if any(occupied.values()):
+                raise ModelChoiceRefused("subject_chosen_under_another_role")
+        return record
+
+    def _run_after(
+        self,
+        society: Mapping[str, Any],
+        rows: Sequence[Mapping[str, Any]],
+        role: DecisionRole,
+        chosen: Sequence[str],
+        record: Mapping[str, Any] | None,
+        contract: DecisionContract,
+    ) -> tuple[int, int]:
+        """How many subjects models would run once ``chosen`` are decided for by ``record`` (as
+        they are now with none), and the contract's bound on them."""
+        after = self._current(role, rows)
+        if record is not None:
+            for subject in chosen:
+                after[subject] = {"decider": record}
+        counted = _counted(society, role, after)
+        run = sum(1 for subject in counted if after[subject]["decider"]["kind"] == "model")
+        return run, contract.value(role.subjects_bound)
+
+    def preview_choice(
+        self,
+        version_id: uuid.UUID,
+        role: DecisionRole,
+        *,
+        subjects: Sequence[str],
+        model: Mapping[str, str] | None,
+        manifest: Manifest,
+        contract: DecisionContract,
+    ) -> dict[str, Any]:
+        """What :meth:`record_choice` would meet for ``subjects`` and ``model`` now, read with no
+        lock and recording nothing, so a plan offers a choice only where the route would take it.
+
+        ``code`` is why the whole choice is refused (the engine takes none, the model is not
+        offered, or it would run more subjects by models than the contract allows), else None.
+        ``subjects`` are those a choice may name; ``left_out`` holds every other one under the
+        code a choice naming it alone is refused by. ``run_now`` and ``run_after`` count the
+        subjects models run now and once ``subjects`` are chosen for, against ``bound``;
+        ``choice_seq`` is the society's newest choice, so a caller's key can follow it. The world
+        may move before the choice is sent: the route stays the authority."""
+        society = self._society(version_id, lock=False)
+        rows = self._rows(society["society_id"])
+        newest = rows[-1]["choice_seq"] if rows else 0
+        run_now, bound = self._run_after(society, rows, role, (), None, contract)
+        read: dict[str, Any] = {
+            "code": None,
+            "subjects": [],
+            "left_out": {},
+            "run_now": run_now,
+            "run_after": run_now,
+            "bound": bound,
+            "choice_seq": newest,
+        }
+        named = list(dict.fromkeys(subjects))
+        if not role.hosted_by(society["engine_version"]):
+            return {**read, "code": "engine_takes_no_model_choice"}
+        try:
+            record = of_model(_model_record(role, manifest, self._asked(version_id, role), model))
+        except ModelChoiceRefused as refused:
+            return {**read, "code": refused.code}
+        taken: list[str] = []
+        left: dict[str, list[str]] = {}
+        for subject in named:
+            try:
+                self._checked(
+                    society,
+                    rows,
+                    role,
+                    [subject],
+                    lambda: record,
+                    granted_away=True,
+                    handing_back=False,
+                )
+            except ModelChoiceRefused as refused:
+                left.setdefault(refused.code, []).append(subject)
+            else:
+                taken.append(subject)
+        run_after, _bound = self._run_after(society, rows, role, taken, record, contract)
+        return {
+            **read,
+            "code": "too_many_model_people" if run_after > bound else None,
+            "subjects": taken,
+            "left_out": left,
+            "run_after": run_after,
+        }
+
     def _record(
         self,
         version_id: uuid.UUID,
@@ -886,64 +1039,17 @@ class SocietyModelChoiceRepository:
             if derived and not named:
                 return None
             chosen = sorted(set(named))
-            if not role.hosted_by(society["engine_version"]):
-                raise ModelChoiceRefused("engine_takes_no_model_choice")
-            if len(chosen) != len(named):
-                raise ModelChoiceRefused("person_named_twice")
-            record = described()
-            present = set(role.adapter.subjects(society["state"]))
-            # Who is here: everyone, but in a hand-back, whose subjects may have been sent away.
-            here = [subject for subject in chosen if subject in present]
-            if not chosen or (len(here) != len(chosen) and not handing_back):
-                raise ModelChoiceRefused("person_not_in_this_world")
-            if any(decided_from_outside(society["state"], subject) for subject in here):
-                raise ModelChoiceRefused("decided_from_outside")
-            if record["kind"] == "external" and any(
-                _came_from_outside(society["state"], subject) for subject in chosen
-            ):
-                # A visitor is never handed to another outside program: its own program, or the
-                # world, decides for it.
-                raise ModelChoiceRefused("decided_from_outside")
-            held = self._current(role, rows)
-            if any(is_played(held.get(subject, {}).get("decider", {})) for subject in chosen):
-                # While a person plays a being, only giving it back names it.
-                raise ModelChoiceRefused("being_played")
-            if granted_away and any(
-                held.get(subject, {}).get("decider", {}).get("kind") == "external"
-                for subject in chosen
-            ):
-                raise ModelChoiceRefused("decided_from_outside")
-            state = society["state"]
-            if not all(kind_allows(state, subject, record["kind"]) for subject in here):
-                raise ModelChoiceRefused("decider_not_allowed")
-            if record["kind"] == "external" and not all(
-                kind_allows(state, subject, "routine") for subject in chosen
-            ):
-                # A grant ends, and whoever it decided for goes back to their routine then, so a
-                # thing whose kind takes no routine is never handed to an outside program.
-                raise ModelChoiceRefused("decider_not_allowed")
-            if record["kind"] != "routine":
-                occupied: dict[tuple[str, str], bool] = {}
-                for row in rows:
-                    document = row["document"]
-                    other = decision_roles().for_choice(document["profile"])
-                    if other is None:
-                        raise ValueError("a model choice names no registered role")
-                    if other.key == role.key:
-                        continue
-                    for subject in document[other.choice_subjects]:
-                        if subject in chosen:
-                            occupied[(other.key, subject)] = (
-                                decider_of(document)["kind"] != "routine"
-                            )
-                if any(occupied.values()):
-                    raise ModelChoiceRefused("subject_chosen_under_another_role")
-            after = self._current(role, rows)
-            for subject in chosen:
-                after[subject] = {"decider": record}
-            counted = _counted(society, role, after)
-            run = sum(1 for subject in counted if after[subject]["decider"]["kind"] == "model")
-            if run > contract.value(role.subjects_bound):
+            record = self._checked(
+                society,
+                rows,
+                role,
+                named,
+                described,
+                granted_away=granted_away,
+                handing_back=handing_back,
+            )
+            run, bound = self._run_after(society, rows, role, chosen, record, contract)
+            if run > bound:
                 raise ModelChoiceRefused("too_many_model_people")
             sequence = (rows[-1]["choice_seq"] if rows else 0) + 1
             document: dict[str, Any] = {

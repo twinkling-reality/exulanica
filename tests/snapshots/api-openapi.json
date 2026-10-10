@@ -21706,6 +21706,20 @@
       },
       "type": "array",
       "title": "Actions"
+     },
+     "facts": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Facts"
      }
     },
     "additionalProperties": false,
@@ -22410,6 +22424,34 @@
        }
       ],
       "title": "Estimate"
+     },
+     "mind": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mind"
+     },
+     "cost": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cost"
      },
      "replay": {
       "type": "string",
@@ -31816,6 +31858,18 @@
        }
       ],
       "title": "Piece Request Ids"
+     },
+     "choice_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Choice Seq"
      }
     },
     "additionalProperties": false,
@@ -31923,6 +31977,18 @@
        }
       ],
       "title": "Society State Sha256"
+     },
+     "choice_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Choice Seq"
      }
     },
     "additionalProperties": false,
@@ -31995,7 +32061,8 @@
        "PUT /world/versions/{version_id}/society/control",
        "POST /world/versions/{version_id}/society/control/steps",
        "POST /world/versions/{version_id}/society",
-       "POST /world/piece-requests"
+       "POST /world/piece-requests",
+       "POST /world/versions/{version_id}/models/{role_key}"
       ],
       "title": "Operation"
      },
@@ -33406,6 +33473,7 @@
         "mapping": {
          "advance": "#/components/schemas/TypedSimulationBody",
          "bring_people": "#/components/schemas/TypedSimulationBody",
+         "choose_mind": "#/components/schemas/TypedActionBody",
          "direct_thing": "#/components/schemas/TypedActionBody",
          "move_object": "#/components/schemas/TypedActionBody",
          "pause": "#/components/schemas/TypedSimulationBody",
@@ -41324,7 +41392,8 @@
        "undo_last_edit",
        "place_arrangement",
        "place_thing",
-       "direct_thing"
+       "direct_thing",
+       "choose_mind"
       ],
       "title": "Operation"
      },
@@ -41485,6 +41554,32 @@
        }
       ],
       "title": "With Id"
+     },
+     "whom": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 300,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Whom"
+     },
+     "mind": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 300,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mind"
      }
     },
     "additionalProperties": false,

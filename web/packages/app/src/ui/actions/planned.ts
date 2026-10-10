@@ -36,6 +36,8 @@ export const PLAN_ACTIONS: Readonly<Record<string, string | null>> = Object.free
   apply_appearance: null,
   // New generated pieces for a world's look (GEN's S1): the sheet says their time and cost before Confirm.
   request_pieces: 'pieces.request',
+  // A mind for a being or a group (MAKE's package 1): the sheet says whom, the mind and its cost.
+  choose_mind: 'minds.choose',
   other: null,
 });
 
@@ -121,6 +123,7 @@ const ANSWER_FIELDS: Readonly<Record<string, { readonly at: string | null; reado
   'POST /world/versions/{version_id}/society': { at: null, fields: ['society_id'] },
   'POST /world/versions/{version_id}/things': { at: null, fields: ['edit_seq', 'state_sha256'] },
   'POST /world/versions/{version_id}/society/actions': { at: 'request', fields: ['request_id', 'document_sha256'] },
+  'POST /world/versions/{version_id}/models/{role_key}': { at: null, fields: ['choice_seq'] },
 };
 
 /**

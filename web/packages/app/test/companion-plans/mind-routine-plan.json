@@ -1,0 +1,109 @@
+{
+  "profile": "exulanica.companion-action-plan/v1",
+  "outcome": "plan",
+  "kind": "world_edit",
+  "world_id": "world:authored:test",
+  "version_id": "00000000-0000-0000-0000-000000000007",
+  "plan_sha256": "5ab9eb5c78c249992bbc1f947eeb9fcfa9e9495b64ced8fe2763aca183127a9d",
+  "atomic": false,
+  "steps": [
+    {
+      "index": 0,
+      "action": {
+        "operation": "choose_mind",
+        "whom": "kind:knight",
+        "mind": "routine"
+      },
+      "state": "prepared",
+      "code": null,
+      "operation": "POST /world/versions/{version_id}/models/{role_key}",
+      "bind": {
+        "version_id": "00000000-0000-0000-0000-000000000007",
+        "role_key": "society_decision"
+      },
+      "bind_from": null,
+      "query": {
+        "world_id": "world:authored:test"
+      },
+      "body": {
+        "idempotency_key": "2f742d6b-593c-5150-93c8-7795889b8175",
+        "subjects": [
+          "00000000-0000-0000-0000-000000000003"
+        ],
+        "model": null
+      },
+      "body_from": null,
+      "requires": [
+        "model.invoke",
+        "world.write"
+      ],
+      "permitted": true,
+      "spends": false,
+      "preview": null,
+      "pins": {
+        "choice_seq": 4
+      },
+      "effects": [
+        {
+          "on": "decisions",
+          "state": "available",
+          "code": null
+        }
+      ],
+      "confirmation": "required",
+      "titles": {
+        "whom": "every knight",
+        "mind": "their own routine"
+      },
+      "estimate": null,
+      "mind": {
+        "subjects": 1,
+        "left_out": {},
+        "run_now": 0,
+        "run_after": 0,
+        "bound": 8,
+        "host_refusal": null,
+        "model_refusal": null,
+        "groups_here": [
+          {
+            "value": "everyone",
+            "title": "everyone here",
+            "count": 5
+          },
+          {
+            "value": "kind:villager",
+            "title": "every villager",
+            "count": 3
+          },
+          {
+            "value": "kind:knight",
+            "title": "every knight",
+            "count": 1
+          },
+          {
+            "value": "kind:lantern_spirit",
+            "title": "every lantern spirit",
+            "count": 1
+          }
+        ]
+      },
+      "cost": null,
+      "replay": "same_key_returns_the_recorded_choice",
+      "receipt": "model_choice",
+      "compensation": null
+    }
+  ],
+  "spends": false,
+  "spends_by": [],
+  "clarification": null,
+  "refusal": null,
+  "capabilities": null,
+  "proposal_speech": null,
+  "clock": null,
+  "execution": {
+    "prompt_version": "action-plan-11",
+    "calls": [],
+    "rejections": []
+  },
+  "names": {}
+}

@@ -1,0 +1,51 @@
+{
+  "profile": "exulanica.companion-action-plan/v1",
+  "outcome": "clarify",
+  "kind": "world_edit",
+  "world_id": "world:authored:test",
+  "version_id": "00000000-0000-0000-0000-000000000007",
+  "plan_sha256": "ca21e502052f23d699200f1c3c80bbadea602aaeca67df04b44c69edb5fe0df9",
+  "atomic": false,
+  "steps": [],
+  "spends": false,
+  "spends_by": [],
+  "clarification": {
+    "code": "too_many_people_for_models",
+    "step": 0,
+    "slot": "whom",
+    "candidates": [
+      {
+        "value": "kind:knight",
+        "title": "every knight (1)",
+        "selected": false
+      },
+      {
+        "value": "kind:lantern_spirit",
+        "title": "every lantern spirit (1)",
+        "selected": false
+      }
+    ],
+    "actions": [
+      {
+        "operation": "choose_mind",
+        "whom": null,
+        "mind": "model:nebius_token_factory/example/nano"
+      }
+    ],
+    "facts": {
+      "asked": 3,
+      "bound": 8,
+      "run_now": 7
+    }
+  },
+  "refusal": null,
+  "capabilities": null,
+  "proposal_speech": null,
+  "clock": null,
+  "execution": {
+    "prompt_version": "action-plan-11",
+    "calls": [],
+    "rejections": []
+  },
+  "names": {}
+}

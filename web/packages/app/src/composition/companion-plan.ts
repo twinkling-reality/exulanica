@@ -37,7 +37,9 @@ import { PLAN_ACTIONS, plannedEntry, plannedRequest, stepAnswer } from '../ui/ac
 import { performPlanned, type ActionHost } from '../ui/actions/surfaces.js';
 import { plannedStepView, thePlace, type PlanSheet, type PlanStepView } from '../ui/companion-plan.js';
 import { OBJECT_ROLE_LABELS, isObjectRole } from '../world-objects-api.js';
-import { PLAN_WAITED, PLAN_WORDS, planRefusalWords, prepareFailureWords } from '../ui/words/companion-plan.js';
+import {
+  MIND_GREW, PLAN_WAITED, PLAN_WORDS, midRunQuestionWords, planRefusalWords, prepareFailureWords,
+} from '../ui/words/companion-plan.js';
 
 /**
  * The codes a step asking one of the world's beings is prepared with while it must wait for the
@@ -284,6 +286,24 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
             again = await client.prepare(current(), [step.action]);
           }
           sending = again.outcome === 'plan' ? again.steps[0] ?? null : null;
+          // A question in the middle of a plan (a later choice now past the world's head count)
+          // is said in its own words; its answer is another plan, asked for on its own.
+          if (again.outcome === 'clarify' && again.clarification !== null) {
+            deps.sheet.setStep(step.index, {
+              kind: 'not-done', words: midRunQuestionWords(again.clarification.code, again.clarification.facts),
+              code: again.clarification.code,
+            });
+            stopped = true;
+            continue;
+          }
+          // A later choice of a mind was confirmed with what the sheet showed of it: one that would
+          // now name more beings, or that the sheet showed nothing of, is not sent.
+          if (sending !== null && step.action.operation === 'choose_mind' && sending.state === 'prepared'
+            && (step.mind === null || sending.mind === null || sending.mind.subjects > step.mind.subjects)) {
+            deps.sheet.setStep(step.index, { kind: 'not-done', words: MIND_GREW, code: 'mind_choice_grew' });
+            stopped = true;
+            continue;
+          }
           if (sending !== null && sending.state === 'pending') {
             deps.sheet.setStep(step.index, { kind: 'not-done', words: PLAN_WAITED, code: sending.code });
             stopped = true;

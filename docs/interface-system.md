@@ -521,8 +521,23 @@ read every 15 seconds while any waits (`composition/piece-requests.ts`): the sta
 new pieces for the well. The piece maker runs until 19:30." (or that it waits for the piece maker to
 start), and each outcome is said once: arrived, with Take back; not used, and why; or not made.
 
-Two entries exist only as plan steps (placement `companion`): Add a thing (`things.place`) and Ask
-someone (`people.direct`). Their rows say the step in words from the names the server's reads gave
+Another, Choose who decides (`minds.choose`), records who decides for a being or a group
+(`POST /world/versions/{version_id}/models/{role_key}`, the request Who decides sends). Its row says
+the mind and whom it decides for ("Nemotron 3 Nano 30B decides for every villager", "Knight: their
+own routine"), and before the one Confirm the sheet states what the step says of the choice
+(`mindChoiceWords` in `ui/words/companion-plan.ts`): how many beings it is for, how many were left
+out and why, that choosing asks no model, the most a simulated minute may cost while the world
+plays and the world's hourly ceilings, or that no AI is asked for their own routine, or that this
+server does not ask the model here now. A choice past the number of beings models run here at once
+is a question with its figures and the groups that fit ("You asked for 9, and AI models decide for
+at most 8 beings here at once. Who instead?"). Each mind step of a plan has its own line, a later
+one as well as the first, and a dollar bound is rounded up at the precision shown, never below
+itself. A later mind step that would name more beings when it is sent than its line said, or that
+then needs a question answered, is not sent and says so. Who decides and the thing card show the
+new mind at their next read of the world's models.
+
+Two more entries exist only as plan steps (placement `companion`): Add a thing (`things.place`) and
+Ask someone (`people.direct`). Their rows say the step in words from the names the server's reads gave
 it (`step.titles`, `thingDetail` in `ui/companion-plan.ts`): "Lantern, beside Knight", "Knight, go
 to the well", "Knight, give the sword to Traveller"; an activity's words are the activity catalog's,
 and a step the server could not name fully shows no detail rather than half a sentence. A step asking

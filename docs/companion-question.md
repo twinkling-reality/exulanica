@@ -655,6 +655,7 @@ saved-entry lock and refusal as the same operation sent directly, because it is 
 | Bring people into a world with none | none | `POST .../society` |
 | Add a thing by its kind, beside something named or where the person points | none; the route's own checks run in process | `POST .../things` |
 | Ask one of the world's beings to go to a place or use it, or to pick up, put down, give or take a thing | none; the step is prepared again just before it is sent | `POST .../society/actions` |
+| Choose who decides for a being, a kind, a role or everyone: an open model, or their own routine | none; the choice record's own checks run with no lock and record nothing | `POST .../models/{role_key}` |
 
 A plan names each step's route key, path values, body, the permissions its route declares, the
 version pins (`base_state_sha256` and `edit_seq`), the authority's preview document and its digest,
@@ -663,13 +664,15 @@ operation from the fixed vocabulary above or `other`, and options from the reads
 makes, the reviewed kinds a person may place, the kinds of thing an author may add, the version's
 objects and placed things offered by opaque label so a client-chosen id never reaches a hosted
 request, the society's beings and the places they use (a town's premises and benches by the name
-and number the town gives them), and the published arrangements. Positions
+and number the town gives them), the groups the society holds and the minds a being may be given,
+and the published arrangements. Positions
 come from the page's placement or viewer context, or from what a thing is put beside, and the
 origin role of anything added is the person's stated choice. What is missing is asked about before
 anything is prepared (`asset_ambiguous`, `object_ambiguous`, `object_required`,
 `arrangement_ambiguous`, `origin_role_required`, `placement_required`, `viewer_required`,
 `kind_ambiguous`, `anchor_ambiguous`, `being_required`, `being_ambiguous`, `place_required`,
-`place_ambiguous`, `thing_ambiguous`); the answer goes to `POST /selection/actions/prepare`
+`place_ambiguous`, `thing_ambiguous`, `whom_required`, `whom_ambiguous`, `mind_required`,
+`mind_ambiguous`, `too_many_people_for_models`); the answer goes to `POST /selection/actions/prepare`
 (`world.read`, no model),
 which validates typed actions as any direct body is validated.
 
@@ -780,9 +783,9 @@ that paused a playing world and stopped before playing it again leaves it paused
 Bringing people in reads back the version's society in the region the step named, when the step's
 answer names it.
 
-Behaviour changes, photo point maps, environment instances, model choices, comparisons, character
-and thing looks, style rollback, interaction policy, sending people away or bringing them back,
-and playing a being are not prepared by the Companion: the drafter's form has no slot for them, so
+Behaviour changes, photo point maps, environment instances, a traffic light's model, comparisons,
+character and thing looks, style rollback, interaction policy, sending people away or bringing them
+back, and playing a being are not prepared by the Companion: the drafter's form has no slot for them, so
 a request for one is refused `action_not_offered`. Conversation and remembered context never make a
 step permitted, and the planner imports neither the interaction-policy plane nor stored
 conversation (`tests/test_companion_action_policy_boundary.py`). Scripted tests hold the mechanics;
@@ -791,8 +794,9 @@ each step's options moved last under a 640-token ceiling, are in
 [evidence and limits](#evidence-and-limits). The later binds the prompt `action-plan-5`; the
 prompt `action-plan-9` adds things and beings and a being's hands acts, asks each step's
 options to name what a thing goes beside or where a being goes as well as what is added or asked
-(what stands in the world by its listed label; a visit to a place as using it); the current prompt,
-`action-plan-10`, adds new pieces of the world's look. Neither is measured by those records.
+(what stands in the world by its listed label; a visit to a place as using it); `action-plan-10`
+adds new pieces of the world's look; the current prompt, `action-plan-11`, adds who decides for a
+being or a group. None of the three is measured by those records.
 
 ### Things and beings
 
@@ -878,6 +882,58 @@ step that cannot be asked carries the reason as its code: `look_not_served` for 
 look pieces can be made in, `look_without_style_words` for a look without generation style words
 yet, and `no_piece_needed` when every thing asked for has pieces already. `titles` names the kinds asked. The step reads back as the
 piece requests its answer names.
+
+### Who decides
+
+Who decides for a society's beings is asked as `choose_mind`, the request
+`POST /world/versions/{version_id}/models/{role_key}` takes for the role that decides for people
+([decision roles](decision-roles-contract.md)): an open model the server offers that role, or their
+own routine, for one being or for a group. The drafter names the being or the group, and the mind;
+several beings or groups are a step each. Taking a mind back is the same step naming the routine.
+
+The groups are read from the society's own state when the plan is made
+([action_minds.py](../exulanica/selection/action_minds.py)): everyone here, each kind of being
+present, and each role present whose people are not exactly a kind's, each offered with how many it
+holds. Nothing names a kind or a role in code, so a world's groups are whatever its people are, and
+a step states the groups its world holds (`mind.groups_here`). A role is the word the society's own
+state gives a person; what that word rests on is its engine's
+([society contract](synthetic-society-contract.md)). A kind of thing named in the step
+stands for the group of that kind here. A group becomes the ids of its members when the step is
+prepared, so a being that arrives later is not chosen for by an earlier step; one choice names at
+most the 512 subjects the route's body takes.
+
+The route has no preview, so the choice record's own checks run with no lock and record nothing
+(`SocietyModelChoiceRepository.preview_choice`, the checks a recorded choice is refused by, in
+their order). Whoever a choice may not name is left out and counted by the code a choice naming it
+alone is refused by (`mind.left_out`: `being_played`, `decided_from_outside`,
+`decider_not_allowed`, `person_not_in_this_world`, `subject_chosen_under_another_role`); a step
+left naming nobody is `blocked` with that code, and a choice the route refuses whole is `blocked`
+with the route's code (`engine_takes_no_model_choice`, `model_not_offered`). A choice that would
+run more beings by models than the society's contract allows is never trimmed: where another group
+this world holds would fit, the plan asks which instead (`too_many_people_for_models`, with the
+number asked for, the bound and how many models run now, as `facts`), and with nothing that fits
+the step is `blocked` with `too_many_model_people`. A group the society no longer holds is
+`group_not_here`, a model no longer offered `mind_not_offered`.
+
+The step always needs the person's yes. Choosing asks no model; playing the world then asks a
+chosen model at each of a being's own choice points. A step naming a model says so (`spends:
+true`) and carries `cost`: per simulated minute, the most the choice may reserve (the figure the
+playback host reserves for one answer of that model under the society's contract, once for each
+being named), no typical figure while no record holds one for the world (`usd_typical` null), and
+the world's own ceilings an hour, in dollars and in decisions, past which the routine decides
+whatever was chosen. Where this host asks no model for the world, or none of the chosen model's
+provider, the step says why by code (`mind.host_refusal`, `mind.model_refusal`): the choice is
+recorded and the routine decides until the host asks. A step naming the routine spends nothing and
+carries no cost. A choice after the first step of a plan is confirmed by the same yes, so it
+states the same on the plan as the world stands when the plan is made (`mind`, `cost`, `spends` on
+the pending step; one the route would refuse then is `blocked` and the plan is not confirmed); it
+is prepared again just before it is sent, and the page does not send one that would then name more
+beings than the sheet showed, nor one that then needs a question answered. Where the workspace's
+allowance for the model's provider is used up, the model says so (`mind.model_refusal`) and no
+cost is stated. The request's key follows the society's newest choice, so a plan sent twice
+answers the choice it recorded and the same words asked again later record a new one. `titles`
+names whom and the mind. The step reads back as the choice its answer names (`choice_seq`),
+recorded by the caller under the step's key for the subjects and the mind it named.
 
 ### The browser's path
 

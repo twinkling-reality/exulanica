@@ -7,7 +7,7 @@
  */
 
 import type { RefusalWords } from '../actions/registry.js';
-import type { PieceEstimate } from '../../companion-actions-api.js';
+import type { MindCost, MindFacts, PieceEstimate } from '../../companion-actions-api.js';
 
 export const PLAN_WORDS = Object.freeze({
   title: 'Check this plan',
@@ -106,7 +106,23 @@ export const PLAN_CLARIFY_WORDS: Readonly<Record<string, string>> = Object.freez
   place_required: 'Where should they go?',
   place_ambiguous: 'Which place did you mean?',
   thing_ambiguous: 'Which thing did you mean?',
+  whom_required: 'Who should it decide for? Choose a group here, or select someone in the world and ask again.',
+  whom_ambiguous: 'Who did you mean?',
+  mind_required: 'Which mind should decide for them?',
+  mind_ambiguous: 'Which mind did you mean?',
+  too_many_people_for_models: 'That is more beings than AI models run in this world at once. Who instead?',
 });
+
+/**
+ * The question a choice past the world's bound asks, with its figures where the plan states them:
+ * how many were asked for, how many AI models may run here at once, and how many they run now.
+ */
+export function tooManyForModelsWords(facts: Readonly<Record<string, number>>): string {
+  const asked = facts['asked']; const bound = facts['bound']; const running = facts['run_now'];
+  if (asked === undefined || bound === undefined) return PLAN_CLARIFY_WORDS['too_many_people_for_models']!;
+  const now = running === undefined || running === 0 ? '' : `, and ${running} ${running === 1 ? 'has' : 'have'} one already`;
+  return `You asked for ${asked}, and AI models decide for at most ${bound} beings here at once${now}. Who instead?`;
+}
 
 /**
  * A question asked of one slot rather than of the code's usual one: `being_required` on a give or
@@ -123,6 +139,82 @@ export const PLAN_HANDS_WORDS: Readonly<Record<string, string>> = Object.freeze(
   give: '{subject}, give the {thing} to {with}',
   take: '{subject}, take the {thing} from {with}',
 });
+
+/** Why some of a group were left out of a choice, by the models route's own code. */
+const MIND_LEFT_OUT: Readonly<Record<string, string>> = Object.freeze({
+  being_played: 'someone is playing them',
+  decided_from_outside: 'a program from outside this world decides for them',
+  decider_not_allowed: 'their kind cannot be given this kind of mind',
+  person_not_in_this_world: 'they are not here any more',
+  subject_chosen_under_another_role: 'a model already decides for them in another way',
+});
+
+/** US dollars from a decimal string, small sums kept: "$0.25", "$0.0031", "under $0.0001". */
+function smallDollarsWords(usd: string): string {
+  const value = Number(usd);
+  if (value >= 0.01) return `$${value.toFixed(2)}`;
+  return value < 0.0001 ? 'under $0.0001' : `$${value.toFixed(4)}`;
+}
+
+/**
+ * A bound in US dollars, never said below itself: rounded up at the precision shown (cents from a
+ * cent up, a hundredth of a cent below), so "at most $0.02" holds for a bound of $0.0149.
+ */
+export function atMostDollarsWords(usd: string): string {
+  // Counted in whole digits of the decimal string, so no binary fraction can round a bound down.
+  const [whole = '0', fraction = ''] = usd.split('.');
+  const up = (places: number): string => {
+    const kept = Number(`${whole}${fraction.padEnd(places, '0').slice(0, places)}`);
+    const more = /[1-9]/u.test(fraction.slice(places));
+    return ((kept + (more ? 1 : 0)) / 10 ** places).toFixed(places);
+  };
+  const value = Number(usd);
+  if (value >= 0.01) return `$${up(2)}`;
+  return value <= 0 ? '$0.00' : `$${up(4)}`;
+}
+
+/** A later mind step that names more beings when it is sent than the sheet showed: never sent. */
+export const MIND_GREW: RefusalWords = {
+  happened: 'This world changed since you checked the plan: that choice would now name more beings than you were shown.',
+  next: 'Nothing more was changed. Ask again to see what it comes to now.',
+};
+
+/** A question the plan needs answered in the middle of carrying it out, by its code. */
+export function midRunQuestionWords(code: string, facts: Readonly<Record<string, number>>): RefusalWords {
+  const question = code === 'too_many_people_for_models' ? tooManyForModelsWords(facts)
+    : PLAN_CLARIFY_WORDS[code] ?? PLAN_CLARIFY_WORDS['asset_ambiguous']!;
+  return { happened: `This step needs an answer first: ${question}`, next: 'Nothing more was changed. Ask for it on its own.' };
+}
+
+/** A mind step's row: "Nemotron 3 Nano 30B decides for every villager", "Knight: their own routine". */
+export function mindDetailWords(whom: string, mind: string, routine: boolean): string {
+  return routine ? `${whom.charAt(0).toUpperCase()}${whom.slice(1)}: ${mind}` : `${mind} decides for ${whom}`;
+}
+
+/**
+ * What a choice of who decides comes to, said before the yes: how many beings it names, who was
+ * left out and why, what a model may cost while the world plays (at most, by the host's own
+ * reservation; the world's hourly ceilings) or that no AI is asked, and whether this server asks
+ * models here at all. Choosing asks no model; playing the world does.
+ */
+export function mindChoiceWords(facts: MindFacts, cost: MindCost | null, routine: boolean): string {
+  const count = `${facts.subjects} being${facts.subjects === 1 ? '' : 's'}`;
+  const left = Object.entries(facts.leftOut).map(([code, number]) =>
+    `${number} left out because ${MIND_LEFT_OUT[code] ?? 'they cannot be chosen for now'}`);
+  const who = `This is for ${count}${left.length === 0 ? '' : ` (${left.join('; ')})`}.`;
+  if (routine) return `${who} No AI is asked and nothing is spent.`;
+  if (facts.hostRefusal !== null || facts.modelRefusal !== null) {
+    return `${who} This server does not ask this model here now, so they keep their own routine until it does. The choice is kept.`;
+  }
+  if (cost === null) return `${who} Choosing asks no model. While the world plays, each is asked at their own choices, which can cost money.`;
+  const ceiling = cost.usdPerWorldHour === null ? ''
+    : ` This world stops asking models at ${smallDollarsWords(cost.usdPerWorldHour)}`
+      + `${cost.decisionsPerWorldHour === null ? '' : ` or ${cost.decisionsPerWorldHour} decisions`} an hour, whatever is chosen.`;
+  const typical = cost.usdTypical === null ? ' No typical figure is measured for this world yet.'
+    : ` Typically about ${smallDollarsWords(cost.usdTypical)}.`;
+  return `${who} Choosing asks no model. While the world plays, at most ${atMostDollarsWords(cost.usdAtMost)} a simulated minute `
+    + `(at most ${atMostDollarsWords(cost.usdPerAnswerAtMost)} each time a being is asked, at most once a minute).${typical}${ceiling}`;
+}
 
 export function planRefusalWords(code: string): RefusalWords {
   return PLAN_REFUSAL_WORDS[code] ?? PLAN_REFUSED;

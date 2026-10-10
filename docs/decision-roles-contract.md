@@ -249,6 +249,14 @@ anything else is checked, so it still returns after its model stops being offere
 process can reach the model's provider, or the program's door, is the host's to say, never a reason
 to refuse the choice: a choice outlives a deployment.
 
+What a choice would meet may be read before it is sent:
+`SocietyModelChoiceRepository.preview_choice` runs the checks a recorded choice is refused by, in
+their order, with no lock and recording nothing, and answers the subjects a choice may name, every
+other subject under the code a choice naming it alone is refused by, how many subjects models run
+now and would run after against the bound, and the society's newest choice. The Companion's plan
+step for a mind rests on it ([world actions](companion-question.md#who-decides)); the route stays
+the authority when the choice is sent, since the world may move in between.
+
 `GET` at the same path, with `world.read`, returns the models the person's role is offered, in plain
 words with whether this process can ask each; whether this host asks models for the world at all,
 and why not (`host_refusal`: `models_not_run_here`, `provider_credential_absent`,

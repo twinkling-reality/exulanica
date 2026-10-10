@@ -39,8 +39,10 @@ const PAGE: ActionPageContext = {
 const everything: OperationDescriptors = parseWorldCapabilities({
   profile: 'exulanica.world-capabilities/v1', world_id: 'world:test', version_id: 'v', kind: 'authored-starter',
   society: { held: true, engine: 'exulanica-society/v2' },
-  operations: [...new Set(ACTIONS.flatMap((spec) => (spec.operation === undefined ? [] : [spec.operation])))]
-    .map((operation) => ({ operation, bind: {}, permitted: true, state: 'available', code: null, spends: false,
+  // One descriptor for each operation, bound as its entry binds it (the models route is listed for a role).
+  operations: [...new Map(ACTIONS.flatMap((spec) => (spec.operation === undefined ? []
+    : [[spec.operation, spec.bind ?? {}] as const]))).entries()]
+    .map(([operation, bind]) => ({ operation, bind, permitted: true, state: 'available', code: null, spends: false,
       writes: true, effects: [], dependencies: [], preview: null })),
 });
 
@@ -565,5 +567,50 @@ describe('a plan of things', () => {
     expect(stepStates(h.sheet)).toEqual(['not-done']);
     expect(h.sheet.root.querySelector('.companion-plan-step-held')?.textContent)
       .toBe('The world did not move on, so this step was not sent. Play the world, or move it on a minute, then ask again.');
+  });
+});
+
+describe('two minds chosen under one Confirm', () => {
+  // The planner's own two-step plan (tests/test_companion_minds_plan.py's world): the second step
+  // was shown as for 2 beings.
+  const later = (subjects: number): unknown => {
+    const drafted = fixture('mind-two-steps-plan') as { steps: Record<string, unknown>[] };
+    const step = drafted.steps[1]!;
+    return { ...drafted, steps: [{
+      ...step, index: 0, state: 'prepared', bind: { ...(step['bind'] as Record<string, unknown>), role_key: 'society_decision' },
+      body: { idempotency_key: '00000000-0000-5000-8000-000000000002', subjects: Array.from({ length: subjects }, (_, i) => `s-${i}`), model: null },
+      mind: { ...(step['mind'] as Record<string, unknown>), subjects },
+    }] };
+  };
+
+  it('sends the later choice when it names no more beings than the sheet showed', async () => {
+    const h = harness({ plan: async () => fixture('mind-two-steps-plan'), prepare: async () => later(2), send: async () => ({ choice_seq: 5 }) });
+    await h.plans.route('nano for the knight and for the villagers');
+    expect(h.sheet.root.querySelectorAll('.companion-plan-estimate[data-kind="mind"]').length).toBe(2);
+    await confirmAndWait(h);
+    expect(h.sent.map((request) => request.actionId)).toEqual(['minds.choose', 'minds.choose']);
+    expect(stepStates(h.sheet)).toEqual(['done', 'done']);
+  });
+
+  it('does not send a later choice that would now name more beings than the sheet showed', async () => {
+    const h = harness({ plan: async () => fixture('mind-two-steps-plan'), prepare: async () => later(3), send: async () => ({ choice_seq: 5 }) });
+    await h.plans.route('nano for the knight and for the villagers');
+    await confirmAndWait(h);
+    expect(h.sent.map((request) => request.actionId)).toEqual(['minds.choose']);
+    expect(stepStates(h.sheet)).toEqual(['done', 'not-done']);
+    expect(h.sheet.root.textContent).toContain('more beings than you were shown');
+  });
+
+  it('says a question that comes up in the middle of the plan in its own words', async () => {
+    const h = harness({
+      plan: async () => fixture('mind-two-steps-plan'), prepare: async () => fixture('mind-too-many'),
+      send: async () => ({ choice_seq: 5 }),
+    });
+    await h.plans.route('nano for the knight and for the villagers');
+    await confirmAndWait(h);
+    expect(h.sent.length).toBe(1);
+    expect(stepStates(h.sheet)).toEqual(['done', 'not-done']);
+    expect(h.sheet.root.textContent).toContain('at most 8 beings here at once');
+    expect(h.sheet.root.textContent).not.toContain('Try saying it another way');
   });
 });

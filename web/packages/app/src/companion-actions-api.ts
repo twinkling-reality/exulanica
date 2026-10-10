@@ -36,6 +36,39 @@ export interface StepAnswer {
   readonly request_id?: string;
   /** The piece requests an ask for new pieces was answered with, in its order. */
   readonly piece_request_ids?: readonly string[];
+  /** The choice a mind choice was answered with, by its sequence in its society. */
+  readonly choice_seq?: number;
+}
+
+/**
+ * What a choice of who decides comes to, stated on its step before the yes: how many beings it
+ * names, who is left out and why by the models route's own code, how many beings models run now
+ * and after against the world's bound, and why this host asks no model where it asks none.
+ */
+export interface MindFacts {
+  readonly subjects: number;
+  readonly leftOut: Readonly<Record<string, number>>;
+  readonly runNow: number | null;
+  readonly runAfter: number | null;
+  readonly bound: number | null;
+  readonly hostRefusal: string | null;
+  readonly modelRefusal: string | null;
+  /** The groups this world holds, as its society's own state gives them. */
+  readonly groupsHere: readonly { readonly value: string; readonly title: string; readonly count: number }[];
+}
+
+/**
+ * What a chosen model may cost while the world plays: the most by the host's own reservation for
+ * one answer and for every being named in one simulated minute, a typical figure only where a
+ * record holds one, and the world's own ceilings an hour.
+ */
+export interface MindCost {
+  readonly subjects: number;
+  readonly usdPerAnswerAtMost: string;
+  readonly usdAtMost: string;
+  readonly usdTypical: string | null;
+  readonly usdPerWorldHour: string | null;
+  readonly decisionsPerWorldHour: number | null;
 }
 
 /**
@@ -88,6 +121,9 @@ export interface PlanStep {
   readonly titles: Readonly<Record<string, string>>;
   /** For a step asking for new pieces, what they would take, stated before the yes; null otherwise. */
   readonly estimate: PieceEstimate | null;
+  /** For a mind chosen, what the choice comes to and what it may cost; null otherwise. */
+  readonly mind: MindFacts | null;
+  readonly cost: MindCost | null;
   /** The step as the server sent it, for the outcome read and the technical record. */
   readonly raw: Readonly<Record<string, unknown>>;
 }
@@ -112,6 +148,8 @@ export interface PlanClarification {
   readonly slot: string | null;
   readonly candidates: readonly ClarificationCandidate[];
   readonly actions: readonly Readonly<Record<string, unknown>>[];
+  /** The figures a question rests on, where the plan states any (how many were asked, the bound). */
+  readonly facts: Readonly<Record<string, number>>;
 }
 
 export interface ActionPlan {
@@ -207,7 +245,59 @@ function parseStep(value: unknown): PlanStep {
       row['titles'] !== null && typeof row['titles'] === 'object' ? row['titles'] as Record<string, unknown> : {},
     ).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))),
     estimate: pieceEstimate(row['estimate']),
+    mind: mindFacts(row['mind']),
+    cost: mindCost(row['cost']),
     raw: Object.freeze({ ...row }),
+  });
+}
+
+const whole = (value: unknown): number | null =>
+  (typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null);
+const dollars = (value: unknown): string | null =>
+  (typeof value === 'string' && /^\d+(\.\d+)?$/u.test(value) ? value : null);
+
+/** A mind step's facts, or null where the step states none; a field it does not know is passed over. */
+function mindFacts(value: unknown): MindFacts | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  const subjects = whole(row['subjects']);
+  if (subjects === null) return null;
+  const left = row['left_out'] !== null && typeof row['left_out'] === 'object' ? row['left_out'] as Record<string, unknown> : {};
+  return Object.freeze({
+    subjects,
+    leftOut: Object.freeze(Object.fromEntries(Object.entries(left)
+      .flatMap(([code, count]) => (whole(count) === null || count === 0 ? [] : [[code, count as number]])))),
+    runNow: whole(row['run_now']),
+    runAfter: whole(row['run_after']),
+    bound: whole(row['bound']),
+    hostRefusal: nullableText(row['host_refusal']),
+    modelRefusal: nullableText(row['model_refusal']),
+    groupsHere: Object.freeze((Array.isArray(row['groups_here']) ? row['groups_here'] : []).flatMap((group) => {
+      if (group === null || typeof group !== 'object') return [];
+      const found = group as Record<string, unknown>;
+      const count = whole(found['count']);
+      return typeof found['value'] === 'string' && typeof found['title'] === 'string' && count !== null
+        ? [Object.freeze({ value: found['value'], title: found['title'], count })] : [];
+    })),
+  });
+}
+
+/** A mind step's cost, or null where it states none or one that does not read whole. */
+function mindCost(value: unknown): MindCost | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  const subjects = whole(row['subjects']);
+  const one = dollars(row['usd_per_answer_at_most']);
+  const most = dollars(row['usd_at_most']);
+  if (row['per'] !== 'simulated_minute' || subjects === null || one === null || most === null) return null;
+  const ceilings = row['ceilings'] !== null && typeof row['ceilings'] === 'object' ? row['ceilings'] as Record<string, unknown> : {};
+  return Object.freeze({
+    subjects,
+    usdPerAnswerAtMost: one,
+    usdAtMost: most,
+    usdTypical: dollars(row['usd_typical']),
+    usdPerWorldHour: dollars(ceilings['usd_per_world_hour']),
+    decisionsPerWorldHour: whole(ceilings['decisions_per_world_hour']),
   });
 }
 
@@ -261,6 +351,10 @@ export function parseActionPlan(value: unknown): ActionPlan {
       })),
       actions: Object.freeze((Array.isArray(clarification['actions']) ? clarification['actions'] : [])
         .map((a) => Object.freeze({ ...record(a, 'clarification action') }))),
+      facts: Object.freeze(Object.fromEntries(Object.entries(
+        clarification['facts'] !== null && typeof clarification['facts'] === 'object'
+          ? clarification['facts'] as Record<string, unknown> : {},
+      ).filter((entry): entry is [string, number] => typeof entry[1] === 'number'))),
     }),
     refusal: refusal === null ? null : Object.freeze({
       code: text(refusal['code'], 'refusal code'),

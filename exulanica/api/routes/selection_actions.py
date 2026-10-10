@@ -45,6 +45,7 @@ from exulanica.api.dependencies import (
     ScopedConnection,
     get_services,
 )
+from exulanica.api.mind_offer import world_minds
 from exulanica.api.permissions import Permission, Requires, rule_for
 from exulanica.api.routes.capabilities import version_capabilities_document
 from exulanica.api.routes.selection import ExecutionView, _execution, _require_model
@@ -142,6 +143,7 @@ class TypedActionBody(BaseModel):
         "place_arrangement",
         "place_thing",
         "direct_thing",
+        "choose_mind",
     ]
     asset_key: str | None = Field(default=None, max_length=200, pattern=r"^[a-z][a-z0-9.-]*$")
     object_id: str | None = Field(default=None, max_length=200, pattern=OBJECT_ID_PATTERN)
@@ -159,6 +161,11 @@ class TypedActionBody(BaseModel):
     subject_id: str | None = Field(default=None, max_length=200)
     target_id: str | None = Field(default=None, max_length=1000)
     with_id: str | None = Field(default=None, max_length=200)
+    #: A mind chosen: whom for (``being:`` and an id, or a group the society holds: ``everyone``,
+    #: ``kind:`` or ``role:`` and a key) and which (``routine``, or ``model:``, a provider, ``/``
+    #: and a model id).
+    whom: str | None = Field(default=None, min_length=1, max_length=300)
+    mind: str | None = Field(default=None, min_length=1, max_length=300)
 
 
 class TypedSimulationBody(BaseModel):
@@ -213,6 +220,7 @@ OutcomeOperation = Literal[
     "POST /world/versions/{version_id}/society/control/steps",
     "POST /world/versions/{version_id}/society",
     "POST /world/piece-requests",
+    "POST /world/versions/{version_id}/models/{role_key}",
 ]
 
 
@@ -230,6 +238,8 @@ class OutcomePinsBody(BaseModel):
     control_revision: int | None = Field(default=None, ge=0)
     tick: int | None = Field(default=None, ge=0)
     society_state_sha256: str | None = Field(default=None, pattern=_SHA256)
+    #: A mind choice's step: the society's newest choice when the plan was made.
+    choice_seq: int | None = Field(default=None, ge=0)
 
 
 class OutcomeAnswerBody(BaseModel):
@@ -257,6 +267,8 @@ class OutcomeAnswerBody(BaseModel):
     request_id: uuid.UUID | None = None
     #: The piece requests an ask for new pieces was answered with, by their ids, in its order.
     piece_request_ids: list[uuid.UUID] | None = Field(default=None, max_length=16)
+    #: The choice a mind choice was answered with, by its sequence in its society.
+    choice_seq: int | None = Field(default=None, ge=1)
 
 
 class OutcomeStepBody(BaseModel):
@@ -321,6 +333,10 @@ class ActionClarificationView(BaseModel):
     #: The typed actions as drafted, the open slot null: sent to ``/selection/actions/prepare``
     #: with it filled.
     actions: list[dict[str, JsonValue]]
+    #: The figures a question rests on, where it has any: for a choice that would run more beings
+    #: by models than the world allows, how many were asked for, the bound, and how many models
+    #: run now; absent otherwise.
+    facts: dict[str, JsonValue] | None = None
 
 
 class ActionStepView(BaseModel):
@@ -363,6 +379,15 @@ class ActionStepView(BaseModel):
     #: route's own estimate (items, seconds warm and from a start, US dollars typically and at
     #: most, the provider and where the figures come from); absent otherwise.
     estimate: dict[str, JsonValue] | None = None
+    #: For a mind chosen, what the choice comes to before the person confirms: how many beings it
+    #: names, who is left out and why by the route's own code, how many beings models run now and
+    #: after against the world's bound, why this host asks no model where it asks none, and the
+    #: groups this world holds; absent otherwise.
+    mind: dict[str, JsonValue] | None = None
+    #: For a step that leads to spending, what it may cost: per what, the provider, the most by
+    #: the spender's own reservation, the typical figure where a record holds one (else null),
+    #: and the world's own hourly ceilings; absent otherwise.
+    cost: dict[str, JsonValue] | None = None
     replay: str
     receipt: str
     compensation: dict[str, str] | None
@@ -594,6 +619,9 @@ def plan_actions(
         clock=_clock_reader(connection, session, world_id, body.version_id),
         society=_society_reader(request, scoped, session, world_id, body.version_id),
         pieces=world_pieces(connection, session.workspace_id, world_id),
+        minds=world_minds(
+            connection, session.workspace_id, world_id, body.version_id, get_services(request)
+        ),
     )
     return _view(
         planned.document,
@@ -627,6 +655,9 @@ def prepare_actions(
         previewer=_previewer(request, session, held, world_id),
         clock=_clock_reader(connection, session, world_id, body.version_id),
         society=_society_reader(request, scoped, session, world_id, body.version_id),
+        minds=world_minds(
+            connection, session.workspace_id, world_id, body.version_id, get_services(request)
+        ),
     )
     return _view(document, _execution((), (), prompt_version=ACTION_PROMPT_VERSION), {})
 

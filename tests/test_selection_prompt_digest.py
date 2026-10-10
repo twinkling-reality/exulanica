@@ -54,6 +54,10 @@ PINNED = {
     # `action-plan-10`: the world-edit drafter may ask for new pieces of how kinds of thing look
     # (`request_pieces`), and the classifier counts that as a world edit.
     "action-plan-10": "54f46a55581c758b1f8f76878d845a275b2f36dae751de645ec791a5f5bbcf3c",
+    # `action-plan-11`: the world-edit drafter may say who decides for a being or a group of them
+    # (`choose_mind`: a listed model or their own routine), and the classifier counts that as a
+    # world edit.
+    "action-plan-11": "0e116a6d36677840f24714416717933f54ec14d1113a3b6a7a78f4c6534c941b",
     # The appearance drafter for a design choice drawn from no evidence; its own family, so the
     # evidence drafter's texts and `proposal-4` are untouched.
     "proposal-authored-1": "7b840134c24bc8152ab423f0665362b1d37bdd3cfb9b96cf208cfc6a46308d9a",
