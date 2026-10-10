@@ -489,6 +489,7 @@ export function buildWorldRecipes(options: {
       await loaded;
       const next = specification?.presets.find((offered) => offered.key === presetKey);
       if (next === undefined) {
+        status.textContent = 'This world recipe is not available. Choose one of the available recipes.';
         return { code: 'unknown_world_recipe', key: presetKey, detail: `no world recipe is named ${JSON.stringify(presetKey)}` };
       }
       choose(next);

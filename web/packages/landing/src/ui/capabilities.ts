@@ -1,30 +1,19 @@
-/** Two supported paths through a world: make it, then run and compare it. */
+/** World creation, editing, inspection and agents share one saved state. */
+import { buildEditorialPage } from './editorial-page.js';
+import { buildWorldShowcase } from './world-showcase.js';
 
-import { el } from './dom.js';
-
-export function buildCapabilities(): HTMLElement {
-  return el('section', {
-    id: 'capabilities',
-    class: 'pane pane-information pane-capabilities',
-    tabindex: '-1',
-    'aria-labelledby': 'capabilities-title',
-  }, [
-    el('article', { class: 'reading-space' }, [
-      el('h1', { id: 'capabilities-title', class: 'sr-only', text: 'Capabilities' }),
-      el('section', { class: 'capability-section', 'aria-labelledby': 'capability-world' }, [
-        el('h2', { id: 'capability-world', class: 'capability-heading', text: 'Build a world' }),
-        el('p', {
-          class: 'reading-copy',
-          text: 'Start with a saved place or a town recipe. Add supported objects, shape its appearance, and inspect what exists and where it came from.',
-        }),
-      ]),
-      el('section', { class: 'capability-section', 'aria-labelledby': 'capability-agents' }, [
-        el('h2', { id: 'capability-agents', class: 'capability-heading', text: 'Run and compare models' }),
-        el('p', {
-          class: 'reading-copy',
-          text: 'Choose an available open model for a person or group. Exulanica validates and records its decisions. Paired runs begin from the same saved version, so you can inspect what each model did differently.',
-        }),
-      ]),
-    ]),
-  ]);
+export function buildCapabilities(options: { atlasHref: string | null } = { atlasHref: null }): HTMLElement {
+  return buildEditorialPage({
+    id: 'capabilities', title: 'A place to make your own.',
+    introduction: 'Create a world, develop its surroundings, and choose the intelligence within it. Keep the result and return to it.',
+    links: [{ href: '/docs/world-api', label: 'World API' }, { href: '/developers', label: 'Developer Overview' }],
+    feature: buildWorldShowcase(options),
+    sections: [
+      { id: 'capability-create', title: 'Create', copy: 'Choose a supported world type, configure its settings, and save the result.' },
+      { id: 'capability-edit', title: 'Shape', copy: 'Place and move objects, adjust supported appearances and behaviors, and undo object edits.' },
+      { id: 'capability-inspect', title: 'Understand', copy: 'Inspect properties, edit history, events, and recorded agent decisions.' },
+      { id: 'capability-agents', title: 'Connect', copy: 'Choose an available open model or connect your own agent. Control access and review its actions.' },
+    ],
+    note: 'Controls depend on the world type and its content. Imported objects do not automatically gain behavior or become editable in every detail.',
+  });
 }

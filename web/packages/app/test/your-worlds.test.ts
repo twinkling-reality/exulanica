@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildYourWorlds, onlyUntouchedStarter } from '../src/composition/world-entry.js';
+import { entryRecipe, matchingRecipeEntry } from '../src/world-entry-intent.js';
 import { worldPicture } from '../src/composition/world-pictures.js';
 import type { SavedWorldEntry } from '../src/world-entry-api.js';
 
@@ -76,6 +77,28 @@ describe('Your worlds', () => {
     expect(root.querySelector('.your-worlds-meta')?.textContent).toContain('Established 4 October 2026');
     expect(root.querySelector('.your-worlds-meta')?.textContent).toContain('From A market town');
     expect(root.querySelector('.your-worlds-card .your-worlds-caption')?.textContent).toBe('Established 4 Oct');
+  });
+
+  it('selects the requested recipe by served identity without opening or creating anything', () => {
+    const saved = matchingRecipeEntry([entry(), quiet], entryRecipe('?recipe=small_town'));
+    const { root, open, create } = build([entry(), quiet], { initialEntryId: saved!.entryId });
+    expect(title(root)).toBe('Quiet corner');
+    expect(root.querySelector('[aria-current="true"]')?.getAttribute('data-entry-id')).toBe(quiet.entryId);
+    expect(open).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    expect(matchingRecipeEntry([quiet], 'market_town')).toBeNull();
+    expect(entryRecipe('?recipe=../market')).toBeNull();
+    expect(entryRecipe('?recipe=')).toBeNull();
+  });
+
+  it('chooses the newest matching entry and preserves unavailable-world refusal', () => {
+    const unavailable = entry({ availability: 'unavailable', unavailableReason: 'authored_version_changed' });
+    const older = entry({ entryId: 'older', updatedAt: '2026-09-01T00:00:00Z' });
+    expect(matchingRecipeEntry([older, unavailable], 'market_town')).toBe(unavailable);
+    const { root, open } = build([quiet, unavailable], { initialEntryId: unavailable.entryId });
+    expect(title(root)).toBe(unavailable.title);
+    expect(root.querySelector<HTMLButtonElement>('.your-worlds-open')!.disabled).toBe(true);
+    expect(open).not.toHaveBeenCalled();
   });
 
   it('says what each world is and that it keeps its changes, once', () => {

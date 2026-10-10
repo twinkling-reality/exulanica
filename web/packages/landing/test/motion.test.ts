@@ -21,6 +21,7 @@ const read = (relative: string): string =>
 
 const PAGE = read('../src/style.css');
 const ARTWORK = read('../src/ui/gradient-forms/style.css');
+const FIELD = read('../src/hero.css');
 
 interface Keyframes {
   readonly name: string;
@@ -89,23 +90,27 @@ function looping(source: string): ReadonlySet<string> {
 describe('landing motion', () => {
   it('finds the loops it is meant to be checking', () => {
     expect(looping(PAGE)).toEqual(
-      new Set(['wordmark-sheen', 'companion-breathe', 'companion-blink-track']),
+      new Set(['nav-edge-color']),
     );
     expect(looping(ARTWORK)).toEqual(new Set(['gradient-forms-color']));
+    expect(looping(FIELD)).toEqual(new Set(['orbit-travel']));
   });
 
   it('starts and ends every looping animation on the resting composition', () => {
-    for (const source of [PAGE, ARTWORK]) {
+    for (const source of [PAGE, ARTWORK, FIELD]) {
       const loops = looping(source);
       const blocks = keyframes(source).filter((block) => loops.has(block.name));
       for (const block of blocks) {
         expect(block.steps.get('0%'), `${block.name} has no 0% step`).toBeDefined();
         expect(block.steps.get('100%'), `${block.name} has no 100% step`).toBeDefined();
-        expect(block.steps.get('0%'), `${block.name} does not end where it starts`).toBe(
-          block.steps.get('100%'),
-        );
+        if (block.name === 'orbit-travel') {
+          expect(block.steps.get('0%')).toBe('offset-distance: 0%');
+          expect(block.steps.get('100%')).toBe('offset-distance: 100%');
+        } else {
+          expect(block.steps.get('0%'), `${block.name} does not end where it starts`).toBe(block.steps.get('100%'));
+        }
       }
-      expect(blocks.length).toBeGreaterThan(0);
+      expect(blocks.length).toBe(loops.size);
     }
   });
 
@@ -113,9 +118,8 @@ describe('landing motion', () => {
     const block = PAGE.slice(PAGE.indexOf('@media (prefers-reduced-motion: reduce)'));
     expect(block).toContain('animation-duration: 0.01ms !important');
     expect(block).toContain('animation-iteration-count: 1 !important');
-    for (const selector of ['.companion-menu-life', '.companion-menu-blink', '.companion-menu-face', '.wordmark']) {
-      expect(block).toContain(selector);
-    }
+    expect(block).toContain('.hero-content, .menu-panel { animation: none !important; opacity: 1; }');
+    expect(FIELD.slice(FIELD.indexOf('@media (prefers-reduced-motion: reduce)'))).toContain('animation-play-state: paused !important');
     expect(ARTWORK).toMatch(
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*gradient-forms-shift[\s\S]*animation: none !important/,
     );

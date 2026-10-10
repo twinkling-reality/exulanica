@@ -1,30 +1,25 @@
-/**
- * The developer surface, scaffolded and deliberately empty.
- *
- * The route, the pane and the navigation entry exist so that writing this page later is a change
- * to one file rather than a change to routing, chrome, transitions and tests at once. Nothing is
- * written yet, and nothing here should be invented: what this page will eventually describe is
- * recorded in docs/capabilities/world-api.md and docs/world-memory-package.md, where World Read
- * serves scene and place bundles and World Write records generation receipts. General object
- * editing, alternate world versions and simulation are roadmap items there, not shipped surface,
- * so copy added here has to keep that separation or it becomes the claim the docs refuse to make.
- *
- * Its station is disabled until there is something to read. See `.destination:disabled` for what
- * that looks like, and the note on chrome.ts about why a dead control is a deliberate exception
- * here rather than the rule it otherwise follows.
- */
-
+/** Public interfaces for applications and agents working with saved worlds. */
 import { el } from './dom.js';
+import { buildEditorialPage } from './editorial-page.js';
 
 export function buildDevelopers(): HTMLElement {
-  return el(
-    'section',
-    {
-      id: 'developers',
-      class: 'pane pane-information pane-developers',
-      tabindex: '-1',
-      'aria-labelledby': 'developers-title',
-    },
-    [el('h1', { id: 'developers-title', class: 'sr-only', text: 'Developers' })],
-  );
+  const example = el('section', { class: 'developer-example', 'aria-labelledby': 'developer-example-title' }, [
+    el('div', {}, [
+      el('h2', { id: 'developer-example-title', text: 'Start with a world.' }),
+      el('p', { text: 'Set your server address and a workspace token with world.read permission to list the worlds you can access.' }),
+    ]),
+    el('pre', { tabindex: '0', 'aria-label': 'Read accessible worlds with cURL' }, [
+      el('code', { text: 'curl --fail-with-body "$EXULANICA_API_URL/worlds" \\\n  -H "Authorization: Bearer $EXULANICA_TOKEN"' }),
+    ]),
+  ]);
+  return buildEditorialPage({
+    id: 'developers', title: 'One world. Your tools.',
+    introduction: 'Connect applications and agents to the same world. Read its state, make permitted changes, and inspect what happened.',
+    links: [{ href: '/docs', label: 'Read the Documentation' }],
+    feature: example,
+    sections: [
+      { id: 'developers-api', title: 'World API', copy: 'Work with worlds, objects, versions, and recorded events. Discover supported operations before making a change.', href: '/docs/world-api', link: 'Explore the API' },
+      { id: 'developers-agents', title: 'Agent Integrations', copy: 'Bring your own model or framework. Connect through the Python bridge or MCP, with access controlled by the world owner.', href: '/docs/agents', link: 'Connect an Agent' },
+    ],
+  });
 }

@@ -1,399 +1,154 @@
-/**
- * One signed-out navigation set shared by every landing surface.
- *
- * Resources remains one Companion station. Its ordinary links live in a secondary disclosure, so
- * documentation, research, and source code do not become extra primary destinations.
- */
-
-import {
-  companionAppearanceConfiguration,
-  DEFAULT_COMPANION,
-  type CompanionBodyVariant,
-  type CompanionColorVariant,
-} from '@exulanica/presentation/companion';
-
+/** Public navigation: a home link, three disclosures, and independent utility links. */
 import { el } from './dom.js';
-import { createCompanionMenuMarker, MENU_FACE } from './companion-menu-marker.js';
-
-/**
- * The silhouette the Companion wears at each station.
- *
- * This was a face per station until the faces turned out to be the wrong channel: at this size
- * the relaxed and pleased poses read as squinting rather than as character. Shape carries it
- * instead, the eyes stay open and identical everywhere, and each station keeps its own colour.
- * Meanings are as close to literal as the contract's shapes allow: a doorway at the way in and a
- * circle for return. All of them come from one family of silhouettes, so the marker changes shape
- * between stations without changing what it is.
- */
-const STATION_BODY: Readonly<Record<string, CompanionBodyVariant>> = Object.freeze({
-  'path-home': 'circle',
-  /*
-   * Enter and the waitlist share the arch because they share the slot and the job: they are the
-   * way in, and only ever one of them exists. A doorway is the honest shape for both.
-   */
-  'path-enter': 'arch',
-  'path-waitlist': 'arch',
-  'path-purpose': 'squircle',
-  'path-capabilities': 'cloud',
-  'path-resources': 'pebble',
-});
-
-/**
- * EXPERIMENT: the Companion's own colour, per station.
- *
- * companion-appearance.ts argues against this. It records that the saturated variants read as a
- * sticker on the field and that ink is the default for that reason, and that colour there is a
- * device preference a person sets in Customize rather than something a menu assigns. This is here
- * to see the argument rather than take it on faith. Deleting this map and the two custom
- * properties it sets returns the Companion to one ink identity; nothing else depends on it.
- */
-export const STATION_COLOR: Readonly<Record<string, CompanionColorVariant>> = Object.freeze({
-  'path-home': 'ink',
-  'path-enter': 'mint',
-  'path-purpose': 'periwinkle',
-  'path-capabilities': 'orange',
-  'path-resources': 'rose',
-  'path-waitlist': 'iris',
-});
-
-/** The contract owns the colours; this only picks which one a station asks for. */
-const stationInk = (station: string): { body: string; eye: string } => {
-  const configuration = companionAppearanceConfiguration({
-    body: DEFAULT_COMPANION.bodyVariant,
-    color: STATION_COLOR[station] ?? DEFAULT_COMPANION.colorVariant,
-    face: MENU_FACE,
-  });
-  return { body: configuration.bodyColor, eye: configuration.eyeColor };
-};
+import { icon } from './icons.js';
+import type { Surface } from '../router.js';
+export type { Surface } from '../router.js';
 
 export const REPOSITORY_URL = 'https://github.com/twinkling-reality/exulanica';
-/** The documents this page is built from, which are the same ones it is checked against. */
-export const DOCS_URL = `${REPOSITORY_URL}/tree/main/docs`;
+export const DOCS_URL = '/docs';
+export interface Chrome { readonly root: HTMLElement; setSurface(surface: Surface): void }
 
-/** Where the visitor is. Informational surfaces retain a direct return to the title. */
-export type Surface =
-  | 'title'
-  | 'purpose'
-  | 'capabilities'
-  | 'research'
-  | 'waitlist'
-  | 'developers';
-
-export interface ChromeActions {
-  onHome(): void;
-  onPurpose(): void;
-  onCapabilities(): void;
-  onResearch(): void;
-  onWaitlist(): void;
-  onDevelopers(): void;
+interface MenuItem {
+  label: string;
+  href: string;
+  id?: string;
+  surface?: Surface;
 }
 
-export interface ChromeOptions extends ChromeActions {
-  readonly atlasHref: string | null;
-}
-
-/**
- * One destination. Every item remains a native link or button, so the game-title hierarchy does
- * not compromise ordinary browser and assistive-technology navigation.
- */
-function destination(
-  label: string,
-  id: string,
-  onPick: () => void,
-  href?: string,
-  primary = false,
-): HTMLElement {
-  const inner = [el('span', { class: 'destination-label', text: label })];
-  const attrs: Record<string, string> = {
-    class: primary ? 'destination destination-primary' : 'destination',
-    id,
-  };
-  if (href !== undefined) {
-    const link = el('a', {
-      ...attrs,
-      href,
-      ...(href.startsWith('http') ? { rel: 'noreferrer' } : {}),
-    }, inner);
-    link.addEventListener('click', onPick);
-    return link;
-  }
-  const b = el('button', { ...attrs, type: 'button' }, inner);
-  b.addEventListener('click', onPick);
-  return b;
-}
-
-export interface Chrome {
-  readonly root: HTMLElement;
-  setSurface(surface: Surface): void;
-}
-
-export function buildChrome(options: ChromeOptions): Chrome {
+export function buildChrome(): Chrome {
   const bar = el('nav', { class: 'topbar', 'aria-label': 'Primary navigation' });
-
-  const home = destination('Return', 'path-home', options.onHome, '#title');
-  const purpose = destination('Purpose', 'path-purpose', options.onPurpose, '#purpose');
-  const capabilities = destination(
-    'Capabilities',
-    'path-capabilities',
-    options.onCapabilities,
-    '#capabilities',
-  );
-  /*
-   * One way in, and it is whichever one is true. Never both.
-   *
-   * With a world to enter the column leads with Enter Exulanica. Without one it leads with the
-   * waitlist, and the Enter station is not rendered at all. Showing the pair together offers a
-   * visitor two ways in when only one of them exists, and showing Enter greyed out with a caption
-   * saying the world is not connected is the same false promise with a footnote. Only the station
-   * that can be acted on is built.
-   */
-  const connected = options.atlasHref !== null;
-  const atlas = destination(
-    'Enter Exulanica',
-    'path-enter',
-    () => {},
-    options.atlasHref ?? undefined,
-    true,
-  );
-  const waitlist = destination(
-    'Join the waitlist',
-    'path-waitlist',
-    options.onWaitlist,
-    '#waitlist',
-    !connected,
-  );
-  /** Whichever station leads the column. The marker rests here, and it is never a dead control. */
-  const wayIn = connected ? atlas : waitlist;
-
-  const resources = destination('Resources', 'path-resources', () => {});
-  resources.setAttribute('aria-expanded', 'false');
-  resources.setAttribute('aria-controls', 'resource-links');
-
-  const resourceLinks = el('div', {
-    class: 'resource-disclosure',
-    id: 'resource-links',
-    'aria-label': 'Resources',
-  });
-  resourceLinks.hidden = true;
-  const resourceBack = destination('Back', 'resource-back', () => {});
-  const documentation = destination('Documentation', 'resource-docs', () => {}, DOCS_URL);
-  const research = destination('Research', 'path-research', options.onResearch, '#research');
-  /*
-   * Scaffolded, and the one deliberate dead control on this page.
-   *
-   * Everything else in this column is either live or absent, and the disabled Enter Exulanica
-   * station was deleted for exactly the reason this entry reintroduces: a greyed word is a
-   * promise a visitor cannot act on. This one is kept on the operator's instruction so the route
-   * and its slot exist before the writing does. Give the page copy and delete the two lines
-   * below, and it becomes an ordinary destination.
-   */
-  const developers = destination('Developers', 'path-developers', options.onDevelopers);
-  (developers as HTMLButtonElement).disabled = true;
-  developers.setAttribute('aria-describedby', 'developers-pending');
-  /*
-   * The reason sits beside the control, not inside it. Nested, it joined the button's accessible
-   * name, so the entry announced itself as "Developers Not written yet" and the rendered text of
-   * the disclosure stopped matching its labels.
-   */
-  const developersPending = el('span', {
-    class: 'sr-only',
-    id: 'developers-pending',
-    text: 'Not written yet',
-  });
-
-  const github = destination('GitHub', 'resource-github', () => {}, REPOSITORY_URL);
-  resourceLinks.append(resourceBack, documentation, research, developers, developersPending, github);
-
-  /*
-   * The order attention travels down the column, used to stagger an entry's arrival.
-   *
-   * Return and Enter Exulanica never appear at the same time, so they share the first position.
-   * The stylesheet reads this as a delay multiplier; nothing else depends on it, and an entry
-   * without one simply arrives first.
-   */
-  for (const [node, order] of [
-    [home, 0],
-    [atlas, 0],
-    [waitlist, 0],
-    [purpose, 2],
-    [capabilities, 3],
-    [resources, 4],
-    [resourceBack, 0],
-    [documentation, 1],
-    [research, 2],
-    [developers, 3],
-    [github, 4],
+  const home = el('a', { class: 'brand', id: 'path-home', href: '/', text: 'exulanica', 'aria-label': 'Exulanica home' });
+  const sections = el('div', { class: 'nav-sections' });
+  const utilities = el('div', { class: 'nav-utilities' });
+  const entry = el('a', { class: 'header-entry', id: 'path-waitlist', href: '/waitlist' }, [
+    el('span', { class: 'action-label', text: 'Join Waitlist' }),
+  ]);
+  utilities.append(entry);
+  for (const [label, href, mark] of [
+    ['GitHub', REPOSITORY_URL, 'github'],
+    ['Twinkling Reality', 'https://twinklingreality.com/', 'twinkling'],
   ] as const) {
-    node.style.setProperty('--enter-index', String(order));
+    utilities.append(el('a', {
+      class: 'utility-link', href, 'aria-label': `${label} (external)`, title: `${label} (external)`,
+    }, [icon(mark)]));
   }
 
-  const left = el('div', { class: 'destinations' });
-  const marker = createCompanionMenuMarker();
-  left.append(marker, home, wayIn, purpose, capabilities, resourceLinks, resources);
-
-  const targets = [home, wayIn, purpose, capabilities, resources];
-  let currentSurface: Surface = 'title';
-  let hovered: HTMLElement | null = null;
-  let focused: HTMLElement | null = null;
-  let previousTarget = wayIn;
-  let occupied: HTMLElement | null = null;
-  let motionPhase = false;
-  let outsideListener: ((event: PointerEvent) => void) | null = null;
-  let escapeListener: ((event: KeyboardEvent) => void) | null = null;
-
-  const defaultTarget = (): HTMLElement => {
-    if (currentSurface === 'purpose') return purpose;
-    if (currentSurface === 'capabilities') return capabilities;
-    if (currentSurface === 'research') return resources;
-    // A connected build has no waitlist station, so the surface rests the Companion on Return.
-    if (currentSurface === 'waitlist') return connected ? home : waitlist;
-    // Developers has no station the Companion can stand on while it is disabled.
-    if (currentSurface === 'developers') return resources;
-    return wayIn;
+  let opened: { trigger: HTMLButtonElement; panel: HTMLElement } | null = null;
+  const tracked: { link: HTMLAnchorElement; surface: Surface; trigger: HTMLButtonElement }[] = [];
+  let closeTimer = 0;
+  let openedByHover = false;
+  const keepOpen = (): void => window.clearTimeout(closeTimer);
+  const close = (restoreFocus = false): void => {
+    keepOpen();
+    if (!opened) return;
+    const { trigger, panel } = opened;
+    opened = null;
+    delete bar.dataset.menuOpen;
+    trigger.setAttribute('aria-expanded', 'false');
+    panel.hidden = true;
+    document.removeEventListener('pointerdown', outside);
+    document.removeEventListener('keydown', escape);
+    if (restoreFocus || panel.contains(document.activeElement)) trigger.focus({ preventScroll: true });
   };
-
-  const placeMarker = (): void => {
-    const target = focused ?? hovered ?? defaultTarget();
-    marker.dataset['state'] = focused !== null || hovered !== null ? 'attending' : 'resting';
-    marker.dataset['target'] = target.id;
-    marker.dataset['body'] = STATION_BODY[target.id] ?? 'circle';
-    marker.dataset['face'] = MENU_FACE;
-    const ink = stationInk(target.id);
-    marker.style.setProperty('--companion-body', ink.body);
-    marker.style.setProperty('--companion-eye', ink.eye);
-    /*
-     * The Companion and the station mark are two indicators of one thing, and they share a column,
-     * so the mark yields where the character is standing. Before the marks were filled this
-     * overlapped invisibly; a filled mark sits on the Companion's face.
-     */
-    if (occupied !== target) {
-      if (occupied) delete occupied.dataset['companion'];
-      target.dataset['companion'] = 'here';
-      occupied = target;
-    }
-    if (target !== previousTarget) {
-      const previousIndex = targets.indexOf(previousTarget);
-      const nextIndex = targets.indexOf(target);
-      const direction = nextIndex >= previousIndex ? 'down' : 'up';
-      const distance = Math.max(1, Math.abs(nextIndex - previousIndex));
-      marker.style.setProperty('--companion-travel-ms', `${Math.min(400, 280 + (distance - 1) * 60)}ms`);
-      motionPhase = !motionPhase;
-      marker.dataset['motion'] = `${direction}-${motionPhase ? 'a' : 'b'}`;
-      // Arriving somewhere new is what a blink is for here: it covers the change of expression,
-      // so the eyes are shut at the moment the new pose is revealed rather than morphing.
-      marker.dataset['arrive'] = motionPhase ? 'a' : 'b';
-      previousTarget = target;
-    }
-    requestAnimationFrame(() => {
-      marker.style.setProperty(
-        '--companion-marker-y',
-        `${target.offsetTop + target.offsetHeight / 2}px`,
-      );
-      requestAnimationFrame(() => {
-        marker.dataset['positioned'] = 'true';
+  const outside = (event: PointerEvent): void => {
+    if (!(event.target instanceof Node) || !bar.contains(event.target)) close();
+  };
+  const escape = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    close(true);
+  };
+  const addMenu = (label: string, key: string, items: readonly MenuItem[]): void => {
+    const group = el('div', { class: 'nav-group', 'data-menu': key });
+    const trigger = el('button', {
+      class: 'nav-trigger', id: `menu-${key}`, type: 'button',
+      'aria-expanded': 'false', 'aria-controls': `panel-${key}`,
+    }, [el('span', { class: 'nav-marker', 'aria-hidden': 'true' }), el('span', { text: label })]);
+    const panel = el('div', { class: 'menu-panel', id: `panel-${key}`, 'aria-labelledby': trigger.id, hidden: '' });
+    const links = el('div', { class: 'menu-links' });
+    panel.append(links);
+    for (const item of items) {
+      const link = el('a', { class: 'menu-link', href: item.href, 'aria-label': item.label,
+        ...(item.id ? { id: item.id } : {}), text: item.label,
       });
-    });
-  };
-
-  const applyPrimaryVisibility = (): void => {
-    const resourcesOpen = !resourceLinks.hidden;
-    home.hidden = resourcesOpen || currentSurface === 'title';
-    // Enter belongs to the title; the waitlist stays reachable from the reading surfaces too.
-    atlas.hidden = resourcesOpen || currentSurface !== 'title';
-    waitlist.hidden = resourcesOpen;
-    purpose.hidden = resourcesOpen;
-    capabilities.hidden = resourcesOpen;
-  };
-
-  const closeResources = (restoreFocus: boolean): void => {
-    if (resourceLinks.hidden) return;
-    resourceLinks.hidden = true;
-    resources.setAttribute('aria-expanded', 'false');
-    applyPrimaryVisibility();
-    if (outsideListener) document.removeEventListener('pointerdown', outsideListener);
-    if (escapeListener) document.removeEventListener('keydown', escapeListener);
-    outsideListener = null;
-    escapeListener = null;
-    if (restoreFocus) resources.focus({ preventScroll: true });
-  };
-
-  const openResources = (): void => {
-    if (!resourceLinks.hidden) {
-      closeResources(false);
-      return;
+      link.addEventListener('click', (event) => {
+        // Opening another tab or window leaves this page and its focused link in place.
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+        close();
+      });
+      links.append(link);
+      if (item.surface) tracked.push({ link, surface: item.surface, trigger });
     }
-    resourceLinks.hidden = false;
-    resources.setAttribute('aria-expanded', 'true');
-    applyPrimaryVisibility();
-    focused = resources;
-    placeMarker();
-
-    outsideListener = (event): void => {
-      if (event.target instanceof Node && left.contains(event.target)) return;
-      closeResources(false);
+    const open = (hover = false): void => {
+      keepOpen();
+      if (opened?.trigger === trigger) return;
+      close();
+      opened = { trigger, panel };
+      openedByHover = hover;
+      bar.dataset.menuOpen = 'true';
+      trigger.setAttribute('aria-expanded', 'true');
+      panel.hidden = false;
+      document.addEventListener('pointerdown', outside);
+      document.addEventListener('keydown', escape);
     };
-    escapeListener = (event): void => {
-      if (event.key !== 'Escape') return;
+    const leave = (event: PointerEvent): void => {
+      if (event.pointerType !== 'mouse') return;
+      keepOpen();
+      closeTimer = window.setTimeout(() => {
+        if (opened?.trigger === trigger && !panel.contains(document.activeElement)) close();
+      }, 240);
+    };
+    trigger.addEventListener('pointerenter', event => { if (event.pointerType === 'mouse') open(true); });
+    trigger.addEventListener('pointerleave', leave);
+    panel.addEventListener('pointerenter', keepOpen);
+    panel.addEventListener('pointerleave', leave);
+    trigger.addEventListener('click', () => {
+      if (opened?.trigger === trigger && !openedByHover) close();
+      else { open(); openedByHover = false; }
+    });
+    trigger.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowDown') return;
       event.preventDefault();
-      closeResources(true);
-    };
-    document.addEventListener('pointerdown', outsideListener);
-    document.addEventListener('keydown', escapeListener);
+      if (opened?.trigger !== trigger) open();
+      panel.querySelector<HTMLAnchorElement>('a')?.focus();
+    });
+    group.addEventListener('focusout', (event) => {
+      if (event.relatedTarget instanceof Node && group.contains(event.relatedTarget)) return;
+      if (opened?.trigger === trigger) close();
+    });
+    group.append(trigger, panel);
+    sections.append(group);
   };
-  resources.addEventListener('click', openResources);
-  resourceBack.addEventListener('click', () => closeResources(true));
-
-  for (const target of targets) {
-    target.addEventListener('pointerenter', () => {
-      hovered = target;
-      placeMarker();
-    });
-    target.addEventListener('pointerleave', () => {
-      if (hovered === target) hovered = null;
-      placeMarker();
-    });
-    target.addEventListener('focus', () => {
-      focused = target;
-      placeMarker();
-    });
-    target.addEventListener('blur', () => {
-      if (focused === target) focused = null;
-      placeMarker();
-    });
-  }
-
-  resourceLinks.addEventListener('focusin', () => {
-    focused = resources;
-    placeMarker();
-  });
-  resourceLinks.addEventListener('focusout', (event) => {
-    const next = event.relatedTarget;
-    if (next instanceof Node && resourceLinks.contains(next)) return;
-    if (focused === resources && document.activeElement !== resources) focused = null;
-    placeMarker();
-  });
-
-  bar.append(left);
-
+  addMenu('Platform', 'explore', [
+    { label: 'About', href: '/about', id: 'path-purpose', surface: 'purpose' },
+    { label: 'Worlds', href: '/worlds', id: 'path-capabilities', surface: 'capabilities' },
+  ]);
+  addMenu('Developers', 'builders', [
+    { label: 'Overview', href: '/developers', id: 'path-developers', surface: 'developers' },
+    { label: 'World API', href: '/docs/world-api', surface: 'docs-world-api' },
+    { label: 'Agent Integrations', href: '/docs/agents', surface: 'docs-agents' },
+  ]);
+  addMenu('Resources', 'resources', [
+    { label: 'Documentation', href: DOCS_URL, surface: 'docs' },
+    { label: 'Research', href: '/research', id: 'path-research', surface: 'research' },
+    { label: 'Roadmap', href: '/roadmap', surface: 'roadmap' },
+  ]);
+  home.addEventListener('click', () => close());
+  bar.append(home, sections, utilities);
   return {
     root: bar,
     setSurface(surface) {
-      currentSurface = surface;
-      closeResources(false);
-      hovered = null;
-      focused = null;
-      applyPrimaryVisibility();
-      for (const [node, owns] of [
-        [purpose, surface === 'purpose'],
-        [capabilities, surface === 'capabilities'],
-        [research, surface === 'research'],
-        [waitlist, surface === 'waitlist'],
-        [developers, surface === 'developers'],
-      ] as const) {
-        if (owns) node.setAttribute('aria-current', 'page');
-        else node.removeAttribute('aria-current');
+      close();
+      entry.hidden = surface === 'title' || surface === 'waitlist';
+      sections.querySelectorAll('[data-current]').forEach((node) => node.removeAttribute('data-current'));
+      for (const item of tracked) {
+        if (item.surface === surface) {
+          item.link.setAttribute('aria-current', 'page');
+          item.trigger.dataset['current'] = 'true';
+        } else item.link.removeAttribute('aria-current');
       }
-      placeMarker();
+      if (surface === 'title') home.setAttribute('aria-current', 'page');
+      else home.removeAttribute('aria-current');
     },
   };
 }

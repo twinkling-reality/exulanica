@@ -1,291 +1,144 @@
 // @vitest-environment happy-dom
-
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { buildChrome, STATION_COLOR } from '../src/ui/chrome.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildChrome } from '../src/ui/chrome.js';
 import { buildTitle } from '../src/ui/title.js';
-import { buildViewportBoundary } from '../src/ui/viewport-boundary.js';
 
-describe('the Exulanica title screen', () => {
+function setup(atlasHref: string | null = null) {
+  const options = { atlasHref };
+  const chrome = buildChrome();
+  document.body.append(chrome.root);
+  chrome.setSurface('title');
+  return { ...chrome, options };
+}
+const click = (root: HTMLElement, id: string) => root.querySelector<HTMLButtonElement>(`#${id}`)!.click();
+
+describe('the public invitation and navigation', () => {
   beforeEach(() => document.body.replaceChildren());
+  afterEach(() => { document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); vi.useRealTimers(); });
 
-  it('presents one primary wordmark and one decorative gradient field', () => {
-    const title = buildTitle();
-
-    expect(title.querySelector('h1')?.textContent).toBe('Exulanica');
-    expect(title.getAttribute('aria-labelledby')).toBe('title-wordmark');
-    expect(title.querySelector('.proposition')?.textContent).toBe(
-      'Worlds for AI Agents',
-    );
-    expect(title.querySelectorAll('.title-artwork')).toHaveLength(1);
-    expect(title.querySelector('.title-artwork')?.getAttribute('aria-hidden')).toBe('true');
-    expect(title.querySelectorAll('img')).toHaveLength(0);
-    expect(title.querySelector('.publisher-mark')?.textContent).toBe(
-      '© 2026 Twinkling Reality',
-    );
+  it('keeps the waitlist invitation regardless of app configuration', () => {
+    for (const atlasHref of [null, 'https://atlas.example/session']) {
+      const title = buildTitle({ atlasHref });
+      expect(title.getAttribute('aria-labelledby')).toBe(title.querySelector('h1')?.id);
+      expect(title.querySelector('.field-form')?.getAttribute('aria-hidden')).toBe('true');
+      expect(title.querySelectorAll('.hero-actions a')).toHaveLength(1);
+      expect(title.querySelectorAll('[aria-controls="home-preview"]')).toHaveLength(2);
+      expect(title.querySelector('#hero-entry')?.getAttribute('href')).toBe('/waitlist');
+      expect(title.querySelector('#hero-entry')?.textContent).toBe('Join Waitlist');
+    }
   });
 
-  it('keeps the title menu semantic and preserves the keyboard destination ids', () => {
-    const onHome = vi.fn();
-    const onPurpose = vi.fn();
-    const onCapabilities = vi.fn();
-    const onResearch = vi.fn();
-    const onWaitlist = vi.fn();
-    const onDevelopers = vi.fn();
-    const chrome = buildChrome({
-      atlasHref: 'https://atlas.example/session',
-      onHome,
-      onPurpose,
-      onCapabilities,
-      onResearch,
-      onWaitlist,
-      onDevelopers,
-    });
-    document.body.append(chrome.root);
-
-    const atlas = chrome.root.querySelector<HTMLAnchorElement>('#path-enter');
-    const purpose = chrome.root.querySelector<HTMLAnchorElement>('#path-purpose');
-    const capabilities = chrome.root.querySelector<HTMLAnchorElement>('#path-capabilities');
-    const resources = chrome.root.querySelector<HTMLButtonElement>('#path-resources');
-    const home = chrome.root.querySelector<HTMLAnchorElement>('#path-home');
-    const marker = chrome.root.querySelector<SVGSVGElement>('.companion-menu-marker');
-
-    expect(chrome.root.tagName).toBe('NAV');
+  it('keeps home and creator links available and does not invent an application destination', () => {
+    const chrome = setup();
     expect(chrome.root.getAttribute('aria-label')).toBe('Primary navigation');
-    expect(atlas?.textContent).toContain('Enter Exulanica');
-    expect(atlas?.href).toBe('https://atlas.example/session');
-    expect(purpose?.tagName).toBe('A');
-    expect(purpose?.getAttribute('href')).toBe('#purpose');
-    expect(capabilities?.tagName).toBe('A');
-    expect(capabilities?.getAttribute('href')).toBe('#capabilities');
-    expect(resources?.tagName).toBe('BUTTON');
-    expect(resources?.getAttribute('aria-controls')).toBe('resource-links');
-    expect(chrome.root.querySelectorAll('.companion-menu-marker')).toHaveLength(1);
-    expect(marker?.getAttribute('aria-hidden')).toBe('true');
-    expect(marker?.getAttribute('focusable')).toBe('false');
-    expect(marker?.hasAttribute('tabindex')).toBe(false);
-    expect(marker?.querySelectorAll('.companion-menu-wake')).toHaveLength(1);
-
-    chrome.setSurface('title');
-    expect(home?.hidden).toBe(true);
-    expect(atlas?.hidden).toBe(false);
-    expect(
-      Array.from(
-        chrome.root.querySelectorAll<HTMLElement>('.destinations > .destination'),
-        (node) => node.hidden ? null : node.textContent?.trim(),
-      ).filter(Boolean),
-    ).toEqual(['Enter Exulanica', 'Purpose', 'Capabilities', 'Resources']);
-    expect(purpose?.hasAttribute('aria-current')).toBe(false);
-    expect(marker?.dataset['target']).toBe('path-enter');
-
-    purpose?.dispatchEvent(new PointerEvent('pointerenter'));
-    expect(marker?.dataset['target']).toBe('path-purpose');
-    expect(marker?.dataset['motion']).toMatch(/^down-/);
-    capabilities?.dispatchEvent(new FocusEvent('focus'));
-    atlas?.dispatchEvent(new PointerEvent('pointerenter'));
-    expect(marker?.dataset['target']).toBe('path-capabilities');
-    expect(marker?.dataset['state']).toBe('attending');
-    expect(marker?.dataset['motion']).toMatch(/^down-/);
-    capabilities?.dispatchEvent(new FocusEvent('blur'));
-    expect(marker?.dataset['target']).toBe('path-enter');
-    expect(marker?.dataset['motion']).toMatch(/^up-/);
-
-    chrome.setSurface('purpose');
-    expect(home?.hidden).toBe(false);
-    expect(atlas?.hidden).toBe(true);
-    expect(
-      Array.from(
-        chrome.root.querySelectorAll<HTMLElement>('.destinations > .destination'),
-        (node) => node.hidden ? null : node.textContent?.trim(),
-      ).filter(Boolean),
-    ).toEqual(['Return', 'Purpose', 'Capabilities', 'Resources']);
-    expect(purpose?.getAttribute('aria-current')).toBe('page');
-    expect(capabilities?.hasAttribute('aria-current')).toBe(false);
-    expect(marker?.dataset['target']).toBe('path-purpose');
-
-    chrome.setSurface('capabilities');
-    expect(purpose?.hasAttribute('aria-current')).toBe(false);
-    expect(capabilities?.getAttribute('aria-current')).toBe('page');
-    expect(marker?.dataset['target']).toBe('path-capabilities');
-
-    chrome.setSurface('research');
-    expect(chrome.root.querySelector('#path-research')?.getAttribute('aria-current')).toBe('page');
-    expect(marker?.dataset['target']).toBe('path-resources');
-  });
-
-  it('opens Resources as one keyboard-operable station and restores focus on Escape', () => {
-    const chrome = buildChrome({
-      atlasHref: 'https://atlas.example/session',
-      onHome: vi.fn(),
-      onPurpose: vi.fn(),
-      onCapabilities: vi.fn(),
-      onResearch: vi.fn(),
-      onWaitlist: vi.fn(),
-      onDevelopers: vi.fn(),
-    });
-    document.body.append(chrome.root);
-    chrome.setSurface('title');
-
-    const resources = chrome.root.querySelector<HTMLButtonElement>('#path-resources');
-    const disclosure = chrome.root.querySelector<HTMLElement>('#resource-links');
-    const back = chrome.root.querySelector<HTMLButtonElement>('#resource-back');
-    const docs = chrome.root.querySelector<HTMLAnchorElement>('#resource-docs');
-    const research = chrome.root.querySelector<HTMLAnchorElement>('#path-research');
-    const github = chrome.root.querySelector<HTMLAnchorElement>('#resource-github');
-    const purpose = chrome.root.querySelector<HTMLAnchorElement>('#path-purpose');
-    const marker = chrome.root.querySelector<SVGSVGElement>('.companion-menu-marker');
-
-    expect(resources?.getAttribute('aria-expanded')).toBe('false');
-    expect(disclosure?.hidden).toBe(true);
-    expect(chrome.root.querySelectorAll('#path-docs, #path-github')).toHaveLength(0);
-
-    resources?.click();
-    expect(resources?.getAttribute('aria-expanded')).toBe('true');
-    expect(disclosure?.hidden).toBe(false);
-    expect(back?.tagName).toBe('BUTTON');
-    expect(docs?.tagName).toBe('A');
-    expect(research?.tagName).toBe('A');
-    expect(research?.getAttribute('href')).toBe('#research');
-    expect(github?.tagName).toBe('A');
-    expect(purpose?.hidden).toBe(true);
-    expect(
-      Array.from(
-        disclosure?.querySelectorAll<HTMLElement>('.destination') ?? [],
-        (node) => node.textContent?.trim(),
-      ),
-    ).toEqual(['Back', 'Documentation', 'Research', 'Developers', 'GitHub']);
-
-    docs?.dispatchEvent(new FocusEvent('focusin', { bubbles: true, relatedTarget: resources }));
-    purpose?.dispatchEvent(new PointerEvent('pointerenter'));
-    expect(marker?.dataset['target']).toBe('path-resources');
-    expect(github?.tagName).toBe('A');
-
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(disclosure?.hidden).toBe(true);
-    expect(resources?.getAttribute('aria-expanded')).toBe('false');
-    expect(document.activeElement).toBe(resources);
-    expect(purpose?.hidden).toBe(false);
-  });
-
-  it('dismisses Resources on an outside pointer press without opening it on hover', () => {
-    const chrome = buildChrome({
-      atlasHref: 'https://atlas.example/session',
-      onHome: vi.fn(),
-      onPurpose: vi.fn(),
-      onCapabilities: vi.fn(),
-      onResearch: vi.fn(),
-      onWaitlist: vi.fn(),
-      onDevelopers: vi.fn(),
-    });
-    document.body.append(chrome.root);
-    chrome.setSurface('title');
-
-    const resources = chrome.root.querySelector<HTMLButtonElement>('#path-resources');
-    const disclosure = chrome.root.querySelector<HTMLElement>('#resource-links');
-    const back = chrome.root.querySelector<HTMLButtonElement>('#resource-back');
-
-    resources?.dispatchEvent(new PointerEvent('pointerenter'));
-    expect(disclosure?.hidden).toBe(true);
-    resources?.click();
-    back?.click();
-    expect(disclosure?.hidden).toBe(true);
-    expect(document.activeElement).toBe(resources);
-    resources?.click();
-    document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-    expect(disclosure?.hidden).toBe(true);
-    expect(resources?.getAttribute('aria-expanded')).toBe('false');
-  });
-
-  /*
-   * The one dead control on the page, kept on purpose.
-   *
-   * Everything else is live or absent, and the disabled Enter Exulanica station was removed for
-   * exactly the reason this one exists. It is scaffolding: the route and the slot are in place
-   * before the writing is. If this test fails because somebody enabled the entry, check that the
-   * Developers page actually has copy first, then delete this test with the disabled line.
-   */
-  it('keeps Developers scaffolded and visibly unavailable', () => {
-    const chrome = buildChrome({
-      atlasHref: 'https://atlas.example/session',
-      onHome: vi.fn(),
-      onPurpose: vi.fn(),
-      onCapabilities: vi.fn(),
-      onResearch: vi.fn(),
-      onWaitlist: vi.fn(),
-      onDevelopers: vi.fn(),
-    });
-    document.body.append(chrome.root);
-    chrome.setSurface('title');
-
-    const developers = chrome.root.querySelector<HTMLButtonElement>('#path-developers');
-    expect(developers?.tagName).toBe('BUTTON');
-    expect(developers?.disabled).toBe(true);
-    // The label is the whole accessible name; the reason is a separate description.
-    expect(developers?.textContent?.trim()).toBe('Developers');
-    expect(developers?.getAttribute('aria-describedby')).toBe('developers-pending');
-    expect(chrome.root.querySelector('#developers-pending')?.textContent).toBe('Not written yet');
-    // It is a station without a Companion colour or face, because nothing can stand on it.
-    expect(STATION_COLOR['path-developers']).toBeUndefined();
-  });
-
-  it('uses the public product name in the desktop boundary', () => {
-    const boundary = buildViewportBoundary();
-    expect(boundary.root.querySelector('.boundary-eyebrow')?.textContent).toBe('Exulanica');
-  });
-
-  /*
-   * The disconnected build used to lead with a greyed Enter Exulanica and a line saying the world
-   * was not connected. An unusable control is not made honest by a caption under it, so the
-   * station is absent instead and the waitlist leads. Nothing in the column is ever dead.
-   */
-  it('offers the waitlist instead of a dead entry when no world is connected', () => {
-    const chrome = buildChrome({
-      atlasHref: null,
-      onHome: vi.fn(),
-      onPurpose: vi.fn(),
-      onCapabilities: vi.fn(),
-      onResearch: vi.fn(),
-      onWaitlist: vi.fn(),
-      onDevelopers: vi.fn(),
-    });
-    const marker = chrome.root.querySelector<SVGSVGElement>('.companion-menu-marker');
-
-    chrome.setSurface('title');
+    expect(chrome.root.querySelector('#path-home')?.getAttribute('href')).toBe('/');
+    expect(chrome.root.querySelector('a[href="https://twinklingreality.com/"]')?.getAttribute('aria-label')).toBe('Twinkling Reality (external)');
+    expect(chrome.root.querySelector('a[aria-label="GitHub (external)"]')).not.toBeNull();
     expect(chrome.root.querySelector('#path-enter')).toBeNull();
-    expect(chrome.root.querySelector('[role="status"]')).toBeNull();
-
-    const waitlist = chrome.root.querySelector<HTMLAnchorElement>('#path-waitlist');
-    expect(waitlist?.tagName).toBe('A');
-    expect(waitlist?.getAttribute('href')).toBe('#waitlist');
-    expect(waitlist?.classList.contains('destination-primary')).toBe(true);
-    expect(waitlist?.hidden).toBe(false);
-    expect(marker?.dataset['target']).toBe('path-waitlist');
-
-    expect(
-      Array.from(
-        chrome.root.querySelectorAll<HTMLElement>('.destinations > .destination'),
-        (node) => (node.hidden ? null : node.textContent?.trim()),
-      ).filter(Boolean),
-    ).toEqual(['Join the waitlist', 'Purpose', 'Capabilities', 'Resources']);
+    expect(chrome.root.querySelector<HTMLAnchorElement>('#path-waitlist')?.hidden).toBe(true);
+    expect(chrome.root.querySelector('.nav-utilities .icon-github')).not.toBeNull();
+    expect(chrome.root.querySelector('.nav-utilities .icon-twinkling')).not.toBeNull();
+    chrome.setSurface('purpose');
+    expect(chrome.root.querySelector<HTMLAnchorElement>('#path-waitlist')?.hidden).toBe(false);
+    chrome.setSurface('waitlist');
+    expect(chrome.root.querySelector<HTMLAnchorElement>('#path-waitlist')?.hidden).toBe(true);
   });
 
-  it('leads with Enter Exulanica and builds no waitlist station when a world is connected', () => {
-    const chrome = buildChrome({
-      atlasHref: 'https://atlas.example/session',
-      onHome: vi.fn(),
-      onPurpose: vi.fn(),
-      onCapabilities: vi.fn(),
-      onResearch: vi.fn(),
-      onWaitlist: vi.fn(),
-      onDevelopers: vi.fn(),
-    });
+  it('keeps the waitlist without adding app navigation in connected builds', () => {
+    const chrome = setup('https://atlas.example/session');
+    expect(chrome.root.querySelector('#path-waitlist')?.getAttribute('href')).toBe('/waitlist');
+    chrome.setSurface('purpose');
+    expect(chrome.root.querySelector('#path-enter')).toBeNull();
+  });
+
+  it('opens only one disclosure and restores focus when Escape closes it', () => {
+    const chrome = setup();
+    click(chrome.root, 'menu-explore');
+    expect(chrome.root.querySelector<HTMLElement>('#panel-explore')?.hidden).toBe(false);
+    click(chrome.root, 'menu-builders');
+    expect(chrome.root.querySelector<HTMLElement>('#panel-explore')?.hidden).toBe(true);
+    expect(chrome.root.querySelector('#menu-explore')?.getAttribute('aria-expanded')).toBe('false');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(chrome.root.querySelector<HTMLElement>('#panel-builders')?.hidden).toBe(true);
+    expect(document.activeElement?.id).toBe('menu-builders');
+  });
+
+  it('supports keyboard entry, normal links, and closing when focus leaves the group', () => {
+    const chrome = setup();
+    const trigger = chrome.root.querySelector<HTMLButtonElement>('#menu-explore')!;
+    trigger.focus();
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(document.activeElement?.id).toBe('path-purpose');
+    chrome.root.querySelector<HTMLAnchorElement>('#path-capabilities')!.focus();
+    expect(chrome.root.querySelector<HTMLElement>('#panel-explore')?.hidden).toBe(false);
+    chrome.root.querySelector<HTMLAnchorElement>('#path-home')!.focus();
+    expect(chrome.root.querySelector<HTMLElement>('#panel-explore')?.hidden).toBe(true);
+  });
+
+  it('keeps the focused dropdown destination visible when opening another tab or window', () => {
+    const chrome = setup();
+    click(chrome.root, 'menu-builders');
+    const link = chrome.root.querySelector<HTMLAnchorElement>('#path-developers')!;
+    link.focus();
+    for (const modifier of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }]) {
+      link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ...modifier }));
+      expect(chrome.root.querySelector<HTMLElement>('#panel-builders')?.hidden).toBe(false);
+      expect(document.activeElement).toBe(link);
+    }
+  });
+
+  it('opens on mouse hover and holds the menu across the gap into its links', () => {
+    vi.useFakeTimers();
+    const chrome = setup();
+    const trigger = chrome.root.querySelector('#menu-resources')!;
+    const panel = chrome.root.querySelector<HTMLElement>('#panel-resources')!;
+    trigger.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+    expect(panel.hidden).toBe(false);
+    trigger.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse' }));
+    vi.advanceTimersByTime(150);
+    panel.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+    vi.advanceTimersByTime(300);
+    expect(panel.hidden).toBe(false);
+    panel.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse' }));
+    vi.advanceTimersByTime(250);
+    expect(panel.hidden).toBe(true);
+  });
+
+  it('keeps the first click after hover open, and supports tap toggling without touch hover', () => {
+    const chrome = setup();
+    const trigger = chrome.root.querySelector<HTMLButtonElement>('#menu-resources')!;
+    const panel = chrome.root.querySelector<HTMLElement>('#panel-resources')!;
+    trigger.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'touch' }));
+    expect(panel.hidden).toBe(true);
+    trigger.click();
+    expect(panel.hidden).toBe(false);
+    trigger.click();
+    expect(panel.hidden).toBe(true);
+    trigger.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+    trigger.click();
+    expect(panel.hidden).toBe(false);
+    document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    expect(panel.hidden).toBe(true);
+  });
+
+  it('switches hovered categories without leaving multiple panels open', () => {
+    const chrome = setup();
+    for (const key of ['explore', 'builders', 'resources']) {
+      chrome.root.querySelector(`#menu-${key}`)!.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+      expect([...chrome.root.querySelectorAll<HTMLElement>('.menu-panel')].filter(panel => !panel.hidden).map(panel => panel.id)).toEqual([`panel-${key}`]);
+    }
+  });
+
+  it('closes after following a destination and marks the containing group as current', () => {
+    const chrome = setup();
+    click(chrome.root, 'menu-builders');
+    chrome.root.querySelector<HTMLAnchorElement>('#path-developers')!.click();
+    expect(chrome.root.querySelector('#path-developers')?.getAttribute('href')).toBe('/developers');
+    expect(chrome.root.querySelector<HTMLElement>('#panel-builders')?.hidden).toBe(true);
+    chrome.setSurface('developers');
+    expect(chrome.root.querySelector('#path-developers')?.getAttribute('aria-current')).toBe('page');
+    expect(chrome.root.querySelector('#menu-builders')?.getAttribute('data-current')).toBe('true');
     chrome.setSurface('title');
-    const atlas = chrome.root.querySelector<HTMLAnchorElement>('#path-enter');
-    expect(atlas?.classList.contains('destination-primary')).toBe(true);
-    // Two ways in, when only one of them exists, is the thing this replaced.
-    expect(chrome.root.querySelector('#path-waitlist')).toBeNull();
-    expect(
-      chrome.root.querySelector<SVGSVGElement>('.companion-menu-marker')?.dataset['target'],
-    ).toBe('path-enter');
+    expect(chrome.root.querySelector('#menu-builders')?.hasAttribute('data-current')).toBe(false);
   });
 });

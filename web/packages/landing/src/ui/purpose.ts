@@ -1,20 +1,11 @@
-/** The product purpose in one uninterrupted reading line. */
-
-import { el } from './dom.js';
+/** An introduction to the platform through its three core responsibilities. */
+import { buildEditorialPage } from './editorial-page.js';
 
 export function buildPurpose(): HTMLElement {
-  return el('section', {
-    id: 'purpose',
-    class: 'pane pane-information pane-purpose',
-    tabindex: '-1',
-    'aria-labelledby': 'purpose-title',
-  }, [
-    el('article', { class: 'reading-space' }, [
-      el('h1', { id: 'purpose-title', class: 'sr-only', text: 'Purpose' }),
-      el('p', {
-        class: 'reading-copy',
-        text: 'Build a world. Let open models decide what its people do. Swap a model, run the same saved world again, and see the difference. Exulanica keeps the world, its sources, and each validated decision available to inspect.',
-      }),
-    ]),
-  ]);
+  return buildEditorialPage({
+    id: 'purpose', title: 'Worlds you can build on.',
+    introduction: 'Build a persistent world, shape its surroundings, and let open AI models act within it. Return to your saved changes and inspect what happened.',
+    links: [{ href: '/worlds', label: 'Explore Worlds' }, { href: '/developers', label: 'For developers' }],
+    compact: true, sections: [],
+  });
 }

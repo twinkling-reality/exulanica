@@ -103,9 +103,14 @@ only for an entry that states true (`web/packages/app/src/ui/world-identity.ts`)
 
 ## Entry and creation
 
-`GET /world-entries` is the entry catalog. A single available entry opens directly. More than one
-entry produces a choice; none is selected by recency. An unavailable entry is visible and cannot
-be substituted with another world.
+`GET /world-entries` is the entry catalog. The application presents Your worlds before opening a
+world. The most recently changed entry is selected initially; selection does not open it.
+A public `?recipe=<recipe_key>` link selects the most recently changed matching saved entry in the
+current workspace, using its served recipe key rather than its title. If none matches, the existing
+Create a world controls open with that recipe selected, once creation is available. Recipe values
+come from the server's specification. An unknown recipe is reported in the controls. Following a
+link neither creates nor opens a world; both require the person's action. An unavailable matching
+entry remains visible with its refusal and is not substituted with another world.
 
 Creation has one source-independent first-world path and two explicit personal-source paths:
 

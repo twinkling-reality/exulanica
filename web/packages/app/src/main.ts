@@ -32,6 +32,7 @@
  * interface would be confidently wrong. Re-reading costs one request and cannot drift.
  */
 
+import { entryRecipe, matchingRecipeEntry } from './world-entry-intent.js';
 import { readBrowserAccount, type BrowserAccountState } from './account-session.js';
 import {
   anchorId as toAnchorId,
@@ -336,7 +337,7 @@ interface MakeWorldSurface {
  */
 function showWorldRecipes(
   onClose: () => void,
-  start: { readonly recipeKey: string; readonly values: Readonly<Record<string, number | string>>; readonly origin: string } | null = null,
+  start: { readonly recipeKey: string; readonly values: Readonly<Record<string, number | string>>; readonly origin: string | null } | null = null,
 ): MakeWorldSurface | null {
   const client = state.worldEntries;
   const credentials = state.credentials;
@@ -452,8 +453,14 @@ function showWorldRecipes(
   };
 }
 
+/** Read the entry intent once; internal returns do not reopen a dismissed creation panel. */
+let pendingEntryRecipe = entryRecipe(window.location.search);
+
 /** Show Your worlds. Only `mountNoWorld` calls this. */
 async function mountWorldEntry(failed?: string): Promise<void> {
+  const requestedRecipe = pendingEntryRecipe;
+  pendingEntryRecipe = null;
+  const requestedEntry = matchingRecipeEntry(state.savedWorldEntries, requestedRecipe);
   const entries = state.worldEntries;
   canvas.hidden = true;
   shell.setAttribute('data-world-state', 'entry');
@@ -472,6 +479,7 @@ async function mountWorldEntry(failed?: string): Promise<void> {
   };
   const yourWorlds = buildYourWorlds({
     entries: state.savedWorldEntries,
+    ...(requestedEntry === null ? {} : { initialEntryId: requestedEntry.entryId }),
     open,
     picture: worldPicture,
     ...(entries === null ? {} : {
@@ -510,10 +518,17 @@ async function mountWorldEntry(failed?: string): Promise<void> {
     const spec = actionSpec('world.make');
     const client = new CapabilitiesClient({ ...state.credentials, worldId: null });
     void client.creation()
-      .then((creation) => yourWorlds.setCreate(availability(spec, creation)))
+      .then((creation) => {
+        const available = availability(spec, creation);
+        yourWorlds.setCreate(available);
+        if (requestedRecipe !== null && requestedEntry === null && available.state === 'available'
+          && yourWorlds.root.isConnected && creating?.isConnected !== true) {
+          creating = showWorldRecipes(closeCreate, { recipeKey: requestedRecipe, values: {}, origin: null });
+        }
+      })
       .catch(() => yourWorlds.setCreate(availability(spec, null)));
   }
-  (yourWorlds.root.querySelector('.your-worlds-card') as HTMLElement | null)?.focus({ preventScroll: true });
+  (yourWorlds.root.querySelector('[aria-current="true"]') as HTMLElement | null)?.focus({ preventScroll: true });
 }
 
 function activeEntryWriteBinding(): SavedEntryWriteBinding {

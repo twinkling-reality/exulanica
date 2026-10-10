@@ -1,8 +1,8 @@
-import type { Surface } from './chrome.js';
+import type { Surface } from '../router.js';
 
 type Panes = Readonly<Record<Surface, HTMLElement>>;
 const REST = 'translate3d(0, 0, 0) scale(1)';
-type InformationSurface = Exclude<Surface, 'title'>;
+type InformationSurface = 'purpose' | 'capabilities' | 'research' | 'waitlist' | 'developers';
 type Rectangle = Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>;
 
 /**
@@ -39,30 +39,7 @@ export function titleCamera(
   return { transform: `translate3d(${x}px, ${y}px, 0) scale(${scale})`, x, y, scale, target };
 }
 
-const informationDistance = (destination: InformationSurface): string => {
-  if (destination === 'research') return 'translate3d(0, 3vh, 0) scale(0.92)';
-  // The waitlist rises to meet the visitor rather than receding, which is the opposite of
-  // Research below it. Both sit on the wordmark's centre, so they need different approaches.
-  if (destination === 'waitlist') return 'translate3d(0, -4vh, 0) scale(0.96)';
-  if (destination === 'developers') return 'translate3d(0, 2vh, 0) scale(0.95)';
-  return `translate3d(${destination === 'purpose' ? 6 : -6}vw, -3vh, 0) scale(0.97)`;
-};
-
-const readingHandoff = (next: InformationSurface): { outgoingEnd: string; incomingFrom: string } => {
-  if (next === 'research') {
-    return {
-      outgoingEnd: 'translate3d(0, 0, 0) scale(1.05)',
-      incomingFrom: 'translate3d(0, 0, 0) scale(0.94)',
-    };
-  }
-  const lateral = next === 'capabilities' ? -3 : 3;
-  return {
-    outgoingEnd: `translate3d(${-lateral}vw, 0, 0) scale(1)`,
-    incomingFrom: `translate3d(${lateral}vw, 0, 0) scale(1)`,
-  };
-};
-
-/** Move through the title plane while leaving the shared navigation outside the camera. */
+/** Text crossfades in place; only the decorative landscape follows the camera. */
 export function createSurfaceTransition(
   panes: Panes,
   reducedMotion: () => boolean,
@@ -97,22 +74,28 @@ export function createSurfaceTransition(
   const measureCamera = (destination: InformationSurface): string => {
     const title = panes.title;
     const wasHidden = title.hidden;
-    // This synchronous measurement runs after cancellation, so no scaled coordinates leak into
-    // the next camera. Temporarily exposing a hidden title also supports a direct information URL.
+    // Expose the title before reading its scroll offset. Hidden scrollports need not report it.
     title.hidden = false;
-    const wordmark = title.querySelector<HTMLElement>('#title-wordmark');
-    const result = wordmark === null ? REST : titleCamera(
-      destination,
-      wordmark.getBoundingClientRect(),
-      title.getBoundingClientRect(),
-      { width: window.innerWidth, height: window.innerHeight },
-    ).transform;
-    title.hidden = wasHidden;
-    return result;
+    const scrollTop = title.scrollTop;
+    title.scrollTop = 0;
+    try {
+      const wordmark = title.querySelector<HTMLElement>('#title-wordmark');
+      return wordmark === null ? REST : titleCamera(
+        destination,
+        wordmark.getBoundingClientRect(),
+        title.getBoundingClientRect(),
+        { width: window.innerWidth, height: window.innerHeight },
+      ).transform;
+    } finally {
+      // The camera uses the resting composition without discarding the visitor's reading position.
+      title.scrollTop = scrollTop;
+      title.hidden = wasHidden;
+    }
   };
   const cameraFor = (destination: Surface): string => {
-    if (destination === 'title') return REST;
-    return cameras[destination] ??= measureCamera(destination);
+    if (!(destination in CAMERA)) return REST;
+    const information = destination as InformationSurface;
+    return cameras[information] ??= measureCamera(information);
   };
   const placeLandscape = (transform: string): void => {
     landscapeTarget = transform;
@@ -136,8 +119,6 @@ export function createSurfaceTransition(
       if (next === current) return;
       const previous = current;
       const reduced = reducedMotion();
-      const toInformation = previous === 'title';
-      const toTitle = next === 'title';
       const outgoing = previous === null ? null : panes[previous];
       const incoming = panes[next];
       // Read the painted positions before cancelling, so a quick reversal starts where it is.
@@ -154,55 +135,29 @@ export function createSurfaceTransition(
       cancel();
       // Returning to the title must not replay its first-paint typography entrance.
       if (previous !== null || next !== 'title') panes.title.dataset['entered'] = 'true';
-      const destination = next === 'title' ? previous : next;
-      const camera = (landscape !== undefined || (previous !== null && !reduced && (toInformation || toTitle)))
-        && destination !== null && destination !== 'title'
-        ? cameraFor(destination) : REST;
       current = next;
-      if (landscape) placeLandscape(next === 'title' ? REST : camera);
+      if (landscape) placeLandscape(cameraFor(next));
       settle();
       if (outgoing === null || typeof incoming.animate !== 'function') return;
 
       outgoing.hidden = false;
-      // The outgoing surface stays visible only as scenery, never as a second active document.
       outgoing.inert = true;
       outgoing.setAttribute('aria-hidden', 'true');
-      const duration = reduced ? 140 : toInformation || toTitle ? 600 : 360;
       const options: KeyframeAnimationOptions = {
-        duration,
-        easing: 'cubic-bezier(0.25, 0.55, 0.35, 1)',
+        duration: reduced ? 100 : 180,
+        easing: 'cubic-bezier(.22,1,.36,1)',
         fill: 'both',
       };
-      const information = destination as InformationSurface;
-      const handoff = readingHandoff(next === 'title' ? information : next as InformationSurface);
-      const outgoingEnd = toInformation ? camera : toTitle
-        ? informationDistance(information) : handoff.outgoingEnd;
-      const incomingFrom = toInformation ? informationDistance(information) : toTitle
-        ? landscapeStart ?? camera : handoff.incomingFrom;
-      const outFrames: Keyframe[] = reduced
-        ? [{ opacity: outgoingStart?.opacity ?? 1 }, { opacity: 0 }]
-        : [
-            { ...(outgoingStart ?? { transform: REST, opacity: 1 }), transformOrigin: '50% 50%' },
-            { transform: outgoingEnd, opacity: 0, transformOrigin: '50% 50%' },
-          ];
-      const inFrames: Keyframe[] = reduced
-        ? [{ opacity: incomingStart?.opacity ?? 0 }, { opacity: 1 }]
-        : [
-            { ...(incomingStart ?? { transform: incomingFrom, opacity: 0 }), transformOrigin: '50% 50%' },
-            { transform: REST, opacity: 1, transformOrigin: '50% 50%' },
-          ];
+      const outFrames: Keyframe[] = [{ opacity: outgoingStart?.opacity ?? 1 }, { opacity: 0 }];
+      const inFrames: Keyframe[] = [{ opacity: incomingStart?.opacity ?? 0 }, { opacity: 1 }];
       const token = generation;
       for (const pane of [outgoing, incoming]) {
         layerHints.set(pane, pane.style.willChange);
-        pane.style.willChange = reduced ? 'opacity' : 'transform, opacity';
+        pane.style.willChange = 'opacity';
       }
       animations = [
         outgoing.animate(outFrames, options),
-        incoming.animate(inFrames, {
-          ...options,
-          duration: reduced || !toInformation ? duration : 520,
-          delay: 0,
-        }),
+        incoming.animate(inFrames, options),
       ];
       if (landscape && !reduced && typeof landscape.animate === 'function') {
         layerHints.set(landscape, landscape.style.willChange);
@@ -210,7 +165,7 @@ export function createSurfaceTransition(
         animations.push(landscape.animate([
           { transform: landscapeStart ?? REST },
           { transform: landscapeTarget },
-        ], options));
+        ], { ...options, duration: 420, easing: 'cubic-bezier(0.25, 0.55, 0.35, 1)' }));
       }
       void Promise.all(animations.map((animation) => animation.finished)).then(() => {
         if (generation !== token) return;

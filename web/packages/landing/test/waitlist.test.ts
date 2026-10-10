@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { resolveWaitlistDestination } from '../src/waitlist-destination.js';
 import { buildWaitlist } from '../src/ui/waitlist.js';
@@ -99,13 +99,8 @@ describe('the waitlist surface', () => {
     const page = buildWaitlist({ endpoint: null });
     expect(page.id).toBe('waitlist');
     const heading = page.querySelector('h1');
-    /*
-     * The surface keeps a name for assistive technology and shows none. The station that opens it
-     * is already called Join the waitlist, so a visible heading repeats the press that got here.
-     * One line of plain text is the whole surface: no second heading, no subtitle under it.
-     */
-    expect(heading?.textContent).toBe('Join the waitlist');
-    expect(heading?.classList.contains('sr-only')).toBe(true);
+    expect(heading?.textContent).toBe('Join Exulanica.');
+    expect(heading?.classList.contains('sr-only')).toBe(false);
     expect(page.getAttribute('aria-labelledby')).toBe(heading?.id);
     expect(page.querySelectorAll('h2')).toHaveLength(0);
     expect(page.querySelector('.reading-copy')).toBeNull();
@@ -118,14 +113,13 @@ describe('the waitlist surface', () => {
     expect(field(page).getAttribute('aria-describedby')).toBe(status(page).id);
   });
 
-  it('goes quiet rather than explaining the build when no endpoint is configured', () => {
+  it('explains unavailability and hides the form when no endpoint is configured', () => {
     const submit = vi.fn();
     const page = buildWaitlist({ endpoint: null, submit });
     expect(field(page).disabled).toBe(true);
     expect(button(page).disabled).toBe(true);
-    // It used to say "The waitlist is not connected in this build." A visitor has no use for the
-    // reason a control is shut, and the surface must never apologise for its own deployment.
-    expect(status(page).textContent).toBe('');
+    expect(status(page).textContent).toContain('temporarily unavailable');
+    expect(page.querySelector<HTMLFormElement>('#waitlist-form')!.hidden).toBe(true);
     expect(page.textContent).not.toMatch(/build/i);
 
     field(page).value = 'someone@example.com';
@@ -152,7 +146,7 @@ describe('the waitlist surface', () => {
 
     field(page).value = '  someone@example.com  ';
     send(page);
-    expect(submit).toHaveBeenCalledWith(endpoint, 'someone@example.com');
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledWith(endpoint, 'someone@example.com'));
     // While the request is out the control is shut, so a second press cannot post twice.
     expect(button(page).disabled).toBe(true);
     send(page);
@@ -163,6 +157,8 @@ describe('the waitlist surface', () => {
     await vi.waitFor(() => expect(status(page).textContent).toContain('on the list'));
     expect(status(page).textContent).not.toMatch(/confirm/i);
     expect(page.querySelector<HTMLFormElement>('#waitlist-form')!.hidden).toBe(true);
+    send(page);
+    expect(submit).toHaveBeenCalledTimes(1);
   });
 
   it('gives the field back when the endpoint refuses, so the address is not lost', async () => {
@@ -171,10 +167,48 @@ describe('the waitlist surface', () => {
 
     field(page).value = 'someone@example.com';
     send(page);
-    await vi.waitFor(() => expect(status(page).textContent).toContain('did not send'));
+    await vi.waitFor(() => expect(status(page).textContent).toContain('Please try again'));
     expect(button(page).disabled).toBe(false);
     expect(field(page).disabled).toBe(false);
     expect(page.querySelector<HTMLFormElement>('#waitlist-form')!.hidden).toBe(false);
     expect(field(page).value).toBe('someone@example.com');
+  });
+});
+
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('the provider boundary', () => {
+  it.each([
+    { ok: true, json: async () => ({ status: 'success' }), accepted: true },
+    { ok: true, json: async () => ({ status: 'error' }), accepted: false },
+    { ok: true, json: async () => ({}), accepted: false },
+    { ok: true, json: async () => { throw new Error('HTML response'); }, accepted: false },
+    { ok: false, json: async () => ({ status: 'success' }), accepted: false },
+  ])('requires an explicit provider success: $accepted', async ({ ok, json, accepted }) => {
+    const fetch = vi.fn(async () => ({ ok, json }));
+    vi.stubGlobal('fetch', fetch);
+    const page = buildWaitlist({ endpoint: new URL('https://forms.example/f') });
+    field(page).value = 'someone+signup@example.com';
+    send(page);
+    await vi.waitFor(() => expect(status(page).textContent).not.toBe('Joining…'));
+    expect(fetch).toHaveBeenCalledWith('https://forms.example/f', expect.objectContaining({
+      method: 'POST', body: 'email_address=someone%2Bsignup%40example.com',
+    }));
+    expect(page.querySelector<HTMLFormElement>('#waitlist-form')!.hidden).toBe(accepted);
+    if (!accepted) expect(field(page).disabled).toBe(false);
+  });
+
+  it('restores the form when a request rejects and permits a retry', async () => {
+    const submit = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(true);
+    const page = buildWaitlist({ endpoint: new URL('https://forms.example/f'), submit });
+    field(page).value = 'someone@example.com';
+    send(page);
+    await vi.waitFor(() => expect(status(page).textContent).toContain('Please try again'));
+    expect(field(page).value).toBe('someone@example.com');
+    expect(button(page).disabled).toBe(false);
+    send(page);
+    await vi.waitFor(() => expect(status(page).textContent).toContain('on the list'));
+    expect(submit).toHaveBeenCalledTimes(2);
   });
 });

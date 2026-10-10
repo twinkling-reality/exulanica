@@ -13,6 +13,8 @@ import '../ui/your-worlds.css';
 
 export interface WorldEntrySurface {
   readonly entries: readonly SavedWorldEntry[];
+  /** Select an entry already served to this workspace; opening remains a separate action. */
+  readonly initialEntryId?: string;
   readonly open: (entry: SavedWorldEntry) => Promise<void>;
   readonly adoptLatest: (entry: SavedWorldEntry) => Promise<void>;
   /**
@@ -394,7 +396,8 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
     detail.textContent = offered || state.words === null ? say('yourWorlds.create.detail') : state.words.happened;
   };
   setCreate(createState);
-  if (entries[0] !== undefined) choose(entries[0]);
+  const initial = entries.find(entry => entry.entryId === deps.initialEntryId) ?? entries[0];
+  if (initial !== undefined) choose(initial);
   // The first world's own card is the button of record when it is the untouched starter: creating
   // is the action asked for, opening the starter the alternative.
   root.dataset['first'] = String(first);

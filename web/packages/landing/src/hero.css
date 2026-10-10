@@ -1,0 +1,67 @@
+/* The field, central copy and invitation occupy independent layers of one viewport. */
+.pane-title { isolation: isolate; background: #fff; }
+.pane-title .hero-stage { position: relative; width: 100%; height: max(720px, 100dvh); min-height: 100%; flex: 0 0 auto; overflow: clip; }
+.pane-title .hero-content { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); width: 350px; max-width: calc(100% - 72px); margin: 0; padding: 0; text-align: center; z-index: 2; animation: none; }
+.pane-title .hero-heading { margin: 0; font-size: clamp(20px, 1.65vw, 25px); font-weight: 400; line-height: 1.18; letter-spacing: -.035em; color: #7a807c; }
+.hero-heading > span { display: block; }
+.hero-heading .hero-statement { color: var(--ink); font-weight: 500; }
+.pane-title .hero-actions { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; margin: 0; z-index: 2; }
+.pane-title .primary-action { min-height: 48px; padding: 0 28px; border-radius: 999px; background: #111512; color: #fff; font-size: 14px; }
+.pane-title .primary-action:hover { background: #35413b; }
+
+/* Two counter-rotating tracks preserve the order and spacing of the forms. */
+.pane-title .world-portals { position: absolute; inset: 0; display: block; width: min(100%, max(400px, 68dvh)); height: 100%; margin: 0 auto; padding: 0; }
+.pane-title .world-portals .orbit-item { position: absolute; left: 0; top: 0; display: block; width: clamp(46px, 4.2vw, 60px); height: clamp(46px, 4.2vw, 60px); min-width: 0; min-height: 0; margin: 0; border-radius: 50%; offset-anchor: center; offset-rotate: 0deg; animation: orbit-travel 84s linear var(--phase) infinite; }
+.orbit-outer { offset-path: circle(28dvh at 50% 44%); }
+.orbit-inner { offset-path: circle(21dvh at 50% 44%); animation-direction: reverse !important; }
+.orbit-field { position: absolute; inset: 0; }
+.pane-title .world-portals .portal-label { display: none; }
+.pane-title .world-portals .portal-orbit { display: block; width: 100%; height: 100%; perspective: 600px; animation: none; }
+.pane-title .world-portals .portal-window { width: 100%; height: 100%; aspect-ratio: 1; border-radius: 50%; background: var(--material); background-size: cover; background-position: var(--crop, 50%) center; transform: rotate(32deg) rotateY(38deg); box-shadow: none; transition: transform 240ms ease; }
+.pane-title .world-portals .portal-window img { transform: scale(1.35); object-position: var(--crop, 50%) center; }
+.pane-title .world-portals .world-choice:hover .portal-window,
+.pane-title .world-portals .world-choice:focus-visible .portal-window { transform: rotate(32deg) rotateY(38deg) scale(1.08); }
+.pane-title .world-choice:focus-visible { outline: 2px solid var(--ink); outline-offset: 8px; offset-distance: 25% !important; }
+.field-form { pointer-events: none; }
+.field-market { --material: url('/worlds/market-town.jpg'); }
+.field-town { --material: url('/worlds/small-town.jpg'); }
+.field-sky { --material: radial-gradient(ellipse at 28% 22%, #edf7ff, #c6e1ff 40%, #76a5d5 76%, #294d67); }
+.field-leaf { --material: radial-gradient(ellipse at 30% 24%, #efffd8, #cefa96 34%, #649879 74%, #284d40); }
+.field-gold { --material: radial-gradient(ellipse at 30% 25%, #ffffef, #f4ff91 40%, #c5d586 74%, #7a975e); }
+@keyframes orbit-travel { 0% { offset-distance: 0%; } 100% { offset-distance: 100%; } }
+:root:not([data-surface='title']) .orbit-item,
+.world-portals:has(.world-choice:hover, .world-choice:focus-visible, .world-context:not([hidden])) .orbit-item { animation-play-state: paused; }
+@media (max-width: 600px) {
+  .pane-title .hero-stage { height: max(700px, 100dvh); }
+  .pane-title .hero-content { top: 44%; width: 250px; }
+  .pane-title .hero-heading { font-size: 18px; }
+  .pane-title .hero-actions { bottom: 7%; }
+  .pane-title .primary-action { min-height: 46px; padding: 0 25px; }
+  .orbit-outer { offset-path: circle(min(28dvh, 236px) at 50% 44%); }
+  .orbit-inner { offset-path: circle(min(21dvh, 177px) at 50% 44%); }
+  .pane-title .world-portals .orbit-item { width: 46px; height: 46px; }
+}
+@media (max-height: 600px) and (min-width: 601px) { .pane-title .hero-stage { height: 620px; } }
+@media (prefers-reduced-motion: reduce) {
+  .pane-title .world-portals .orbit-item { animation-play-state: paused !important; }
+  .pane-title .world-portals .portal-window { transition: none; }
+}
+@media (forced-colors: active) { .field-form { display: none; } .orbit-field { filter: none; } .hero-heading > span { color: CanvasText; } }
+
+/* The GPU image and native controls share the same projected geometry. */
+.world-optics { opacity: 0; transition: opacity 640ms var(--interaction-ease); position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.pane-title .has-optics .field-form { display: none; }
+.pane-title .has-optics .world-choice { offset-path: none; animation: none; transform: none; }
+.pane-title .has-optics .portal-orbit { opacity: 0; }
+@media (forced-colors: active) {
+  .world-optics { display: none; }
+  .pane-title .has-optics .portal-orbit { opacity: 1; }
+}
+
+.has-optics .world-optics { opacity: 1; }
+.world-portals[data-selected] .orbit-item { animation-play-state: paused; }
+.pane-title .world-portals .world-choice[aria-expanded='true'] .portal-window { transform: rotate(32deg) rotateY(38deg) scale(1.08); }
+.world-portals .world-choice[aria-expanded='true'] { outline: 1px solid #6a8676; outline-offset: 7px; }
+.has-optics .world-choice[aria-expanded='true']:not(:focus-visible) { outline: none; }
+.pane-title .hero-content { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .world-optics { transition: none; } }
