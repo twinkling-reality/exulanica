@@ -53,7 +53,7 @@ import {
   type GeneratedWorldReady,
 } from './generated-world-ready.js';
 import { committedTextureLibrary } from '../texture-library.js';
-import { arrivalView, parkedFootprint, type PlanFootprint, type SightBlocker } from './arrival-view.js';
+import { arrivalView, parkedFootprint, seatsOf, type PlanFootprint, type SightBlocker, type TownLife } from './arrival-view.js';
 import { TOWN_FIRST_VIEW } from '../town-first-view.js';
 import { WORLD_LOOK_ATTRIBUTE, swappableDrawing } from './world-look-redraw.js';
 
@@ -134,6 +134,28 @@ function sightBlockersOfTown(
     return [...buildings, ...standing];
   } catch {
     return [];
+  }
+}
+
+/**
+ * Where a town's life is, for its first view: the seats among its street furniture, found by shape,
+ * and its doors onto a footway, each once by identity, from the tiles' own records. Where those
+ * cannot be read, none, and the first view is chosen by openness alone.
+ */
+function lifeOfTown(
+  route: { readonly doorsOf?: (bytes: Uint8Array) => readonly { readonly identity: string; readonly eastMm: number; readonly southMm: number }[] },
+  containers: readonly { readonly bytes: Uint8Array }[],
+  furniture: readonly StreetFurniture[],
+): TownLife {
+  try {
+    const doors = new Map<string, readonly [number, number]>();
+    for (const { bytes } of containers) {
+      for (const door of route.doorsOf?.(bytes) ?? []) if (!doors.has(door.identity)) doors.set(door.identity, [door.eastMm, door.southMm]);
+    }
+    const rule = TOWN_FIRST_VIEW.life;
+    return { seats: rule === undefined ? [] : seatsOf(furniture, rule), doors: [...doors.values()] };
+  } catch {
+    return { seats: [], doors: [] };
   }
 }
 
@@ -234,37 +256,49 @@ export function groundNear(
   return null;
 }
 
-/** How long the first view waits for the placed things and the parked vehicles before it stands without them. */
-const ARRIVAL_INPUTS_MS = 4000;
+/** How long a dressed town's first view waits for the parked vehicles before it stands without them. */
+const PARKED_VEHICLES_MS = 4000;
 
 /**
- * The placed things' plan points and the vehicles parked at the traffic's current second, or null
- * where either cannot be read in time: the arrival then stands as served.
+ * The placed things' plan points, as the world's version states them, or null where the version
+ * cannot be read: the town is then looked at as one with nothing known placed. Whether anything is
+ * placed decides which first view a town opens with, so this read is waited for like the tiles and
+ * loses no race: a town opens the same way when it is made and when it is opened again.
  */
-async function arrivalInputs(
+async function placedThings(
   access: Credentials, entry: SavedWorldEntry,
-): Promise<{ readonly targets: readonly (readonly [number, number])[]; readonly parked: readonly PlanFootprint[] } | null> {
-  const read = async () => {
-    const [{ Transport }, { parseVersion }, { WorldTrafficClient }] = await Promise.all([
-      import('@exulanica/graph-client'), import('../world-objects-api.js'), import('../traffic-api.js'),
+): Promise<readonly (readonly [number, number])[] | null> {
+  try {
+    const [{ Transport }, { parseVersion }] = await Promise.all([
+      import('@exulanica/graph-client'), import('../world-objects-api.js'),
     ]);
-    const [version, traffic] = await Promise.all([
-      new Transport(access).getJson<unknown>(`/world/versions/${encodeURIComponent(entry.authoredVersionId)}`, { world_id: entry.worldId })
-        .then(parseVersion),
-      new WorldTrafficClient(access).window(entry.worldId, entry.authoredVersionId, null, 1),
-    ]);
+    const version = parseVersion(await new Transport(access).getJson<unknown>(
+      `/world/versions/${encodeURIComponent(entry.authoredVersionId)}`, { world_id: entry.worldId },
+    ));
+    return (version.things ?? []).filter((thing) => !thing.removed)
+      .map((thing) => [thing.transform.xMm, thing.transform.zMm] as const);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The vehicles parked at the traffic's current second, or none where they cannot be read in time.
+ * Only a town with things placed looks past them (a scene behind a parked car), and what is parked
+ * is the traffic's state at that second, so nothing else of the first view is chosen by this read.
+ */
+async function parkedNow(access: Credentials, entry: SavedWorldEntry): Promise<readonly PlanFootprint[]> {
+  const read = async (): Promise<readonly PlanFootprint[]> => {
+    const { WorldTrafficClient } = await import('../traffic-api.js');
+    const traffic = await new WorldTrafficClient(access).window(entry.worldId, entry.authoredVersionId, null, 1);
     const parkedMode = traffic.window.modes.indexOf('parked');
-    return {
-      targets: (version.things ?? []).filter((thing) => !thing.removed)
-        .map((thing) => [thing.transform.xMm, thing.transform.zMm] as const),
-      parked: traffic.window.vehicles
-        .filter((vehicle) => vehicle.mode[0] === parkedMode)
-        .flatMap((vehicle) => parkedFootprint(vehicle) ?? []),
-    };
+    return traffic.window.vehicles
+      .filter((vehicle) => vehicle.mode[0] === parkedMode)
+      .flatMap((vehicle) => parkedFootprint(vehicle) ?? []);
   };
   return Promise.race([
-    read().catch(() => null),
-    new Promise<null>((resolve) => { setTimeout(() => resolve(null), ARRIVAL_INPUTS_MS); }),
+    read().catch(() => []),
+    new Promise<readonly PlanFootprint[]>((resolve) => { setTimeout(() => resolve([]), PARKED_VEHICLES_MS); }),
   ]);
 }
 
@@ -282,9 +316,10 @@ export async function loadGeneratedWorld(
   if (ground === null) return null;
   if (ground.tiles.some((tile) => tile.state === 'failed')) return { waiting: 'failed', ground };
   if (ground.tiles.some((tile) => tile.state !== 'baked')) return { waiting: 'baking', ground };
-  // What the first look should see past: the version's placed things and what is parked now; read
-  // beside the tiles, and never waited on for long (the served arrival stands without them).
-  const viewing = arrivalInputs(access, entry);
+  // What the first look faces and sees past, read beside the tiles: the version's placed things,
+  // waited for, and, only where something is placed, what is parked now, never waited on for long.
+  const placing = placedThings(access, entry).then((targets) => targets ?? []);
+  const parking = placing.then((targets) => (targets.length === 0 ? [] : parkedNow(access, entry)));
   const [route, { parseTextureSetManifest }, library] = await Promise.all([
     import('@exulanica/atlas-react/generated-tile'),
     import('@exulanica/atlas-core'),
@@ -296,7 +331,8 @@ export async function loadGeneratedWorld(
   })));
   const [first, ...rest] = containers;
   const neighbours: readonly { readonly name: string; readonly bytes: Uint8Array }[] = rest;
-  rememberTownFurniture(entry.entryId, streetFurnitureOfTown(route, containers));
+  const furniture = streetFurnitureOfTown(route, containers);
+  rememberTownFurniture(entry.entryId, furniture);
   const worldLook = await import('../world-look.js');
   type Prepared = import('../world-look.js').PreparedWorldLook;
   type Choice = import('../world-look.js').WorldLookChoice;
@@ -352,17 +388,19 @@ export async function loadGeneratedWorld(
   const [facingEast, facingSouth] = ground.arrivalFacingMm;
   const stand = groundNear(loaded.navigationWorld.surface, east, south, [facingEast, facingSouth]);
   const surface = loaded.navigationWorld.surface;
-  // Facing the placed things, from the nearest spot whose sight of them nothing parked blocks.
-  const inputs = await viewing;
-  // Where the placed things and the parked vehicles could not be read in time, the view is still
-  // chosen from what the town's own tiles state: nothing known placed, nothing known parked.
+  // Facing the placed things, from the nearest spot whose sight of them nothing parked blocks. With
+  // nothing placed the view is chosen from the town's own tiles alone and the parked vehicles, which
+  // may or may not arrive in time, are not asked after: the town opens the same way either way.
+  const [targets, parked] = await Promise.all([placing, parking]);
   const view = arrivalView({
     eastMm: stand?.eastMm ?? east, southMm: stand?.southMm ?? south, facing: [facingEast, facingSouth],
-    targets: inputs?.targets ?? [], parked: inputs?.parked ?? [],
+    targets, parked,
     ground: (e, s) => surface.sample(e / 1000, s / 1000) !== null,
-    // What stands at eye height in the town's own records, and how a town with nothing placed is looked at.
+    // What stands at eye height in the town's own records, how a town with nothing placed is looked
+    // at, and the seats and doors that view is chosen by.
     blockers: sightBlockersOfTown(route, containers, loaded),
     open: TOWN_FIRST_VIEW,
+    life: lifeOfTown(route, containers, furniture),
   });
   const standHeight = view.moved ? surface.sample(view.eastMm / 1000, view.southMm / 1000)?.height ?? null : null;
   const start = {

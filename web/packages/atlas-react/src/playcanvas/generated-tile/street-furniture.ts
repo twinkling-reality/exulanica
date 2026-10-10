@@ -72,6 +72,42 @@ export function streetFurnitureOf(bytes: Uint8Array): StatedStreetFurniture[] {
   return [...furniture.values()];
 }
 
+/** The record kind a tile states a door under: where the footway meets it, and the curb it opens onto. */
+export const ENTRANCE_KIND = 'city.entrance';
+
+/** A door a person can reach from a footway, in the society's plan: millimetres east and south. */
+export interface StatedDoor {
+  readonly identity: string;
+  readonly eastMm: number;
+  readonly southMm: number;
+}
+
+/**
+ * The doors one tile container states that open onto a footway: every entrance record's threshold,
+ * its own and the halo copies it carries of its neighbours', each once by identity. A town's people
+ * go in and come out at these, so walks begin and end there. A door that names no curb opens onto a
+ * lot, not a footway, and is left out, as is a record that states no threshold.
+ */
+export function doorsOf(bytes: Uint8Array): StatedDoor[] {
+  return doorsOfRecords(decodeOwd(bytes).header.records);
+}
+
+/** The same of a tile's records as read: `doorsOf` is this over a container's own. */
+export function doorsOfRecords(
+  records: readonly { readonly kind: string; readonly identity: string; readonly fields: { readonly [name: string]: unknown } }[],
+): StatedDoor[] {
+  const doors = new Map<string, StatedDoor>();
+  for (const record of records) {
+    if (record.kind !== ENTRANCE_KIND || record.identity === '' || doors.has(record.identity)) continue;
+    const x = whole(record.fields['threshold_x_mm']), y = whole(record.fields['threshold_y_mm']);
+    const curb = record.fields['approach_curb_identity'];
+    if (x === null || y === null || !Array.isArray(curb) || curb.length === 0) continue;
+    // North is the society's negative south.
+    doors.set(record.identity, { identity: record.identity, eastMm: x, southMm: -y });
+  }
+  return [...doors.values()];
+}
+
 /** The record kind a tile states its street trees under: a base point and parts, facing east. */
 export const STREET_TREE_KIND = 'city.street_tree';
 

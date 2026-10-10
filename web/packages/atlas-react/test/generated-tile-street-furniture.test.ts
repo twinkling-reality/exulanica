@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  STREET_FURNITURE_KIND, STREET_TREE_KIND, sightBlockersOf, sightBlockersOfRecords, streetFurnitureOf,
+  ENTRANCE_KIND, STREET_FURNITURE_KIND, STREET_TREE_KIND, doorsOf, doorsOfRecords, sightBlockersOf, sightBlockersOfRecords,
+  streetFurnitureOf,
 } from '../src/playcanvas/generated-tile/street-furniture.js';
 
 /*
@@ -140,5 +141,43 @@ describe('a part that stands off its record\'s base point', () => {
     ]);
     // The same record a second time (a neighbour's halo copy) is read once.
     expect(sightBlockersOfRecords([tree, tree], 1_600)).toHaveLength(1);
+  });
+});
+
+/*
+ * A town's doors onto a footway: of the same document's entrance records, every one that names the
+ * curb it opens onto, at the threshold the document states, carried into east and south.
+ */
+describe('a town tile\'s doors', () => {
+  const ENTRANCES = (DOCUMENT.grammars.flatMap((grammar) => [...grammar.owned, ...grammar.halo]) as unknown as {
+    kind: string; fields: { identity: string; threshold_x_mm: number; threshold_y_mm: number; approach_curb_identity: string[] };
+  }[]).filter((record) => record.kind === 'city.entrance');
+
+  it('are every entrance its document states that opens onto a curb, once, at the stated threshold', () => {
+    expect(ENTRANCE_KIND).toBe('city.entrance');
+    const onto = new Map(ENTRANCES.filter((record) => record.fields.approach_curb_identity.length > 0)
+      .map((record) => [record.fields.identity, record.fields]));
+    // Positive control: the document states doors onto a footway, on more than one tile's records.
+    expect(onto.size).toBeGreaterThanOrEqual(3);
+    expect(ENTRANCES.length).toBeGreaterThanOrEqual(onto.size);
+    const read = doorsOf(CONTAINER);
+    expect(read.map((door) => door.identity).sort()).toEqual([...onto.keys()].sort());
+    for (const door of read) {
+      expect(door.eastMm).toBe(onto.get(door.identity)!.threshold_x_mm);
+      // North in the tile is negative south in the society's plan.
+      expect(door.southMm).toBe(-onto.get(door.identity)!.threshold_y_mm);
+    }
+  });
+
+  it('leave out a door onto a lot, a record with no threshold and any other kind, and read a halo copy once', () => {
+    const entrance = (identity: string, fields: Record<string, unknown>) => ({ kind: 'city.entrance', identity, fields });
+    const read = doorsOfRecords([
+      entrance('street', { threshold_x_mm: 4_000, threshold_y_mm: 9_000, approach_curb_identity: ['kerb'] }),
+      entrance('street', { threshold_x_mm: 4_000, threshold_y_mm: 9_000, approach_curb_identity: ['kerb'] }),
+      entrance('lot', { threshold_x_mm: 1_000, threshold_y_mm: 2_000, approach_curb_identity: [] }),
+      entrance('unplaced', { threshold_y_mm: 2_000, approach_curb_identity: ['kerb'] }),
+      { kind: 'city.premises', identity: 'shop', fields: { threshold_x_mm: 1, threshold_y_mm: 1, approach_curb_identity: ['kerb'] } },
+    ]);
+    expect(read).toEqual([{ identity: 'street', eastMm: 4_000, southMm: -9_000 }]);
   });
 });

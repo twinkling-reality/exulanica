@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  arrivalView, crosses, openDistance, parkedFootprint, viewOpenness, type OpenViewRule, type SightBlocker,
+  arrivalView, crosses, nearestInWedge, openDistance, parkedFootprint, seatsOf, viewLife, viewOpenness,
+  type LifeViewRule, type OpenViewRule, type SightBlocker,
 } from '../src/composition/arrival-view.js';
 
 /*
@@ -194,5 +195,214 @@ describe('the first view of a dressed town, with what else stands at eye height'
     const reach = Math.hypot(0 - view.eastMm, -12_000 - view.southMm);
     const toward: [number, number] = [(0 - view.eastMm) / reach, (-12_000 - view.southMm) / reach];
     expect(openDistance([view.eastMm, view.southMm], toward, [trunk], reach)).toBe(reach);
+  });
+});
+
+/*
+ * The same street under a rule that judges a view by the town's life (version 2 of the catalog),
+ * written here and not read from the catalog: a seat is worth four doors, each counts whole to 25 m
+ * and fades to nothing at 60 m, dead ahead is 12 degrees either side, and nothing may stand in it
+ * nearer than 10 m.
+ */
+const DEGREE = Math.PI / 180;
+const LIFE: LifeViewRule = {
+  nearMm: 25_000, farMm: 60_000, seatWeight: 4, tie: 0.5, sightMarginMm: 500,
+  centreHalf: 12 * DEGREE, centreFloorMm: 10_000, seatTopMinimumMm: 350, seatTopMaximumMm: 600, seatSpanMinimumMm: 400,
+};
+const LIVELY = { ...RULE, faceMm: 0, life: LIFE };
+/** The street closed 30 m to the west by a building across it: the west is the less open way. */
+const westEnd: SightBlocker = [[-31_000, -16_000], [-30_000, -16_000], [-30_000, 3_000], [-31_000, 3_000]];
+/**
+ * A wing 20 m to the east that juts 10 m into the street from the far frontage: the east is the less
+ * open way, and a sight line along the near frontage still runs past it.
+ */
+const eastWing: SightBlocker = [[20_000, -16_000], [21_000, -16_000], [21_000, -6_000], [20_000, -6_000]];
+
+describe('what stands dead ahead', () => {
+  it('is the nearest part of anything inside the wedge, however thin, and nothing outside it', () => {
+    // A post 300 mm wide 6 m north: its near face is 5.85 m off.
+    expect(nearestInWedge([0, 0], [0, -1], 12 * DEGREE, [post(0, -6_000)])).toBeCloseTo(5_850, 6);
+    // A signpost 60 mm wide, 8 m off and 5 degrees from where the view looks, lies between the sight
+    // lines a fan ten degrees apart casts (positive control: the middle line runs past it), and is found.
+    const sign = post(8_000 * Math.sin(5 * DEGREE), -8_000 * Math.cos(5 * DEGREE), 60);
+    expect(openDistance([0, 0], [0, -1], [sign], 40_000)).toBe(40_000);
+    const found = nearestInWedge([0, 0], [0, -1], 12 * DEGREE, [sign]);
+    expect(found).toBeGreaterThan(8_000 - 43);
+    expect(found).toBeLessThan(8_000);
+    // The same post 20 degrees off either way is at the side of the frame, and one behind the eye is not ahead.
+    for (const side of [1, -1]) {
+      const aside = post(side * 8_000 * Math.sin(20 * DEGREE), -8_000 * Math.cos(20 * DEGREE), 60);
+      expect(nearestInWedge([0, 0], [0, -1], 12 * DEGREE, [aside])).toBe(Infinity);
+      // And 5 degrees off either way it is found.
+      const near = post(side * 8_000 * Math.sin(5 * DEGREE), -8_000 * Math.cos(5 * DEGREE), 60);
+      expect(nearestInWedge([0, 0], [0, -1], 12 * DEGREE, [near])).toBeLessThan(8_000);
+    }
+    expect(nearestInWedge([0, 0], [0, -1], 12 * DEGREE, [post(0, 6_000)])).toBe(Infinity);
+  });
+
+  it('is where a wall first enters the wedge, not where the middle line meets it', () => {
+    // Straight at the wall opposite: 16 m.
+    expect(nearestInWedge([0, 0], [0, -1], 12 * DEGREE, [opposite])).toBeCloseTo(16_000, 6);
+    // Turned 60 degrees from it, the wedge spans 48 to 72 degrees from north: the wall is nearest
+    // along its 48 degree edge, 16 m / cos 48, nearer than along the middle line (16 m / cos 60).
+    const slanted = nearestInWedge([0, 0], [Math.sin(60 * DEGREE), -Math.cos(60 * DEGREE)], 12 * DEGREE, [opposite]);
+    expect(slanted).toBeCloseTo(16_000 / Math.cos(48 * DEGREE), 6);
+    expect(slanted).toBeLessThan(32_000);
+  });
+});
+
+describe('a town\'s seats, found by shape', () => {
+  const part = (alongMm: number, leftMm: number, bottomMm: number, sizeAlongMm: number, sizeLeftMm: number, heightMm: number) =>
+    ({ alongMm, leftMm, bottomMm, sizeAlongMm, sizeLeftMm, heightMm });
+
+  it('are the parts at sitting height that are wide and deep enough, and no leg, back, bin or cap', () => {
+    const bench = {
+      eastMm: 5_000, southMm: -2_000, facing: [1, 0] as const,
+      // A board with its top at 480 mm, a back above it, and two legs under it whose tops are at 420 mm.
+      parts: [part(0, 0, 420, 1_800, 450, 60), part(0, -200, 480, 1_800, 60, 420), part(-800, 0, 0, 60, 450, 420), part(800, 0, 0, 60, 450, 420)],
+    };
+    const bin = { eastMm: 9_000, southMm: -2_000, facing: [1, 0] as const, parts: [part(0, 0, 0, 520, 520, 1_000)] };
+    const bollard = { eastMm: 11_000, southMm: -2_000, facing: [1, 0] as const, parts: [part(0, 0, 0, 160, 160, 450)] };
+    // A plinth 150 mm high is wide and deep enough, and too low to be a seat.
+    const plinth = { eastMm: 13_000, southMm: -2_000, facing: [1, 0] as const, parts: [part(0, 0, 0, 800, 800, 150)] };
+    expect(seatsOf([bench, bin, bollard, plinth], LIFE)).toEqual([[5_000, -2_000]]);
+  });
+
+  it('are placed where their furniture faces: ahead is its direction, left is to its left', () => {
+    // Facing south, a seat 1 m ahead of the base and 0.5 m to its left is 1 m south and 0.5 m east.
+    const ledge = { eastMm: 10_000, southMm: 20_000, facing: [0, 3] as const, parts: [part(1_000, 500, 0, 600, 600, 450)] };
+    const [seat] = seatsOf([ledge], LIFE);
+    expect(seat![0]).toBeCloseTo(10_500, 9);
+    expect(seat![1]).toBeCloseTo(21_000, 9);
+  });
+});
+
+describe('how alive a view is', () => {
+  const east = [1, 0] as const;
+  const alive = (life: { seats?: [number, number][]; doors?: [number, number][] }, rings: SightBlocker[] = []) =>
+    viewLife([0, 0], east, { seats: life.seats ?? [], doors: life.doors ?? [] }, rings, LIVELY);
+
+  it('counts a near door as one and a near seat as the rule\'s many, and fades each with distance', () => {
+    expect(alive({ doors: [[10_000, 0]] })).toBe(1);
+    expect(alive({ seats: [[10_000, 0]] })).toBe(4);
+    expect(alive({ doors: [[25_000, 0]] })).toBe(1);
+    // Half way from 25 m to 60 m counts half; at and beyond 60 m, nothing.
+    expect(alive({ doors: [[42_500, 0]] })).toBeCloseTo(0.5, 9);
+    expect(alive({ seats: [[42_500, 0]] })).toBeCloseTo(2, 9);
+    expect(alive({ doors: [[61_000, 0]] })).toBe(0);
+    expect(alive({ doors: [[10_000, 0]], seats: [[12_000, 1_000]] })).toBe(5);
+  });
+
+  it('counts what lies inside the fan and nothing beside or behind it', () => {
+    const at = (degrees: number): [number, number] => [10_000 * Math.cos(degrees * DEGREE), 10_000 * Math.sin(degrees * DEGREE)];
+    expect(alive({ doors: [at(35)] })).toBe(1);
+    expect(alive({ doors: [at(-35)] })).toBe(1);
+    expect(alive({ doors: [at(45)] })).toBe(0);
+    expect(alive({ doors: [at(180)] })).toBe(0);
+  });
+
+  it('counts a door on its own wall and not one hidden behind another', () => {
+    const front: SightBlocker = [[10_000, -5_000], [12_000, -5_000], [12_000, 5_000], [10_000, 5_000]];
+    // The door's threshold is in the face of the building it belongs to, here 100 mm behind the
+    // base ring's line: the sight line ends on its own building within the margin, and it counts.
+    expect(alive({ doors: [[10_100, 0]] }, [front])).toBe(1);
+    // A door a metre inside that building is behind its wall, not in it.
+    expect(alive({ doors: [[11_000, 0]] }, [front])).toBe(0);
+    // A wall a metre nearer hides the door; it does not hide a seat on the near side of it.
+    const screen: SightBlocker = [[9_000, -5_000], [9_100, -5_000], [9_100, 5_000], [9_000, 5_000]];
+    expect(alive({ doors: [[10_100, 0]] }, [front, screen])).toBe(0);
+    expect(alive({ seats: [[8_000, 0]] }, [front, screen])).toBe(4);
+  });
+});
+
+describe('the first view of a town with nothing placed, chosen by its life', () => {
+  const town = { eastMm: 0, southMm: 0, facing: [0, -1] as const, targets: [], parked: [], ground: footway };
+  const street = [opposite, behind];
+
+  it('looks the way along the street its seats are', () => {
+    for (const side of [1, -1]) {
+      const view = arrivalView({ ...town, blockers: street, open: LIVELY, life: { seats: [[side * 12_000, -1_500]], doors: [] } });
+      expect(Math.sign(looks(view.yaw)[0])).toBe(side);
+      // Still a slant of 60 degrees from straight across, never straight at the wall or the seat.
+      expect(looks(view.yaw)[1]).toBeCloseTo(-Math.cos(Math.PI / 3), 9);
+    }
+  });
+
+  it('takes the livelier way even where the other is more open', () => {
+    const blockers = [...street, westEnd];
+    const life = { seats: [[-12_000, -1_500]] as [number, number][], doors: [] };
+    // Positive control: by openness alone (version 1) this street is looked along eastward.
+    expect(looks(arrivalView({ ...town, blockers, open: RULE }).yaw)[0]).toBeGreaterThan(0);
+    expect(looks(arrivalView({ ...town, blockers, open: LIVELY, life }).yaw)[0]).toBeLessThan(0);
+  });
+
+  it('takes the more open of two equally alive ways', () => {
+    // A door either way on the far frontage, mirrored: the same life both ways; the east is the less open.
+    const life = { seats: [], doors: [[-10_000, -16_000], [10_000, -16_000]] as [number, number][] };
+    const blockers = [...street, eastWing];
+    // Positive control: the wing costs the eastward view more openness than the rule's tie.
+    const eastward = [Math.sin(Math.PI / 3), -Math.cos(Math.PI / 3)] as const;
+    const westward = [-Math.sin(Math.PI / 3), -Math.cos(Math.PI / 3)] as const;
+    expect(viewOpenness([0, 0], westward, blockers, LIVELY) - viewOpenness([0, 0], eastward, blockers, LIVELY)).toBeGreaterThan(LIVELY.tie);
+    expect(looks(arrivalView({ ...town, blockers, open: LIVELY, life }).yaw)[0]).toBeLessThan(0);
+    // A door at the far edge of sight to the east, 52 m along the near frontage, makes the east the
+    // livelier way by less than the tie's half a door (positive control), and does not outweigh that.
+    const faint = { seats: [], doors: [...life.doors, [52_000, 3_000]] as [number, number][] };
+    const more = viewLife([0, 0], eastward, faint, blockers, LIVELY) - viewLife([0, 0], westward, faint, blockers, LIVELY);
+    expect(more).toBeGreaterThan(0.1);
+    expect(more).toBeLessThan(LIFE.tie);
+    expect(looks(arrivalView({ ...town, blockers, open: LIVELY, life: faint }).yaw)[0]).toBeLessThan(0);
+  });
+
+  it('opens as version 1 does where the town states no life and nothing stands near', () => {
+    expect(arrivalView({ ...town, blockers: street, open: LIVELY })).toEqual(arrivalView({ ...town, blockers: street, open: RULE }));
+  });
+
+  it('never has a thin post dead ahead nearer than the floor where another spot or way has none', () => {
+    // The seats are to the west. A signpost 60 mm wide stands 6 m from the spot one step back, 3
+    // degrees off the westward slant: between the fan's sight lines, so openness does not see it.
+    const life = { seats: [[-14_000, -1_500]] as [number, number][], doors: [] };
+    const west = [-Math.sin(Math.PI / 3), -Math.cos(Math.PI / 3)] as const;
+    const bearing = Math.PI / 3 + 3 * DEGREE;
+    const sign = post(-6_000 * Math.sin(bearing), 750 - 6_000 * Math.cos(bearing), 60);
+    const blockers = [...street, sign];
+    // Positive controls: from that spot the post is dead ahead and near, and no sampled line meets it.
+    expect(nearestInWedge([0, 750], west, LIFE.centreHalf, blockers)).toBeLessThan(6_100);
+    expect(viewOpenness([0, 750], west, blockers, LIVELY)).toBe(viewOpenness([0, 750], west, street, LIVELY));
+    const view = arrivalView({ ...town, blockers, open: LIVELY, life });
+    expect(nearestInWedge([view.eastMm, view.southMm], looks(view.yaw), LIFE.centreHalf, blockers)).toBeGreaterThanOrEqual(LIFE.centreFloorMm);
+    // It still looks toward the seats: a step along the footway clears the post.
+    expect(looks(view.yaw)[0]).toBeLessThan(0);
+    expect([view.eastMm, view.southMm]).not.toEqual([0, 750]);
+  });
+
+  it('takes the view whose nearest thing dead ahead is farthest where every view has one', () => {
+    // One spot to stand on, a post 5 m along the westward slant and one 7 m along the eastward.
+    const posts = [post(-5_000 * Math.sin(Math.PI / 3), -5_000 * Math.cos(Math.PI / 3)), post(7_000 * Math.sin(Math.PI / 3), -7_000 * Math.cos(Math.PI / 3))];
+    const view = arrivalView({
+      ...town, ground: () => false, blockers: [...street, ...posts], open: LIVELY, life: { seats: [[-12_000, -1_500]], doors: [] },
+    });
+    expect(view).toMatchObject({ eastMm: 0, southMm: 0, moved: false });
+    // Eastward, though the seats are to the west: the nearer post is the worse.
+    expect(looks(view.yaw)[0]).toBeGreaterThan(0);
+  });
+
+  it('is the same whatever is parked: parked vehicles do not enter the choice', () => {
+    const life = { seats: [[12_000, -1_500]] as [number, number][], doors: [] };
+    const bare = arrivalView({ ...town, blockers: street, open: LIVELY, life });
+    // Parked at the kerb 6 m along the eastward slant, in the middle of the view the seats call for.
+    const parked = parkedFootprint({
+      frontAxleMm: [3_000 + 1_400, 1_500], rearAxleMm: [3_000 - 1_400, 1_500],
+      dimensionsMm: { width: 1_800, frontOverhang: 800, rearOverhang: 900 },
+    })!;
+    // Positive control: under version 1 that car turns the view the other way.
+    expect(looks(arrivalView({ ...town, parked: [parked], blockers: street, open: RULE }).yaw)[0]).toBeLessThan(0);
+    expect(arrivalView({ ...town, parked: [parked], blockers: street, open: LIVELY, life })).toEqual(bare);
+    expect(looks(bare.yaw)[0]).toBeGreaterThan(0);
+  });
+
+  it('changes nothing where things are placed', () => {
+    const dressed = { eastMm: 0, southMm: 0, facing: [0, -1] as const, targets: scene, parked: [car], ground: everywhere };
+    expect(arrivalView({ ...dressed, open: LIVELY, life: { seats: [[-12_000, -1_500]], doors: [] } })).toEqual(arrivalView(dressed));
   });
 });

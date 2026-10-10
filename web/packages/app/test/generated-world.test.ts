@@ -16,7 +16,9 @@ const loadGeneratedTile = vi.hoisted(() => vi.fn());
 const TILE_LOOK_V1 = vi.hoisted(() => ({ id: 'exulanica.generated-tile-look', version: 1 }));
 // A container's street furniture, as the tile module would read it from the container's records.
 const streetFurnitureOf = vi.hoisted(() => vi.fn<(bytes: Uint8Array) => { identity: string }[]>(() => []));
-vi.mock('@exulanica/atlas-react/generated-tile', () => ({ loadGeneratedTile, TILE_LOOK_V1, streetFurnitureOf }));
+// A container's doors onto a footway, the same way.
+const doorsOf = vi.hoisted(() => vi.fn<(bytes: Uint8Array) => { identity: string; eastMm: number; southMm: number }[]>(() => []));
+vi.mock('@exulanica/atlas-react/generated-tile', () => ({ loadGeneratedTile, TILE_LOOK_V1, streetFurnitureOf, doorsOf }));
 vi.mock('../src/texture-library.js', () => ({
   committedTextureLibrary: async () => ({
     textureManifest: new Uint8Array(),
@@ -33,6 +35,11 @@ vi.mock('../src/world-look.js', async (importOriginal) => ({
     looks.asked.push(asked);
     throw new Error('this test reads no pack');
   },
+}));
+// A version is read as the route would answer it for these tests: its things, each with where it stands.
+vi.mock('../src/world-objects-api.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/world-objects-api.js')>()),
+  parseVersion: (raw: unknown) => raw,
 }));
 vi.mock('@exulanica/atlas-core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@exulanica/atlas-core')>()),
@@ -126,7 +133,10 @@ describe('a saved generated world of several tiles', () => {
     // In the tile look, so what it reads is the tiles alone; a pack's reads are world-look.test.ts's.
     const loaded = await loadGeneratedWorld(access, entry(tiles), '?look=today');
     expect(isGeneratedWorld(loaded)).toBe(true);
-    // Its tiles' bytes (the first view also reads the version's things and what is parked).
+    // Its tiles' bytes (the first view also reads the version's things). With nothing placed the
+    // view is chosen from the tiles alone, so what is parked is never asked after.
+    expect(read.some((url) => url.startsWith('/world/versions/version?'))).toBe(true);
+    expect(read.some((url) => url.includes('traffic'))).toBe(false);
     expect(read.filter((url) => url.includes('/tiles/'))).toEqual([west, east].map((id) =>
       `/world/versions/version/tiles/${id}/bytes?world_id=world%3Agenerated%3Awide`));
     // The runtime draws the first container as the tile and every other as a neighbour, whose
@@ -213,6 +223,80 @@ describe('a saved generated world of several tiles', () => {
     const loaded = await loadGeneratedWorld(access, entry(tiles, [3000, 0]), '?look=today');
     if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
     expect(loaded.tile.start).toMatchObject({ x: 128 - BACK_STEP_MM / 1000, z: -58.75 });
+  });
+
+  it('waits for the version\'s placed things however long they take, and faces them', async () => {
+    const tiles = [tile(0, 'baked')];
+    const route = tileRoute({ [tiles[0]!.bakedTileId!]: new Uint8Array([1]) });
+    let answer: ((response: Response) => void) | null = null;
+    const asked: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname.includes('/tiles/')) return route.fetch(input);
+      asked.push(url.pathname);
+      if (url.pathname === '/world/versions/version') return new Promise<Response>((resolve) => { answer = resolve; });
+      throw new Error('this test serves no traffic');
+    }));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      let loaded: Awaited<ReturnType<typeof loadGeneratedWorld>> | undefined;
+      const loading = loadGeneratedWorld(access, entry(tiles), '?look=today').then((world) => { loaded = world; });
+      // Ten seconds pass with the version unanswered: the town has not opened without it.
+      for (let waited = 0; waited < 10 && answer === null; waited += 1) await vi.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(answer).not.toBeNull();
+      expect(loaded).toBeUndefined();
+      // One thing stands 11.25 m north of the arrival, behind a person who arrives facing south.
+      answer!(Response.json({ things: [{ removed: false, transform: { xMm: 128_000, zMm: -70_000 } }] }));
+      // No more of the clock is needed: the traffic this test does not serve refuses at once.
+      await loading;
+      if (loaded === undefined || !isGeneratedWorld(loaded)) throw new Error('not loaded');
+      // Something is placed, so what is parked is asked after, and the view faces the thing from the
+      // served spot: north is yaw 0.
+      expect(asked.some((path) => path.includes('traffic'))).toBe(true);
+      expect(loaded.tile.start).toMatchObject({ x: 128, z: -58.75 });
+      expect((loaded.tile.start as { yaw: number }).yaw).toBeCloseTo(0, 9);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('chooses the first view by the town\'s own doors and seats, read from every tile once', async () => {
+    const tiles = [tile(0, 'baked'), tile(1, 'baked')];
+    const [west, east] = tiles.map((one) => one.bakedTileId!);
+    vi.stubGlobal('fetch', tileRoute({ [west!]: new Uint8Array([1, 2, 3]), [east!]: new Uint8Array([4, 5, 6]) }).fetch);
+    // A bench 12 m east of the arrival on its own footway, stated by both tiles (a halo copy), and
+    // a door 40 m west stated by the first: the seat outweighs the door, so the view looks east.
+    const bench = { identity: 'bench', eastMm: 140_000, southMm: -58_750, facing: [1, 0], parts: [
+      { alongMm: 0, leftMm: 0, bottomMm: 420, sizeAlongMm: 1_800, sizeLeftMm: 450, heightMm: 60 },
+    ] };
+    streetFurnitureOf.mockImplementation(() => [bench]);
+    doorsOf.mockClear();
+    doorsOf.mockImplementation((container) => (container[0] === 1 ? [{ identity: 'door', eastMm: 88_000, southMm: -58_750 }] : []));
+    try {
+      const loaded = await loadGeneratedWorld(access, entry(tiles), '?look=today');
+      if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
+      const yaw = (loaded.tile.start as { yaw: number }).yaw;
+      // Forward is (-sin yaw, -cos yaw) in east and south: eastward, and south across the road.
+      expect(-Math.sin(yaw)).toBeCloseTo(Math.sin(Math.PI / 3), 9);
+      expect(-Math.cos(yaw)).toBeCloseTo(Math.cos(Math.PI / 3), 9);
+      expect(doorsOf.mock.calls.map(([container]) => [...container])).toEqual([[1, 2, 3], [4, 5, 6]]);
+      // With the bench to the west instead, it looks west: the same town mirrored.
+      streetFurnitureOf.mockImplementation(() => [{ ...bench, eastMm: 116_000 }]);
+      doorsOf.mockImplementation(() => []);
+      const mirrored = await loadGeneratedWorld(access, entry(tiles), '?look=today');
+      if (!isGeneratedWorld(mirrored)) throw new Error('not loaded');
+      expect(-Math.sin((mirrored.tile.start as { yaw: number }).yaw)).toBeCloseTo(-Math.sin(Math.PI / 3), 9);
+      // With no seat anywhere and one door 15 m east, the door decides: it looks east again.
+      streetFurnitureOf.mockImplementation(() => []);
+      doorsOf.mockImplementation((container) => (container[0] === 4 ? [{ identity: 'door', eastMm: 143_000, southMm: -58_750 }] : []));
+      const byDoor = await loadGeneratedWorld(access, entry(tiles), '?look=today');
+      if (!isGeneratedWorld(byDoor)) throw new Error('not loaded');
+      expect(-Math.sin((byDoor.tile.start as { yaw: number }).yaw)).toBeCloseTo(Math.sin(Math.PI / 3), 9);
+    } finally {
+      streetFurnitureOf.mockImplementation(() => []);
+      doorsOf.mockImplementation(() => []);
+    }
   });
 
   it('opens beside the served arrival when the drawn ground carves the point itself', async () => {
