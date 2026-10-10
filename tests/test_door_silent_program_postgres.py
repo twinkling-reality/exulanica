@@ -14,7 +14,10 @@ What is shown:
 *   a program that answers again is asked every minute again.
 
 Whether the program answers an ask is the test's own choice, and the world's wait follows that
-choice rather than the clock, so a loaded machine changes none of it.
+choice rather than the clock, so a loaded machine changes none of it. Where the routine walks the
+knight is the seed's, so the society starts from a chosen one, and each turn read is held to be the
+one its own minute recorded: a being with nothing to choose is not asked at all
+(``docs/decision-roles-contract.md``), and a minute with no turn is never read as the one before.
 """
 
 from __future__ import annotations
@@ -26,6 +29,7 @@ from exulanica.door import asker as asker_module
 
 import test_society_authored_world_postgres as helpers
 import test_society_person_decisions_postgres as decisions
+from society_seed_support import choose_society_seed
 from test_door_crossings_postgres import crossings as crossings
 from test_door_lines_postgres import _Bridge, _host, _Knight, _minute, _person
 from test_door_postgres import OWNER, _bridges, _credential, _hello
@@ -41,6 +45,12 @@ EVERY = 3
 #: The program's answer window: the longest the decision contract lets a world wait
 #: (decision_deadline_ms), so an ask the program answers is never cut short by a loaded machine.
 DEADLINE_MS = 20_000
+#: The seed the society starts from (sha256 of "door-silent-program-0"). The one a saved world
+#: derives from its workspace and world ids changes each run, and under some the routine walks the
+#: knight out of everyone's hearing with something still under way, where it has nothing but going
+#: on to choose and is not asked, so that minute records no turn for it. Under this one the knight
+#: and the squire each have something to choose in every minute the test plays.
+SEED = "efdb9fcce2332384424ef1265bbe00febf867ddb8094c6b48939a9f8b8e06a7d"
 
 
 def _asks(door, grant_id: str, subject: str) -> int:
@@ -72,6 +82,7 @@ def test_a_silent_program_is_asked_now_and_then_and_its_world_does_not_wait(
     # A society of things with two knights the grant hands to the program: it answers for one of
     # them all along and lets the other's asks pass.
     world = door["world"]
+    choose_society_seed(client.app, SEED)
     _place(client, world, "well", "well", 2, -4_000, 2_000)
     _place(client, world, "knight", "knight", 1, 3_000, 3_000)
     _place(client, world, "squire", "knight", 1, -3_000, 3_000)
@@ -118,16 +129,27 @@ def test_a_silent_program_is_asked_now_and_then_and_its_world_does_not_wait(
 
     def turns(count: int) -> list[tuple[str, int]]:
         """The knight's next ``count`` turns: each one's reason and the asks for it written by its
-        end; the squire's turns are each asked and answered meanwhile."""
+        end; the squire's turns are each asked and answered meanwhile. Each turn read is the one
+        its own minute recorded."""
         nonlocal society
         seen = []
         for _ in range(count):
+            minute = society["current_tick"]
             society = _minute(door, host, world, society)
-            receipts = decisions._decisions(services, world, society)
+            receipts = [
+                d
+                for d in decisions._decisions(services, world, society)
+                if d["base_tick"] == minute
+            ]
             mine = [d for d in receipts if d["subject_id"] == knight]
             theirs = [d for d in receipts if d["subject_id"] == squire]
-            assert theirs[-1]["reason"] == "validated_choice", theirs[-1]
-            seen.append((mine[-1]["reason"], _asks(door, grant_id, knight)))
+            # A being with nothing to choose is not asked, and its minute records no turn.
+            assert (len(mine), len(theirs)) == (1, 1), (
+                f"minute {minute} recorded {len(mine)} turns of the knight and {len(theirs)} of "
+                "the squire: under SEED each has something to choose in every minute"
+            )
+            assert theirs[0]["reason"] == "validated_choice", theirs[0]
+            seen.append((mine[0]["reason"], _asks(door, grant_id, knight)))
         return seen
 
     with _Bridge(client, channel, hello.json()["cursor"], choose):
