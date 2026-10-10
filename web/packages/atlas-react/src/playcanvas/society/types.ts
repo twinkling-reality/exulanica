@@ -255,6 +255,13 @@ export interface CrowdRenderable {
   readonly standingHeight: number;
   readonly facing: number;
   /**
+   * Optional: how fast this renderable walks at its walk's own cadence, metres a second at the size
+   * it is drawn, for one whose look declares it, as a rigged thing's does. Absent or null means it
+   * declares none, and the crowd then walks the person at the catalog person's pace for their id; a
+   * catalog person omits it for that reason.
+   */
+  readonly walkSpeed?: number | null;
+  /**
    * Optional: whether this renderable draws an activity on a seat in a seat posture. The catalog
    * person does; one that omits it, like the abstract figure, draws every activity standing, and the
    * crowd then keeps it standing at its place rather than lifting it onto a seat it would hover over.

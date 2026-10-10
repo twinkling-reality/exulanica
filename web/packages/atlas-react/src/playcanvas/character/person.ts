@@ -19,6 +19,12 @@ export interface PersonPose {
   readonly speed: number;
   /** Signed turn rate, radians per second. */
   readonly turnRate: number;
+  /**
+   * Whether a turn is a pivot: the body turns as its owner turned it and no step is drawn for the
+   * turn, as for someone a crowd walks round a corner or turns to face what they are doing. Absent
+   * means a turn is stepped, the feet travelling `TURN_RADIUS_METRES` for each radian turned.
+   */
+  readonly pivot?: boolean;
   readonly deltaSeconds: number;
   readonly reducedMotion: boolean;
   readonly discontinuity: boolean;
@@ -41,7 +47,12 @@ const POSTURE = 'posture';
  */
 export const POSTURE_BLEND_SECONDS = 0.8;
 /** Half the distance between the feet: how far a foot travels per radian of turning in place. */
-const TURN_RADIUS_METRES = 0.18;
+export const TURN_RADIUS_METRES = 0.18;
+/**
+ * A pivot slower than this, radians a second (about a tenth of a degree), has ended: the feet are
+ * planted again where they stand.
+ */
+const PIVOT_ENDED_RADIANS_PER_SECOND = 0.002;
 
 function skinsMatch(a: pc.Skin, b: pc.Skin): boolean {
   if (a.boneNames.length !== b.boneNames.length) return false;
@@ -59,6 +70,11 @@ function containerMeshes(container: LoadedContainer): pc.Mesh[] {
 
 /** The slowest cadence a walk plays at, as a share of its calibrated speed; slower is a blend into standing. */
 export const SLOWEST_WALK_CADENCE = 0.5;
+/**
+ * Slower than this, metres a second, a figure stands: what is left of a speed easing to rest is not
+ * a walk, and a figure going nowhere does not step.
+ */
+export const STANDING_SPEED = 0.02;
 
 /**
  * Where on the idle, walk and run blend a speed sits, and how fast the clips play there.
@@ -76,6 +92,15 @@ export function gaitFor(speed: number, walk: number, run: number): { readonly bl
   if (speed <= walk) return { blend: walk, cadence: speed / walk };
   if (speed <= run) return { blend: speed, cadence: 1 };
   return { blend: run, cadence: speed / run };
+}
+
+/**
+ * The speed a person's stride is drawn for, metres a second, for a body drawn at `scale` times its
+ * rest height: the ground speed, and in a turn that is stepped the feet's own travel about the body
+ * as well. A pivot adds nothing, so someone who is going nowhere stands however they are turned.
+ */
+export function strideSpeed(pose: Pick<PersonPose, 'speed' | 'turnRate' | 'pivot'>, scale: number): number {
+  return Math.hypot(pose.speed, pose.pivot ? 0 : pose.turnRate * TURN_RADIUS_METRES * scale);
 }
 
 /** A state's name holds no dot: `assignAnimation` reads a dot as a path into a blend tree. */
@@ -326,17 +351,17 @@ export class CharacterPerson {
       this.plantAbove(pose);
       return;
     }
-    const target = pose.reducedMotion || pose.discontinuity
-      ? 0
-      : Math.hypot(pose.speed, pose.turnRate * TURN_RADIUS_METRES * this.scale);
+    const target = pose.reducedMotion || pose.discontinuity ? 0 : strideSpeed(pose, this.scale);
     const dt = Math.max(0, Math.min(0.1, pose.deltaSeconds));
     // Acceleration and braking read as weight transfer rather than a snap between gaits.
     this.smoothedSpeed = pose.discontinuity ? 0 : this.smoothedSpeed + (target - this.smoothedSpeed) * (1 - Math.exp(-dt / 0.12));
-    const speed = this.smoothedSpeed < 0.02 ? 0 : this.smoothedSpeed;
+    const speed = this.smoothedSpeed < STANDING_SPEED ? 0 : this.smoothedSpeed;
     const gait = gaitFor(speed, this.walkSpeed, this.runSpeed);
     anim.setFloat(SPEED, gait.blend);
     anim.speed = pose.reducedMotion ? 0 : gait.cadence;
-    if (pose.discontinuity) this.footLock?.reset();
+    // Pivoted, the feet turn with the body: pinned where they stood, the legs would twist under it.
+    const pivoting = pose.pivot === true && Math.abs(pose.turnRate) > PIVOT_ENDED_RADIANS_PER_SECOND;
+    if (pose.discontinuity || pivoting) this.footLock?.reset();
     else this.footLock?.apply(dt, speed);
     this.plantAbove(pose);
   }

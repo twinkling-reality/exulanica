@@ -6,9 +6,12 @@
  * joint for each plan bone it maps (`rig.bones`), a clip for each motion it has (`rig.clips`), the
  * joint each socket holds things at (`rig.sockets`) and the ground speed of its locomotion clips
  * (`rig.ground_speed_mm_per_s`, metres a second at the look's height). Standing, walking and running
- * blend by ground speed; a clip plays faster past its own pace, at most twice, and beyond that its
- * feet slide (named, never hidden by moving the figure). A motion with no clip falls back to idle,
- * as the body plan says. Over a clip, the arm of a socket that reaches is posed procedurally on the
+ * blend by ground speed, and the clips' cadence follows it as a catalog person's does (`gaitFor`), so
+ * a planted foot moves as fast as the ground: slower than its walk clip's pace the walk plays slower,
+ * down to half its cadence, and only below that fades into standing; slower than `STANDING_SPEED` the
+ * figure stands. A clip plays faster past its own pace, at most twice, and beyond that its feet
+ * slide (named, never hidden by moving the figure). A motion with no clip falls back to idle, as
+ * the body plan says. Over a clip, the arm of a socket that reaches is posed procedurally on the
  * mapped arm bones, and the head nods while the thing speaks.
  *
  * A rig with no clips at all (a creature sculpted for its own body plan) is posed as a rigid look is:
@@ -18,9 +21,10 @@
  */
 
 import * as pc from 'playcanvas';
+import { STANDING_SPEED, gaitFor } from '../character/person.js';
 import type { Grip, SkinnedRig } from './documents.js';
 import { HALF_TURN, bodyCarry, nodeCarry, placeHeld, quat, quatOf, type PickVolume, type ThingFigure, type ThingPose } from './figures.js';
-import { axisAngle, mul, rotate, solvePose } from './motion.js';
+import { axisAngle, gaitTravel, mul, rotate, solvePose } from './motion.js';
 import { dressSkeleton, type BodyPlanEntry, type DressedSkeleton, type Vec3 } from './skeleton.js';
 
 const LOCOMOTION = 'locomotion';
@@ -46,15 +50,24 @@ export class SkinnedFigure implements ThingFigure {
   private readonly restLocal = new Map<string, pc.Quat>();
   private readonly sockets = new Map<string, pc.Entity>();
   private readonly held = new Map<string, { entity: pc.Entity; grip: Grip }>();
-  private readonly walkSpeed: number | null;
-  private readonly runSpeed: number | null;
+  /**
+   * The ground speeds the walk and run clips are blended at and paced by, metres a second at the
+   * look's height: the walk is the slowest moving clip the rig has and the run its fastest, one clip
+   * being both. Null for a rig with no moving clip, or with no clips at all.
+   */
+  private readonly gait: { readonly walk: number; readonly run: number } | null;
+  /**
+   * How fast the figure walks at its walk clip's own cadence, metres a second at the size it is
+   * drawn: the look's declared walk speed scaled as the figure is. Null where the look declares none.
+   */
+  readonly walkSpeed: number | null;
   /** Whether the look has a clip for holding, which it then stands in while it holds something. */
   private readonly holdClip: boolean;
   private previous: readonly [number, number, number] | null = null;
   private speed = 0;
   /** A rig with no clips, posed by the solved gait; its root joint's rest, local and in the look's frame. */
   private readonly procedural: { readonly rootLocal: pc.Vec3; readonly rootLook: Vec3 } | null;
-  /** Metres walked, in the look's own units, for the solved gait. */
+  /** The solved gait's clock: metres walked, in the look's own units (`gaitTravel`). */
   private travelled = 0;
   private time = 0;
   private pending: ThingPose | null = null;
@@ -107,8 +120,8 @@ export class SkinnedFigure implements ThingFigure {
     this.skeleton = dressSkeleton(plan, rest);
     const walk = rig.groundSpeedMmPerS['walk'];
     const run = rig.groundSpeedMmPerS['run'];
-    this.walkSpeed = walk === undefined ? null : walk / 1000;
-    this.runSpeed = run === undefined ? null : run / 1000;
+    const walkSpeed = walk === undefined ? null : walk / 1000;
+    const runSpeed = run === undefined ? null : run / 1000;
     this.holdClip = rig.clips['hold'] !== undefined && tracks.has(rig.clips['hold']!);
     if (Object.keys(rig.clips).length === 0) {
       for (const bone of this.skeleton.order) {
@@ -121,6 +134,8 @@ export class SkinnedFigure implements ThingFigure {
         }
       }
       this.procedural = { rootLocal: this.joints.get(this.skeleton.root)!.getLocalPosition().clone(), rootLook: rest.get(this.skeleton.root)! };
+      this.gait = null;
+      this.walkSpeed = null;
       this.solve({ position: [0, 0, 0], facing: 0, deltaSeconds: 0 });
       return;
     }
@@ -134,10 +149,15 @@ export class SkinnedFigure implements ThingFigure {
     this.figure.addComponent('anim', { activate: true });
     const anim = this.figure.anim!;
     const points: { name: string; point: number }[] = [{ name: 'idle', point: 0 }];
-    if (this.walkSpeed !== null && rig.clips['walk'] !== undefined) points.push({ name: 'walk', point: this.walkSpeed });
-    if (this.runSpeed !== null && rig.clips['run'] !== undefined && (this.walkSpeed === null || this.runSpeed > this.walkSpeed)) {
-      points.push({ name: 'run', point: this.runSpeed });
+    if (walkSpeed !== null && rig.clips['walk'] !== undefined) points.push({ name: 'walk', point: walkSpeed });
+    if (runSpeed !== null && rig.clips['run'] !== undefined && (walkSpeed === null || runSpeed > walkSpeed)) {
+      points.push({ name: 'run', point: runSpeed });
     }
+    const walkPoint = points.find((point) => point.name === 'walk')?.point;
+    const runPoint = points.find((point) => point.name === 'run')?.point;
+    const slowest = walkPoint ?? runPoint;
+    this.gait = slowest === undefined ? null : { walk: slowest, run: runPoint ?? slowest };
+    this.walkSpeed = walkPoint === undefined ? null : walkPoint * this.scale;
     const carrying = points.map((point) => (point.name === 'idle' ? { name: 'hold', point: 0 } : point));
     const held = (value: boolean) => [{ parameterName: HOLDING, predicate: pc.ANIM_EQUAL_TO, value }];
     anim.loadStateGraph({
@@ -180,7 +200,7 @@ export class SkinnedFigure implements ThingFigure {
       this.speed = 0;
     }
     if (this.procedural !== null && this.previous !== null && !pose.discontinuity && dt > 0) {
-      this.travelled += Math.hypot(x - this.previous[0], z - this.previous[2]) / this.scale;
+      this.travelled += gaitTravel(Math.hypot(x - this.previous[0], z - this.previous[2]) / this.scale, this.speed / this.scale);
     }
     this.previous = pose.position;
     this.time += pose.reducedMotion ? 0 : dt;
@@ -193,19 +213,20 @@ export class SkinnedFigure implements ThingFigure {
       return;
     }
     const anim = this.figure.anim!;
-    const ground = pose.reducedMotion ? 0 : this.speed / this.scale;
+    // What is left of a speed easing to rest is not a walk: slower than the threshold it stands.
+    const ground = pose.reducedMotion || this.speed < STANDING_SPEED ? 0 : this.speed / this.scale;
     this.misses.clear();
     if (this.holdClip) anim.setBoolean(HOLDING, (pose.holding?.size ?? 0) > 0);
-    const fastest = this.runSpeed ?? this.walkSpeed;
-    if (fastest === null) {
+    if (this.gait === null) {
       if (ground > 0.15) this.misses.add('no_ground_speed');
       anim.setFloat(SPEED, 0);
       anim.speed = 1;
     } else {
-      anim.setFloat(SPEED, Math.min(ground, fastest));
-      const over = ground > fastest ? ground / fastest : 1;
-      anim.speed = pose.reducedMotion ? 0 : Math.min(CLIP_SPEED_LIMIT, over);
-      if (over > CLIP_SPEED_LIMIT) this.misses.add('feet_slide');
+      // The clips' cadence follows the ground, so a planted foot moves as fast as the ground does.
+      const gait = gaitFor(ground, this.gait.walk, this.gait.run);
+      anim.setFloat(SPEED, gait.blend);
+      anim.speed = pose.reducedMotion ? 0 : Math.min(CLIP_SPEED_LIMIT, gait.cadence);
+      if (gait.cadence > CLIP_SPEED_LIMIT) this.misses.add('feet_slide');
     }
     this.pending = pose;
   }

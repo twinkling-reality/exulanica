@@ -32,24 +32,36 @@ import type {
  *
  * Motion follows the recorded path only. A v4 inhabitant records its own walking speed
  * (`walk_speed_mm_per_tick`) and walks at it, one tick's worth per interval, stopping where the
- * recorded path ends. A v2 state records only a bound, how far anybody may walk in a tick
- * (`movement_budget_mm_per_tick`), and a person's recorded path is usually much shorter: walking
- * it at the bound would cover it in a fraction of the interval and stand for the rest, a burst.
- * So a v2 person walks what they have still to walk evenly over the interval and the caller's
- * start lag, when the next tick's path is expected, never faster than `CATCH_UP_SPEED_LIMIT` times
- * the bound's own pace. Each later snapshot's path is appended to what the person has still to walk
- * when it starts where that ends, so a person walking through several minutes never stops between
- * them; a v4 person behind catches up along the recorded path at most `CATCH_UP_SPEED_LIMIT` times
- * their speed. A v2 person whose newly read minute adds nothing to walk finishes what is left at no
- * slower than their own walking pace (`FarFigures.walkSpeedOf`): spreading a walk to the next minute
- * keeps it continuous into that minute's walk, and with none to continue into, a remainder spread
- * again each minute would shrink without ever ending, and they would never arrive to do anything. Anything else, a path that starts somewhere the person was not, minutes this crowd
- * never saw, or more waiting than can be caught up, moves the person without walking, and every
- * such move is a named jump (`jumps`) rather than a silent one. An older snapshot without a pace is
- * eased along its path over the whole interval. No position is invented between path points.
+ * recorded path ends. A state that records only a bound, how far anybody may walk in a tick
+ * (`movement_budget_mm_per_tick`: a v2 state, and a society of things), says nothing of how fast a
+ * person walks, and a person's recorded path is usually much shorter than the bound: walked at the
+ * bound it would be a burst, and spread over the presented minute a short one would be a creep, feet
+ * stepping over ground that hardly moves. So such a person walks what they have still to walk at
+ * their own walking pace (`walkSpeedOf`: the pace the figure drawing them states, else the catalog
+ * person's), arrives, and stands where their activity is drawn until the next minute is read. A
+ * walk too long to finish at that pace by the time the next tick's path is expected (the interval
+ * and the caller's start lag) is walked evenly over that time instead: faster than a walk only
+ * because the minute's distance needs it, and never faster than `CATCH_UP_SPEED_LIMIT` times the
+ * bound's own pace. The pace is metres a second on the screen whatever the playback speed: a faster
+ * playback shortens the standing, and makes more walks long ones. Each later snapshot's path is
+ * appended to what the person has still to walk when it starts where that ends, so a person still
+ * walking when the next minute is read never stops between them; a v4 person behind catches up
+ * along the recorded path at most `CATCH_UP_SPEED_LIMIT` times their speed. Anything else, a path
+ * that starts somewhere the person was not, minutes this crowd never saw, or more waiting than can
+ * be caught up, moves the person without walking, and every such move is a named jump (`jumps`)
+ * rather than a silent one. An older snapshot without a pace is eased along its path over the whole
+ * interval. No position is invented between path points.
  * Everyone faces the way their recorded path last took them and keeps that facing when they
  * stop, in either form, so a person first drawn in full after arriving, or again after a spell
- * in the far form, faces as their far figure did.
+ * in the far form, faces as their far figure did. The crowd turns its people itself, along a
+ * path's corners and where they stand, toward what they use or whom they talk with, and every such
+ * turn is a pivot (`CharacterPose.pivot`): a figure draws no step for it, so a person's stride is
+ * the ground's alone and someone with no path to walk stands, however the state turns them.
+ *
+ * One clock moves a person and times their figure. A walk is advanced by the caller's clock, and
+ * the seconds handed with each pose are that clock's time since the crowd was last drawn, however
+ * long the frame took: the speed a figure reads from its poses is the speed it was moved at, so
+ * its steps keep to the ground at a low frame rate as at a high one.
  *
  * What a person is doing comes from the state too, never from how they move: an inhabitant whose
  * state names an active action (`action.kind` with `status` active) is handed that activity once
@@ -134,8 +146,9 @@ interface Walker {
   /** Metres one tick allows, as the state records it, or null when it records no pace. */
   readonly budget: number | null;
   /**
-   * For a v2 person, metres per millisecond: what they have still to walk spread evenly until the
-   * next tick is expected. Null for a v4 person, who walks at their own recorded speed.
+   * For a person whose state records only a bound, metres per millisecond: their own walking pace,
+   * or what they have still to walk spread evenly until the next tick is expected where that is
+   * faster. Null for a v4 person, who walks at their own recorded speed.
    */
   readonly rate: number | null;
   /** When a person standing still starts the walk just read, in the caller's clock. */
@@ -214,6 +227,10 @@ const REFRESH_METRES = 4;
 const MARK_CLEARANCE_METRES = 0.18;
 const DEFAULT_INTERVAL_MS = 1_850;
 const MILLISECONDS_PER_SECOND = 1000;
+/** The seconds a first drawing is handed: it has no earlier one to measure from. */
+const FIRST_FRAME_SECONDS = 1 / 60;
+/** The seconds a frame is handed under reduced motion, where nobody walks and nothing is timed by them. */
+const REDUCED_FRAME_SECONDS = 0.05;
 /** Two recorded points this close are one point: the state's unit is the millimetre. */
 const SAME_POINT_METRES = 0.001;
 /**
@@ -328,6 +345,7 @@ export class SocietyCrowd {
   private startLagMs = 0;
   /** Whether anybody still has recorded walking to present. */
   private moving = false;
+  /** When the crowd was last drawn, in the caller's clock. */
   private lastFrameMs = 0;
   /** Up to when every paced walker has been walked, in the caller's clock. */
   private lastWalkMs = 0;
@@ -420,6 +438,10 @@ export class SocietyCrowd {
     if (observer) this.observer = observer;
     this.intervalMs = Math.max(1, options.intervalMs ?? DEFAULT_INTERVAL_MS);
     this.startLagMs = Math.max(0, options.startLagMs ?? 0);
+    // Drawn below as on any frame: the figures are handed the time since they were last drawn.
+    const sinceDrawn = continuing
+      ? Math.max(0, nowMs - this.lastFrameMs) / MILLISECONDS_PER_SECOND
+      : FIRST_FRAME_SECONDS;
     this.startedAtMs = nowMs;
     this.lastFrameMs = nowMs;
     this.lastWalkMs = nowMs;
@@ -442,7 +464,7 @@ export class SocietyCrowd {
       const pace = person.walk_speed_mm_per_tick ?? state.movement_budget_mm_per_tick;
       const budget = pace === undefined ? null : pace / 1000;
       // A recorded speed is walked at; a recorded bound is only a bound (see the class comment).
-      const spread = budget !== null && person.walk_speed_mm_per_tick === undefined;
+      const boundOnly = budget !== null && person.walk_speed_mm_per_tick === undefined;
       let route: readonly Point[];
       let walked = 0;
       let startsAtMs = nowMs;
@@ -477,16 +499,15 @@ export class SocietyCrowd {
       } else if (apart(recorded[0]!, previous.route[previous.route.length - 1]!) <= SAME_POINT_METRES) {
         route = [...remainder(previous), ...recorded.slice(1)];
         const standing = previous.walked >= previous.total;
-        // A spread walk already lasts until the next tick is expected, so it starts at once.
-        startsAtMs = standing && !spread ? nowMs + this.startLagMs : spread ? nowMs : previous.startsAtMs;
+        // Under a bound alone a walk starts at once: a short one ends with them standing, and a
+        // long one already lasts until the next tick is expected.
+        startsAtMs = standing && !boundOnly ? nowMs + this.startLagMs : boundOnly ? nowMs : previous.startsAtMs;
       } else {
         route = recorded;
-        startsAtMs = spread ? nowMs : nowMs + this.startLagMs;
+        startsAtMs = boundOnly ? nowMs : nowMs + this.startLagMs;
         jump(consecutive ? 'path-starts-elsewhere' : 'minutes-not-read', apart(previous.position, recorded[0]!));
       }
       const { lengths, total } = polyline(route);
-      // What this minute adds to their walk: nothing for a person staying where they are.
-      const adds = recorded && recorded.length > 1 ? polyline(recorded).total : 0;
       if (budget !== null && total - walked > budget * BEHIND_LIMIT_TICKS) {
         const skipped = total - walked - budget;
         walked += skipped;
@@ -509,11 +530,12 @@ export class SocietyCrowd {
         total,
         walked,
         budget,
-        rate: stepping ? GATE_STEP_SPEED / MILLISECONDS_PER_SECOND : spread
+        rate: stepping ? GATE_STEP_SPEED / MILLISECONDS_PER_SECOND : boundOnly
           ? Math.min(
+            // Their own walking pace, and the even spread only where the minute's distance needs more.
             Math.max(
               (total - walked) / (this.intervalMs + this.startLagMs),
-              adds <= SAME_POINT_METRES ? this.far.walkSpeedOf(person.id) / MILLISECONDS_PER_SECOND : 0,
+              this.walkSpeedOf(person.id) / MILLISECONDS_PER_SECOND,
             ),
             (CATCH_UP_SPEED_LIMIT * budget!) / this.intervalMs,
           )
@@ -565,7 +587,7 @@ export class SocietyCrowd {
     this.missesRead = misses;
     if (this.selectedId && !walkers.has(this.selectedId)) this.selectedId = null;
     this.assignDetail();
-    this.place(nowMs, 1 / 60, false);
+    this.place(nowMs, sinceDrawn, false);
     return this.counts;
   }
 
@@ -576,8 +598,10 @@ export class SocietyCrowd {
   update(nowMs: number): void {
     if (!this.state) return;
     const reduced = nowMs === Number.MAX_SAFE_INTEGER;
-    const dt = Math.max(0.001, Math.min(0.05, (nowMs - this.lastFrameMs) / 1000));
-    this.lastFrameMs = reduced ? this.lastFrameMs : nowMs;
+    // One clock: the seconds handed on are the time the walkers are moved by, however long the frame took.
+    const dt = reduced ? REDUCED_FRAME_SECONDS : Math.max(0, nowMs - this.lastFrameMs) / MILLISECONDS_PER_SECOND;
+    // Never backward, as the walk's own clock never is (`lastWalkMs`).
+    this.lastFrameMs = reduced ? this.lastFrameMs : Math.max(this.lastFrameMs, nowMs);
     this.place(nowMs, dt, reduced);
   }
 
@@ -720,6 +744,16 @@ export class SocietyCrowd {
   private gateNear(id: string, at: Point): Point | null {
     const gate = this.gates.get(id);
     return gate !== undefined && Math.hypot(gate[0] - at[0], gate[1] - at[1]) <= GATE_STEP_METRES ? gate : null;
+  }
+
+  /**
+   * How fast a person walks when nothing hurries them, metres a second: the pace the figure drawing
+   * them states (`CrowdRenderable.walkSpeed`, a rigged thing's declared walk), else the catalog
+   * person's of their id, its walk clip's measured ground speed at their height.
+   */
+  private walkSpeedOf(id: string): number {
+    const stated = this.near.get(id)?.walkSpeed ?? null;
+    return stated !== null && stated > 0 ? stated : this.far.walkSpeedOf(id);
   }
 
   /**
@@ -1035,6 +1069,8 @@ export class SocietyCrowd {
       activity: this.drawnActivity(walker),
       ...(seated ? { seated } : {}),
       ...(walker.drawn[1] !== 0 ? { groundY: 0 } : {}),
+      // The crowd turns its people itself: no step is drawn for a turn, so their stride is the ground's alone.
+      pivot: true,
     };
   }
 

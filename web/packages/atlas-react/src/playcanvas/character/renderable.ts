@@ -7,7 +7,7 @@ import type { CharacterSubject } from '@exulanica/atlas-core';
 import type { CharacterHost } from './host.js';
 import { activityPosture, catalogFamily, type CatalogFamily, type CharacterCatalog } from './catalog.js';
 import { describeLook, type CharacterDetail, type CharacterLook, type CharacterRenderableDescription } from './look.js';
-import { CharacterPerson } from './person.js';
+import { CharacterPerson, strideSpeed } from './person.js';
 import { FarPerson, farAppearance, type FarAppearance } from './far.js';
 
 export interface CharacterPose {
@@ -37,6 +37,12 @@ export interface CharacterPose {
    * position is on the ground.
    */
   readonly groundY?: number;
+  /**
+   * Whether a change of facing is a pivot (`PersonPose.pivot`): the body is turned and no step is
+   * drawn for the turn. A crowd says so for everyone it walks and turns, so their stride is the
+   * ground's alone and a person with nowhere to go never strides. Absent means a turn is stepped.
+   */
+  readonly pivot?: boolean;
 }
 
 export type CharacterRenderableStatus = 'pending' | 'ready' | 'unavailable';
@@ -107,6 +113,8 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
   private heading: number | null = null;
   private speed = 0;
   private turnRate = 0;
+  /** Whether the last pose's turn was a pivot on the spot. */
+  private pivot = false;
   private visible = true;
   private disposed = false;
   private readonly unsubscribe: () => void;
@@ -170,6 +178,14 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
 
   get resolvedSpeed(): number {
     return this.speed;
+  }
+
+  /**
+   * The speed the full form's stride is drawn for after the last pose, before its easing (`strideSpeed`):
+   * the ground speed, and the feet's travel in a turn that is stepped. 0 is standing.
+   */
+  get resolvedStrideSpeed(): number {
+    return strideSpeed({ speed: this.speed, turnRate: this.turnRate, pivot: this.pivot }, this.nearDescription.scaleMicro / 1_000_000);
   }
 
   /** What this person's far form draws. */
@@ -269,6 +285,7 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
     this.turnRate = dt > 0 && !discontinuity ? wrap(heading - before) / dt : 0;
     this.heading = heading;
     this.speed = discontinuity ? 0 : speed;
+    this.pivot = pose.pivot === true;
     this.root.setLocalPosition(x, y, z);
     this.root.setLocalEulerAngles(0, (heading * 180) / Math.PI, 0);
     const reduced = pose.reducedMotion === true;
@@ -276,7 +293,10 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
     this.far.setPosture(this.posture);
     this.far.update(this.speed, dt, reduced);
     const footDrop = pose.groundY === undefined ? 0 : y - pose.groundY;
-    this.near?.update({ speed: this.speed, turnRate: this.turnRate, deltaSeconds: dt, reducedMotion: reduced, discontinuity, posture: this.posture, footDropMetres: footDrop });
+    this.near?.update({
+      speed: this.speed, turnRate: this.turnRate, ...(this.pivot ? { pivot: true } : {}), deltaSeconds: dt,
+      reducedMotion: reduced, discontinuity, posture: this.posture, footDropMetres: footDrop,
+    });
   }
 
   // Members the district runtime reads from its display avatars. They keep that code unchanged.

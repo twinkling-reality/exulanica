@@ -92,6 +92,71 @@ describe('a rig with no clips', () => {
     expect(Math.abs(world(skinned, 'leftFoot').x - world(skinned, 'rightFoot').x)).toBeGreaterThan(0.05);
   });
 
+  it('keeps a planted foot where it stands at a slow walk, as a rigid look does: shorter steps, no slower', () => {
+    const FRAME = 1 / 60;
+    const parent = new pc.Entity('region');
+    const figures = {
+      sculpted: new SkinnedFigure(parent, sculpted(), new Map(), HUMANOID, RIG, 'slow-sculpted', 1750, 1750),
+      rigid: new RigidOnBonesFigure(parent, blocky(), HUMANOID, 'slow-rigid', 1750, 1750),
+    };
+    /** Walk straight ahead (-Z at facing 0) at `speed`; the left foot's world place on each frame of the last 8 s. */
+    const walk = (figure: SkinnedFigure | RigidOnBonesFigure, speed: number, from: number): { trail: { y: number; z: number }[]; to: number } => {
+      const trail: { y: number; z: number }[] = [];
+      let at = from;
+      for (let frame = 1; frame <= 12 * 60; frame += 1) {
+        at = from + speed * frame * FRAME;
+        figure.pose({ position: [0, 0, -at], facing: 0, deltaSeconds: FRAME });
+        const foot = world(figure, 'leftFoot');
+        if (frame > 4 * 60) trail.push({ y: foot.y, z: foot.z });
+      }
+      return { trail, to: at };
+    };
+    /** The most a foot on the ground moved over the ground between two frames, and how often it was set down. */
+    const read = (trail: readonly { y: number; z: number }[]) => {
+      const down = trail.map((foot) => foot.y < AT['leftFoot']![1] + 1e-6);
+      let slid = 0, plants = 0;
+      for (let i = 1; i < trail.length; i += 1) {
+        if (down[i] && down[i - 1]) slid = Math.max(slid, Math.abs(trail[i]!.z - trail[i - 1]!.z));
+        if (down[i] && !down[i - 1]) plants += 1;
+      }
+      return { slid, plants };
+    };
+    for (const [name, figure] of Object.entries(figures)) {
+      // 0.5 m/s is the pace the solved walk is fully drawn at; 0.25 m/s is half of it. The ground
+      // passes 4.2 mm a frame at the slow walk, and a foot on the ground must not go with it.
+      const full = walk(figure, 0.5, 0);
+      const slow = walk(figure, 0.25, full.to);
+      expect(read(full.trail).slid, `${name} at 0.5 m/s`).toBeLessThan(1e-4);
+      expect(read(slow.trail).slid, `${name} at 0.25 m/s`).toBeLessThan(1e-4);
+      // The slow walk steps as often as the full one, over half the ground: its steps are half as long.
+      expect(read(full.trail).plants, name).toBeGreaterThanOrEqual(3);
+      expect(Math.abs(read(slow.trail).plants - read(full.trail).plants), name).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('stands on its rest feet when it goes nowhere, however it is turned', () => {
+    const FRAME = 1 / 60;
+    const parent = new pc.Entity('region');
+    const figures = {
+      sculpted: new SkinnedFigure(parent, sculpted(), new Map(), HUMANOID, RIG, 'still-sculpted', 1750, 1750),
+      rigid: new RigidOnBonesFigure(parent, blocky(), HUMANOID, 'still-rigid', 1750, 1750),
+    };
+    for (const [name, figure] of Object.entries(figures)) {
+      /** A foot in the figure's own frame: where it is whatever way the figure faces. */
+      const own = (bone: string) => figure.root.getWorldTransform().clone().invert().transformPoint(world(figure, bone), new pc.Vec3());
+      const rest = { left: own('leftFoot'), right: own('rightFoot') };
+      // A walk of two seconds, then it stops where it is and the speed it reads eases to nothing.
+      for (let frame = 1; frame <= 120; frame += 1) figure.pose({ position: [0, 0, -frame * 0.02], facing: 0, deltaSeconds: FRAME });
+      for (let frame = 0; frame < 180; frame += 1) figure.pose({ position: [0, 0, -2.4], facing: 0, deltaSeconds: FRAME });
+      // Turned on the spot for four seconds, a quarter turn a frame at first and then slowly.
+      for (let frame = 0; frame < 240; frame += 1) {
+        figure.pose({ position: [0, 0, -2.4], facing: frame < 4 ? (frame * Math.PI) / 2 : frame * 0.02, deltaSeconds: FRAME });
+        expect(own('leftFoot').distance(rest.left), `${name} frame ${frame}`).toBeLessThan(1e-4);
+        expect(own('rightFoot').distance(rest.right), `${name} frame ${frame}`).toBeLessThan(1e-4);
+      }
+    }
+  });
+
   it('is refused by name when a joint does not hang from its plan parent\'s, or is turned at rest', () => {
     const parent = new pc.Entity('region');
     const flat = sculpted(() => null);

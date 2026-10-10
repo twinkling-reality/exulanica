@@ -100,7 +100,10 @@ const frac = (x: number) => x - Math.floor(x);
 
 /** What the figure is doing this frame, as the drawing read it from the state. */
 export interface MotionInput {
-  /** Metres walked along the ground since the figure was made: the gait's clock. */
+  /**
+   * The gait's clock, metres: the ground walked since the figure was made, each metre counted for
+   * more where the walk is drawn with a shorter stride (`gaitTravel`).
+   */
   readonly travelled: number;
   /** Ground speed, metres a second, as the drawing smoothed it. */
   readonly speed: number;
@@ -136,6 +139,23 @@ export const DUTY = 0.6;
 const STRIDE_PER_LEG = 0.85;
 /** Walking speed at which the walk is fully drawn, metres a second; slower blends from standing. */
 const FULL_WALK_SPEED = 0.5;
+/**
+ * The shortest stride the gait's clock is kept true to, as a share of the full one. A stride
+ * shorter than this is a few centimetres of a person's, and a clock true to it would spin at the
+ * first frame of a walk, when the speed read from the ground has barely risen.
+ */
+const SHORTEST_CLOCKED_STRIDE = 0.1;
+
+/**
+ * How far the gait's clock advances for `moved` metres of ground walked at ground speed `speed`,
+ * metres a second. At a full walk it is the ground itself. Slower, the stride is drawn shorter by
+ * the same share (`FULL_WALK_SPEED`), so each metre counts for more: the steps come as often as at a
+ * full walk and each is shorter, and a planted foot stays where it stands instead of being dragged
+ * over the ground at the full stride's slower beat.
+ */
+export function gaitTravel(moved: number, speed: number): number {
+  return moved / clamp(speed / FULL_WALK_SPEED, SHORTEST_CLOCKED_STRIDE, 1);
+}
 
 function chainLength(skeleton: DressedSkeleton, bones: readonly string[]): number {
   let total = 0;

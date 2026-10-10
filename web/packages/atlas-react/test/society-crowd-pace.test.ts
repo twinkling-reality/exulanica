@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
+import { CHARACTER_CATALOG } from '../src/playcanvas/character/catalog-data.js';
+import { farAppearance } from '../src/playcanvas/character/far.js';
+import { inhabitantLookOf } from '../src/playcanvas/character/inhabitant.js';
 import { SocietyCrowd } from '../src/playcanvas/society/crowd.js';
-import type { CrowdRenderableFactory, OwnedSocietyState } from '../src/playcanvas/society/types.js';
+import type { CrowdPose, CrowdRenderableFactory, OwnedSocietyState } from '../src/playcanvas/society/types.js';
 import { serveFixturePeople } from './served-people.js';
 
 /*
@@ -14,7 +17,18 @@ const INTERVAL_MS = 6_000;
 const FRAME_MS = 1000 / 60;
 const NOMINAL = 1 / 60;
 
-function crowd() {
+/**
+ * The walker's own walking pace, metres a second, from the people catalog and never from the crowd:
+ * the walk clip's measured ground speed at its base's rest height, scaled to the height of the look
+ * the id `walker` draws.
+ */
+const WALKER_PACE = (() => {
+  const appearance = farAppearance(CHARACTER_CATALOG, inhabitantLookOf(CHARACTER_CATALOG, 'walker'));
+  const base = CHARACTER_CATALOG.families.flatMap((family) => family.bases).find((one) => one.baseId === appearance.baseId)!;
+  return (base.clips.walk.speedMillimetresPerSecond / base.restHeightMillimetres) * appearance.heightMetres;
+})();
+
+function crowd(poses: CrowdPose[] = []) {
   const canvas = document.createElement('canvas');
   const device = new pc.NullGraphicsDevice(canvas);
   const app = new pc.AppBase(canvas);
@@ -30,7 +44,7 @@ function crowd() {
     parent.addChild(entity);
     return {
       root: entity, subject: { kind: 'synthetic-inhabitant', ...identity }, standingHeight: 1.8, facing: 0,
-      pose: (pose) => entity.setLocalPosition(pose.position[0], pose.position[1], pose.position[2]),
+      pose: (pose) => { poses.push(pose); entity.setLocalPosition(pose.position[0], pose.position[1], pose.position[2]); },
       setVisible: (visible) => { entity.enabled = visible; },
       destroy: () => entity.destroy(),
     };
@@ -82,8 +96,12 @@ function watch(
 }
 
 describe('a paced crowd', () => {
-  it('walks a short recorded path evenly until the next minute arrives, never stopping between them', () => {
+  it('walks a short recorded path at a walking pace, then stands until the next minute arrives', () => {
     const { society, done } = crowd();
+    // The catalog's people walk at 1.0 to 1.4 m/s (1,051 mm/s at 1,591 mm and 1,223 mm/s at 1,729 mm,
+    // drawn 1,520 to 1,930 mm tall): the figures below hold for any of them.
+    expect(WALKER_PACE).toBeGreaterThan(1.0);
+    expect(WALKER_PACE).toBeLessThan(1.4);
     // The bound allows 60 m a tick; each minute's recorded walk is 3 m, as in a small square.
     const wide = 60_000;
     society.set(v2(0, [[0, 0]], wide), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
@@ -94,18 +112,100 @@ describe('a paced crowd', () => {
       [12_700, v2(3, [[6, 0], [9, 0]], wide)],
     ]);
     const steps = watch(society, 0, 26_000, deliveries, 1_000);
-    // From the first frame until the last minute's walk is done, the walker moves on every frame.
-    const walking = steps.filter(({ at }) => at > 2 * FRAME_MS && at < 19_000);
-    for (const { at, step } of walking) expect(step, `frame at ${at.toFixed(0)} ms`).toBeGreaterThan(0);
-    // Within a minute the pace is even: 3 m over the interval and the lag, then only what is left.
-    const first = steps.filter(({ at }) => at > 2 * FRAME_MS && at < 6_700);
-    const firstPace = (3 / (INTERVAL_MS + 1_000)) * FRAME_MS;
-    for (const { at, step } of first) expect(step, `frame at ${at.toFixed(0)} ms`).toBeCloseTo(firstPace, 9);
+    // Spread over the interval and the lag, 3 m in 7 s, the walk would creep at 0.43 m/s. It is
+    // walked at the walker's own pace instead: every frame of the first two seconds covers that pace.
+    const walking = steps.filter(({ at }) => at > 2 * FRAME_MS && at < 2_000);
+    for (const { at, step } of walking) expect(step, `frame at ${at.toFixed(0)} ms`).toBeCloseTo((WALKER_PACE * FRAME_MS) / 1000, 9);
+    // 3 m at that pace is done within 3 s; then the walker stands where it arrived until the next
+    // minute is read at 6.7 s.
+    const standing = steps.filter(({ at }) => at > 3_000 + 2 * FRAME_MS && at < 6_700);
+    expect(standing.length).toBeGreaterThan(200);
+    for (const { at, step, x } of standing) {
+      expect(step, `frame at ${at.toFixed(0)} ms`).toBe(0);
+      expect(x, `frame at ${at.toFixed(0)} ms`).toBe(3);
+    }
+    // The next minute's walk starts when it is read, at the same pace, and ends the same way.
+    const second = steps.filter(({ at }) => at > 6_700 + 2 * FRAME_MS && at < 8_700);
+    for (const { at, step } of second) expect(step, `frame at ${at.toFixed(0)} ms`).toBeCloseTo((WALKER_PACE * FRAME_MS) / 1000, 9);
+    const between = steps.filter(({ at }) => at > 9_700 + 2 * FRAME_MS && at < 12_700);
+    for (const { at, step } of between) expect(step, `frame at ${at.toFixed(0)} ms`).toBe(0);
     // Never faster than the bound's own pace allows (60 m in 6 s is 1/6 m a frame).
     expect(Math.max(...steps.map(({ step }) => step))).toBeLessThan((wide / 1000 / INTERVAL_MS) * FRAME_MS);
     expect(society.positionOf('walker')).toEqual([9, 0]);
     expect(society.jumps).toEqual([]);
     done();
+  });
+
+  it('spreads a walk too long for a walking pace evenly over the minute, never stopping between minutes', () => {
+    const { society, done } = crowd();
+    // The bound allows 60 m a tick; each minute's recorded walk is 21 m, a crossing of a town.
+    const wide = 60_000;
+    society.set(v2(0, [[0, 0]], wide), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
+    const deliveries = new Map([
+      [0, v2(1, [[0, 0], [21, 0]], wide)],
+      [6_700, v2(2, [[21, 0], [42, 0]], wide)],
+      [12_700, v2(3, [[42, 0], [63, 0]], wide)],
+    ]);
+    const steps = watch(society, 0, 26_000, deliveries, 1_000);
+    // 21 m in the interval and the lag, 7 s, is 3 m/s: more than twice anybody's walking pace, so
+    // the minute's distance sets the speed, evenly, and the walker moves on every frame until the
+    // last minute's walk is done.
+    const first = steps.filter(({ at }) => at > 2 * FRAME_MS && at < 6_700);
+    for (const { at, step } of first) expect(step, `frame at ${at.toFixed(0)} ms`).toBeCloseTo((21 / 7_000) * FRAME_MS, 9);
+    const walking = steps.filter(({ at }) => at > 2 * FRAME_MS && at < 19_000);
+    for (const { at, step } of walking) expect(step, `frame at ${at.toFixed(0)} ms`).toBeGreaterThan(0);
+    // Never faster than the bound's own pace allows (60 m in 6 s is 1/6 m a frame).
+    expect(Math.max(...steps.map(({ step }) => step))).toBeLessThan((wide / 1000 / INTERVAL_MS) * FRAME_MS);
+    expect(society.positionOf('walker')).toEqual([63, 0]);
+    expect(society.jumps).toEqual([]);
+    done();
+  });
+
+  it('hands a figure the time its walker was moved by, at ten frames a second as at sixty', () => {
+    for (const frameMs of [100, FRAME_MS]) {
+      const poses: CrowdPose[] = [];
+      const { society, done } = crowd(poses);
+      // A recorded speed of 6 m a tick over a 6 s interval: one metre a second, from the interval alone.
+      const at = (tick: number, path: readonly (readonly [number, number])[]): OwnedSocietyState => {
+        const state = v2(tick, path);
+        const { movement_budget_mm_per_tick: _bound, ...rest } = state;
+        return { ...rest, inhabitants: state.inhabitants.map((p) => ({ ...p, walk_speed_mm_per_tick: BUDGET_MM })) };
+      };
+      society.set(at(0, [[0, 0]]), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
+      society.set(at(1, [[0, 0], [6, 0]]), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
+      const before = poses.length;
+      let now = 0;
+      let read = false;
+      for (let frame = 1; frame * frameMs <= 5_000; frame += 1) {
+        now = frame * frameMs;
+        society.update(now);
+        // The next minute, which adds nothing to walk, is read between two frames, as a poll's answer
+        // is, and a frame whose time was taken just before that read is drawn just after it.
+        if (!read && now >= 3_000) {
+          now += 0.4 * frameMs;
+          society.set(at(2, [[6, 0]]), [0, 0], { nowMs: now, intervalMs: INTERVAL_MS });
+          society.update(now - 0.2 * frameMs);
+          read = true;
+        }
+      }
+      expect(read).toBe(true);
+      const walked = poses.slice(before);
+      let held = [0, 0, 0] as readonly [number, number, number];
+      let seconds = 0;
+      for (const pose of walked) {
+        const metres = Math.hypot(pose.position[0] - held[0], pose.position[2] - held[2]);
+        // The speed a figure reads from a pose is the distance it was moved over the time it is
+        // handed; a frame from before the walk's own time moves nobody and hands on no time.
+        if (pose.deltaSeconds === 0) expect(metres).toBe(0);
+        else expect(metres / pose.deltaSeconds, `${frameMs.toFixed(0)} ms frames, at ${pose.position[0].toFixed(3)} m`).toBeCloseTo(1, 9);
+        seconds += pose.deltaSeconds;
+        held = pose.position;
+      }
+      // And all the time is handed on: none is dropped at a slow frame, none added at a state read.
+      expect(seconds).toBeCloseTo(now / 1000, 9);
+      expect(held[0]).toBeCloseTo(now / 1000, 9);
+      done();
+    }
   });
 
   it('walks a recorded speed at that speed, standing once the path is done (the control for the above)', () => {
@@ -174,10 +274,11 @@ describe('a paced crowd', () => {
     expect(society.jumps).toEqual([
       { inhabitantId: 'walker', reason: 'too-far-behind', tick: 3, unreadTicks: 0, metres: 12 },
     ]);
-    // Carried to where the last minute's walk begins, which is still walked.
+    // Carried to where the last minute's walk begins, which is still walked: 6 m in the 6 s
+    // interval is 1 m/s, slower than the walker's own pace, so after 3 s it is 3 s of that pace on.
     expect(society.positionOf('walker')).toEqual([12, 0]);
     society.update(3_000);
-    expect(society.positionOf('walker')![0]).toBeCloseTo(15, 6);
+    expect(society.positionOf('walker')![0]).toBeCloseTo(12 + 3 * WALKER_PACE, 6);
     done();
   });
 
@@ -204,9 +305,9 @@ describe('a paced crowd', () => {
     society.set(v2(0, [[6, 0]]), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
     society.set(v2(4, [[6, 0], [9, 0]]), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
     expect(society.jumps).toEqual([]);
-    // 3 m spread over the 6 s interval: a quarter of it walked after 1.5 s.
+    // 3 m walked at the walker's own pace, which is faster than 3 m spread over the 6 s interval.
     society.update(1_500);
-    expect(society.positionOf('walker')![0]).toBeCloseTo(6.75, 6);
+    expect(society.positionOf('walker')![0]).toBeCloseTo(6 + 1.5 * WALKER_PACE, 6);
     done();
   });
 

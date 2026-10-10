@@ -432,13 +432,22 @@ movement. Idle has quiet breathing and weight balance, without constant bouncing
 suppresses nonessential sway and camera transition motion.
 
 A catalog person derives speed and turning from resolved positions. Gait keeps a planted foot moving
-backward exactly as fast as the ground: below the walk clip's calibrated speed the whole walk plays at
-a slower cadence, down to half, rather than being mixed with standing; only below that does it fade
-into standing. Between walk and run the clips blend at full cadence, and beyond the run the cadence
-rises. Speed changes ease over about 0.12 seconds, and heading over about 0.14 seconds. A contact lock
-then pins whatever touches the ground, the heel from heel strike and the toe from the moment it is down
-through push-off, with an analytic two-bone leg solve; the toe inherits the heel's correction so the
-handover does not jump, and a correction beyond 25 cm re-plants the foot.
+backward exactly as fast as the ground: below the walk clip's calibrated speed the whole walk plays
+at a slower cadence, down to half, rather than being mixed with standing; only below that does it
+fade into standing. Between walk and run the clips blend at full cadence, and beyond the run the
+cadence rises. Speed changes ease over about 0.12 seconds, and heading over about 0.14 seconds;
+slower than 0.02 m/s a person stands. A contact lock then pins whatever touches the ground, the heel
+from heel strike and the toe from the moment it is down through push-off, with an analytic two-bone
+leg solve; the toe inherits the heel's correction so the handover does not jump, and a correction
+beyond 25 cm re-plants the foot.
+
+A turn on the spot is stepped: each foot travels 0.18 m, at rest height, for each radian turned, so
+feet that the lock holds are lifted and set down again as the body turns. Whoever poses a person
+may instead say that a turn is a pivot (`pivot` in `CharacterPose`): the body turns, no step is drawn
+for it, and the lock lets the feet turn with the body until the pivot ends. The society's crowd
+pivots every turn it makes, along a path's corners and where a person stands, so its people's
+stride is the ground's alone and a person with no path to walk is never drawn striding, however the
+state turns them.
 
 Measured 2026-09-17 in the development preview (debug engine) at 1440x900 (headless Chrome 152, Apple
 M3 Pro), during steady
@@ -555,20 +564,36 @@ objects are placed in. While everyone is away the state holds nobody, so the cro
 
 **Walking the recorded path.** Motion follows the recorded path (`motion_path_mm`) only, and no
 position is invented between its points. A v4 inhabitant walks the path at its recorded
-`walk_speed_mm_per_tick`, one tick's worth per interval, and stops where the path ends. A v2 state
-records only a bound, `movement_budget_mm_per_tick`, usually far longer than the path a person walks
-in a tick, so a v2 person walks what they have left evenly until the next tick is expected (the
-interval plus the caller's start lag), never faster than 1.5 times the bound's own pace, so nobody
-sprints and then stands. A v2 person whose newly read tick adds nothing to walk finishes what is
-left at no slower than their own walking pace, the walk clip's measured ground speed at their
-height; a remainder spread again at every tick would never end. Each later tick's path is appended
-to what the person has still to walk when it starts where that ends, so a walk through several
-minutes does not stop between them. A v4 person behind catches up along the path at most 1.5 times
-their speed. Anyone moved without walking (a path that starts elsewhere, minutes not read, more
-walking waiting than can be caught up, no recorded path, or an older state) is named with its reason
-rather than moved silently (`CrowdJump` in `society/types.ts`). A state without a pace is eased
-along its path over the interval. Everyone walks on the ground plane: an inhabitant that states the
-height of the surface it stands on is refused rather than drawn under it.
+`walk_speed_mm_per_tick`, one tick's worth per interval, and stops where the path ends. A state that
+records only a bound, `movement_budget_mm_per_tick` (a v2 state, and a society of things), says how
+far anybody may walk in a tick and nothing of how fast a person walks, and the bound is usually far
+longer than the path a person walks in a tick. Such a person walks what they have left at their own
+walking pace, arrives, and stands where their activity is drawn until the next tick is read. Their
+pace is the one the figure drawing them declares (a rigged look's declared walk speed, at the height
+it is drawn) and otherwise the catalog person's for their id: the walk clip's measured ground speed
+at their height, 1.00 to 1.37 m/s across the catalog's bodies (1,051 mm/s at a rest height of 1,591
+mm drawn 1,520 to 1,800 mm tall, 1,223 mm/s at 1,729 mm drawn 1,620 to 1,930 mm tall). A walk too
+long to finish at that pace by the time the next tick is expected (the interval plus the caller's
+start lag) is walked evenly over that time instead, so only a tick's distance makes anybody faster
+than a walk, and never faster than 1.5 times the bound's own pace. The pace is metres a second on
+the screen at every playback speed: a faster playback shortens the standing and spreads shorter
+walks. With 8 s between ticks and a start lag of 2 s, as the page passes at 1x, a person whose pace
+is 1.1 m/s walks anything up to 11 m at that pace and a 16 m walk at 1.6 m/s; with 2 s and 1 s, as
+at 4x, the same person walks up to 3.3 m at their pace and a 10 m walk at 3.33 m/s. Each later
+tick's path is appended to what the person has still to walk when it starts where that ends, so a
+person still walking when the next tick is read does not stop between them. A v4 person behind
+catches up along the path at most 1.5 times their speed. Anyone moved without walking (a path that
+starts elsewhere, minutes not read, more walking waiting than can be caught up, no recorded path, or
+an older state) is named with its reason rather than moved silently (`CrowdJump` in
+`society/types.ts`). A state without a pace is eased along its path over the interval. Everyone
+walks on the ground plane: an inhabitant that states the height of the surface it stands on is
+refused rather than drawn under it.
+
+**One clock.** A walk is advanced by the caller's clock, and the seconds handed with each pose are
+that clock's time since the crowd was last drawn, on a frame and at a state read alike, however long
+the frame took. The speed a figure reads from its poses is therefore the speed it was moved at, and
+its steps keep to the ground at ten frames a second as at sixty. The engine itself plays a clip for
+at most 0.1 s a frame (`maxDeltaTime`), so below ten frames a second a clip falls behind the ground.
 
 **Facing and activity.** Everyone faces the way their recorded path last took them and keeps that
 facing when they stop, in either form, so a person first drawn in full after arriving, or again
@@ -580,7 +605,8 @@ They face as their activity's rule says (`society/activity-facing.ts`): `rest` a
 object across the place, so a visitor at the market stall faces its counter and one at the tree
 faces the tree, also in the minute after a visit completes while the visitor still stands there;
 `talk` faces the partner the goal names; standing and walking keep the way they last walked, and an
-activity with no rule is drawn that way and named.
+activity with no rule is drawn that way and named. Every turn the crowd makes is a pivot: no figure
+draws a step for it.
 
 **Seats.** With each state the page hands the crowd a seating layout (`society/seating.ts`): each
 kind's use as `GET /world/assets` serves it from the world object catalog, the drawn version's

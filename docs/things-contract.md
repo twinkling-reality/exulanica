@@ -935,7 +935,7 @@ substituted or truncated is read. One figure draws each look kind:
 | Look kind | Drawn as |
 | --- | --- |
 | `catalog_person` | One of the world's people, drawn from the thing's id by the people catalog's draw |
-| `skinned` | The rigged container with its own clips; standing, walking and running blend by ground speed (`rig.ground_speed_mm_per_s`), a clip plays at most twice its pace, and a motion with no clip is drawn idle. A rig with no clips at all, as a creature sculpted for its own plan has, is posed by the same solved gait as `rigid_on_bones`, its skin following its joints; it must rest translation-only with each joint hung from its plan parent's, and is refused by name otherwise |
+| `skinned` | The rigged container with its own clips; standing, walking and running blend by ground speed (`rig.ground_speed_mm_per_s`) and the clips' cadence follows it as a catalog person's does, so a planted foot moves as fast as the ground: slower than its walk clip's pace the walk plays slower, down to half its cadence, and only below that fades into standing; slower than 0.02 m/s the figure stands. A clip plays at most twice its pace, and a motion with no clip is drawn idle. A rig with no clips at all, as a creature sculpted for its own plan has, is posed by the same solved gait as `rigid_on_bones`, its skin following its joints; it must rest translation-only with each joint hung from its plan parent's, and is refused by name otherwise |
 | `rigid_on_bones` | The container's `bone:<name>` nodes, each hung from its nearest dressed ancestor in the body plan's parent table, posed procedurally |
 | `light` | An omni light of the look's colour, intensity and radius, a core and a glow, floating 1,250 mm over the thing's point and drifting within its radius (presentation only) |
 | `static` | The container at the thing's place, turned by its placed yaw as an authored object is, at its kind's size: scaled uniformly so its longest side is its kind's box's longest side, the side the hands fit to a socket; within 1 mm a metre of that it is drawn as authored |
@@ -950,8 +950,10 @@ past the box's narrower sides. No bone is named in the drawing: a skeleton's
 limbs are read from its shape and its plan's sockets (a chain ending near the ground is a leg, one
 carrying a socket an arm, the one ending highest the head), so any body plan's skeleton is read the
 same way. Standing figures breathe and turn their heads; walking figures step in their skeleton's
-gait, clocked by the distance walked so a planted foot never slides; under reduced motion they stand
-still.
+gait, clocked by the distance walked so a planted foot never slides: slower than 0.5 m/s at the
+look's height the steps are drawn shorter and come as often as at that pace, the clock true to the
+shortened stride down to a tenth of the full one. No thing's figure steps for a turn, so a thing
+that is going nowhere stands however it is turned; under reduced motion they stand still.
 
 A version's placed things stand where it places them, in the frame their region is drawn in: the
 region a saved world's people live in, or an authored object's region root. A thing in a region
@@ -960,7 +962,12 @@ does not draw or a container that does not read is drawn as nothing, its reason 
 (`ThingLayer.misses`), never stood in for.
 
 Where a society of things runs (`exulanica-society/v7`), its people are the society's crowd's, which
-walks everyone along their recorded paths as it walks every society's people. A person whose look
+walks everyone along their recorded paths as it walks every society's people: at their own walking
+pace, then standing, or evenly over the presented minute where the walk is too long for that
+([character representation](character-representation-contract.md#drawing-a-societys-people)). A rigged
+look's declared walk speed, at the height it is drawn, is the pace its person is walked at; a look
+that declares none is walked at the catalog person's pace for the person's id, and so is a minute
+read before the person's figure is made, when its look's pace is not yet known. A person whose look
 is not the people catalog's is drawn by its own figure, in full wherever it is within the crowd's far
 radius and ranked before the world's people for the full places of the measured budget; a placed
 being's standing figure is then not drawn. A placed being faces as it was placed until it first
@@ -973,7 +980,8 @@ people it passes between have walked to where the state ends their walks: the la
 drawn walks for a hand-over, the actor's own for a pick up or put down. Until then it is drawn where
 it was, in the giver's socket or on the ground; a pair already in reach exchanges at once. The
 event's `at_ms` is the simulation's own instant and is not what the drawing waits on: the crowd
-spreads a walk over the presented minute, the state's budget being a bound.
+walks each person at a walking pace, or evenly over the presented minute where the walk is too long
+for that, the state's budget being a bound.
 
 A visitor who crossed in is drawn stepping out of the gate it came through, at a walk (1.4 m a
 second), from the gate to where the state first places it, and back into the gate when the state no

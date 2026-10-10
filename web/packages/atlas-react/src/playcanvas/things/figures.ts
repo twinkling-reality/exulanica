@@ -48,6 +48,12 @@ export interface ThingFigure {
   readonly lookKind: LookKind;
   /** Metres from the ground contact to the top of the figure, for its mark and its pick volume. */
   readonly standingHeight: number;
+  /**
+   * Optional: how fast the figure walks at its walk's own cadence, metres a second at the size it is
+   * drawn, for a look that declares one. Absent or null means the look declares no walking speed,
+   * not that the figure cannot walk: whoever walks it then chooses the pace.
+   */
+  readonly walkSpeed?: number | null;
   pose(pose: ThingPose): void;
   /** After the engine's animation step, for a look whose clips play there. */
   afterAnimation?(): void;

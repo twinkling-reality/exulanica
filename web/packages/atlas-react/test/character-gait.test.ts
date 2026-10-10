@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SLOWEST_WALK_CADENCE, gaitFor } from '../src/playcanvas/character/person.js';
+import { SLOWEST_WALK_CADENCE, gaitFor, strideSpeed } from '../src/playcanvas/character/person.js';
 
 const walk = 1.12, run = 2.55;
 /** How fast a planted foot moves backward under a blend at a cadence, for the idle, walk and run points. */
@@ -33,5 +33,23 @@ describe('gait for a resolved ground speed', () => {
       expect(Math.abs(gait.cadence - previous.cadence), `cadence jump at ${speed.toFixed(3)}`).toBeLessThan(0.01);
       previous = gait;
     }
+  });
+});
+
+describe('the stride a turn is drawn with', () => {
+  it('steps a turn by the feet\'s own travel about the body, and draws no step for a pivot', () => {
+    // The feet stand 0.36 m apart at rest height, 0.18 m from the body's axis: a quarter turn in a
+    // second carries each foot a quarter of that circle, 0.283 m, in that second.
+    expect(strideSpeed({ speed: 0, turnRate: Math.PI / 2 }, 1)).toBeCloseTo((2 * Math.PI * 0.18) / 4, 12);
+    expect(strideSpeed({ speed: 0, turnRate: -Math.PI / 2 }, 1)).toBeCloseTo((2 * Math.PI * 0.18) / 4, 12);
+    // A body drawn a tenth taller stands a tenth wider.
+    expect(strideSpeed({ speed: 0, turnRate: Math.PI / 2 }, 1.1)).toBeCloseTo((2 * Math.PI * 0.198) / 4, 12);
+    // A stepped turn while walking adds to the ground speed; 3 and 4 make 5.
+    expect(strideSpeed({ speed: 0.3, turnRate: 0.4 / 0.18 }, 1)).toBeCloseTo(0.5, 12);
+    // Pivoted on the spot, a turn draws no step: standing stays standing, and a walk is its ground speed alone.
+    expect(strideSpeed({ speed: 0, turnRate: Math.PI / 2, pivot: true }, 1)).toBe(0);
+    expect(strideSpeed({ speed: 0, turnRate: -40, pivot: true }, 1.1)).toBe(0);
+    expect(strideSpeed({ speed: 1.1, turnRate: 3, pivot: true }, 1)).toBe(1.1);
+    expect(gaitFor(strideSpeed({ speed: 0, turnRate: 6, pivot: true }, 1), walk, run)).toEqual({ blend: 0, cadence: 1 });
   });
 });

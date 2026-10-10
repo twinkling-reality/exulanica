@@ -304,18 +304,20 @@ describe('a person using an object', () => {
       ...STATE, tick,
       inhabitants: [{ ...person('walker', path.at(-1)!, 'rest', null), motion_path_mm: path }],
     });
-    // Each minute is expected 8 s after the last and learnt of 2 s late, so a walk is spread over
-    // 10 s; the next minute arrives at 8 s, when a fifth of the 4 m is left.
+    // Each minute is expected 8 s after the last and learnt of 2 s late. A 20 m walk is too long for
+    // a walking pace in that time, so it is spread over the 10 s; the next minute arrives at 8 s,
+    // when a fifth of it, 4 m, is left.
     const timing = { intervalMs: 8_000, startLagMs: 2_000 };
     crowd.set(walking(3, [[0, 0]]), [0, 0], { ...timing, nowMs: 0 });
-    crowd.set(walking(4, [[0, 0], [4_000, 0]]), [0, 0], { ...timing, nowMs: 0 });
+    crowd.set(walking(4, [[0, 0], [20_000, 0]]), [0, 0], { ...timing, nowMs: 0 });
     crowd.update(8_000);
     expect(crowd.activityOf('walker')).toBeNull();
-    crowd.set(walking(5, [[4_000, 0]]), [0, 0], { ...timing, nowMs: 8_000 });
-    // The 0.8 m left is walked at the person's own pace, about a metre a second, not spread over
-    // another 10 s, where a fifth would be left again at every minute.
-    crowd.update(9_000);
-    crowd.update(9_100);
+    crowd.set(walking(5, [[20_000, 0]]), [0, 0], { ...timing, nowMs: 8_000 });
+    // The 4 m left is walked at the person's own pace, no slower than the catalog's slowest walker
+    // (1,051 mm/s at a rest height of 1,591 mm, drawn no shorter than 1,520 mm: 1.004 m/s), so it
+    // is done within 4 s; spread over another 10 s, a fifth would be left again at every minute.
+    crowd.update(12_100);
+    crowd.update(12_200);
     expect(crowd.activityOf('walker')).toBe('rest');
   });
 

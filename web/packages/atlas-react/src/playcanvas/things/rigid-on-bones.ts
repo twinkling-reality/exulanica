@@ -13,7 +13,7 @@
 import * as pc from 'playcanvas';
 import type { Grip } from './documents.js';
 import { HALF_TURN, bodyCarry, nodeCarry, placeHeld, quat, quatOf, type PickVolume, type ThingFigure, type ThingPose } from './figures.js';
-import { mul, solvePose, type Pose } from './motion.js';
+import { gaitTravel, mul, solvePose, type Pose } from './motion.js';
 import { dressSkeleton, type BodyPlanEntry, type DressedSkeleton, type Vec3 } from './skeleton.js';
 
 /** How wide a standing figure is to a pick, as a share of its height on each side. */
@@ -81,8 +81,8 @@ export class RigidOnBonesFigure implements ThingFigure {
     const dt = Math.max(0, pose.deltaSeconds);
     if (this.previous !== null && !pose.discontinuity && dt > 0) {
       const moved = Math.hypot(x - this.previous[0], z - this.previous[2]);
-      this.travelled += moved / this.scale;
       this.speed += (moved / dt / this.scale - this.speed) * Math.min(1, dt * 6);
+      this.travelled += gaitTravel(moved / this.scale, this.speed);
     } else if (pose.discontinuity) {
       this.speed = 0;
     }

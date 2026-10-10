@@ -70,6 +70,11 @@ export class ThingCrowdRenderable implements CrowdRenderable {
     return this.figureMade?.standingHeight ?? PENDING_HEIGHT;
   }
 
+  /** The walking speed the figure's look declares, once the figure is made; null until then or for none. */
+  get walkSpeed(): number | null {
+    return this.figureMade?.walkSpeed ?? null;
+  }
+
   /** The sockets holding something now, as the society's state says. */
   setHolding(sockets: ReadonlySet<string>): void {
     this.holding = sockets;
