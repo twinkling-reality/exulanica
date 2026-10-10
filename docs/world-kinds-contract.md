@@ -73,7 +73,7 @@ take each and why, are the [role catalog](../assets/catalogs/world-kinds/kind-ro
 catalog](../assets/catalogs/world-kinds/look-family.v1.json); the leaf is the kind's own word, so
 a pack dresses any leaf of a family it knows and the engine's own primitive draws the rest. A
 surface's leaf (a ground, a path, water, a wall, a roof) is read by its words in the [surface
-material catalog](../assets/catalogs/world-kinds/surface-material.v1.json), so sand is drawn as sand
+material catalog](../assets/catalogs/world-kinds/surface-material.v2.json), so sand is drawn as sand
 and adobe as adobe in any pack ([style pack contract](style-pack-contract.md), section 3).
 
 ## Checks
@@ -404,7 +404,9 @@ town's receipt or digest depends on the adapter.
 - A surface is drawn in one flat colour for its material
   ([style pack contract](style-pack-contract.md), section 3). The shape of what wears it does not
   follow its words: every structure is a box under a slab or a gable, so a tent is a canvas
-  coloured box, and nothing is drawn beyond the site's own rectangle.
+  coloured box.
+- Beyond an open site its own base ground runs out to the pack's reach, flat. What surrounds a
+  place is not read from its words: an island has no sea round it and a forest camp no tree.
 - A draft's state lives in the API process that started it, so drafting needs one API process or
   routing that sends each person to the same one ([deployment guide](deployment.md), 5.4): a poll
   another process answers reads `kind_draft_unknown` while the draft still runs. A draft still

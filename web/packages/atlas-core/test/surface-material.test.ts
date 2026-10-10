@@ -10,7 +10,7 @@ import {
 
 // Relative to web/, where the suite runs: the files a deployment ships, not copies of them.
 const read = (path: string): string => readFileSync(`../assets/${path}`, 'utf8');
-const CATALOG_TEXT = read('catalogs/world-kinds/surface-material.v1.json');
+const CATALOG_TEXT = read('catalogs/world-kinds/surface-material.v2.json');
 const materials = readSurfaceMaterials(CATALOG_TEXT);
 const families = new Map<string, LookFamily>(
   (JSON.parse(read('catalogs/world-kinds/look-family.v1.json')) as { entries: { key: string; fit: LookFamily['fit']; dressing: LookFamily['dressing']; fill_minimum_permille: number; fill_maximum_permille: number }[] })
@@ -42,6 +42,21 @@ describe('the surface material catalog', () => {
       expect(material.swatch).toMatchObject({ key: `material:${material.key}`, emission_permille: 0 });
     }
     expect([...materials.families].sort()).toEqual(['boundary', 'ground', 'path', 'road', 'roof', 'wall', 'water']);
+  });
+
+  it('is version 2, which moved six colours of version 1 and nothing else; version 1 is kept beside it and still read', () => {
+    const first = readSurfaceMaterials(read('catalogs/world-kinds/surface-material.v1.json'));
+    expect([first.version, materials.version]).toEqual([1, 2]);
+    const moved: string[] = [];
+    expect(materials.materials.map((material) => material.key)).toEqual(first.materials.map((material) => material.key));
+    materials.materials.forEach((material, index) => {
+      const before = first.materials[index]!;
+      // Everything a leaf is read by is the same in both versions: only what a material is drawn in may differ.
+      expect({ ...material, swatch: null }, material.key).toEqual({ ...before, swatch: null });
+      expect({ ...material.swatch, srgb8: null }, material.key).toEqual({ ...before.swatch, srgb8: null });
+      if (material.swatch.srgb8.join() !== before.swatch.srgb8.join()) moved.push(material.key);
+    });
+    expect(moved.sort()).toEqual(['adobe', 'forest_floor', 'sand', 'soil', 'thatch', 'timber']);
   });
 
   it('gives no word to two materials one family may wear, so no entry is unreachable', () => {

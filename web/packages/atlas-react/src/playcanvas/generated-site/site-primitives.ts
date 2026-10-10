@@ -14,7 +14,7 @@ import type { SiteDrawing, SiteSlot } from './site-drawing.js';
  * turn is 90 degrees about the renderer's up axis.
  *
  * The colour is the fallback a pack replaces: the material the slot's leaf names in the surface
- * material catalog (`assets/catalogs/world-kinds/surface-material.v1.json`, passed in), so sand,
+ * material catalog (`assets/catalogs/world-kinds/surface-material.v2.json`, passed in), so sand,
  * a field and a stone wall read apart with no pack at all, and otherwise one colour per look family.
  * The colours decide nothing about a pack's look.
  */

@@ -91,7 +91,8 @@ A world made from a kind adds one step between the leaf and the family's default
 that take a surface. Its parts name their surfaces in a kind's own words (`ground.sand`,
 `wall.adobe`, `roof.thatched`, `path.desert_track`), and a pack states few of them, so the plain rule
 would draw every ground as the pack's one ground. The surface material catalog
-([`surface-material.v1.json`](../assets/catalogs/world-kinds/surface-material.v1.json)) states
+([`surface-material.v2.json`](../assets/catalogs/world-kinds/surface-material.v2.json); version 1 is kept
+beside it, and version 2 moved six of its colours and nothing a leaf is read by) states
 each material a surface may be drawn in: the words that name it, the families that may wear it,
 what it is in plain words, and the colour it is drawn in. A leaf is read by its words, whole and
 then one by one in the order written, among the materials its family may wear
@@ -240,6 +241,7 @@ material back and shows every primitive again.
 | Resolving | Each slot by its look role (section 3): a slot the engine draws as a primitive takes either a surface or a piece, a surface before a piece at each leaf; a `none` slot, a hole only a pack fills, takes a piece alone |
 | Surfaces | A swatch, with its up swatch, becomes the material of the slot's primitive, in the pack's shading. A site holds no texture set's images, so a leaf the pack dresses with a texture set is resolved as if the pack left it out, and takes its material where its words name one and otherwise its family's `default` |
 | Materials | A leaf the pack does not state is drawn in the material its words name (section 3): the pack's own surface for that material, or the surface material catalog's colour in the pack's shading. A leaf that names none takes its family's `default` and is counted on the canvas |
+| Ground beyond | A pack's ground beyond the world is its own colour for a town. Beyond a site that is open to the sky, the pack's plane is drawn in whatever the site's base ground is drawn in (the one ground its drawing lays over its whole extent, once dressed) and lies just under it, so a desert's sand runs to the pack's reach. It reads the base ground only, never a zone or an area at the site's edge; an indoor site keeps the pack's own. The canvas states the base ground's look role (`data-site-ground-beyond`) |
 | Pieces | Placed by the family's fit and baked one mesh per swatch, as a town's are (`dressSlots`); the slot's primitive is hidden while its piece stands |
 | The rest | A slot the pack does not dress keeps the engine's primitive in its fallback colour, drawn in the pack's shading; when the shading draws ink, everything the site draws is outlined |
 

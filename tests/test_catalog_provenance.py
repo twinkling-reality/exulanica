@@ -134,8 +134,8 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # gaits a drafted body's pace is read by, the
     # generated piece recipes in two versions, what generating a piece costs and the style
     # words a piece request carries for each pack, and the materials a made place's surfaces are
-    # drawn in by the words of their look roles.
-    assert len(found[ENTRY_SHAPE]) == 126
+    # drawn in by the words of their look roles, in two versions (the second moved six colours).
+    assert len(found[ENTRY_SHAPE]) == 127
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
     # mappings, the road derivation and the signal placement.
     assert len(found[CITED_SHAPE]) == 7

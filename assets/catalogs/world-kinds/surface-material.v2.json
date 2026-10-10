@@ -1,0 +1,1101 @@
+{
+ "schema_version": 1,
+ "catalog_id": "surface-material",
+ "catalog_version": 2,
+ "entries": [
+  {
+   "key": "grass",
+   "words": [
+    "grass",
+    "lawn",
+    "green",
+    "turf",
+    "clearing",
+    "paddock"
+   ],
+   "plain": "short grass",
+   "families": [
+    "ground"
+   ],
+   "family_default": [
+    "ground"
+   ],
+   "srgb8": [
+    112,
+    148,
+    77
+   ],
+   "roughness_permille": 900,
+   "metalness_permille": 0,
+   "reason": "Mown or grazed grass. Every style pack's own ground default is a lawn, so a leaf that names grass is drawn in the pack's own default and this colour is used only where a pack states none. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "meadow",
+   "words": [
+    "meadow",
+    "pasture",
+    "heath",
+    "prairie"
+   ],
+   "plain": "long grass",
+   "families": [
+    "ground"
+   ],
+   "family_default": [],
+   "srgb8": [
+    140,
+    152,
+    84
+   ],
+   "roughness_permille": 900,
+   "metalness_permille": 0,
+   "reason": "Uncut grass, yellower and paler than a lawn, so a meadow reads apart from a mown green beside it. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "crop",
+   "words": [
+    "crop",
+    "wheat",
+    "barley",
+    "corn",
+    "grain",
+    "hay",
+    "stubble",
+    "rye",
+    "oats"
+   ],
+   "plain": "a field of grain",
+   "families": [
+    "ground"
+   ],
+   "family_default": [],
+   "srgb8": [
+    204,
+    178,
+    102
+   ],
+   "roughness_permille": 900,
+   "metalness_permille": 0,
+   "reason": "A standing or cut cereal crop, drawn as ripe straw so a field reads apart from the yard round it. The page drew these words in this colour before the catalog existed. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "soil",
+   "words": [
+    "soil",
+    "earth",
+    "dirt",
+    "mud",
+    "bare",
+    "tilled",
+    "plough",
+    "ploughed",
+    "track"
+   ],
+   "plain": "bare earth",
+   "families": [
+    "ground",
+    "path",
+    "road"
+   ],
+   "family_default": [],
+   "srgb8": [
+    146,
+    126,
+    102
+   ],
+   "roughness_permille": 950,
+   "metalness_permille": 0,
+   "reason": "Bare or trodden earth. A track with no other word is worn earth, so it is named here. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement. Version 2 lifted and greyed this colour from 122, 94, 66: beside the three packs' own palettes the first read heavy and too orange, in every pack's light.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "forest_floor",
+   "words": [
+    "forest_floor",
+    "forest",
+    "woodland",
+    "leaf",
+    "litter",
+    "needles",
+    "undergrowth"
+   ],
+   "plain": "leaf litter under trees",
+   "families": [
+    "ground",
+    "path"
+   ],
+   "family_default": [],
+   "srgb8": [
+    98,
+    96,
+    70
+   ],
+   "roughness_permille": 950,
+   "metalness_permille": 0,
+   "reason": "Leaf litter and needles under trees: darker and browner than grass, so a camp in a forest does not stand on a lawn. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement. Version 2 lifted and greyed this colour from 88, 82, 54: beside the three packs' own palettes the first read heavy and too orange, in every pack's light.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "sand",
+   "words": [
+    "sand",
+    "sandy",
+    "beach",
+    "dune",
+    "dunes",
+    "desert",
+    "shore"
+   ],
+   "plain": "sand",
+   "families": [
+    "ground",
+    "path",
+    "road"
+   ],
+   "family_default": [],
+   "srgb8": [
+    216,
+    202,
+    164
+   ],
+   "roughness_permille": 950,
+   "metalness_permille": 0,
+   "reason": "Dry sand, as on a beach or a desert floor. A shore named for ground is its sand, since water is a family of its own. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement. Version 2 lifted and greyed this colour from 214, 196, 150: beside the three packs' own palettes the first read heavy and too orange, in every pack's light.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "gravel",
+   "words": [
+    "gravel",
+    "shingle",
+    "pebble",
+    "pebbles",
+    "aggregate",
+    "hardcore",
+    "scree"
+   ],
+   "plain": "loose small stones",
+   "families": [
+    "ground",
+    "path",
+    "road"
+   ],
+   "family_default": [],
+   "srgb8": [
+    166,
+    158,
+    142
+   ],
+   "roughness_permille": 950,
+   "metalness_permille": 0,
+   "reason": "Loose small stones, greyer than sand and paler than rock. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "rock",
+   "words": [
+    "rock",
+    "rocky",
+    "bedrock",
+    "cliff",
+    "boulder",
+    "crag"
+   ],
+   "plain": "bare rock",
+   "families": [
+    "ground",
+    "path",
+    "wall",
+    "boundary"
+   ],
+   "family_default": [],
+   "srgb8": [
+    120,
+    116,
+    110
+   ],
+   "roughness_permille": 900,
+   "metalness_permille": 0,
+   "reason": "Bare natural rock, darker and less even than cut stone. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "snow",
+   "words": [
+    "snow",
+    "snowy",
+    "snowfield"
+   ],
+   "plain": "snow",
+   "families": [
+    "ground",
+    "path",
+    "roof"
+   ],
+   "family_default": [],
+   "srgb8": [
+    238,
+    242,
+    247
+   ],
+   "roughness_permille": 800,
+   "metalness_permille": 0,
+   "reason": "Lying snow, a little blue of white so it is not the page's own white. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "ice",
+   "words": [
+    "ice",
+    "icy",
+    "frozen",
+    "glacier"
+   ],
+   "plain": "ice",
+   "families": [
+    "ground",
+    "path",
+    "water"
+   ],
+   "family_default": [],
+   "srgb8": [
+    198,
+    222,
+    234
+   ],
+   "roughness_permille": 250,
+   "metalness_permille": 0,
+   "reason": "Ice, pale blue and smooth, so it takes a highlight where snow takes none. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "cobble",
+   "words": [
+    "cobble",
+    "cobbles",
+    "cobbled",
+    "cobblestone",
+    "cobblestones",
+    "sett",
+    "setts"
+   ],
+   "plain": "cobbles",
+   "families": [
+    "ground",
+    "path",
+    "road"
+   ],
+   "family_default": [],
+   "srgb8": [
+    128,
+    124,
+    118
+   ],
+   "roughness_permille": 850,
+   "metalness_permille": 0,
+   "reason": "Rounded stones set in a street or a yard, darker than paving because of the joints between them. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "paving",
+   "words": [
+    "paving",
+    "paved",
+    "pavement",
+    "flag",
+    "flags",
+    "flagstone",
+    "flagstones",
+    "slab",
+    "slabs",
+    "quay",
+    "terrace",
+    "plaza"
+   ],
+   "plain": "stone paving",
+   "families": [
+    "ground",
+    "path",
+    "road"
+   ],
+   "family_default": [],
+   "srgb8": [
+    170,
+    166,
+    158
+   ],
+   "roughness_permille": 850,
+   "metalness_permille": 0,
+   "reason": "Flat cut stone laid as a surface. A quay named for ground is its paved top. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "stone",
+   "words": [
+    "stone",
+    "stonework",
+    "masonry",
+    "granite",
+    "limestone",
+    "sandstone",
+    "rubble",
+    "drystone"
+   ],
+   "plain": "stone",
+   "families": [
+    "wall",
+    "boundary",
+    "ground",
+    "path",
+    "roof"
+   ],
+   "family_default": [],
+   "srgb8": [
+    150,
+    146,
+    138
+   ],
+   "roughness_permille": 850,
+   "metalness_permille": 0,
+   "reason": "Built stone, as in a wall or a quay's face: a warm mid grey. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "concrete",
+   "words": [
+    "concrete",
+    "cement",
+    "screed"
+   ],
+   "plain": "concrete",
+   "families": [
+    "ground",
+    "path",
+    "road",
+    "wall",
+    "roof",
+    "boundary"
+   ],
+   "family_default": [],
+   "srgb8": [
+    164,
+    164,
+    160
+   ],
+   "roughness_permille": 850,
+   "metalness_permille": 0,
+   "reason": "Cast concrete, a cooler and flatter grey than stone. The page drew these words in a near colour before the catalog existed. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "asphalt",
+   "words": [
+    "asphalt",
+    "tarmac",
+    "bitumen",
+    "blacktop"
+   ],
+   "plain": "asphalt",
+   "families": [
+    "ground",
+    "path",
+    "road"
+   ],
+   "family_default": [],
+   "srgb8": [
+    72,
+    72,
+    74
+   ],
+   "roughness_permille": 900,
+   "metalness_permille": 0,
+   "reason": "A sealed road surface, near black, so a road reads apart from a paved path. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "brick",
+   "words": [
+    "brick",
+    "bricks",
+    "brickwork"
+   ],
+   "plain": "brick",
+   "families": [
+    "wall",
+    "boundary",
+    "ground",
+    "path"
+   ],
+   "family_default": [],
+   "srgb8": [
+    158,
+    87,
+    66
+   ],
+   "roughness_permille": 850,
+   "metalness_permille": 0,
+   "reason": "Fired clay brick, as a wall or as paving. The page drew this word in this colour before the catalog existed. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "timber",
+   "words": [
+    "timber",
+    "wood",
+    "wooden",
+    "plank",
+    "planks",
+    "board",
+    "boards",
+    "boarded",
+    "deck",
+    "decking",
+    "parquet",
+    "log",
+    "logs",
+    "palisade",
+    "shingles",
+    "clapboard"
+   ],
+   "plain": "timber",
+   "families": [
+    "wall",
+    "roof",
+    "boundary",
+    "ground",
+    "path"
+   ],
+   "family_default": [],
+   "srgb8": [
+    150,
+    126,
+    98
+   ],
+   "roughness_permille": 800,
+   "metalness_permille": 0,
+   "reason": "Sawn or split wood, as planks, boards, logs or a palisade's stakes: a mid brown. The page drew these words in a near colour before the catalog existed. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement. Version 2 lifted and greyed this colour from 148, 112, 76: beside the three packs' own palettes the first read heavy and too orange, in every pack's light.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "tile",
+   "words": [
+    "tile",
+    "tiles",
+    "tiled",
+    "terrazzo",
+    "marble",
+    "ceramic",
+    "mosaic"
+   ],
+   "plain": "floor tiles",
+   "families": [
+    "ground",
+    "path",
+    "wall"
+   ],
+   "family_default": [],
+   "srgb8": [
+    194,
+    189,
+    178
+   ],
+   "roughness_permille": 500,
+   "metalness_permille": 0,
+   "reason": "Glazed or polished tile underfoot or on a wall: pale and smoother than stone. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "roof_tile",
+   "words": [
+    "tile",
+    "tiles",
+    "tiled",
+    "terracotta",
+    "pantile",
+    "pantiles",
+    "clay"
+   ],
+   "plain": "clay roof tiles",
+   "families": [
+    "roof"
+   ],
+   "family_default": [],
+   "srgb8": [
+    170,
+    84,
+    60
+   ],
+   "roughness_permille": 800,
+   "metalness_permille": 0,
+   "reason": "Fired clay roof tiles. The same word on a roof is this material and not a floor's tile, which is why the two are separate entries. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "slate",
+   "words": [
+    "slate",
+    "slates",
+    "slated"
+   ],
+   "plain": "slate",
+   "families": [
+    "roof",
+    "ground",
+    "path",
+    "wall"
+   ],
+   "family_default": [],
+   "srgb8": [
+    86,
+    92,
+    104
+   ],
+   "roughness_permille": 700,
+   "metalness_permille": 0,
+   "reason": "Split slate, a dark blue grey, on a roof or as a floor. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "thatch",
+   "words": [
+    "thatch",
+    "thatched",
+    "straw",
+    "reed",
+    "reeds",
+    "rushes",
+    "palm"
+   ],
+   "plain": "thatch",
+   "families": [
+    "roof",
+    "wall"
+   ],
+   "family_default": [],
+   "srgb8": [
+    172,
+    154,
+    116
+   ],
+   "roughness_permille": 950,
+   "metalness_permille": 0,
+   "reason": "A roof of straw or reed, weathered from gold toward grey. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement. Version 2 lifted and greyed this colour from 170, 148, 104: beside the three packs' own palettes the first read heavy and too orange, in every pack's light.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "adobe",
+   "words": [
+    "adobe",
+    "daub",
+    "earthen",
+    "cob",
+    "mudbrick",
+    "rammed"
+   ],
+   "plain": "sun dried earth",
+   "families": [
+    "wall",
+    "roof",
+    "boundary"
+   ],
+   "family_default": [],
+   "srgb8": [
+    204,
+    170,
+    134
+   ],
+   "roughness_permille": 950,
+   "metalness_permille": 0,
+   "reason": "Sun dried earth walls and the flat earth roofs built with them: a warm tan. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement. Version 2 lifted and greyed this colour from 196, 150, 110: beside the three packs' own palettes the first read heavy and too orange, in every pack's light.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "plaster",
+   "words": [
+    "plaster",
+    "plastered",
+    "whitewash",
+    "whitewashed",
+    "limewash",
+    "render",
+    "rendered",
+    "stucco",
+    "painted"
+   ],
+   "plain": "painted plaster",
+   "families": [
+    "wall",
+    "boundary"
+   ],
+   "family_default": [],
+   "srgb8": [
+    236,
+    232,
+    220
+   ],
+   "roughness_permille": 900,
+   "metalness_permille": 0,
+   "reason": "A wall rendered and whitewashed or painted pale. A wall named only as painted is drawn so, since no colour of paint reaches the page. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "canvas",
+   "words": [
+    "canvas",
+    "tent",
+    "cloth",
+    "fabric",
+    "awning",
+    "tarp",
+    "tarpaulin",
+    "sailcloth",
+    "hide"
+   ],
+   "plain": "canvas",
+   "families": [
+    "wall",
+    "roof",
+    "ground"
+   ],
+   "family_default": [],
+   "srgb8": [
+    214,
+    203,
+    172
+   ],
+   "roughness_permille": 950,
+   "metalness_permille": 0,
+   "reason": "Undyed canvas, as a tent's walls, roof and groundsheet. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "metal",
+   "words": [
+    "metal",
+    "steel",
+    "iron",
+    "tin",
+    "aluminium",
+    "corrugated",
+    "hull",
+    "plating",
+    "panel",
+    "panels"
+   ],
+   "plain": "metal",
+   "families": [
+    "wall",
+    "roof",
+    "ground",
+    "path",
+    "boundary"
+   ],
+   "family_default": [],
+   "srgb8": [
+    132,
+    138,
+    146
+   ],
+   "roughness_permille": 450,
+   "metalness_permille": 600,
+   "reason": "Bare or painted metal sheet, as a hull, a deck or a shed's cladding: a cool grey that takes a highlight. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "glass",
+   "words": [
+    "glass",
+    "glazed",
+    "glazing",
+    "greenhouse"
+   ],
+   "plain": "glass",
+   "families": [
+    "wall",
+    "roof"
+   ],
+   "family_default": [],
+   "srgb8": [
+    156,
+    192,
+    206
+   ],
+   "roughness_permille": 150,
+   "metalness_permille": 0,
+   "reason": "Glass seen from outside in daylight, drawn opaque as the sky it reflects, since the page draws no see-through surface for a site. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "carpet",
+   "words": [
+    "carpet",
+    "carpeted",
+    "rug",
+    "matting",
+    "mat"
+   ],
+   "plain": "carpet",
+   "families": [
+    "ground"
+   ],
+   "family_default": [],
+   "srgb8": [
+    134,
+    78,
+    74
+   ],
+   "roughness_permille": 950,
+   "metalness_permille": 0,
+   "reason": "A woven floor covering, drawn a muted red so a carpeted room reads apart from bare boards. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "floor",
+   "words": [
+    "floor",
+    "flooring",
+    "floorboards"
+   ],
+   "plain": "a plain indoor floor",
+   "families": [
+    "ground",
+    "path"
+   ],
+   "family_default": [],
+   "srgb8": [
+    168,
+    140,
+    107
+   ],
+   "roughness_permille": 800,
+   "metalness_permille": 0,
+   "reason": "A floor that names no material. It is drawn as the page drew an indoor ground before the catalog existed, so a room that says only floor is not a lawn. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "sea",
+   "words": [
+    "sea",
+    "ocean",
+    "bay",
+    "lagoon",
+    "surf"
+   ],
+   "plain": "the sea",
+   "families": [
+    "water"
+   ],
+   "family_default": [],
+   "srgb8": [
+    46,
+    92,
+    128
+   ],
+   "roughness_permille": 200,
+   "metalness_permille": 0,
+   "reason": "Open salt water, the deepest of the water colours. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "harbour",
+   "words": [
+    "harbour",
+    "harbor",
+    "basin",
+    "dock",
+    "docks",
+    "marina",
+    "port"
+   ],
+   "plain": "harbour water",
+   "families": [
+    "water"
+   ],
+   "family_default": [],
+   "srgb8": [
+    54,
+    96,
+    116
+   ],
+   "roughness_permille": 200,
+   "metalness_permille": 0,
+   "reason": "Sheltered salt water, a little greener and darker than the open sea. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "lake",
+   "words": [
+    "lake",
+    "loch",
+    "mere",
+    "reservoir",
+    "water"
+   ],
+   "plain": "a lake",
+   "families": [
+    "water"
+   ],
+   "family_default": [],
+   "srgb8": [
+    62,
+    108,
+    140
+   ],
+   "roughness_permille": 200,
+   "metalness_permille": 0,
+   "reason": "Still fresh water under an open sky. Water that names nothing else is drawn so. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "river",
+   "words": [
+    "river",
+    "stream",
+    "brook",
+    "creek",
+    "canal",
+    "moat"
+   ],
+   "plain": "running water",
+   "families": [
+    "water"
+   ],
+   "family_default": [],
+   "srgb8": [
+    70,
+    112,
+    132
+   ],
+   "roughness_permille": 200,
+   "metalness_permille": 0,
+   "reason": "Running fresh water, paler than a lake. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "pond",
+   "words": [
+    "pond",
+    "pool",
+    "marsh",
+    "swamp",
+    "bog",
+    "trough"
+   ],
+   "plain": "a pond",
+   "families": [
+    "water"
+   ],
+   "family_default": [],
+   "srgb8": [
+    74,
+    110,
+    104
+   ],
+   "roughness_permille": 300,
+   "metalness_permille": 0,
+   "reason": "Small still water, greener than a lake. The colour is chosen by eye as the material's middle value in daylight; it cites no measurement.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  }
+ ]
+}

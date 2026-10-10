@@ -12,6 +12,8 @@ import { isNavigationPositionClear, atlasVec3, readSurfaceMaterials } from '@exu
 import * as pc from 'playcanvas';
 import { describe, expect, it } from 'vitest';
 import {
+  SITE_BEYOND_DROP_M,
+  baseGroundSlot,
   parseSiteDrawing,
   siteMount,
   siteNavigationWorld,
@@ -20,6 +22,8 @@ import {
   drawSiteSlots,
   type SiteDrawing,
 } from '../src/playcanvas/generated-site/index.js';
+import type { TileLook } from '../src/playcanvas/generated-tile/look.js';
+import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
 
 function slot(identity: string, lookRole: string, primitive: string, position: number[], yaw: number, box: number[]) {
   return {
@@ -110,8 +114,13 @@ describe('walking a site', () => {
 });
 
 // Relative to web/, where the suite runs: the catalog a deployment ships.
-const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-kinds/surface-material.v1.json', 'utf8'));
+const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-kinds/surface-material.v2.json', 'utf8'));
 const bytes = (rgb: readonly number[]): number[] => rgb.map((channel) => Math.round(channel * 255));
+/** The default light of the committed cozy town pack, which states a ground beyond the world: a lawn, 0.6 m down. */
+const COZY = JSON.parse(readFileSync('../assets/style-packs/packs/exulanica.cozy-town/manifest.json', 'utf8')) as {
+  light: { default_preset: string; presets: Record<string, never> }; shading: never; edge: { ground: number[]; drop_mm: number };
+};
+const edgedLook = (): TileLook => renderLookOfPreset(COZY.light.presets[COZY.light.default_preset]!, COZY.shading, COZY.edge as never);
 
 const xyz = (v: pc.Vec3): number[] => [v.x, v.y, v.z].map((n) => Math.round(n * 1e6) / 1e6);
 
@@ -195,6 +204,50 @@ describe('drawing a site', () => {
     const plain = siteMount(drawing, { servedBytes: 1 }).attach({ app, camera, environmentRoot });
     expect('siteMaterials' in canvas.dataset).toBe(false);
     plain.dispose();
+  });
+
+  it('draws the ground beyond an open site in what its base ground is drawn in, just under it, and says so on the canvas', () => {
+    const { app, camera, environmentRoot } = nullApp();
+    const canvas = app.graphicsDevice.canvas as HTMLCanvasElement;
+    expect(baseGroundSlot(drawing)?.identity).toBe('ground');
+    const attachment = siteMount(drawing, { servedBytes: 1, look: edgedLook(), materials: MATERIALS }).attach({ app, camera, environmentRoot });
+    const edge = app.root.findByName('generated-tile:edge-ground') as pc.Entity;
+    const ground = (environmentRoot.findByName('ground:shape') as pc.Entity).render!.meshInstances[0]!;
+    // The pack's own plane, out to the pack's own reach, now in the site's soil and not the pack's lawn.
+    expect(edge.render!.meshInstances[0]!.material).toBe(ground.material);
+    expect(bytes([...'rgb'].map((channel) => (ground.material as pc.StandardMaterial).diffuse[channel as 'r']))).toEqual([...MATERIALS.materials.find((m) => m.key === 'soil')!.swatch.srgb8]);
+    expect(edge.getPosition().y).toBeCloseTo(-SITE_BEYOND_DROP_M, 5);
+    // Under the ground by more than one of the drawing's 6 mm layer steps, and by too little for a step to show at the site's edge.
+    expect(SITE_BEYOND_DROP_M).toBeGreaterThan(0.006);
+    expect(SITE_BEYOND_DROP_M).toBeLessThanOrEqual(0.03);
+    expect(canvas.dataset['siteGroundBeyond']).toBe('ground.tilled_soil');
+    attachment.dispose();
+    expect('siteGroundBeyond' in canvas.dataset).toBe(false);
+    expect(app.root.findByName('generated-tile:edge-ground')).toBeNull();
+  });
+
+  it('keeps the look\'s own ground beyond an indoor site and beyond a site with no ground over its whole extent', () => {
+    const indoor = parseSiteDrawing({ ...served(), extent: { widthMm: 10_000, depthMm: 12_000, enclosure: 'indoor' } });
+    const patch = parseSiteDrawing({ ...served(), slots: (served()['slots'] as { identity: string; boxMm: number[] }[]).map((one) => (one.identity === 'ground' ? { ...one, boxMm: [9000, 12_000, 0] } : one)) });
+    expect(baseGroundSlot(patch)).toBeNull();
+    // The base ground is the plane over the whole extent at the site's own level: not one as wide but
+    // shallower, not one of the right size laid off its centre or above the ground, and not a box.
+    const groundAs = (change: Record<string, unknown>) => parseSiteDrawing({ ...served(), slots: (served()['slots'] as { identity: string }[]).map((one) => (one.identity === 'ground' ? { ...one, ...change } : one)) });
+    expect(baseGroundSlot(groundAs({ boxMm: [10_000, 11_000, 0] }))).toBeNull();
+    expect(baseGroundSlot(groundAs({ positionMm: [5500, 6000, 0] }))).toBeNull();
+    expect(baseGroundSlot(groundAs({ positionMm: [5000, 6500, 0] }))).toBeNull();
+    expect(baseGroundSlot(groundAs({ positionMm: [5000, 6000, 6] }))).toBeNull();
+    expect(baseGroundSlot(groundAs({ primitive: 'box' }))).toBeNull();
+    expect(baseGroundSlot(groundAs({ lookRole: 'path.tilled_soil' }))).toBeNull();
+    for (const site of [indoor, patch]) {
+      const { app, camera, environmentRoot } = nullApp();
+      const attachment = siteMount(site, { servedBytes: 1, look: edgedLook(), materials: MATERIALS }).attach({ app, camera, environmentRoot });
+      const edge = app.root.findByName('generated-tile:edge-ground') as pc.Entity;
+      expect(edge.render!.meshInstances[0]!.material.name).toBe('generated-tile:edge-ground');
+      expect(edge.getPosition().y).toBeCloseTo(-COZY.edge.drop_mm / 1000, 5);
+      expect('siteGroundBeyond' in (app.graphicsDevice.canvas as HTMLCanvasElement).dataset).toBe(false);
+      attachment.dispose();
+    }
   });
 
   it('hands a dresser every drawn slot by identity and undresses before the slots go', () => {

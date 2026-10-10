@@ -20,4 +20,4 @@ export { SITE_WALKER_RADIUS_M, siteNavigationWorld, siteStart, siteSurface } fro
 export type { DrawnSiteSlots } from './site-primitives.js';
 export { drawSiteSlots, slotColour } from './site-primitives.js';
 export type { GeneratedSiteMount, SiteDresser, SiteMountOptions } from './site-mount.js';
-export { siteMount } from './site-mount.js';
+export { SITE_BEYOND_DROP_M, baseGroundSlot, siteMount } from './site-mount.js';

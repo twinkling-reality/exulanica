@@ -6,7 +6,7 @@
  * `roof.thatched`, `path.desert_track`). A style pack states a surface for some leaves and a
  * `default` for a family, and the pack's one rule (`resolveLookRole`) gives every other leaf that
  * default, so sand, a quay and a beach are all the pack's lawn. The surface material catalog
- * (`assets/catalogs/world-kinds/surface-material.v1.json`) stands between the two: each entry is a
+ * (`assets/catalogs/world-kinds/surface-material.v2.json`) stands between the two: each entry is a
  * material, the words that name it, the families that may wear it and the colour it is drawn in.
  * A leaf is read by its words, so a compound a model wrote (`forest_floor`, `tent_floor`,
  * `lake_shore`) finds its material.

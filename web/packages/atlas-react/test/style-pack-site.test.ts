@@ -20,6 +20,7 @@ import {
 import { parseSiteDrawing, siteMount, type SiteDrawing } from '../src/playcanvas/generated-site/index.js';
 import type { RenderShading } from '../src/playcanvas/generated-tile/look.js';
 import { fetchPackPieces, packSiteDresser, type FetchedPieces, type SiteDressingSummary } from '../src/playcanvas/style-pack/index.js';
+import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
 
 // Relative to web/, where the suite runs.
 const CASES = JSON.parse(readFileSync('../assets/style-packs/manifest-cases.v1.json', 'utf8'));
@@ -31,7 +32,7 @@ const families = new Map<string, LookFamily>(CATALOG.entries.map((entry) => [ent
   fit: entry.fit, dressing: entry.dressing, fillMinimumPermille: entry.fill_minimum_permille, fillMaximumPermille: entry.fill_maximum_permille,
 }]));
 
-const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-kinds/surface-material.v1.json', 'utf8'));
+const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-kinds/surface-material.v2.json', 'utf8'));
 const colourOf = (key: string): number[] => [...MATERIALS.materials.find((material) => material.key === key)!.swatch.srgb8];
 
 const SOIL = [120, 90, 60] as const;
@@ -164,7 +165,9 @@ async function dressedSite(shading: RenderShading, materials?: SurfaceMaterials,
   const pieces: FetchedPieces = await fetchPackPieces(pack, Object.keys(pack.modules), TABLE, async (file: StylePackFile) => PIECES[file.path]!);
   const summaries: SiteDressingSummary[] = [];
   const { app, camera, environmentRoot } = nullApp();
-  const mount = siteMount(site, { servedBytes: 1, dress: packSiteDresser({ pack, families, pieces, shading, ...(materials === undefined ? {} : { materials }), told: (summary) => summaries.push(summary) }) });
+  // The pack's own light, with a ground beyond the world stated where the pack states none.
+  const look = renderLookOfPreset(pack.light.presets[pack.light.default_preset]!, pack.shading, pack.edge ?? { ground: [136, 165, 96], drop_mm: 600, reach_mm: 3_000_000 });
+  const mount = siteMount(site, { servedBytes: 1, look, dress: packSiteDresser({ pack, families, pieces, shading, ...(materials === undefined ? {} : { materials }), told: (summary) => summaries.push(summary) }) });
   const attachment = mount.attach({ app, camera, environmentRoot });
   const canvas = app.graphicsDevice.canvas as HTMLCanvasElement;
   const root = environmentRoot.findByName('generated-site:world-1') as pc.Entity;
@@ -173,7 +176,8 @@ async function dressedSite(shading: RenderShading, materials?: SurfaceMaterials,
     const { r, g, b } = (material as pc.StandardMaterial).diffuse;
     return [r, g, b].map((channel) => Math.round(channel * 255));
   };
-  return { root, environmentRoot, attachment, summaries, shape, rgb, canvas };
+  const beyond = (): pc.Material => (app.root.findByName('generated-tile:edge-ground') as pc.Entity).render!.meshInstances[0]!.material;
+  return { root, environmentRoot, attachment, summaries, shape, rgb, canvas, beyond };
 }
 
 describe('a site dressed in a pack that carries the surface material catalog', () => {
@@ -188,6 +192,9 @@ describe('a site dressed in a pack that carries the surface material catalog', (
     // The pieces stand as before: a leaf's material never takes a slot a piece fills.
     expect((site.root.findByName('fence') as pc.Entity).enabled).toBe(false);
     expect(site.summaries).toEqual([{ surfaces: 0, materials: 3, unknownLooks: ['boundary.picket'], pieces: 2, placed: 4, undressed: 2, inkSegments: 0 }]);
+    // The ground beyond the site wears the very material the dressed ground wears: soil to the horizon.
+    expect(site.beyond()).toBe(site.shape('ground').material);
+    expect(site.beyond().name).toBe('style-pack:material:ground.soil');
     expect(site.canvas.dataset['siteMaterials']).toBe('3');
     expect(JSON.parse(site.canvas.dataset['siteUnknownLooks']!)).toEqual(['boundary.picket']);
     site.attachment.dispose();
