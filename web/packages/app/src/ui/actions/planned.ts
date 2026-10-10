@@ -38,6 +38,14 @@ export const PLAN_ACTIONS: Readonly<Record<string, string | null>> = Object.free
   request_pieces: 'pieces.request',
   // A mind for a being or a group (MAKE's package 1): the sheet says whom, the mind and its cost.
   choose_mind: 'minds.choose',
+  // The steps that spend nothing (MAKE's package 2): a placed thing moved or removed, a being
+  // played and given back, everyone sent away and brought back.
+  move_thing: 'things.move',
+  remove_thing: 'things.remove',
+  play_being: 'beings.play',
+  give_back: 'beings.give-back',
+  send_away: 'people.send-away',
+  bring_back: 'people.bring-back',
   other: null,
 });
 
@@ -124,6 +132,10 @@ const ANSWER_FIELDS: Readonly<Record<string, { readonly at: string | null; reado
   'POST /world/versions/{version_id}/things': { at: null, fields: ['edit_seq', 'state_sha256'] },
   'POST /world/versions/{version_id}/society/actions': { at: 'request', fields: ['request_id', 'document_sha256'] },
   'POST /world/versions/{version_id}/models/{role_key}': { at: null, fields: ['choice_seq'] },
+  'POST /world/versions/{version_id}/things/{thing_id}/move': { at: null, fields: ['edit_seq', 'state_sha256'] },
+  'POST /world/versions/{version_id}/things/{thing_id}/remove': { at: null, fields: ['edit_seq', 'state_sha256'] },
+  'POST /world/versions/{version_id}/society/play': { at: null, fields: ['choice_seq'] },
+  'POST /world/versions/{version_id}/society/play/{subject_id}/give-back': { at: null, fields: ['choice_seq'] },
 };
 
 /**

@@ -656,6 +656,9 @@ saved-entry lock and refusal as the same operation sent directly, because it is 
 | Add a thing by its kind, beside something named or where the person points | none; the route's own checks run in process | `POST .../things` |
 | Ask one of the world's beings to go to a place or use it, or to pick up, put down, give or take a thing | none; the step is prepared again just before it is sent | `POST .../society/actions` |
 | Choose who decides for a being, a kind, a role or everyone: an open model, or their own routine | none; the choice record's own checks run with no lock and record nothing | `POST .../models/{role_key}` |
+| Move a placed thing to where the person points, or take it away | none; the route's own checks run in process | `POST .../things/{thing_id}/move`, `POST .../things/{thing_id}/remove` |
+| Start playing a being, or give it back | none; the choice record's own checks run with no lock and record nothing | `POST .../society/play`, `POST .../society/play/{subject_id}/give-back` |
+| Send everyone away, or bring them back | none; the route's own check of the society's state runs in process | `POST .../society/presence` |
 
 A plan names each step's route key, path values, body, the permissions its route declares, the
 version pins (`base_state_sha256` and `edit_seq`), the authority's preview document and its digest,
@@ -784,8 +787,8 @@ Bringing people in reads back the version's society in the region the step named
 answer names it.
 
 Behaviour changes, photo point maps, environment instances, a traffic light's model, comparisons,
-character and thing looks, style rollback, interaction policy, sending people away or bringing them
-back, and playing a being are not prepared by the Companion: the drafter's form has no slot for them, so
+character and thing looks, style rollback, interaction policy and what a played being does each
+minute are not prepared by the Companion: the drafter's form has no slot for them, so
 a request for one is refused `action_not_offered`. Conversation and remembered context never make a
 step permitted, and the planner imports neither the interaction-policy plane nor stored
 conversation (`tests/test_companion_action_policy_boundary.py`). Scripted tests hold the mechanics;
@@ -795,8 +798,9 @@ each step's options moved last under a 640-token ceiling, are in
 prompt `action-plan-9` adds things and beings and a being's hands acts, asks each step's
 options to name what a thing goes beside or where a being goes as well as what is added or asked
 (what stands in the world by its listed label; a visit to a place as using it); `action-plan-10`
-adds new pieces of the world's look; the current prompt, `action-plan-11`, adds who decides for a
-being or a group. None of the three is measured by those records.
+adds new pieces of the world's look; `action-plan-11` adds who decides for a being or a group; the
+current prompt, `action-plan-12`, adds moving and removing a placed thing, playing a being and
+sending everyone away. None of the four is measured by those records.
 
 ### Things and beings
 
@@ -893,8 +897,9 @@ several beings or groups are a step each. Taking a mind back is the same step na
 
 The groups are read from the society's own state when the plan is made
 ([action_minds.py](../exulanica/selection/action_minds.py)): everyone here, each kind of being
-present, and each role present whose people are not exactly a kind's, each offered with how many it
-holds. Nothing names a kind or a role in code, so a world's groups are whatever its people are, and
+present, and each role present, each offered with how many it holds. A role whose people are exactly
+a kind's, or everyone, is that group, listed once, which then answers to the role's word as well as
+its own. Nothing names a kind or a role in code, so a world's groups are whatever its people are, and
 a step states the groups its world holds (`mind.groups_here`). A role is the word the society's own
 state gives a person; what that word rests on is its engine's
 ([society contract](synthetic-society-contract.md)). A kind of thing named in the step
@@ -902,12 +907,25 @@ stands for the group of that kind here. A group becomes the ids of its members w
 prepared, so a being that arrives later is not chosen for by an earlier step; one choice names at
 most the 512 subjects the route's body takes.
 
+What the drafter names is held to the person's own words by code, never by the model. A kind's or a
+role's group counts only when one of its labels is in the words, so a group this world does not hold
+is asked about with the groups it does hold. A group the words name outranks a being the draft names
+that is not in it; a being that is one of several in such a group is asked about beside the group;
+everyone, drafted where the words name another group, is asked about beside it. Where the words hold
+no group's label, a drafted being stands only when its own name is in them, and everyone is the
+drafter's reading alone, shown with its count before the yes. A model is the one the words name by
+its served name: a word several offered models share is asked about among them, and words that name
+no model ask among every mind. Their own routine is the drafter's reading alone, since it asks
+nobody. Each question lists what the words could mean and picks nothing for the person.
+
 The route has no preview, so the choice record's own checks run with no lock and record nothing
 (`SocietyModelChoiceRepository.preview_choice`, the checks a recorded choice is refused by, in
 their order). Whoever a choice may not name is left out and counted by the code a choice naming it
 alone is refused by (`mind.left_out`: `being_played`, `decided_from_outside`,
 `decider_not_allowed`, `person_not_in_this_world`, `subject_chosen_under_another_role`); a step
-left naming nobody is `blocked` with that code, and a choice the route refuses whole is `blocked`
+left naming nobody is `blocked` with the code the route answers a choice naming them all, which the
+preview states by running the same checks on the whole choice, and a choice the route refuses whole
+is `blocked`
 with the route's code (`engine_takes_no_model_choice`, `model_not_offered`). A choice that would
 run more beings by models than the society's contract allows is never trimmed: where another group
 this world holds would fit, the plan asks which instead (`too_many_people_for_models`, with the
@@ -920,20 +938,62 @@ chosen model at each of a being's own choice points. A step naming a model says 
 true`) and carries `cost`: per simulated minute, the most the choice may reserve (the figure the
 playback host reserves for one answer of that model under the society's contract, once for each
 being named), no typical figure while no record holds one for the world (`usd_typical` null), and
-the world's own ceilings an hour, in dollars and in decisions, past which the routine decides
-whatever was chosen. Where this host asks no model for the world, or none of the chosen model's
-provider, the step says why by code (`mind.host_refusal`, `mind.model_refusal`): the choice is
-recorded and the routine decides until the host asks. A step naming the routine spends nothing and
-carries no cost. A choice after the first step of a plan is confirmed by the same yes, so it
-states the same on the plan as the world stands when the plan is made (`mind`, `cost`, `spends` on
-the pending step; one the route would refuse then is `blocked` and the plan is not confirmed); it
-is prepared again just before it is sent, and the page does not send one that would then name more
-beings than the sheet showed, nor one that then needs a question answered. Where the workspace's
-allowance for the model's provider is used up, the model says so (`mind.model_refusal`) and no
-cost is stated. The request's key follows the society's newest choice, so a plan sent twice
-answers the choice it recorded and the same words asked again later record a new one. `titles`
-names whom and the mind. The step reads back as the choice its answer names (`choice_seq`),
-recorded by the caller under the step's key for the subjects and the mind it named.
+the world's own ceilings, in dollars and in decisions over any hour of real time (the host counts
+the hour just past, whatever the world's speed), past which the routine decides whatever was
+chosen. Where this host asks no model for the world, or none of the chosen model's provider, the
+step says why by code (`mind.host_refusal`, `mind.model_refusal`): the choice is recorded and the
+routine decides until the host asks. The step still carries `cost`, the bound it would meet once
+the host asks, and the page shows no figure while nothing is asked. A step naming
+the routine spends nothing and carries no cost. A choice after the first step of a plan is
+confirmed by the same yes, so it states the same on the plan as the world stands when the plan is
+made (`mind`, `cost`, `spends` on the pending step; one the route would refuse then is `blocked`
+and the plan is not confirmed). Such a step is judged alone: an earlier step of the same plan that
+would make room for it is not counted, and the page says so on the blocked step. It is prepared
+again just before it is sent, and the page does not send one that would then name more beings than
+the sheet showed, nor one the sheet showed no count of, nor one that then needs a question
+answered. Where the workspace's allowance for the model's provider is used up, the model says so
+(`mind.model_refusal`); the allowance is read once for a plan, and a read that fails leaves it
+unknown and fails no plan. The request's key follows the society's newest choice and the account
+that asks, so a plan sent twice answers the choice it recorded, the same words asked again later
+record a new one, and two accounts never share a key. `titles` names whom and the mind. The step
+reads back as the choice its answer names (`choice_seq`), recorded by the caller under the step's
+key for the subjects and the mind it named; a step that holds no request, blocked or still
+pending, reads back as `not_applied`.
+
+### Steps that spend nothing
+
+**A placed thing moved or taken away.** The drafter's `move_object` and `remove_object` are read by
+the list a label came from: a listed thing, or a listed being an author placed (the society states
+the thing it was placed as), is typed `move_thing` or `remove_thing` and sent to the things routes;
+an object to the objects'. A kind of thing named, or a place a placed thing provides, stands for the
+placed thing of that kind or at that place; several that fit are asked about. One of the world's own
+people, or a visitor, is no placed thing, and a removal naming one names nothing. A thing is moved to where the person points, in its own region,
+laid out as a thing added there is (the pointed spot, or the nearest free place on rings about it;
+the ground's elevation; turned to face the person); moving a thing beside something named is not
+offered. The routes have no preview, so their own checks run in process: a thing that does not
+stand in the version is `blocked` with `invalid_object_state`, a spot in another region or one no
+pose can state with `invalid_thing_placement`, and a spot with nowhere free near it with
+`no_free_place_near`. Each reads back as its own `move_thing` or `remove_thing` edit, and the
+things undo route takes it back.
+
+**A being played and given back.** `play_being` is the request `POST .../society/play` takes for
+one listed being, and `give_back` the request its give-back takes for the being the caller plays,
+which the plan reads from the society and never from the words. No version's capability read lists
+these routes, so the plan states their descriptors from the caller's grant, available while the
+version holds a society. The choice record's own checks run with no lock and record nothing
+(`SocietyModelChoiceRepository.preview_play`): a play the route would refuse is `blocked` with its
+code (`engine_takes_no_play`, `being_played`, `decided_from_outside`, `decider_not_allowed`), a
+being the caller plays already with `no_change`, and a give-back with nobody played with
+`not_played`. Playing asks no model and spends nothing. Once the step ran, the page's play band
+takes the play up, and what the being does each minute is chosen there, in the world
+([decision roles](decision-roles-contract.md#a-person-playing-a-being)).
+
+**Everyone sent away and brought back.** A simulation request may ask `send_away` or `bring_back`,
+the one request `POST .../society/presence` takes, pinned to the minute and the state the clock
+read gave. An engine that keeps its people (a society of things) is refused with the capability
+read's own code (`engine_keeps_its_people`), and what the society's state already holds with the
+route's own name (`nobody_to_send_away`, `already_here`), by the route's pure check run in process.
+The world and its history stay; the step reads back as the presence request recorded under its key.
 
 ### The browser's path
 

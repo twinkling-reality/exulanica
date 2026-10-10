@@ -283,7 +283,7 @@ def test_the_outcome_route_takes_exactly_the_operations_a_plan_names():
     from exulanica.api.routes.selection_actions import OutcomeOperation
 
     named = {row.commit for row in plan._MATRIX.values()} | {plan.STYLE_PREVIEW, plan.STYLE_APPLY}
-    named |= {plan.CONTROL, plan.CONTROL_STEP, plan.BRING_PEOPLE}
+    named |= {plan.CONTROL, plan.CONTROL_STEP, plan.BRING_PEOPLE, plan.PRESENCE}
     assert set(get_args(OutcomeOperation)) == named
 
 

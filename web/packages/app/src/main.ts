@@ -1422,7 +1422,10 @@ async function mountWorld(): Promise<void> {
     : new CompanionActionsClient({ ...currentCredentials, worldId: state.activeWorldEntry.worldId });
   // Plan steps that write a new version of the world: the page follows each to the version it made,
   // so the next step is prepared against it. A placed thing's answer is a version, as an object's is.
-  const PLANNED_EDITS = new Set(['objects.place', 'objects.move', 'objects.remove', 'objects.undo', 'arrangements.place', 'things.place']);
+  const PLANNED_EDITS = new Set([
+    'objects.place', 'objects.move', 'objects.remove', 'objects.undo', 'arrangements.place',
+    'things.place', 'things.move', 'things.remove',
+  ]);
   const sendPlanned = async (
     request: PlannedRequest,
   ): Promise<{ readonly status: number; readonly body: unknown }> => {
@@ -1660,6 +1663,13 @@ async function mountWorld(): Promise<void> {
       waitMs: COMPANION_DRAFT_WAIT_MS,
       paused: () => environmentSelection.people.clock().mode === 'paused',
       onSaid: (utterance, said) => companion.panel.showAnswer(plannedAnswer(utterance, said)),
+      // A play begun or ended by a confirmed step: the play band takes it up. The play route answers
+      // the one who already plays a being with that play, and giving back a being nobody plays ends
+      // the band, so the band's own calls change nothing the step did not.
+      onPlay: (subjectId) => {
+        if (subjectId === null) void environmentSelection.giveBack();
+        else void environmentSelection.play(subjectId);
+      },
       // New pieces asked for: their waiting line and outcomes, until each has one.
       onPieces: (ids) => {
         const active = state.activeWorldEntry;

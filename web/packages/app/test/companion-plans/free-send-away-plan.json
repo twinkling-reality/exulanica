@@ -1,0 +1,89 @@
+{
+  "profile": "exulanica.companion-action-plan/v1",
+  "outcome": "plan",
+  "kind": "simulation",
+  "world_id": "world:authored:test",
+  "version_id": "00000000-0000-0000-0000-000000000007",
+  "plan_sha256": "17a6a0da0d0ab548beee14622d917a6a4981c00c7a2fd00d64e7151f609aff8e",
+  "atomic": false,
+  "steps": [
+    {
+      "index": 0,
+      "action": {
+        "operation": "send_away",
+        "speed": null,
+        "minutes": null,
+        "region_id": null
+      },
+      "state": "prepared",
+      "code": null,
+      "operation": "POST /world/versions/{version_id}/society/presence",
+      "bind": {
+        "version_id": "00000000-0000-0000-0000-000000000007"
+      },
+      "bind_from": null,
+      "query": {
+        "world_id": "world:authored:test"
+      },
+      "body": {
+        "idempotency_key": "b672bae1-1e88-56d0-898c-68e28ea1fbf0",
+        "presence": "away",
+        "base_tick": 12,
+        "base_state_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "body_from": null,
+      "requires": [
+        "world.write"
+      ],
+      "permitted": true,
+      "spends": false,
+      "preview": null,
+      "pins": {
+        "clock_revision": 0,
+        "tick": 12,
+        "society_state_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "effects": [],
+      "confirmation": "required",
+      "titles": null,
+      "estimate": null,
+      "mind": null,
+      "cost": null,
+      "replay": "same_key_returns_the_recorded_request",
+      "receipt": "society_presence",
+      "compensation": {
+        "operation": "POST /world/versions/{version_id}/society/presence"
+      }
+    }
+  ],
+  "spends": false,
+  "spends_by": [],
+  "clarification": null,
+  "refusal": null,
+  "capabilities": null,
+  "proposal_speech": null,
+  "clock": {
+    "profile": "exulanica.world-clock/v1",
+    "clock_profile": "exulanica.world-clock/legacy-v1",
+    "revision": 0,
+    "state": "paused",
+    "presented_through_tick": null,
+    "traffic": null,
+    "society": {
+      "control_revision": 4,
+      "engine": "exulanica-society/v5",
+      "mode": "paused",
+      "society_id": "00000000-0000-0000-0000-000000000009",
+      "speed": 1,
+      "state_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "tick": 12,
+      "tick_interval_ms": null
+    }
+  },
+  "execution": {
+    "prompt_version": "action-plan-12",
+    "calls": [],
+    "rejections": []
+  },
+  "names": {}
+}

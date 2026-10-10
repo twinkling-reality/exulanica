@@ -32062,7 +32062,12 @@
        "POST /world/versions/{version_id}/society/control/steps",
        "POST /world/versions/{version_id}/society",
        "POST /world/piece-requests",
-       "POST /world/versions/{version_id}/models/{role_key}"
+       "POST /world/versions/{version_id}/models/{role_key}",
+       "POST /world/versions/{version_id}/things/{thing_id}/move",
+       "POST /world/versions/{version_id}/things/{thing_id}/remove",
+       "POST /world/versions/{version_id}/society/presence",
+       "POST /world/versions/{version_id}/society/play",
+       "POST /world/versions/{version_id}/society/play/{subject_id}/give-back"
       ],
       "title": "Operation"
      },
@@ -33472,16 +33477,22 @@
         "propertyName": "operation",
         "mapping": {
          "advance": "#/components/schemas/TypedSimulationBody",
+         "bring_back": "#/components/schemas/TypedSimulationBody",
          "bring_people": "#/components/schemas/TypedSimulationBody",
          "choose_mind": "#/components/schemas/TypedActionBody",
          "direct_thing": "#/components/schemas/TypedActionBody",
+         "give_back": "#/components/schemas/TypedActionBody",
          "move_object": "#/components/schemas/TypedActionBody",
+         "move_thing": "#/components/schemas/TypedActionBody",
          "pause": "#/components/schemas/TypedSimulationBody",
          "place_arrangement": "#/components/schemas/TypedActionBody",
          "place_object": "#/components/schemas/TypedActionBody",
          "place_thing": "#/components/schemas/TypedActionBody",
          "play": "#/components/schemas/TypedSimulationBody",
+         "play_being": "#/components/schemas/TypedActionBody",
          "remove_object": "#/components/schemas/TypedActionBody",
+         "remove_thing": "#/components/schemas/TypedActionBody",
+         "send_away": "#/components/schemas/TypedSimulationBody",
          "set_speed": "#/components/schemas/TypedSimulationBody",
          "undo_last_edit": "#/components/schemas/TypedActionBody"
         }
@@ -41393,7 +41404,11 @@
        "place_arrangement",
        "place_thing",
        "direct_thing",
-       "choose_mind"
+       "choose_mind",
+       "move_thing",
+       "remove_thing",
+       "play_being",
+       "give_back"
       ],
       "title": "Operation"
      },
@@ -41599,7 +41614,9 @@
        "pause",
        "set_speed",
        "advance",
-       "bring_people"
+       "bring_people",
+       "send_away",
+       "bring_back"
       ],
       "title": "Operation"
      },

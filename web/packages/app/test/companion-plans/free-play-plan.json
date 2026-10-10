@@ -1,0 +1,68 @@
+{
+  "profile": "exulanica.companion-action-plan/v1",
+  "outcome": "plan",
+  "kind": "world_edit",
+  "world_id": "world:authored:test",
+  "version_id": "00000000-0000-0000-0000-000000000007",
+  "plan_sha256": "23a5f63f71cf654153a37955200c564c1daff626b7317dd76b7066b5b00f558a",
+  "atomic": false,
+  "steps": [
+    {
+      "index": 0,
+      "action": {
+        "operation": "play_being",
+        "subject_id": "00000000-0000-0000-0000-000000000001"
+      },
+      "state": "prepared",
+      "code": null,
+      "operation": "POST /world/versions/{version_id}/society/play",
+      "bind": {
+        "version_id": "00000000-0000-0000-0000-000000000007"
+      },
+      "bind_from": null,
+      "query": {
+        "world_id": "world:authored:test"
+      },
+      "body": {
+        "idempotency_key": "c887cb6e-3668-5b83-819a-171ba00892e4",
+        "subject_id": "00000000-0000-0000-0000-000000000001"
+      },
+      "body_from": null,
+      "requires": [
+        "world.write"
+      ],
+      "permitted": true,
+      "spends": false,
+      "preview": null,
+      "pins": {
+        "choice_seq": 6
+      },
+      "effects": [],
+      "confirmation": "required",
+      "titles": {
+        "subject": "Traveller"
+      },
+      "estimate": null,
+      "mind": null,
+      "cost": null,
+      "replay": "the_play_that_stands_is_returned",
+      "receipt": "model_choice",
+      "compensation": {
+        "operation": "POST /world/versions/{version_id}/society/play/{subject_id}/give-back"
+      }
+    }
+  ],
+  "spends": false,
+  "spends_by": [],
+  "clarification": null,
+  "refusal": null,
+  "capabilities": null,
+  "proposal_speech": null,
+  "clock": null,
+  "execution": {
+    "prompt_version": "action-plan-12",
+    "calls": [],
+    "rejections": []
+  },
+  "names": {}
+}

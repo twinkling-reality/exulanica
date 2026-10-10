@@ -65,10 +65,15 @@ from exulanica.selection.action_plan import (
     MOVE,
     PIECES,
     PLACE,
+    PLAY,
+    PLAY_GIVE_BACK,
+    PRESENCE,
     REMOVE,
     STYLE_APPLY,
     STYLE_PREVIEW,
+    THING_MOVE,
     THING_PLACE,
+    THING_REMOVE,
     UNDO,
     ClockReader,
     SimulationAction,
@@ -101,6 +106,8 @@ _EDIT_KINDS: Final[Mapping[str, str]] = {
     UNDO: "undo",
     ARRANGE: "add_object",
     THING_PLACE: "add_thing",
+    THING_MOVE: "move_thing",
+    THING_REMOVE: "remove_thing",
 }
 #: The playback controls a simulation plan's chain is sent to.
 _CONTROLS: Final = frozenset({CONTROL, CONTROL_STEP})
@@ -185,6 +192,10 @@ def _one_step(
         return _pieces_step(connection, session, world_id, step)
     if operation == MIND:
         return _mind_step(connection, session, world_id, version_id, step)
+    if operation in (PLAY, PLAY_GIVE_BACK):
+        return _play_step(connection, session, world_id, version_id, step)
+    if operation == PRESENCE:
+        return _presence_step(connection, session, world_id, version_id, step)
     raise InvalidOutcomeStep(f"{operation!r} is not an operation a Companion plan names")
 
 
@@ -197,7 +208,10 @@ def _mind_step(
 ) -> dict[str, Any]:
     """A choice of who decides: ``applied`` when the choice its answer names is this version's
     society's, recorded by the caller under the step's own key, for the subjects and the mind the
-    step's body named; ``not_applied`` when its answer names none or it is not so."""
+    step's body named; ``not_applied`` when its answer names none or it is not so, and for a
+    step that holds no request (one the plan blocked or left for later, which nothing sent)."""
+    if not step.get("body"):
+        return _step(step, "not_applied")
     with _client_shape(step):
         body = step.get("body") or {}
         key = uuid.UUID(str(body["idempotency_key"]))
@@ -235,6 +249,106 @@ def _mind_step(
         "choice_seq": int(row["choice_seq"]),
         "document_sha256": row["document_sha256"],
         "subjects": len(subjects),
+    }
+    return _step(step, "applied", receipts=[receipt])
+
+
+def _play_step(
+    connection: psycopg.Connection,
+    session: Session,
+    world_id: str,
+    version_id: uuid.UUID,
+    step: Mapping[str, Any],
+) -> dict[str, Any]:
+    """A play started or given back: ``applied`` when the choice its answer names is this
+    version's society's, names the being the step named and the caller as the person playing, and
+    is a play's start or its end as the step asked; ``not_applied`` otherwise, and for a step
+    that holds no request."""
+    if not step.get("body"):
+        return _step(step, "not_applied")
+    with _client_shape(step):
+        giving = step.get("operation") == PLAY_GIVE_BACK
+        subject = str(
+            (step.get("bind") or {})["subject_id"]
+            if giving
+            else (step.get("body") or {})["subject_id"]
+        )
+        answer = _answer(step)
+        named = None if answer is None else answer.get("choice_seq")
+        sequence = None if named is None else int(named)
+    if sequence is None:
+        return _step(step, "not_applied")
+    row = connection.execute(
+        "select c.society_id,c.choice_seq,c.request_id,c.document,c.document_sha256 "
+        "from world_society_model_choice c "
+        "join world_society s using(workspace_id,society_id) "
+        "where c.workspace_id=%s and s.world_id=%s and s.version_id=%s and c.choice_seq=%s",
+        (session.workspace_id, world_id, version_id, sequence),
+    ).fetchone()
+    [role] = [found for found in decision_roles() if found.subject == "person"]
+    if row is None:
+        return _step(step, "not_applied")
+    document = row["document"]
+    decider = decider_of(document)
+    if (
+        decider.get("kind") != "person"
+        or decider.get("account_id") != str(session.actor)
+        or [str(found) for found in document.get(role.choice_subjects) or ()] != [subject]
+        or ("ended" in document) != giving
+    ):
+        return _step(step, "not_applied")
+    receipt = {
+        "operation": step.get("operation"),
+        "world_id": world_id,
+        "version_id": str(version_id),
+        "society_id": str(row["society_id"]),
+        "request_id": str(row["request_id"]),
+        "choice_seq": int(row["choice_seq"]),
+        "document_sha256": row["document_sha256"],
+        "subject_id": subject,
+    }
+    return _step(step, "applied", receipts=[receipt])
+
+
+def _presence_step(
+    connection: psycopg.Connection,
+    session: Session,
+    world_id: str,
+    version_id: uuid.UUID,
+    step: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Everyone sent away or brought back: ``applied`` when the step's own request was answered
+    with success and this version's society holds a presence request under the step's key for
+    what the step asked; ``not_applied`` otherwise, and for a step that holds no request."""
+    if not step.get("body"):
+        return _step(step, "not_applied")
+    with _client_shape(step):
+        body = step.get("body") or {}
+        key = uuid.UUID(str(body["idempotency_key"]))
+        wanted = str(body["presence"])
+        answer = _answer(step)
+    if answer is None:
+        return _step(step, "not_applied")
+    row = connection.execute(
+        "select p.society_id,p.request_id,p.document "
+        "from world_society_presence p "
+        "join world_society s using(workspace_id,society_id) "
+        "where p.workspace_id=%s and s.world_id=%s and s.version_id=%s and p.request_id=%s",
+        (session.workspace_id, world_id, version_id, key),
+    ).fetchone()
+    if (
+        row is None
+        or row["document"].get("presence") != wanted
+        or row["document"].get("requested_by") != str(session.actor)
+    ):
+        return _step(step, "not_applied")
+    receipt = {
+        "operation": step.get("operation"),
+        "world_id": world_id,
+        "version_id": str(version_id),
+        "society_id": str(row["society_id"]),
+        "request_id": str(row["request_id"]),
+        "presence": wanted,
     }
     return _step(step, "applied", receipts=[receipt])
 
@@ -359,6 +473,8 @@ def _subjects(step: Mapping[str, Any]) -> list[str | None]:
         return [str((step.get("body") or {})["thing_id"])]
     if operation in (MOVE, REMOVE):
         return [str((step.get("bind") or {}).get("object_id"))]
+    if operation in (THING_MOVE, THING_REMOVE):
+        return [str((step.get("bind") or {}).get("thing_id"))]
     return [None]
 
 
@@ -445,7 +561,7 @@ def _edit_step(
 def _made_by(row: Mapping[str, Any], kind: str, subject: str | None) -> bool:
     if row["kind"] != kind:
         return False
-    named = row["thing_id"] if kind == "add_thing" else row["object_id"]
+    named = row["thing_id"] if kind.endswith("_thing") else row["object_id"]
     return subject is None or named == subject
 
 

@@ -179,6 +179,18 @@ export const MIND_GREW: RefusalWords = {
   next: 'Nothing more was changed. Ask again to see what it comes to now.',
 };
 
+/** A mind step the sheet showed no count or cost of when the plan was confirmed: never sent. */
+export const MIND_UNSHOWN: RefusalWords = {
+  happened: 'This choice of who decides was not shown with its count and cost when you confirmed, so it was not sent.',
+  next: 'Nothing more was changed. Ask for it on its own.',
+};
+
+/**
+ * Said of a later mind step the plan could not prepare: it was judged as the world stands now,
+ * alone, so an earlier step of the same plan that makes room for it is not counted.
+ */
+export const LATER_MIND_JUDGED_NOW = 'This was checked as the world stands now, before the earlier steps of this plan. If they make room for it, ask for it on its own after them.';
+
 /** A question the plan needs answered in the middle of carrying it out, by its code. */
 export function midRunQuestionWords(code: string, facts: Readonly<Record<string, number>>): RefusalWords {
   const question = code === 'too_many_people_for_models' ? tooManyForModelsWords(facts)
@@ -194,8 +206,9 @@ export function mindDetailWords(whom: string, mind: string, routine: boolean): s
 /**
  * What a choice of who decides comes to, said before the yes: how many beings it names, who was
  * left out and why, what a model may cost while the world plays (at most, by the host's own
- * reservation; the world's hourly ceilings) or that no AI is asked, and whether this server asks
- * models here at all. Choosing asks no model; playing the world does.
+ * reservation; the world's ceilings over any hour of real time, which is how the host counts
+ * them) or that no AI is asked, and whether this server asks models here at all. Choosing asks no
+ * model; playing the world does.
  */
 export function mindChoiceWords(facts: MindFacts, cost: MindCost | null, routine: boolean): string {
   const count = `${facts.subjects} being${facts.subjects === 1 ? '' : 's'}`;
@@ -208,8 +221,8 @@ export function mindChoiceWords(facts: MindFacts, cost: MindCost | null, routine
   }
   if (cost === null) return `${who} Choosing asks no model. While the world plays, each is asked at their own choices, which can cost money.`;
   const ceiling = cost.usdPerWorldHour === null ? ''
-    : ` This world stops asking models at ${smallDollarsWords(cost.usdPerWorldHour)}`
-      + `${cost.decisionsPerWorldHour === null ? '' : ` or ${cost.decisionsPerWorldHour} decisions`} an hour, whatever is chosen.`;
+    : ` This world stops asking models at ${atMostDollarsWords(cost.usdPerWorldHour)}`
+      + `${cost.decisionsPerWorldHour === null ? '' : ` or ${cost.decisionsPerWorldHour} decisions`} in any hour of real time, whatever is chosen.`;
   const typical = cost.usdTypical === null ? ' No typical figure is measured for this world yet.'
     : ` Typically about ${smallDollarsWords(cost.usdTypical)}.`;
   return `${who} Choosing asks no model. While the world plays, at most ${atMostDollarsWords(cost.usdAtMost)} a simulated minute `

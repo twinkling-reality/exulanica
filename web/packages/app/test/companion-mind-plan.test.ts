@@ -93,8 +93,14 @@ describe('what the sheet says of a mind before the yes', () => {
       'This is for 2 beings (1 left out because someone is playing them). Choosing asks no model. '
       + 'While the world plays, at most $0.0062 a simulated minute (at most $0.0031 each time a being is asked, at most once a minute). '
       + 'No typical figure is measured for this world yet. '
-      + 'This world stops asking models at $0.25 or 600 decisions an hour, whatever is chosen.',
+      + 'This world stops asking models at $0.25 or 600 decisions in any hour of real time, whatever is chosen.',
     );
+  });
+
+  it('never says the world’s ceiling below itself', () => {
+    const [step] = plan('mind-plan').steps;
+    expect(mindChoiceWords(step!.mind!, { ...step!.cost!, usdPerWorldHour: '0.254000' }, false))
+      .toContain('stops asking models at $0.26 or 600 decisions');
   });
 
   it('says their own routine asks no AI and spends nothing', () => {

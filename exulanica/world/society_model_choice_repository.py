@@ -44,7 +44,7 @@ not the world's: a choice outlives a deployment.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence, Set
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final
 
@@ -586,6 +586,51 @@ class SocietyModelChoiceRepository:
         assert recorded is not None
         return recorded
 
+    def preview_play(
+        self,
+        version_id: uuid.UUID,
+        role: DecisionRole,
+        *,
+        subject: str | None,
+        account_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        """What :meth:`record_play` would meet for ``subject`` now, read with no lock and
+        recording nothing. ``code`` is why the play would be refused, by the name it is refused
+        by, else None; ``playing`` whether this person plays ``subject`` already; ``played`` the
+        beings this person plays now, which :meth:`give_back` would hand back; ``choice_seq`` the
+        society's newest choice. With no ``subject`` only ``played`` is answered."""
+        played = decider({"kind": "person", "account_id": str(account_id)})
+        society = self._society(version_id, lock=False)
+        rows = self._rows(society["society_id"])
+        held = self._current(role, rows)
+        read: dict[str, Any] = {
+            "code": None,
+            "playing": False,
+            "played": sorted(
+                found for found, choice in held.items() if choice["decider"] == played
+            ),
+            "choice_seq": rows[-1]["choice_seq"] if rows else 0,
+        }
+        if society_engine(str(society["engine_version"])).state_family != "things":
+            return {**read, "code": "engine_takes_no_play"}
+        if subject is None:
+            return read
+        if subject in read["played"]:
+            return {**read, "playing": True}
+        try:
+            self._checked(
+                society,
+                rows,
+                role,
+                [subject],
+                lambda: played,
+                granted_away=True,
+                handing_back=False,
+            )
+        except ModelChoiceRefused as refused:
+            return {**read, "code": refused.code}
+        return read
+
     def give_back(
         self,
         version_id: uuid.UUID,
@@ -845,19 +890,26 @@ class SocietyModelChoiceRepository:
         *,
         granted_away: bool,
         handing_back: bool,
+        present: Set[str] | None = None,
+        held: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """The decider a choice naming ``named`` records, as ``described()`` checks it, or the
         refusal: every check of a choice but the bound on the subjects models run
         (:meth:`_run_after`), in the order a choice is refused by. Reads only what it is handed, so
         recording a choice (:meth:`_record`, under the society's lock) and previewing one
-        (:meth:`preview_choice`, with no lock) are refused by the same code for the same reason."""
+        (:meth:`preview_choice`, with no lock) are refused by the same code for the same reason.
+
+        ``present`` and ``held`` are who is here and each subject's current choice, as this
+        method reads them from ``society`` and ``rows``; a caller checking many choices against
+        the same two (a preview, a subject at a time) reads them once and hands them in."""
         chosen = sorted(set(named))
         if not role.hosted_by(society["engine_version"]):
             raise ModelChoiceRefused("engine_takes_no_model_choice")
         if len(chosen) != len(named):
             raise ModelChoiceRefused("person_named_twice")
         record = described()
-        present = set(role.adapter.subjects(society["state"]))
+        if present is None:
+            present = set(role.adapter.subjects(society["state"]))
         # Who is here: everyone, but in a hand-back, whose subjects may have been sent away.
         here = [subject for subject in chosen if subject in present]
         if not chosen or (len(here) != len(chosen) and not handing_back):
@@ -870,7 +922,8 @@ class SocietyModelChoiceRepository:
             # A visitor is never handed to another outside program: its own program, or the
             # world, decides for it.
             raise ModelChoiceRefused("decided_from_outside")
-        held = self._current(role, rows)
+        if held is None:
+            held = self._current(role, rows)
         if any(is_played(held.get(subject, {}).get("decider", {})) for subject in chosen):
             # While a person plays a being, only giving it back names it.
             raise ModelChoiceRefused("being_played")
@@ -936,7 +989,8 @@ class SocietyModelChoiceRepository:
         lock and recording nothing, so a plan offers a choice only where the route would take it.
 
         ``code`` is why the whole choice is refused (the engine takes none, the model is not
-        offered, or it would run more subjects by models than the contract allows), else None.
+        offered, or it would run more subjects by models than the contract allows; or, where no
+        subject may be named, the code a choice naming them all is refused by), else None.
         ``subjects`` are those a choice may name; ``left_out`` holds every other one under the
         code a choice naming it alone is refused by. ``run_now`` and ``run_after`` count the
         subjects models run now and once ``subjects`` are chosen for, against ``bound``;
@@ -964,25 +1018,41 @@ class SocietyModelChoiceRepository:
             return {**read, "code": refused.code}
         taken: list[str] = []
         left: dict[str, list[str]] = {}
+        # Read once for every subject: who is here and whom each is decided for by now.
+        present = set(role.adapter.subjects(society["state"]))
+        held = self._current(role, rows)
+
+        def checked(chosen: Sequence[str]) -> None:
+            self._checked(
+                society,
+                rows,
+                role,
+                chosen,
+                lambda: record,
+                granted_away=True,
+                handing_back=False,
+                present=present,
+                held=held,
+            )
+
         for subject in named:
             try:
-                self._checked(
-                    society,
-                    rows,
-                    role,
-                    [subject],
-                    lambda: record,
-                    granted_away=True,
-                    handing_back=False,
-                )
+                checked([subject])
             except ModelChoiceRefused as refused:
                 left.setdefault(refused.code, []).append(subject)
             else:
                 taken.append(subject)
         run_after, _bound = self._run_after(society, rows, role, taken, record, contract)
+        code = "too_many_model_people" if run_after > bound else None
+        if not taken:
+            # Nobody may be named: the code the route answers a choice naming them all.
+            try:
+                checked(named)
+            except ModelChoiceRefused as refused:
+                code = refused.code
         return {
             **read,
-            "code": "too_many_model_people" if run_after > bound else None,
+            "code": code,
             "subjects": taken,
             "left_out": left,
             "run_after": run_after,

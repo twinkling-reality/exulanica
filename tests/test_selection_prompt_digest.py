@@ -58,6 +58,10 @@ PINNED = {
     # (`choose_mind`: a listed model or their own routine), and the classifier counts that as a
     # world edit.
     "action-plan-11": "0e116a6d36677840f24714416717933f54ec14d1113a3b6a7a78f4c6534c941b",
+    # `action-plan-12`: a move or a removal may name a placed thing; the person may start to play
+    # a listed being or give it back (`play_being`, `give_back`); the simulation drafter may send
+    # everyone away or bring them back; the classifier counts playing a being as a world edit.
+    "action-plan-12": "0d41046441d43eb2ef3e290e68a5298a9484ae605fecd348930cd892ef0fd64d",
     # The appearance drafter for a design choice drawn from no evidence; its own family, so the
     # evidence drafter's texts and `proposal-4` are untouched.
     "proposal-authored-1": "7b840134c24bc8152ab423f0665362b1d37bdd3cfb9b96cf208cfc6a46308d9a",

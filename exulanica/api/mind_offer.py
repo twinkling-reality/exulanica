@@ -17,6 +17,7 @@ A choice asks no model itself: playing the world does.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -31,11 +32,14 @@ from exulanica.api.services import Services
 from exulanica.models.manifest import ManifestError, load_manifest
 from exulanica.models.usage import usd_string
 from exulanica.selection.action_minds import MindChoice
+from exulanica.spending.status import SpendingRefusals
 from exulanica.world.decision_roles import DecisionContract, DecisionRole, decision_roles
 from exulanica.world.society import UnknownSociety
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
 
 __all__ = ["WorldMinds", "world_minds"]
+
+_LOG = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +54,12 @@ class WorldMinds:
     #: The engine of the version's society, or None where it holds none.
     engine: str | None
     services: Services
+    #: Who asks: the account a play would name.
+    actor: uuid.UUID | None = None
+    #: What the durable spending authority would answer the workspace's next attempt, by provider,
+    #: read once for the plan (:func:`world_minds`); None where no authority admits or the read
+    #: failed, and then no model is said to be refused by an allowance.
+    spent: SpendingRefusals | None = None
 
     @property
     def role_key(self) -> str:
@@ -65,9 +75,9 @@ class WorldMinds:
         """Every model the server offers the people's role that this version's contract can ask,
         each with why nothing its provider serves is asked for this workspace now, if nothing is:
         this process's own refusal of the provider, else the durable spending authority's once
-        the workspace's allowance for that provider is used up (``Services.spending_refusals``).
-        A step naming such a model states no cost: nothing would be asked."""
-        spent = self.services.spending_refusals(self.connection, self.workspace_id)
+        the workspace's allowance for that provider is used up (``spent``). A step naming such a
+        model states no cost: nothing would be asked."""
+        spent = self.spent
         found = []
         for model in offered_models(self.role, self.services, self._asked()):
             provider = str(model["provider"])
@@ -116,6 +126,22 @@ class WorldMinds:
                 "choice_seq": 0,
             }
 
+    def play_preview(self, subject: str | None) -> Mapping[str, Any]:
+        """What the play route would meet for the caller starting to play ``subject`` now, and
+        whom the caller plays, recording nothing."""
+        empty = {"code": "society_unavailable", "playing": False, "played": [], "choice_seq": 0}
+        if self.actor is None:
+            return empty
+        repository = SocietyModelChoiceRepository(
+            self.connection, self.workspace_id, world_id=self.world_id
+        )
+        try:
+            return repository.preview_play(
+                self.version_id, self.role, subject=subject, account_id=self.actor
+            )
+        except UnknownSociety:
+            return empty
+
     def cost(self, model: Mapping[str, str], subjects: int) -> Mapping[str, Any] | None:
         """What ``model`` deciding for ``subjects`` beings may cost while the world plays, from the
         host's own figures; None where this process has no model client to reserve with."""
@@ -157,12 +183,24 @@ def world_minds(
     world_id: str,
     version_id: uuid.UUID,
     services: Services,
+    actor: uuid.UUID | None = None,
 ) -> WorldMinds | None:
     """Who may decide for ``version_id``'s beings, read once for a plan on the route's connection;
-    None where the registry states no one role deciding for people."""
+    None where the registry states no one role deciding for people.
+
+    The workspace's allowance is read once here. A read that fails is an allowance not known, never
+    a failed plan: no model is then said to be refused by it, and admission still refuses each
+    attempt it would (as the playback host reads it, ``DecisionHost._spent_providers``)."""
     found = [role for role in decision_roles() if role.subject == "person"]
     if len(found) != 1:
         return None
+    try:
+        with connection.transaction():
+            spent = services.spending_refusals(connection, workspace_id)
+    except Exception as exc:
+        # Never the exception's text, which may carry a connection string.
+        _LOG.warning("the spending state could not be read: %s", type(exc).__qualname__)
+        spent = None
     row = connection.execute(
         "select engine_version from world_society where workspace_id=%s and world_id=%s "
         "and version_id=%s",
@@ -176,4 +214,6 @@ def world_minds(
         found[0],
         None if row is None else str(row["engine_version"]),
         services,
+        actor,
+        spent,
     )

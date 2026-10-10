@@ -253,9 +253,13 @@ What a choice would meet may be read before it is sent:
 `SocietyModelChoiceRepository.preview_choice` runs the checks a recorded choice is refused by, in
 their order, with no lock and recording nothing, and answers the subjects a choice may name, every
 other subject under the code a choice naming it alone is refused by, how many subjects models run
-now and would run after against the bound, and the society's newest choice. The Companion's plan
+now and would run after against the bound, and the society's newest choice; where no subject may be
+named, its code is the one a choice naming them all is refused by. Who is here and whom each
+subject is decided for are read once for the preview. The Companion's plan
 step for a mind rests on it ([world actions](companion-question.md#who-decides)); the route stays
-the authority when the choice is sent, since the world may move in between.
+the authority when the choice is sent, since the world may move in between. `preview_play` answers
+the same for a play: the code the play route would refuse it by, whether the caller plays that being
+already, and whom the caller plays now.
 
 `GET` at the same path, with `world.read`, returns the models the person's role is offered, in plain
 words with whether this process can ask each; whether this host asks models for the world at all,

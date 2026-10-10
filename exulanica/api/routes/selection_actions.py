@@ -144,6 +144,10 @@ class TypedActionBody(BaseModel):
         "place_thing",
         "direct_thing",
         "choose_mind",
+        "move_thing",
+        "remove_thing",
+        "play_being",
+        "give_back",
     ]
     asset_key: str | None = Field(default=None, max_length=200, pattern=r"^[a-z][a-z0-9.-]*$")
     object_id: str | None = Field(default=None, max_length=200, pattern=OBJECT_ID_PATTERN)
@@ -173,7 +177,9 @@ class TypedSimulationBody(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    operation: Literal["play", "pause", "set_speed", "advance", "bring_people"]
+    operation: Literal[
+        "play", "pause", "set_speed", "advance", "bring_people", "send_away", "bring_back"
+    ]
     #: A listed speed, as an integer or as the clarification candidate's value says it.
     speed: Literal[SPEEDS] | None = None  # type: ignore[valid-type]
     #: Simulated minutes to move forward: the server takes 1 to 10, and refuses any other count.
@@ -221,6 +227,11 @@ OutcomeOperation = Literal[
     "POST /world/versions/{version_id}/society",
     "POST /world/piece-requests",
     "POST /world/versions/{version_id}/models/{role_key}",
+    "POST /world/versions/{version_id}/things/{thing_id}/move",
+    "POST /world/versions/{version_id}/things/{thing_id}/remove",
+    "POST /world/versions/{version_id}/society/presence",
+    "POST /world/versions/{version_id}/society/play",
+    "POST /world/versions/{version_id}/society/play/{subject_id}/give-back",
 ]
 
 
@@ -606,6 +617,14 @@ def plan_actions(
 ) -> ActionPlanView:
     client = _require_model(request, connection, session)
     require_world(connection, session.workspace_id, world_id)
+    minds = world_minds(
+        connection,
+        session.workspace_id,
+        world_id,
+        body.version_id,
+        get_services(request),
+        session.actor,
+    )
     planned = plan_action(
         connection,
         client,
@@ -619,9 +638,8 @@ def plan_actions(
         clock=_clock_reader(connection, session, world_id, body.version_id),
         society=_society_reader(request, scoped, session, world_id, body.version_id),
         pieces=world_pieces(connection, session.workspace_id, world_id),
-        minds=world_minds(
-            connection, session.workspace_id, world_id, body.version_id, get_services(request)
-        ),
+        minds=minds,
+        play=minds,
     )
     return _view(
         planned.document,
@@ -645,6 +663,14 @@ def prepare_actions(
     world_id: WorldId,
 ) -> ActionPlanView:
     require_world(connection, session.workspace_id, world_id)
+    minds = world_minds(
+        connection,
+        session.workspace_id,
+        world_id,
+        body.version_id,
+        get_services(request),
+        session.actor,
+    )
     document = prepare_action(
         connection,
         body.model_dump(mode="json"),
@@ -655,9 +681,9 @@ def prepare_actions(
         previewer=_previewer(request, session, held, world_id),
         clock=_clock_reader(connection, session, world_id, body.version_id),
         society=_society_reader(request, scoped, session, world_id, body.version_id),
-        minds=world_minds(
-            connection, session.workspace_id, world_id, body.version_id, get_services(request)
-        ),
+        minds=minds,
+        play=minds,
+        grant=_grant(held),
     )
     return _view(document, _execution((), (), prompt_version=ACTION_PROMPT_VERSION), {})
 

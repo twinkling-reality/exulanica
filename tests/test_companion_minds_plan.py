@@ -72,6 +72,8 @@ class Checks:
     whole, as the route refuses it."""
 
     role_key = "society_decision"
+    #: Who asks; a test of the key sets one.
+    actor = None
 
     def __init__(self, *, running=(), refused=None, choice_seq=4, host=None, whole=None):
         self.running = set(running)
@@ -180,6 +182,117 @@ def test_a_role_is_a_group_where_the_people_have_one_and_a_kind_where_they_have_
         "role:resident": ("everyone whose role is resident", (two,)),
     }
     assert minds.groups({"inhabitants": []}) == ()
+
+
+def test_a_role_whose_people_are_exactly_a_kind_s_is_that_group_by_either_name():
+    """Every villager here is a farmer and nobody else is: one group, listed once, that answers
+    to "villagers" and to "farmers". A role everybody holds names everyone."""
+    farmers = {
+        "inhabitants": [
+            _person(1, "villager", "farmer"),
+            _person(2, "villager", "farmer"),
+            _person(3, "knight", "knight"),
+        ]
+    }
+    found = minds.groups(farmers)
+    assert [(group.value, group.labels) for group in found] == [
+        ("everyone", ()),
+        ("kind:villager", ("villager", "farmer")),
+        ("kind:knight", ("knight",)),
+    ]
+    world = _town(state=farmers)
+    nano = _label(world.mind_choices, minds.mind_value(NANO.provider, NANO.model_id))
+    villagers = _label(world.groups, "kind:villager")
+    for words in ("let Nano decide for the farmers", "let Nano decide for the villagers"):
+        [action] = _words(world, words, villagers, nano).actions
+        assert action.whom == "kind:villager", words
+    # A label neither the kind nor the role holds still asks.
+    [asked] = _words(world, "let Nano decide for the bakers", villagers, nano).actions
+    assert asked.whom is None
+
+    residents = {
+        "inhabitants": [
+            _person(number, None, {"key": "resident", "label": "resident", "destination_id": "a"})
+            for number in (1, 2, 3)
+        ]
+    }
+    [everyone] = minds.groups(residents)
+    assert (everyone.value, everyone.labels) == ("everyone", ("resident",))
+    world = _town(state=residents)
+    routine = _label(world.mind_choices, "routine")
+    # The one group the words name is everyone: it stands, with no question.
+    said = _words(
+        world,
+        "all the residents go back to their own routine",
+        _label(world.groups, "everyone"),
+        routine,
+    )
+    assert said.clarification is None and said.actions[0].whom == "everyone"
+
+
+def test_a_being_of_a_made_kind_is_in_everyone_and_in_its_role_and_in_no_kind_s_group():
+    """A being a workspace made is named in a state by its kind's source and digest, not by a
+    shipped kind and version. It has no shipped kind's label, so it joins no kind's group; it is
+    one of everyone, and of its role where the state gives it one. A choice for it is prepared as
+    any being's is."""
+    made = {
+        **_person(6, None, "wanderer"),
+        "kind": {"source": "workspace", "sha256": "ab" * 32},
+    }
+    state = {"inhabitants": [*TOWN["inhabitants"], made]}
+    found = {group.value: group.subjects for group in minds.groups(state)}
+    six = str(uuid.UUID(int=6))
+    assert found["everyone"] == (*EVERYONE, six)
+    assert found["role:wanderer"] == (six,)
+    assert [value for value, subjects in found.items() if six in subjects] == [
+        "everyone",
+        "role:wanderer",
+    ]
+    assert found["kind:villager"] == VILLAGERS
+    world = _town(state=state)
+    [step] = _planned(
+        world, _label(world.groups, "role:wanderer"), _label(world.mind_choices, "routine")
+    )["steps"]
+    assert (step["state"], step["body"]["subjects"]) == ("prepared", [six])
+
+
+def test_two_accounts_asking_the_same_of_the_same_world_never_share_a_key():
+    one, other = uuid.UUID(int=10), uuid.UUID(int=11)
+    asked = ("world:test", VERSION, 4, 0, VILLAGERS, "routine")
+    assert minds.choice_key(*asked, one) == minds.choice_key(*asked, one)
+    assert len({minds.choice_key(*asked, actor) for actor in (one, other, None)}) == 3
+    # The step's own key is the asking account's.
+    keys = []
+    for actor in (one, other):
+        checks = Checks()
+        checks.actor = actor
+        world = _town(checks)
+        [step] = _planned(
+            world, _label(world.groups, "kind:villager"), _label(world.mind_choices, "routine")
+        )["steps"]
+        keys.append(step["body"]["idempotency_key"])
+    assert len(set(keys)) == 2
+
+
+def test_a_step_that_holds_no_request_reads_back_as_not_applied():
+    """A step the plan blocked, or left for later, holds no request: nothing sent it, so the
+    outcome read says it was not applied whatever answer a client attaches, and reads nothing."""
+    from exulanica.selection import action_outcome
+
+    for read, operation in (
+        (action_outcome._mind_step, MIND),
+        (action_outcome._play_step, plan.PLAY),
+        (action_outcome._presence_step, plan.PRESENCE),
+    ):
+        step = {
+            "index": 1,
+            "operation": operation,
+            "state": "blocked",
+            "body": None,
+            "answer": {"status": 200, "choice_seq": 3},
+        }
+        found = read(None, None, "world:test", VERSION, step)
+        assert (found["index"], found["state"], found["receipts"]) == (1, "not_applied", [])
 
 
 def test_the_drafter_is_shown_this_world_s_groups_with_their_numbers_and_the_minds_offered():
@@ -353,6 +466,62 @@ def test_a_group_the_words_do_not_name_is_asked_about_never_replaced_by_another(
         world, "Nano for the whole town", _label(world.groups, "everyone"), nano
     ).actions
     assert all_of_them.whom == "everyone"
+
+
+def test_the_group_the_words_name_outranks_beings_the_draft_names_that_are_not_in_it():
+    """A draft naming beings where the words name a group ("both villagers") is held to the words:
+    a being outside that group is not what was asked for, and the group is."""
+    read = _read()
+    knight = dataclasses.replace(read.society.beings[0], id=KNIGHT, kind="knight")
+    villager = dataclasses.replace(
+        read.society.beings[1], id=VILLAGERS[0], kind="villager", display_name="Villager"
+    )
+    society = dataclasses.replace(read.society, state=TOWN, beings=(knight, villager))
+    world = plan._with_minds(
+        _with_route(_world(dataclasses.replace(read, society=society))), Checks()
+    )
+    routine = _label(world.mind_choices, "routine")
+    knight_label, villager_label = (being.label for being in world.beings)
+    # The words name the villagers; the draft named the knight, who is not one.
+    [action] = _words(
+        world, "the villagers follow their own routine again", knight_label, routine
+    ).actions
+    assert (action.whom, action.mind) == ("kind:villager", "routine")
+    # Two steps, one a being outside the group and one a being inside it: the group, said once.
+    both = plan._typed_from_draft(
+        [
+            {"operation": "choose_mind", "options": [knight_label, routine]},
+            {"operation": "choose_mind", "options": [villager_label, routine]},
+        ],
+        world,
+        "both villagers should follow their own routine again",
+    )
+    assert both.clarification is None
+    assert [(found.whom, found.mind) for found in both.actions] == [("kind:villager", "routine")]
+    # One being of a group of several, alone: that one or all of them is asked.
+    one = _words(world, "the villager by the gate thinks for itself", villager_label, routine)
+    assert one.clarification["code"] == "whom_ambiguous"
+    assert [candidate["value"] for candidate in one.clarification["candidates"]] == [
+        f"being:{VILLAGERS[0]}",
+        "kind:villager",
+    ]
+    # The knight is the only knight: the being and its kind are one meaning, and it stands.
+    [alone] = _words(world, "the knight thinks for itself", knight_label, routine).actions
+    assert alone.whom == f"being:{KNIGHT}"
+    # Everyone drafted where the words name a group: which is asked, never everyone taken.
+    everyone = _words(
+        world, "the villagers think for themselves", _label(world.groups, "everyone"), routine
+    )
+    assert everyone.clarification["code"] == "whom_ambiguous"
+    assert [candidate["value"] for candidate in everyone.clarification["candidates"]] == [
+        "everyone",
+        "kind:villager",
+    ]
+    # No kind's or role's label in the words and no name: whom is the person's to say.
+    unnamed = _words(world, "give him his own routine back", knight_label, routine)
+    assert unnamed.actions[0].whom is None
+    named = _words(world, "give Traveller its own routine back", knight_label, routine)
+    assert named.actions[0].whom == f"being:{KNIGHT}"
 
 
 def test_a_word_several_models_share_is_asked_about_among_them():
@@ -596,18 +765,12 @@ def test_a_model_whose_provider_s_allowance_is_used_up_is_said_not_to_be_asked()
             return Refused() if set(providers) <= self.providers else None
 
     class Services:
-        def __init__(self, spent):
-            self.spent = spent
-
         def provider_refusal(self, _provider):
             return None
 
-        def spending_refusals(self, _connection, _workspace):
-            return self.spent
-
     def offer(spent):
         return WorldMinds(
-            None, uuid.UUID(int=1), "world:test", VERSION, role, None, Services(spent)
+            None, uuid.UUID(int=1), "world:test", VERSION, role, None, Services(), None, spent
         )
 
     open_handed = offer(None).models()
@@ -631,6 +794,72 @@ def test_a_model_whose_provider_s_allowance_is_used_up_is_said_not_to_be_asked()
         _label(world.mind_choices, minds.mind_value(NANO.provider, NANO.model_id)),
     )["steps"]
     assert step["mind"]["model_refusal"] == "spending_limit_reached"
+
+
+def test_the_allowance_is_read_once_for_a_plan_and_a_failed_read_fails_no_plan(caplog):
+    """The durable allowance is read once when the offer is made for a plan, inside its own
+    savepoint; a read that fails leaves the allowance unknown: the offer is made, no model is said
+    to be refused by it, and the failure's text, which may hold a connection string, is not kept."""
+    import contextlib
+
+    from exulanica.api.mind_offer import world_minds
+
+    class Refused:
+        reason = "spending_limit_reached"
+
+    class Spent:
+        def every(self, _providers):
+            return Refused()
+
+    class Connection:
+        def __init__(self):
+            self.savepoints = 0
+            self.left = []
+
+        @contextlib.contextmanager
+        def transaction(self):
+            self.savepoints += 1
+            try:
+                yield
+            except Exception as exc:
+                self.left.append(type(exc).__name__)
+                raise
+
+        def execute(self, _query, _parameters):
+            return self
+
+        def fetchone(self):
+            return None
+
+    class Services:
+        def __init__(self, failing):
+            self.failing = failing
+            self.reads = 0
+
+        def provider_refusal(self, _provider):
+            return None
+
+        def spending_refusals(self, _connection, _workspace):
+            self.reads += 1
+            if self.failing:
+                raise RuntimeError("postgresql://someone:secret@host/db is not reachable")
+            return Spent()
+
+    read, connection = Services(failing=False), Connection()
+    offer = world_minds(connection, uuid.UUID(int=1), "world:test", VERSION, read)
+    assert offer.models() and {model.refusal for model in offer.models()} == {
+        "spending_limit_reached"
+    }
+    assert (read.reads, connection.savepoints, connection.left) == (1, 1, [])
+
+    failed, connection = Services(failing=True), Connection()
+    offer = world_minds(connection, uuid.UUID(int=1), "world:test", VERSION, failed)
+    assert offer is not None and offer.spent is None
+    assert offer.models() and all(model.refusal is None for model in offer.models())
+    assert offer.models() == offer.models()
+    # Read once however often the offer is asked, and the failure left its own savepoint.
+    assert (failed.reads, connection.savepoints, connection.left) == (1, 1, ["RuntimeError"])
+    assert "RuntimeError" in caplog.text and "secret" not in caplog.text
 
 
 def test_their_own_routine_asks_nobody_and_states_no_cost():
@@ -720,6 +949,9 @@ def test_why_this_host_asks_no_model_is_on_the_step():
     ]
     assert step["state"] == "prepared"
     assert step["mind"]["host_refusal"] == "models_not_run_here"
+    # The bound it would meet once this host asks stays on the step; the page shows no figure
+    # while nothing is asked (web/packages/app/test/companion-mind-plan.test.ts).
+    assert step["cost"]["usd_at_most"] == "0.010000"
 
 
 # -- what is not offered ---------------------------------------------------------------------------

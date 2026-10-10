@@ -64,6 +64,7 @@ function harness(options: {
   readonly outcome?: unknown;
   readonly capabilities?: OperationDescriptors | null;
   readonly paused?: () => boolean;
+  readonly onPlay?: (subjectId: string | null) => void;
 }): Harness {
   const sent: PlannedRequest[] = [];
   const host: ActionHost = {
@@ -104,6 +105,7 @@ function harness(options: {
     // A step that waits for the world's next minute waits no time here.
     pause: async () => { whens.push(sheet.root.querySelector('.companion-plan-step-when')?.textContent ?? null); },
     ...(options.paused === undefined ? {} : { paused: options.paused }),
+    ...(options.onPlay === undefined ? {} : { onPlay: options.onPlay }),
   };
   const whens: (string | null)[] = [];
   plans = mountCompanionPlans(deps);
@@ -601,6 +603,64 @@ describe('two minds chosen under one Confirm', () => {
     expect(h.sheet.root.textContent).toContain('more beings than you were shown');
   });
 
+  it('does not send a later choice whose fresh preparation states no count', async () => {
+    const uncounted = (): unknown => {
+      const drafted = later(2) as { steps: Record<string, unknown>[] };
+      return { ...drafted, steps: [{ ...drafted.steps[0]!, mind: null }] };
+    };
+    const h = harness({ plan: async () => fixture('mind-two-steps-plan'), prepare: async () => uncounted(), send: async () => ({ choice_seq: 5 }) });
+    await h.plans.route('nano for the knight and for the villagers');
+    await confirmAndWait(h);
+    expect(h.sent.map((request) => request.actionId)).toEqual(['minds.choose']);
+    expect(stepStates(h.sheet)).toEqual(['done', 'not-done']);
+    expect(h.sheet.root.textContent).toContain('was not shown with its count and cost');
+    expect(h.sheet.root.textContent).not.toContain('more beings than you were shown');
+  });
+
+  it('sends no choice the sheet showed nothing of, the first step or a later one', async () => {
+    const unshown = (index: number): unknown => {
+      const drafted = fixture('mind-two-steps-plan') as { steps: Record<string, unknown>[] };
+      return { ...drafted, steps: drafted.steps.map((step, at) => (at === index ? { ...step, mind: null, cost: null } : step)) };
+    };
+    const first = harness({ plan: async () => unshown(0), prepare: async () => later(2), send: async () => ({ choice_seq: 5 }) });
+    await first.plans.route('nano for the knight and for the villagers');
+    expect(first.sheet.root.querySelectorAll('.companion-plan-estimate[data-kind="mind"]').length).toBe(1);
+    await confirmAndWait(first);
+    expect(first.sent).toEqual([]);
+    expect(stepStates(first.sheet)).toEqual(['not-done', 'not-reached']);
+    expect(first.sheet.root.textContent).toContain('was not shown with its count and cost');
+
+    const second = harness({ plan: async () => unshown(1), prepare: async () => later(2), send: async () => ({ choice_seq: 5 }) });
+    await second.plans.route('nano for the knight and for the villagers');
+    await confirmAndWait(second);
+    expect(second.sent.map((request) => request.actionId)).toEqual(['minds.choose']);
+    expect(second.client.prepare).not.toHaveBeenCalled();
+    expect(stepStates(second.sheet)).toEqual(['done', 'not-done']);
+  });
+
+  it('cannot be confirmed while a later choice is blocked, and says it was judged alone', async () => {
+    const blocked = (): unknown => {
+      const drafted = fixture('mind-two-steps-plan') as { steps: Record<string, unknown>[] };
+      const step = drafted.steps[1]!;
+      return { ...drafted, steps: [drafted.steps[0]!, {
+        ...step, state: 'blocked', code: 'too_many_model_people', cost: null,
+        mind: { ...(step['mind'] as Record<string, unknown>), subjects: 0 },
+      }] };
+    };
+    const h = harness({ plan: async () => blocked(), send: async () => ({ choice_seq: 5 }) });
+    await h.plans.route('nano for the knight and for the villagers');
+    expect(confirmButton(h.sheet).disabled).toBe(true);
+    // The blocked step names nobody: its row says why, and no "This is for 0 beings" is drawn.
+    const lines = [...h.sheet.root.querySelectorAll('.companion-plan-estimate[data-kind="mind"]')].map((line) => line.textContent ?? '');
+    expect(lines.length).toBe(1);
+    expect(h.sheet.root.textContent).not.toContain('for 0 beings');
+    const held = h.sheet.root.querySelector('.companion-plan-step[data-step="1"] .companion-plan-step-held')?.textContent ?? '';
+    expect(held).toContain('before the earlier steps of this plan');
+    confirmButton(h.sheet).click();
+    await settle();
+    expect(h.sent).toEqual([]);
+  });
+
   it('says a question that comes up in the middle of the plan in its own words', async () => {
     const h = harness({
       plan: async () => fixture('mind-two-steps-plan'), prepare: async () => fixture('mind-too-many'),
@@ -612,5 +672,45 @@ describe('two minds chosen under one Confirm', () => {
     expect(stepStates(h.sheet)).toEqual(['done', 'not-done']);
     expect(h.sheet.root.textContent).toContain('at most 8 beings here at once');
     expect(h.sheet.root.textContent).not.toContain('Try saying it another way');
+  });
+});
+
+describe('a being played or given back by a plan', () => {
+  // The planner's own documents (tests/test_companion_free_steps_plan.py), as the route serves them.
+  const KNIGHT = '00000000-0000-0000-0000-000000000001';
+
+  it('hands the play to the page once its step ran, and never before Confirm', async () => {
+    const played: (string | null)[] = [];
+    const h = harness({
+      plan: async () => fixture('free-play-plan'), send: async () => ({ choice_seq: 3 }),
+      onPlay: (subject) => { played.push(subject); },
+    });
+    await h.plans.route('let me play the traveller');
+    expect(h.sheet.root.querySelector('.companion-plan-step-label')?.textContent).toBe('Play this being');
+    expect(h.sheet.root.querySelector('.companion-plan-spends')?.getAttribute('data-spends')).toBe('false');
+    expect(played).toEqual([]);
+    await confirmAndWait(h);
+    expect(h.sent.map((request) => request.actionId)).toEqual(['beings.play']);
+    expect(played).toEqual([KNIGHT]);
+  });
+
+  it('tells the page a being was given back, and nothing when the step did not run', async () => {
+    const played: (string | null)[] = [];
+    const given = harness({
+      plan: async () => fixture('free-give-back-plan'), send: async () => ({ choice_seq: 4 }),
+      onPlay: (subject) => { played.push(subject); },
+    });
+    await given.plans.route('give it back');
+    await confirmAndWait(given);
+    expect(played).toEqual([null]);
+    const refused = harness({
+      plan: async () => fixture('free-play-plan'),
+      send: async () => { throw new ApiError(409, 'being_played', 'somebody else is playing this being now'); },
+      onPlay: (subject) => { played.push(subject); },
+    });
+    await refused.plans.route('let me play the traveller');
+    await confirmAndWait(refused);
+    expect(played).toEqual([null]);
+    expect(stepStates(refused.sheet)).toEqual(['not-done']);
   });
 });

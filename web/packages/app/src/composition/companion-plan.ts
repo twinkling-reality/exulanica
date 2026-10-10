@@ -38,7 +38,7 @@ import { performPlanned, type ActionHost } from '../ui/actions/surfaces.js';
 import { plannedStepView, thePlace, type PlanSheet, type PlanStepView } from '../ui/companion-plan.js';
 import { OBJECT_ROLE_LABELS, isObjectRole } from '../world-objects-api.js';
 import {
-  MIND_GREW, PLAN_WAITED, PLAN_WORDS, midRunQuestionWords, planRefusalWords, prepareFailureWords,
+  LATER_MIND_JUDGED_NOW, MIND_GREW, MIND_UNSHOWN, PLAN_WAITED, PLAN_WORDS, midRunQuestionWords, planRefusalWords, prepareFailureWords,
 } from '../ui/words/companion-plan.js';
 
 /**
@@ -108,6 +108,11 @@ export interface CompanionPlansDeps {
   readonly onSaid?: (utterance: string, said: Extract<PlanRouting, { readonly route: 'answer' }>) => void;
   /** New pieces were asked for by a confirmed step: the page watches these requests to their outcome. */
   readonly onPieces?: (pieceRequestIds: readonly string[]) => void;
+  /**
+   * A confirmed step started a play, or gave a being back: the page's own play band takes it up
+   * (`subjectId` for a play begun, null for one ended), so the person goes on in the world.
+   */
+  readonly onPlay?: (subjectId: string | null) => void;
 }
 
 export interface CompanionPlans {
@@ -215,7 +220,10 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
       // The step's own words where its entry has them (a thing step's checks are the route's).
       const entry = plannedEntry(step);
       const own = 'spec' in entry && step.code !== null ? entry.spec.refusals?.[step.code] : undefined;
-      return { ...view, held: { state: 'unavailable', words: own ?? planRefusalWords('preview_blocked') } };
+      const words = own ?? planRefusalWords('preview_blocked');
+      // A later choice of a mind is judged alone at plan time, and says so.
+      const later = step.index > 0 && step.action.operation === 'choose_mind';
+      return { ...view, held: { state: 'unavailable', words: later ? { happened: words.happened, next: `${words.next} ${LATER_MIND_JUDGED_NOW}` } : words } };
     }
     if (step.state === 'not_permitted') return { ...view, held: { state: 'not-permitted', words: planRefusalWords('action_not_permitted') } };
     return view;
@@ -267,6 +275,13 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
     for (const step of plan.steps) {
       if (stopped) { deps.sheet.setStep(step.index, { kind: 'not-reached' }); continue; }
       deps.sheet.setStep(step.index, { kind: 'running' });
+      // A choice of a mind is confirmed with its count, who is left out and its cost on the sheet:
+      // one the sheet showed nothing of, first step or later, is not sent.
+      if (step.action.operation === 'choose_mind' && step.mind === null) {
+        deps.sheet.setStep(step.index, { kind: 'not-done', words: MIND_UNSHOWN, code: 'mind_choice_unshown' });
+        stopped = true;
+        continue;
+      }
       let sending: PlanStep | null = step;
       // A later world edit is prepared against the state the one before it left, and a step asking
       // one of the world's beings always just before it is sent: the world moves on every minute.
@@ -297,10 +312,13 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
             continue;
           }
           // A later choice of a mind was confirmed with what the sheet showed of it: one that would
-          // now name more beings, or that the sheet showed nothing of, is not sent.
+          // now name more beings is not sent, nor one whose fresh preparation states no count.
           if (sending !== null && step.action.operation === 'choose_mind' && sending.state === 'prepared'
             && (step.mind === null || sending.mind === null || sending.mind.subjects > step.mind.subjects)) {
-            deps.sheet.setStep(step.index, { kind: 'not-done', words: MIND_GREW, code: 'mind_choice_grew' });
+            const unshown = step.mind === null || sending.mind === null;
+            deps.sheet.setStep(step.index, unshown
+              ? { kind: 'not-done', words: MIND_UNSHOWN, code: 'mind_choice_unshown' }
+              : { kind: 'not-done', words: MIND_GREW, code: 'mind_choice_grew' });
             stopped = true;
             continue;
           }
@@ -359,6 +377,9 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
         answers[step.index] = stepAnswer(operation, { status: result.status, body: result.response });
         const pieces = answers[step.index]?.piece_request_ids;
         if (pieces !== undefined && pieces.length > 0) deps.onPieces?.(pieces);
+        const played = step.action['subject_id'];
+        if (step.action.operation === 'play_being' && typeof played === 'string') deps.onPlay?.(played);
+        if (step.action.operation === 'give_back') deps.onPlay?.(null);
       } else if (result.kind === 'refused' && result.status !== null) {
         answers[step.index] = stepAnswer(operation, { status: result.status, code: result.code });
       }

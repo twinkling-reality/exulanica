@@ -21,6 +21,7 @@ What this module holds by construction:
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import re
 import uuid
@@ -85,13 +86,21 @@ class MindChoice:
 @dataclass(frozen=True, slots=True)
 class Group:
     """Some of a society's beings, by what they share: ``value`` is ``everyone``, ``kind:<key>``
-    or ``role:<key>``, ``title`` the words a person would say, ``subjects`` their ids, and
-    ``words`` the kind's or the role's own label (None for everyone)."""
+    or ``role:<key>``, ``title`` the words a person would say, ``subjects`` their ids,
+    ``words`` the kind's or the role's own label (None for everyone), and ``also`` the label of
+    every role whose people are exactly these, so the group answers to each of its names."""
 
     value: str
     title: str
     subjects: tuple[str, ...]
     words: str | None = None
+    also: tuple[str, ...] = ()
+
+    @property
+    def labels(self) -> tuple[str, ...]:
+        """Every label this group answers to: its own, then each role's that names the same
+        beings; none for everyone where no role names them all."""
+        return tuple(dict.fromkeys(label for label in (self.words, *self.also) if label))
 
 
 class Minds(Protocol):
@@ -100,6 +109,8 @@ class Minds(Protocol):
     choice would meet and what it would cost."""
 
     role_key: str
+    #: The account that asks, where the caller is one: part of a planned choice's key.
+    actor: uuid.UUID | None
 
     def models(self) -> Sequence[MindChoice]: ...
 
@@ -139,7 +150,8 @@ def _role_label(role: Any) -> tuple[str, str] | None:
 def groups(state: Mapping[str, Any]) -> tuple[Group, ...]:
     """The groups this society holds, read from its state: everyone, then each kind present, then
     each role present, each in the order its first member stands in the state. A role whose people
-    are exactly a kind's, or everyone, is the same group said twice and is listed once."""
+    are exactly a kind's, or everyone, is the same group said twice: it is listed once, and
+    answers to the role's label too (:attr:`Group.also`)."""
     [role] = [found for found in decision_roles() if found.subject == "person"]
     present = set(role.adapter.subjects(state))
     people = [person for person in state.get("inhabitants", ()) if person.get("id") in present]
@@ -160,12 +172,15 @@ def groups(state: Mapping[str, Any]) -> tuple[Group, ...]:
         Group(f"kind:{key}", f"every {label}", tuple(members), label)
         for key, (label, members) in by_kind.items()
     ]
-    seen = {frozenset(group.subjects) for group in found}
+    seen = {frozenset(group.subjects): index for index, group in enumerate(found)}
     for key, (label, members) in by_role.items():
-        if frozenset(members) not in seen:
+        same = seen.get(frozenset(members))
+        if same is None:
             found.append(
                 Group(f"role:{key}", f"everyone whose role is {label}", tuple(members), label)
             )
+        elif label not in found[same].labels:
+            found[same] = dataclasses.replace(found[same], also=(*found[same].also, label))
     return tuple(found)
 
 
@@ -221,13 +236,18 @@ def choice_key(
     index: int,
     subjects: Sequence[str],
     mind: str,
+    actor: uuid.UUID | None = None,
 ) -> uuid.UUID:
     """The key a planned choice is sent with: the same plan sent twice answers the choice it
     recorded, and the same words asked again after any other choice are a new one, since the
-    society's newest choice is part of it."""
+    society's newest choice is part of it. ``actor``, the account that asks, is part of it too,
+    so two accounts of one workspace asking the same of the same world never share a key (the
+    record refuses a key another account used)."""
     named = hashlib.sha256("\n".join(sorted(subjects)).encode()).hexdigest()
+    asker = "" if actor is None else f"|{actor}"
     return uuid.uuid5(
-        uuid.UUID(int=0), f"{world_id}|{version_id}|{choice_seq}|{index}|{named}|{mind}|mind"
+        uuid.UUID(int=0),
+        f"{world_id}|{version_id}|{choice_seq}|{index}|{named}|{mind}|mind{asker}",
     )
 
 
@@ -259,10 +279,13 @@ def prepare(
     """The choice ``mind`` for ``whom``, as the models route would take it now, or why not.
 
     Blocked with the route's own code when the whole choice is refused, or when everybody it
-    names is left out (the first of their codes in the order a choice is refused by); with
-    ``group_not_here`` for a group this society no longer holds, ``mind_not_offered`` for a model
-    the server no longer offers, and ``too_many_subjects_for_one_choice`` past what one choice's
-    body may name."""
+    names is left out (the code the preview states for a choice naming them all; where it states
+    none, the first of their codes in the order a choice is refused by); with ``group_not_here``
+    for a group this society no longer holds or one that holds nobody, ``mind_not_offered`` for a
+    model the server no longer offers, and ``too_many_subjects_for_one_choice`` past what one
+    choice's body may name. The cost is the bound the choice may meet while the world plays; it
+    is stated also where this host or the workspace's allowance asks nothing now (the facts say
+    so), so a reader can say what asking would cost once it starts."""
     offered = {mind_value(model.provider, model.model_id): model for model in minds.models()}
     model = None if mind == ROUTINE else offered.get(mind)
     named = subjects_of(whom, found)
@@ -297,14 +320,18 @@ def prepare(
     pins = {"choice_seq": read["choice_seq"]}
     code = read["code"]
     if code is None and not taken:
-        code = next((known for known in _LEFT_OUT if known in left), None) or next(iter(left))
+        code = next((known for known in _LEFT_OUT if known in left), None) or next(
+            iter(left), "group_not_here"
+        )
     if code is None and len(taken) > SUBJECTS_PER_CHOICE:
         code = "too_many_subjects_for_one_choice"
     if code is not None:
         return PreparedMind(None, code, facts, None, False, pins)
     body = {
         "idempotency_key": str(
-            choice_key(world_id, version_id, int(read["choice_seq"]), index, taken, mind)
+            choice_key(
+                world_id, version_id, int(read["choice_seq"]), index, taken, mind, minds.actor
+            )
         ),
         "subjects": sorted(taken),
         "model": chosen,

@@ -1,0 +1,70 @@
+{
+  "profile": "exulanica.companion-action-plan/v1",
+  "outcome": "plan",
+  "kind": "world_edit",
+  "world_id": "world:authored:test",
+  "version_id": "00000000-0000-0000-0000-000000000007",
+  "plan_sha256": "0e3f4a594629ca8029358b78bed223a037e5997b0695df69e30710d9bea3d6c4",
+  "atomic": false,
+  "steps": [
+    {
+      "index": 0,
+      "action": {
+        "operation": "remove_thing",
+        "thing_id": "well"
+      },
+      "state": "prepared",
+      "code": null,
+      "operation": "POST /world/versions/{version_id}/things/{thing_id}/remove",
+      "bind": {
+        "version_id": "00000000-0000-0000-0000-000000000007",
+        "thing_id": "well"
+      },
+      "bind_from": null,
+      "query": {
+        "world_id": "world:authored:test"
+      },
+      "body": {
+        "base_state_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "saved_entry": null
+      },
+      "body_from": null,
+      "requires": [
+        "world.write"
+      ],
+      "permitted": true,
+      "spends": false,
+      "preview": null,
+      "pins": {
+        "base_state_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "edit_seq": 3
+      },
+      "effects": [],
+      "confirmation": "required",
+      "titles": {
+        "thing": "well"
+      },
+      "estimate": null,
+      "mind": null,
+      "cost": null,
+      "replay": "stale_base_refused",
+      "receipt": "version_edit",
+      "compensation": {
+        "operation": "POST /world/versions/{version_id}/things/undo"
+      }
+    }
+  ],
+  "spends": false,
+  "spends_by": [],
+  "clarification": null,
+  "refusal": null,
+  "capabilities": null,
+  "proposal_speech": null,
+  "clock": null,
+  "execution": {
+    "prompt_version": "action-plan-12",
+    "calls": [],
+    "rejections": []
+  },
+  "names": {}
+}

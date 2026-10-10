@@ -87,6 +87,14 @@ export function thePlace(title: string): string {
 export function thingDetail(step: PlanStep): string | null {
   const titles = step.titles;
   const capital = (words: string): string => words.charAt(0).toUpperCase() + words.slice(1);
+  // A placed thing moved or removed, by the label the server's reads give it ("Well").
+  if ((step.action.operation === 'move_thing' || step.action.operation === 'remove_thing') && titles['thing'] !== undefined) {
+    return capital(titles['thing']);
+  }
+  // A being played, or given back, by its name.
+  if ((step.action.operation === 'play_being' || step.action.operation === 'give_back') && titles['subject'] !== undefined) {
+    return titles['subject'];
+  }
   // A mind chosen: whom for and which, as the server's reads label them.
   if (step.action.operation === 'choose_mind' && titles['whom'] !== undefined && titles['mind'] !== undefined) {
     return mindDetailWords(titles['whom'], titles['mind'], step.action['mind'] === 'routine');
@@ -193,7 +201,8 @@ export function buildPlanSheet(options: PlanSheetOptions): PlanSheet {
           ]),
         ])),
         // What a mind chosen comes to and may cost, before the one Confirm.
-        ...plan.steps.flatMap((step) => (step.mind === null ? [] : [
+        // A step the plan could not prepare names nobody: its row says why, and no count is drawn.
+        ...plan.steps.flatMap((step) => (step.mind === null || (step.state === 'blocked' && step.mind.subjects === 0) ? [] : [
           el('p', { class: 'companion-plan-estimate', 'data-step': String(step.index), 'data-kind': 'mind' }, [
             icon('spends', 'sm'), mindChoiceWords(step.mind, step.cost, step.action['mind'] === 'routine'),
           ]),

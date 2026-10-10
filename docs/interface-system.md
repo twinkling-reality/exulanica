@@ -533,8 +533,18 @@ is a question with its figures and the groups that fit ("You asked for 9, and AI
 at most 8 beings here at once. Who instead?"). Each mind step of a plan has its own line, a later
 one as well as the first, and a dollar bound is rounded up at the precision shown, never below
 itself. A later mind step that would name more beings when it is sent than its line said, or that
-then needs a question answered, is not sent and says so. Who decides and the thing card show the
-new mind at their next read of the world's models.
+then needs a question answered, is not sent and says so; nor is a mind step, first or later, whose
+count the sheet did not show. A later mind step the plan could not prepare turns Confirm off, and
+its row says it was checked as the world stands now, before the earlier steps of the plan; a step
+that names nobody draws no count line. The world's ceilings are said over any hour of real time,
+which is how the host counts them. Who decides and the thing card show the new mind at their next
+read of the world's models.
+
+Six more exist only as plan steps and spend nothing: Move a thing and Remove a thing (`things.move`,
+`things.remove`, their rows naming the thing: "Well"), Play this being and Give it back
+(`beings.play`, `beings.give-back`, their rows naming the being; once the step ran the play band
+takes the play up, and a being given back ends it), and Send everyone away and Bring them back
+(`people.send-away`, `people.bring-back`, the request People's own buttons send).
 
 Two more entries exist only as plan steps (placement `companion`): Add a thing (`things.place`) and
 Ask someone (`people.direct`). Their rows say the step in words from the names the server's reads gave

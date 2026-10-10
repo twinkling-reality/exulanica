@@ -49,6 +49,8 @@ export interface ActionSpec {
    * read lists it, so the plan step, or the route's own refusal, says whether it can be asked.
    */
   readonly worldScoped?: boolean;
+  /** For such a route that asks no model and costs nothing (playing a being): never marked as spending. */
+  readonly spendsNothing?: boolean;
 }
 
 export const GROUP_LABEL: Readonly<Record<ActionGroup, string>> = {
@@ -74,6 +76,12 @@ const PIECES = 'POST /world/piece-requests';
 /** Who decides for a society's people: the models route, bound to the people's role. */
 const MIND = 'POST /world/versions/{version_id}/models/{role_key}';
 const PEOPLE_ROLE = 'society_decision';
+const THING_MOVE = 'POST /world/versions/{version_id}/things/{thing_id}/move';
+const THING_REMOVE = 'POST /world/versions/{version_id}/things/{thing_id}/remove';
+const PRESENCE = 'POST /world/versions/{version_id}/society/presence';
+/** A person playing one being, and giving it back: a society's routes no version's capability read lists. */
+const PLAY = 'POST /world/versions/{version_id}/society/play';
+const PLAY_GIVE_BACK = 'POST /world/versions/{version_id}/society/play/{subject_id}/give-back';
 /** Making a town, read from the workspace's creation descriptors (`GET /worlds/capabilities`). */
 const MAKE_GENERATED = 'POST /worlds/generated';
 
@@ -267,6 +275,66 @@ const MIND_REFUSALS: Readonly<Record<string, RefusalWords>> = {
   },
 };
 
+/** What moving or removing a placed thing can meet: the things routes' codes and the plan's. */
+const THING_EDIT_REFUSALS: Readonly<Record<string, RefusalWords>> = {
+  invalid_object_state: {
+    happened: 'That thing is not in this world any more.',
+    next: 'Ask about something that is here.',
+  },
+  invalid_thing_placement: {
+    happened: 'It cannot go where you are pointing.',
+    next: 'Point somewhere else in the same part of this world, then ask again.',
+  },
+  no_free_place_near: {
+    happened: 'There is no free place near where you are pointing.',
+    next: 'Point somewhere with more room, then ask again.',
+  },
+  thing_kind_erased: {
+    happened: 'What that thing was made as is no longer kept, so it cannot be moved.',
+    next: 'It can still be removed.',
+  },
+  stale_object_base: STALE_WORLD,
+  invalidated_source_version: SOURCE_GONE,
+};
+
+/** What playing a being, or giving it back, can meet: the play routes' codes and the plan's. */
+const PLAY_REFUSALS: Readonly<Record<string, RefusalWords>> = {
+  engine_takes_no_play: {
+    happened: 'The people of this world cannot be played.',
+    next: 'Only beings in a world with placed things can be.',
+  },
+  being_played: { happened: 'Someone else is playing them now.', next: 'Ask again once they are given back.' },
+  decided_from_outside: {
+    happened: 'A program from outside this world decides for them.',
+    next: 'They cannot be played while it does.',
+  },
+  decider_not_allowed: { happened: 'That kind of being cannot be played.', next: 'Ask to play someone else.' },
+  person_not_in_this_world: { happened: 'They are not in this world any more.', next: 'Ask about someone who is here.' },
+  not_played: { happened: 'You are not playing anyone here.', next: 'Nothing needed to change.' },
+  no_change: { happened: 'You are playing them already.', next: 'Nothing needed to change.' },
+  society_unavailable: NOBODY_HERE,
+};
+
+/** What sending everyone away, or bringing them back, can meet: the presence route's names. */
+const PRESENCE_REFUSALS: Readonly<Record<string, RefusalWords>> = {
+  nobody_to_send_away: { happened: 'Nobody is here to send away.', next: 'Nothing needed to change.' },
+  already_here: { happened: 'They are already here.', next: 'Nothing needed to change.' },
+  a_request_is_waiting: {
+    happened: 'Someone was just asked to do something, and that waits for the world\'s next minute.',
+    next: 'Move the world on a minute, then ask again.',
+  },
+  nowhere_to_arrive: {
+    happened: 'They cannot come back yet: there is nowhere here they could reach.',
+    next: 'Add something to rest on or visit near where you arrive, then ask again.',
+  },
+  engine_keeps_its_people: {
+    happened: 'The people of this world cannot be sent away yet.',
+    next: 'A world with placed things keeps its people for now. You can pause the world instead.',
+  },
+  stale_society_state: CLOCK_STALE,
+  society_unavailable: NOBODY_HERE,
+};
+
 /** What every clock action can meet, whether a rail button or a Companion plan step sent it. */
 const CLOCK_REFUSALS: Readonly<Record<string, RefusalWords>> = {
   society_unavailable: NOBODY_HERE,
@@ -325,6 +393,16 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     refusals: THING_REFUSALS,
   },
   {
+    id: 'things.move', label: 'Move a thing', hint: 'Move a placed thing to where you are pointing',
+    icon: 'arrange', group: 'build', placement: ['companion'], operation: THING_MOVE,
+    refusals: THING_EDIT_REFUSALS,
+  },
+  {
+    id: 'things.remove', label: 'Remove a thing', hint: 'Take a placed thing out of this world',
+    icon: 'remove', group: 'build', placement: ['companion'], operation: THING_REMOVE,
+    refusals: THING_EDIT_REFUSALS,
+  },
+  {
     id: 'creatures.make', label: 'Make a creature', hint: 'Describe a creature in your own words and it comes to stand in front of you',
     icon: 'add', group: 'build', placement: ['rail', 'palette'],
   },
@@ -338,6 +416,29 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     hint: 'Give a being, a kind, a role or everyone an AI model, or their own routine back, after seeing what it comes to',
     icon: 'people', group: 'people', placement: ['companion'], operation: MIND, bind: { role_key: PEOPLE_ROLE },
     refusals: MIND_REFUSALS,
+  },
+  {
+    id: 'beings.play', label: 'Play this being',
+    hint: 'You choose what one being does, in the world, until you give it back; its mind rests meanwhile',
+    icon: 'people', group: 'people', placement: ['companion'], operation: PLAY, worldScoped: true, spendsNothing: true,
+    refusals: PLAY_REFUSALS,
+  },
+  {
+    id: 'beings.give-back', label: 'Give it back', hint: 'Give back the being you play; its own mind decides again',
+    icon: 'people', group: 'people', placement: ['companion'], operation: PLAY_GIVE_BACK, worldScoped: true,
+    spendsNothing: true,
+    refusals: PLAY_REFUSALS,
+  },
+  {
+    id: 'people.send-away', label: 'Send everyone away',
+    hint: 'Send the people who live here away for now; the world and its history stay',
+    icon: 'people', group: 'people', placement: ['companion'], operation: PRESENCE,
+    refusals: PRESENCE_REFUSALS,
+  },
+  {
+    id: 'people.bring-back', label: 'Bring them back', hint: 'Bring back the people who were sent away',
+    icon: 'people', group: 'people', placement: ['companion'], operation: PRESENCE,
+    refusals: PRESENCE_REFUSALS,
   },
   {
     id: 'people.open', label: 'People', hint: 'See who lives here and what they are doing',
@@ -501,7 +602,9 @@ export function availability(spec: ActionSpec, capabilities: OperationDescriptor
   if (spec.operation === undefined) {
     return { state: 'available', code: null, words: null, spends: false, descriptor: null };
   }
-  if (spec.worldScoped === true) return { state: 'available', code: null, words: null, spends: true, descriptor: null };
+  if (spec.worldScoped === true) {
+    return { state: 'available', code: null, words: null, spends: spec.spendsNothing !== true, descriptor: null };
+  }
   const descriptor = descriptorFor(spec, capabilities);
   if (descriptor === null) {
     return { state: 'unknown', code: null, words: STATE_WORDS.unknown ?? null, spends: false, descriptor: null };
