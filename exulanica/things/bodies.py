@@ -65,6 +65,7 @@ __all__ = [
     "build_body",
     "load_body_grammar",
     "read_body_recipe",
+    "stance_mm",
 ]
 
 BODY_RECIPE_PROFILE: Final = "exulanica.body-recipe/v1"
@@ -1264,6 +1265,19 @@ def _moves(recipe: BodyRecipe, grammar: BodyGrammar) -> list[str]:
         if enabled:
             moves.append(str(spec["module"]))
     return moves
+
+
+def stance_mm(recipe: BodyRecipe, role: str) -> int | None:
+    """How high above the ground the body ``recipe`` describes hangs its chains of ``role`` at
+    rest: the height of the first joint of the lowest-hung such chain as the builder lays it
+    (millimetres, the ground at 0), or None where the body has no chain of that role. A leg's is
+    the height of its hip."""
+    skeleton = _Skeleton()
+    _LAYOUTS[recipe.posture](skeleton, recipe)
+    heights = [
+        skeleton.joints[limb["bones"][0]][2] for limb in skeleton.limbs if limb["role"] == role
+    ]
+    return min(heights) if heights else None
 
 
 def enabled_movements(recipe: BodyRecipe, grammar: BodyGrammar | None = None) -> list[str]:

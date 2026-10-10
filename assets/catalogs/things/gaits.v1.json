@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "catalog_id": "gaits",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "stance_similarity",
+      "group": "rule",
+      "words": "pace follows the square root of the height a body stands at",
+      "spec": {
+        "numerator": "stance_mm",
+        "denominator": "reference_stance_mm",
+        "root": 2,
+        "scale_permille": 1000
+      },
+      "reason": "Published: Alexander and Jayes (1983), A dynamic similarity hypothesis for the gaits of quadrupedal mammals, Journal of Zoology 201: 135 to 152. Animals of different sizes move in a dynamically similar way at equal Froude numbers, the Froude number being speed squared over gravity times the height of the hip joint from the ground in normal standing. At an equal Froude number, then, speed goes as the square root of that height, and a body's pace is the reference body's pace times the square root of the ratio of their standing heights. No Froude number is stated here: the ratio needs only the two heights.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature gaits; see the entry reason"
+      }
+    },
+    {
+      "key": "reference_stance_mm",
+      "group": "reference",
+      "words": "the standing height a society's own pace is a pace for",
+      "spec": {
+        "value": 900
+      },
+      "reason": "Derived: the hips of the 1,700 mm figure the things contract states for a person's body stand 900 mm above the ground, and a society's walking was set for people of about that size. A body whose hips stand there walks at the society's own pace, 1,000 in a thousand; a taller one faster and a shorter one slower by the rule. It is this product's own figure, not an anthropometric constant.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature gaits; see the entry reason"
+      }
+    },
+    {
+      "key": "legs",
+      "group": "gait",
+      "words": "walks on its legs",
+      "spec": {
+        "reads": "leg",
+        "pace": "stance_similarity"
+      },
+      "reason": "Authored: a body with legs stands at its hips, the first joint of its leg chains above the ground as the body builder lays them at rest, which is the height the published rule is stated for. Where pairs differ the lowest hips are read: the shortest legs set a body's walk.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature gaits; see the entry reason"
+      }
+    },
+    {
+      "key": "tentacles",
+      "group": "gait",
+      "words": "steps on its tentacles",
+      "spec": {
+        "reads": "tentacle",
+        "pace": "stance_similarity"
+      },
+      "reason": "Authored: a body with no leg that walks steps on its tentacles, and is read as standing where they hang from it, by the same rule as a leg's hip. This is a chosen analogy, not a published result: the rule was stated for the legs of mammals. It keeps a small tentacled body slower than a large one, which is the property the rule gives legs.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature gaits; see the entry reason"
+      }
+    },
+    {
+      "key": "lying",
+      "group": "gait",
+      "words": "moves along the ground on its length",
+      "spec": {
+        "reads": null,
+        "pace": "reference"
+      },
+      "reason": "Authored: a legless body lying along the ground keeps the society's own pace, 1,000 in a thousand. This is a chosen default: no similarity rule for limbless motion is taken from a source here, and until one is, a serpent moves as fast as the people it lives among.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature gaits; see the entry reason"
+      }
+    },
+    {
+      "key": "limits",
+      "group": "limit",
+      "words": "what every pace is held to",
+      "spec": {
+        "pace_permille_minimum": 100,
+        "pace_permille_maximum": 3000
+      },
+      "reason": "Authored: a pace is a whole number of thousandths of the society's own, held between a tenth and three times it. By the rule a tenth is a body whose hips stand 9 mm above the ground and three times one whose hips stand 8,100 mm; the body grammar lets a kind state a height up to 20 m, so a taller body than that is held to three times. The bounds exist so that a walker's share of a minute's travel is always a small whole multiple or fraction of it, whatever a recipe states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature gaits; see the entry reason"
+      }
+    }
+  ]
+}

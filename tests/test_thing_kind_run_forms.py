@@ -172,6 +172,8 @@ def test_every_string_of_a_run_form_is_a_catalog_name_a_module_a_digest_or_a_fig
         | {"grip_section_mm_maximum", "module", "parameters", "weights", "follow_holders_of"}
         | {"default", "allowed", "routine", "model", "person", "none", "jaws", "hands"}
         | {"front_claws"}
+        # The one figure a walking move may state: its pace (the gaits catalog).
+        | {"pace_permille"}
     )
     # The movement modules a body may move by: those the body grammar's movements name.
     grammar_entries = json.loads((THINGS / "body-grammar.v1.json").read_text())["entries"]

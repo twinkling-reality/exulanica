@@ -781,7 +781,7 @@ workspace's store (`ThingStore.run_form`):
 | `reference` | `{"source": "workspace", "sha256"}`: the digest of the kind's document alone |
 | `class` | `being` |
 | `body` | the plan's digest; the kind's four figures (`extent_mm`); the plan's reach and its sockets by key, how many each holds and how long and thick a thing; the recipe's posture, spine, heads, limbs by role with their counts and segments, tail, what it holds with and its colours, each a number or a body grammar name |
-| `moves`, `abilities`, `offers`, `deciders` | as the kind states them |
+| `moves`, `abilities`, `offers`, `deciders` | as the kind states them; the walking it moves by also states `pace_permille`, its body's pace in thousandths of a society's own (optional: a form written before it states none) |
 | `routine` | the kind's weights, and the kinds whose holders it follows where they are shipped kinds |
 | `label`, `summary`, `named_by` | its body name and its body sentence, and the names catalog that gave them (`body-names/v1`) |
 
@@ -811,6 +811,20 @@ Two different creatures may share a body name. The name and the summary its make
 are the workspace's alone to show: the page asks the workspace's store for the kind by the digest
 the state names and says its label over the being, in the headers of the lines it says and hears,
 and on its card, and says nothing of it once the store no longer answers.
+
+**Paced by its body.** [`gaits.v1.json`](../assets/catalogs/things/gaits.v1.json) states how fast a
+drafted body walks, each entry with its reason, and
+[`gaits.py`](../exulanica/things/gaits.py) computes it. The rule is the dynamic similarity of
+animal walking (Alexander and Jayes, 1983): bodies of different sizes move alike at equal Froude
+numbers, so pace goes as the square root of the height a body stands at. A body with legs stands
+at its hips, the height the builder hangs its leg chains from (the lowest, where pairs differ); a
+body with no leg that steps on its tentacles is read where they hang, by analogy and not by a
+published result; a legless body lying along the ground keeps the society's own pace, a chosen
+default. The reference is the 900 mm at which the hips of the 1,700 mm figure stand. A pace is a
+whole number of thousandths of the society's own, the whole root of a whole quotient so it is the
+same on any machine, held between 100 and 3,000: hips at 1,235 mm give 1,171, at 57 mm 251. The run
+form states it with the walking the body moves by; a reader takes any whole number from 1 to
+10,000 there and no other figure.
 
 **Its card.** The card of such a being
 (`GET /world/versions/{version_id}/society/things/{thing_id}`) states what it can do here, where
@@ -1236,7 +1250,8 @@ These are material limits of the boundary above, not partial behaviour:
   wear a look the workspace keeps, by its digest; nothing yet shows a picture of one (`preview` is
   null).
 - A creature in a society ([above](#a-creature-in-a-society)) walks at the people's pace whatever
-  its body: no society reads a pace from a body yet. Its routine is the purposeful routine held to
+  its body: its run form states its body's own pace, and no society reads it yet (the walking
+  module spends one budget for every walker). Its routine is the purposeful routine held to
   the abilities its kind lists; the weights drafted with it are read by nothing, so a creature
   whose kind lists none of rest, visit, stand and talk waits where it is. A decider is told its
   body, never a temperament: nothing drafts or carries one. Because the society moves every body at

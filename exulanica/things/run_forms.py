@@ -14,7 +14,9 @@ here by code from the kept kind, its drafted plan and that plan's recipe:
     recipe's figures and grammar names (posture, spine, heads, limbs, tail, what it holds with,
     colours), never its appearance;
 *   what it **moves** by, its **abilities** and **offers**, its routine's weights and its
-    **deciders**, as the kind states them;
+    **deciders**, as the kind states them; with the walking it moves by, its **pace** in
+    thousandths of a society's own, from its body's standing height
+    (:func:`exulanica.things.gaits.pace_permille`, ``assets/catalogs/things/gaits.v1.json``);
 *   its **label**, a body name, and its **summary**, a sentence of its size, its parts, whether
     it walks and what it carries with: catalog words built from the body's own figures
     (:func:`body_name`, :func:`body_summary`, ``assets/catalogs/things/body-names.v1.json``),
@@ -58,6 +60,7 @@ from exulanica.things.catalogs import (
     ThingCatalogs,
     thing_catalogs,
 )
+from exulanica.things.gaits import PACE_PERMILLE, pace_permille
 from exulanica.things.kinds import ThingKind
 
 __all__ = [
@@ -463,6 +466,10 @@ def run_form(
     routine = document["routine"]
     shipped = _shipped_kind_keys()
     moves = [_move(entry) for entry in document["moves"]]
+    for move in moves:
+        # A body that walks states the pace its own standing height gives it.
+        if PACE_PERMILLE in _MOVE_PARAMETERS.get(move["module"], frozenset()):
+            move["parameters"][PACE_PERMILLE] = pace_permille(recipe)
     form = {
         "profile": RUN_FORM_PROFILE,
         "reference": workspace_reference(kind.sha256),
@@ -545,10 +552,17 @@ def _figures(where: str, value: object, declared: frozenset[str]) -> None:
         raise _refuse(where, "holds whole numbers under the names its catalog entry declares")
 
 
-#: The figures a kind may state for a movement module it moves by, by module: none today. A
-#: module that takes a figure from each kind (a pace, a wingspan) is added here with that
-#: figure's name, in a later run form profile where a stored one could not read it.
-_MOVE_PARAMETERS: Final[Mapping[str, frozenset[str]]] = MappingProxyType({})
+#: The figures a run form may state for a movement module its kind moves by, by module: the
+#: walking a body moves by takes its pace. Each is optional: a form written before a figure was
+#: declared states none and reads as it did, and whatever reads the figure takes its absence as
+#: the society's own pace. Another module that takes a figure from each kind (a wingspan) is
+#: added here with that figure's name.
+_MOVE_PARAMETERS: Final[Mapping[str, frozenset[str]]] = MappingProxyType(
+    {"exulanica-movement/walking/v1": frozenset({PACE_PERMILLE})}
+)
+#: The widest a pace may be read: from one thousandth of a society's own pace to ten times it.
+#: The gaits catalog holds a pace it computes to its own, narrower limits.
+_PACE_RANGE: Final = (1, 10_000)
 
 
 def read_run_form(
@@ -657,6 +671,12 @@ def read_run_form(
             row["parameters"],
             _MOVE_PARAMETERS.get(row["module"], frozenset()),
         )
+        pace = row["parameters"].get(PACE_PERMILLE)
+        if pace is not None and not _PACE_RANGE[0] <= pace <= _PACE_RANGE[1]:
+            raise _refuse(
+                f"moves[{index}].parameters.{PACE_PERMILLE}",
+                f"is a whole number of thousandths from {_PACE_RANGE[0]} to {_PACE_RANGE[1]}",
+            )
     abilities = {
         entry["key"]
         for entry in _keyed("abilities", form["abilities"], catalogs.abilities, "an ability")

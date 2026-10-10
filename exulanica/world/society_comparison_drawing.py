@@ -83,6 +83,7 @@ DRAWING_MODULES: Final = (
     "exulanica.movement.walking",
     "exulanica.things.bodies",
     "exulanica.things.catalogs",
+    "exulanica.things.gaits",
     "exulanica.things.kinds",
     "exulanica.things.lines",
     "exulanica.things.origin",
