@@ -8,9 +8,11 @@
 -- row of a world and a role before it asks; a world with none is asked under the two figures its
 -- role's policy catalog states, as every world was before this table, so no world changes by it.
 --
--- IT CAN ONLY LOWER WHAT THE HOST ALLOWS. The process's own budget, a deployment's guest
--- allowance and the durable spending authority's grants bound every call whatever a row here
--- says; a row is the most a person lets their world ask inside those.
+-- IT IS NEVER ABOVE WHAT THE HOST ALLOWS. The process's own budget and the part of it kept for
+-- other work, a deployment's guest allowance and the workspace's grant under the durable spending
+-- authority bound every call whatever a row here says; a row is the most a person lets their
+-- world ask inside those. Against the two figures a world had before, a row may be lower or
+-- higher.
 --
 -- WHO SET IT, AND WHEN. Each row names the account that set it and is recorded under the caller's
 -- request id once: the same request asked again answers the row it recorded. Rows are appended in
