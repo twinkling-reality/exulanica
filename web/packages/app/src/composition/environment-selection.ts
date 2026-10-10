@@ -106,7 +106,7 @@ import { LineWatch, thingLine } from './thing-lines.js';
 import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
 import { DoorGrantsClient, type DoorGrant } from '../door-grants-api.js';
 import { ThingLooksClient, type ResolveWorkspaceLook, type ThingLookChoice } from '../thing-looks-api.js';
-import { departedNowWords, kindDocumentLabel, kindKey, noticeKinds, visitorNotice, VisitorNoticeWatch, type FreshEvent, type KindReference } from './visitor-notices.js';
+import { departedNowWords, isMadeKind, kindDocumentLabel, kindKey, libraryKind, noticeKinds, sameKind, visitorNotice, VisitorNoticeWatch, type FreshEvent, type KindReference } from './visitor-notices.js';
 import { VisitorGates } from './visitor-gates.js';
 import { heardBy, saidBy, type BeingLine } from './being-lines.js';
 import '../ui/thing-marks.css';
@@ -2136,6 +2136,32 @@ export function mountEnvironmentSelection(
   }
 
   /**
+   * A kind's label as the page says it: the shipped library's, or, for a kind its workspace keeps
+   * (a creature drafted from a person's words, named by digest alone), its own document's, asked
+   * of the workspace once by that digest. Until it is read, and where the workspace no longer
+   * holds the kind, null; the marks are drawn again when a label arrives.
+   */
+  function kindLabelOf(kind: KindReference): string | null {
+    const library = things?.layer.maker.library ?? null;
+    if (!isMadeKind(kind)) {
+      return library?.list.kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label ?? null;
+    }
+    const key = kindKey(kind);
+    if (library !== null && !documentLabels.has(key) && !kindsReading.has(key)) {
+      kindsReading.add(key);
+      void library.kindDocument(libraryKind(kind)).then(
+        (document) => { documentLabels.set(key, kindDocumentLabel(document)); },
+        // Read and unreadable (erased, or another workspace's): no name to say.
+        () => { documentLabels.set(key, null); },
+      ).finally(() => {
+        kindsReading.delete(key);
+        if ((phase as string) !== 'disposed') refreshMarks();
+      });
+    }
+    return documentLabels.get(key) ?? null;
+  }
+
+  /**
    * Mark who runs each person of the drawn state, decided by the one function the card shares
    * (`markOf`): who plays them, else the model asked for them by the last models read, or the bridge
    * a visitor crossed through. A visitor whose bridge is not yet known asks the door, at most once a
@@ -2146,7 +2172,6 @@ export function mountEnvironmentSelection(
     const people = state?.inhabitants ?? [];
     const running = societyModels?.runningModels() ?? new Map();
     const played = societyModels?.playedSubjects() ?? new Map();
-    const kinds = things?.layer.maker.library.list.kinds ?? [];
     const subjects = new Map<string, MarkedSubject>();
     let unknownBridge = false;
     let unnamedAgent = false;
@@ -2159,8 +2184,7 @@ export function mountEnvironmentSelection(
       const mark = markOf(markInputFor(person, running, played));
       if (mark === null) continue;
       const kind = person.kind;
-      const label = kind === undefined ? null
-        : kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label ?? null;
+      const label = kind === undefined ? null : kindLabelOf(kind);
       subjects.set(person.id, { mark, label, spoken: markLabel(mark) });
     }
     marks.set(subjects);
@@ -2190,13 +2214,11 @@ export function mountEnvironmentSelection(
   function showLines(societyId: string, events: readonly SocietyEvent[], state: OwnedSocietyState): void {
     const lines = lineWatch.take(societyId, events);
     if (marks === null || lines.length === 0) return;
-    const kinds = things?.layer.maker.library.list.kinds ?? [];
     const people = new Map(state.inhabitants.map((person) => [person.id, person]));
     const words = {
-      kindLabel: (kind: { kind: string; version: number; sha256: string }) =>
-        kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label ?? null,
-      countOf: (kind: { kind: string; version: number; sha256: string }) =>
-        state.inhabitants.filter((person) => person.kind?.kind === kind.kind && person.kind.version === kind.version && person.kind.sha256 === kind.sha256).length,
+      kindLabel: (kind: KindReference) => kindLabelOf(kind),
+      countOf: (kind: KindReference) =>
+        state.inhabitants.filter((person) => person.kind !== undefined && sameKind(person.kind, kind)).length,
       modelName: (model: ModelRef) =>
         societyModels?.models()?.find((one) => one.provider === model.provider && one.modelId === model.modelId) ?? null,
     };
@@ -2322,13 +2344,12 @@ export function mountEnvironmentSelection(
     const events = liveSociety?.view.eventsAvailable ? liveSociety.view.events : [];
     const running = societyModels?.runningModels() ?? new Map();
     const people = state?.inhabitants ?? [];
-    const kinds = things?.layer.maker.library.list.kinds ?? [];
     const names = {
       person: (other: string) => {
         const found = people.find((held) => held.id === other);
         return found === undefined ? null : inhabitantLabel(found);
       },
-      kindLabel: (kind: KindReference) => kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label ?? null,
+      kindLabel: (kind: KindReference) => kindLabelOf(kind),
       speaker: (other: string) => {
         const speaker = people.find((held) => held.id === other);
         return speaker === undefined ? null : markInputFor(speaker, running);
@@ -2362,7 +2383,7 @@ export function mountEnvironmentSelection(
     const library = things?.layer.maker.library ?? null;
     const kinds = library?.list.kinds ?? [];
     const listedLabel = (kind: KindReference): string | undefined =>
-      kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label;
+      (isMadeKind(kind) ? undefined : kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label);
     // A kind the shipped list does not hold (a workspace's own) is named from its own document,
     // read once by digest before anything is told, so it is never announced as "a visitor".
     // Nothing is told while any held notice's kind is still being read: a later minute's read
@@ -2375,7 +2396,7 @@ export function mountEnvironmentSelection(
       if (toRead.length > 0) {
         void Promise.allSettled(toRead.map(async (kind) => {
           try {
-            documentLabels.set(kindKey(kind), kindDocumentLabel(await library.kindDocument({ key: kind.kind, version: kind.version, sha256: kind.sha256 })));
+            documentLabels.set(kindKey(kind), kindDocumentLabel(await library.kindDocument(libraryKind(kind))));
           } catch {
             // Read and unreadable: told with the generic words.
             documentLabels.set(kindKey(kind), null);

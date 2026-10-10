@@ -66,12 +66,14 @@ from psycopg.types.json import Jsonb
 
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.namespaces import look_lock_key
+from exulanica.things.bodies import BodyRefused, read_body_recipe
 from exulanica.things.catalogs import BodyPlan, BodyPlanRefused, ThingCatalogs, read_body_plan
 from exulanica.things.catalogs import thing_catalogs as shipped_thing_catalogs
 from exulanica.things.creatures import Creature
 from exulanica.things.kinds import ThingKind, ThingKindRefused, read_thing_kind, shipped_thing_kinds
 from exulanica.things.lines import LineRefused, check_line
 from exulanica.things.looks import Look, LookRefused, read_look
+from exulanica.things.run_forms import RunFormRefused, run_form
 from exulanica.world.thing_library import shipped_looks
 from exulanica.world.workspace_lock import lock_workspace
 
@@ -393,6 +395,34 @@ class ThingStore:
                 (self.workspace_id, sha256),
             ).fetchone()
         return None if row is None else self.kind(row["key"], row["version"])
+
+    def run_form(self, kind_sha256: str) -> dict[str, Any] | None:
+        """What a society runs of a being this workspace holds, by its kind's digest: the kind's
+        run form (:mod:`exulanica.things.run_forms`), built from the kind, the drafted plan it
+        names by digest and the recipe that plan was built from, each read again; None where the
+        workspace holds no such kind, or its plan or recipe no longer reads. It holds no word of
+        the kind's label, summary or appearance, so a society may record it. Rows only."""
+        kind = self.kind_by_digest(kind_sha256)
+        if kind is None or kind.klass != "being":
+            return None
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            row = cursor.execute(
+                "select p.document as plan, p.sha256 as plan_sha256, r.document as recipe "
+                "from body_plan_version p join body_recipe_version r "
+                "on r.workspace_id=p.workspace_id and r.sha256=p.recipe_sha256 "
+                "where p.workspace_id=%s and p.sha256=%s",
+                (self.workspace_id, kind.document["body"].get("plan_sha256")),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            plan = read_body_plan(row["plan"], catalogs=self.catalogs)
+            recipe = read_body_recipe(row["recipe"])
+            if plan.sha256 != row["plan_sha256"]:
+                return None
+            return run_form(kind, plan, recipe, catalogs=self.catalogs)
+        except (BodyPlanRefused, BodyRefused, RunFormRefused):
+            return None
 
     def _store(self) -> ContentAddressedStore:
         if self.looks is None:

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import type { OwnedSocietyState } from '../src/playcanvas/society/types.js';
 import type { LookDrawing } from '../src/playcanvas/things/documents.js';
+import { ThingCrowdFigures, type ThingCrowdRenderable } from '../src/playcanvas/things/crowd-figures.js';
+import { RigidOnBonesFigure } from '../src/playcanvas/things/rigid-on-bones.js';
 import { ThingLibrary, type HeldThings } from '../src/playcanvas/things/library.js';
 import { ThingLayer, type PlacedThingRecord } from '../src/playcanvas/things/thing-layer.js';
 import { canonicalBytes, servedLibrary, sha256 } from './things-fixtures.js';
@@ -118,7 +120,7 @@ async function setup() {
     { thingId: 'sword-1', kind: served.kindRef('sword', 1), regionId: 'r', transform: at(1000, 0), removed: false },
   ] satisfies PlacedThingRecord[]);
   for (let i = 0; i < 8; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
-  return { layer, served };
+  return { layer, served, device, region };
 }
 
 describe('a thing of a kind its workspace keeps, while a society of things is drawn', () => {
@@ -155,5 +157,27 @@ describe('a thing of a kind its workspace keeps, while a society of things is dr
     // With no society drawn, it stands again.
     layer.setSociety(null, null);
     expect(layer.figureOf('creature-1')!.root.enabled).toBe(true);
+  });
+});
+
+describe('a being of a kind its workspace keeps, as one of a society\'s people', () => {
+  it('is drawn by the crowd in its sketch, asked of its workspace by the digest the state names', async () => {
+    const { layer, device, region } = await setup();
+    const figures = new ThingCrowdFigures({ maker: layer.maker });
+    // The state names a made kind by its document's digest alone: no key, no version.
+    const person = { id: 'p-creature', synthetic: true as const, position_mm: [3000, 0] as const, kind: { source: 'workspace' as const, sha256: kindDigest }, came_by: 'placed' as const, placed_id: 'creature-1' };
+    const named = figures.figureFor(person)!;
+    expect(named.key).toBe(`workspace/${kindDigest}|none`);
+    const renderable = named.factory(device, region, { societyId: 'society', branchId: 'branch', inhabitantId: 'p-creature' }, 'near') as ThingCrowdRenderable;
+    for (let i = 0; i < 8; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(figures.misses).toEqual([]);
+    // Its figure is the sketch on its own drafted plan: the three joints the plan states.
+    expect(renderable.figure).toBeInstanceOf(RigidOnBonesFigure);
+    expect(figures.figureOf('p-creature')).toBe(renderable.figure);
+    // A digest its workspace does not hold (the creature was erased) is a miss by name, drawn as nothing.
+    const gone = figures.figureFor({ ...person, id: 'p-gone', kind: { source: 'workspace', sha256: 'e'.repeat(64) } })!;
+    gone.factory(device, region, { societyId: 'society', branchId: 'branch', inhabitantId: 'p-gone' }, 'near');
+    for (let i = 0; i < 8; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(figures.misses.map((miss) => [miss.subjectId, miss.reason])).toEqual([['p-gone', 'not_in_library']]);
   });
 });

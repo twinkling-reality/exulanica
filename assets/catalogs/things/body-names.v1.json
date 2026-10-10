@@ -1,0 +1,502 @@
+{
+  "schema_version": 1,
+  "catalog_id": "body-names",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "creature",
+      "group": "noun",
+      "words": "creature",
+      "spec": {},
+      "reason": "The noun every body name ends with: a society names a made being by what its body is, and every drafted body is some creature, whatever its maker calls it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "limits",
+      "group": "limit",
+      "words": "what every body name is held to",
+      "spec": {
+        "features_maximum": 2
+      },
+      "reason": "A body name states at most two features and the noun: enough to tell most bodies in a town apart in a sentence a decider reads, short enough to read over a figure. Two bodies that share a name are told apart by number, as two beings of one kind are. A tail names nothing: most bodies have one.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "heads",
+      "group": "feature",
+      "words": "{count} headed",
+      "spec": {
+        "part": "heads",
+        "least": 2,
+        "rank": 1,
+        "counted": true
+      },
+      "reason": "More than one head is what anybody notices first, so it is named first, with how many.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "wings",
+      "group": "feature",
+      "words": "winged",
+      "spec": {
+        "part": "wings",
+        "least": 2,
+        "rank": 2,
+        "counted": false
+      },
+      "reason": "Wings are named next: every winged body has one or two pairs, and a pair or two reads the same from the ground, so they are not counted.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "legs",
+      "group": "feature",
+      "words": "{count} legged",
+      "spec": {
+        "part": "legs",
+        "least": 2,
+        "rank": 3,
+        "counted": true
+      },
+      "reason": "How many legs a body walks on tells a biped from a beast from a many-legged thing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "tentacles",
+      "group": "feature",
+      "words": "{count} tentacled",
+      "spec": {
+        "part": "tentacles",
+        "least": 1,
+        "rank": 4,
+        "counted": true
+      },
+      "reason": "Tentacles are named where legs do not already name the body, with how many.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "arms",
+      "group": "feature",
+      "words": "{count} armed",
+      "spec": {
+        "part": "arms",
+        "least": 2,
+        "rank": 5,
+        "counted": true
+      },
+      "reason": "Arms tell a body that can carry in its hands from one that cannot.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "fins",
+      "group": "feature",
+      "words": "finned",
+      "spec": {
+        "part": "fins",
+        "least": 2,
+        "rank": 6,
+        "counted": false
+      },
+      "reason": "Fins are named after everything a body stands or carries with, uncounted, as wings are.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "long_body",
+      "group": "feature",
+      "words": "long bodied",
+      "spec": {
+        "part": "spine",
+        "least": 6,
+        "rank": 7,
+        "counted": false,
+        "without": [
+          "legs"
+        ]
+      },
+      "reason": "A body of six or more spine segments and no legs is mostly spine, as a serpentine body is by the body grammar's own bound, so its length is what names it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "one",
+      "group": "number",
+      "words": "one",
+      "spec": {
+        "value": 1
+      },
+      "reason": "A count as a word, so a body name is words and spaces alone, as every kind's label is. Twelve is the most of any one part a body recipe states (six pairs of legs, twelve tentacles).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "two",
+      "group": "number",
+      "words": "two",
+      "spec": {
+        "value": 2
+      },
+      "reason": "A count as a word, so a body name is words and spaces alone, as every kind's label is. Twelve is the most of any one part a body recipe states (six pairs of legs, twelve tentacles).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "three",
+      "group": "number",
+      "words": "three",
+      "spec": {
+        "value": 3
+      },
+      "reason": "A count as a word, so a body name is words and spaces alone, as every kind's label is. Twelve is the most of any one part a body recipe states (six pairs of legs, twelve tentacles).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "four",
+      "group": "number",
+      "words": "four",
+      "spec": {
+        "value": 4
+      },
+      "reason": "A count as a word, so a body name is words and spaces alone, as every kind's label is. Twelve is the most of any one part a body recipe states (six pairs of legs, twelve tentacles).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "five",
+      "group": "number",
+      "words": "five",
+      "spec": {
+        "value": 5
+      },
+      "reason": "A count as a word, so a body name is words and spaces alone, as every kind's label is. Twelve is the most of any one part a body recipe states (six pairs of legs, twelve tentacles).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "six",
+      "group": "number",
+      "words": "six",
+      "spec": {
+        "value": 6
+      },
+      "reason": "A count as a word, so a body name is words and spaces alone, as every kind's label is. Twelve is the most of any one part a body recipe states (six pairs of legs, twelve tentacles).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "seven",
+      "group": "number",
+      "words": "seven",
+      "spec": {
+        "value": 7
+      },
+      "reason": "A count as a word, so a body name is words and spaces alone, as every kind's label is. Twelve is the most of any one part a body recipe states (six pairs of legs, twelve tentacles).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "eight",
+      "group": "number",
+      "words": "eight",
+      "spec": {
+        "value": 8
+      },
+      "reason": "A count as a word, so a body name is words and spaces alone, as every kind's label is. Twelve is the most of any one part a body recipe states (six pairs of legs, twelve tentacles).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "nine",
+      "group": "number",
+      "words": "nine",
+      "spec": {
+        "value": 9
+      },
+      "reason": "A count as a word, so a body name is words and spaces alone, as every kind's label is. Twelve is the most of any one part a body recipe states (six pairs of legs, twelve tentacles).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "ten",
+      "group": "number",
+      "words": "ten",
+      "spec": {
+        "value": 10
+      },
+      "reason": "A count as a word, so a body name is words and spaces alone, as every kind's label is. Twelve is the most of any one part a body recipe states (six pairs of legs, twelve tentacles).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "eleven",
+      "group": "number",
+      "words": "eleven",
+      "spec": {
+        "value": 11
+      },
+      "reason": "A count as a word, so a body name is words and spaces alone, as every kind's label is. Twelve is the most of any one part a body recipe states (six pairs of legs, twelve tentacles).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "twelve",
+      "group": "number",
+      "words": "twelve",
+      "spec": {
+        "value": 12
+      },
+      "reason": "A count as a word, so a body name is words and spaces alone, as every kind's label is. Twelve is the most of any one part a body recipe states (six pairs of legs, twelve tentacles).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "part_heads",
+      "group": "part",
+      "words": "heads",
+      "spec": {
+        "part": "heads",
+        "one": "head",
+        "rank": 1
+      },
+      "reason": "What a body summary calls its heads, one and many, in the order the features rank them, so a decider reads a body's parts in the order a body name would state them.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "part_wings",
+      "group": "part",
+      "words": "wings",
+      "spec": {
+        "part": "wings",
+        "one": "wing",
+        "rank": 2
+      },
+      "reason": "What a body summary calls its wings, one and many, in the order the features rank them, so a decider reads a body's parts in the order a body name would state them.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "part_legs",
+      "group": "part",
+      "words": "legs",
+      "spec": {
+        "part": "legs",
+        "one": "leg",
+        "rank": 3
+      },
+      "reason": "What a body summary calls its legs, one and many, in the order the features rank them, so a decider reads a body's parts in the order a body name would state them.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "part_tentacles",
+      "group": "part",
+      "words": "tentacles",
+      "spec": {
+        "part": "tentacles",
+        "one": "tentacle",
+        "rank": 4
+      },
+      "reason": "What a body summary calls its tentacles, one and many, in the order the features rank them, so a decider reads a body's parts in the order a body name would state them.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "part_arms",
+      "group": "part",
+      "words": "arms",
+      "spec": {
+        "part": "arms",
+        "one": "arm",
+        "rank": 5
+      },
+      "reason": "What a body summary calls its arms, one and many, in the order the features rank them, so a decider reads a body's parts in the order a body name would state them.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "part_fins",
+      "group": "part",
+      "words": "fins",
+      "spec": {
+        "part": "fins",
+        "one": "fin",
+        "rank": 6
+      },
+      "reason": "What a body summary calls its fins, one and many, in the order the features rank them, so a decider reads a body's parts in the order a body name would state them.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    },
+    {
+      "key": "summary",
+      "group": "sentence",
+      "words": "what a decider reads of the body",
+      "spec": {
+        "lead": "A creature about {length} long and {height} high",
+        "with": " with {parts}",
+        "tail": "a tail",
+        "join": " and ",
+        "moves": {
+          "walks": " It moves over the ground.",
+          "still": " It cannot move from where it is."
+        },
+        "holds": {
+          "none": "",
+          "jaws": " It carries a thing in its jaws.",
+          "hands": " It carries things in its hands.",
+          "front_claws": " It carries things in its front claws."
+        }
+      },
+      "reason": "A made being's summary, where a shipped kind's is written by hand: its size in metres, its parts by count in rank order, whether it walks and what it carries with, all from its body's own figures, so a decider knows what body it decides for and nothing a person wrote reaches a society.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica body names; see the entry reason"
+      }
+    }
+  ]
+}

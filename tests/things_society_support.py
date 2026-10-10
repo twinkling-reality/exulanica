@@ -71,10 +71,12 @@ def compose(
     version_id: uuid.UUID | None = None,
     world_id: str | None = None,
     source_snapshot_id: uuid.UUID | None = None,
+    made_kinds: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The things input of a starter version holding the small square and ``things``, at the
     opening pose ``arrival`` pins, or the ground's own; the starter's own version unless the
-    version, world and snapshot are given, as a test holding a version of its own gives them."""
+    version, world and snapshot are given, as a test holding a version of its own gives them.
+    ``made_kinds`` are the run forms of the kinds its workspace keeps, by digest."""
     held = tuple(square.square_objects() if objects is None else objects)
     starter = square.version(held, edit_seq)
     version = dataclasses.replace(
@@ -107,6 +109,7 @@ def compose(
         reviewed_affordances=square.REGISTRY,
         segment_blocked=segment_blocked,
         standing=square.STANDING,
+        made_kinds=made_kinds,
     )
 
 

@@ -36,15 +36,23 @@ export interface ThingCardRoute {
   readonly offers: readonly string[];
   /** What it holds, by each held thing's kind label; null where this world's beings have no hands, or for an object. */
   readonly holding: readonly string[] | null;
-  /** The look it wears now. */
+  /**
+   * The look it wears now; null where it has none to wear: a being of a kind its workspace no
+   * longer holds (the creature was erased), or whose only look was withdrawn.
+   */
   readonly look: {
     readonly ref: CardLookReference;
     readonly label: string;
     readonly origin: OriginRecord | null;
     readonly chosenByOwner: boolean;
-  };
+  } | null;
   /** Every look it may be drawn as, the one it wears included. */
   readonly looks: readonly CardLookOption[];
+  /**
+   * The open model that drafted its kind from words, by the name the server reads for it; null for
+   * a shipped kind, and for a made kind its workspace no longer holds.
+   */
+  readonly draftedBy: { readonly provider: string; readonly modelId: string; readonly name: string } | null;
   /** The society's minute and the digest of its record as the card was read. */
   readonly society: { readonly tick: number; readonly stateSha256: string };
 }
@@ -92,15 +100,20 @@ function originOrNull(value: unknown): OriginRecord | null {
 export function readThingCardRoute(value: unknown): ThingCardRoute {
   const held = object(value, 'card');
   if (held['profile'] !== THING_CARD_PROFILE) invalid('profile');
-  const look = object(held['look'], 'look');
+  const look = held['look'] === null ? null : object(held['look'], 'look');
   const society = object(held['society'], 'society');
   const holding = held['holding'];
+  const drafted = object(held['kind'], 'kind')['drafted_by'];
   return {
     thingId: text(held['thing_id'], 'thing id'),
+    draftedBy: drafted === null || drafted === undefined ? null : (() => {
+      const by = object(drafted, 'drafting model');
+      return { provider: text(by['provider'], 'drafting model provider'), modelId: text(by['model_id'], 'drafting model id'), name: text(by['name'], 'drafting model name') };
+    })(),
     can: wordsOf(held['abilities'], 'ability'),
     offers: wordsOf(held['offers'], 'offer'),
     holding: holding === null ? null : list(holding, 'holding').map((entry) => text(object(entry, 'held thing')['label'], 'held thing label')),
-    look: {
+    look: look === null ? null : {
       ref: lookReference(look, 'look'),
       label: text(look['label'], 'look label'),
       origin: originOrNull(look['origin']),

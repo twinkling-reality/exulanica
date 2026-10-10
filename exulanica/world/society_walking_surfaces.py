@@ -57,7 +57,9 @@ from exulanica.world.society_authored_ground import (
     _UsableObject,
     area_supports,
     destination_places,
+    made_things_gone,
     objects_in_region,
+    state_made_kinds,
     thing_dependency_refs,
     things_in_region,
 )
@@ -740,6 +742,7 @@ def build_walking_surfaces_input(
     segment_blocked: SegmentBlocked | None = None,
     obstructions: CityObstructions | None = None,
     people: Mapping[str, Any] | None = None,
+    made_kinds: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compose a generated world's input over the walking surfaces its records state, from the
     place :func:`walking_surfaces_place` made of them for ``ground``.
@@ -748,8 +751,9 @@ def build_walking_surfaces_input(
     walking-surfaces-v2 input that also carries the place itself, for the living town to walk;
     with ``things``, a walking-surfaces-v3 input for a society of things, which also reads the
     things placed in the world's region (``segment_blocked`` tells whether a step crosses one,
-    ``obstructions`` what of the town's own a thing's place keeps clear of), whose first input
-    also carries ``people``, what the town's people are made from
+    ``obstructions`` what of the town's own a thing's place keeps clear of; ``made_kinds`` the run
+    forms of the kinds its workspace keeps, by digest, so a thing of one is read as a being), whose
+    first input also carries ``people``, what the town's people are made from
     (:func:`~exulanica.world.town_people.people_frame`), where one is given;
     without either, the walking-surfaces-v1 input the purposeful society reads."""
     if version_delta_sha256(version) != version.state_sha256:
@@ -880,8 +884,8 @@ def build_walking_surfaces_input(
                 ),
             }
         )
-    placed = things_in_region(version, ground) if things else []
-    thing_kinds, unknown = _thing_kinds(placed)
+    placed = things_in_region(version, ground, made_kinds) if things else []
+    thing_kinds, unknown = _thing_kinds(placed, made_kinds)
     # Only a society of things reads how high a thing stands: v1 and v2 read no height.
     height_above = surface_height_above(place, ground) if things else None
     if things and unknown is not None:
@@ -989,6 +993,8 @@ def build_walking_surfaces_input(
         document["things"] = (
             _input_things(placed, thing_kinds, ground, height_above) if reason is None else []
         )
+        if reason is None:
+            state_made_kinds(document, thing_kinds, made_things_gone(version, ground, made_kinds))
         # The kind the ground's catalog entry names its population of, recorded here so genesis
         # and replay read it from the input, whatever a later catalog version says.
         kind = society_ground_for_navigation(ground.navigation_profile).population_kind

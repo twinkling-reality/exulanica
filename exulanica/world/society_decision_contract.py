@@ -68,10 +68,10 @@ from exulanica.world.decision_roles import (
     DecisionContract,
     DecisionRole,
 )
-from exulanica.world.placed_things import ThingKindReference, shipped_kind
 from exulanica.world.role_decisions import context_bytes, written_messages
 from exulanica.world.society_catalogs import PurposefulActivity, PurposefulRoutine
 from exulanica.world.society_engines import society_engine
+from exulanica.world.society_kinds import kind_here
 from exulanica.world.society_planner import (
     PLACE_INPUTS,
     _crowded,
@@ -382,11 +382,13 @@ def of_things(profile: str) -> bool:
     return society_engine(profile).state_family == "things"
 
 
-def kind_of(person: Mapping[str, Any]) -> Any:
-    """The shipped kind a person of a society of things is, by the reference their state records;
-    None for a person of a society whose people state no kind."""
+def kind_of(person: Mapping[str, Any], state: Mapping[str, Any] | None = None) -> Any:
+    """The kind a person of a society of things is, by the reference their state records: a
+    shipped kind, or one its workspace keeps as ``state`` carries its run form
+    (:func:`~exulanica.world.society_kinds.kind_here`); None for a person of a society whose
+    people state no kind."""
     reference = person.get("kind")
-    return None if reference is None else shipped_kind(ThingKindReference(**reference))
+    return None if reference is None else kind_here(state, reference)
 
 
 def _abilities(kind: Any) -> frozenset[str]:
@@ -411,7 +413,7 @@ def hearers(
     x, y = speaker["position_mm"]
     found = []
     for other in state["inhabitants"]:
-        if other["id"] == speaker["id"] or not _hears(kind_of(other)):
+        if other["id"] == speaker["id"] or not _hears(kind_of(other, state)):
             continue
         distance = math.isqrt(
             (other["position_mm"][0] - x) ** 2 + (other["position_mm"][1] - y) ** 2
@@ -447,7 +449,7 @@ def things_options(
     society's people."""
     if not of_things(state["profile"]) or not set(contract.words) >= THINGS_KINDS:
         return []
-    kind = kind_of(person)
+    kind = kind_of(person, state)
     if kind is None:
         return []
     abilities = _abilities(kind)
@@ -461,9 +463,9 @@ def things_options(
                     "say_to",
                     # The label of their kind and the number their simulated name ends with.
                     label=contract.words["say_to"].format(
-                        who=kind_of(other).document["label"],
+                        who=kind_of(other, state).document["label"],
                         number=other["ordinal"] + 1,
-                        name=page_name(other).lower(),
+                        name=page_name(other, state).lower(),
                         metres=round(distance / 1000),
                     ),
                     addressee_id=other["id"],
@@ -496,7 +498,7 @@ def follow_options(
         or not set(contract.words) >= FOLLOW_KINDS
     ):
         return []
-    kind = kind_of(person)
+    kind = kind_of(person, state)
     if kind is None or "follow" not in _abilities(kind):
         return []
     people = {other["id"]: other for other in state["inhabitants"]}
@@ -509,9 +511,9 @@ def follow_options(
                 contract,
                 "stop_following",
                 label=contract.words["stop_following"].format(
-                    who=kind_of(other).document["label"],
+                    who=kind_of(other, state).document["label"],
                     number=other["ordinal"] + 1,
-                    name=page_name(other).lower(),
+                    name=page_name(other, state).lower(),
                 ),
                 addressee_id=following,
             )
@@ -522,7 +524,9 @@ def follow_options(
     reach = contract.value("hearing_reach_mm")
     near = []
     for other in state["inhabitants"]:
-        if other["id"] in (person["id"], following) or not _offers(kind_of(other), "be_followed"):
+        if other["id"] in (person["id"], following) or not _offers(
+            kind_of(other, state), "be_followed"
+        ):
             continue
         distance = math.isqrt(
             (other["position_mm"][0] - x) ** 2 + (other["position_mm"][1] - y) ** 2
@@ -537,9 +541,9 @@ def follow_options(
                 contract,
                 "follow",
                 label=contract.words["follow"].format(
-                    who=kind_of(other).document["label"],
+                    who=kind_of(other, state).document["label"],
                     number=other["ordinal"] + 1,
-                    name=page_name(other).lower(),
+                    name=page_name(other, state).lower(),
                     metres=round(distance / 1000),
                 ),
                 addressee_id=other["id"],
@@ -584,16 +588,16 @@ def hands_options(
     ]
     for offer in offers[: contract.value("hands_options_maximum")]:
         act = offer.act
-        thing = shipped_kind(ThingKindReference(**things[act.thing_id]["kind"]))
+        thing = kind_here(state, things[act.thing_id]["kind"])
         words: dict[str, Any] = {"thing": thing.document["label"]}
         if act.ability in ("pick_up", "give", "take"):
             words["metres"] = round(act.distance_mm / 1000)
         if act.other_id is not None:
             other = people[act.other_id]
             words.update(
-                who=kind_of(other).document["label"],
+                who=kind_of(other, state).document["label"],
                 number=other["ordinal"] + 1,
-                name=page_name(other).lower(),
+                name=page_name(other, state).lower(),
             )
         walk = 0
         if offer.approach_node is not None:
@@ -830,7 +834,7 @@ def choice_options(
                 # The number their simulated name ends with: theirs for the society's life.
                 label=contract.words["talk"].format(
                     number=other["ordinal"] + 1,
-                    name=page_name(other).lower(),
+                    name=page_name(other, state).lower(),
                     metres=round(walk / 1000),
                 ),
                 kind="talk",
@@ -940,17 +944,17 @@ def line_listener(option: Mapping[str, Any], contract: DecisionContract) -> str 
     return named.get("name") or named.get("who")
 
 
-def page_name(person: Mapping[str, Any]) -> str:
+def page_name(person: Mapping[str, Any], state: Mapping[str, Any] | None = None) -> str:
     """A person of a society named as the page names it (:func:`named`), by their kind's label
-    where they state a kind."""
-    kind = kind_of(person)
+    where they state a kind (``state`` carries a made kind's)."""
+    kind = kind_of(person, state)
     return named(person["display_name"], None if kind is None else kind.document["label"])
 
 
-def _speaker_words(heard: Mapping[str, Any]) -> str:
+def _speaker_words(heard: Mapping[str, Any], state: Mapping[str, Any] | None = None) -> str:
     """Who said a heard line, as a model reads it: as the page named them (:func:`named`), or, for
     a line heard before names were kept, their kind's label and number."""
-    kind = shipped_kind(ThingKindReference(**heard["from_kind"]))
+    kind = kind_here(state, heard["from_kind"])
     if "from_name" in heard:
         return named(heard["from_name"], kind.document["label"])
     return f"the {kind.document['label']} (person {heard['from_number']})"
@@ -979,7 +983,7 @@ def _things_context(
         "line_characters_maximum": contract.value("line_characters_maximum"),
         "heard": [
             {
-                "from": _speaker_words(heard),
+                "from": _speaker_words(heard, state),
                 "to_you": heard["to"] == person["id"],
                 "line": heard["line"],
                 "tick": heard["tick"],
@@ -987,7 +991,7 @@ def _things_context(
             }
             for heard in person.get("heard", ())
         ],
-        **_being(person),
+        **_being(person, state),
         **_said(state, person),
         **_holding(state, person),
         **_noticed(state, document, person),
@@ -995,9 +999,10 @@ def _things_context(
     }
 
 
-def _being(person: Mapping[str, Any]) -> dict[str, Any]:
-    """Who the being is, as its kind says it in plain words: its label and summary."""
-    kind = kind_of(person)
+def _being(person: Mapping[str, Any], state: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Who the being is, as its kind says it in plain words: its label and summary (a made
+    kind's are its body's name and sentence, built from its figures)."""
+    kind = kind_of(person, state)
     return {"being": {"kind": kind.document["label"], "summary": kind.document["summary"]}}
 
 
@@ -1015,7 +1020,7 @@ def _said(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str, Any]
                 if entry["to_name"] is None
                 else named(
                     entry["to_name"],
-                    shipped_kind(ThingKindReference(**entry["to_kind"])).document["label"],
+                    kind_here(state, entry["to_kind"]).document["label"],
                 ),
                 "line": entry["line"],
                 "minutes_ago": _minutes_ago(state, entry["tick"]),
@@ -1034,7 +1039,7 @@ def _holding(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str, A
         return {}
     return {
         "holding": [
-            shipped_kind(ThingKindReference(**thing["kind"])).document["label"]
+            kind_here(state, thing["kind"]).document["label"]
             for thing in state["things"]
             if thing["held_by"] == person["id"]
         ]

@@ -301,6 +301,11 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         # What a town's people are made from: recorded by its first input alone, where it is.
         if "people" in document:
             fields.add("people")
+        # The run forms of the kinds its workspace keeps that a placed thing is of, and the
+        # placed things left out because theirs is gone: each stated only where there is one.
+        for made in ("kinds", "things_gone"):
+            if made in document:
+                fields.add(made)
     _require(set(document) == fields, "invalid society input fields")
     profile = document["profile"]
     _require(profile in NAVIGATION_PROFILES, "unsupported society input profile")
@@ -1496,9 +1501,9 @@ def routine_withheld(state: Mapping[str, Any], person: Mapping[str, Any]) -> fro
 
     if PURPOSEFUL_BY_KIND not in state.get("modules", ()) or "kind" not in person:
         return frozenset()
-    from exulanica.world.placed_things import ThingKindReference, shipped_kind
+    from exulanica.world.society_kinds import kind_here
 
-    kind = shipped_kind(ThingKindReference(**person["kind"]))
+    kind = kind_here(state, person["kind"])
     listed = {ability["key"] for ability in kind.document["abilities"]}
     return kind_gated_activities() - listed
 

@@ -67,6 +67,16 @@ from exulanica.world.society import (
 )
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_input_policy import THING_INPUTS
+from exulanica.world.society_kinds import (
+    KINDS_FIELD,
+    THINGS_GONE_FIELD,
+    is_made,
+    kind_here,
+    kinds_of,
+    reference_of,
+    reference_shape,
+    validate_kinds,
+)
 from exulanica.world.society_planner import (
     initial_purposeful_society,
     never_tired,
@@ -134,6 +144,8 @@ THING_REASONS: Final = frozenset(
         "placed_by_author",
         "moved_by_author",
         "removed_by_author",
+        # A placed being of a kind its workspace kept, once the workspace erased that kind.
+        "kind_erased",
         "society_full",
         "no_place_to_stand",
         "id_taken",
@@ -255,6 +267,7 @@ _VELOCITY_MM_S: Final = 100_000
 #: The size classes a being other than a person may walk or fly by: whole half metres up to the
 #: widest air column; the people's class (a 450 mm walking clearance) is stated by no field.
 _SIZE_CLASS_MM: Final = (500, 8_000, 500)
+#: A SHA-256 digest as a record states one: what a town's people are recorded by.
 _HEX64: Final = re.compile(r"[0-9a-f]{64}")
 
 
@@ -267,13 +280,49 @@ def _thing_id(world_id: str, placed_id: str) -> str:
     return str(uuid.uuid5(THING_NAMESPACE, f"{world_id}:{placed_id}"))
 
 
-def _reference(semantics: Mapping[str, Any]) -> dict[str, Any]:
-    return dict(semantics["reference"])
+def _reference(kind: Mapping[str, Any]) -> dict[str, Any]:
+    """The reference an input's entry names its kind by: a shipped kind's semantics state it, and
+    an entry of a kind its workspace keeps is that reference alone."""
+    return reference_of(kind) if is_made(kind) else dict(kind["reference"])
 
 
-def _label(kind: ThingKind | Mapping[str, Any]) -> str:
-    label = kind.label if isinstance(kind, ThingKind) else str(kind["label"])
+def _label(kind: ThingKind | Mapping[str, Any], document: Mapping[str, Any] | None = None) -> str:
+    """A kind's label as a name begins: a shipped kind's own, or, for an entry of a kind its
+    workspace keeps, the body name its run form in ``document`` states."""
+    if isinstance(kind, ThingKind):
+        label = kind.label
+    elif is_made(kind):
+        label = str(kind_here(document, kind).document["label"])
+    else:
+        label = str(kind["label"])
     return label[:1].upper() + label[1:]
+
+
+def _keep_kind(state: dict[str, Any], document: Mapping[str, Any], kind: Mapping[str, Any]) -> None:
+    """Before a being of a made kind comes, the state takes its run form from the input, so
+    everything that reads the being's kind from the state finds it."""
+    if not is_made(kind) or kind["sha256"] in kinds_of(state):
+        # A form stays as the state took it when the first being of its kind came.
+        return
+    form = kinds_of(document).get(kind["sha256"])
+    _require(form is not None, "an input states the run form of every made kind it places")
+    state[KINDS_FIELD] = dict(sorted({**kinds_of(state), kind["sha256"]: form}.items()))
+
+
+def _settle_kinds(state: dict[str, Any]) -> None:
+    """The state keeps the run forms of exactly the made kinds somebody or something here is of,
+    in digest order, and states none where nobody is: a form stays as the state took it when its
+    first being came, whatever a later input states."""
+    here = {
+        holder["kind"]["sha256"]
+        for holder in (*state["inhabitants"], *state["things"])
+        if is_made(holder["kind"])
+    }
+    held = kinds_of(state)
+    if here:
+        state[KINDS_FIELD] = {sha256: held[sha256] for sha256 in sorted(here)}
+    else:
+        state.pop(KINDS_FIELD, None)
 
 
 def _name(people: Sequence[Mapping[str, Any]], label: str) -> str:
@@ -713,7 +762,7 @@ def _place_beings(minute: _Minute, *, record: bool, before_population: bool = Fa
                     reason,
                     "not_placed",
                     person=None,
-                    name=_label(entry["kind"]),
+                    name=_label(entry["kind"], document),
                     details={
                         "kind": _reference(entry["kind"]),
                         "came_by": "placed",
@@ -722,12 +771,13 @@ def _place_beings(minute: _Minute, *, record: bool, before_population: bool = Fa
                 )
             continue
         point = list(nodes[node])
+        _keep_kind(state, document, entry["kind"])
         person = _newcomer(
             state,
             minute.seed,
             minute.document,
             identity=identity,
-            label=_label(entry["kind"]),
+            label=_label(entry["kind"], document),
             kind=_reference(entry["kind"]),
             came_by="placed",
             node_id=node,
@@ -759,12 +809,16 @@ def _reconcile(minute: _Minute) -> None:
     if document["availability"] != "available" or document["navigation"]["unavailable_reason"]:
         return
     wanted = {entry["placed_id"]: entry for entry in placed_beings(document)}
+    # The placed things the input leaves out because the kind each is of is gone: a being that
+    # was one of them leaves because its kind was erased, not because its author removed it.
+    erased = set(document.get(THINGS_GONE_FIELD, ()))
     for person in list(state["inhabitants"]):
         if person["came_by"] != "placed":
             continue
         entry = wanted.get(person["placed_id"])
         if entry is None or _reference(entry["kind"]) != person["kind"]:
-            minute.leave(person, "removed_by_author")
+            gone = entry is None and is_made(person["kind"]) and person["placed_id"] in erased
+            minute.leave(person, "kind_erased" if gone else "removed_by_author")
     nodes = {n["node_id"]: n["position_mm"] for n in document["navigation"]["nodes"]}
     for person in state["inhabitants"]:
         if person["came_by"] != "placed":
@@ -975,7 +1029,7 @@ def kind_allows(state: Mapping[str, Any], subject_id: str, decider_kind: str) ->
     if person is None or "kind" not in person:
         return True
     try:
-        kind = shipped_kind(ThingKindReference(**person["kind"]))
+        kind = kind_here(state, person["kind"])
     except (InvalidThingPlacement, TypeError):
         return False
     deciders = kind.document["deciders"]
@@ -1077,6 +1131,7 @@ def initial_things_society(
     # The author's beings first, where they were put; then the population steps aside from them.
     _place_beings(minute, record=False, before_population=True)
     _population_steps_aside(state, document)
+    _settle_kinds(state)
     validate_things_state(state)
     return state
 
@@ -1196,6 +1251,7 @@ def advance_things(
         _follow(minute, decisions)
     if _remembers(result):
         _remember(minute, decisions)
+    _settle_kinds(result)
     validate_things_state(result)
     return result, tuple(minute.events), tuple(bound)
 
@@ -1685,14 +1741,8 @@ def _point_shape(value: Any) -> bool:
 
 
 def _reference_shape(value: Any) -> bool:
-    return (
-        isinstance(value, dict)
-        and set(value) == {"kind", "version", "sha256"}
-        and isinstance(value["kind"], str)
-        and type(value["version"]) is int
-        and isinstance(value["sha256"], str)
-        and _HEX64.fullmatch(value["sha256"]) is not None
-    )
+    """A kind's reference of either shape: a shipped kind's, or a workspace's own by digest."""
+    return isinstance(value, dict) and reference_shape(value)
 
 
 _HEARD_FIELDS: Final = frozenset({"tick", "from", "from_kind", "from_number", "to", "line"})
@@ -1877,6 +1927,15 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
         except AbilityError as exc:
             raise ValueError(f"a society of things runs built modules only: {exc}") from exc
     people = state["inhabitants"]
+    # The run forms it keeps are exactly those of the made kinds somebody or something here is of.
+    validate_kinds(
+        state,
+        {
+            holder["kind"]["sha256"]
+            for holder in (*people, *state["things"])
+            if isinstance(holder.get("kind"), dict) and is_made(holder["kind"])
+        },
+    )
     ids = [person["id"] for person in people]
     _require(len(ids) == len(set(ids)), "a person is in a society once")
     ordinals = [person["ordinal"] for person in people]

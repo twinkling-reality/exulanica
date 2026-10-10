@@ -87,6 +87,12 @@ from exulanica.world.society_input_policy import (
     UNSUPPORTED_BEHAVIOUR,
     input_profile,
 )
+from exulanica.world.society_kinds import (
+    KINDS_FIELD,
+    THINGS_GONE_FIELD,
+    MadeKind,
+    made_reference,
+)
 from exulanica.world.society_place import ceil_distance
 from exulanica.world.society_planner import (
     CLEARANCE_MM,
@@ -969,6 +975,7 @@ def build_authored_ground_society_input_v5(
     standing: StandingPolicy,
     routine: PurposefulRoutine | None = None,
     workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
+    made_kinds: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compose a society of things' input, ``exulanica.society-composition/authored-ground-v5``.
 
@@ -979,7 +986,9 @@ def build_authored_ground_society_input_v5(
     offers a rest or a visit offers it at the places its kind states, turned with it, unless it is
     off the ground; and every placed thing not removed is listed with its kind's semantics, where
     it stands and, for a gate, where visitors arrive. A thing whose kind is not shipped at the
-    digest it names makes the input unavailable by name.
+    digest it names makes the input unavailable by name. A thing of a kind its workspace keeps is
+    read where ``made_kinds`` states that kind's run form, by its digest: it is listed by that
+    reference alone, a being that lives in the society, and the input states the run form once.
     """
     if arrival is not None:
         if (
@@ -1006,6 +1015,7 @@ def build_authored_ground_society_input_v5(
         arrival=arrival,
         workspace_obstacles=workspace_obstacles,
         things=True,
+        made_kinds=made_kinds,
     )
 
 
@@ -1028,19 +1038,25 @@ def thing_activities() -> tuple[tuple[str, str], ...]:
     )
 
 
-def things_in_region(version: AlternateVersion, ground: SocietyGround) -> list[PlacedThing]:
+def things_in_region(
+    version: AlternateVersion,
+    ground: SocietyGround,
+    made_kinds: Mapping[str, Mapping[str, Any]] | None = None,
+) -> list[PlacedThing]:
     """The version's placed things this society reads, in id order: each placed in its region,
     removed ones included, as its input's references bind them.
 
-    A thing of a kind its workspace keeps (a creature drafted from a person's words) is left out,
-    by name, whatever its region: a society reads shipped kinds alone and replays from its inputs
-    without the workspace's store, so such a thing stands where it was placed, is never one of the
-    society's, and never stops a society that runs beside it."""
+    A thing of a kind its workspace keeps (a creature drafted from a person's words) is read only
+    where ``made_kinds`` states that kind's run form (:mod:`exulanica.things.run_forms`), which
+    is all a society runs of it, and its workspace still holds the kind. One whose kind is gone
+    (erased, or erased after the thing was placed), or whose run form nobody stated, is left out,
+    by name, whatever its region: it is never one of the society's and never stops a society that
+    runs beside it."""
     return sorted(
         (
             thing
             for thing in version.things
-            if thing.region_id == ground.region_id and not _of_a_workspace_kind(thing)
+            if thing.region_id == ground.region_id and _read_by_a_society(thing, made_kinds)
         ),
         key=lambda value: value.thing_id,
     )
@@ -1051,18 +1067,82 @@ def _of_a_workspace_kind(thing: PlacedThing) -> bool:
     return isinstance(thing.kind, WorkspaceKindReference)
 
 
-def _thing_kinds(things: Sequence[PlacedThing]) -> tuple[dict[str, ThingKind], str | None]:
-    """The shipped kind of each placed thing not removed, by its id, or the reason the input is
-    unavailable: a thing whose kind is not shipped at the digest it names."""
-    kinds: dict[str, ThingKind] = {}
+def _read_by_a_society(
+    thing: PlacedThing, made_kinds: Mapping[str, Mapping[str, Any]] | None
+) -> bool:
+    if not _of_a_workspace_kind(thing):
+        return True
+    return made_kinds is not None and not thing.kind_gone and thing.kind.sha256 in made_kinds
+
+
+def made_things_gone(
+    version: AlternateVersion,
+    ground: SocietyGround,
+    made_kinds: Mapping[str, Mapping[str, Any]] | None,
+) -> list[str]:
+    """The placed ids of the things placed in the region and not removed whose kind, one their
+    workspace kept, is gone (erased, or erased after the thing was placed), in order: what an
+    input states as ``things_gone``, so a being that was one of them leaves because its kind was
+    erased. A thing whose kind the workspace still holds but whose run form nobody stated (its
+    plan or recipe no longer reads) is left out of the input and is not listed: its kind was not
+    erased. None where nobody stated the workspace's kinds."""
+    if made_kinds is None:
+        return []
+    return sorted(
+        {
+            thing.thing_id
+            for thing in version.things
+            if thing.region_id == ground.region_id
+            and _of_a_workspace_kind(thing)
+            and not thing.removed
+            and thing.kind_gone
+        }
+    )
+
+
+def _thing_kinds(
+    things: Sequence[PlacedThing],
+    made_kinds: Mapping[str, Mapping[str, Any]] | None = None,
+) -> tuple[dict[str, ThingKind | MadeKind], str | None]:
+    """The kind of each placed thing not removed, by its id: a shipped kind, or a made kind as
+    its run form states it; or the reason the input is unavailable: a thing whose kind is not
+    shipped at the digest it names."""
+    kinds: dict[str, ThingKind | MadeKind] = {}
     for thing in things:
         if thing.removed:
+            continue
+        if _of_a_workspace_kind(thing):
+            assert made_kinds is not None
+            kinds[thing.thing_id] = MadeKind(made_kinds[thing.kind.sha256], thing.kind.sha256)
             continue
         try:
             kinds[thing.thing_id] = shipped_kind(thing.kind)
         except InvalidThingPlacement:
             return {}, f"unknown_thing_kind:{thing.thing_id}"
     return kinds, None
+
+
+def _semantics(kind: ThingKind | MadeKind) -> Mapping[str, Any]:
+    """What a society reads of a kind: a shipped kind's semantics, a made kind's run form."""
+    return kind.document if isinstance(kind, MadeKind) else kind.semantics()
+
+
+def state_made_kinds(
+    document: dict[str, Any],
+    kinds: Mapping[str, ThingKind | MadeKind],
+    gone: Sequence[str],
+) -> None:
+    """An available things input states the run form of each made kind a thing it lists is of,
+    once, in digest order (``kinds``), and the placed things it leaves out because their kind is
+    gone (``things_gone``): each only where there is one, so an input with no made thing keeps the
+    bytes it always had."""
+    made = {
+        kind.sha256: dict(kind.document) for kind in kinds.values() if isinstance(kind, MadeKind)
+    }
+    if made:
+        document[KINDS_FIELD] = dict(sorted(made.items()))
+    if gone:
+        document[THINGS_GONE_FIELD] = list(gone)
 
 
 def _height_above_plane(ground: SocietyGround) -> Callable[[PlacedThing], int | None]:
@@ -1077,7 +1157,7 @@ def _height_above_plane(ground: SocietyGround) -> Callable[[PlacedThing], int | 
 
 def _things_one_by_one(
     things: Sequence[PlacedThing],
-    kinds: Mapping[str, ThingKind],
+    kinds: Mapping[str, ThingKind | MadeKind],
     ground: SocietyGround,
     version_id: uuid.UUID,
     height_above: Callable[[PlacedThing], int | None] | None = None,
@@ -1099,7 +1179,7 @@ def _things_one_by_one(
     for thing in things:
         if thing.removed:
             continue
-        semantics = kinds[thing.thing_id].semantics()
+        semantics = _semantics(kinds[thing.thing_id])
         if semantics["class"] != "object":
             continue
         body = semantics["body"]
@@ -1157,7 +1237,7 @@ def _arrival_point(semantics: Mapping[str, Any], thing: PlacedThing) -> list[int
 
 def _input_things(
     things: Sequence[PlacedThing],
-    kinds: Mapping[str, ThingKind],
+    kinds: Mapping[str, ThingKind | MadeKind],
     ground: SocietyGround,
     height_above: Callable[[PlacedThing], int | None] | None = None,
 ) -> list[dict[str, Any]]:
@@ -1169,10 +1249,12 @@ def _input_things(
     for thing in things:
         if thing.removed:
             continue
-        semantics = kinds[thing.thing_id].semantics()
+        kind = kinds[thing.thing_id]
+        semantics = _semantics(kind)
         entry = {
             "placed_id": thing.thing_id,
-            "kind": semantics,
+            # A made kind's entry names it by digest alone; its run form is stated once.
+            "kind": made_reference(kind.sha256) if isinstance(kind, MadeKind) else semantics,
             "position_mm": [thing.transform.x_mm, thing.transform.z_mm],
             "yaw_microradians": thing.transform.yaw_microradians,
             "arrival_mm": _arrival_point(semantics, thing),
@@ -1185,14 +1267,19 @@ def _input_things(
 
 
 def thing_dependency_refs(
-    version_id: uuid.UUID, things: Sequence[PlacedThing], kinds: Mapping[str, ThingKind]
+    version_id: uuid.UUID,
+    things: Sequence[PlacedThing],
+    kinds: Mapping[str, ThingKind | MadeKind],
 ) -> list[dict[str, str]]:
     """Bind every placed thing in the region, removed ones included, and the kind of each one that
-    is not removed, by its digest."""
+    is not removed, by its digest: a made kind as ``made_thing_kind``, named by that digest alone,
+    never by a key a person's words made."""
     refs: list[dict[str, str]] = []
     for thing in things:
         kind = kinds.get(thing.thing_id)
-        if kind is not None:
+        if isinstance(kind, MadeKind):
+            refs.append({"kind": "made_thing_kind", "identity": kind.sha256, "sha256": kind.sha256})
+        elif kind is not None:
             refs.append(
                 {
                     "kind": "thing_kind",
@@ -1226,6 +1313,7 @@ def _authored_ground_with_routine(
     arrival: ArrivalDescriptor | None = None,
     workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
     things: bool = False,
+    made_kinds: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     chosen = purposeful_routine() if routine is None else routine
     catalog = world_object_catalog()
@@ -1255,6 +1343,7 @@ def _authored_ground_with_routine(
         standing=standing,
         workspace_obstacles=workspace_obstacles,
         things=things,
+        made_kinds=made_kinds,
     )
     del document["document_sha256"]
     document["routine"] = chosen.binding()
@@ -1336,9 +1425,11 @@ def _authored_ground_input(
     standing: StandingPolicy,
     workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
     things: bool = False,
+    made_kinds: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The projection the second and later compositions share, with its digest, unvalidated:
-    with ``things``, the things composition's placed things too."""
+    with ``things``, the things composition's placed things too, those of a kind its workspace
+    keeps where ``made_kinds`` states the kind's run form."""
     if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
     validate_reviewed_affordances(reviewed_affordances)
@@ -1381,8 +1472,8 @@ def _authored_ground_input(
             workspace_obstacles=workspace_obstacles,
         )
     )
-    placed = things_in_region(version, ground) if things else []
-    thing_kinds, thing_refusal = _thing_kinds(placed)
+    placed = things_in_region(version, ground, made_kinds) if things else []
+    thing_kinds, thing_refusal = _thing_kinds(placed, made_kinds)
     refs.extend(thing_dependency_refs(version.version_id, placed, thing_kinds))
 
     targets: list[dict[str, Any]] = []
@@ -1452,6 +1543,8 @@ def _authored_ground_input(
         document["things"] = (
             [] if reason is not None else _input_things(placed, thing_kinds, ground)
         )
+        if reason is None:
+            state_made_kinds(document, thing_kinds, made_things_gone(version, ground, made_kinds))
     document["document_sha256"] = input_sha256(document)
     return document
 

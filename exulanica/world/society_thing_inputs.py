@@ -4,10 +4,15 @@ An ``exulanica.society-input/authored-ground-v5`` input lists every thing placed
 not removed, in id order (:mod:`exulanica.world.placed_things`). Each entry states what the thing's
 kind says it is and does, its semantics (:meth:`exulanica.things.kinds.ThingKind.semantics`, which
 never holds a look), where it stands on the ground, which way it faces, and, for a gate, the point
-visitors arrive at, turned with it. A thing that does not rest on the ground also states how high
-above the ground's elevation it stands (``height_mm``); one on the ground states none. The kind's
-semantics ride in the input, so a stored society replays from its inputs alone and never reads the
-kind library again.
+visitors arrive at, turned with it. An entry of a kind its workspace keeps (a creature drafted
+from a person's words) states that kind's reference alone, ``{source: "workspace", sha256}``, and
+the input states the kind's run form once, under ``kinds`` (:mod:`exulanica.things.run_forms`,
+:mod:`exulanica.world.society_kinds`): what a society runs of it, which holds no word a person
+wrote. A placed thing whose made kind its workspace no longer holds is left out, and the input
+names it, by its placed id, under ``things_gone``. A thing that does not rest on the ground also
+states how high above the ground's elevation it stands (``height_mm``); one on the ground states
+none. A kind's semantics or run form rides in the input, so a stored society replays from its
+inputs alone and never reads the kind library or a workspace's store again.
 
 What the society does with them is :mod:`exulanica.world.society_things`'s: a placed being lives
 there, a placed object is one of the society's things, and its obstacle and activity are already
@@ -24,6 +29,12 @@ from typing import Any, Final
 
 from exulanica.world.objects import MAX_YAW_MICRORADIANS
 from exulanica.world.placed_things import PLACED_THING_ID_PATTERN
+from exulanica.world.society_kinds import (
+    is_made,
+    reference_shape,
+    validate_kinds,
+    validate_things_gone,
+)
 
 __all__ = [
     "ENTRY_FIELDS",
@@ -162,6 +173,7 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
     if document["availability"] != "available" and things:
         raise ValueError("an unavailable input carries no things")
     names = []
+    made: set[str] = set()
     for entry in things:
         if not isinstance(entry, dict) or set(entry) - {OFF_GROUND_FIELD} != ENTRY_FIELDS:
             raise ValueError("invalid placed thing fields")
@@ -174,22 +186,30 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
         placed_id = entry["placed_id"]
         if not isinstance(placed_id, str) or _PLACED_ID.fullmatch(placed_id) is None:
             raise ValueError("invalid placed thing id")
-        _check_kind(entry["kind"])
+        if is_made(entry["kind"]):
+            # A kind its workspace keeps: its reference alone, its run form stated once below.
+            if not reference_shape(entry["kind"]):
+                raise ValueError("a placed thing of a workspace's own kind names it by digest")
+            made.add(entry["kind"]["sha256"])
+        else:
+            _check_kind(entry["kind"])
         if not _point(entry["position_mm"]):
             raise ValueError("invalid placed thing position")
         yaw = entry["yaw_microradians"]
         if type(yaw) is not int or not 0 <= yaw <= MAX_YAW_MICRORADIANS:
             raise ValueError("invalid placed thing yaw")
-        arrives = "arrive_through" in _offers(entry["kind"])
+        arrives = not is_made(entry["kind"]) and "arrive_through" in _offers(entry["kind"])
         if arrives != (entry["arrival_mm"] is not None) or (
             arrives and not _point(entry["arrival_mm"])
         ):
             raise ValueError("a gate states where visitors arrive, and nothing else does")
-        if entry["kind"]["class"] == "being" and arrives:
+        if _class(entry) == "being" and arrives:
             raise ValueError("a being is no gate")
         names.append(placed_id)
     if names != sorted(set(names)):
         raise ValueError("placed things must be unique and sorted")
+    validate_kinds(document, made)
+    validate_things_gone(document, set(names))
 
 
 def input_things(document: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
@@ -197,14 +217,19 @@ def input_things(document: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
     return document.get("things", ())
 
 
+def _class(entry: Mapping[str, Any]) -> str:
+    """Whether an entry's thing is a being or an object: a made kind is always a being's."""
+    return "being" if is_made(entry["kind"]) else str(entry["kind"]["class"])
+
+
 def placed_beings(document: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     """The beings the world's author placed, in id order: each lives in the society."""
-    return [entry for entry in input_things(document) if entry["kind"]["class"] == "being"]
+    return [entry for entry in input_things(document) if _class(entry) == "being"]
 
 
 def placed_objects(document: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     """The objects the world's author placed, in id order: the society's things."""
-    return [entry for entry in input_things(document) if entry["kind"]["class"] == "object"]
+    return [entry for entry in input_things(document) if _class(entry) == "object"]
 
 
 def arrival_points(document: Mapping[str, Any]) -> dict[str, list[int]]:

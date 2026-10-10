@@ -1654,7 +1654,8 @@ one only on a host that sets `EXULANICA_SOCIETY_OF_THINGS` on, and refuses it by
 rules, use their hands where a decider chooses or the world's owner asks (below), and follow
 another being where a person playing one chooses to (below); a person may play one of them
 ([decision roles](decision-roles-contract.md#a-person-playing-a-being)).
-Each of them names its kind by key, version and digest, and how it came: `populated` (the
+Each of them names its kind by key, version and digest (a being of a kind its workspace keeps,
+by that kind's digest alone: below), and how it came: `populated` (the
 people its ground's population brings, the purposeful genesis's own people with the same names and
 draws, of the kind the ground's catalog entry names, `population_kind`), `placed` (a being the
 world's author placed in the version) or `crossed` (a visitor from an outside program). At genesis
@@ -1679,6 +1680,33 @@ authored object's id can hold, so they never meet an authored object's. Every pl
 `placed_thing` dependency and each kind a `thing_kind` dependency by digest; a thing whose kind is
 not shipped at the digest it names makes the input unavailable (`unknown_thing_kind:<placed id>`). A society's inputs keep its arrival
 for its whole life and may move on to a later things composition, never back.
+
+**A being of a kind its workspace keeps.** A thing placed by a kind its workspace keeps (a creature
+drafted from a person's words, [things contract](things-contract.md#a-creature-in-a-society)) is a
+being of the society like any other. Its entry in `things` states `kind` as the reference
+`{"source": "workspace", "sha256"}` alone, and the input states that kind's run form once, under
+`kinds`, by the same digest, in digest order: what the society runs of it (its abilities, offers,
+deciders, routine weights, what it moves by, its body's figures and sockets) and its label and
+summary, which are built from those figures and hold no word a person wrote. `kinds` is stated only
+where the region holds such a thing, so every other input keeps its bytes, and each kind is a
+`made_thing_kind` dependency named by its digest. The state names the being's kind by the same
+reference and keeps the run forms of exactly the made kinds somebody here is of (`kinds`, stated
+only while one is here), as the state took each when its first being came. Events, heard lines and
+recollections name such a kind by that reference too. Everything that reads what a kind is reads
+it through one function (`kind_here` in `exulanica/world/society_kinds.py`): a shipped kind from
+the shipped library, at its digest, and a made kind from the run forms the record at hand carries;
+a made reference whose run form the record no longer states (a line heard from a creature erased
+since) reads as a kind that can do nothing, named by the body names catalog's noun. So a society
+replays from its inputs alone, and its history holds nothing an erasure of the creature has to
+remove. A placed thing whose kind its workspace no longer holds is left out of `things`, and the
+input names it under `things_gone` (placed ids, each the shape of one, in order, none of them a
+thing it lists; by thing,
+since one placed before an erasure stays gone though the same creature is kept again and another
+thing of that kind lives): a being that was one of them leaves in the things phase of the
+society's next minute (`thing_departed`, `kind_erased`), putting down what it holds, as a being
+its author removes does. Code from before
+these fields refuses an input carrying one, so a society that has taken such a being in cannot be
+read by an older release.
 
 **The modules it runs.** A society's first input records the ability modules it runs, by version
 (`modules`: sorted, each once, each a built row of
@@ -1792,7 +1820,8 @@ first, unchanged, and every event they record names v7; then the things phase:
 * placed beings follow the latest input: one an edit places arrives at the open node nearest where
   it was placed (`thing_arrived`, `placed_by_author`), one an edit moves is put where the edit says
   (`thing_moved`, `moved_by_author`), one an edit removes or replaces leaves (`thing_departed`,
-  `removed_by_author`); one that cannot be placed is refused once while its placement stands
+  `removed_by_author`), and one whose kind its workspace erased leaves for that reason
+  (`kind_erased`); one that cannot be placed is refused once while its placement stands
   (`arrival_refused`: `no_place_to_stand`, or `id_taken` where somebody or something here already
   has the id it would have) and tried again when it is moved; one refused because the society is
   full (`society_full`) is tried again every minute, silently, and comes when there is room; an
@@ -1985,7 +2014,8 @@ to_kind, line}`), so its decider is shown what it already said. A visitor its pr
 `quiet_minutes` only while that program has been quiet, and a being states `hands` only while a
 hands act its decider chose or the world's owner asked for waits to be done (`{ability, thing, with,
 since}`, with `asked` true for one asked for). A society states
-`modules` only where its first input recorded them.
+`modules` only where its first input recorded them, and `kinds` only while a being of a kind its
+workspace keeps is here.
 
 It runs no experiment, and its people are not sent away. A comparison of models runs an hour of it
 from its genesis, where nobody has crossed in, so it compares the world's own beings, scored by the

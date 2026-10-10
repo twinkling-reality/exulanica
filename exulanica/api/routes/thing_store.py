@@ -32,15 +32,21 @@ any byte is sent, so another workspace's thing, a withdrawn look and an absent o
     erases only its own; anyone else's ask is 403 ``kind_not_yours``. A row the database refuses
     is 409 ``kind_changed``, an installation sealed for a restore 409 ``restore_sealed``, and a
     workspace another transaction holds 409 ``busy`` with ``Retry-After``, as every route answers
-    it.
+    it. A society that runs a being of the creature is then told, as an authored edit tells it:
+    its next input leaves the thing out and the being leaves with its next minute, recorded as
+    ``kind_erased``; the society's own records are not touched, since they never held a word of
+    the creature. Asked again for a creature already erased, the route answers 404 and tells any
+    society that could not be told the first time.
 
 Each read needs a session (``world.read``), as the library does.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Any
 
+import psycopg
 from fastapi import APIRouter, Path, Request
 from fastapi.responses import JSONResponse, Response
 
@@ -62,6 +68,7 @@ from exulanica.world.thing_store import ThingStore, ThingStoreRefused
 __all__ = ["router"]
 
 router = APIRouter(prefix="/things", tags=["things"])
+_LOGGER = logging.getLogger(__name__)
 
 _DOCUMENT_HEADERS = {"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"}
 _GLB = "model/gltf-binary"
@@ -186,13 +193,69 @@ def erase_kind(
         )
     except ThingStoreRefused as refused:
         if refused.code == "kind_unknown":
+            # A creature erased before: a society that could not be told then (its input could
+            # not be composed, or the process stopped between the erasure and the telling) is
+            # told now. Telling is idempotent: an input that reads the same is not appended.
+            if _erased_here(connection, session, kind_sha256):
+                _tell_societies(request, connection, session, kind_sha256)
             return _absent()
         return JSONResponse(
             status_code=403 if refused.code == "kind_not_yours" else 409,
             content={"code": refused.code, "detail": refused.detail},
             headers=_DOCUMENT_HEADERS,
         )
+    _tell_societies(request, connection, session, kind_sha256)
     return Response(status_code=204)
+
+
+def _erased_here(connection: psycopg.Connection, session: Session, kind_sha256: str) -> bool:
+    """Whether this workspace recorded an erasure of the kind at that digest."""
+    row = connection.execute(
+        "select exists(select 1 from thing_erasure where workspace_id=%s and sha256=%s) as erased",
+        (session.workspace_id, kind_sha256),
+    ).fetchone()
+    return bool(row["erased"])
+
+
+def _tell_societies(
+    request: Request, connection: psycopg.Connection, session: Session, kind_sha256: str
+) -> None:
+    """After a creature's erasure, tell each society that runs a being of it.
+
+    Every version of this workspace that holds a society and a placed thing of the erased kind,
+    not removed, is told as an authored edit tells it (the application's hook, which composes the
+    society's next input): that input leaves the thing out and names it among those gone,
+    so the being leaves with the society's next minute, recorded as ``kind_erased``. Nothing is
+    deleted here and no record of the society changes: what a society recorded of the creature
+    never held a word of it (:mod:`exulanica.things.run_forms`), so its history stays whole.
+
+    The erasure stands whatever happens here: it has committed, and each version is told in a
+    transaction of its own. One that cannot be told (its input cannot be composed now, or its
+    society is busy) is passed by; its society loses the being at its next input, because the
+    composer leaves out a thing whose kind is gone whoever asks, and asking for the erasure again
+    tells it again (the route answers 404 as for any kind the workspace does not hold)."""
+    observer = getattr(request.app.state, "society_authored_edit", None)
+    if observer is None:
+        return
+    versions = connection.execute(
+        "select distinct t.version_id from world_alternate_thing t join world_society s "
+        "on s.workspace_id=t.workspace_id and s.world_id=t.world_id and s.version_id=t.version_id "
+        "where t.workspace_id=%s and t.kind_source='workspace' and t.kind_sha256=%s "
+        "and not t.removed order by t.version_id",
+        (session.workspace_id, bytes.fromhex(kind_sha256)),
+    ).fetchall()
+    for row in versions:
+        try:
+            with connection.transaction():
+                observer(connection, session, row["version_id"])
+        except Exception:
+            # Whatever a society's input does (it cannot be composed now, its place is still
+            # being made, its rows are locked), the erasure stands; only this telling is undone.
+            _LOGGER.warning(
+                "a society was not told of an erased creature; its next input leaves it out",
+                extra={"version_id": str(row["version_id"])},
+                exc_info=True,
+            )
 
 
 def _owns_workspace(request: Request, session: Session) -> bool:

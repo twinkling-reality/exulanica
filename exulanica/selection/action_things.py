@@ -490,8 +490,13 @@ def _society(
     beings = []
     for person in state["inhabitants"]:
         reference = person.get("kind")
+        # A being of a kind its workspace keeps is named by digest alone, with no key or version
+        # (exulanica.world.society_kinds): it is read here as a being of no shipped kind, named by
+        # the society's own name for it.
         kind = (
-            None if reference is None else _kinds().get((reference["kind"], reference["version"]))
+            None
+            if reference is None or "kind" not in reference or "version" not in reference
+            else _kinds().get((reference["kind"], reference["version"]))
         )
         came_by = person.get("came_by")
         x_mm, z_mm = (int(value) for value in person["position_mm"])

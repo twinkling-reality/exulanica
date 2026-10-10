@@ -35,7 +35,7 @@ from typing import Any, Final
 
 from exulanica.canonical import canonical_json
 from exulanica.things.catalogs import offers_of_version
-from exulanica.world.placed_things import ThingKindReference, shipped_kind
+from exulanica.world.society_kinds import kind_here
 
 __all__ = [
     "MORE_MAXIMUM",
@@ -82,12 +82,12 @@ def _distance(a: Sequence[int], b: Sequence[int]) -> int:
     return math.isqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
-def _kind(reference: Mapping[str, Any]) -> Any:
-    return shipped_kind(ThingKindReference(**reference))
+def _kind(state: Mapping[str, Any], reference: Mapping[str, Any]) -> Any:
+    return kind_here(state, reference)
 
 
-def _label(reference: Mapping[str, Any]) -> str:
-    return str(_kind(reference).document["label"])
+def _label(state: Mapping[str, Any], reference: Mapping[str, Any]) -> str:
+    return str(_kind(state, reference).document["label"])
 
 
 def _offers(kind: Any) -> list[str]:
@@ -99,11 +99,11 @@ def _metres(distance_mm: int) -> int:
     return round(distance_mm / 1000)
 
 
-def _who(person: Mapping[str, Any]) -> str:
+def _who(person: Mapping[str, Any], state: Mapping[str, Any] | None = None) -> str:
     """A being as the say and give options name it."""
     from exulanica.world.society_decision_contract import page_name
 
-    return page_name(person).lower()
+    return page_name(person, state).lower()
 
 
 def _doing(
@@ -111,6 +111,7 @@ def _doing(
     people: Mapping[str, Mapping[str, Any]],
     targets: Mapping[str, Mapping[str, Any]],
     routine: Any,
+    state: Mapping[str, Any] | None = None,
 ) -> str:
     """What a being is doing, in its routine's words: the activity at a place it is using, the
     routine's words for standing a while or talking (with whom), walking, or waiting."""
@@ -126,7 +127,11 @@ def _doing(
         activity = routine.activities.get(action["kind"])
         if activity is not None and activity.setting == "pair":
             partner = people.get((person.get("goal") or {}).get("partner_id") or "")
-            return activity.label if partner is None else f"{activity.label} with {_who(partner)}"
+            return (
+                activity.label
+                if partner is None
+                else f"{activity.label} with {_who(partner, state)}"
+            )
         if activity is not None:
             return str(activity.label)
     return "waiting"
@@ -198,7 +203,7 @@ def surroundings(
     held: dict[str, list[str]] = {}
     for thing in state["things"]:
         if thing["held_by"] is not None:
-            held.setdefault(thing["held_by"], []).append(_label(thing["kind"]))
+            held.setdefault(thing["held_by"], []).append(_label(state, thing["kind"]))
 
     beings = sorted(
         (_distance(me["position_mm"], other["position_mm"]), other["id"], other)
@@ -208,13 +213,13 @@ def surroundings(
     beings = [row for row in beings if row[0] <= terms.reach_mm]
     listed_beings = [
         {
-            "who": _who(other),
-            "kind": str(kind_of(other).document["label"]),
+            "who": _who(other, state),
+            "kind": str(kind_of(other, state).document["label"]),
             "metres": _metres(distance),
-            "doing": _doing(other, people, targets, routine),
+            "doing": _doing(other, people, targets, routine, state),
             "holding": held.get(other["id"], []),
             "from_elsewhere": other.get("came_by") == "crossed",
-            "hears_you": distance <= terms.hearing_reach_mm and _hears(kind_of(other)),
+            "hears_you": distance <= terms.hearing_reach_mm and _hears(kind_of(other, state)),
         }
         for distance, _, other in beings[: terms.beings_maximum]
     ]
@@ -226,7 +231,7 @@ def surroundings(
     things = [row for row in things if row[0] <= terms.reach_mm]
     listed_things = []
     for distance, _, thing in things[: terms.things_maximum]:
-        kind = _kind(thing["kind"])
+        kind = _kind(state, thing["kind"])
         listed_things.append(
             {
                 "what": str(kind.document["label"]),

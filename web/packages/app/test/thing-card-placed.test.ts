@@ -178,6 +178,13 @@ describe('origin words', () => {
   it('say where a kind came from by its origin class alone', () => {
     expect(kindCameWords('lantern', origin({}))).toBe('A lantern is one of Exulanica\'s own kinds.');
     expect(kindCameWords('dragon', origin({ class: 'drafted', by: { kind: 'model' } }))).toBe('A dragon is a kind a model drafted from words.');
+    // A drafted kind's origin names the model that drafted it (the creature drafter's provenance):
+    // the card says which open model, by the name the server reads for it where it gave one.
+    const drafted = origin({ class: 'drafted', by: { kind: 'model', provider: 'nebius_token_factory', model_id: 'nvidia/nemotron-3-super-120b-a12b' } });
+    expect(drafted.model).toEqual({ provider: 'nebius_token_factory', modelId: 'nvidia/nemotron-3-super-120b-a12b' });
+    expect(kindCameWords('dragon', drafted)).toBe('A dragon is a kind the open model nvidia/nemotron-3-super-120b-a12b drafted from words.');
+    expect(kindCameWords('dragon', drafted, 'Nemotron 3 Super')).toBe('A dragon is a kind the open model Nemotron 3 Super drafted from words.');
+    expect(origin({}).model).toBeNull();
     expect(kindCameWords('crate', origin({ class: 'imported', sources: [{ reference: 'https://example.org/crate' }] })))
       .toBe('A crate is a kind imported from example.org.');
   });

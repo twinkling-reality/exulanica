@@ -19,6 +19,7 @@ import type { CharacterSubject } from '@exulanica/atlas-core';
 import { CHARACTER_RENDERABLE_TAG } from '../character/renderable.js';
 import type { CrowdFigures } from '../society/crowd.js';
 import type { CrowdPose, CrowdRenderable, CrowdRenderableFactory, InhabitantIdentity, SocietyInhabitantSnapshot } from '../society/types.js';
+import { isMadeKind } from '../society/types.js';
 import type { ThingFigureMaker } from './figure-maker.js';
 import { refusalOf } from './figure-maker.js';
 import { PresenceFigure, facingOfYaw, type ThingFigure } from './figures.js';
@@ -134,22 +135,25 @@ export class ThingCrowdFigures implements CrowdFigures {
     const kind = person.kind;
     if (kind === undefined) return null;
     const library = this.options.maker.library;
-    const listed = library.list.kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256);
+    // A kind its workspace keeps is named by its digest alone: the maker asks the workspace for
+    // it, and with no look chosen draws its kind's first look, its sketch.
+    const made = isMadeKind(kind);
+    const listed = made ? undefined : library.list.kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256);
     const look = this.options.lookOf?.(person) ?? (listed === undefined ? null : listed.looks[0] ?? null);
     const lookKey = look === null ? 'none' : `${look.key}/${look.version}/${look.sha256}`;
     // A person whose look is the people catalog's is one of the world's people, drawn as today.
     if (this.catalogLooks.has(lookKey)) return null;
-    const key = `${kind.kind}/${kind.version}/${kind.sha256}|${lookKey}`;
+    const key = `${made ? 'workspace' : `${kind.kind}/${kind.version}`}/${kind.sha256}|${lookKey}`;
     const factory: CrowdRenderableFactory = (_device, parent, identity) => {
       const renderable = new ThingCrowdRenderable(parent, identity, (miss) => this.missed.set(miss.subjectId, miss), async (root, stale) => {
-        const made = await this.options.maker.make(root, {
+        const figure = await this.options.maker.make(root, {
           name: `thing:${identity.inhabitantId}`,
           thingId: identity.inhabitantId,
-          kind: { key: kind.kind, version: kind.version, sha256: kind.sha256 },
+          kind: isMadeKind(kind) ? { source: 'workspace', sha256: kind.sha256 } : { key: kind.kind, version: kind.version, sha256: kind.sha256 },
           look,
         }, stale);
-        if (made !== null) this.missed.delete(identity.inhabitantId);
-        return made?.figure ?? null;
+        if (figure !== null) this.missed.delete(identity.inhabitantId);
+        return figure?.figure ?? null;
       });
       this.made.set(identity.inhabitantId, renderable);
       return renderable;

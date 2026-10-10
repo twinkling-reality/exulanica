@@ -9,12 +9,34 @@ export type SocietyProfile =
   | 'exulanica-society/v5'
   | 'exulanica-society/v7';
 
-/** A thing kind by key, version and digest, as a society of things names it: never a look. */
-export interface ThingKindReference {
+/** A shipped thing kind by key, version and digest, as a society of things names it: never a look. */
+export interface ShippedThingKindReference {
   readonly kind: string;
   readonly version: number;
   readonly sha256: string;
+  readonly source?: undefined;
 }
+
+/**
+ * A kind its workspace keeps (a creature drafted from a person's words), as a society of things
+ * names it: by its document's digest alone, never by a key its maker's words made. What the
+ * society runs of it is its run form, which the state carries under `kinds`; what it is called
+ * and drawn as is asked of the workspace's store by this digest.
+ */
+export interface MadeThingKindReference {
+  readonly source: 'workspace';
+  readonly sha256: string;
+  /** Never stated: a kept kind's key and version are its workspace's, made from a person's words. */
+  readonly kind?: undefined;
+  readonly version?: undefined;
+}
+
+/** How a society of things names a kind: a shipped one, or one its workspace keeps. */
+export type ThingKindReference = ShippedThingKindReference | MadeThingKindReference;
+
+/** Whether a society names this kind as its workspace's own, by digest alone. */
+export const isMadeKind = (kind: ThingKindReference): kind is MadeThingKindReference =>
+  'source' in kind && kind.source === 'workspace';
 
 /**
  * One of a society of things' things (v7): an object its author placed, standing where the version

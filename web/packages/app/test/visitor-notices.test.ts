@@ -7,7 +7,7 @@
 // kinds' own (assets/catalogs/things).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { departedNowWords, visitorNotice, VisitorNoticeWatch, type VisitorNoticeWords } from '../src/composition/visitor-notices.js';
+import { departedNowWords, isMadeKind, kindKey, kindOf, libraryKind, sameKind, visitorNotice, VisitorNoticeWatch, type VisitorNoticeWords } from '../src/composition/visitor-notices.js';
 import type { SocietyEvent } from '../src/society-api.js';
 import type { DoorBridge } from '../src/door-bridges-api.js';
 
@@ -106,5 +106,30 @@ describe('the watch over a society\'s events', () => {
     watch.see([]);
     const left = event('thing_departed', 'visitor-1', 6, 'sent_home', { kind: ref(KNIGHT), came_by: 'crossed', placed_id: null, carried: [] });
     expect(watch.take('society', [left])).toEqual([{ event: left, bridgeKey: 'blockgame' }]);
+  });
+});
+
+describe('a kind as a society names it', () => {
+  const shipped = { kind: 'knight', version: 2, sha256: 'a'.repeat(64) };
+  const made = { source: 'workspace' as const, sha256: 'd'.repeat(64) };
+
+  it('is read in either shape: a shipped kind by key, version and digest, a kept one by digest alone', () => {
+    expect(kindOf(shipped)).toEqual(shipped);
+    expect(kindOf(made)).toEqual(made);
+    // A kept kind states no key: one that does is not that shape, and half a reference is none.
+    expect(kindOf({ source: 'workspace' })).toBeNull();
+    expect(kindOf({ kind: 'knight', sha256: 'a'.repeat(64) })).toBeNull();
+    expect(isMadeKind(kindOf(made)!)).toBe(true);
+    expect(isMadeKind(kindOf(shipped)!)).toBe(false);
+  });
+
+  it('is kept and asked for by what names it', () => {
+    expect(kindKey(shipped)).toBe(`knight/2/${'a'.repeat(64)}`);
+    expect(kindKey(made)).toBe(`workspace/${'d'.repeat(64)}`);
+    expect(sameKind(made, { source: 'workspace', sha256: 'd'.repeat(64) })).toBe(true);
+    expect(sameKind(made, shipped)).toBe(false);
+    // The library is asked for a shipped kind by key, version and digest, a kept one by its digest.
+    expect(libraryKind(shipped)).toEqual({ key: 'knight', version: 2, sha256: 'a'.repeat(64) });
+    expect(libraryKind(made)).toEqual({ source: 'workspace', sha256: 'd'.repeat(64) });
   });
 });

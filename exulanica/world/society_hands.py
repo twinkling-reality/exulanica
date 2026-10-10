@@ -28,8 +28,8 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from exulanica.abilities.registry import HANDS, ability_module, recorded_row
-from exulanica.things.catalogs import Socket, thing_catalogs
-from exulanica.world.placed_things import ThingKindReference, shipped_kind
+from exulanica.things.catalogs import Socket
+from exulanica.world.society_kinds import kind_here, sockets_of
 
 __all__ = [
     "ACTS",
@@ -165,8 +165,8 @@ def acts_offered(
     return found
 
 
-def _kind(reference: Mapping[str, Any]) -> Any:
-    return shipped_kind(ThingKindReference(**reference))
+def _kind(state: Mapping[str, Any], reference: Mapping[str, Any]) -> Any:
+    return kind_here(state, reference)
 
 
 def _abilities(kind: Any) -> frozenset[str]:
@@ -178,8 +178,7 @@ def _offers(kind: Any) -> Mapping[str, Mapping[str, Any]]:
 
 
 def _sockets(kind: Any) -> tuple[Socket, ...]:
-    plan = thing_catalogs().plans.get(str(kind.document["body"]["plan"]))
-    return () if plan is None else plan.sockets
+    return sockets_of(kind)
 
 
 def _length_mm(kind: Any) -> int:
@@ -206,11 +205,11 @@ def socket_of_held(state: Mapping[str, Any], thing: Mapping[str, Any]) -> str | 
         return None
     held = [other for other in state["things"] if other["held_by"] == holder["id"]]
     taken = {other["socket"] for other in held if other.get("socket") is not None}
-    sockets = _sockets(_kind(holder["kind"]))
+    sockets = _sockets(_kind(state, holder["kind"]))
     for other in held:
         if other.get("socket") is not None:
             continue
-        length = _length_mm(_kind(other["kind"]))
+        length = _length_mm(_kind(state, other["kind"]))
         found = next(
             (
                 socket.key
@@ -239,7 +238,7 @@ def _free_socket(state: Mapping[str, Any], being: Mapping[str, Any], thing_kind:
     return next(
         (
             socket.key
-            for socket in _sockets(_kind(being["kind"]))
+            for socket in _sockets(_kind(state, being["kind"]))
             if socket.key not in taken and length <= socket.length_mm_maximum
         ),
         None,
@@ -286,7 +285,7 @@ def _acts_within(
     between = reach if between is None else between
     if "kind" not in being:
         return []
-    abilities = _abilities(_kind(being["kind"])) & set(ACTS)
+    abilities = _abilities(_kind(state, being["kind"])) & set(ACTS)
     if not abilities:
         return []
     here = being["position_mm"]
@@ -295,7 +294,7 @@ def _acts_within(
     for thing in state["things"]:
         if thing["id"] in taken:
             continue
-        thing_kind = _kind(thing["kind"])
+        thing_kind = _kind(state, thing["kind"])
         holder = thing["held_by"]
         if holder is None:
             if "pick_up" not in abilities or "holdable" not in _offers(thing_kind):
@@ -315,7 +314,7 @@ def _acts_within(
                     if other["id"] == being["id"]:
                         continue
                     distance = _distance(here, other["position_mm"])
-                    if distance > between or "receive" not in _offers(_kind(other["kind"])):
+                    if distance > between or "receive" not in _offers(_kind(state, other["kind"])):
                         continue
                     socket = _free_socket(state, other, thing_kind)
                     if socket is not None:
@@ -331,7 +330,7 @@ def _acts_within(
             if (
                 distance <= between
                 and socket is not None
-                and "let_take" in _offers(_kind(other["kind"]))
+                and "let_take" in _offers(_kind(state, other["kind"]))
             ):
                 found.append(HandsAct("take", being["id"], thing["id"], holder, socket, distance))
     return sorted(

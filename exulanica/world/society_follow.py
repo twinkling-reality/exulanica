@@ -24,7 +24,7 @@ from collections.abc import Collection, Mapping, Sequence
 from typing import Any, Final
 
 from exulanica.abilities.registry import AbilityModule, recorded_row
-from exulanica.world.placed_things import ThingKindReference, shipped_kind
+from exulanica.world.society_kinds import kind_here
 
 __all__ = [
     "FOLLOW_EVENT_KINDS",
@@ -52,17 +52,20 @@ def runs_follow(state: Mapping[str, Any]) -> bool:
     return follow_row(state) is not None
 
 
-def _kind_document(reference: Mapping[str, Any]) -> Mapping[str, Any]:
-    return shipped_kind(ThingKindReference(**reference)).document
-
-
-def followable(follower: Mapping[str, Any], other: Mapping[str, Any]) -> bool:
-    """Whether ``follower``'s kind lists follow and ``other``'s offers to be followed."""
+def followable(
+    follower: Mapping[str, Any],
+    other: Mapping[str, Any],
+    state: Mapping[str, Any] | None = None,
+) -> bool:
+    """Whether ``follower``'s kind lists follow and ``other``'s offers to be followed, each kind
+    read as the society whose ``state`` is at hand reads it."""
     if "kind" not in follower or "kind" not in other or follower["id"] == other["id"]:
         return False
-    follows = any(a["key"] == "follow" for a in _kind_document(follower["kind"])["abilities"])
-    offered = any(o["key"] == "be_followed" for o in _kind_document(other["kind"])["offers"])
-    return follows and offered
+    abilities = kind_here(state, follower["kind"]).document["abilities"]
+    offers = kind_here(state, other["kind"]).document["offers"]
+    return any(a["key"] == "follow" for a in abilities) and any(
+        o["key"] == "be_followed" for o in offers
+    )
 
 
 def _distance(a: Sequence[int], b: Sequence[int]) -> int:
@@ -120,7 +123,7 @@ def follow_goal_policy(
     row = follow_row(state)
     people = {person["id"]: person for person in state["inhabitants"]}
     follower, target = people.get(subject), people.get(target_id)
-    if row is None or follower is None or target is None or not followable(follower, target):
+    if row is None or follower is None or target is None or not followable(follower, target, state):
         return "thing_gone"
     within = row.value("follow_distance_mm")
     idle = {"allowed_target_ids": [], "wait": True} if at_choice_point(follower) else None

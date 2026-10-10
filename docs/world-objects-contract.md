@@ -980,10 +980,14 @@ again does not bring that thing back), the thing is gone. The version document t
 `"gone": true`, which is no part of the version's state or digest; nothing draws it, a move is
 refused as `410 thing_kind_erased`, and a removal or an undo still stands. Gone asks only whether
 the workspace holds the kind's row: a kind the drawing later cannot read stays present and is
-drawn as a miss. A society of things leaves such a thing out of its input by name, whatever its
-region: a society reads shipped kinds alone and replays without the workspace's store, so the thing
-stands where it was placed, stops no society and blocks no one (its beings walk through it), and
-whether a new society over a saved world is a society of things counts shipped kinds alone.
+drawn as a miss. A society of things takes a thing of a kind its workspace holds in as a being
+([a creature in a society](things-contract.md#a-creature-in-a-society)): its input names the kind
+by that digest alone and states once what the society runs of it, which holds no word a person
+wrote, so the society still replays without the workspace's store. A thing whose kind is gone is
+left out of the input, and the input names the thing among those gone, so a being that was it
+leaves the society that minute. Whether a new society over a saved world is a society of things counts a
+thing of a kind its workspace holds exactly as it counts a shipped one, and a thing whose kind is
+gone not at all.
 
 A placed thing's id is the author's own text, and it stays in the row, the edit log and the state
 digest after its kind is erased, so a creature's id is never made from its label or the person's

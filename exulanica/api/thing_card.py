@@ -28,6 +28,7 @@ from exulanica.world.errors import UnknownWorldResource
 from exulanica.world.placed_things import ThingKindReference, shipped_kind
 from exulanica.world.society_decision_contract import person_role
 from exulanica.world.society_engines import society_engine
+from exulanica.world.society_kinds import is_made, kind_here
 from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
 from exulanica.world.society_planner import routine_withheld
 from exulanica.world.society_repository import SocietyRepository
@@ -101,6 +102,16 @@ def _card(
         raise UnknownWorldResource("no such thing in this version's society")
     held = person if person is not None else thing
     assert held is not None
+    if person is not None and is_made(person["kind"]):
+        # A being of a kind its workspace keeps: what it does is the society's, as for anybody,
+        # and what it is called is the workspace's store's.
+        decider = _decider(
+            connection, services, workspace_id, world_id, version_id, state, person, reader
+        )
+        made = _made_card(
+            connection, workspace_id, snapshot, person, decider, said=said, left_out=left_out
+        )
+        return made, held
     kind = shipped_kind(ThingKindReference(**held["kind"]))
     runs = list(recorded_modules(state))
     hands = recorded_row(runs, "hands") is not None
@@ -148,6 +159,109 @@ def _card(
     return card, held
 
 
+def _made_card(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    snapshot: Mapping[str, Any],
+    person: Mapping[str, Any],
+    decider: Mapping[str, Any],
+    *,
+    said: Sequence[Mapping[str, Any]],
+    left_out: int,
+) -> dict[str, Any]:
+    """The card of a being of a kind its workspace keeps (a creature drafted from words).
+
+    What it can do, where it is, what it holds, who decides for it and what it said are the
+    society's, read from the run form its state carries, as for any being. What it is called is
+    the workspace's: the label and summary its maker's words gave it, the open model that drafted
+    it and the sketch it wears are read here from the workspace's store by the digest the state
+    names, on the caller's connection, and never from the society. Where the workspace no longer
+    holds the kind (the creature was erased; the being leaves with the society's next minute) the
+    card says so and names it only by its body, as the society does."""
+    state = snapshot["state"]
+    sha256 = str(person["kind"]["sha256"])
+    run = kind_here(state, person["kind"])
+    runs = list(recorded_modules(state))
+    hands = recorded_row(runs, "hands") is not None
+    kept = ThingStore(connection, workspace_id, None).kind_by_digest(sha256)
+    drafted_by = None
+    sketch = None
+    if kept is not None:
+        by = (kept.document["origin"] or {}).get("by") or {}
+        if by.get("kind") == "model":
+            drafted_by = {
+                "provider": by["provider"],
+                "model_id": by["model_id"],
+                "name": load_manifest().model_name(str(by["model_id"])),
+            }
+        first = next(iter(kept.document["looks"]), None)
+        if first is not None:
+            sketch = admitted_look_by_digest(connection, workspace_id, first["sha256"])
+    look: dict[str, Any] | None = None
+    looks: list[dict[str, Any]] = []
+    if sketch is not None:
+        look = {
+            "source": "workspace",
+            "sha256": sketch.sha256,
+            "label": sketch.label,
+            "look_kind_words": _look_kind_words().get(sketch.look_kind),
+            "chosen_by_owner": False,
+            "origin": sketch.document.get("origin"),
+        }
+        looks = [
+            {
+                "source": "workspace",
+                "sha256": sketch.sha256,
+                "label": sketch.label,
+                "licence": _licence(sketch),
+                "authors": list((sketch.document.get("origin") or {}).get("authors", ())),
+                "preview": None,
+            }
+        ]
+    return {
+        "profile": THING_CARD_PROFILE,
+        "thing_id": person["id"],
+        "subject_id": person["id"],
+        # The society's own name for it: its body's, numbered.
+        "label": person["display_name"],
+        "came_by": person["came_by"],
+        "kind": {
+            "source": "workspace",
+            "sha256": sha256,
+            "held": kept is not None,
+            "label": run.document["label"] if kept is None else kept.document["label"],
+            "summary": run.document["summary"] if kept is None else kept.document["summary"],
+            "class": "being",
+            "body": {
+                "plan": None,
+                "name": run.document["label"],
+                "summary": run.document["summary"],
+            },
+            "drafted_by": drafted_by,
+        },
+        "runs": runs,
+        "abilities": _abilities(run, runs),
+        "offers": _offers(run, runs, routine_withheld(state, person)),
+        "where": _where(person, True),
+        "holding": _holding(state, str(person["id"])) if hands else None,
+        "decider": dict(decider),
+        "look": look,
+        "looks": looks,
+        # Who made the kind, and nothing of the words it was made from.
+        "kind_origin": None
+        if kept is None
+        else {"class": (kept.document["origin"] or {}).get("class"), "by": drafted_by},
+        "crossing": None,
+        "lines": _lines(said),
+        **(
+            {"lines_left_out": {"count": left_out, "reason": "unavailable_society_input"}}
+            if left_out
+            else {}
+        ),
+        "society": {"tick": int(state["tick"]), "state_sha256": snapshot["state_sha256"]},
+    }
+
+
 def choose_look(
     connection: psycopg.Connection,
     services: Services,
@@ -175,6 +289,11 @@ def choose_look(
         thing_id=thing_id,
         reader=actor,
     )
+    if card["kind"].get("source") == "workspace":
+        # A creature its workspace keeps wears its sketch, its only look, until another is made.
+        raise ThingLookRefused(
+            "look_unfit", "a creature made from words wears only its sketch: no other look is made"
+        )
     chosen = check_crossing_look(
         {key: card["kind"][key] for key in ("kind", "version", "sha256")},
         look,
@@ -278,7 +397,7 @@ def _holding(state: Mapping[str, Any], holder: str) -> list[dict[str, Any]]:
     return [
         {
             "thing_id": thing["id"],
-            "label": shipped_kind(ThingKindReference(**thing["kind"])).document["label"],
+            "label": kind_here(state, thing["kind"]).document["label"],
             "socket": thing.get("socket"),
         }
         for thing in state["things"]

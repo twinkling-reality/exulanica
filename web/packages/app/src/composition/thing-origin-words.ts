@@ -70,15 +70,21 @@ export function creditOf(origin: OriginRecord): CardLink | { readonly text: stri
   return href === null ? { text, href: null } : { text, href };
 }
 
-/** Where a kind of thing came from, after "You placed it here." */
-export function kindCameWords(label: string, origin: OriginRecord): string {
+/**
+ * Where a kind of thing came from, after "You placed it here." A kind a model drafted from words
+ * names that model: by `draftedBy`, the name the server reads for it, or else by the model id its
+ * own origin records, so the open model behind a made creature is always said.
+ */
+export function kindCameWords(label: string, origin: OriginRecord, draftedBy: string | null = null): string {
   const named = withArticle(label);
   const a = named.charAt(0).toUpperCase() + named.slice(1);
   switch (origin.class) {
     case 'authored':
       return origin.by === 'project' ? `${a} is one of Exulanica's own kinds.` : `${a} is a kind made in this workspace.`;
-    case 'drafted':
-      return `${a} is a kind a model drafted from words.`;
+    case 'drafted': {
+      const model = draftedBy ?? origin.model?.modelId ?? null;
+      return model === null ? `${a} is a kind a model drafted from words.` : `${a} is a kind the open model ${model} drafted from words.`;
+    }
     case 'generated':
       return `${a} is a kind a model generated.`;
     case 'uploaded':

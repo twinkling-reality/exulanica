@@ -3,8 +3,8 @@
 Status: **THING KINDS, BODY PLANS, ABILITIES, OFFERS, LOOKS, THE ORIGIN RECORD AND TRANSLATION
 MANIFESTS ARE DATA HELD TO THEIR CHECKS, A WORLD'S AUTHOR PLACES THINGS BY THEIR KIND, THE SOCIETY OF
 THINGS LIVES WITH THEM AND ITS BEINGS SAY LINES AND LEAVE BY THEIR DECIDERS' CHOICE, A CREATURE'S BODY
-PLAN, SKETCH AND KIND ARE BUILT FROM A DRAFTED BODY RECIPE, AND THE BROWSER DRAWS A VERSION'S PLACED
-THINGS BY THEIR LOOKS**.
+PLAN, SKETCH AND KIND ARE BUILT FROM A DRAFTED BODY RECIPE, A CREATURE ITS WORKSPACE KEEPS LIVES IN
+THE SOCIETY OF THINGS AS A BEING, AND THE BROWSER DRAWS A VERSION'S PLACED THINGS BY THEIR LOOKS**.
 
 A thing is anything addressable in a world: a knight, a lantern spirit, a sword, a well, a gate, a
 visitor that came in from another program. What a kind of thing is and can do is one typed,
@@ -39,6 +39,7 @@ records the choice and the alternatives it rejected.
 - [Lines](#lines)
 - [The kinds and looks this repository ships](#the-kinds-and-looks-this-repository-ships)
 - [Creatures: bodies drafted from words](#creatures-bodies-drafted-from-words)
+- [A creature in a society](#a-creature-in-a-society)
 - [A workspace's own things](#a-workspaces-own-things)
 - [Drawing](#drawing)
 - [What is not built](#what-is-not-built)
@@ -90,8 +91,10 @@ three: a world's author places one by its kind in a version's authored plane
 ([world objects contract, section 14](world-objects-contract.md#14-placed-things)), a being only
 where its kind's deciders allow the routine. A kind its workspace keeps (below) is placed by its
 digest alone, never by its key, which a person's words may have made. What a society
-is given of a kind is `ThingKind.semantics()`: every field but `looks`, `origin`, `ext` and
-`summary`, with the kind's reference, so no look reaches a society through its kind.
+is given of a shipped kind is `ThingKind.semantics()`: every field but `looks`, `origin`, `ext` and
+`summary`, with the kind's reference, so no look reaches a society through its kind. What it is
+given of a kind its workspace keeps is that kind's run form
+([a creature in a society](#a-creature-in-a-society)), which holds no word of it.
 
 ### Refusals
 
@@ -751,6 +754,94 @@ restore from it brings them back into the live job until the draft is played or 
 installation's startup ends it. A draft of a workspace that no process knows any more (no token,
 account or list names it) waits with its words until one does.
 
+## A creature in a society
+
+A creature its workspace keeps lives in a society of things as any being does
+([society contract](synthetic-society-contract.md#the-society-of-things-v7)): placed by its kind's
+digest, it arrives at the open node nearest where it was put, walks, rests, visits, stands and
+talks by the routine as far as its kind lists each, says lines and uses what it holds with where a
+decider chooses, may be decided for by a model or played by a person where its kind allows, and
+leaves when its author removes it. Nothing in the kind changes for this, so every creature a
+workspace already keeps lives when it is placed.
+
+**The run form.** A society never holds a kept kind's document. The kind's label, key and summary,
+its plan's title and its recipe's appearance are words drafted from a person's, which an erasure
+promises gone at once ([below](#a-workspaces-own-things)), and a society's records are bound to
+each other by digest and cannot be blanked in part. What a society runs of a kept kind is its
+**run form**, `exulanica.thing-kind-run/v1`
+([`run_forms.py`](../exulanica/things/run_forms.py)), built by code from the kept kind, the drafted
+plan it names by digest and the recipe that plan was built from, each read again from the
+workspace's store (`ThingStore.run_form`):
+
+| Field | Holds |
+| --- | --- |
+| `reference` | `{"source": "workspace", "sha256"}`: the digest of the kind's document alone |
+| `class` | `being` |
+| `body` | the plan's digest; the kind's four figures (`extent_mm`); the plan's reach and its sockets by key, how many each holds and how long and thick a thing; the recipe's posture, spine, heads, limbs by role with their counts and segments, tail, what it holds with and its colours, each a number or a body grammar name |
+| `moves`, `abilities`, `offers`, `deciders` | as the kind states them |
+| `routine` | the kind's weights, and the kinds whose holders it follows where they are shipped kinds |
+| `label`, `summary`, `named_by` | its body name and its body sentence, and the names catalog that gave them (`body-names/v1`) |
+
+It is written field by field, never the kind with fields taken out, and it never holds the kind's
+key, version, label, summary or origin, the plan's name or title, the recipe's appearance, a look,
+or a digest of words. Its reader (`read_run_form`) holds every string to a digest, a movement
+module the body grammar's movements name, a socket's key, or a name of the body grammar or the
+things catalogs; holds every parameter's name to what its ability or offer declares (a movement
+module declares none); bounds every list by its catalog; and holds the label and the summary to
+exactly what the body's own figures give under the names catalog `named_by` states. So no field of
+a run form can carry free text, whoever composed it. The naming functions and the reader are frozen
+with the profile and the names catalog version a form states: a stored form is read by them as
+written. A later run
+form is a new profile beside this one, and a society keeps the one its input recorded.
+
+**Named by its body.** [`body-names.v1.json`](../assets/catalogs/things/body-names.v1.json) states
+how a body is named and described, each entry with its reason. A body name is at most two features
+in rank order (heads past one, with how many; wings; legs, with how many; tentacles; arms; fins; a
+long body with no legs) and the noun: "winged four legged creature", "three headed four legged
+creature", "long bodied creature". A body sentence states its length and height in metres, its
+parts by count, a tail where it has one, whether it moves over the ground and what it carries with:
+"A creature about 12 m long and 2.6 m high with one head, two wings, four legs and a tail. It moves
+over the ground. It carries a thing in its jaws." The society names the being by its body name,
+numbered from the second present as any kind's beings are, its summaries and every option naming
+it say that name, and a decider asked for it is told that name and that sentence as what it is.
+Two different creatures may share a body name. The name and the summary its maker's words gave it
+are the workspace's alone to show: the page asks the workspace's store for the kind by the digest
+the state names and says its label over the being, in the headers of the lines it says and hears,
+and on its card, and says nothing of it once the store no longer answers.
+
+**Its card.** The card of such a being
+(`GET /world/versions/{version_id}/society/things/{thing_id}`) states what it can do here, where
+it is, what it holds, who decides for it (with whether a model may be chosen) and the lines it
+said, from the society, as any being's card does. Its `kind` states `source` `workspace` and the
+digest, `held` (whether the workspace still holds the kind), the label and summary the workspace's
+store holds for it, its body's name and sentence (`body`), and `drafted_by`: the provider, model
+id and served name of the open model that drafted it, from the kind's origin. Its look is its
+sketch, by digest, and `kind_origin` states its class and that model and nothing of the words.
+Where the workspace no longer holds the kind, `held` is false, the label and summary are its
+body's, and `drafted_by` and the look are null with no looks listed; the page then says it has no
+look to be drawn in.
+
+**Erased.** Erasing a creature ([below](#a-workspaces-own-things)) removes its rows from the
+workspace's store as before. Each version of the workspace that holds a society and a placed thing
+of that kind, not removed, is then told as an authored edit tells it: the society's next input
+leaves the thing out and names it, by its placed id, among those gone, and the being leaves in that
+society's next minute (`thing_departed`, `kind_erased`), a recorded event like any departure. No
+record of the society is changed or deleted, since none ever held a word of the creature; the
+society replays as before. What stays in a society that ran the creature: the kind's digest (as the
+erasure's own row keeps it), its body's figures, names and sentence, the lines beings said to or
+about it, every copy already sent to a hosted model provider, and the placed thing's own id, which
+is its author's text (up to 200 characters, kept in the version, its edits and every input, state
+and event that names the thing): the page names a creature it places `creature:` and the first
+eight characters of its draft's id, and a caller of the route who names a thing after its creature
+has put that name where no erasure reaches. A version that cannot be told (its input cannot be
+composed at that moment) is passed by; its society loses the being at its next input all the same,
+because a thing whose kind is gone is left out whoever composes it, and asking for the erasure
+again (the route answers 404, as for any kind the workspace does not hold) tells it again, appending
+nothing to a society already told. The erasure stands whatever a society does. A thing whose kind
+its workspace still holds but whose run form cannot be built (its plan or recipe no longer reads)
+is left out of the input too and is not named among those gone: a being that was it leaves as a
+removed one does.
+
 ## A workspace's own things
 
 A workspace keeps the things it made or admitted as the documents they were read as
@@ -786,7 +877,7 @@ the workspace's erasure purges it.
 | --- | --- |
 | `keep_creature` | A creature drafted from words: its recipe, plan, sketch with its container, and kind, the four rows in one transaction |
 | `admit_look` | A look made elsewhere (generated, imported or uploaded) with its container, read by `read_admission` and then by its intake's own check. `read_admission` makes every check that needs no database: the look's reader, a shipped key, a container that is not the look's or that its reader refuses, the line rule on the label and on the origin's words (attribution, the licence's address, authors, source references and revisions, the maker's provider, model, prompt version and bridge), and a share-alike look's credit |
-| `erase_creature` | An erasure of a creature drafted from a person's words, by its kind's digest, under the workspace's lock: a `creature` tombstone, and one row naming the kind by that digest and that tombstone and holding nothing a person wrote, whose trigger deletes at once, as the definer owner, the kind and, with its drafted plan, the plan, its recipe and every look drawn on it with their withdrawals (migration 0172). Asked by the person who drafted the creature or by an owner of the workspace, and refused as `kind_not_yours` to anyone else. A restore carries the row and replays the tombstone, so a restore from an older backup loses the creature again |
+| `erase_creature` | An erasure of a creature drafted from a person's words, by its kind's digest, under the workspace's lock: a `creature` tombstone, and one row naming the kind by that digest and that tombstone and holding nothing a person wrote, whose trigger deletes at once, as the definer owner, the kind and, with its drafted plan, the plan, its recipe and every look drawn on it with their withdrawals (migration 0172). A society that ran a being of it is told afterwards and holds nothing to erase ([a creature in a society](#a-creature-in-a-society)). Asked by the person who drafted the creature or by an owner of the workspace, and refused as `kind_not_yours` to anyone else. A restore carries the row and replays the tombstone, so a restore from an older backup loses the creature again |
 | `withdraw_look` | A withdrawal of one of the workspace's own looks, once, with a reason in one line, naming the version and the digest it was kept at. The look stays held and is never admitted again; a choice naming it stays, as choices are appended. A restore carries the withdrawal ([withdrawal catalog](../exulanica/deletion/withdrawals.v2.json)), so a restore from an older backup never admits the look again |
 
 Every read passes a withdrawn look by unless it asks for withdrawn looks. A kind naming a withdrawn
@@ -855,7 +946,7 @@ each reaching only the requester's own workspace:
 | `GET /things/looks/{look_sha256}/container` | That look's container, verified against the digest the look names, tagged with the look's digest and revalidated before each use (`no-cache`): a revalidation is answered 304 while the look is held and 404 once it is withdrawn |
 | `GET /things/kinds/{kind_sha256}` | The kind held at that digest, read again with its looks and plan resolved in the store, never cached |
 | `GET /things/plans/{plan_sha256}` | The drafted body plan held at that digest, read again, its canonical bytes, never cached: what a page draws a held kind's figure on, since the shipped library holds only shipped plans |
-| `DELETE /things/kinds/{kind_sha256}` | Erases the creature that kind was drafted for (`erase_creature`), needing `world.write` and `deletion.write`, for the person who drafted it or an owner of the workspace: an owner by the membership record (a browser session held in the `owner` role), anyone else only a creature their own actor drafted, so a guest, or a bearer token, which holds no membership, erases only its own, and anyone else's ask is 403 `kind_not_yours`. 204, after which its kind, its look and its container answer 404; 409 `kind_changed` for a row the database refuses, 409 `restore_sealed` while the installation is sealed for a restore, and 409 `busy` with `Retry-After` while another transaction holds the workspace |
+| `DELETE /things/kinds/{kind_sha256}` | Erases the creature that kind was drafted for (`erase_creature`) and tells each society that runs a being of it, whose being then leaves (`kind_erased`); asked again for a creature already erased it answers 404 and tells any society not yet told, needing `world.write` and `deletion.write`, for the person who drafted it or an owner of the workspace: an owner by the membership record (a browser session held in the `owner` role), anyone else only a creature their own actor drafted, so a guest, or a bearer token, which holds no membership, erases only its own, and anyone else's ask is 403 `kind_not_yours`. 204, after which its kind, its look and its container answer 404; 409 `kind_changed` for a row the database refuses, 409 `restore_sealed` while the installation is sealed for a restore, and 409 `busy` with `Retry-After` while another transaction holds the workspace |
 
 Another workspace's look, kind or plan, a withdrawn look and an absent digest all answer 404
 `unknown_reference` alike, and a renderer then draws the kind's first look. The container is
@@ -974,9 +1065,11 @@ being's standing figure is then not drawn. A placed being faces as it was placed
 walks, by the same rule the layer turns it by before a society holds it: its yaw turns the look's
 front from +Z, so at yaw 0 it faces +Z. Each object stands where the state puts it, its plan point
 turned by its yaw, or is held in the socket the state names, its grip at the socket's place; an
-object the state does not list is not drawn. A thing of a kind its workspace keeps is in no society,
-so it is among neither the state's things nor its people and stands where its version places it
-while the society is drawn. A rigged look whose rig names a hold clip stands in it
+object the state does not list is not drawn. A thing of a kind its workspace keeps that the state
+lists among neither its things nor its people (a society made before the thing was placed and not
+yet told, or one that does not take things in) stands where its version places it while the
+society is drawn; one the state lists as a person is the crowd's, drawn in its kind's first look,
+its sketch, asked of the workspace's store by the digest the state names. A rigged look whose rig names a hold clip stands in it
 while it holds something. A thing that changes hands, or is picked up or put down, moves when the
 people it passes between have walked to where the state ends their walks: the later of the two
 drawn walks for a hand-over, the actor's own for a pick up or put down. Until then it is drawn where
@@ -1091,11 +1184,21 @@ These are material limits of the boundary above, not partial behaviour:
   A visitor the world decides for takes no person's direct request yet, and nobody in the app can
   take a being over and play it.
 - A workspace's own kinds and looks are kept and served (a creature's by the creature route, a look
-  made elsewhere by the operator's command, and a route erases a drafted creature). A creature its
-  workspace keeps is placed by its kind's digest and stands where it was placed in its sketch: it
-  lives in no society yet, so it neither walks nor decides, and a society's beings walk through it.
-  A thing may wear a look the workspace keeps, by its digest; nothing yet shows a picture of
-  one (`preview` is null).
+  made elsewhere by the operator's command, and a route erases a drafted creature). A thing may
+  wear a look the workspace keeps, by its digest; nothing yet shows a picture of one (`preview` is
+  null).
+- A creature in a society ([above](#a-creature-in-a-society)) walks at the people's pace whatever
+  its body: no society reads a pace from a body yet. Its routine is the purposeful routine held to
+  the abilities its kind lists; the weights drafted with it are read by nothing, so a creature
+  whose kind lists none of rest, visit, stand and talk waits where it is. A decider is told its
+  body, never a temperament: nothing drafts or carries one. The page poses its sketch by guessing
+  each limb's role from its shape, not from the chains its plan states: a chain that carries a
+  socket is read as an arm, so a jawed head and its neck are posed as an arm is; no role is a
+  wing, a tail or a tentacle; a body with no legs has no walk; and a being faces along its last
+  step with no turning rate, so a long body turns about its middle at once. It wears only its sketch: a
+  choice of another look for it is refused (`look_unfit`). A creature placed in a world whose
+  society is not a society of things (a living town already made) is taken in by nothing and
+  stands where it was placed.
 - A model's line names its model only where its said event records one (a society made since its
   modules are recorded keeps it) and the page has read that model; otherwise it says `an AI model`.
   A person in flight wears no pill: the flock draws them, not the crowd.
@@ -1126,6 +1229,7 @@ These are material limits of the boundary above, not partial behaviour:
 | Look choices | [`thing_looks.py`](../exulanica/world/thing_looks.py), [`world_things.py`](../exulanica/api/routes/world_things.py) (the read), migrations 0156 and 0167 | `tests/test_thing_looks.py` (a shipped look fit for the kind, each refusal by name), `tests/test_thing_looks_postgres.py` (as the deployed writer: one look per crossing, the newest per thing, no change or removal; the table's shape and its append-only trigger; another workspace sees nothing; the route), `tests/test_workspace_looks_worn_postgres.py` (a workspace's own look listed, worn and passed by once withdrawn, for the choice before it; licences as their origins state them; another workspace's look answered as one nobody keeps; a look withdrawn between two reads), `tests/test_thing_look_source_migration.py` (0167 over stored choices; the said-events index and its use) |
 | Placed things | [`placed_things.py`](../exulanica/world/placed_things.py), the object repository, [`world_things.py`](../exulanica/api/routes/world_things.py), migrations 0152 and 0188 | `tests/test_placed_things.py`, `tests/test_placed_things_postgres.py` (as the deployed writer: place, move, remove, undo and place again; the kind fixed by the table; another workspace sees nothing; a branch keeps them; the routes' refusals by name), `tests/test_edit_kind_undo_postgres.py`, `tests/test_placed_workspace_kinds_postgres.py` (a creature placed by its kind's digest alone, the row naming no key or version; another workspace's kind and an invented digest refused alike with nothing written; the table holding where a thing's kind comes from; an erased creature's thing gone, its move refused by name and its removal standing, and the same creature kept again not bringing it back; the plans route serving a held plan and answering 404 alike; a shipped thing stored before 0188 reading as it always was; a world holding only a creature not made a world of things; a thing gone by its kind's row alone, with no erasure recorded; undoing a gone thing's removal keeping it gone and undoing its placing taking it out; a branch holding a gone thing gone after its creature is kept again), `tests/test_society_thing_inputs.py` (a thing of a workspace kind left out of a society's input), `tests/test_walking_surfaces_v3.py` (a creature left out of a town's v3 input, blocking and offering nothing), `web/packages/app/test/things-composition.test.ts` and `web/packages/atlas-react/test/things-workspace-kind.test.ts` (the page reading a workspace kind by digest, its held plan, and drawing a gone thing nowhere) |
 | The society of things | [`society_things.py`](../exulanica/world/society_things.py), [`society_thing_inputs.py`](../exulanica/world/society_thing_inputs.py), [`crossings.py`](../exulanica/world/crossings.py), the things composition in [`society_authored_ground.py`](../exulanica/world/society_authored_ground.py) and, on a generated town, in [`society_walking_surfaces.py`](../exulanica/world/society_walking_surfaces.py), migrations 0151 and 0169 | `tests/test_society_things.py` (genesis, a minute equal to the planner's, placed beings, crossings, the state check), `tests/test_society_thing_inputs.py` (the composition and its shape), `tests/test_society_things_postgres.py` (through the routes: made by name, an edit reaching it, a visitor crossing in and out, replay), `tests/test_outside_deciders_postgres.py` (a visitor decided for by its own program), `tests/test_traveller_choices_postgres.py` (a visitor the world decides for, by its gate's travellers' choice), `tests/test_society_request_rule_parity.py`, `tests/test_walking_surfaces_v3.py` (a town's things: what blocks, what is offered, what is unreachable, the town's v1 and v2 inputs unchanged), `tests/test_walking_surfaces_v3_postgres.py` (a society of things on a town through the routes, replayed; the input checks), `tests/test_town_target_names.py` (what a town's place calls a premises or a bench on its targets, an input from before the field, a name never moving a destination, every label lower case) |
+| A creature in a society | [`run_forms.py`](../exulanica/things/run_forms.py), [`body-names.v1.json`](../assets/catalogs/things/body-names.v1.json), [`society_kinds.py`](../exulanica/world/society_kinds.py), `ThingStore.run_form` in [`thing_store.py`](../exulanica/world/thing_store.py), the composers' `made_kinds` in [`society_authored_ground.py`](../exulanica/world/society_authored_ground.py) and [`society_walking_surfaces.py`](../exulanica/world/society_walking_surfaces.py), the things phase in [`society_things.py`](../exulanica/world/society_things.py), the made being's card in [`thing_card.py`](../exulanica/api/thing_card.py), the erasure telling societies in [`thing_store.py`](../exulanica/api/routes/thing_store.py) | `tests/test_thing_kind_run_forms.py` (each fixture creature assembled under nonsense words: none of them, nor the drafting model's provenance, the recipe's digest or the plan's title, in its run form; every string of a run form in a vocabulary read from the catalogs' own files; each body's name and four bodies' sentences written by hand; its sockets the plan's own and its figures the fixture's; each field that could carry words refused by name; a kind, plan and recipe that do not belong together refused), `tests/test_society_made_kinds.py` (with no database: it arrives named by its body and by its kind's digest alone, the input and the state stating its run form once; two of one kind told apart by number; it walks and stays by the routine and an hour twice is the same bytes; it is offered what its kind lists and may be given a mind or played; a decider is told its body's sentence; jaws pick a sword up into `mouth` and a body that holds with nothing is offered no hands act; it leaves the minute its kind is erased, for that reason, and the society goes on; an author's removal stays an author's removal; none of the nonsense words in the inputs, the states, the events or a decider's context, with a positive control; an input with no made thing keeps its bytes; the input's and the state's checks each refuse a made kind stated wrongly), `tests/test_society_made_kinds_postgres.py` (through the routes: a creature alone makes the world one of things and lives in its society, which replays; its card names it as its maker did with who drafted it and who decides, and refuses another look by name; erasing it appends an input naming the kind gone, its card then names nothing, the being leaves the next minute for that reason, the society replays, and no row of any table of the schema holds a nonsense word, which the same search found in the workspace's store before; a society that could not be told loses the being at its next input), `tests/test_placed_workspace_kinds_postgres.py` (a world holding only a creature is a world of things while its kind is held and not once it is erased), `web/packages/atlas-react/test/things-workspace-kind-standing.test.ts` (a being named by digest alone drawn by the crowd in its sketch; an erased kind a miss by name), `web/packages/app/test/visitor-notices.test.ts` and `thing-lines.test.ts` (a kind's reference read in either shape; a line's header naming a made speaker as the workspace's store does), `web/packages/app/test/thing-card-route.test.ts` and `thing-card-placed.test.ts` (the card's drafting model) |
 | Creatures: recipes, plans, sketches, assembly | [`bodies.py`](../exulanica/things/bodies.py), [`sketch.py`](../exulanica/things/sketch.py), [`creatures.py`](../exulanica/things/creatures.py), [`body-grammar.v1.json`](../assets/catalogs/things/body-grammar.v1.json) | `tests/test_creature_bodies.py` (thirteen hand-written creatures: each body where its recipe says, a left limb the mirror of its right, each limb of a lying body hung from the stretch of spine beside it, the bone count the recipe's own sum, each refusal by name, the sketch read back from its bytes) |
 | The creature drafter | [`creature_drafting.py`](../exulanica/selection/creature_drafting.py), [`creature-drafting.v1.json`](../exulanica/selection/creature-drafting.v1.json) | `tests/test_creature_drafting.py` (scripted replies: a pass with its provenance, a refusal repaired with its check's sentence, two refusals, a form outside the schema, a reply cut off in blank space), `tests/test_hosted_boundary.py` (its request carries no saved name) |
 | A workspace's own things | [`thing_store.py`](../exulanica/world/thing_store.py), [`thing_store_command.py`](../exulanica/api/thing_store_command.py), the routes in [`thing_store.py`](../exulanica/api/routes/thing_store.py), migrations 0159 and 0172, the `looks` namespace and its purge in [`namespaces.py`](../exulanica/store/namespaces.py), the seed's refusal in [`judge_seed.py`](../exulanica/orchestration/judge_seed.py) | `tests/test_thing_store_admission.py` (with no database: a static and a skinned look read by their containers' readers, a broken rig refused; a look the reader refuses, a shipped key, a look that draws no file and another container each refused by name; the line rule on the label and each word of the origin, its licence's address included, the field named; a share-alike look refused without its attribution, its authors or its licence's address), `tests/test_thing_store_postgres.py` (as the deployed writer: a drafted creature kept whole and read back at its assembly's digests; no update or delete, even by the table's owner (the owner's TRUNCATE is not refused: no truncate guard like 0013's is attached); another workspace reads none of it and keeps its own; each table's row written only in its own workspace's context, even by a superuser; a shipped kind, plan or look key, another container, a held version drawn from other bytes and a full library of kinds or of looks each refused with nothing written, bytes included; a look kept only after its intake's own check, with its licence as columns; the table's own checks on a share-alike look's credit, a container profile and its look kind, a kind's plan digest and a withdrawal's digest; a withdrawn look passed by unless asked for, its kind still read, and a look the reader refuses withdrawn by its row), `tests/test_thing_erasure_postgres.py` (an erasure removes a creature's kind, plan, recipe, looks and their withdrawals at once and nothing of another creature, naming the kind by digest and its `creature` tombstone only; the rows go only through it, not by the runtime role nor the table's owner; a plan or recipe another still names stays, and a shared recipe holds no words digest; an unknown, foreign or somebody else's kind refused with nothing deleted and no tombstone; the same creature in another workspace untouched; the erasure waits for the workspace's lock; its containers, a second look's on the plan too, destroyed by the purge, which completes its tombstone; a container another creature or the same creature kept again names stays, its job waiting, or skipped when the look arrives while the purger waits for the container's lock; a creature tombstone reaching no capture, photograph, artefact or other creature, and a capture tombstone erasing no creature; a container recorded before its bytes, its purge waiting for them; a keep that dies after recording, or is refused after it, reached by the workspace's erasure; the migration's backfill recording containers kept before the inventory; a workspace tombstone purges every recorded container, an erased creature's too, completion waiting for it, a worker without the looks namespaces leaving it open, a capture tombstone not authorized; the purge command's worker destroying them; a database without the look question claiming every other kind; nothing kept after it), `tests/test_thing_store_words.py` (every string a sketch container holds, for every fixture creature and 160 recipes drawn across the grammar: names from the grammar's vocabulary, colours from its palette and nothing else but the format's own words), `tests/test_restore_replay_withdrawals.py` (a look withdrawn after a backup stays withdrawn, and a creature erased after a backup stays erased, its container purged by the replayed tombstone, through a real restore, as it does when the backup holds its withdrawn sketch or when the whole workspace is erased after it), `tests/test_thing_store_command.py` (a mapping admitted only when a declared bridge pins it and the door's check reads it; the intake's check on the entry's digest, source, SPDX identifier and share-alike mark and on the look being imported; a look document that is not JSON and a withdrawal reason that is not one line refused by the dry runs; against PostgreSQL, a dry run that writes nothing, a copy relabelled CC0 and public and an unpinned mapping refused with nothing written, the positive control, once only, a listing and a withdrawal), `tests/test_thing_store_routes.py` (as a deployment serves them: the document's bytes hash to the URL's digest; the container's bytes, tag and `no-cache`, a revalidation answered 304 with no body; a kind; another workspace's, a withdrawn, a revalidated withdrawn and an absent one all 404 alike, and missing bytes too; 503 without a look store; a writer's erasure, then 404 for its kind, look and container, a reader, a token without `deletion.write`, a stranger and an invented digest erasing nothing, nor an installation sealed for a restore; a session required), `tests/test_judge_seed.py` (a workspace holding a look, a kind or an unpurged container of its own is not seeded, and a schema without the inventory is read without it), `tests/test_existence_oracle.py` (a stranger cannot tell a held look or kind from an invented digest) |

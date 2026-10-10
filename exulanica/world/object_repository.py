@@ -3075,16 +3075,25 @@ class WorldObjectRepository:
 def version_holds_things(
     connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, version_id: uuid.UUID
 ) -> bool:
-    """Whether a version of the world holds a thing of a shipped kind its author placed and has not
-    removed (an undone placement is a removed one): what decides, with its ground and the host,
-    whether a new society over a saved world is a society of things
-    (:func:`~exulanica.world.society_grounds.created_engine`). A thing of a kind its workspace
-    keeps, a drafted creature, is not counted: no society reads such a thing yet
-    (:mod:`exulanica.world.society_authored_ground` leaves it out), so a world holding only one
-    keeps the society it would have had without it."""
+    """Whether a version of the world holds a thing its author placed and has not removed (an
+    undone placement is a removed one): what decides, with its ground and the host, whether a new
+    society over a saved world is a society of things
+    (:func:`~exulanica.world.society_grounds.created_engine`). One rule for every thing: a thing
+    of a shipped kind counts, and so does one of a kind its workspace keeps, a drafted creature,
+    which a society of things takes in as a being (:mod:`exulanica.world.society_authored_ground`).
+    A thing whose kept kind is gone (the workspace no longer holds it, or erased it after the
+    thing was placed) is read by no society and is not counted, by the test
+    :meth:`WorldObjectRepository._things` reads ``kind_gone`` with."""
     row = connection.execute(
-        "select exists(select 1 from world_alternate_thing where workspace_id=%s "
-        "and world_id=%s and version_id=%s and not removed and kind_source='shipped') as held",
+        "select exists(select 1 from world_alternate_thing t where t.workspace_id=%s "
+        "and t.world_id=%s and t.version_id=%s and not t.removed "
+        "and (t.kind_source='shipped' or ("
+        "exists (select 1 from thing_kind_version k where k.workspace_id=t.workspace_id "
+        "and k.sha256=encode(t.kind_sha256,'hex')) "
+        "and not exists (select 1 from thing_erasure e join world_alternate_version_edit p "
+        "on p.workspace_id=t.workspace_id and p.edit_id=t.created_edit_id "
+        "where e.workspace_id=t.workspace_id and e.sha256=encode(t.kind_sha256,'hex') "
+        "and e.erased_at>=p.recorded_at)))) as held",
         (workspace_id, world_id, version_id),
     ).fetchone()
     return bool(row["held"])

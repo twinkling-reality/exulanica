@@ -40,7 +40,7 @@ from typing import Any, Final
 
 from exulanica.canonical import canonical_json
 from exulanica.things.lines import LINE_CHARACTERS_MAXIMUM
-from exulanica.world.placed_things import ThingKindReference, shipped_kind
+from exulanica.world.society_kinds import kind_here, reference_of, reference_shape
 
 __all__ = [
     "HOW",
@@ -103,11 +103,7 @@ def _empty() -> dict[str, list[Any]]:
 
 
 def _kind_reference(reference: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "kind": reference["kind"],
-        "version": reference["version"],
-        "sha256": reference["sha256"],
-    }
+    return reference_of(reference)
 
 
 def _oldest(entries: Sequence[Mapping[str, Any]], key: str, identity: str) -> int:
@@ -390,9 +386,15 @@ def _ticks(entry: Mapping[str, Any]) -> None:
 
 
 def _reference(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ValueError("a kind is named by its kind, version and digest")
+    if set(value) == {"source", "sha256"}:
+        # A kind its workspace keeps, by its document's digest alone.
+        if not reference_shape(value):
+            raise ValueError("a workspace's own kind is named by its document's digest")
+        return
     if (
-        not isinstance(value, Mapping)
-        or set(value) != {"kind", "version", "sha256"}
+        set(value) != {"kind", "version", "sha256"}
         or not isinstance(value["kind"], str)
         or isinstance(value["version"], bool)
         or not isinstance(value["version"], int)
@@ -404,19 +406,21 @@ def _reference(value: object) -> None:
 # -- what a decider is shown ----------------------------------------------------------------------
 
 
-def _label(reference: Mapping[str, Any]) -> str:
-    return str(shipped_kind(ThingKindReference(**reference)).document["label"])
+def _label(reference: Mapping[str, Any], state: Mapping[str, Any] | None = None) -> str:
+    return str(kind_here(state, reference).document["label"])
 
 
-def _who(entry: Mapping[str, Any], here: Mapping[str, Any]) -> str:
+def _who(
+    entry: Mapping[str, Any], here: Mapping[str, Any], state: Mapping[str, Any] | None = None
+) -> str:
     """A remembered being as the options name it where it is still here, else by what the
     meeting kept: its name and kind as the page names them, or its kind and number."""
     from exulanica.world.society_decision_contract import named, page_name
 
     person = here.get(entry["id"])
     if person is not None:
-        return page_name(person).lower()
-    label = _label(entry["kind"])
+        return page_name(person, state).lower()
+    label = _label(entry["kind"], state)
     if entry["name"] is None:
         return f"the {label} (person {entry['number']})"
     return named(entry["name"], label).lower()
@@ -443,7 +447,7 @@ def remembered(
     beings = []
     for entry in sorted(recollection["met"], key=lambda e: (-e["last_tick"], e["id"])):
         being: dict[str, Any] = {
-            "who": _who(entry, here),
+            "who": _who(entry, here, state),
             "met_minutes_ago": now - entry["first_tick"],
             "last_minutes_ago": now - entry["last_tick"],
             "times": entry["times"],
@@ -472,9 +476,9 @@ def remembered(
         (
             (entry["tick"], 2),
             {
-                "thing": _label(entry["thing"]),
+                "thing": _label(entry["thing"], state),
                 "way": entry["way"],
-                "who": _who(entry["other"], here),
+                "who": _who(entry["other"], here, state),
                 "minutes_ago": now - entry["tick"],
             },
         )

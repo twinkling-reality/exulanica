@@ -252,30 +252,37 @@ def test_an_erased_creature_s_thing_is_gone_and_keeping_it_again_does_not_bring_
     }
 
 
-def test_a_world_holding_only_a_creature_is_not_made_a_world_of_things(
+def test_a_world_holding_only_a_creature_is_a_world_of_things_while_its_kind_is_held(
     objects_api, repository, writer, tmp_path
 ):
-    # No society reads a thing of its workspace's own kind yet, so it never decides which society
-    # a saved world gets; a shipped thing beside it does.
-    creature = _kept(writer, repository.workspace_id, tmp_path / "looks", "lone walker")
+    # A society of things takes a creature its workspace keeps in as a being, so it decides which
+    # society a saved world gets exactly as a shipped being does: one rule for every thing. Once
+    # its kind is erased no society reads it, and it decides nothing.
+    looks = tmp_path / "looks"
+    creature = _kept(writer, repository.workspace_id, looks, "lone walker")
     version = objects_api.version("Only a creature")
+    empty = uuid.UUID(version["version_id"])
+
+    def holds(version_id: uuid.UUID) -> bool:
+        return version_holds_things(
+            repository.connection, repository.workspace_id, objects_api.world_id, version_id
+        )
+
+    assert holds(empty) is False
     placed = _place(
         objects_api, version, WALKER, {"source": "workspace", "sha256": creature.kind.sha256}
     )
     assert placed.status_code == 201, placed.text
-
-    def holds(answer) -> bool:
-        return version_holds_things(
-            repository.connection,
-            repository.workspace_id,
-            objects_api.world_id,
-            uuid.UUID(answer["version_id"]),
-        )
-
-    assert holds(placed.json()) is False
-    shipped = _place(objects_api, placed.json(), "thing:shipped", kind_body(placeable_kind()))
+    held = uuid.UUID(placed.json()["version_id"])
+    assert holds(held) is True
+    _erase(writer, repository.workspace_id, creature, looks)
+    assert holds(held) is False
+    # A shipped thing beside it counts as it always did.
+    shipped = _place(
+        objects_api, _read(objects_api, placed.json()), "thing:shipped", kind_body(placeable_kind())
+    )
     assert shipped.status_code == 201, shipped.text
-    assert holds(shipped.json()) is True
+    assert holds(uuid.UUID(shipped.json()["version_id"])) is True
 
 
 def test_a_thing_whose_kind_its_workspace_no_longer_holds_is_gone_with_no_erasure_recorded(

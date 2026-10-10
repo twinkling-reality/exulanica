@@ -22,7 +22,7 @@ import type { InhabitantView, MountedEnvironmentSelection, SelectedBeing, Select
 import { creditOf, kindCameWords, lookLine, lookOptionLine, sourceLink, withArticle } from './thing-origin-words.js';
 import { chooseThingLook, fetchThingCardRoute, sameLook, type CardLookReference, type LookChoiceOutcome, type ThingCardRoute } from '../thing-card-route-api.js';
 import { lineMarkOf, markLabel, markOf, type ThingMark } from './thing-marks.js';
-import { carriedWords, type KindReference } from './visitor-notices.js';
+import { carriedWords, kindKey, libraryKind, type KindReference } from './visitor-notices.js';
 import type { BeingLine } from './being-lines.js';
 import { fetchCrossingManifest, type CrossingManifest, type CrossingRows } from '../crossing-manifest-api.js';
 import { THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type ThingLookChosenDetail, type ThingPickDetail } from './things.js';
@@ -88,12 +88,12 @@ function cardLines(lines: readonly BeingLine[], subjectId: string, models: reado
 }
 
 /** How a being came to be here, in words. */
-function beingCameWords(being: SelectedBeing, kind: KindFacts | null): string {
+function beingCameWords(being: SelectedBeing, kind: KindFacts | null, draftedBy: string | null = null): string {
   switch (being.cameBy) {
     case 'crossed':
       return `Came in from ${being.crossing?.entry?.label ?? 'outside this world'}.`;
     case 'placed':
-      return kind === null ? 'You placed it here.' : `You placed it here. ${kindCameWords(kind.label, kind.origin)}`;
+      return kind === null ? 'You placed it here.' : `You placed it here. ${kindCameWords(kind.label, kind.origin, draftedBy)}`;
     case 'populated':
       return 'One of the people who live in this world.';
   }
@@ -132,7 +132,7 @@ export function personCard(
       crossing: facts?.crossing ?? null,
       said: cardLines(being.said, subjectId, models, true),
       heard: cardLines(being.heard, subjectId, models, false),
-      cameFrom: outsideEntry !== null ? cameWords(outsideEntry) : beingCameWords(being, facts?.kind ?? null),
+      cameFrom: outsideEntry !== null ? cameWords(outsideEntry) : beingCameWords(being, facts?.kind ?? null, facts?.route?.draftedBy?.name ?? null),
     };
   }
   const running = about.mind?.running ?? null;
@@ -193,7 +193,7 @@ export function personCard(
       said: cardLines(being.said, subjectId, models, true),
       heard: cardLines(being.heard, subjectId, models, false),
     }),
-    cameFrom: being === null ? 'One of the people who live in this world.' : beingCameWords(being, facts?.kind ?? null),
+    cameFrom: being === null ? 'One of the people who live in this world.' : beingCameWords(being, facts?.kind ?? null, facts?.route?.draftedBy?.name ?? null),
   };
 }
 
@@ -217,9 +217,12 @@ export const lookKey = (ref: CardLookReference): string =>
 /** The look it wears, as its served card names it, and every look it may wear; null where no card is served. */
 function routeLooks(route: ThingCardRoute | null): CardLooks | null {
   if (route === null) return null;
-  const origin = route.look.origin;
+  const worn = route.look;
+  // Nothing to wear (its kind was erased, or its only look withdrawn): the card says so.
+  if (worn === null) return { name: 'None', line: 'It has no look to be drawn in.', source: null, credit: null, choices: [] };
+  const origin = worn.origin;
   return {
-    name: title(route.look.label),
+    name: title(worn.label),
     line: origin === null ? '' : lookLine(origin),
     source: origin === null ? null : sourceLink(origin),
     credit: origin === null ? null : creditOf(origin),
@@ -227,7 +230,7 @@ function routeLooks(route: ThingCardRoute | null): CardLooks | null {
       key: lookKey(option.ref),
       name: title(option.label),
       line: lookOptionLine(option.authors, option.licence),
-      now: sameLook(option.ref, route.look.ref),
+      now: sameLook(option.ref, worn.ref),
     })),
   };
 }
@@ -376,7 +379,7 @@ export function mountThingCard(options: {
   let choices: { readonly version: string; readonly at: number; readonly worn: ReadonlyMap<string, LookReference> } | null = null;
   const refKey = (ref: { readonly version: number; readonly sha256: string }, key: string): string => `${key}/${ref.version}/${ref.sha256}`;
   /** A kind's facts once read, by its reference: a shipped kind or one the workspace keeps alike. */
-  const kindRead = (kind: KindReference): KindFacts | undefined => kinds.get(refKey(kind, kind.kind));
+  const kindRead = (kind: KindReference): KindFacts | undefined => kinds.get(kindKey(kind));
   /** The look a being is drawn in: the one chosen for it, or its kind's first (from the kind's document). */
   const wornLook = (subjectId: string, being: SelectedBeing): LookReference | null =>
     choices?.worn.get(being.placedId ?? subjectId) ?? kindRead(being.kind)?.firstLook ?? null;
@@ -416,7 +419,7 @@ export function mountThingCard(options: {
     }
     const readKind = async (kind: KindReference): Promise<void> => {
       if (kindRead(kind) !== undefined) return;
-      kinds.set(refKey(kind, kind.kind), readKindFacts(await library.kindDocument({ key: kind.kind, version: kind.version, sha256: kind.sha256 })));
+      kinds.set(kindKey(kind), readKindFacts(await library.kindDocument(libraryKind(kind))));
     };
     await readKind(being.kind);
     // What it holds is named by each held thing's own kind; one that cannot be read is left unnamed.
@@ -480,7 +483,7 @@ export function mountThingCard(options: {
     if (target === shown) shown.redraw();
     const after = await readCard(shown.worldId, shown.versionId, shown.thingId).catch(() => null);
     return {
-      words: `Now drawn as ${withArticle(outcome.card.look.label)}. Only its look changed: what it does, says and decides is exactly the same.`,
+      words: `Now drawn as ${outcome.card.look === null ? 'nothing' : withArticle(outcome.card.look.label)}. Only its look changed: what it does, says and decides is exactly the same.`,
       proof: after === null ? null : lookProof(outcome.card.society, after.society),
     };
   }

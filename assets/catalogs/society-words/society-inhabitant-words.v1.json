@@ -891,6 +891,13 @@
       "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
     },
     {
+      "key": "event_reason.kind_erased",
+      "kind": "event_reason",
+      "code": "kind_erased",
+      "words": "its maker erased the creature it was",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
       "key": "event_reason.society_full",
       "kind": "event_reason",
       "code": "society_full",

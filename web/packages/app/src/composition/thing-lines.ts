@@ -16,7 +16,7 @@ import type { ThingLine } from '@exulanica/atlas-react/things';
 import type { SocietyEvent } from '../society-api.js';
 import type { ModelRef, NamedModelRef } from '../society-models-api.js';
 import { lineMarkOf, markLabel, type LineDecider, type MarkInput } from './thing-marks.js';
-import type { KindReference } from './visitor-notices.js';
+import { kindOf, type KindReference } from './visitor-notices.js';
 
 /** A `said` event as the drawing reads it. */
 export interface SaidLine {
@@ -34,11 +34,6 @@ export interface SaidLine {
 
 const record = (value: unknown): Readonly<Record<string, unknown>> =>
   value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
-
-function kindOf(value: unknown): KindReference | null {
-  const { kind, version, sha256 } = record(value);
-  return typeof kind === 'string' && typeof version === 'number' && typeof sha256 === 'string' ? { kind, version, sha256 } : null;
-}
 
 function numbered(kind: unknown, number: unknown): { readonly kind: KindReference; readonly number: number } | null {
   const reference = kindOf(kind);

@@ -65,6 +65,7 @@ from exulanica.world.kinds.worker import (
 )
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import AuthoredObject
+from exulanica.world.placed_things import WorkspaceKindReference
 from exulanica.world.society import (
     SocietyBytesNotRead,
     SocietyPlaceWaiting,
@@ -858,6 +859,32 @@ class SocietyRuntime:
                 obj.workspace_preparation_id, row["width_mm"], row["depth_mm"]
             )
         return obstacles
+
+    @staticmethod
+    def _made_kinds(
+        connection: psycopg.Connection, workspace_id: uuid.UUID, things: Iterable[Any]
+    ) -> dict[str, dict[str, Any]]:
+        """What a society runs of each kind its workspace keeps that a placed thing names: the
+        kind's run form, by its digest (:meth:`~exulanica.world.thing_store.ThingStore.run_form`).
+
+        Rows only, so it is asked under the asset read lock. A thing removed, or whose kind is
+        gone, is passed by, and so is a kind whose run form the store cannot build: the composer
+        leaves a thing of such a kind out and names the thing among those gone.
+        """
+        from exulanica.world.thing_store import ThingStore
+
+        store = ThingStore(connection, workspace_id, None)
+        forms: dict[str, dict[str, Any]] = {}
+        for thing in things:
+            kind = thing.kind
+            if thing.removed or thing.kind_gone or not isinstance(kind, WorkspaceKindReference):
+                continue
+            if kind.sha256 in forms:
+                continue
+            form = store.run_form(kind.sha256)
+            if form is not None:
+                forms[kind.sha256] = form
+        return forms
 
     def _workspace_ref(
         self, connection: psycopg.Connection, session: Session, ref: Mapping[str, str]
@@ -1661,6 +1688,7 @@ class SocietyRuntime:
                     segment_blocked=segment_blocked,
                     standing=self._standing,
                     workspace_obstacles=workspace,
+                    made_kinds=self._made_kinds(connection, binding.workspace_id, version.things),
                 )
             if arrival is not None:
                 arrived_ground = replace(
@@ -1785,6 +1813,9 @@ class SocietyRuntime:
                 if chosen == WALKING_SURFACES_COMPOSITION_V3
                 else None,
                 people=people,
+                made_kinds=self._made_kinds(connection, binding.workspace_id, version.things)
+                if chosen == WALKING_SURFACES_COMPOSITION_V3
+                else None,
             )
         raise UnavailableSocietyInput(
             f"no society composition walks a {ground.navigation_form!r} ground"

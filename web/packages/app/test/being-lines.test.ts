@@ -20,7 +20,7 @@ const people = [
 
 const names: LineNames = {
   person: (id) => (people as { id: string; display_name: string }[]).find((one) => one.id === id)?.display_name ?? null,
-  kindLabel: (kind) => ({ knight: 'knight', traveller: 'traveller' } as Record<string, string>)[kind.kind] ?? null,
+  kindLabel: (kind) => ({ knight: 'knight', traveller: 'traveller' } as Record<string, string>)[kind.kind ?? ''] ?? null,
   speaker: (id) => (id === 'visitor-0' ? VISITOR_NOW : id === 'gone-0' ? null : { running: null }),
 };
 

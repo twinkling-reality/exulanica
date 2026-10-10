@@ -116,10 +116,40 @@ describe('the served card, read', () => {
     expect(card.can).toEqual(['talk', 'pick_up', 'give', 'say'].map((key) => ability(key).words));
     expect(card.offers).toEqual([offer('talk_to').words, offer('receive').words]);
     expect(card.holding).toEqual([read('kinds/sword.v3.json')['label']]);
-    expect(card.look.ref).toEqual({ source: 'shipped', key: 'kaykit-knight', ...{ version: kindLook(KNIGHT, 'kaykit-knight').version, sha256: kindLook(KNIGHT, 'kaykit-knight').sha256 } });
+    expect(card.look!.ref).toEqual({ source: 'shipped', key: 'kaykit-knight', ...{ version: kindLook(KNIGHT, 'kaykit-knight').version, sha256: kindLook(KNIGHT, 'kaykit-knight').sha256 } });
     expect(card.society).toEqual({ tick: 12, stateSha256: BEFORE });
     expect(() => readThingCardRoute({ ...knightCard('kaykit-knight'), profile: 'exulanica.thing-card/v2' })).toThrow();
     expect(() => readThingCardRoute({ ...knightCard('kaykit-knight'), society: { tick: 12, state_sha256: 'not a digest' } })).toThrow();
+  });
+
+  it('reads the open model that drafted a made kind, and none for a shipped one', () => {
+    // A shipped kind's card states no drafting model.
+    expect(readThingCardRoute(knightCard('kaykit-knight')).draftedBy).toBeNull();
+    // A being of a kind its workspace keeps, as the server's card states it (docs/things-contract.md):
+    // named by digest alone, with the model its origin records and the name the server reads for it.
+    const base = knightCard('kaykit-knight');
+    const made = {
+      ...base,
+      label: 'Four legged creature',
+      kind: {
+        source: 'workspace', sha256: 'd'.repeat(64), held: true, label: 'street dragon', summary: 'A dragon that walks the streets.', class: 'being',
+        body: { plan: null, name: 'four legged creature', summary: 'A creature about 12 m long.' },
+        drafted_by: { provider: 'nebius_token_factory', model_id: 'nvidia/nemotron-3-super-120b-a12b', name: 'Nemotron 3 Super' },
+      },
+    };
+    expect(readThingCardRoute(made).draftedBy).toEqual({ provider: 'nebius_token_factory', modelId: 'nvidia/nemotron-3-super-120b-a12b', name: 'Nemotron 3 Super' });
+    // Once its workspace erased the creature the card is as the server serves it until the being
+    // leaves (docs/things-contract.md, "Its card"): held false, its body's name for a label, no
+    // drafting model, no look and no looks to choose. The page reads it and names no model or look.
+    const erased = readThingCardRoute({
+      ...made,
+      kind: { ...made.kind, held: false, label: 'four legged creature', summary: 'A creature about 12 m long.', drafted_by: null },
+      look: null, looks: [], kind_origin: null,
+    });
+    expect(erased.draftedBy).toBeNull();
+    expect(erased.look).toBeNull();
+    expect(erased.looks).toEqual([]);
+    expect(() => readThingCardRoute({ ...made, kind: { ...made.kind, drafted_by: { provider: 'p' } } })).toThrow();
   });
 
   it('reads a look the workspace keeps by its digest alone', () => {

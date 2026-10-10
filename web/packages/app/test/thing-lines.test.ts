@@ -74,8 +74,8 @@ describe('LineWatch', () => {
 
 describe('thingLine', () => {
   const words = (counts: Record<string, number>) => ({
-    kindLabel: (kind: { kind: string }) => (kind.kind === 'knight' ? 'knight' : kind.kind === 'lantern_spirit' ? 'lantern spirit' : null),
-    countOf: (kind: { kind: string }) => counts[kind.kind] ?? 0,
+    kindLabel: (kind: { kind?: string | undefined }) => (kind.kind === 'knight' ? 'knight' : kind.kind === 'lantern_spirit' ? 'lantern spirit' : null),
+    countOf: (kind: { kind?: string | undefined }) => counts[kind.kind ?? ''] ?? 0,
     modelName: (model: { provider: string; modelId: string }) => (model.modelId === QWEN.modelId ? QWEN : null),
   });
 
@@ -95,5 +95,19 @@ describe('thingLine', () => {
     const drawn = thingLine(line, null, words({}));
     expect(drawn.header).toBe('someone');
     expect(drawn.mark).toBe(AN_AI_MODEL);
+  });
+
+  it('reads a line said by or to a being of a kind its workspace keeps, named by digest alone', () => {
+    // As the society records it for a creature drafted from words: no key and no version.
+    const made = { source: 'workspace', sha256: 'd'.repeat(64) };
+    const line = saidLine(said('creature-0', 5, 'Who are you?', { from_kind: made, from_number: 3, to: 'knight-0', to_kind: KNIGHT, to_number: 1 }))!;
+    expect(line.from).toEqual({ kind: made, number: 3 });
+    // The page names it as its maker did once the workspace's store answers, and "someone" until then.
+    const labels = (kind: { kind?: string | undefined; source?: string | undefined; sha256: string }) =>
+      (kind.source === 'workspace' && kind.sha256 === made.sha256 ? 'street dragon' : kind.kind === 'knight' ? 'knight' : null);
+    const named = thingLine(line, null, { kindLabel: labels, countOf: () => 1, modelName: () => null });
+    expect(named.header.startsWith('street dragon to knight')).toBe(true);
+    const unread = thingLine(line, null, { kindLabel: (kind) => (kind.kind === 'knight' ? 'knight' : null), countOf: () => 1, modelName: () => null });
+    expect(unread.header.startsWith('someone to knight')).toBe(true);
   });
 });

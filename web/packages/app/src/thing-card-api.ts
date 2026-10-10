@@ -13,6 +13,8 @@ export interface OriginRecord {
   readonly class: 'authored' | 'drafted' | 'generated' | 'uploaded' | 'imported' | 'crossed';
   /** Who made it: this project, an account, a model by name, or an outside program. */
   readonly by: 'project' | 'account' | 'model' | 'program';
+  /** The model that made it, by provider and model id, where a model did and its origin names it. */
+  readonly model: { readonly provider: string; readonly modelId: string } | null;
   readonly sources: readonly string[];
   readonly licence: {
     readonly spdx: string;
@@ -64,9 +66,13 @@ export function readOrigin(value: unknown): OriginRecord {
   const licence = object(held['licence'], 'origin licence');
   const sources = Array.isArray(held['sources']) ? held['sources'] : invalid('origin sources');
   const authors = Array.isArray(held['authors']) ? held['authors'] : invalid('origin authors');
+  const by = object(held['by'], 'origin by');
   return {
     class: oneOf(held['class'], CLASSES, 'origin class'),
-    by: oneOf(object(held['by'], 'origin by')['kind'], BY, 'origin by'),
+    by: oneOf(by['kind'], BY, 'origin by'),
+    model: by['kind'] === 'model' && typeof by['provider'] === 'string' && typeof by['model_id'] === 'string' && by['model_id'] !== ''
+      ? { provider: by['provider'], modelId: by['model_id'] }
+      : null,
     sources: sources.map((source) => {
       const entry = object(source, 'origin source');
       return text(entry['reference'] ?? entry['url'], 'origin source reference');

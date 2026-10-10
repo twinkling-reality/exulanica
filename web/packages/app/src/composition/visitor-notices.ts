@@ -14,12 +14,35 @@ import type { SocietyEvent } from '../society-api.js';
 import { reasonWords } from '../society-inhabitant-words.js';
 import { withArticle } from './thing-origin-words.js';
 
-/** A thing kind by key, version and digest, as the society's state and events name it. */
-export interface KindReference {
+/** A shipped thing kind by key, version and digest, as the society's state and events name it. */
+export interface ShippedKindReference {
   readonly kind: string;
   readonly version: number;
   readonly sha256: string;
+  readonly source?: undefined;
 }
+
+/**
+ * A kind its workspace keeps (a creature drafted from a person's words), as the society's state
+ * and events name it: by its document's digest alone. Its name is asked of the workspace's store.
+ */
+export interface MadeKindReference {
+  readonly source: 'workspace';
+  readonly sha256: string;
+  /** Never stated: a kept kind's key and version are its workspace's, made from a person's words. */
+  readonly kind?: undefined;
+  readonly version?: undefined;
+}
+
+/** How a society names a kind: a shipped one, or one its workspace keeps. */
+export type KindReference = ShippedKindReference | MadeKindReference;
+
+/** Whether a society names this kind as its workspace's own, by digest alone. */
+export const isMadeKind = (kind: KindReference): kind is MadeKindReference => 'source' in kind && kind.source === 'workspace';
+
+/** How the thing library is asked for a kind's document: by key, version and digest, or by digest alone. */
+export const libraryKind = (kind: KindReference): { readonly key: string; readonly version: number; readonly sha256: string } | { readonly source: 'workspace'; readonly sha256: string } =>
+  (isMadeKind(kind) ? { source: 'workspace', sha256: kind.sha256 } : { key: kind.kind, version: kind.version, sha256: kind.sha256 });
 
 export interface VisitorNotice {
   /** The event it tells of, so one event is told once. */
@@ -42,14 +65,20 @@ const capital = (words: string): string => words.charAt(0).toUpperCase() + words
 const record = (value: unknown): Readonly<Record<string, unknown>> =>
   value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
-function kindOf(value: unknown): KindReference | null {
+/** A kind's reference as a record states it, of either shape, or null. */
+export function kindOf(value: unknown): KindReference | null {
   const held = record(value);
-  const { kind, version, sha256 } = held;
+  const { kind, version, sha256, source } = held;
+  if (source === 'workspace') return typeof sha256 === 'string' ? { source: 'workspace', sha256 } : null;
   return typeof kind === 'string' && typeof version === 'number' && typeof sha256 === 'string' ? { kind, version, sha256 } : null;
 }
 
 /** A kind reference as one key, for keeping what was read about it. */
-export const kindKey = (kind: KindReference): string => `${kind.kind}/${kind.version}/${kind.sha256}`;
+export const kindKey = (kind: KindReference): string =>
+  (isMadeKind(kind) ? `workspace/${kind.sha256}` : `${kind.kind}/${kind.version}/${kind.sha256}`);
+
+/** Whether two references name the same kind. */
+export const sameKind = (a: KindReference, b: KindReference): boolean => kindKey(a) === kindKey(b);
 
 /** Every kind a crossing event names (the visitor's and what it carried), for reading their labels. */
 export function noticeKinds(event: SocietyEvent): readonly KindReference[] {
