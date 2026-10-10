@@ -169,6 +169,7 @@ interface Seen {
   readonly x: number;
   readonly y: number;
   readonly small: boolean;
+  readonly behind: boolean;
   readonly alone: MarkContent | null;
   readonly size: Size | null;
   readonly box: Box | null;
@@ -179,6 +180,8 @@ interface MarkContent {
   readonly alone: boolean;
   /** Its being is picked, speaking or at a decision: it is drawn over every other mark. */
   readonly held: boolean;
+  /** Its being is followed (picked, or played by the viewer) and something stands between: drawn as behind it. */
+  readonly behind: boolean;
   readonly pillClass: string;
   readonly kind: ThingMark['kind'];
   readonly word: string;
@@ -199,7 +202,7 @@ interface MarkContent {
  */
 function contentOf(
   subject: MarkedSubject, mark: ThingMark, held: boolean,
-  decision: { readonly chose: string; readonly said: string | null } | null, alone: boolean,
+  decision: { readonly chose: string; readonly said: string | null } | null, alone: boolean, behind = false,
 ): MarkContent {
   const ai = mark.kind === 'ai';
   // The model's whole name, always: never a word of it, never hidden for being far.
@@ -214,7 +217,7 @@ function contentOf(
   const label = held ? subject.label : null;
   const classes = pillClass(mark);
   return {
-    alone, held, pillClass: classes, kind: mark.kind, word, name, from, label, chose, said,
+    alone, held, behind, pillClass: classes, kind: mark.kind, word, name, from, label, chose, said,
     aria: chose === null ? named : `${named}. ${[chose, said].filter((part) => part !== '').join(' ')}`,
     words: alone
       ? ['alone', classes, word].join('\u0000')
@@ -234,7 +237,15 @@ export interface UnnamedCounts {
   readonly beyondShare: number;
   /** Its name would cover a name or a mark already standing over a nearer being, so nobody could tell whose it was. */
   readonly collides: number;
+  /** Something of the world stands between the viewer and it: it wears nothing, mark or name. */
+  readonly hidden: number;
 }
+
+/**
+ * Whether a point of the world is seen from an eye, as the page answers it for the world drawn (a
+ * town's plan of what stands at eye height). World metres.
+ */
+export type Sees = (eye: pc.Vec3, point: pc.Vec3) => boolean;
 
 interface LineNode {
   readonly root: HTMLDivElement;
@@ -272,7 +283,7 @@ export class ThingMarks {
   private readonly decisions = new Map<string, { readonly chose: string; readonly said: string | null; readonly until: number }>();
   /** The size of a mark by what it shows, read from the page once for each. */
   private readonly sizes = new Map<string, Size>();
-  private unnamed: UnnamedCounts = { small: 0, beyondShare: 0, collides: 0 };
+  private unnamed: UnnamedCounts = { small: 0, beyondShare: 0, collides: 0, hidden: 0 };
   private named = 0;
   /** How tall all a being wears stands over its head this frame, in CSS pixels, for a line to stand over. */
   private readonly tops = new Map<string, number>();
@@ -348,11 +359,14 @@ export class ThingMarks {
   /**
    * Once a frame, after everyone is posed: `anchors` is where each being's mark hangs in the world
    * (over its head) and `heights` how tall each stands, in metres, where the society drawn says. A
-   * being that is selected, speaking or at a decision shows its label and is always named.
+   * being that is selected, speaking or at a decision shows its label and is always named. `sees`
+   * is the page's answer to whether a point is seen from the eye: a being it says is not seen wears
+   * nothing and says nothing, and is counted; the one that is picked and one the viewer plays are
+   * followed, and keep what they wear, marked as behind something. Absent, everything is seen.
    */
   update(
     camera: pc.Entity, anchors: ReadonlyMap<string, pc.Vec3>, selected: string | null, nowMs: number,
-    heights: ReadonlyMap<string, number> = new Map(),
+    heights: ReadonlyMap<string, number> = new Map(), sees: Sees | null = null,
   ): void {
     const component = camera.camera;
     if (!component) return;
@@ -382,7 +396,7 @@ export class ThingMarks {
     let used = 0;
     let named = 0;
     let nearest = true;
-    const unnamed = { small: 0, beyondShare: 0, collides: 0 };
+    const unnamed = { small: 0, beyondShare: 0, collides: 0, hidden: 0 };
     // First where everything stands: a model's mark is on its being's head whatever else is drawn,
     // so every one of them is known before any name is.
     const seen: Seen[] = [];
@@ -390,10 +404,17 @@ export class ThingMarks {
       const screen = this.project(one.at, width, height);
       // Only marks on screen are drawn: one behind the eye takes no name and is no name missed.
       if (screen === null) continue;
+      // What the eye cannot see wears nothing. The picked one and one the viewer plays are followed:
+      // they keep what they wear, said to be behind something.
+      const behind = sees !== null && !sees(this.viewer, one.at);
+      if (behind && one.id !== selected && !(one.mark.kind === 'person' && one.mark.mine)) {
+        unnamed.hidden += 1;
+        continue;
+      }
       const tall = heights.get(one.id);
       const small = !one.held && tall !== undefined && one.distance > 0 && tall * pixelsPerMetre / one.distance < this.rule.beingLeastPx;
       // A being a model decides for always wears its mark; anything else too small to name wears nothing.
-      const alone = one.mark.kind === 'ai' ? contentOf(one.subject, one.mark, false, null, true) : null;
+      const alone = one.mark.kind === 'ai' ? contentOf(one.subject, one.mark, false, null, true, behind) : null;
       if (small && alone === null) {
         unnamed.small += 1;
         continue;
@@ -406,7 +427,7 @@ export class ThingMarks {
         mark = this.sizeOf(node);
       }
       const [x, y] = screen;
-      seen.push({ id: one.id, subject: one.subject, mark: one.mark, held: one.held, x, y, small, alone, size: mark, box: mark === null ? null : boxAt(x, y, mark, 0) });
+      seen.push({ id: one.id, subject: one.subject, mark: one.mark, held: one.held, x, y, small, behind, alone, size: mark, box: mark === null ? null : boxAt(x, y, mark, 0) });
     }
     const names: Box[] = [];
     const overlap = (box: Box, other: Box): boolean =>
@@ -417,7 +438,7 @@ export class ThingMarks {
       const node = this.marks[used] ?? this.markNode();
       const decision = deciding.has(one.id) ? this.decisions.get(one.id)! : null;
       // The whole of it, name and all, from what was read before where it was: nothing is written to learn it.
-      const whole = contentOf(one.subject, one.mark, one.held, decision, false);
+      const whole = contentOf(one.subject, one.mark, one.held, decision, false, one.behind);
       let size = decision === null ? this.sizes.get(whole.words) : undefined;
       if (size === undefined) {
         this.fill(node, one.id, whole);
@@ -459,7 +480,7 @@ export class ThingMarks {
     this.named = named;
     // Said on the overlay too, for a page that tells a person how many more there are: written only
     // when it changes, so a frame that draws the same writes nothing.
-    const said = `${named} ${unnamed.small} ${unnamed.beyondShare} ${unnamed.collides}`;
+    const said = `${named} ${unnamed.small} ${unnamed.beyondShare} ${unnamed.collides} ${unnamed.hidden}`;
     if (said !== this.said) {
       this.said = said;
       this.root.dataset['named'] = String(named);
@@ -471,7 +492,8 @@ export class ThingMarks {
     }
     for (const line of this.lines) {
       const at = line.subject === null || line.until <= nowMs ? undefined : anchors.get(line.subject);
-      const screen = at === undefined ? null : this.project(at, width, height);
+      // A line is never drawn through what hides its speaker, followed or not.
+      const screen = at === undefined || (sees !== null && !sees(this.viewer, at)) ? null : this.project(at, width, height);
       if (screen === null) {
         if (line.until <= nowMs) line.subject = null;
         hide(line);
@@ -565,13 +587,14 @@ export class ThingMarks {
 
   /** Write what a node shows, where it differs from what the node shows already. */
   private fill(node: MarkNode, id: string, content: MarkContent): void {
-    const filled = [id, content.words, content.name ?? '', content.from ?? '', content.aria, content.held ? 'held' : ''].join('\u0000');
+    const filled = [id, content.words, content.name ?? '', content.from ?? '', content.aria, content.held ? 'held' : '', content.behind ? 'behind' : ''].join('\u0000');
     node.subject = id;
     if (filled === node.filled) return;
     node.filled = filled;
     node.words = content.words;
     node.root.classList.toggle('thing-mark-alone', content.alone);
     node.root.classList.toggle('thing-mark-held', content.held);
+    node.root.classList.toggle('thing-mark-behind', content.behind);
     node.pill.className = content.pillClass;
     node.pill.dataset['form'] = content.alone ? 'mark' : 'name';
     node.pill.dataset['subject'] = id;
@@ -672,6 +695,11 @@ export interface AttachedMarksOptions {
   readonly onPick: (subjectId: string) => void;
   /** What bounds the marks, as the page's catalog states it. */
   readonly rule: DeciderMarkRule;
+  /**
+   * Whether a point is seen from the eye in the world drawn now, or null where the page has no
+   * answer for it; absent or null, everything is seen (`ThingMarks.update`).
+   */
+  readonly sees?: () => Sees | null;
   /** Ask for a frame, so marks just set are placed. */
   readonly invalidate?: () => void;
   readonly now?: () => number;
@@ -743,7 +771,7 @@ export class AttachedMarks {
         if (tall !== null) this.heights.set(id, tall);
       }
     }
-    this.overlay.update(this.options.camera, this.found, this.options.selected(), now, this.heights);
+    this.overlay.update(this.options.camera, this.found, this.options.selected(), now, this.heights, this.options.sees?.() ?? null);
   }
 
   destroy(): void {

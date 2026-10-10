@@ -178,6 +178,11 @@ export interface GeneratedWorld {
   /** The bodies its traffic takes from its pack while its tiles are attached, if any. */
   readonly bodies: () => VehicleBodies | null;
   /**
+   * What stands in a sight line at eye height in the town (`sightBlockersOfTown`): the plan its
+   * first view was chosen by, kept for what hides a being while the town is mounted.
+   */
+  readonly sightBlockers: readonly SightBlocker[];
+  /**
    * The same tiles, as loaded, in another look: nothing is fetched, verified or decoded again;
    * refused, and nothing changed, when the pack cannot be read.
    */
@@ -392,13 +397,14 @@ export async function loadGeneratedWorld(
   // nothing placed the view is chosen from the town's own tiles alone and the parked vehicles, which
   // may or may not arrive in time, are not asked after: the town opens the same way either way.
   const [targets, parked] = await Promise.all([placing, parking]);
+  const sightBlockers = sightBlockersOfTown(route, containers, loaded);
   const view = arrivalView({
     eastMm: stand?.eastMm ?? east, southMm: stand?.southMm ?? south, facing: [facingEast, facingSouth],
     targets, parked,
     ground: (e, s) => surface.sample(e / 1000, s / 1000) !== null,
     // What stands at eye height in the town's own records, how a town with nothing placed is looked
     // at, and the seats and doors that view is chosen by.
-    blockers: sightBlockersOfTown(route, containers, loaded),
+    blockers: sightBlockers,
     open: TOWN_FIRST_VIEW,
     life: lifeOfTown(route, containers, furniture),
   });
@@ -415,6 +421,7 @@ export async function loadGeneratedWorld(
     ground,
     look: { pack: choice.packId, source: choice.source, drawn: prepared !== null, reason, ...settingOf(prepared) },
     bodies: drawn.bodies,
+    sightBlockers,
     async relook(asked) {
       const next = await resolved(asked);
       const nextPrepared = await prepare(next);
@@ -606,11 +613,14 @@ export async function openGeneratedWorld(
   access: Credentials,
   entry: SavedWorldEntry,
   bound: WorldStylePackBinding | null = null,
+  /** Handed the town's plan of what stands in a sight line, once the town is read and will be drawn. */
+  standing: (blockers: readonly SightBlocker[]) => void = () => undefined,
 ): Promise<LoadedGeneratedTile | null> {
   env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
   const loaded = await loadGeneratedWorld(access, entry, undefined, bound);
   if (loaded === null) return null;
   if (isGeneratedWorld(loaded)) {
+    standing(loaded.sightBlockers);
     const stated = (look: GeneratedWorld['look']): void => env.shell.setAttribute(WORLD_LOOK_ATTRIBUTE, JSON.stringify(look));
     stated(loaded.look);
     const world = switchableWorld(loaded, stated, env.shell);

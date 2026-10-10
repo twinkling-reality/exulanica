@@ -52,7 +52,7 @@ const RULE: DeciderMarkRule = {
   nameLeastPx: 14, beingLeastPx: 22, screenShare: 0.08, linesAtOnce: 4,
   lineBaseMs: 2000, linePerCharacterMs: 55, lineMostMs: 9000,
 };
-const NOTHING_UNNAMED = { small: 0, beyondShare: 0, collides: 0 };
+const NOTHING_UNNAMED = { small: 0, beyondShare: 0, collides: 0, hidden: 0 };
 
 const AI: ThingMark = { kind: 'ai', name: 'Qwen3 235B Instruct', full: 'Qwen3 235B Instruct' };
 const AGENT: ThingMark = { kind: 'ai', name: 'Scout', full: 'An outside AI agent, Scout', outside: true };
@@ -237,7 +237,7 @@ describe('marks over the beings a model or someone outside decides for', () => {
       expect(placedAt(stage, 'knight')).toEqual(at(kx, ky));
       expect(overlay.counts).toMatchObject({ marks: 3, aiMarks: 3, named: 2, unnamed: { small: 0, beyondShare: 0, collides: 1 } });
       const root = stage.querySelector<HTMLElement>('.thing-marks')!;
-      expect([root.dataset['named'], JSON.parse(root.dataset['unnamed']!)]).toEqual(['2', { small: 0, beyondShare: 0, collides: 1 }]);
+      expect([root.dataset['named'], JSON.parse(root.dataset['unnamed']!)]).toEqual(['2', { small: 0, beyondShare: 0, collides: 1, hidden: 0 }]);
       // The mark alone is marked so on its node, which is what the page's stylesheet hides the name by.
       const alone = Array.from(stage.querySelectorAll<HTMLElement>('.thing-mark-alone')).filter((node) => node.style.display !== 'none');
       expect(alone.map((node) => node.querySelector<HTMLElement>('.thing-mark-pill')!.dataset['subject'])).toEqual(['traveller']);
@@ -246,7 +246,7 @@ describe('marks over the beings a model or someone outside decides for', () => {
       overlay.update(camera, anchors, 'traveller', 0);
       expect(formOf()).toEqual({ spirit: 'mark', traveller: 'name', knight: 'name' });
       expect(placedAt(stage, 'traveller')).toEqual(at(tx, ty));
-      expect(overlay.counts.unnamed).toEqual({ small: 0, beyondShare: 0, collides: 1 });
+      expect(overlay.counts.unnamed).toEqual({ small: 0, beyondShare: 0, collides: 1, hidden: 0 });
       const held = Array.from(stage.querySelectorAll<HTMLElement>('.thing-mark-held')).filter((node) => node.style.display !== 'none');
       expect(held.map((node) => node.querySelector<HTMLElement>('.thing-mark-pill')!.dataset['subject'])).toEqual(['traveller']);
       // One sits on a bench and one stands just behind, 30 cm taller: the stander's mark is in the
@@ -313,7 +313,7 @@ describe('marks over the beings a model or someone outside decides for', () => {
       expect(overlay.counts).toMatchObject({ marks: 30, named: 20, unnamed: { small: 0, beyondShare: 10, collides: 0 } });
       // The overlay says the same on its root, for a page that tells a person how many more there are.
       const root = stage.querySelector<HTMLElement>('.thing-marks')!;
-      expect([root.dataset['named'], JSON.parse(root.dataset['unnamed']!)]).toEqual(['20', { small: 0, beyondShare: 10, collides: 0 }]);
+      expect([root.dataset['named'], JSON.parse(root.dataset['unnamed']!)]).toEqual(['20', { small: 0, beyondShare: 10, collides: 0, hidden: 0 }]);
       // The picked one is named outside the share, and takes none of it from the near.
       overlay.update(camera, anchors, 'p29', 0);
       expect(names()).toEqual([...ids.slice(0, 20), 'p29']);
@@ -523,6 +523,67 @@ describe('marks over the beings a model or someone outside decides for', () => {
     expect([...overlay.speaking(9010)].sort()).toEqual(['s2', 's3', 's4', 's5']);
   });
 
+  it('leaves a being the eye cannot see unmarked and unheard, counted, and marks a followed one as behind something', () => {
+    const restore = sized();
+    try {
+      const { camera, stage } = setup();
+      const overlay = new ThingMarks(stage, () => undefined, RULE);
+      const YOU: ThingMark = { kind: 'person', mine: true, label: 'You', full: 'Played by you' };
+      const PLAYED: ThingMark = { kind: 'person', mine: false, label: 'Played', full: 'Played by another person' };
+      overlay.setMarks(marked([
+        ['open', AI, 'knight'], ['walled', AI, 'baker'], ['mine', YOU, 'squire'], ['theirs', PLAYED, 'page'], ['near', AI, null],
+      ]));
+      // A wall stands across the view 8 m ahead: everything farther is behind it. The page's answer
+      // is asked with the eye and the point over each being's head.
+      const asked: [number, number][] = [];
+      const sees = (eye: pc.Vec3, point: pc.Vec3): boolean => {
+        asked.push([eye.z, point.z]);
+        return point.z > -8;
+      };
+      const anchors = new Map([
+        ['open', new pc.Vec3(-3, 1, -5)], ['walled', new pc.Vec3(0, 1, -12)], ['mine', new pc.Vec3(3, 1, -12)],
+        ['theirs', new pc.Vec3(-3, 1, -12)],
+        // In line with the hidden one and 5 px under it on the screen: the hidden one's mark is not
+        // there to be covered, so this one is named.
+        ['near', new pc.Vec3(0, 1.2, -6)],
+      ]);
+      overlay.update(camera, anchors, null, 0, new Map(), sees);
+      const worn = () => Object.fromEntries(shown(stage).map((one) => [one.subject, one.form]));
+      const behind = () => Array.from(stage.querySelectorAll<HTMLElement>('.thing-mark-behind'))
+        .filter((node) => node.style.display !== 'none').map((node) => node.querySelector<HTMLElement>('.thing-mark-pill')!.dataset['subject']);
+      // Behind the wall: the model's being and the one another person plays wear nothing. The one
+      // the viewer plays is followed: it keeps its pill, said to be behind something.
+      expect(worn()).toEqual({ open: 'name', near: 'name', mine: 'name' });
+      expect(behind()).toEqual(['mine']);
+      expect(overlay.counts.unnamed).toEqual({ small: 0, beyondShare: 0, collides: 0, hidden: 2 });
+      expect(JSON.parse(stage.querySelector<HTMLElement>('.thing-marks')!.dataset['unnamed']!).hidden).toBe(2);
+      expect(asked.every(([eyeZ]) => eyeZ === 0)).toBe(true);
+      // Picked, the model's being behind the wall is followed too, with its name and its word.
+      overlay.update(camera, anchors, 'walled', 0, new Map(), sees);
+      expect(worn()).toMatchObject({ walled: 'name', mine: 'name' });
+      expect(behind().sort()).toEqual(['mine', 'walled']);
+      expect(shown(stage).find((one) => one.subject === 'walled')).toMatchObject({ name: 'Qwen3 235B Instruct', label: 'baker' });
+      expect(overlay.counts.unnamed.hidden).toBe(1);
+      // A line of speech is never drawn through the wall, not even the picked one's; one in the open is.
+      overlay.showLine({ subjectId: 'walled', text: 'Bread!', mark: AI, header: 'baker' }, 0);
+      overlay.showLine({ subjectId: 'open', text: 'Halt!', mark: AI, header: 'knight' }, 0);
+      overlay.update(camera, anchors, 'walled', 0, new Map(), sees);
+      const heard = Array.from(stage.querySelectorAll<HTMLElement>('.thing-line')).filter((node) => node.style.display !== 'none')
+        .map((node) => node.querySelector('.thing-line-speaker')!.textContent);
+      expect(heard).toEqual(['knight']);
+      // Seen again, it is behind nothing; and with no answer from the page everything is seen.
+      anchors.get('walled')!.set(0, 1, -7.5);
+      overlay.update(camera, anchors, 'walled', 0, new Map(), sees);
+      expect(behind()).toEqual(['mine']);
+      overlay.update(camera, anchors, null, 10_000);
+      expect(behind()).toEqual([]);
+      expect(Object.keys(worn()).sort()).toEqual(['mine', 'near', 'open', 'theirs', 'walled']);
+      expect(overlay.counts.unnamed.hidden).toBe(0);
+    } finally {
+      restore();
+    }
+  });
+
   it('stands a line of speech over all its speaker wears, and over the head of a speaker who wears nothing', () => {
     const restore = sized();
     try {
@@ -555,8 +616,10 @@ describe('marks over the beings a model or someone outside decides for', () => {
     const at = new Map([['knight', new pc.Vec3(0, 1, -5)], ['speck', new pc.Vec3(10, 1, -40)], ['baker', new pc.Vec3(-3, 1, -6)]]);
     const asked: string[] = [];
     let picked: string | null = null;
+    let hides = false;
     const attached = new AttachedMarks({
       app, camera, parent: stage, now: () => now, selected: () => picked, onPick: () => undefined, rule: RULE,
+      sees: () => (hides ? () => false : null),
       anchors: () => ({
         anchorOf(id, out) {
           asked.push(id);
@@ -584,7 +647,7 @@ describe('marks over the beings a model or someone outside decides for', () => {
     app.tick(16);
     expect(asked.sort()).toEqual(['indoors', 'knight', 'speck']);
     // The one the society does not draw wears nothing; the one too small to name is counted.
-    expect(attached.counts).toMatchObject({ marks: 2, named: 1, unnamed: { small: 1, beyondShare: 0, collides: 0 } });
+    expect(attached.counts).toMatchObject({ marks: 2, named: 1, unnamed: { small: 1, beyondShare: 0, collides: 0, hidden: 0 } });
     attached.showDecision({ subjectId: 'knight', chose: 'Chose “wait”.' });
     at.get('knight')!.set(0, 1, -10);
     now = 16;
@@ -592,6 +655,13 @@ describe('marks over the beings a model or someone outside decides for', () => {
     const [x, y] = screenOf(10, 1);
     expect(shown(stage)[0]!.transform).toContain(`translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`);
     expect(shown(stage)[0]!.chose).toBe('Chose “wait”.');
+    // The page's answer to what the eye sees is asked each frame and handed on: with everything
+    // behind something, only what is followed would be drawn, and nothing here is.
+    hides = true;
+    app.tick(40);
+    expect(shown(stage)).toEqual([]);
+    expect(attached.counts.unnamed.hidden).toBe(2);
+    hides = false;
     attached.destroy();
     asked.length = 0;
     app.tick(48);

@@ -57,6 +57,6 @@ export { ThingFigureMaker } from './figure-maker.js';
 export type { ThingCrowdFiguresOptions, ThingFigureMiss } from './crowd-figures.js';
 export { ThingCrowdFigures, ThingCrowdRenderable } from './crowd-figures.js';
 export type {
-  AttachedMarksOptions, DeciderMarkRule, MarkAnchors, MarkedSubject, ThingDecision, ThingLine, ThingMark, UnnamedCounts,
+  AttachedMarksOptions, DeciderMarkRule, MarkAnchors, MarkedSubject, Sees, ThingDecision, ThingLine, ThingMark, UnnamedCounts,
 } from './marks.js';
 export { AttachedMarks, NAME_LEAST_PROPERTY, ThingMarks, lineSeconds } from './marks.js';

@@ -198,13 +198,15 @@ function mount() {
   let modelsAnswer: SocietyModels | null = models();
   const canvas = document.createElement('canvas');
   const shell = document.createElement('div');
+  const session = {
+    atlas: { binding },
+    worldSight: null,
+    activeWorldEntry: { worldId: WORLD, authoredVersionId: 'version', title: 'My world',
+      authoredScene: { region: { regionId: 'region:starter' } } },
+  } as unknown as SessionState;
   const mounted = mountEnvironmentSelection({
     env: { canvas, shell, preview: false, systemReducedMotion: { matches: false } } as unknown as AppEnvironment,
-    state: {
-      atlas: { binding },
-      activeWorldEntry: { worldId: WORLD, authoredVersionId: 'version', title: 'My world',
-        authoredScene: { region: { regionId: 'region:starter' } } },
-    } as unknown as SessionState,
+    state: session,
     scene: { islands: [] } as unknown as AtlasScene,
     credentials: { baseUrl: 'https://example.test', token: 'token' },
     showStatus: vi.fn(), admissionId: null,
@@ -214,20 +216,27 @@ function mount() {
     thingLooksClient: { read: vi.fn(async () => new Map()) },
   });
   document.body.append(mounted.root);
-  return { mounted, crowd, canvas, stage };
+  return { mounted, crowd, canvas, stage, session };
 }
 
 const settle = async () => { for (let i = 0; i < 12; i += 1) await new Promise((resolve) => setTimeout(resolve, 0)); };
 
 describe('marks over the people of a saved world\'s society', () => {
   it('marks a model\'s person AI, a visitor by its bridge, and nobody else', async () => {
-    const { mounted, crowd, canvas, stage } = mount();
+    const { mounted, crowd, canvas, stage, session } = mount();
     await mounted.begin();
     await settle();
     const marks = marksMade.at(-1)!;
     // Drawn into the element the world shows through, over the society the binding draws.
     expect(marks.options.parent).toBe(stage);
     expect(marks.options.anchors()).toBe(crowd);
+    // What hides a being is asked of the world mounted, each frame: this one states no plan, so the
+    // overlay is handed no answer and hides nobody; once the session holds one, that is the answer.
+    expect(marks.options.sees!()).toBeNull();
+    const sees = () => false;
+    session.worldSight = { sees, reach: () => Number.POSITIVE_INFINITY };
+    expect(marks.options.sees!()).toBe(sees);
+    session.worldSight = null;
     const subjects = marks.sets.at(-1)!;
     expect(Object.fromEntries(subjects)).toEqual({
       'knight-0': { mark: { kind: 'ai', name: 'Qwen3 235B Instruct', full: 'Qwen3 235B Instruct' }, label: 'knight', spoken: 'run by an AI model, Qwen3 235B Instruct' },

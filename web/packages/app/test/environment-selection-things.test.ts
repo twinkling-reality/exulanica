@@ -10,6 +10,7 @@ import { parseSocietyControl } from '../src/society-control-api.js';
 import { THING_PICK_EVENT, type ThingPickDetail } from '../src/composition/things.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
+import { planSight, type Sight } from '../src/composition/sight.js';
 
 /*
  * A saved world whose version places things: they are handed to the things layer in the frame its
@@ -110,7 +111,7 @@ const thingsSociety = (): SocietySnapshot => parseSociety({
   },
 });
 
-function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; readonly everyoneIndoors?: boolean } = {}) {
+function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; readonly everyoneIndoors?: boolean; readonly sight?: Sight } = {}) {
   const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
   const regionEntity = { name: 'authored-region:region:starter' };
   const crowd = {
@@ -167,6 +168,8 @@ function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; r
     env: { canvas, shell, preview: false, systemReducedMotion: { matches: false } } as unknown as AppEnvironment,
     state: {
       atlas: { binding },
+      // What hides a being in the world mounted, where a test states a plan of it.
+      worldSight: scene.sight ?? null,
       activeWorldEntry: { worldId: WORLD, authoredVersionId: 'version', title: 'My world',
         authoredScene: { region: { regionId: 'region:starter' } } },
     } as unknown as SessionState,
@@ -204,6 +207,33 @@ describe('a saved world\'s placed things', () => {
     expect(crowd.pickInhabitant.mock.results.at(-1)!.value).toBe('person-0');
     mounted.dispose();
     expect(canvas.dataset['thingsDrawn']).toBeUndefined();
+  });
+
+  it('picks nobody through a wall of the world\'s plan, by aim or by click, and still picks the thing in front of the wall', async () => {
+    // The ray starts at (0, 1.68, 4) and looks north (-z). A wall 20 cm thick crosses it 2 m on,
+    // in front of the well at 3 m and the person at 5 m.
+    const wall = [[-3000, 1800], [3000, 1800], [3000, 2000], [-3000, 2000]] as const;
+    const { mounted, crowd, controls, shell } = mount(false, { sight: planSight([wall], 500) });
+    await mounted.begin();
+    const layer = layers.at(-1)!;
+    const heard: ThingPickDetail[] = [];
+    shell.addEventListener(THING_PICK_EVENT, (event) => heard.push((event as CustomEvent<ThingPickDetail>).detail));
+    // With the well behind the person, the person would be picked: the wall, 2 m along, is nearer
+    // than both, so neither the person nor the well behind it is picked.
+    layer.distance = 9;
+    controls.onInteract!();
+    expect(crowd.pickInhabitant.mock.calls.at(-1)![2]).toBeCloseTo(2, 9);
+    expect(crowd.pickInhabitant.mock.results.at(-1)!.value).toBeNull();
+    controls.onPointerPick!(640, 400);
+    expect(crowd.pickInhabitant.mock.calls.at(-1)![2]).toBeCloseTo(2, 9);
+    expect(crowd.pickInhabitant.mock.results.at(-1)!.value).toBeNull();
+    expect(heard).toEqual([]);
+    // A placed thing nearer than the wall still bounds the reach by its own distance.
+    layer.distance = 1;
+    controls.onInteract!();
+    expect(crowd.pickInhabitant.mock.calls.at(-1)![2]).toBe(1);
+    expect(heard.at(-1)).toMatchObject({ placedId: 'well-1', via: 'aim' });
+    mounted.dispose();
   });
 
   it('draws a society of things\' things through the crowd by their looks, and its objects as the state says', async () => {

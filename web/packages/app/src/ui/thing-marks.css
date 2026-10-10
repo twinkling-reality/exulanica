@@ -203,6 +203,22 @@
   outline-offset: 2px;
 }
 
+/*
+ * Behind something: the being is followed (picked, or played by the viewer) and a wall of the world
+ * stands between. One look for it, whatever the mark: faded and flat, as a thing seen through
+ * another is, so it reads as where the being is and not as another kind of name.
+ */
+.thing-mark-behind {
+  opacity: 0.5;
+}
+
+.thing-mark-behind .thing-mark-pill,
+.thing-mark-behind .thing-mark-word,
+.thing-mark-behind .thing-mark-plate,
+.thing-mark-behind .thing-mark-decision {
+  box-shadow: none;
+}
+
 /* Their own routine decides: said only while the being is picked, quieter than a decider's name. */
 .thing-mark-routine {
   /* Read from as far as a decider's name is: its letters keep the same floor. */

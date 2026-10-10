@@ -48,6 +48,7 @@ import type { ReconstructionRungDisclosure } from '../ui/status.js';
 import type { WorldStyleClient, WorldStyleConnection } from '../world-style-api.js';
 import type { SavedWorldEntry, WorldEntryClient } from '../world-entry-api.js';
 import type { Credentials } from '../config.js';
+import type { Sight } from './sight.js';
 
 /** What the document and the URL settled before a session existed. Never written by a mount. */
 export interface AppEnvironment {
@@ -92,6 +93,11 @@ export interface SessionState {
 
   // -- the handles that stop a previous mount -------------------------------------------------
   atlas: MountedAtlas | null;
+  /**
+   * What hides a being in the world mounted now (`sight.ts`), or null where the page has no plan of
+   * what stands in a sight line there: then nothing is hidden, as before.
+   */
+  worldSight: Sight | null;
   mountedCompanionStage: CompanionStage | null;
   mountListeners: AbortController | null;
   stopWatching: (() => void) | null;
@@ -239,6 +245,7 @@ export function createSessionState(): SessionState {
     companionEngine: null,
 
     atlas: null,
+    worldSight: null,
     mountedCompanionStage: null,
     mountListeners: null,
     stopWatching: null,

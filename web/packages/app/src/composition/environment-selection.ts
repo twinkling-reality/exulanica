@@ -2745,8 +2745,13 @@ export function mountEnvironmentSelection(
     // The nearest along a ray wins: a placed thing, or one of the world's people in front of it.
     // Aiming and pressing E and a click on the world before looking around pick the same way.
     const pickedAlong = (origin: readonly [number, number, number], direction: readonly [number, number, number]) => {
-      const thing = things?.pick(origin, direction) ?? null;
-      const inhabitantId = atlas.authoredSociety?.pickInhabitant(origin, direction, thing?.distance ?? Number.POSITIVE_INFINITY) ?? null;
+      // Nothing is picked through what hides it: the ray reaches a placed thing or a person only
+      // short of the first thing of the world's plan that stands in it, and a person only short of
+      // a placed thing in front.
+      const open = deps.state.worldSight?.reach(origin, direction) ?? Number.POSITIVE_INFINITY;
+      const met = things?.pick(origin, direction) ?? null;
+      const thing = met !== null && met.distance <= open ? met : null;
+      const inhabitantId = atlas.authoredSociety?.pickInhabitant(origin, direction, Math.min(open, thing?.distance ?? Number.POSITIVE_INFINITY)) ?? null;
       const pick: PlayPick | null = inhabitantId !== null ? { subjectId: inhabitantId, thingId: null }
         : thing !== null ? { subjectId: thing.pick.subjectId, thingId: thing.pick.thingId } : null;
       return { thing, inhabitantId, pick };
@@ -2814,6 +2819,8 @@ export function mountEnvironmentSelection(
         onPick: (id) => { inspectInhabitant(id); },
         // What bounds the marks is the catalog's: a floor for a name's letters and a share of the view.
         rule: DECIDER_MARKS,
+        // What hides a being is the mounted world's own plan; where it states none, nothing is hidden.
+        sees: () => deps.state.worldSight?.sees ?? null,
         invalidate: () => atlas.invalidate(),
       });
     }

@@ -1267,9 +1267,8 @@ than a stated share of the view (what a name adds over its mark; the marks are n
 and where it would cover no name already drawn and nobody else's mark. Where any of the three fails
 the being wears its mark alone, which is still a button that picks it, and pointing at the mark or
 reaching it by keyboard opens its name over whatever stands there. So of two people on a bench one
-is named and both are marked, and no name stands where a reader cannot tell whose it is. The nearest
-being a model decides for is named however small it stands, though not where its name would cover
-somebody else's mark. The picked person, a speaking one and one at a
+is named and both are marked, and no name stands where a reader cannot tell whose it is. The one
+named however small it stands is the nearest whose name covers nobody's mark. The picked person, a speaking one and one at a
 decision are named whatever stands by, outside the share, with their kind over the name, and are
 drawn over the other marks. A marked being no model decides for (a game's player, a person's) has no
 shorter form: too small or beyond the share it wears nothing. Every name not drawn is counted by why
@@ -1278,9 +1277,26 @@ the canvas states who decides for how many beings and how many are indoors (`dat
 from each being's own state: one that states it is indoors (`indoors` true, or `location.indoors`
 true where the state keeps a location) is not drawn and is counted indoors, and one that states
 nothing of it is in the street. Limits: marks are not kept off each other, so far off, where a mark
-is as tall as the being under it, the marks of a crowd overlap; a held being's name is drawn over
-the marks of those standing by it, which it hides for as long; and a name can show through a wall,
-since nothing here tests what stands between the viewer and a being.
+is as tall as the being under it, the marks of a crowd overlap; and a held being's name is drawn over
+the marks of those standing by it, which it hides for as long.
+
+What hides a being is the world's own plan, asked one question: how far a sight line runs before
+something stands in it ([`sight.ts`](../web/packages/app/src/composition/sight.ts)). In a town the plan
+is the one its first view is chosen by: every building's base and each trunk and post that crosses a
+standing person's eye height, from the town's own tiles. A being with something of the plan between
+it and the viewer wears no mark and no name, its line of speech is not drawn, and a click or an aim
+picks neither it nor a placed thing behind what stands there; it is counted (`hidden` in
+`data-unnamed`). What stands within the first-view catalog's `sight_margin_mm` of a point is the
+thing the point is at, so a person in a doorway is seen from in front. Two beings are followed
+through a wall, because the person asked to: the picked one and the one the viewer plays keep what
+they wear, drawn in one look that says behind something (faded and flat, `thing-mark-behind`), and
+neither can be picked through the wall nor heard through it. It is the plan's answer and no more:
+a parked vehicle, a bench, a bin, a tree's canopy and another person hide nobody, since none
+crosses eye height in the plan; a town's doorway is not an opening in its building's base, so past
+the margin a person standing inside one is hidden; and it is asked in plan, which is right for a
+viewer on foot. A saved world with no town under it, a made place and a district state no such plan
+to the marks yet, and there a name still shows through a wall; the district's own click already
+stops at its buildings. Nothing is read back from the picture.
 
 When a minute takes up a model's decision, what the model chose opens over its name, in the action's
 offered words as the models read serves them ("Chose “walk to the well”."), with what came of it where

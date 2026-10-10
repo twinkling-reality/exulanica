@@ -90,8 +90,11 @@ describe('a saved generated world\'s traffic', () => {
       navigationWorld: { eyeHeight: 1.6, surface: { sample: () => null } },
       attach: () => ({ metrics: {}, animating: false, dispose: () => { tileDisposed = true; } }),
     });
-    const tile = await openGeneratedWorld(env, access, entry);
+    // The town's plan of what stands in a sight line is handed over once, when the town will be drawn.
+    const standing = vi.fn();
+    const tile = await openGeneratedWorld(env, access, entry, null, standing);
     expect(tile).not.toBeNull();
+    expect(standing.mock.calls).toEqual([[[]]]);
     const listeners = new Set<() => void>();
     const host = {
       app: { on: (_: string, callback: () => void) => listeners.add(callback), off: (_: string, callback: () => void) => listeners.delete(callback) },

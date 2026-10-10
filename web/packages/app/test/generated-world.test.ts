@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { groundNear, isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generated-world.js';
+import { planSight } from '../src/composition/sight.js';
 import { townFurniture } from '../src/composition/town-furniture.js';
 import type { GeneratedGround, GeneratedTile, SavedWorldEntry } from '../src/world-entry-api.js';
 import { worldDidNotOpen } from '../src/ui/startup-state.js';
@@ -18,7 +19,9 @@ const TILE_LOOK_V1 = vi.hoisted(() => ({ id: 'exulanica.generated-tile-look', ve
 const streetFurnitureOf = vi.hoisted(() => vi.fn<(bytes: Uint8Array) => { identity: string }[]>(() => []));
 // A container's doors onto a footway, the same way.
 const doorsOf = vi.hoisted(() => vi.fn<(bytes: Uint8Array) => { identity: string; eastMm: number; southMm: number }[]>(() => []));
-vi.mock('@exulanica/atlas-react/generated-tile', () => ({ loadGeneratedTile, TILE_LOOK_V1, streetFurnitureOf, doorsOf }));
+// What a container's furniture and trees put in a sight line at a height, the same way.
+const sightBlockersOf = vi.hoisted(() => vi.fn<(bytes: Uint8Array, heightMm: number) => (readonly (readonly [number, number])[])[]>(() => []));
+vi.mock('@exulanica/atlas-react/generated-tile', () => ({ loadGeneratedTile, TILE_LOOK_V1, streetFurnitureOf, doorsOf, sightBlockersOf }));
 vi.mock('../src/texture-library.js', () => ({
   committedTextureLibrary: async () => ({
     textureManifest: new Uint8Array(),
@@ -296,6 +299,44 @@ describe('a saved generated world of several tiles', () => {
     } finally {
       streetFurnitureOf.mockImplementation(() => []);
       doorsOf.mockImplementation(() => []);
+    }
+  });
+
+  it('keeps the plan of what stands at eye height, which hides a being behind a building or a post while the town is open', async () => {
+    const tiles = [tile(0, 'baked')];
+    vi.stubGlobal('fetch', tileRoute({ [tiles[0]!.bakedTileId!]: new Uint8Array([1, 2, 3]) }).fetch);
+    // A building 10 m square whose near wall is 20 m south of the arrival, among the obstructions the
+    // tile states (with a kerb, which is no building), and a lamp post 30 cm square 5 m east of the
+    // arrival, from the tile's records at the eye height the tile states.
+    const [east, south] = [128, -58.75];
+    loadGeneratedTile.mockResolvedValue({
+      navigationWorld: { eyeHeight: 1.6, surface: { sample: () => ({ height: 0.105 }) } },
+      routeObstructions: { obstacles: [
+        { id: 'city.massing:lot-1', rings: [[
+          { x: east - 5, z: south + 20 }, { x: east + 5, z: south + 20 }, { x: east + 5, z: south + 30 }, { x: east - 5, z: south + 30 },
+        ]] },
+        { id: 'city.kerb:1', rings: [[{ x: east - 50, z: south + 2 }, { x: east + 50, z: south + 2 }, { x: east + 50, z: south + 2.1 }, { x: east - 50, z: south + 2.1 }]] },
+      ] },
+    });
+    const post = [[133_000 - 150, -58_750 - 150], [133_000 + 150, -58_750 - 150], [133_000 + 150, -58_750 + 150], [133_000 - 150, -58_750 + 150]] as const;
+    sightBlockersOf.mockImplementation(() => [post]);
+    try {
+      const loaded = await loadGeneratedWorld(access, entry(tiles), '?look=today');
+      if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
+      expect(sightBlockersOf).toHaveBeenLastCalledWith(new Uint8Array([1, 2, 3]), 1600);
+      // The building's base in millimetres east and south, and the post; the kerb is not among them.
+      expect(loaded.sightBlockers).toHaveLength(2);
+      expect(loaded.sightBlockers[0]![0]).toEqual([123_000, -38_750]);
+      expect(loaded.sightBlockers[1]).toEqual(post);
+      // Asked in the world's metres from the arrival: behind the building and behind the post are
+      // not seen; in front of the building, and past the kerb, are.
+      const sight = planSight(loaded.sightBlockers, 500);
+      const eye = { x: east, z: south };
+      expect(sight.sees(eye, { x: east, z: south + 40 })).toBe(false);
+      expect(sight.sees(eye, { x: east + 10, z: south })).toBe(false);
+      expect(sight.sees(eye, { x: east, z: south + 15 })).toBe(true);
+    } finally {
+      sightBlockersOf.mockImplementation(() => []);
     }
   });
 
