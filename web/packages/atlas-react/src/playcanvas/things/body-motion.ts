@@ -25,8 +25,9 @@ export interface BodyMotion {
   readonly wave: number;
   readonly wavePeriod: number;
   readonly waveLag: number;
-  /** The share of the way to the body's back a wing's segments are folded, and how far a folded wing settles on a step. */
+  /** The share of the way to the body's back a wing's segments are folded, how far below level its trailing side hangs, and how far a folded wing settles on a step. */
   readonly wingFold: number;
+  readonly wingDroop: number;
   readonly wingSettle: number;
   /** How far a fin sways. */
   readonly finSway: number;
@@ -74,6 +75,7 @@ const ROWS: Readonly<Record<string, Row>> = {
   wave_period_seconds: { field: 'wavePeriod', unit: 'second', from: 0.2, to: 600 },
   wave_lag_cycles: { field: 'waveLag', unit: 'cycle', from: 0, to: 1 },
   wing_fold_share: { field: 'wingFold', unit: 'share', from: 0, to: 1 },
+  wing_droop_rad: { field: 'wingDroop', unit: 'radian', from: 0, to: 1.5708 },
   wing_settle_rad: { field: 'wingSettle', unit: 'radian', from: 0, to: 0.5 },
   fin_sway_rad: { field: 'finSway', unit: 'radian', from: 0, to: 1 },
   spine_wave_rad: { field: 'spineWave', unit: 'radian', from: 0, to: 1.2 },

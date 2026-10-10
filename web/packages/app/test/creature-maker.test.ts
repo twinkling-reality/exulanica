@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { atlasVec3 } from '@exulanica/atlas-core';
 import { DEFAULT_PLACEMENT_DISTANCE_MM, generatedRegionName } from '@exulanica/atlas-react/playcanvas';
 import { ApiError } from '@exulanica/graph-client';
-import { mountCreatureMaker, offerWords, placementInGeneratedRegion, planPlacement } from '../src/composition/creature-maker.js';
+import { fartherAhead, mountCreatureMaker, offerWords, placementInGeneratedRegion, planPlacement } from '../src/composition/creature-maker.js';
 import type { CreatureDraft, CreatureDraftsClient, CreatureOffer } from '../src/creature-drafts-api.js';
 import type { CreatureSheet, CreatureSheetOffer } from '../src/ui/creature-sheet.js';
 
@@ -20,7 +20,7 @@ const draft = (status: CreatureDraft['status'], more: Partial<CreatureDraft> = {
   draftId: DRAFT, status, label: null, kind: null, look: null, model: null, refusal: null, failure: null, ...more,
 });
 
-function harness(answers: CreatureDraft[], options: { asked?: CreatureDraft; running?: CreatureDraft[]; askRefused?: ApiError } = {}) {
+function harness(answers: CreatureDraft[], options: { asked?: CreatureDraft; running?: CreatureDraft[]; askRefused?: ApiError; bodyLengthMm?: (kindSha256: string) => Promise<number | null> } = {}) {
   const said: string[] = [];
   const placed: { versionId: string; body: Readonly<Record<string, unknown>> }[] = [];
   const sheet: CreatureSheet = {
@@ -48,6 +48,7 @@ function harness(answers: CreatureDraft[], options: { asked?: CreatureDraft; run
     placement: () => ({ region_id: 'region:starter', transform: { x_mm: 1000, y_mm: 0, z_mm: -4000, yaw_microradians: 1_000_000 } }),
     place: async (versionId, body) => { placed.push({ versionId, body }); return { status: 201 }; },
     wait: async () => undefined,
+    ...(options.bodyLengthMm ? { bodyLengthMm: options.bodyLengthMm } : {}),
   });
   return { maker, said, placed };
 }
@@ -79,6 +80,24 @@ describe('making a creature from the open world', () => {
       },
     }]);
     expect(said).toEqual(['imagining', 'placing:hill walker', 'made:hill walker']);
+  });
+
+  it('puts a long body half its length farther along the way the person faces, on the ground found ahead', async () => {
+    // The place ahead is (1000, -4000) with the person's heading of 1 rad as its yaw: a step of e
+    // along it adds e sin 1 to x and e cos 1 to z. A 4,200 mm body steps 2,100: 1,767 and 1,135.
+    const { maker, placed } = harness([kept], { bodyLengthMm: async (sha256) => (sha256 === 'a'.repeat(64) ? 4200 : null) });
+    await maker.make('a long walker of the hills');
+    expect((placed[0]!.body as { pose: unknown }).pose).toEqual({ x_mm: 2767, y_mm: 0, z_mm: -2865, yaw_microradians: 4_141_593 });
+    // A kind the page cannot read, or one that states no length, stands at the place as given.
+    for (const bodyLengthMm of [async () => null, async () => { throw new Error('not held'); }]) {
+      const unread = harness([kept], { bodyLengthMm });
+      await unread.maker.make('a walker');
+      expect((unread.placed[0]!.body as { pose: unknown }).pose).toEqual({ x_mm: 1000, y_mm: 0, z_mm: -4000, yaw_microradians: 4_141_593 });
+    }
+    // Along each axis by hand: facing +z (yaw 0) and facing +x (a quarter turn).
+    const at = (yaw: number) => ({ region_id: 'r', transform: { x_mm: 10, y_mm: 7, z_mm: 20, yaw_microradians: yaw } });
+    expect(fartherAhead(at(0), 500).transform).toEqual({ x_mm: 10, y_mm: 7, z_mm: 520, yaw_microradians: 0 });
+    expect(fartherAhead(at(1_570_796), 500).transform).toEqual({ x_mm: 510, y_mm: 7, z_mm: 20, yaw_microradians: 1_570_796 });
   });
 
   it('shows a refusal\'s own fixed sentence and places nothing', async () => {

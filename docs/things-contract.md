@@ -735,8 +735,11 @@ so a reload loses nothing. A kept creature is placed by its kind's digest alone 
 person and turned to face them, at the pose the objects panel offers, or, in a world made from a recipe or a world kind,
 where that panel places nothing, the same distance ahead in the one region drawn there, on the plane
 its people stand on; through the same edit as a planned thing (the version's compare-and-swap, the
-saved entry advancing). Where the page cannot say where the person stands it places nothing and says
-so; the creature stays kept. A refusal shows its code's fixed sentence
+saved entry advancing). A creature stands with its middle at its place, so it is put half its body's
+stated length farther along the way the person faces: its head is then as far from them as any
+placed thing is, 3,500 mm, whatever its size, on the ground found at that distance; a kind whose
+extent the page cannot read is placed at the distance as given. Where the page cannot say where the
+person stands it places nothing and says so; the creature stays kept. A refusal shows its code's fixed sentence
 and keeps the line, and a failure says why in one sentence.
 
 Spending is keyed by the job: under durable spending a job taken again after a crash is admitted
@@ -1065,7 +1068,7 @@ rest turn. Each role is posed by one rule, written once for every body:
 | `neck` and the head | The neck returns what the body turned, so the head faces where the being goes; neck and head share a slow look to each side, and the head nods on each beat while the being speaks |
 | `jaw` | Opens on each beat of speech; stays shut on what its socket carries, and otherwise |
 | `tail`, and a `tentacle` that hangs | A wave that travels outward, each joint a lag behind the one before: about the upright for a chain along the ground, about the body's length for one that hangs |
-| `wing` | Folded along the body: each segment turned from where its look drew it spread toward the body's back, so the wing lies inside the body's width. It settles a little on each step. Nothing flies |
+| `wing` | Folded along the body: each segment turned from where its look drew it spread toward the body's back, so its bones lie inside the body's width, and rolled about its own length so the side its membrane is stretched from hangs outward and down the flank. It settles a little on each step. Nothing flies |
 | `fin` | A slow sway about the body's length |
 | `tentacle`, on a body with no leg | The body steps on its tentacles, alternate ones together; while it stands they hang and wave |
 

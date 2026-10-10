@@ -230,6 +230,10 @@ export default defineConfig({
   build: { target: 'es2022' },
   plugins: [societyRecordingPlugin(resolve(APP_ROOT, '../../..')), previewApi],
   server: {
+    // A recorded take (scripts/demo/take_run.sh) must not be reloaded part way: with
+    // TAKE_APP_WATCHES_NOTHING set the development server watches no file, so no change, real or
+    // reported late by the system, reloads the page. Unset, it watches as any development server.
+    ...(process.env['TAKE_APP_WATCHES_NOTHING'] ? { watch: null } : {}),
     // The workspace, plus the committed character containers the development preview fetches.
     // The words the inspector and the Companion share are read from the repository's catalog.
     fs: {

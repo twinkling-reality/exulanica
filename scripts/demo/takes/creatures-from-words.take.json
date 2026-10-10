@@ -1,0 +1,56 @@
+{
+ "profile": "exulanica.film-take/v1",
+ "title": "Three strangers",
+ "world": {
+  "describe": "A bright cartoon town like a toy box, with lofts, cafes and restaurants."
+ },
+ "sentence": "Add a stone well, a gate for travellers, a knight on guard by the well, a lantern spirit by the gate, and a sword and a lantern by the well.",
+ "creatures": [
+  {
+   "words": "a red dragon the size of a horse that walks the streets and carries things in its jaws",
+   "stand": [
+    {
+     "key": "ArrowRight",
+     "ms": 2300
+    }
+   ]
+  },
+  {
+   "words": "a green serpent as long as a bus that winds along the ground",
+   "stand": [
+    {
+     "key": "KeyA",
+     "ms": 420
+    }
+   ]
+  },
+  {
+   "words": "a spider as big as a table with eight long legs",
+   "stand": [
+    {
+     "key": "KeyD",
+     "ms": 840
+    }
+   ]
+  }
+ ],
+ "minds": [
+  {
+   "being": "Winged four legged creature",
+   "model": "Nemotron 3 Nano 30B"
+  }
+ ],
+ "speed": 1,
+ "alive_seconds": 150,
+ "step_back_ms": 400,
+ "frame": [
+  {
+   "key": "KeyA",
+   "ms": 420
+  }
+ ],
+ "card": {
+  "being": "Winged four legged creature"
+ },
+ "scene": "assets/catalogs/scenes/three-strangers-in-town.v2.json"
+}

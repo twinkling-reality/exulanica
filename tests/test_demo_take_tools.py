@@ -218,6 +218,46 @@ def test_a_take_in_a_made_town_says_the_town_and_stands_before_its_sentence():
     assert set(opening) == {"profile", "title", "world", "stand", "until"}
 
 
+def test_a_take_that_makes_creatures_says_each_in_words_and_its_stack_drafts_them():
+    take = json.loads((DEMO / "takes/creatures-from-words.take.json").read_text())
+    driver = (DEMO / "film_take.mjs").read_text()
+    runner = (DEMO / "take_run.sh").read_text()
+    assert take["profile"] == "exulanica.film-take/v1"
+    # A town of the person's own words, not the empty starter world, and the scene made for one.
+    assert take["world"]["describe"].strip()
+    scene = json.loads((ROOT / take["scene"]).read_text())
+    assert scene["ground"]["kind"] == "generated" and scene["engine"] == "exulanica-society/v7"
+    # Each creature is words a person would type, each said once, and no model's name or figure.
+    said = [creature["words"] for creature in take["creatures"]]
+    assert len(said) >= 2 and len(set(said)) == len(said)
+    for creature in take["creatures"]:
+        assert set(creature) <= {"words", "stand"} and creature["words"].strip()
+        for held in creature.get("stand", []):
+            assert f"{held['key']}:" in driver and held["ms"] > 0
+    for held in take["frame"]:
+        assert f"{held['key']}:" in driver and held["ms"] > 0
+    # The driver makes them before the people are brought in, so the society takes each in from its
+    # first minute, and marks each; the card may be opened without changing a look or a mind.
+    assert driver.index("step('creature-made'") < driver.index("step('people-in'")
+    assert "await mark('creature-made', said);" in driver
+    assert set(take["card"]) == {"being"}
+    assert take["card"]["being"] in {mind["being"] for mind in take["minds"]}
+    # The stack drafts creatures only for a take that makes them: the runner reads the field.
+    assert "field $DOC creatures" in runner and "MAKES=(--creatures)" in runner
+    assert runner.count('"${MAKES[@]}"') == 2
+    # The earlier takes state no creatures, so their stacks start as before.
+    for name in ("three-strangers.take.json", "three-strangers-film.take.json"):
+        assert "creatures" not in json.loads((DEMO / "takes" / name).read_text())
+
+
+def test_a_recorded_frame_is_never_given_less_than_a_millisecond():
+    # Two screencast frames can arrive out of their own order; a negative duration in the frame
+    # list makes ffmpeg refuse the whole take.
+    driver = (DEMO / "film_take.mjs").read_text()
+    assert "duration ${Math.max(0.001, next ? next.t - frame.t : 1 / 30).toFixed(4)}" in driver
+    assert "duration ${(next ? next.t - frame.t" not in driver
+
+
 def test_the_driver_and_its_page_file_name_the_same_words_and_selectors():
     # The app's words and selectors live in one file so a changed interface is re-pointed there:
     # the driver uses nothing the file lacks, and the file holds nothing the driver stopped using.

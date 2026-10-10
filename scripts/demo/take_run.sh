@@ -14,7 +14,8 @@
 # film_take.mjs reads, this script reads its optional "scene" (the scene catalog file whose record
 # start_society.py reads back: needed for the receipts) and "doors": {"game": {"label", "mapping"}} (a game's
 # bridge, declared with those words and that mapping file of bridges/luanti) and "agents" (a bridge entry
-# file for outside agents, added beside it). With TAKE_HOLD=yes the take holds after its alive stretch until
+# file for outside agents, added beside it), and whether it states "creatures" (the person makes a creature
+# in the page: the stack then drafts creatures). With TAKE_HOLD=yes the take holds after its alive stretch until
 # <run folder>/crossed exists; take_hold.sh is what runs meanwhile.
 #
 # A live take needs EXULANICA_DEMO_ENV_FILE: the key is read from it into the stack's own process
@@ -68,11 +69,24 @@ if [ -n "${TAKE_TICK_INTERVAL_MS:-}" ]; then
   CLOCK=(--society-tick-interval-ms $TAKE_TICK_INTERVAL_MS)
   log "a world minute every $TAKE_TICK_INTERVAL_MS ms at 1x"
 fi
+# Creature drafting on, where the take has the person make a creature (its "creatures").
+MAKES=()
+if [ -n "$(field $DOC creatures)" ]; then
+  MAKES=(--creatures)
+  log "creature drafting is on: the take makes creatures"
+fi
+# A recording is never reloaded. The development server reloads the page whenever it is told a source
+# file changed, and one reload during a take throws the page back to the list of worlds; this machine's
+# file events can arrive an hour late, naming files nobody is writing. So the server watches no file for
+# a take (the app's vite.config.ts reads this). A production build would do the same but carries no
+# credential, and the take would record the access gate at every page load.
+export TAKE_APP_WATCHES_NOTHING=yes
+log "the app's development server watches no file: nothing reloads the page during the take"
 if [ -n "${TAKE_PLAN:-}" ]; then
   log "scripted plan ${TAKE_PLAN:A} ($(shasum -a 256 < $TAKE_PLAN | cut -c1-16)); no key, no provider"
   env -u NEBIUS_API_KEY -u EXULANICA_EGRESS_ALLOWLIST .venv/bin/python scripts/acceptance/launch.py up \
     --worktree $ROOT --slot 0 --port-base $BASE --society-of-things --society-playback \
-    --scripted-model ${TAKE_PLAN:A} "${DOORS[@]}" "${CLOCK[@]}" > $RUN/stack-up.json 2>> $RUN/run.log.txt
+    --scripted-model ${TAKE_PLAN:A} "${DOORS[@]}" "${CLOCK[@]}" "${MAKES[@]}" > $RUN/stack-up.json 2>> $RUN/run.log.txt
 else
   ENV_FILE=${EXULANICA_DEMO_ENV_FILE:?a live take reads its model key from EXULANICA_DEMO_ENV_FILE}
   log "live minds on Nebius Token Factory, at most USD ${TAKE_BUDGET_USD:-0.50} and ${TAKE_BUDGET_CALLS:-300} calls"
@@ -82,7 +96,7 @@ else
     export EXULANICA_BUDGET_USD=${TAKE_BUDGET_USD:-0.50} EXULANICA_BUDGET_MAX_CALLS=${TAKE_BUDGET_CALLS:-300}
     export EXULANICA_SPENDING=process
     .venv/bin/python scripts/acceptance/launch.py up --worktree $ROOT --slot 0 --port-base $BASE \
-      --society-of-things --society-playback --model "${DOORS[@]}" "${CLOCK[@]}" > $RUN/stack-up.json 2>> $RUN/run.log.txt
+      --society-of-things --society-playback --model "${DOORS[@]}" "${CLOCK[@]}" "${MAKES[@]}" > $RUN/stack-up.json 2>> $RUN/run.log.txt
   )
 fi
 STACK=$(field $RUN/stack-up.json run_dir)

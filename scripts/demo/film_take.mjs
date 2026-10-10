@@ -30,11 +30,17 @@
 // "stand" (optional, keys held in turn as in "frame") moves the person before they say the sentence: the
 // Companion puts things a few metres ahead of where they stand, facing the way they face, so in a town they
 // step onto the footway and look along it first (mark stood).
+// "creatures" (optional, [{"words": <a creature in the person's own words>, "stand": <optional keys held
+// first, as in "frame">}, ...]) has the person make each in Make a creature before the people are brought
+// in, so the society takes each in as one of its beings from its first minute: the words are typed, an open
+// model drafts its body, and it comes to stand in front of them (mark creature-made, with the page's own
+// sentence). take_run.sh starts the stack with creature drafting on for such a take.
+// "card" may state only "being": the card opens and How we know is shown, and no look or mind is changed.
 // A take document may also hold "scene", "doors" and "hold": take_run.sh and take_hold.sh read those (the
 // stack's doors, what happens outside the page during the hold); this script does not.
 //
 // Steps, each marked in marks.json (seconds from the recording's first frame): world-open, named,
-// (stood,) asked, question, plan-shown, placed, reopened, people-in, framed, minds-chosen, playing, alive-end, then,
+// (stood,) asked, question, plan-shown, placed, reopened, (creature-made,) people-in, framed, minds-chosen, playing, alive-end, then,
 // with --hold, hold-start and hold-end (the recording runs while something outside, such as a game's
 // crossing, happens; it ends when the file exists or after --hold-minutes; a request written to
 // <hold>.say meanwhile is typed to the Companion and confirmed: asked-plan, asked-done or asked-refused),
@@ -74,7 +80,7 @@ if (pageProfile !== PAGE_PROFILE) throw new Error(`${pageFile} is not an ${PAGE_
 const fill = (text, values) => text.replace(/\{(\w+)\}/g, (_, key) => values[key]);
 // A take that ends once its world is open or named states only what it needs up to there.
 const short = ['world-open', 'named', 'stood'].includes(take.until);
-for (const key of short ? ['title'] : ['title', 'sentence', 'minds', 'speed', 'alive_seconds', 'step_back_ms', 'card']) {
+for (const key of short ? ['title'] : ['title', 'sentence', 'minds', 'speed', 'alive_seconds', 'step_back_ms']) {
   if (take[key] === undefined) throw new Error(`the take document states no ${key}`);
 }
 const out = args.out;
@@ -98,7 +104,11 @@ if (take.world !== undefined && [describedWorld, openedWorld].filter((text) => t
 }
 if (openedWorld !== null && openedWorld !== take.title) throw new Error('a take that opens a saved world keeps its name: title is that world\'s title');
 const until = take.until ?? null;
-for (const [name, keys] of [['frame', frameKeys], ['stand', standKeys]]) {
+const creatures = take.creatures ?? [];
+if (!Array.isArray(creatures) || creatures.some((one) => typeof one?.['words'] !== 'string' || one['words'].trim() === '')) {
+  throw new Error('creatures lists the creatures the person makes, each {"words": <in their own words>}');
+}
+for (const [name, keys] of [['frame', frameKeys], ['stand', standKeys], ...creatures.map((one) => ['a creature\'s stand', one.stand ?? null])]) {
   if (keys !== null && (!Array.isArray(keys) || keys.some((held) => !(held.key in FRAME_KEYS) || !(Number(held.ms) > 0)))) {
     throw new Error(`${name} lists the keys the viewer moves by (W, A, S, D, C and the arrows), each held some ms`);
   }
@@ -342,6 +352,42 @@ try {
     await sleep(4_000);
     await mark('reopened', await page.evaluate(`(${titleInput})?.value ?? ''`));
   });
+  for (const creature of creatures) {
+    await step('creature-made', async () => {
+      // Make a creature: the person's own words, an open model's draft of its body, and the creature
+      // placed in front of them; the page says which in one sentence.
+      const field = css(selectors.creature_words);
+      if (creature.stand !== undefined) {
+        // Where the person stands for this one: it is placed a few metres ahead of them. A click on
+        // open sky gives the world the keyboard without picking what stands in front.
+        await page.key('Escape', 'Escape');
+        await page.clickAt(width / 2, Math.round(height * 0.18));
+        await sleep(400);
+        for (const held of creature.stand) {
+          await page.key(held.key, FRAME_KEYS[held.key], { holdMs: Number(held.ms) });
+          await sleep(300);
+        }
+        await sleep(600);
+      }
+      await page.click(buttonStarting(words.make_a_creature), 'Make a creature');
+      await page.waitFor(`!!(${field}) && (${field}).offsetParent !== null`, 15_000, 'Describe a creature');
+      await sleep(1_000);
+      await page.click(field, 'the creature\'s description');
+      await page.typeInto(field, creature.words);
+      await sleep(1_200);
+      await page.click(css(selectors.creature_make), 'Make');
+      const status = `(${css(selectors.creature_status)}?.textContent ?? '').trim()`;
+      const stands = `(${status}).endsWith(${JSON.stringify(words.creature_stands)})`;
+      // The sheet says it is imagining, then placing, then that it stands; anything else it ends on is why not.
+      const ended = await page.waitFor(`${stands} ? 'made' : (${status}) !== '' && !${anyOf(words.creature_working, (text) => `(${status}).startsWith(${JSON.stringify(text)})`)} ? 'not made' : null`, 180_000, 'the creature made');
+      const said = await page.evaluate(status);
+      if (ended !== 'made') throw new Error(`the creature was not made: ${said}`);
+      await mark('creature-made', said);
+      await sleep(2_500);
+      await page.click(button(words.back_to_world), 'Back to the world');
+      await sleep(1_500);
+    });
+  }
   await step('people-in', async () => {
     await page.click(buttonStarting(words.people), 'People');
     const bring = css(selectors.bring_people_in);
@@ -421,7 +467,7 @@ try {
     }
     await mark('hold-end', existsSync(hold) ? 'the file exists' : 'the limit');
   }
-  await step('card', async () => {
+  if (being !== undefined) await step('card', async () => {
     // A being may have walked out of view: choose it in People's picker, else click its label.
     const pill = buttonStarting(fill(words.being_label, { being: being.toLowerCase() }));
     if (!(await page.evaluate(`!!(${pill})`))) {
@@ -441,20 +487,20 @@ try {
   const changeBeside = (heading) => `(() => { const section = [...document.querySelectorAll('*')].find(e => e.children.length === 0 && (e.textContent || '').trim().toLowerCase() === ${JSON.stringify(heading)} && e.offsetParent !== null); let box = section; for (let i = 0; i < 4 && box; i += 1) { const b = [...box.parentElement.querySelectorAll('button')].find(x => x.innerText.trim() === ${JSON.stringify(words.change)}); if (b) return b; box = box.parentElement; } return null; })()`;
   const lookChange = changeBeside(words.looks_heading);
   const choice = (name, children) => `[...document.querySelectorAll(${JSON.stringify(selectors.choice)})].filter(${visible}).find(e => e.children.length <= ${children} && (e.innerText || '').trim().startsWith(${JSON.stringify(name)}))`;
-  await step('look-swapped', async () => {
+  if (look !== undefined) await step('look-swapped', async () => {
     await page.click(lookChange, 'Change beside Looks like');
     await page.click(choice(look, 3), look);
     await page.waitFor(anyWords(words.look_changed), 20_000, 'the look changed');
     await mark('look-swapped', look);
     await sleep(2_000);
   });
-  await step('how-we-know', async () => {
+  if (being !== undefined) await step('how-we-know', async () => {
     await page.click(`[...document.querySelectorAll(${JSON.stringify(selectors.disclosure)})].filter(${visible}).find(e => (e.innerText || '').trim() === ${JSON.stringify(words.how_we_know)})`, 'How we know');
     await sleep(500);
     await mark('how-we-know');
     await sleep(4_000);
   });
-  await step('look-back', async () => {
+  if (lookBack !== undefined) await step('look-back', async () => {
     await page.click(lookChange, 'Change beside Looks like');
     await page.click(choice(lookBack, 3), lookBack);
     await sleep(2_000);
@@ -495,7 +541,8 @@ try {
     const lines = [];
     frames.forEach((frame, index) => {
       const next = frames[index + 1];
-      lines.push(`file 'frames/${frame.file}'`, `duration ${(next ? next.t - frame.t : 1 / 30).toFixed(4)}`);
+      // Two frames may arrive out of their own order: a frame is never given less than a millisecond.
+      lines.push(`file 'frames/${frame.file}'`, `duration ${Math.max(0.001, next ? next.t - frame.t : 1 / 30).toFixed(4)}`);
     });
     lines.push(`file 'frames/${frames.at(-1).file}'`);
     writeFileSync(join(out, 'frames.txt'), lines.join('\n') + '\n');

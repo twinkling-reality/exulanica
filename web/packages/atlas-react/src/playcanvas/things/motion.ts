@@ -14,7 +14,7 @@
  * neck returns the head to the front; a neck and its head look about and the head nods while the
  * being speaks; a jaw opens on each beat of speech and stays shut on what its socket carries; a
  * tail and a tentacle that hangs bend in a wave that travels outward; a wing lies folded along
- * the body; a fin sways; a body with no leg steps on its tentacles; and a body with neither,
+ * the body, its membrane hanging down the flank; a fin sways; a body with no leg steps on its tentacles; and a body with neither,
  * lying along the ground, moves by a wave down its spine that is fixed to the ground it has
  * covered. With no table, every stated chain but a leg and an arm holds its rest pose.
  *
@@ -503,8 +503,11 @@ export function solvePose(skeleton: DressedSkeleton, input: MotionInput, motion:
       }
       case 'wing': {
         if (motion === null) break;
-        // Folded: each segment turned from where the look drew it toward the body's back.
+        // Folded: each segment turned from where the look drew it toward the body's back, and
+        // rolled about its own length so the side that trails behind a spread wing (where its
+        // membrane is stretched) hangs outward and down the flank instead of lying flat.
         const back = rotate(parentRotation, [0, 0, -1]);
+        const hang = normalise(add(scale(rotate(parentRotation, ACROSS), limb.side * Math.cos(motion.wingDroop)), scale(rotate(parentRotation, UP), -Math.sin(motion.wingDroop))));
         const settle = quiet ? IDENTITY : axisAngle(ALONG, limb.side * motion.wingSettle * walk * Math.sin(4 * Math.PI * leadPhase));
         let before = parentRotation;
         let drawn: Vec3 = normalise(sub(skeleton.rest.get(bones[0]!)!, skeleton.rest.get(limb.from)!));
@@ -513,7 +516,14 @@ export function solvePose(skeleton: DressedSkeleton, input: MotionInput, motion:
           if (k + 1 < n) drawn = normalise(sub(skeleton.rest.get(bones[k + 1]!)!, skeleton.rest.get(bone)!));
           const now = normalise(rotate(before, drawn));
           const to = normalise(add(scale(now, 1 - motion.wingFold), scale(back, motion.wingFold)));
-          const rotation = mul(k === 0 ? settle : IDENTITY, mul(fromTo(now, to), before));
+          const swept = mul(fromTo(now, to), before);
+          // The roll is about the folded segment: both sides are measured across it.
+          const acrossIt = (v: Vec3): Vec3 => sub(v, scale(to, dot(v, to)));
+          const trails = acrossIt(rotate(swept, [0, 0, -1])), wanted = acrossIt(hang);
+          const roll = length(trails) < 1e-6 || length(wanted) < 1e-6
+            ? IDENTITY
+            : dot(normalise(trails), normalise(wanted)) < -1 + 1e-9 ? axisAngle(to, Math.PI) : fromTo(normalise(trails), normalise(wanted));
+          const rotation = mul(k === 0 ? settle : IDENTITY, mul(roll, swept));
           place(k, rotation);
           before = rotation;
         });

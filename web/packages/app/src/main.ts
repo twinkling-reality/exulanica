@@ -90,6 +90,7 @@ import { PieceRequestsClient, watchPieceRequests } from './composition/piece-req
 import { CreatureDraftsClient } from './creature-drafts-api.js';
 import { mountCreatureMaker, placementInGeneratedRegion, planPlacement } from './composition/creature-maker.js';
 import { buildCreatureSheet } from './ui/creature-sheet.js';
+import { openThingLibrary } from './things-library.js';
 import { mountCompanionPlans, type CompanionPlans } from './composition/companion-plan.js';
 import { openWorldPath } from './world-scope.js';
 import { createFirstUseGuidance, type FirstUseMode } from './ui/first-use-guidance.js';
@@ -1470,6 +1471,8 @@ async function mountWorld(): Promise<void> {
   // it while it shows a panel, and this one leaves the world in view so the creature is seen arriving.
   shell.querySelector('section.creature-sheet')?.remove();
   shell.append(creatureSheet.root);
+  /** The thing library a made creature's kind is read from, opened once the first is made. */
+  let creatureKinds: ReturnType<typeof openThingLibrary> | null = null;
   const creatureMaker = mountCreatureMaker({
     client: new CreatureDraftsClient(currentCredentials),
     sheet: creatureSheet,
@@ -1495,6 +1498,11 @@ async function mountWorld(): Promise<void> {
       state.atlas?.binding.authoredSociety?.root.parent?.name,
       state.atlas?.binding.playerPose(),
     ),
+    // The made kind's own stated length, read from the workspace by its digest as its figure is.
+    bodyLengthMm: async (sha256) => {
+      creatureKinds ??= openThingLibrary(currentCredentials);
+      return (await (await creatureKinds).kind({ source: 'workspace', sha256 })).extentMm?.length ?? null;
+    },
     place: (versionId, body) => sendPlanned({
       actionId: 'things.place', stepIndex: 0, method: 'POST', path: `/world/versions/${versionId}/things`, body,
     }),

@@ -51,6 +51,12 @@ export interface CreatureMakerDeps {
   } | null;
   /** Where to put it now, or null when the page cannot say where the person stands. */
   readonly placement: () => CreaturePlacement | null;
+  /**
+   * How long the body of the kind at that digest is, millimetres, as its kind states, or null where
+   * the page cannot read it. A creature stands facing the person with its middle at its place, so a
+   * long one is put half its length farther ahead (`fartherAhead`); left out or null, at the place as given.
+   */
+  readonly bodyLengthMm?: (kindSha256: string) => Promise<number | null>;
   /** Send the placement through the page's edit path for a planned thing; answers its status. */
   readonly place: (versionId: string, body: Readonly<Record<string, unknown>>) => Promise<{ readonly status: number }>;
   readonly wait?: (ms: number) => Promise<void>;
@@ -89,6 +95,23 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => { setTimeo
  */
 export function facingThePerson(aheadYawMicroradians: number): number {
   return yawMicroradiansOf(aheadYawMicroradians / 1_000_000 + Math.PI);
+}
+
+/**
+ * A place `extraMm` farther along the way the person faces than `placement`, on the ground found
+ * there. A place ahead carries the person's own heading as its yaw (`placementPoseBeforeVisitor`:
+ * the yaw whose sine is the heading's x and whose cosine is its z), so the step is along that.
+ */
+export function fartherAhead(placement: CreaturePlacement, extraMm: number): CreaturePlacement {
+  const yaw = placement.transform.yaw_microradians / 1_000_000;
+  return {
+    region_id: placement.region_id,
+    transform: {
+      ...placement.transform,
+      x_mm: Math.round(placement.transform.x_mm + Math.sin(yaw) * extraMm),
+      z_mm: Math.round(placement.transform.z_mm + Math.cos(yaw) * extraMm),
+    },
+  };
 }
 
 /**
@@ -190,7 +213,10 @@ export function mountCreatureMaker(deps: CreatureMakerDeps): {
       return;
     }
     deps.sheet.placing(draft.label);
-    const { region_id: regionId, transform } = placement;
+    // Its middle stands at its place and it faces the person: a body some metres long is put half
+    // its length farther, so its head is as far from them as any placed thing is.
+    const length = deps.bodyLengthMm === undefined ? null : await deps.bodyLengthMm(draft.kind.sha256).catch(() => null);
+    const { region_id: regionId, transform } = length === null || !(length > 0) ? placement : fartherAhead(placement, Math.round(length / 2));
     const placed = await deps.place(version.versionId, {
       base_state_sha256: version.stateSha256,
       thing_id: `creature:${draft.draftId.slice(0, 8)}`,

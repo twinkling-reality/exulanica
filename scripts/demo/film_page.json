@@ -38,7 +38,11 @@
   "look_changed": "Only its look changed",
   "how_we_know": "How we know",
   "mind_changed": ["A new mind takes over", "which you chose"],
-  "mind_recorded": "You chose {model}"
+  "mind_recorded": "You chose {model}",
+  "make_a_creature": "Make a creature",
+  "creature_working": ["Imagining your creature", "Placing "],
+  "creature_stands": "stands in front of you.",
+  "back_to_world": "Back to the world"
  },
  "selectors": {
   "world_canvas": "#atlas",
@@ -55,6 +59,9 @@
   "companion_other": "button.companion-other-reveal",
   "bring_people_in": "button[data-action=\"people.bring-in\"]",
   "choice": "button, [role=option], li, div",
-  "disclosure": "summary, button"
+  "disclosure": "summary, button",
+  "creature_words": "input.creature-sheet-words",
+  "creature_make": "button.creature-sheet-make",
+  "creature_status": "p.creature-sheet-status"
  }
 }

@@ -196,6 +196,31 @@ describe.each(NAMES)('%s, dressed from the chains its plan states', (name) => {
     }
   });
 
+  it('hangs a folded wing\'s trailing side outward and down its flank, by the catalog\'s angle', () => {
+    // A spread wing's membrane is stretched behind its bones (the builder's trailing edge): the
+    // figure's -Z at rest. Folded, that side of every segment points outward on the wing's own
+    // side and down by wing_droop_rad below level. A wing's bones are not drawn exactly across the
+    // body (its elbow sits ahead of its root and its wrist behind), so that side keeps a little of the
+    // bone's own direction: within a third of a radian of the hang (cosine 0.95).
+    const droop = stated('wing_droop_rad');
+    const pose = solvePose(skeleton, input(), MOTION);
+    for (const wing of limbsOf(skeleton, 'wing')) {
+      const hang: Vec3 = [wing.side * Math.cos(droop), -Math.sin(droop), 0];
+      for (const bone of wing.bones) {
+        const q = pose.joints.get(bone)!.rotation;
+        // The trailing side as the bone carries it: (0, 0, -1) turned by the bone's rotation.
+        const [x, y, z, w] = q;
+        const trailing: Vec3 = [-(2 * (x * z + w * y)), -(2 * (y * z - w * x)), -(1 - 2 * (x * x + y * y))];
+        expect(trailing[0] * hang[0] + trailing[1] * hang[1] + trailing[2] * hang[2]).toBeGreaterThan(0.95);
+        expect(trailing[1]).toBeLessThan(-0.8);
+        expect(Math.sign(trailing[0])).toBe(wing.side);
+      }
+    }
+    // Positive control: with no table the wing is as its look drew it, its trailing side straight back.
+    const drawn = solvePose(skeleton, input());
+    for (const wing of limbsOf(skeleton, 'wing')) expect(angleOf(drawn.joints.get(wing.bones[0]!)!.rotation)).toBeCloseTo(0, 9);
+  });
+
   it('holds every stated chain but a leg and an arm at rest when no table is handed', () => {
     const pose = solvePose(skeleton, input({ time: 3.3, talking: true }));
     for (const limb of skeleton.limbs) {
@@ -461,7 +486,7 @@ describe('a plan document\'s chains', () => {
 describe('the body motion catalog', () => {
   it('gives every figure a class and a reason, and the page reads each one', () => {
     expect(CATALOG.profile).toBe('exulanica.body-motion/v1');
-    expect(CATALOG.entries).toHaveLength(15);
+    expect(CATALOG.entries).toHaveLength(16);
     for (const entry of CATALOG.entries) {
       expect(entry.class).toBe('chosen_default');
       expect(entry.reason.length).toBeGreaterThan(80);

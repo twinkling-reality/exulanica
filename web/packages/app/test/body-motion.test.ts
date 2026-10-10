@@ -24,6 +24,7 @@ describe('the body motion table the page hands its figures', () => {
       wavePeriod: stated('wave_period_seconds'),
       waveLag: stated('wave_lag_cycles'),
       wingFold: stated('wing_fold_share'),
+      wingDroop: stated('wing_droop_rad'),
       wingSettle: stated('wing_settle_rad'),
       finSway: stated('fin_sway_rad'),
       spineWave: stated('spine_wave_rad'),

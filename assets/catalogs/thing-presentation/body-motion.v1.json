@@ -70,7 +70,14 @@
       "value": 0.95,
       "unit": "share",
       "class": "chosen_default",
-      "reason": "A being on the ground carries its wings folded: each segment is turned from where the look drew it spread toward the body's back by this share of the way, so the wing lies along the flank inside the body's width and a winged being fits a street. The last twentieth is left so the two wings and the back do not lie in one plane. Flight, when a body flies, is another motion and not this one."
+      "reason": "A being on the ground carries its wings folded: each segment is turned from where the look drew it spread toward the body's back by this share of the way, so the wing's bones lie along the back inside the body's width and a winged being fits a street. The last twentieth is left so the two wings and the back do not lie in one plane. Flight, when a body flies, is another motion and not this one."
+    },
+    {
+      "key": "wing_droop_rad",
+      "value": 1.2,
+      "unit": "radian",
+      "class": "chosen_default",
+      "reason": "A folded wing is also rolled about its own length, so the side that trails behind it when it is spread, where its membrane is stretched, hangs outward and down the flank this far below level, about 69 degrees. Left level, the membranes of two wings swept back lie flat across the back and stick out past both flanks like an open fan, wider than the body; hung straight down they would pass through the body they hang from. At this angle they lie along the flanks like a cloak."
     },
     {
       "key": "wing_settle_rad",
