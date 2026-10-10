@@ -558,7 +558,10 @@ population is canonical state. The nearest inhabitants within 60 m are catalog p
 [above](#detail-levels-and-frame-budget)), and every other outdoor inhabitant within 700 m is drawn
 in the far form of their own look (`society/far-figures.ts`, `farAppearance`), one draw call each,
 the same form a catalog person shows while its parts load, so nobody changes colour or build
-crossing the boundary. Indoor inhabitants are counted, not drawn. A saved world's inhabitants hang
+crossing the boundary. Indoor inhabitants are counted, not drawn. A state says where a person is
+when its minute ends, so someone whose minute ends indoors is indoors only once the walk that
+minute recorded is done: they are drawn walking to the door, and from one door to another, and
+counted indoors from the moment they reach it. A saved world's inhabitants hang
 from their region's root, the frame their input states positions in and the frame the person's
 objects are placed in. While everyone is away the state holds nobody, so the crowd draws nobody.
 

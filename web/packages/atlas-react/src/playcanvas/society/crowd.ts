@@ -159,7 +159,13 @@ interface Walker {
   readonly gateStep: boolean;
   /** When a person standing still starts the walk just read, in the caller's clock. */
   readonly startsAtMs: number;
-  readonly indoors: boolean;
+  /** Whether the state's minute ends with this person indoors. */
+  readonly endsIndoors: boolean;
+  /**
+   * Whether they are indoors now: the minute ends with them indoors and the walk it recorded is
+   * done. Someone still walking to a door is outdoors, and drawn, until they reach it.
+   */
+  indoors: boolean;
   /** The activity the state says this person is performing, or null when it names none. */
   readonly activity: string | null;
   position: readonly [number, number];
@@ -547,7 +553,8 @@ export class SocietyCrowd {
           )
           : null,
         startsAtMs,
-        indoors: person.indoors === true,
+        endsIndoors: person.indoors === true,
+        indoors: person.indoors === true && walked >= total,
         activity,
         position,
         facing: previous?.facing ?? this.figures?.standingFacingOf?.(person) ?? 0,
@@ -1146,6 +1153,7 @@ export class SocietyCrowd {
     const walkedFrom = this.lastWalkMs;
     if (!reduced) this.lastWalkMs = Math.max(this.lastWalkMs, nowMs);
     let moving = false;
+    let wentIn = false;
     // A visitor who has just crossed in steps out of its gate once the gate is read, or is drawn where
     // it stands when the wait ends first.
     for (const [id, until] of this.entering) {
@@ -1192,6 +1200,11 @@ export class SocietyCrowd {
       this.turn(walker, heading(walker.position, position, walker.facing));
       walker.position = position;
       walker.arrived = walker.walked >= walker.total;
+      // At the door their minute ends behind, they go in: drawn up to it and not after.
+      if (walker.indoors !== (walker.endsIndoors && walker.arrived)) {
+        walker.indoors = !walker.indoors;
+        wentIn = true;
+      }
       const settling = this.settle(walker, dt, reduced);
       moving ||= !walker.arrived || settling;
     }
@@ -1204,7 +1217,7 @@ export class SocietyCrowd {
       if (this.selectedId === id) this.selectedId = null;
       gone = true;
     }
-    if (gone) this.assignDetail();
+    if (gone || wentIn) this.assignDetail();
     this.moving = moving;
     if (!draw) return;
     this.frame += 1;
