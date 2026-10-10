@@ -1301,6 +1301,15 @@ track progress. A normal automatic tick does not increment control revision. It 
 simulation's compare-and-swap operation and workspace edit lock, serializing authored edits and
 manual or model-decision reservations through the same domain boundary.
 
+In a saved world the page tells apart a control it has not read yet from one it could not read.
+While the first read after people are brought in is on its way the People panel says nothing about
+playing. After a read has really failed it says "Playing on its own is not available: this world's
+playback could not be read. Trying again.", and the page reads again by itself while people are
+there, after 2 s and then twice as long each time up to 30 s, until a read lands and Play is back;
+a world nobody lives in is not asked again. Limit: this is verified for a saved world's society
+(a town, a made place or a world with no town under it); the district's own society, which is not a
+saved world's, takes the same path in the page and is not verified there.
+
 Speed is a playback multiplier, never a real-time claim: a simulated tick still represents 60
 simulated seconds. The host default base wait is 8,000 ms; 1x/2x/4x request minimum waits of
 8,000/4,000/2,000 ms after batch completion. Computation, polling and contention add time. The host
