@@ -1,0 +1,13 @@
+{
+ "policy_id": "exulanica.thing-erasure-telling",
+ "version": 1,
+ "values": {
+  "seconds_maximum": 2
+ },
+ "classes": {
+  "seconds_maximum": "chosen_budget"
+ },
+ "reasons": {
+  "seconds_maximum": "How long the request that erases a creature goes on telling the societies that run it, read from the server's clock before each one; the societies it has not reached by then are left to tell themselves, which each does before its next minute (SocietyRepository.tell_of_erased_kinds). So the figure decides only how soon a society that is not running reads as told, never whether an erased creature is run again: it is not. Telling one society composes its whole next input, which for a town reads its place; what that takes was not measured for this figure. Two seconds is a wait a person accepts on a button that erases; a host with many worlds a workspace may lower it to 0, which tells none inline, and nothing is lost."
+ }
+}

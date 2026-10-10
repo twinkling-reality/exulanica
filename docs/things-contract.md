@@ -855,11 +855,53 @@ about it, every copy already sent to a hosted model provider, and the placed thi
 is its author's text (up to 200 characters, kept in the version, its edits and every input, state
 and event that names the thing): the page names a creature it places `creature:` and the first
 eight characters of its draft's id, and a caller of the route who names a thing after its creature
-has put that name where no erasure reaches. A version that cannot be told (its input cannot be
-composed at that moment) is passed by; its society loses the being at its next input all the same,
-because a thing whose kind is gone is left out whoever composes it, and asking for the erasure
-again (the route answers 404, as for any kind the workspace does not hold) tells it again, appending
-nothing to a society already told. The erasure stands whatever a society does. A thing whose kind
+has put that name where no erasure reaches. The erasure stands whatever a society does.
+
+**A society finds out by itself.** The telling above is a courtesy, held to a budget of 2 seconds
+read from the server's clock before each version
+([`thing-erasure-telling.v1.json`](../exulanica/world/thing-erasure-telling.v1.json), a chosen
+budget): a version it does not reach, one whose input cannot be composed at that moment, a society
+that is not running, and a society restored from a backup whose erasure the restore replays are
+told by nobody at the time. So every minute asks first. A society of things is untold when its
+latest input still lists a placed thing whose kind is gone (a being already there, or one placed
+and erased before any minute, which the next minute would otherwise bring in), or when its
+latest input is unavailable and its state holds a placed being whose kind is gone (an unavailable
+input lists nothing and names nobody, and would leave the being there). An available input that
+does not list a being the state holds is not behind: the minute sends away every placed being its
+input does not list, so a creature whose thing was removed, before or after its erasure, leaves
+in the next minute as any removed thing does. The minute asks from the row and the
+inputs it has already read: where neither names a thing of a kind its workspace kept it asks
+nothing, and otherwise one query asks which of them have their kind gone, by the condition a
+version's things are read with (`THING_KIND_GONE_SQL` in
+[`thing_kind_gone.py`](../exulanica/world/thing_kind_gone.py)). Where the society is untold, the
+input that sends the thing away is composed first, by the code an authored edit runs: a being
+there leaves in that minute as `kind_erased`, and one not yet arrived never arrives. This holds
+for the step route, a manual step and the minutes a new society is opened with. An erasure, a
+placing edit and a minute each take the workspace's lock first, so each is wholly before or
+wholly after the others: a minute that begins after an erasure commits never runs the erased
+creature. A minute that cannot compose that input runs nothing and is refused: as an unavailable
+input where the society's input is unavailable, else by name (`SocietyInputBehind`, answered as a
+society that changed).
+
+Playback composes nothing inside a round (a round takes the asset read lock only after its
+minutes are computed), so its worker asks before each claimed round, in a transaction of its own.
+It reads the society's engine alone first, and for a society of things takes the workspace's lock,
+reads the society and asks whether its version holds any thing whose kind is gone, so a society
+none of whose things is of an erased kind has its input read by nobody. A round asks no model,
+and is one minute the routine decides, wherever the state may still hold an erased being until
+that minute runs: a society just told, one the erasing request had already told, one whose
+creature's thing was removed, and one that could not be told.
+Where the society is behind and the input that sends the being away could not be composed
+(the minute's two refusals above), that minute pauses it with the reason a person already reads
+for a source that cannot be read (`paused_due_to_error`, `source_unavailable`); it is not left
+playing and standing still. Any other fault while asking is a failed round like any other: no
+minute runs, the lease is left to expire, and a society whose rounds keep failing is paused by
+the claim that finds its three attempts spent (`lease_recovery_limit`). An
+erasure that commits after the worker asked stops the round at the minutes it has computed, with
+no pause, and the next round is told first. A society paused for a month is told at its first
+minute back. A replay reads the inputs that were recorded and composes none. Asking for the
+erasure again (the route answers 404, as for any kind the workspace does not hold) also tells,
+appending nothing to a society already told. A thing whose kind
 its workspace still holds but whose run form cannot be built (its plan or recipe no longer reads)
 is left out of the input too and is not named among those gone: a being that was it leaves as a
 removed one does.

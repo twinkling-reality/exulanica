@@ -43,8 +43,11 @@ Each read needs a session (``world.read``), as the library does.
 
 from __future__ import annotations
 
+import json
 import logging
-from typing import Annotated, Any
+import time
+from pathlib import Path as FilePath
+from typing import Annotated, Any, Final
 
 import psycopg
 from fastapi import APIRouter, Path, Request
@@ -208,6 +211,42 @@ def erase_kind(
     return Response(status_code=204)
 
 
+#: The longest the erase request may be made to go on telling: the request is one a person waits
+#: on, and whatever it does not reach tells itself, so a longer wait buys nothing.
+_TELLING_SECONDS_MOST: Final = 30
+
+
+def _telling_seconds(path: FilePath) -> int:
+    """How long an erasure goes on telling societies inline, from the policy file at the version
+    this reader knows: a whole number of seconds from zero to :data:`_TELLING_SECONDS_MOST`,
+    stated as a chosen budget with a reason in words."""
+    policy = json.loads(path.read_text(encoding="utf-8"))
+    seconds = policy.get("values", {}).get("seconds_maximum")
+    reason = policy.get("reasons", {}).get("seconds_maximum")
+    if (
+        policy.get("policy_id") != "exulanica.thing-erasure-telling"
+        or policy.get("version") != 1
+        or type(seconds) is not int
+        or not 0 <= seconds <= _TELLING_SECONDS_MOST
+        or policy.get("classes") != {"seconds_maximum": "chosen_budget"}
+        or not isinstance(reason, str)
+        or not reason.strip()
+    ):
+        raise ValueError(f"{path.name} does not state the erasure's telling budget")
+    return seconds
+
+
+#: The budget of an erasure's inline telling (``exulanica/world/thing-erasure-telling.v1.json``).
+TELLING_SECONDS: Final = _telling_seconds(
+    FilePath(__file__).resolve().parents[2] / "world" / "thing-erasure-telling.v1.json"
+)
+
+
+def _clock() -> float:
+    """The server's monotonic clock, read through here so a test can stand in for it."""
+    return time.monotonic()
+
+
 def _erased_here(connection: psycopg.Connection, session: Session, kind_sha256: str) -> bool:
     """Whether this workspace recorded an erasure of the kind at that digest."""
     row = connection.execute(
@@ -230,10 +269,15 @@ def _tell_societies(
     never held a word of it (:mod:`exulanica.things.run_forms`), so its history stays whole.
 
     The erasure stands whatever happens here: it has committed, and each version is told in a
-    transaction of its own. One that cannot be told (its input cannot be composed now, or its
-    society is busy) is passed by; its society loses the being at its next input, because the
-    composer leaves out a thing whose kind is gone whoever asks, and asking for the erasure again
-    tells it again (the route answers 404 as for any kind the workspace does not hold)."""
+    transaction of its own. This telling is a courtesy, not what keeps an erased creature from
+    running: every society asks before each of its minutes whether its input still lists a thing
+    whose kind is gone, and composes the next input first where it does
+    (:meth:`~exulanica.world.society_repository.SocietyRepository.tell_of_erased_kinds`). So a
+    version that cannot be told here (its input cannot be composed now, or its society is busy)
+    is passed by, and the telling stops once it has gone on for :data:`TELLING_SECONDS`, a chosen
+    budget read from the server's clock before each version: the societies not reached tell
+    themselves. Asking for the erasure again tells again (the route answers 404 as for any kind
+    the workspace does not hold)."""
     observer = getattr(request.app.state, "society_authored_edit", None)
     if observer is None:
         return
@@ -244,7 +288,14 @@ def _tell_societies(
         "and not t.removed order by t.version_id",
         (session.workspace_id, bytes.fromhex(kind_sha256)),
     ).fetchall()
-    for row in versions:
+    started = _clock()
+    for told, row in enumerate(versions):
+        if _clock() - started >= TELLING_SECONDS:
+            _LOGGER.info(
+                "an erasure's telling reached its budget; the societies left tell themselves",
+                extra={"told": told, "left": len(versions) - told},
+            )
+            break
         try:
             with connection.transaction():
                 observer(connection, session, row["version_id"])

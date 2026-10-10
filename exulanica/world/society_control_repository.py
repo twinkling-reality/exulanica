@@ -34,7 +34,7 @@ from exulanica.world.society_controls import (
     validate_settings,
 )
 from exulanica.world.society_engines import PLAYABLE_ENGINES, society_engine
-from exulanica.world.society_repository import SocietyRepository
+from exulanica.world.society_repository import SocietyInputBehind, SocietyRepository
 from exulanica.world.world_clock import lead_room
 from exulanica.world.world_clock_repository import ClockLeadExhausted, WorldClockRepository
 
@@ -80,6 +80,16 @@ class _RoundInputs:
                 authorizer(actor, document)
 
 
+def _refuse_untold(_version_id: uuid.UUID) -> None:
+    """What a round composes with when its worker could not tell the society of an erased kind:
+    nothing. The minute is refused as one whose input is unavailable, which pauses the society
+    with the reason a person already reads for a source that cannot be read."""
+    raise UnavailableSocietyInput(
+        "a creature this society runs was erased and the input that sends it away could not be "
+        "composed"
+    )
+
+
 class SocietyControlRepository:
     def __init__(
         self,
@@ -88,20 +98,31 @@ class SocietyControlRepository:
         *,
         world_id: str,
         input_authorizer: Callable[[uuid.UUID, dict], None] | None = None,
+        input_refresher: Callable[[uuid.UUID, uuid.UUID], None] | None = None,
         base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS,
     ) -> None:
         validate_settings("paused", 1, base_tick_interval_ms)
         self.connection, self.workspace_id = connection, workspace_id
         self.world_id = world_id
         self.input_authorizer = input_authorizer
+        #: What composes a version's next input for an actor where the society's is behind an
+        #: erasure (:meth:`SocietyRepository.tell_of_erased_kinds`): a manual step is given it. A
+        #: playback round is not: composing reads stored bytes and takes the asset read lock,
+        #: which a round takes only once its minutes are computed, so the worker asks before the
+        #: round, in a transaction of its own.
+        self.input_refresher = input_refresher
         self.base_tick_interval_ms = base_tick_interval_ms
         #: The inputs the running playback round has asked to authorize (:meth:`execute`).
         self._round: _RoundInputs | None = None
+        #: Whether the running round's society could not be told of an erased kind before it
+        #: (:meth:`execute`'s ``untold``).
+        self._untold = False
         connection.row_factory = dict_row
         set_workspace(connection, workspace_id)
 
     def _society(self, actor: uuid.UUID | None = None) -> SocietyRepository:
         authorizer = self.input_authorizer
+        refresher = self.input_refresher
         round_inputs = self._round
         return SocietyRepository(
             self.connection,
@@ -114,6 +135,13 @@ class SocietyControlRepository:
                 if round_inputs is None
                 else (lambda doc: round_inputs.record(actor, doc))
             ),
+            input_refresher=(
+                _refuse_untold
+                if self._untold
+                else None
+                if refresher is None or actor is None or round_inputs is not None
+                else (lambda version: refresher(actor, version))
+            ),
         )
 
     @contextmanager
@@ -124,6 +152,7 @@ class SocietyControlRepository:
             yield self._round
         finally:
             self._round = None
+            self._untold = False
 
     def _scope(self, version_id: uuid.UUID) -> dict:
         self._society()._lock()
@@ -529,7 +558,9 @@ class SocietyControlRepository:
         ):
             raise LeaseLost("playback lease expired or was replaced")
 
-    def execute(self, claim: ControlClaim, *, max_ticks: int | None = None) -> dict:
+    def execute(
+        self, claim: ControlClaim, *, max_ticks: int | None = None, untold: bool = False
+    ) -> dict:
         """Run a claimed batch: the minutes due, at most ``MAX_CATCHUP_TICKS``, or ``max_ticks``.
 
         A world that runs people by models is advanced one minute per claim (``max_ticks=1``), so
@@ -538,6 +569,12 @@ class SocietyControlRepository:
         batch commits (:class:`_RoundInputs`), so the asset read lock is held from that
         authorization to the commit and not while the engine runs. An input refused then rolls
         the minutes back and pauses the society, with the receipt a refusal before them writes.
+
+        ``untold`` says the worker tried to tell this society of an erased kind before the round
+        and the input could not be composed. The first minute then refuses as an unavailable
+        input does, so the society pauses with that reason and is not left standing still; a
+        society the erasure no longer concerns runs as ever, since only a minute that is behind
+        asks.
         """
         if max_ticks is not None and not 1 <= max_ticks <= MAX_CATCHUP_TICKS:
             raise ValueError(f"a claim runs 1 to {MAX_CATCHUP_TICKS} minutes, not {max_ticks}")
@@ -584,6 +621,7 @@ class SocietyControlRepository:
                 "tick_from": before_tick,
                 "previous_state_sha256": before_hash,
             }
+            self._untold = untold
             try:
                 with self.connection.transaction():
                     with self._authorizing_at_the_end() as round_inputs:
@@ -599,6 +637,12 @@ class SocietyControlRepository:
                                     base_state_sha256=current["state_sha256"],
                                     actor=claim.actor,
                                 )
+                            except SocietyInputBehind:
+                                # A kind the society runs was erased after the worker asked,
+                                # before this round. The round composes nothing, so it stops at
+                                # the minutes computed and does not pause: the next round is told
+                                # first, and the erased creature is not run meanwhile.
+                                break
                             except ClockLeadExhausted:
                                 # The count above keeps inside the lead, so this is a guard: stop
                                 # at the minutes committed rather than pause a world that only

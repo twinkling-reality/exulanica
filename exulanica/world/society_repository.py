@@ -75,6 +75,7 @@ from exulanica.world.society_social import (
     initial_social_society,
 )
 from exulanica.world.society_things import advance_things, initial_things_society
+from exulanica.world.thing_kind_gone import THING_KIND_GONE_SQL
 from exulanica.world.world_clock_repository import WorldClockRepository
 
 #: Profiles that consume authorized inputs and record transition receipts, from the engine table.
@@ -88,6 +89,13 @@ LINES_SAID_SQL = (
     "where workspace_id=%s and society_id=%s and subject_id=%s and event_kind='said' "
     "order by tick desc, (document->>'order')::integer nulls last, event_id limit %s"
 )
+
+
+class SocietyInputBehind(StaleSocietyState):
+    """A society's latest input still lists a thing whose kind its workspace erased, and the
+    minute asked for could not compose the input that leaves it out. The minute is not run: an
+    erased creature is never run again. Asked again, the minute composes that input first.
+    Answered as any society that changed since the caller read it."""
 
 
 class InvalidEventCursor(ValueError):
@@ -179,11 +187,17 @@ class SocietyRepository:
         *,
         world_id: str,
         input_authorizer: Callable[[dict[str, Any]], None] | None = None,
+        input_refresher: Callable[[uuid.UUID], None] | None = None,
     ) -> None:
         self.connection = connection
         self.workspace_id = workspace_id
         self.world_id = world_id
         self.input_authorizer = input_authorizer
+        #: What composes a version's next input from the world as it stands and appends it where
+        #: it reads differently: the application's authored-edit hook, bound to this connection
+        #: and its session. A minute calls it where the society's input is behind an erasure
+        #: (:meth:`tell_of_erased_kinds`); a repository that only reads or replays is given none.
+        self.input_refresher = input_refresher
 
     def _lock(self) -> None:
         # Same ordering as authored edits and structural invalidation.
@@ -195,6 +209,168 @@ class SocietyRepository:
         if self.input_authorizer is None:
             raise UnavailableSocietyInput("current society input authorization is not configured")
         self.input_authorizer(document)
+
+    def _latest_input(self, row: dict[str, Any]) -> dict[str, Any]:
+        """The newest input the society holds, as stored."""
+        sequence = self._chain(row)
+        return self._inputs(row, [sequence])[sequence]
+
+    @staticmethod
+    def _kept_kind_beings(row: dict[str, Any]) -> set[str]:
+        """The placed beings the state holds whose kind is one their workspace kept, by placed
+        id."""
+        return {
+            person["placed_id"]
+            for person in row["state"].get("inhabitants", ())
+            if person.get("came_by") == "placed"
+            and isinstance(person.get("kind"), dict)
+            and person["kind"].get("source") == "workspace"
+        }
+
+    @staticmethod
+    def _kept_kind_things(latest: dict[str, Any]) -> set[str]:
+        """The placed things an input lists whose kind is one their workspace kept, by placed
+        id."""
+        return {
+            entry["placed_id"]
+            for entry in latest.get("things", ())
+            if isinstance(entry.get("kind"), dict) and entry["kind"].get("source") == "workspace"
+        }
+
+    def _any_kind_gone(self, row: dict[str, Any], placed_ids: set[str]) -> bool:
+        """Whether any of these placed things of the society's version has its kind gone, by
+        the condition a version's things are read with: nothing asked for none, else one query.
+        Whether a thing was since removed is not asked; each caller says why that is right."""
+        if not placed_ids:
+            return False
+        found = self.connection.execute(
+            "select exists(select 1 from world_alternate_thing t "
+            "where t.workspace_id=%(w)s and t.world_id=%(world)s and t.version_id=%(v)s "
+            f"and t.thing_id = any(%(ids)s) and {THING_KIND_GONE_SQL}) as gone",
+            {
+                "w": self.workspace_id,
+                "world": self.world_id,
+                "v": row["version_id"],
+                "ids": sorted(placed_ids),
+            },
+        ).fetchone()
+        return bool(found["gone"])
+
+    def _erased_and_untold(self, row: dict[str, Any], latest: dict[str, Any]) -> bool:
+        """Whether a creature this society would run was erased and the society not yet told.
+
+        Two ways it can be so. The latest input still LISTS a placed thing whose kind is gone:
+        a being already here, or one placed and erased before any minute, which the next minute
+        would bring in; an input that lists a thing whose kind is gone is behind whether or not
+        the thing was since removed. Or the latest input is NOT AVAILABLE and the STATE holds a
+        placed being whose kind is gone: an unavailable input lists nothing and names nobody,
+        and would leave the being in the state.
+
+        An available input that does not list a being the state holds is not behind, whatever
+        became of the being's kind: the next minute sends away every placed being its input does
+        not list, so a creature whose thing was removed and whose kind was then erased leaves in
+        that minute as any removed thing does.
+
+        Only a society of things is asked, and it costs nothing unless one of those lists names
+        a thing of a kind its workspace kept: then one query asks which of them have their kind
+        gone.
+        """
+        if society_engine(row["engine_version"]).state_family != "things":
+            return False
+        asked = self._kept_kind_things(latest)
+        if latest.get("availability") != "available":
+            asked |= self._kept_kind_beings(row)
+        return self._any_kind_gone(row, asked)
+
+    def _holds_a_being_about_to_leave(self, row: dict[str, Any], latest: dict[str, Any]) -> bool:
+        """Whether the state still holds a placed being whose kind is gone and which the latest
+        input, an available one, no longer lists: a society already told of an erasure (the
+        erasing request tells at once, which is the usual case), or one whose person removed the
+        thing first. The being leaves in the society's next minute; until then the state shows
+        it, and no model is asked about that state."""
+        if latest.get("availability") != "available":
+            return False
+        return self._any_kind_gone(
+            row, self._kept_kind_beings(row) - self._kept_kind_things(latest)
+        )
+
+    def _tell(self, row: dict[str, Any]) -> None:
+        """Compose the next input of a society that is behind an erasure, or refuse by name."""
+        if self.input_refresher is None:
+            raise SocietyInputBehind(
+                "a kind this society runs was erased; its next input is composed first"
+            )
+        self.input_refresher(row["version_id"])
+        latest = self._latest_input(row)
+        if not self._erased_and_untold(row, latest):
+            return
+        if latest["availability"] != "available":
+            # Nothing can be composed that sends the being away while the world's source cannot
+            # be read. The minute is refused as any minute over an unavailable input that must
+            # change is: a step answers it by name and a playback round pauses with its reason.
+            raise UnavailableSocietyInput(
+                "a creature this society holds was erased and its input is unavailable"
+            )
+        raise SocietyInputBehind(
+            "a kind this society runs was erased and its next input still holds it"
+        )
+
+    def tell_of_erased_kinds(self, version_id: uuid.UUID) -> str:
+        """Compose the society's next input where a creature it would run was erased and it has
+        not been told, and answer what was found.
+
+        An erasure tells every society it reaches at once, but one it could not reach, one a
+        restore replayed the erasure under, and one that was not running are told by nobody. So
+        every minute asks first (:meth:`advance`), and a playback round's worker asks before
+        its minutes, in a transaction of its own, which is this. Under the workspace's lock,
+        which an erasure and a placing edit also take, so each is wholly before or wholly after
+        it. The input is composed by the code an authored edit runs and leaves the thing out,
+        naming it among those gone; the being leaves in the society's next minute, recorded as
+        ``kind_erased``, and one not yet arrived never arrives.
+
+        The answer is ``told`` where the input was composed now; ``leaving`` where nothing had
+        to be composed and the state still holds a being of a gone kind that the next minute
+        sends away (:meth:`_holds_a_being_about_to_leave`); and ``clear`` otherwise. After
+        ``told`` and ``leaving`` the state holds an erased being until the minute runs, so the
+        caller asks no model about it.
+
+        Where no refresher was given, or the one given appended nothing that sends the thing
+        away, the minute is refused and the erased creature is not run: as
+        :class:`SocietyInputBehind`, or, where the latest input is unavailable, as an
+        unavailable input.
+
+        The engine is read alone first, without a lock: a society that is not one of things, or
+        a version with none, is answered ``clear`` having locked and read nothing more.
+        """
+        with self.connection.transaction():
+            engine = self.connection.execute(
+                "select engine_version from world_society where workspace_id=%s and world_id=%s "
+                "and version_id=%s",
+                (self.workspace_id, self.world_id, version_id),
+            ).fetchone()
+            if engine is None or society_engine(engine["engine_version"]).state_family != "things":
+                return "clear"
+            self._lock()
+            row = self._row(version_id, lock=True)
+            if row is None or not self._holds_a_gone_kind(row):
+                return "clear"
+            latest = self._latest_input(row)
+            if self._erased_and_untold(row, latest):
+                self._tell(row)
+                return "told"
+            return "leaving" if self._holds_a_being_about_to_leave(row, latest) else "clear"
+
+    def _holds_a_gone_kind(self, row: dict[str, Any]) -> bool:
+        """Whether the society's version holds any placed thing whose kind is gone: one small
+        query over the version's things, asked before a round so that a society none of whose
+        things is of an erased kind has its latest input read by nobody."""
+        found = self.connection.execute(
+            "select exists(select 1 from world_alternate_thing t "
+            "where t.workspace_id=%s and t.world_id=%s and t.version_id=%s "
+            f"and {THING_KIND_GONE_SQL}) as held",
+            (self.workspace_id, self.world_id, row["version_id"]),
+        ).fetchone()
+        return bool(found["held"])
 
     def create(
         self,
@@ -740,6 +916,12 @@ class SocietyRepository:
                 processed = [(d.decision_seq, d.disposition) for d in decided]
             elif engine.state_family in ("purposeful", "things"):
                 inputs = self._pending_inputs(row)
+                # A society told by nobody that a creature it would run was erased is told now,
+                # from the row and the inputs the minute has already read: the input that sends
+                # the being away is composed first, and the minute consumes it.
+                if self._erased_and_untold(row, inputs[-1]):
+                    self._tell(row)
+                    inputs = self._pending_inputs(row)
                 # The latest authorized unavailable input must be able to pause the engine
                 # even when earlier dependencies are now withdrawn. Historical replay/reads
                 # still authorize every materialized input separately.

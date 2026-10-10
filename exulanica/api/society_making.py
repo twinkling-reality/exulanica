@@ -236,12 +236,17 @@ def society_repository(
     and the repository refuses a version that does not belong to the world named here."""
     require_world(connection, session.workspace_id, world_id)
     authorizer = hooks.input_authorizer
+    refresher = hooks.authored_edit
     return SocietyRepository(
         connection,
         session.workspace_id,
         world_id=world_id,
         input_authorizer=(
             None if authorizer is None else lambda doc: authorizer(connection, session, doc)
+        ),
+        # What a minute composes the next input with where the society's is behind an erasure.
+        input_refresher=(
+            None if refresher is None else lambda version: refresher(connection, session, version)
         ),
     )
 

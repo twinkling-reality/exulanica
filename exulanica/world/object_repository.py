@@ -119,6 +119,7 @@ from exulanica.world.point_map_source_authority import PointMapSourceAuthority
 from exulanica.world.reviewed_catalog import ReviewedAssetRow, ReviewedCatalog
 from exulanica.world.society import inputs_ahead
 from exulanica.world.society_engines import INPUT_ENGINES
+from exulanica.world.thing_kind_gone import THING_KIND_GONE_SQL
 from exulanica.world.thing_store import ThingStore
 from exulanica.world.workspace_assets import (
     ResolvedWorkspaceAsset,
@@ -2581,13 +2582,7 @@ class WorldObjectRepository:
         rows = self.connection.execute(
             "select t.thing_id,t.kind_source,t.kind,t.kind_version,t.kind_sha256,t.region_id,"
             "t.x_mm,t.y_mm,t.z_mm,t.yaw_microradians,t.origin_kind,t.origin_role,t.removed,"
-            "(t.kind_source='workspace' and ("
-            "not exists (select 1 from thing_kind_version k where k.workspace_id=t.workspace_id "
-            "and k.sha256=encode(t.kind_sha256,'hex')) "
-            "or exists (select 1 from thing_erasure e join world_alternate_version_edit p "
-            "on p.workspace_id=t.workspace_id and p.edit_id=t.created_edit_id "
-            "where e.workspace_id=t.workspace_id and e.sha256=encode(t.kind_sha256,'hex') "
-            "and e.erased_at>=p.recorded_at))) as kind_gone "
+            f"{THING_KIND_GONE_SQL} as kind_gone "
             "from world_alternate_thing t "
             "where t.workspace_id=%s and t.world_id=%s and t.version_id=%s "
             "and not t.addition_undone order by t.thing_id",
@@ -3087,13 +3082,7 @@ def version_holds_things(
     row = connection.execute(
         "select exists(select 1 from world_alternate_thing t where t.workspace_id=%s "
         "and t.world_id=%s and t.version_id=%s and not t.removed "
-        "and (t.kind_source='shipped' or ("
-        "exists (select 1 from thing_kind_version k where k.workspace_id=t.workspace_id "
-        "and k.sha256=encode(t.kind_sha256,'hex')) "
-        "and not exists (select 1 from thing_erasure e join world_alternate_version_edit p "
-        "on p.workspace_id=t.workspace_id and p.edit_id=t.created_edit_id "
-        "where e.workspace_id=t.workspace_id and e.sha256=encode(t.kind_sha256,'hex') "
-        "and e.erased_at>=p.recorded_at)))) as held",
+        f"and not {THING_KIND_GONE_SQL}) as held",
         (workspace_id, world_id, version_id),
     ).fetchone()
     return bool(row["held"])

@@ -33,6 +33,7 @@ from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.canonical import canonical_json
 from exulanica.db.session import Database
 from exulanica.selection.validation import Session
+from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_control_repository import SocietyControlRepository
 from exulanica.world.society_controls import (
     DEFAULT_BASE_TICK_INTERVAL_MS,
@@ -41,6 +42,7 @@ from exulanica.world.society_controls import (
     LeaseLost,
     validate_settings,
 )
+from exulanica.world.society_repository import SocietyInputBehind, SocietyRepository
 
 _LOG = logging.getLogger(__name__)
 
@@ -343,9 +345,16 @@ class SocietyControlWorker:
             )
         if claim is None:
             return None
+        # Read before the telling, whose wait for the workspace's lock is part of the lease: a
+        # model's deadline never outlasts it.
         lease_ends = time.monotonic() + LEASE_SECONDS
-        one_minute = False
-        if self._before_minute is not None:
+        erasure = self._tell_of_erased_kinds(workspace, claim)
+        # Unless the telling answered clear, the state may still hold an erased being until the
+        # society's minute runs (one just told of, one the erasing request already told of, one
+        # whose thing was removed, one that could not be told): no model is asked about that
+        # state, and the round is one minute the routine decides.
+        one_minute = erasure != "clear"
+        if erasure == "clear" and self._before_minute is not None:
             try:
                 one_minute = self._before_minute(claim, lease_ends)
             except Exception:
@@ -357,10 +366,44 @@ class SocietyControlWorker:
         try:
             with self.database.session(workspace) as connection:
                 return self._repository(connection, workspace, claim.world_id).execute(
-                    claim, max_ticks=1 if one_minute else None
+                    claim, max_ticks=1 if one_minute else None, untold=erasure == "untold"
                 )
         except LeaseLost:
             return {"status": "lease_lost"}
+
+    def _tell_of_erased_kinds(self, workspace: uuid.UUID, claim: ControlClaim) -> str:
+        """Before a claimed round, and before any model is asked about its minute: where a
+        creature the society would run was erased and the society not told, compose the input
+        that sends it away (:meth:`SocietyRepository.tell_of_erased_kinds`), in a transaction of
+        its own, as an authored edit's telling is. Answers what that answers (``clear``,
+        ``told``, ``leaving``), and ``untold`` where the society is behind and the input could
+        not be composed (:class:`UnavailableSocietyInput`, :class:`SocietyInputBehind`): the
+        round's minute, finding the society still behind, pauses it with the reason an
+        unavailable input gives (:meth:`SocietyControlRepository.execute`). Only ``clear`` lets a
+        model be asked.
+
+        Any other failure is not an answer about the society and is not caught: the round fails
+        as any round does, its lease is left to expire, and a society whose rounds keep failing
+        is paused by the claim that finds its attempts spent, with the reason a person reads
+        for that (:meth:`SocietyControlRepository.claim_in_workspace`). No minute runs
+        meanwhile, so the erased creature is not run."""
+        try:
+            with self.database.session(workspace) as connection:
+                session = Session(workspace_id=workspace, actor=claim.actor)
+                return SocietyRepository(
+                    connection,
+                    workspace,
+                    world_id=claim.world_id,
+                    input_refresher=lambda version: self.runtime.authored_edit(
+                        connection, session, version
+                    ),
+                ).tell_of_erased_kinds(claim.version_id)
+        except (UnavailableSocietyInput, SocietyInputBehind) as exc:
+            _LOG.error(
+                "A society could not be told of an erased kind before its round: %s",
+                type(exc).__qualname__,
+            )
+            return "untold"
 
     def _pooled_round(
         self, workspaces: Iterable[uuid.UUID], stop: threading.Event

@@ -240,6 +240,7 @@ def repository(
 ) -> SocietyControlRepository:
     require_world(connection, session.workspace_id, world_id)
     authorizer = getattr(request.app.state, "society_input_authorizer", None)
+    refresher = getattr(request.app.state, "society_authored_edit", None)
     return SocietyControlRepository(
         connection,
         session.workspace_id,
@@ -249,6 +250,12 @@ def repository(
         if authorizer is None
         else lambda actor, doc: authorizer(
             connection, Session(workspace_id=session.workspace_id, actor=actor), doc
+        ),
+        # A manual step composes the next input first where the society's is behind an erasure.
+        input_refresher=None
+        if refresher is None
+        else lambda actor, version: refresher(
+            connection, Session(workspace_id=session.workspace_id, actor=actor), version
         ),
     )
 
