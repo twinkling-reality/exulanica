@@ -492,6 +492,7 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
     'You have started as many worlds this hour as one person may. The next can start in about '
     + '{minutes} minutes.',
   'worldSentence.notNow': '{meaning} No world can be started from here now.',
+  'worldSentence.recipes': 'Make a town from a recipe instead',
   'worldSentence.make': 'Make this world',
   'worldSentence.choosing': 'Working out how to make it, {elapsed} so far.',
   'worldSentence.drafting':

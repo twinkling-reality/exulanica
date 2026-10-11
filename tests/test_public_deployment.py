@@ -543,14 +543,30 @@ def test_no_composition_takes_a_kind_of_place_from_a_person():
     removal reaches (docs/world-kinds-contract.md, "A world made from a sentence"), so a server
     deployed from these files takes none until its operator says so: no service names the setting
     but the API, and there only as off unless public.env sets it."""
-    for name, block in {**BASE_SERVICES, **OVERLAY_SERVICES}.items():
-        for line in block.splitlines():
-            if "EXULANICA_KINDS_FROM_PEOPLE" not in line:
-                continue
-            assert name == "api", name
-            assert re.fullmatch(
-                r" +EXULANICA_KINDS_FROM_PEOPLE: \$\{EXULANICA_KINDS_FROM_PEOPLE:-off\}", line
-            ), line
+    composed = sorted(
+        path
+        for pattern in ("compose*.yaml", "deploy/**/*.yaml")
+        for path in ROOT.glob(pattern)
+        if "\nservices:\n" in path.read_text(encoding="utf-8")
+    )
+    # Every compose file of the repository, found and not listed, so a new one is read too.
+    assert {str(path.relative_to(ROOT)) for path in composed} >= {
+        "compose.yaml",
+        "deploy/public/public.yaml",
+        "deploy/judge/compose.yaml",
+        "deploy/judge/edge.yaml",
+        "deploy/installation/compose.shared-store.yaml",
+    }
+    for path in composed:
+        for name, block in _services(path.read_text(encoding="utf-8")).items():
+            for line in block.splitlines():
+                if "EXULANICA_KINDS_FROM_PEOPLE" not in line:
+                    continue
+                assert name == "api", (path.name, name)
+                assert re.fullmatch(
+                    r" +EXULANICA_KINDS_FROM_PEOPLE: \$\{EXULANICA_KINDS_FROM_PEOPLE:-off\}",
+                    line,
+                ), (path.name, line)
 
 
 def test_only_the_api_makes_a_society_of_things_and_prepare_towns_dresses_the_arrival():

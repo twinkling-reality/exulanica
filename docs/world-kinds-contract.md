@@ -435,6 +435,7 @@ library's `drafting` say so:
 | `POST /worlds/drafts` | Yes | The drafted kind document in the made world's receipt, and what the table below lists |
 | `POST /worlds/kinds/drafts` | Yes | The drafted kind document as a version the workspace keeps (`world_kind_version`) |
 | `POST /worlds/kinds` | Yes | The uploaded kind document as a version the workspace keeps |
+| `POST /worlds/kinds/{kind}/worlds` | Yes, for a kind the workspace keeps | That kind's whole document once more, in the made world's receipt. A world of a shipped kind or of the town is made either way |
 | `POST /worlds/specification/drafts` | No | Nothing: it answers a proposal and writes no row, and the town a person then makes from it holds a preset and values |
 
 **No kind is kept.** A place made this way appends nothing to the workspace's kinds: its receipt
@@ -443,17 +444,18 @@ workspace keeps are the ones a person chose to keep. The draft runs under the sa
 same three budgets as a kind's draft; while one runs in a workspace the other is answered 409
 `kind_draft_busy`. Only the person who started a draft reads it, and only through this route.
 
-**What is kept of the words.** The words themselves are held in the API process while the draft
-runs and forgotten when it ends; the job writes them to no table, and a refused draft keeps
-nothing of them anywhere on the server. They are sent to the hosted models that choose and draft,
+**What is kept of the words.** The whole sentence is held in the API process while the draft runs
+and dropped when it ends; the job writes it to no table, and a refused draft's sentence is kept
+nowhere on the server. The phrases the table's last row names stay for an hour. They are sent to the hosted models that choose and draft,
 every saved name replaced first; a request already sent is beyond any deletion here. What a made
 world keeps that was written from the words:
 
 | Where | What |
 | --- | --- |
 | The world's receipt (`world_generation_receipt`), appended once and never changed | For a place, the whole kind document: its key, label and summary, every part's and use's key and label, and `provenance.words_sha256`, the SHA-256 of the words as sent. The label and summary may repeat the words closely. For a town, its preset and values only |
-| The saved entry's title and the first version's title | The same label |
-| The world's structure records and its stored drawing | The document's part keys and look roles |
+| The saved entry's title (`saved_world_entry`) and the first version's title (`world_alternate_version`) | For a place, the same label. A town's are its preset's label, which is not the person's |
+| The world's structure records (`world_structure_snapshot` and the element tables under it) and its stored drawing | For a place, the document's part keys and look roles. A town's records are the city grammar's, generated from its preset, values and seed |
+| A town's tile bake jobs (`job`) | Ids, a digest and a tile in each payload, and nothing of the words |
 | The API process, for an hour after the draft ends | A town's `left_out` phrases as they were typed, saved names included, read by the person who started the draft and nobody else |
 
 The world's registration (`world_identity`), which outlives a removal, states that the world was

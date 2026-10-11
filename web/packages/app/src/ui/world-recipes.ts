@@ -72,6 +72,8 @@ export interface WorldRecipesPanel {
    * the server offers it. The recipes, the kinds and every value leave the sheet with it.
    */
   showSentence(box: HTMLElement): void;
+  /** Put back what `showSentence` took away: the recipes, the kinds and their values. */
+  showRecipes(): void;
 }
 
 /** Whether a person can reach a control: not inside anything hidden, not disabled. */
@@ -480,6 +482,10 @@ export function buildWorldRecipes(options: {
     }, () => undefined);
   }
 
+  // What the sheet held before the one box took it over, and where Close stood in it, so the
+  // recipes can be put back whole.
+  let recipes: { readonly nodes: readonly ChildNode[]; readonly closeIn: ParentNode | null; readonly closeBefore: ChildNode | null } | null = null;
+
   return {
     root,
     lookSlot,
@@ -493,7 +499,15 @@ export function buildWorldRecipes(options: {
       origin.textContent = words ?? '';
       origin.hidden = words === null;
     },
+    showRecipes() {
+      if (recipes === null) return;
+      delete root.dataset['worldRecipes'];
+      root.replaceChildren(...recipes.nodes);
+      recipes.closeIn?.insertBefore(close, recipes.closeBefore);
+      recipes = null;
+    },
     showSentence(box) {
+      recipes ??= { nodes: [...root.childNodes], closeIn: close.parentNode, closeBefore: close.nextSibling };
       root.dataset['worldRecipes'] = 'sentence';
       root.replaceChildren(
         el('div', { class: 'world-recipes-main' }, [el('h2', { text: say('worldRecipes.heading') }), box]),

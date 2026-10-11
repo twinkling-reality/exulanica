@@ -142,7 +142,8 @@ class CodeView(BaseModel):
 class MadeWorldDraftView(BaseModel):
     draft_id: uuid.UUID
     state: Literal["choosing", "drafting", "making", "ready", "refused"]
-    #: The words, while the draft runs; a draft that ended keeps none.
+    #: The whole sentence, while the draft runs; a draft that ended keeps none of it here. (The
+    #: phrases of ``left_out`` are the person's own words too, and stay while the draft is read.)
     description: str
     started_at: datetime
     elapsed_seconds: int

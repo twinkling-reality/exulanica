@@ -34,6 +34,7 @@ export function readWorldDraftOffer(credentials: TransportOptions): Promise<Worl
 export interface SentenceSheet {
   readonly root: HTMLElement;
   showSentence(box: HTMLElement): void;
+  showRecipes(): void;
 }
 
 export function attachWorldSentence(sheet: SentenceSheet, options: {
@@ -41,6 +42,8 @@ export function attachWorldSentence(sheet: SentenceSheet, options: {
   /** The offer the sheet was decided by. */
   readonly offer: WorldDraftOffer;
   readonly open: (entry: SavedWorldEntry) => Promise<void>;
+  /** Called once the recipes are back in the sheet, where no draft can be started now. */
+  readonly recipes: () => void;
 }): void {
   const client = new WorldMakingClient(options.credentials);
   const box = buildWorldSentence({
@@ -49,6 +52,10 @@ export function attachWorldSentence(sheet: SentenceSheet, options: {
     start: (description) => client.start(description),
     read: (draftId) => client.read(draftId),
     open: options.open,
+    recipes: () => {
+      sheet.showRecipes();
+      options.recipes();
+    },
   });
   sheet.showSentence(box.root);
   // The sheet is a dialog the person has just opened: focus goes to the field, the one way in.

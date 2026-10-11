@@ -307,6 +307,41 @@ def test_a_server_that_takes_no_kind_from_a_person_drafts_none_keeps_none_and_sa
     assert transport.requests == []
 
 
+def test_a_kind_kept_while_kinds_were_taken_makes_no_world_once_they_are_not(drafts):
+    """A world's receipt carries its kind's whole document, so a world of a kept kind copies a
+    person's document once more. A deployment that has turned kinds from people off refuses it by
+    name and writes nothing; the positive control is the same request on the same rows with the
+    setting on."""
+    app, _transport = drafts
+    uploaded = json.loads(
+        (Path(__file__).parent / "fixtures" / "world-kinds" / "fixture-farm.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    uploaded["origin"] = "uploaded"
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+    asked = {"preset": uploaded["presets"][0]["key"], "title": "A farm of mine"}
+    with app() as client:
+        kept = client.post("/worlds/kinds", headers=headers, json={"document": uploaded})
+        assert kept.status_code == 201, kept.text
+        kind = kept.json()["kind"]["kind"]
+    with app(words=False) as client:
+        listed = client.get("/worlds/kinds", headers=headers).json()
+        assert (kind, "workspace") in {(one["kind"], one["source"]) for one in listed["kinds"]}
+        refused = client.post(f"/worlds/kinds/{kind}/worlds", headers=headers, json=asked)
+        assert (refused.status_code, refused.json()["code"]) == (
+            403,
+            "kinds_from_people_not_offered",
+        )
+        assert client.get("/world-entries", headers=headers).json() == []
+        # A kind nobody keeps is still unknown by name, not refused by the setting.
+        unknown = client.post("/worlds/kinds/windmill/worlds", headers=headers, json=asked)
+        assert (unknown.status_code, unknown.json()["code"]) == (404, "unknown_world_kind")
+    with app() as client:
+        made = client.post(f"/worlds/kinds/{kind}/worlds", headers=headers, json=asked)
+        assert made.status_code == 201, made.text
+
+
 def test_the_library_says_before_anything_is_typed_whether_drafting_is_offered(drafts, monkeypatch):
     app, transport = drafts
     with app() as client:

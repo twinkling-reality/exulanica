@@ -100,8 +100,9 @@ function box(
     return next;
   });
   const open = vi.fn(async () => undefined);
+  const recipes = vi.fn();
   const built = buildWorldSentence({
-    offer, readOffer, start, read, open,
+    offer, readOffer, start, read, open, recipes,
     schedule: (run, ms) => {
       const held = { run, ms };
       waiting.push(held);
@@ -122,7 +123,8 @@ function box(
     await settle();
   };
   return {
-    built, start, read, open, readOffer, waiting, field, type, tick,
+    built, start, read, open, readOffer, recipes, waiting, field, type, tick,
+    toRecipes: find<HTMLButtonElement>('.world-sentence-recipes'),
     spend: find<HTMLElement>('.world-sentence-spend'),
     make: find<HTMLButtonElement>('.world-sentence-make'),
     status: find<HTMLElement>('.world-sentence-status'),
@@ -287,6 +289,43 @@ describe('the one box', () => {
     const busy = box([], undefined, other);
     expect(busy.status.textContent).toBe(say('worldSentence.busy.other'));
     expect(busy.follow.hidden).toBe(true);
+  });
+
+  it('never leaves a dead press alone: where no draft can start now, the recipes are one press away', async () => {
+    // Offered: the box is the way in and no other press is shown.
+    expect(box([]).toRecipes.hidden).toBe(true);
+    for (const code of ['budget_exceeded', 'kind_draft_limit', 'kind_draft_busy', 'world_limit_reached']) {
+      const h = box([], undefined, parseWorldDraftOffer(offerWire({ offered: false, code, detail: 'why' })));
+      expect(h.make.disabled, code).toBe(true);
+      expect(h.toRecipes.hidden, code).toBe(false);
+      expect(h.toRecipes.textContent).toBe(say('worldSentence.recipes'));
+      h.toRecipes.click();
+      expect(h.recipes, code).toHaveBeenCalledTimes(1);
+    }
+    // The last start of the hour: once that draft ends, the press appears beside what was made.
+    const spent = parseWorldDraftOffer(offerWire({ offered: false, code: 'kind_draft_limit', detail: 'why', starts: { an_hour: 12, left: 0, retry_after_seconds: 600 } }));
+    const last = box([parseWorldMakingDraft(ready)], undefined, OFFER, [spent]);
+    last.type(WORDS);
+    last.make.click();
+    await settle();
+    expect(last.toRecipes.hidden).toBe(true);
+    await last.tick();
+    expect(last.toRecipes.hidden).toBe(false);
+    expect(last.openButton.hidden).toBe(false);
+    // A person's own draft still running is followed, not turned away to the recipes.
+    const mine = parseWorldDraftOffer(offerWire({ offered: false, code: 'kind_draft_busy', detail: 'why', running_draft_id: DRAFT }));
+    expect(box([parseWorldMakingDraft(wire('making'))], undefined, mine).toRecipes.hidden).toBe(true);
+  });
+
+  it('sends once, however fast Enter is pressed again', async () => {
+    const h = box([]);
+    h.type(WORDS);
+    const enter = (): boolean => h.field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    enter();
+    enter();
+    h.make.click();
+    await settle();
+    expect(h.start).toHaveBeenCalledTimes(1);
   });
 
   it('picks up a draft of the person\u2019s own that is still running', async () => {
@@ -520,6 +559,7 @@ describe('the sheet with the one box', () => {
       credentials: { baseUrl: 'https://exulanica.test', token: 'private', fetch: vi.fn(async () => Response.json(wire('choosing'), { status: 202 })) },
       offer: OFFER,
       open: vi.fn(async () => undefined),
+      recipes: vi.fn(),
     });
     expect(sheet.root.dataset['worldRecipes']).toBe('sentence');
     expect(sheet.root.querySelectorAll('.world-sentence')).toHaveLength(1);
@@ -529,6 +569,32 @@ describe('the sheet with the one box', () => {
     const reachable = [...sheet.root.querySelectorAll<HTMLButtonElement>('button')].filter((button) => button.closest('[hidden]') === null);
     expect(reachable.map((button) => button.textContent)).toEqual([say('worldSentence.make'), say('worldRecipes.close')]);
     reachable[1]!.click();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('puts the recipes back whole, Close included, when a person takes the press to them', () => {
+    const onClose = vi.fn();
+    const sheet = buildWorldRecipes({
+      specification: () => new Promise(() => undefined), make: vi.fn(), open: vi.fn(async () => undefined), onClose,
+    });
+    document.body.replaceChildren(sheet.root);
+    const before = [...sheet.root.children];
+    const back = vi.fn();
+    attachWorldSentence(sheet, {
+      credentials: { baseUrl: 'https://exulanica.test', token: 'private', fetch: vi.fn(async () => Response.json(offerWire())) },
+      offer: parseWorldDraftOffer(offerWire({ offered: false, code: 'budget_exceeded', detail: 'the allowance is spent' })),
+      open: vi.fn(async () => undefined),
+      recipes: back,
+    });
+    expect(sheet.root.dataset['worldRecipes']).toBe('sentence');
+    sheet.root.querySelector<HTMLButtonElement>('.world-sentence-recipes')!.click();
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(sheet.root.dataset['worldRecipes']).toBeUndefined();
+    expect([...sheet.root.children]).toEqual(before);
+    expect(sheet.root.querySelector('.world-sentence')).toBeNull();
+    // Close is back where it stood and still closes.
+    const close = [...sheet.root.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === say('worldRecipes.close'))!;
+    close.click();
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

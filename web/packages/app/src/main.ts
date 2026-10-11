@@ -436,7 +436,7 @@ function showWorldRecipes(
             return;
           }
           panel.root.style.removeProperty('visibility');
-          sentence.attachWorldSentence(panel, { credentials, offer, open: openMade });
+          sentence.attachWorldSentence(panel, { credentials, offer, open: openMade, recipes: describe });
         }).catch(describe);
       }
       // A saved world's own values, loaded as a person's edit is: what is out of range now is said

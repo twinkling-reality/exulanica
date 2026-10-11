@@ -7,7 +7,9 @@
  * spend: the most times it asks a model, and how many of this hour's starts are left. The press
  * cannot be reached before that line is shown. Where a start would be refused now (the hour's
  * starts used up, the allowance spent, as many worlds held as may be) the box says so at once,
- * and a draft of the person's own that is still running is picked up where it is.
+ * and a draft of the person's own that is still running is picked up where it is. A refusal that
+ * passes never leaves the box alone with a dead press: where no draft can be started now, one
+ * press goes to the recipes, which ask no model.
  *
  * A person says the world they want and presses once. The route answers at once, so the page
  * follows the draft and says which step it is at with the time the server counts (never the
@@ -68,6 +70,8 @@ export function buildWorldSentence(options: {
   readonly read: (draftId: string) => Promise<WorldMakingDraft>;
   /** Open the world that was made. */
   readonly open: (entry: SavedWorldEntry) => Promise<void>;
+  /** Show the recipes in place of the box: offered where no draft can be started now. */
+  readonly recipes?: () => void;
   /** Ask again after `ms`; returns a cancel. Tests pass their own. */
   readonly schedule?: (run: () => void, ms: number) => () => void;
 }): WorldSentencePanel {
@@ -86,6 +90,7 @@ export function buildWorldSentence(options: {
   const leftOutLine = el('p', { class: 'world-description-not-supported world-sentence-left-out', hidden: true });
   const open = el('button', { type: 'button', class: 'world-description-use world-sentence-open', text: say('worldSentence.open'), hidden: true });
   const follow = el('button', { type: 'button', class: 'world-description-use world-sentence-follow', text: say('worldSentence.follow'), hidden: true });
+  const toRecipes = el('button', { type: 'button', class: 'world-description-use world-sentence-recipes', text: say('worldSentence.recipes'), hidden: true });
   // The Describe it panel's own structure and classes, so the box is drawn as that panel is: a
   // heading, the line that says what happens to the words, the field, what a draft may spend, the
   // press, the status and what came of it.
@@ -96,7 +101,7 @@ export function buildWorldSentence(options: {
     spend,
     make,
     status,
-    el('div', { class: 'world-description-result' }, [follow, madeLine, leftOutLine, open]),
+    el('div', { class: 'world-description-result' }, [follow, madeLine, leftOutLine, open, toRecipes]),
   ]);
 
   let following: string | null = null;
@@ -106,9 +111,11 @@ export function buildWorldSentence(options: {
   let busyDraft: string | null = null;
   // Whether a start would be taken now, by the last offer read; false until its line is shown.
   let offered = false;
+  // A start that was sent and has not answered: Enter or a second press sends no other.
+  let sending = false;
 
   const reflect = (): void => {
-    make.disabled = !offered || following !== null || field.value.trim() === '';
+    make.disabled = !offered || sending || following !== null || field.value.trim() === '';
     field.readOnly = following !== null;
   };
 
@@ -127,6 +134,8 @@ export function buildWorldSentence(options: {
     offered = answer.offered || answer.runningDraftId !== null;
     spend.textContent = offered || announce ? spendWords(answer) : `${spendWords(answer)} ${refusedNowWords(answer)}`;
     if (!offered && announce) status.textContent = refusedNowWords(answer);
+    // Where no draft can be started now, the recipes are one press away.
+    toRecipes.hidden = offered || options.recipes === undefined;
     reflect();
   };
 
@@ -221,11 +230,16 @@ export function buildWorldSentence(options: {
 
   const send = (): void => {
     const words = field.value.trim();
-    if (words === '' || following !== null || !offered) return;
+    if (words === '' || following !== null || !offered || sending) return;
+    sending = true;
     make.disabled = true;
     clearResult();
     status.textContent = '';
-    void options.start(words).then(followDraft, (error: unknown) => {
+    void options.start(words).then((answer) => {
+      sending = false;
+      followDraft(answer);
+    }, (error: unknown) => {
+      sending = false;
       reflect();
       if (error instanceof ApiError && error.code === 'kind_draft_busy') {
         // The running draft's id is told only to the person who started it.
@@ -257,6 +271,7 @@ export function buildWorldSentence(options: {
       status.textContent = problemSentence(error);
     });
   });
+  toRecipes.addEventListener('click', () => options.recipes?.());
   field.addEventListener('input', reflect);
   make.addEventListener('click', send);
   // Enter makes the world and Shift with Enter starts a new line.

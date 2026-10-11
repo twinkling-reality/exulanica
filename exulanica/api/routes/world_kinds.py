@@ -730,13 +730,21 @@ def read_kind_draft(
     return _draft_view(draft, connection, session.workspace_id, services.kind_drafts.clock())
 
 
+def _kept_kind(
+    connection: Any, workspace_id: uuid.UUID, key: str, version: int | None
+) -> KindDocument | None:
+    """The kind the workspace keeps under ``key``: a person's own document."""
+    stored = WorkspaceKinds(connection, workspace_id)
+    found = stored.version(key, version) if version is not None else stored.latest(key)
+    return None if found is None else found.kind
+
+
 def _find_kind(
     connection: Any, workspace_id: uuid.UUID, key: str, version: int | None
 ) -> KindDocument | None:
-    stored = WorkspaceKinds(connection, workspace_id)
-    found = stored.version(key, version) if version is not None else stored.latest(key)
-    if found is not None:
-        return found.kind
+    kept = _kept_kind(connection, workspace_id, key, version)
+    if kept is not None:
+        return kept
     shipped = [kind for kind in shipped_kinds() if kind.kind == key]
     if version is not None:
         shipped = [kind for kind in shipped if kind.version == version]
@@ -768,6 +776,11 @@ def create_kind_world(
     world people can live in, for any identity drawn, 409 with every refusal; a workspace already
     holding as many generated worlds as the count policy allows 409; a deployment whose database
     role cannot register a world 403 ``worlds_read_only``. Nothing is written when any is refused.
+
+    A world's receipt carries its kind's whole document, so a world of a kind the workspace keeps
+    copies a person's document once more. A server whose deployment has not turned kinds from
+    people on (``EXULANICA_KINDS_FROM_PEOPLE``) makes worlds of shipped kinds and the town only,
+    and answers 403 ``kinds_from_people_not_offered`` for a kind the workspace keeps.
     """
     try:
         require_world_registration(connection)
@@ -785,6 +798,15 @@ def create_kind_world(
                 values=body.values,
             )
         else:
+            if (
+                not services.kinds_from_people
+                and _kept_kind(connection, session.workspace_id, kind, body.version) is not None
+            ):
+                # The workspace's own kind is read before a shipped one of the same key, so it is
+                # refused by name here and never passed over for the shipped one.
+                return _problem(
+                    403, KINDS_FROM_PEOPLE_NOT_OFFERED, KINDS_FROM_PEOPLE_NOT_OFFERED_DETAIL
+                )
             found = _find_kind(connection, session.workspace_id, kind, body.version)
             if found is None:
                 return _problem(404, "unknown_world_kind", f"no world kind is named {kind!r}")
