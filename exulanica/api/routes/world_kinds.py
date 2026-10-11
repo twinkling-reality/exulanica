@@ -454,8 +454,10 @@ def upload_kind(
     """Read the kind, build its sample worlds and keep it when every one passes.
 
     A server whose deployment has not turned kinds from people on
-    (``EXULANICA_KINDS_FROM_PEOPLE``) answers 403 ``kinds_from_people_not_offered`` before the
-    document is read: a kept kind is a person's own document, and no removal reaches its row.
+    (``EXULANICA_KINDS_FROM_PEOPLE``) answers 403 ``kinds_from_people_not_offered`` for a document
+    it would otherwise keep, before any sample world is built and before anything is written: a
+    kept kind is a person's own document, and no removal reaches its row. A body that is no kind
+    is refused 422 for itself first, as on any server.
     A body over :data:`UPLOAD_BODY_MAXIMUM` is refused 413 before it is read; a document larger
     than :data:`UPLOAD_BYTES_MAXIMUM`, one whose origin is not ``uploaded``, and any refusal of
     either stage answer 422 with the refusal's code, where and why (stage B's with its report so
@@ -466,8 +468,6 @@ def upload_kind(
     ``kind_work_busy`` or ``kind_work_unavailable`` with a ``Retry-After``, and finished checks
     are kept, so sending the same kind again reads them.
     """
-    if not services.kinds_from_people:
-        return _problem(403, KINDS_FROM_PEOPLE_NOT_OFFERED, KINDS_FROM_PEOPLE_NOT_OFFERED_DETAIL)
     if len(json.dumps(body.document)) > UPLOAD_BYTES_MAXIMUM:
         return _problem(
             422, "kind_document_invalid", f"a kind is at most {UPLOAD_BYTES_MAXIMUM} bytes"
@@ -483,6 +483,11 @@ def upload_kind(
             )
     except KindRefused as exc:
         return _problem(422, exc.code, exc.detail, where=exc.where)
+    if not services.kinds_from_people:
+        # Only a document that would otherwise be kept is refused by the setting: a body that is
+        # no kind is answered as it always was, so the setting says nothing a caller did not
+        # already send. Before any sample world is built and before anything is written.
+        return _problem(403, KINDS_FROM_PEOPLE_NOT_OFFERED, KINDS_FROM_PEOPLE_NOT_OFFERED_DETAIL)
     stored = WorkspaceKinds(connection, session.workspace_id)
     try:
         # Before the worker builds anything; the append asks again under the workspace's lock.

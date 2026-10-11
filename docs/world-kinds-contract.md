@@ -444,8 +444,10 @@ named parts (`parts`, each an `axis` and a `key`).
 own document, drafted from their words or written by them, and it is kept in rows no removal
 reaches. A server takes one only where its deployment says so (`EXULANICA_KINDS_FROM_PEOPLE=on`,
 [deployment](deployment.md)). Elsewhere every route that would keep one answers 403
-`kinds_from_people_not_offered` before anything is read, and `GET /worlds/drafts` and the
-library's `drafting` say so:
+`kinds_from_people_not_offered` before anything is drafted, built or written, and
+`GET /worlds/drafts` and the library's `drafting` say so. The setting refuses only a request that
+would otherwise be taken: a body that is no description or no kind is refused for itself first
+(422), and a kind nobody keeps is unknown (404), as on any server:
 
 | Route | Covered | What it keeps of a person's |
 | --- | --- | --- |

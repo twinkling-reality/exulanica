@@ -285,6 +285,14 @@ def test_a_server_that_takes_no_kind_from_a_person_drafts_none_keeps_none_and_sa
             json={"document": uploaded},
         )
         assert (kept.status_code, kept.json()["code"]) == (403, "kinds_from_people_not_offered")
+        # A body that is no kind is refused for itself, as on any server: the setting answers
+        # only a document that would otherwise be kept, so it is no 403 to somebody probing.
+        no_kind = client.post(
+            "/worlds/kinds",
+            headers={"Authorization": f"Bearer {OTHER_TOKEN}"},
+            json={"document": {"profile": "exulanica.world-kind/v1"}},
+        )
+        assert (no_kind.status_code, no_kind.json()["code"]) == (422, "kind_document_invalid")
         listed = client.get("/worlds/kinds", headers={"Authorization": f"Bearer {TOKEN}"}).json()
         assert {kind["source"] for kind in listed["kinds"]} == {"shipped"}
         refused = _start(client, "a small farm with a barn")
