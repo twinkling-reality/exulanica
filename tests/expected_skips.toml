@@ -219,3 +219,9 @@ only_without_extra = "segmentation"
 [[cause]]
 reason = "huggingface_hub is absent; install it with `uv sync --extra segmentation`"
 only_without_extra = "segmentation"
+
+# A look drawn on a base states no light of its own; its base's light is held under the base's
+# own name in the same test.
+[[skip]]
+test = "tests/test_world_settings.py::test_every_published_look_stands_in_light_a_setting_is_held_to[exulanica.kit-places current]"
+reason = "drawn on a base, which states the light"
