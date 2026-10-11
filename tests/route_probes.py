@@ -943,6 +943,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/world/versions/{version_id}/traffic/comparisons/{comparison_id}/runs/{run_id}": Owned(
         build.signal_comparison_run
     ),
+    "/worlds/drafts/{draft_id}": Owned(build.world_draft),
     "/worlds/kinds/drafts/{draft_id}": Owned(build.kind_draft),
     "/worlds/references/{reference_id}": Owned(build.reference_request),
 }

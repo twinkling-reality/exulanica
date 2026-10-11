@@ -148,6 +148,18 @@
 
 #shell section.world-recipes .world-description-result { display: grid; gap: 0.25rem; }
 
+/* One sentence makes a world (ui/world-sentence.ts): what came of it reads together, under the
+ * line that says what happens to the words and the press. */
+#shell section.world-recipes .world-sentence .world-sentence-spend {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--color-text-faint);
+}
+
+#shell section.world-recipes .world-sentence .world-description-status { grid-row: 5; }
+#shell section.world-recipes .world-sentence .world-description-result { grid-row: 6; }
+#shell section.world-recipes .world-sentence .world-description-result:not(:has(> :not([hidden]))) { display: none; }
+
 /* The look a draft's words ask for: one line, in full ink among the muted values when a look is
    offered, and the one press that takes it in place of a look the person chose themselves. */
 #shell section.world-recipes .world-description-look:empty { display: none; }

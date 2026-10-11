@@ -12,12 +12,14 @@ import threading
 import time
 import uuid
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pytest
 from exulanica.api import permissions
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
+from exulanica.api.dependencies import holds_as_guest
 from exulanica.api.services import Services
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
@@ -100,28 +102,43 @@ def drafts(named, spine_schema, monkeypatch):
     transport = _Held()
     database = scratch_database(scratch)
 
-    def app(model: bool = True, spent: bool = False) -> TestClient:
-        return TestClient(
-            create_app(
-                Services(
-                    database=database,
-                    readonly_database=database,
-                    store=store,
-                    tokens=load_token_directory(),
-                    executor_shares_the_write_role=True,
-                    model_client=ModelClient(
-                        api_key="test-key-not-real",
-                        transport=transport,
-                        budget=BudgetGuard(ceiling_usd=Decimal("0"), max_calls=0)
-                        if spent
-                        else BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
-                    )
-                    if model
-                    else None,
-                ),
-                verify=False,
-            )
+    def app(
+        model: bool = True,
+        spent: bool = False,
+        words: bool = True,
+        guest: bool = False,
+        spending: object = None,
+    ) -> TestClient:
+        """The application; ``words`` False is a deployment that takes no kind of place from a
+        person, ``guest`` answers every caller as a guest (the role is the account runtime's
+        to decide, tested with it), ``spending`` is a durable authority every call is reserved
+        and settled against."""
+        application = create_app(
+            Services(
+                database=database,
+                readonly_database=database,
+                store=store,
+                tokens=load_token_directory(),
+                executor_shares_the_write_role=True,
+                # A deployment that takes kinds of place from people, unless a test says not.
+                kinds_from_people=words,
+                spending=spending,
+                model_client=ModelClient(
+                    api_key="test-key-not-real",
+                    transport=transport,
+                    budget=BudgetGuard(ceiling_usd=Decimal("0"), max_calls=0)
+                    if spent
+                    else BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+                    spending=spending,
+                )
+                if model
+                else None,
+            ),
+            verify=False,
         )
+        if guest:
+            application.dependency_overrides[holds_as_guest] = lambda: True
+        return TestClient(application)
 
     return app, transport
 
@@ -248,6 +265,46 @@ def _drafting(client: TestClient, token: str = TOKEN) -> dict[str, Any]:
     library = client.get("/worlds/kinds", headers={"Authorization": f"Bearer {token}"})
     assert library.status_code == 200, library.text
     return library.json()["drafting"]
+
+
+def test_a_server_that_takes_no_kind_from_a_person_drafts_none_keeps_none_and_says_so(drafts):
+    """The deployment's switch (EXULANICA_KINDS_FROM_PEOPLE), off: a draft's start and an
+    uploaded kind are each refused by name before anything is read, no model is asked, nothing is
+    kept, and the library says so before a word is typed."""
+    app, transport = drafts
+    uploaded = json.loads(
+        (Path(__file__).parent / "fixtures" / "world-kinds" / "fixture-farm.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    uploaded["origin"] = "uploaded"
+    with app(words=False) as client:
+        kept = client.post(
+            "/worlds/kinds",
+            headers={"Authorization": f"Bearer {TOKEN}"},
+            json={"document": uploaded},
+        )
+        assert (kept.status_code, kept.json()["code"]) == (403, "kinds_from_people_not_offered")
+        listed = client.get("/worlds/kinds", headers={"Authorization": f"Bearer {TOKEN}"}).json()
+        assert {kind["source"] for kind in listed["kinds"]} == {"shipped"}
+        refused = _start(client, "a small farm with a barn")
+        assert (refused.status_code, refused.json()["code"]) == (
+            403,
+            "kinds_from_people_not_offered",
+        )
+        drafting = client.get("/worlds/kinds", headers={"Authorization": f"Bearer {TOKEN}"}).json()[
+            "drafting"
+        ]
+        assert (drafting["offered"], drafting["code"]) == (False, "kinds_from_people_not_offered")
+        assert "kinds_from_people_not_offered" in {one["code"] for one in drafting["refusals"]}
+        assert (
+            client.get("/worlds/kinds/drafts", headers={"Authorization": f"Bearer {TOKEN}"}).json()[
+                "drafts"
+            ]
+            == []
+        )
+    assert not transport.arrived.is_set()
+    assert transport.requests == []
 
 
 def test_the_library_says_before_anything_is_typed_whether_drafting_is_offered(drafts, monkeypatch):

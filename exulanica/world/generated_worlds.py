@@ -215,7 +215,9 @@ def create_kind_world_authorities(
         workspace_id=workspace_id,
         actor=actor,
         title=title,
-        reason=f"generated from world kind {kind} version {version}",
+        # The reason names no kind: a kind drafted from a person's words has a key made from
+        # them, and a world's registration outlives its removal. The receipt names the kind.
+        reason="generated from a world kind",
         composed=composed,
         guest=guest,
     )

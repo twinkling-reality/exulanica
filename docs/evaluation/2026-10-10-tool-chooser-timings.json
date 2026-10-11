@@ -1,0 +1,42 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "catalog_sha256": "79ec43b14622a46f24c9b9256e1166d61477c178d5f8ae4bc1e93db3f38ca001",
+  "client_timeout_seconds": 30,
+  "kind": "exulanica.tool-chooser-timings/v1",
+  "max_tokens": 1024,
+  "measured": {
+   "roles": {
+    "world_tool_chooser": {
+     "primary": "nvidia/nemotron-3-super-120b-a12b",
+     "primary_measured": {
+      "longest_ms": 5916,
+      "p50_ms": 3732,
+      "p99_ms": 5916,
+      "rows": 53
+     }
+    }
+   }
+  },
+  "module_sha256": "b6884166f5c7fbce29525b39042ead876f7768865ee416b0a7f9d8dc0df96210",
+  "note": "The tool chooser's primary's own calls in its pre-registered blind measurement: 48 fixed descriptions of worlds, each asked once and answered with one of the world tool catalog's tools or none; rows are its completed calls, a repair being a call of its own. The calls were asked under the look chooser's binding, the model and token ceiling the tool chooser's role takes, with the client's timeout at 30 s. The manifest's timeout_rule sets the role's timeout from the longest call. A call past the timeout leaves the catalog's tool for an unsure choice and no error. The fallback serves under the same timeout when the primary is withdrawn. Nothing of any other model, and nothing of any answer, is published here.",
+  "preregistration_sha256": "70a618446fa4b8263837539576c13c23db4d7fe11add759461730c690eca15d9",
+  "prompt_sha256": "dc439c9f2e8f5b8cb0b20418289ba0bef9bbee108a558ddda8a5c906a9f11830",
+  "provider": "Nebius Token Factory",
+  "run_sha256": "ec35ab676c4db190761359954c2f3ee798f2c142e37bf9068c4f4d3cc09ce960",
+  "script_sha256": "0847bc20a8086ffdfc49f5a5bc8b69c2fc6b69f3efbd197adaa4672a85775acd",
+  "tree": {
+   "head": "625d4d9c612fde933e3f8e7e828bb8c2478742c8",
+   "untracked_sha256": {
+    "assets/catalogs/world-tools/world-tool.v1.json": "79ec43b14622a46f24c9b9256e1166d61477c178d5f8ae4bc1e93db3f38ca001",
+    "exulanica/selection/tool-choosing.v1.json": "dc439c9f2e8f5b8cb0b20418289ba0bef9bbee108a558ddda8a5c906a9f11830",
+    "exulanica/selection/tool_choosing.py": "b6884166f5c7fbce29525b39042ead876f7768865ee416b0a7f9d8dc0df96210"
+   }
+  },
+  "window": {
+   "ended": "2026-10-10T15:06:03-0400",
+   "started": "2026-10-10T15:02:51-0400"
+  }
+ },
+ "record_sha256": "cec825db18ecb6e076df10629e1c5b5ac8ce597d64eeb9b19fb07fe1f04ccc96"
+}

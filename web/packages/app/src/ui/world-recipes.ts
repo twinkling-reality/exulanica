@@ -67,6 +67,11 @@ export interface WorldRecipesPanel {
   readonly lookSlot: HTMLElement;
   /** Say where the values shown came from, such as a saved world's own; null says nothing. */
   showOrigin(words: string | null): void;
+  /**
+   * Show only `box` under the heading, with Close: the one sentence that makes any world, where
+   * the server offers it. The recipes, the kinds and every value leave the sheet with it.
+   */
+  showSentence(box: HTMLElement): void;
 }
 
 /** Whether a person can reach a control: not inside anything hidden, not disabled. */
@@ -487,6 +492,13 @@ export function buildWorldRecipes(options: {
     showOrigin(words) {
       origin.textContent = words ?? '';
       origin.hidden = words === null;
+    },
+    showSentence(box) {
+      root.dataset['worldRecipes'] = 'sentence';
+      root.replaceChildren(
+        el('div', { class: 'world-recipes-main' }, [el('h2', { text: say('worldRecipes.heading') }), box]),
+        el('div', { class: 'world-recipes-side' }, [el('div', { class: 'world-recipes-actions' }, [close])]),
+      );
     },
     async setValues(presetKey, values) {
       await loaded;

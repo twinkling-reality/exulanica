@@ -123,6 +123,7 @@ class Role(StrEnum):
     KIND_DRAFTER = "kind_drafter"
     LOOK_CHOOSER = "look_chooser"
     SETTING_CHOOSER = "setting_chooser"
+    WORLD_TOOL_CHOOSER = "world_tool_chooser"
     REFERENCE_DRAFTING = "reference_drafting"
     REFERENCE_VISION = "reference_vision"
     EMBEDDING = "embedding"

@@ -15,6 +15,7 @@ import uuid
 import pytest
 from exulanica.api.app import create_app
 from exulanica.api.services import (
+    KINDS_FROM_PEOPLE_ENV,
     SOCIETY_CONTROL_WORKSPACES_ENV,
     SOCIETY_OF_THINGS_ENV,
     SOCIETY_SETTING_REFUSALS,
@@ -161,6 +162,7 @@ _one = "84f363b2-eb09-4699-9711-97cda3022ff6"
         ),
         ("EXULANICA_SOCIETY_CONTROL_WORKER", "automatic", "society_control_worker_not_boolean"),
         (SOCIETY_OF_THINGS_ENV, "sometimes", "society_of_things_not_boolean"),
+        (KINDS_FROM_PEOPLE_ENV, "for guests", "kinds_from_people_not_boolean"),
     ],
 )
 def test_a_malformed_setting_stops_startup_by_name(tmp_path, variable, value, code):
@@ -176,6 +178,20 @@ def test_a_host_makes_societies_of_things_through_its_routes_only_when_it_says_s
     for value, offered in (("on", True), ("1", True), ("off", False), ("", False)):
         services = _settings_only(tmp_path, **{SOCIETY_OF_THINGS_ENV: value})
         assert services.societies_of_things is offered, value
+
+
+def test_a_host_takes_a_kind_of_place_from_a_person_only_when_it_says_so(tmp_path):
+    assert _settings_only(tmp_path).kinds_from_people is False
+    for value, offered in (("on", True), ("1", True), ("off", False), ("", False)):
+        services = _settings_only(tmp_path, **{KINDS_FROM_PEOPLE_ENV: value})
+        assert services.kinds_from_people is offered, value
+
+
+def test_a_draft_budget_that_is_no_whole_number_stops_startup_by_its_variable(tmp_path):
+    with pytest.raises(ValueError, match="EXULANICA_GUEST_DRAFT_STARTS_AN_HOUR"):
+        _settings_only(tmp_path, EXULANICA_GUEST_DRAFT_STARTS_AN_HOUR="a dozen")
+    # The positive control: a whole number of at least 1 starts.
+    _settings_only(tmp_path, EXULANICA_GUEST_DRAFT_STARTS_AN_HOUR="3")
 
 
 def test_every_bound_the_playback_module_accepts_is_accepted(tmp_path):

@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "catalog_id": "world-tool",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "place",
+      "composer_key": "site-plan",
+      "composer_version": 1,
+      "drafter": "kind",
+      "unsure": 1,
+      "makes": "Any place that is not a town of streets, indoors or out, up to about 250 metres across: its own buildings and their rooms, yards, fields, paths, fences and walls, water, furniture and objects, and the people who live or work there. A farm, a camp, a market, a school, a harbour, a station, a castle, a single building or its inside.",
+      "cannot": "Streets with traffic, hills or slopes, anything that drives or sails, and a town's rows of shopfronts along pavements.",
+      "reason": "The site grammar, drafted through the kind drafter: the general tool, which lays out any place a document states on level ground. It is the tool taken where the choice is unsure, because it refuses nothing a town could be asked for outright and names what it left out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world tools; see the entry reasons"
+      }
+    },
+    {
+      "key": "town",
+      "composer_key": "city-grammar-town",
+      "composer_version": 2,
+      "drafter": "specification",
+      "unsure": 0,
+      "makes": "A town, a neighbourhood or a few streets of a city: streets a few hundred metres long with pavements, traffic, parked cars and street trees, lined with buildings of two to five storeys that hold shops, cafes, offices and homes, where people live, work and run errands.",
+      "cannot": "One building alone or the inside of a building, the countryside, a place without streets, water, and anything that is not streets lined with buildings.",
+      "reason": "The city grammar, drafted through the specification drafter: the one tool whose worlds have streets that traffic drives, tiles that are baked and every part drawn by a look's pieces.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world tools; see the entry reasons"
+      }
+    }
+  ]
+}

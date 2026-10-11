@@ -66,6 +66,7 @@ __all__ = [
     "Kept",
     "KindWorkWaiting",
     "KindWorker",
+    "WorkerComposer",
     "check_job",
     "check_key",
     "close_kind_worker",
@@ -518,3 +519,56 @@ def close_kind_worker() -> None:
     global _worker
     closed, _worker = _worker, KindWorker()
     closed.close()
+
+
+class WorkerComposer:
+    """Composes one identity's world of a kind in the kind worker for one workspace, and keeps the
+    drawing and the society's place of the last world it made, which is the world saved when the
+    making succeeds. What makes a world of a kind hands this to the saved entries, so no
+    generation runs on a request's thread or a draft's, and then keeps :attr:`drawn` and
+    :attr:`placed` with :meth:`keep`."""
+
+    def __init__(self, workspace: Any) -> None:
+        self.workspace = str(workspace)
+        #: The last world's drawing and its society's place, each by where the worker keeps it.
+        self.drawn: tuple[str, dict[str, Any]] | None = None
+        self.placed: tuple[str, dict[str, Any]] | None = None
+
+    def __call__(self, kind: Any, values: Mapping[str, int], world_id: str) -> Any:
+        from exulanica.world.kinds.samples import SiteRefused
+
+        outcome = kind_worker().run(
+            f"compose:{self.workspace}:{kind.sha256}:{world_id}:"
+            f"{json.dumps(dict(values), sort_keys=True)}",
+            COMPOSE_SECONDS,
+            compose_job,
+            self.workspace,
+            dict(kind.document),
+            dict(values),
+            world_id,
+            workspace=self.workspace,
+        )
+        if outcome.status != "done" or outcome.value is None:
+            raise KindWorkWaiting(outcome.status, kept=False, reason=outcome.reason)
+        answer = outcome.value
+        if answer["status"] == "refused":
+            raise SiteRefused(answer["code"], answer["refusals"])
+        composed = answer["composed"]
+        self.drawn = (
+            drawing_key(self.workspace, composed.receipt_sha256),
+            {"status": "done", "body": answer["body"], "sha256": answer["sha256"]},
+        )
+        self.placed = (
+            place_key(self.workspace, composed.receipt_sha256, answer["place_id"]),
+            answer["placed"],
+        )
+        return composed
+
+    def keep(self) -> None:
+        """Keep the made world's drawing and its society's place where the worker reads them:
+        the page reads the drawing next, and bringing people in reads the place."""
+        worker = kind_worker()
+        if self.drawn is not None:
+            worker.drawings.put(*self.drawn)
+        if self.placed is not None:
+            worker.places.put(*self.placed)

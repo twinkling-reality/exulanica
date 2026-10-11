@@ -426,6 +426,23 @@
       "required_use_cases": ["text"],
       "rationale": "Chooses which named part of a world's setting a person's description asks for on each axis, if any, after the specification drafter and the look chooser (exulanica/selection/setting_choosing.py): it is shown only the description as the drafter was sent it and each part's axis, key, title and description, and answers one listed key or none for each axis with the description's own words that chose them, validated by code and repaired once. Kept apart from the drafter and the look chooser so offering a setting can move neither. The drafter's model pair, so no new model or licence entry; a pre-registered measurement on held-out descriptions set its timeout. Model-unavailability errors select the fallback; a refused answer is repaired once and then answers none, never escalated to a larger model."
     },
+    "world_tool_chooser": {
+      "primary": "nvidia/nemotron-3-super-120b-a12b",
+      "fallback": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "timeout_seconds": 15,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-10-10-tool-chooser-timings.json",
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "rows": 53,
+        "p50_ms": 3732,
+        "p99_ms": 5916,
+        "longest_ms": 5916,
+        "note": "The primary's own calls in the pre-registered blind measurement of the tool chooser: forty-eight fixed descriptions of worlds, each asked once against the world tool catalog's two tools; five answers were repaired once, each repair a call of its own. The calls were asked under the look chooser's binding, the same model and token ceiling. A call past the timeout leaves the catalog's tool for an unsure choice and no error. No retained public record measures the Qwen3 235B fallback, which serves under this timeout when the primary is withdrawn."
+      },
+      "max_tokens": {"value": 1024, "basis": "The look chooser's ceiling, for a call of the same shape by the same model, above the client's floor for a model that reasons before it answers; the measurement asked with it and no answer was cut short. A ceiling is not a spend; a low one costs a chosen tool, and the catalog's tool for an unsure choice is then taken."},
+      "required_use_cases": ["text"],
+      "rationale": "Chooses which tool of the world tool catalog should make the world a person described, before anything is drafted (exulanica/selection/tool_choosing.py): it is shown only the description as a drafter is sent it and each tool's own words for what it can make and what it cannot, and answers one listed key or none with the description's own words that say what the place is, validated by code and repaired once. Kept apart from every drafter so choosing a tool can move no draft. The specification drafter's model pair, so no new model or licence entry; a pre-registered measurement on blind descriptions set its timeout. Model-unavailability errors select the fallback; a refused answer is repaired once and then the catalog's tool for an unsure choice is taken."
+    },
     "reference_drafting": {
       "primary": "Qwen/Qwen3-235B-A22B-Instruct-2507",
       "fallback": "deepseek-ai/DeepSeek-V4-Flash-0731",

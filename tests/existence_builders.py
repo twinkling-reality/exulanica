@@ -1118,9 +1118,10 @@ def derivative_job(owner) -> uuid.UUID:
     return job_id
 
 
-def kind_draft(owner) -> uuid.UUID:
-    """A kind's draft in the owner's workspace, ended (domain: a draft's job asks a model, so the
-    sweep starts one in the application's own drafts whose job ends refused without asking)."""
+def _ended_draft(owner, purpose: str) -> uuid.UUID:
+    """A draft of ``purpose`` in the owner's workspace, ended (domain: a draft's job asks a model,
+    so the sweep starts one in the application's own drafts whose job ends refused without
+    asking)."""
     import threading
 
     ended = threading.Event()
@@ -1134,10 +1135,20 @@ def kind_draft(owner) -> uuid.UUID:
         ended.set()
 
     made = owner.app.state.services.kind_drafts.start(
-        owner.workspace_id, owner.actor, "a small farm", job
+        owner.workspace_id, owner.actor, "a small farm", job, purpose=purpose
     )
     assert ended.wait(10), "the sweep's draft never ended"
     return made.draft_id
+
+
+def kind_draft(owner) -> uuid.UUID:
+    """A kind's draft in the owner's workspace, ended."""
+    return _ended_draft(owner, "kind")
+
+
+def world_draft(owner) -> uuid.UUID:
+    """A world's draft in the owner's workspace, ended: read by its own route only."""
+    return _ended_draft(owner, "world")
 
 
 def reference_request(owner) -> uuid.UUID:

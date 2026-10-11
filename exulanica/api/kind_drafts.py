@@ -43,12 +43,14 @@ from exulanica.selection.calls import CallLog, ModelCall
 from exulanica.selection.kind_drafting import (
     DRAFT_ATTEMPTS,
     DRAFTER_ROLE,
+    KindDraftOutcome,
     KindVerdict,
     draft_kind,
     kind_drafting_prompt,
     render_instructions,
 )
 from exulanica.spending.status import SpendingRefusals
+from exulanica.world.draft_policy import current_world_draft_policy
 from exulanica.world.kinds.catalogs import load_kind_catalogs
 from exulanica.world.kinds.document import KindRefused, read_kind
 from exulanica.world.kinds.library import shipped_kinds
@@ -57,35 +59,35 @@ from exulanica.world.kinds.worker import CHECK_SECONDS, check_job, check_key, ki
 
 __all__ = [
     "KEEP_SECONDS",
+    "KINDS_FROM_PEOPLE_NOT_OFFERED",
+    "KINDS_FROM_PEOPLE_NOT_OFFERED_DETAIL",
     "KIND_DRAFT_CODES",
-    "SERVER_DRAFTS",
-    "STARTS_PER_HOUR",
+    "DraftAllowance",
     "KindDraft",
     "KindDraftBusy",
     "KindDraftCapacity",
     "KindDraftLimit",
     "KindDrafts",
+    "Opener",
     "allowance_refusal",
     "attempt_floor_usd",
     "draft_deadline_seconds",
+    "drafted_kind",
     "run_draft",
 ]
 
 _LOG = logging.getLogger(__name__)
 
 State = Literal["drafting", "ready", "refused"]
+Purpose = Literal["kind", "world"]
 
 #: How long a draft's ended state is answered after it ended, and the window a person's starts
 #: are counted in.
 KEEP_SECONDS: Final = 3600.0
-#: Drafts running at once in this process. Each holds a thread while the model reasons, a call of
-#: up to the role's timeout; two keep the process's other work and its spend rate in reach.
-SERVER_DRAFTS: Final = 2
-#: Drafts one workspace may have running at once.
-WORKSPACE_DRAFTS: Final = 1
-#: Drafts one person may start in an hour, as reference requests are bounded: a few tries at
-#: describing a place, never a loop.
-STARTS_PER_HOUR: Final = 12
+#: How many drafts run at once in this process and in one workspace, and how many one person may
+#: start in :data:`KEEP_SECONDS`, are chosen budgets of the world draft policy
+#: (:mod:`exulanica.world.draft_policy`), each with its reason and a deployment's own figure in the
+#: variable the policy names. They are read when a draft is asked for, never bound here.
 #: How long past its deadline a draft still drafting is ended as failed: the margin the kind
 #: worker's own bound and a slow database take beyond it.
 STALE_MARGIN_SECONDS: Final = 120.0
@@ -102,7 +104,22 @@ _FAILED: Final = {
 #: Every code a draft's routes and its job answer with, and what it means: a closed list the page
 #: keeps one words table for. A kind's own refusals while it is checked are the kind checks' codes
 #: (``KIND_CODES``), which a refused draft names as its last check.
+#: Why a server refuses to take a kind of place from a person, drafted from their words or
+#: written by them: its deployment has not stated that it keeps one
+#: (``EXULANICA_KINDS_FROM_PEOPLE``).
+KINDS_FROM_PEOPLE_NOT_OFFERED: Final = "kinds_from_people_not_offered"
+#: What a person is told there, by every route that would keep one (answered 403).
+KINDS_FROM_PEOPLE_NOT_OFFERED_DETAIL: Final = (
+    "This server keeps no kind of place from a person, drafted from their words or written by "
+    "them: its deployment has not turned that on."
+)
+
 KIND_DRAFT_CODES: Final = (
+    (
+        KINDS_FROM_PEOPLE_NOT_OFFERED,
+        "This server keeps no kind of place from a person, drafted from their words or written "
+        "by them.",
+    ),
     (
         "not_authorised",
         "This credential may not draft: drafting needs world.write and model.invoke.",
@@ -183,12 +200,21 @@ def allowance_refusal(
 
 
 class KindDraftBusy(Exception):
-    """The workspace already has a draft running; only the person who started it is told its id."""
+    """The workspace already has a draft running; only the person who started it is told its id,
+    and only by the routes of its own purpose, which are the ones that read it."""
 
-    def __init__(self, draft_id: uuid.UUID, actor: uuid.UUID) -> None:
-        super().__init__("a kind is already being drafted in this workspace")
+    def __init__(self, draft_id: uuid.UUID, actor: uuid.UUID, purpose: Purpose = "kind") -> None:
+        super().__init__("a draft is already running in this workspace")
         self.draft_id = draft_id
         self.actor = actor
+        self.purpose = purpose
+
+    def told_to(self, actor: uuid.UUID, purpose: Purpose) -> dict[str, str]:
+        """The running draft's id as a problem's member for the person who started it asking
+        through the routes that read it, and nothing for anybody else: its words are theirs, and
+        an id the asking routes answer 404 for helps nobody."""
+        mine = self.actor == actor and self.purpose == purpose
+        return {"draft_id": str(self.draft_id)} if mine else {}
 
 
 class KindDraftCapacity(Exception):
@@ -222,6 +248,32 @@ class KindDraft:
     model_id: str | None = None
     #: The longest this draft takes (:func:`draft_deadline_seconds` of its client), where known.
     deadline: float | None = None
+    #: What the draft is of: a kind of place to keep (``kind``), or a whole world made from a
+    #: sentence (``world``, :mod:`exulanica.api.world_making`). Each is read and listed by its own
+    #: routes; both count toward the same budgets, since both hold a thread and spend.
+    purpose: Purpose = "kind"
+    #: For a world: the step its job is at while it drafts (``choosing``, ``drafting``,
+    #: ``making``), the tool taken and whether a model chose it, the saved entry made, each part
+    #: that was made and the phrases of the description that were left out.
+    stage: str | None = None
+    tool: str | None = None
+    tool_chosen: bool | None = None
+    entry_id: uuid.UUID | None = None
+    made: tuple[Mapping[str, Any], ...] = ()
+    left_out: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class DraftAllowance:
+    """What of the draft budgets one person has left in one workspace, now."""
+
+    #: The draft running in the workspace, whoever started it and whatever its purpose, or None.
+    running: KindDraft | None
+    #: How many drafts this person may start in an hour, and how many of those are left.
+    starts_an_hour: int
+    starts_left: int
+    #: Whole seconds until a start frees, where none is left; None while one is.
+    retry_seconds: int | None
 
 
 @dataclass
@@ -229,9 +281,11 @@ class KindDrafts:
     """Every draft this process holds, by id, and the threads that run them."""
 
     clock: Callable[[], float] = time.monotonic
-    per_server: int = SERVER_DRAFTS
-    per_workspace: int = WORKSPACE_DRAFTS
-    starts_per_hour: int = STARTS_PER_HOUR
+    #: Each of the three budgets as this holder was told it, or None for the policy's figure,
+    #: which is read at each ask so a deployment's variable is the figure in force.
+    per_server: int | None = None
+    per_workspace: int | None = None
+    starts_per_hour: int | None = None
     keep_seconds: float = KEEP_SECONDS
     deadline_seconds: Callable[[], float] = draft_deadline_seconds
     _drafts: dict[uuid.UUID, KindDraft] = field(default_factory=dict, repr=False)
@@ -247,18 +301,45 @@ class KindDrafts:
         """Called as the server stops, before the kind worker closes."""
         self._closing.set()
 
-    def refusal(self, workspace_id: uuid.UUID, actor: uuid.UUID) -> str | None:
+    def _budget(self, told: int | None, budget: str, *, guest: bool = False) -> int:
+        return current_world_draft_policy().figure(budget, guest=guest) if told is None else told
+
+    def refusal(
+        self, workspace_id: uuid.UUID, actor: uuid.UUID, *, guest: bool = False
+    ) -> str | None:
         """Why this person may not start a draft here now, or None: the workspace's running draft
-        or the person's starts this hour. The server's capacity changes from moment to moment and
-        is answered when a draft starts."""
+        or the person's starts this hour, a guest's by a guest's figure. The server's capacity
+        changes from moment to moment and is answered when a draft starts."""
         with self._lock:
             now = self.clock()
             self._forget(now)
             if self._busy(workspace_id) is not None:
                 return "kind_draft_busy"
-            if self._retry(actor, now) is not None:
+            if self._retry(actor, now, guest) is not None:
                 return "kind_draft_limit"
         return None
+
+    def allowance(
+        self, workspace_id: uuid.UUID, actor: uuid.UUID, *, guest: bool = False
+    ) -> DraftAllowance:
+        """What a start would meet now, read before anything is typed: the workspace's running
+        draft and this person's starts this hour, a guest's by a guest's figure. The server's
+        capacity changes from moment to moment and is answered when a draft starts."""
+        with self._lock:
+            now = self.clock()
+            self._forget(now)
+            busy = self._busy(workspace_id)
+            most = self._budget(self.starts_per_hour, "starts_an_hour", guest=guest)
+            started = sum(
+                draft.actor == actor and now - draft.started < self.keep_seconds
+                for draft in self._drafts.values()
+            )
+            return DraftAllowance(
+                running=None if busy is None else dataclasses.replace(busy),
+                starts_an_hour=most,
+                starts_left=max(0, most - started),
+                retry_seconds=self._retry(actor, now, guest),
+            )
 
     def start(
         self,
@@ -268,19 +349,23 @@ class KindDrafts:
         job: Callable[[KindDraft, KindDrafts], None],
         *,
         deadline: float | None = None,
+        guest: bool = False,
+        purpose: Purpose = "kind",
     ) -> KindDraft:
         """Start ``job`` on a thread of its own for a new draft, or refuse while the workspace,
-        the person or the process already runs or started as many as it may."""
+        the person (a guest by a guest's figure) or the process already runs or started as many
+        as it may."""
         with self._lock:
             now = self.clock()
             self._forget(now)
             busy = self._busy(workspace_id)
             if busy is not None:
-                raise KindDraftBusy(busy.draft_id, busy.actor)
-            retry = self._retry(actor, now)
+                raise KindDraftBusy(busy.draft_id, busy.actor, busy.purpose)
+            retry = self._retry(actor, now, guest)
             if retry is not None:
                 raise KindDraftLimit(retry)
-            if sum(draft.state == "drafting" for draft in self._drafts.values()) >= self.per_server:
+            at_once = self._budget(self.per_server, "drafts_at_once")
+            if sum(draft.state == "drafting" for draft in self._drafts.values()) >= at_once:
                 raise KindDraftCapacity()
             draft = KindDraft(
                 draft_id=uuid.uuid4(),
@@ -291,6 +376,7 @@ class KindDrafts:
                 started=now,
                 changed=now,
                 deadline=deadline,
+                purpose=purpose,
             )
             self._drafts[draft.draft_id] = draft
             snapshot = dataclasses.replace(draft)
@@ -308,28 +394,52 @@ class KindDrafts:
         return snapshot
 
     def read(
-        self, workspace_id: uuid.UUID, actor: uuid.UUID, draft_id: uuid.UUID
+        self,
+        workspace_id: uuid.UUID,
+        actor: uuid.UUID,
+        draft_id: uuid.UUID,
+        *,
+        purpose: Purpose = "kind",
     ) -> KindDraft | None:
         """The draft's state, or None for an id this process holds for nobody here to read: one
-        another person started, one of another workspace, or none."""
+        another person started, one of another workspace, one of another purpose, or none."""
         with self._lock:
             self._forget(self.clock())
             draft = self._drafts.get(draft_id)
-            if draft is None or draft.workspace_id != workspace_id or draft.actor != actor:
+            if (
+                draft is None
+                or draft.workspace_id != workspace_id
+                or draft.actor != actor
+                or draft.purpose != purpose
+            ):
                 return None
             return dataclasses.replace(draft)
 
-    def listing(self, workspace_id: uuid.UUID, actor: uuid.UUID) -> tuple[KindDraft, ...]:
-        """The drafts one person started in one workspace that this process still holds, newest
-        first: so a reload, a second tab or a return finds a draft still running."""
+    def listing(
+        self, workspace_id: uuid.UUID, actor: uuid.UUID, *, purpose: Purpose = "kind"
+    ) -> tuple[KindDraft, ...]:
+        """The drafts of one purpose one person started in one workspace that this process still
+        holds, newest first: so a reload, a second tab or a return finds a draft still running."""
         with self._lock:
             self._forget(self.clock())
             mine = [
                 dataclasses.replace(draft)
                 for draft in self._drafts.values()
-                if draft.workspace_id == workspace_id and draft.actor == actor
+                if draft.workspace_id == workspace_id
+                and draft.actor == actor
+                and draft.purpose == purpose
             ]
         return tuple(sorted(mine, key=lambda draft: draft.started, reverse=True))
+
+    def advance(self, draft: KindDraft, **fields: Any) -> None:
+        """Say where a draft still running has got to (its stage, the tool taken): read by its
+        polls, and never a way to end it or to change one that has ended."""
+        with self._lock:
+            if draft.state != "drafting":
+                return
+            for name, value in fields.items():
+                setattr(draft, name, value)
+            draft.changed = self.clock()
 
     def finish(self, draft: KindDraft, **fields: Any) -> None:
         """Set what the job found, once, and forget the words: a draft that ended stays as it
@@ -339,6 +449,20 @@ class KindDrafts:
                 return
             for name, value in fields.items():
                 setattr(draft, name, value)
+            draft.description = ""
+            draft.changed = self.clock()
+            self._forget(draft.changed)
+
+    def made(self, draft: KindDraft, **fields: Any) -> None:
+        """End a draft ``ready`` because what it was asked for now exists, whatever it was said to
+        be meanwhile: a job that outlived the bound it is ended as failed by has still made its
+        world, and a person is never told to say again what is already theirs."""
+        with self._lock:
+            if draft.state == "ready":
+                return
+            for name, value in fields.items():
+                setattr(draft, name, value)
+            draft.state, draft.refusal = "ready", None
             draft.description = ""
             draft.changed = self.clock()
             self._forget(draft.changed)
@@ -359,18 +483,20 @@ class KindDrafts:
             for draft in self._drafts.values()
             if draft.workspace_id == workspace_id and draft.state == "drafting"
         ]
-        return running[0] if len(running) >= self.per_workspace else None
+        at_once = self._budget(self.per_workspace, "workspace_drafts_at_once")
+        return running[0] if len(running) >= at_once else None
 
-    def _retry(self, actor: uuid.UUID, now: float) -> int | None:
+    def _retry(self, actor: uuid.UUID, now: float, guest: bool = False) -> int | None:
         """Whole seconds until the person may start again, or None while they may now."""
+        most = self._budget(self.starts_per_hour, "starts_an_hour", guest=guest)
         starts = sorted(
             draft.started
             for draft in self._drafts.values()
             if draft.actor == actor and now - draft.started < self.keep_seconds
         )
-        if len(starts) < self.starts_per_hour:
+        if len(starts) < most:
             return None
-        return max(1, math.ceil(starts[-self.starts_per_hour] + self.keep_seconds - now))
+        return max(1, math.ceil(starts[-most] + self.keep_seconds - now))
 
     def _forget(self, now: float) -> None:
         """End as failed a draft still drafting well past its deadline (a job that can no longer
@@ -452,6 +578,101 @@ def _checked(
     return check
 
 
+def drafted_kind(
+    draft: KindDraft,
+    drafts: KindDrafts,
+    *,
+    client: ModelClient,
+    text: str,
+    placeholders: Mapping[Any, str],
+    log: CallLog,
+    key_for: Callable[[str], str] | None,
+) -> KindDraftOutcome | None:
+    """Draft a kind of ``text`` and hold it to both stages of the checks: the outcome with its
+    checked kind, or None after the draft was ended ``refused`` by name with every call it made.
+    ``key_for`` chooses the kind's key before the checks, for a kind that will be kept; a world
+    made from a sentence keeps no kind and gives none."""
+    workspace_id = draft.workspace_id
+
+    def refused(refusal: Mapping[str, Any]) -> None:
+        drafts.finish(draft, state="refused", refusal=dict(refusal), calls=log.calls)
+
+    try:
+        outcome = draft_kind(
+            client.with_attempts(log.attempt),
+            text,
+            role=DRAFTER_ROLE,
+            check=_checked(workspace_id, drafts),
+            placeholders=placeholders,
+            log=log,
+            key_for=key_for,
+        )
+    except BudgetExceededError as spent:
+        # Asked before ModelError, which it is: a spent allowance is not a model's silence.
+        refusal: dict[str, Any] = {
+            "code": "budget_exceeded",
+            "detail": "This server's own spending limit for models is reached.",
+        }
+        if isinstance(spent, SpendingRefused):
+            # The authority's own sentence: spent, not granted, revoked, expired, suspended or
+            # unavailable, with no other workspace's figures.
+            refusal["detail"] = str(spent)
+            refusal["spending"] = spent.problem_member()
+        refused(refusal)
+        return None
+    except ModelError as failed:
+        if isinstance(failed, TransportError) and (failed.timed_out or failed.deadline_ended):
+            refused(
+                {
+                    "code": "kind_draft_unanswered",
+                    "detail": "The model did not answer in time. Try again in a moment.",
+                }
+            )
+        else:
+            # A provider's error status, a connection that failed, or a call refused before it
+            # was sent: not a model's silence, so not said as one.
+            refused(
+                {
+                    "code": "kind_draft_model_failed",
+                    "detail": (
+                        "The model's provider failed or refused the call, or could not be "
+                        "reached. Try again in a moment."
+                    ),
+                }
+            )
+        return None
+    except _ChecksUnavailable:
+        refused(
+            {
+                "code": "kind_work_unavailable",
+                "detail": "The server could not check the drafted kind. Try again in a moment.",
+            }
+        )
+        return None
+    except (KindRefused, psycopg.Error):
+        # No free key, or the database while a key was chosen: after calls that were paid for.
+        refused(_FAILED)
+        return None
+    except Exception as failed:  # anything else, named by its type, still shows what it cost
+        _LOG.warning("a kind draft failed: %s", type(failed).__qualname__)
+        refused(_FAILED)
+        return None
+    if outcome.document is None or outcome.kind is None or outcome.report is None:
+        last = outcome.refusal
+        check = None if last is None else last.check
+        refused(
+            {
+                "code": "kind_not_drafted" if last is None else str(last.code.value),
+                # The last check's own sentence, which the page shows after its own words.
+                "detail": "" if last is None else (last.sentence or last.detail),
+                "check": None if check is None else check[0],
+                "where": None if check is None else check[1],
+            }
+        )
+        return None
+    return outcome
+
+
 def run_draft(
     draft: KindDraft,
     drafts: KindDrafts,
@@ -475,78 +696,16 @@ def run_draft(
     def refused(refusal: Mapping[str, Any]) -> None:
         drafts.finish(draft, state="refused", refusal=dict(refusal), calls=log.calls)
 
-    try:
-        outcome = draft_kind(
-            client.with_attempts(log.attempt),
-            text,
-            role=DRAFTER_ROLE,
-            check=_checked(workspace_id, drafts),
-            placeholders=placeholders,
-            log=log,
-            key_for=_free_key(readable, workspace_id),
-        )
-    except BudgetExceededError as spent:
-        # Asked before ModelError, which it is: a spent allowance is not a model's silence.
-        refusal: dict[str, Any] = {
-            "code": "budget_exceeded",
-            "detail": "This server's own spending limit for models is reached.",
-        }
-        if isinstance(spent, SpendingRefused):
-            # The authority's own sentence: spent, not granted, revoked, expired, suspended or
-            # unavailable, with no other workspace's figures.
-            refusal["detail"] = str(spent)
-            refusal["spending"] = spent.problem_member()
-        refused(refusal)
-        return
-    except ModelError as failed:
-        if isinstance(failed, TransportError) and (failed.timed_out or failed.deadline_ended):
-            refused(
-                {
-                    "code": "kind_draft_unanswered",
-                    "detail": "The model did not answer in time. Try again in a moment.",
-                }
-            )
-        else:
-            # A provider's error status, a connection that failed, or a call refused before it
-            # was sent: not a model's silence, so not said as one.
-            refused(
-                {
-                    "code": "kind_draft_model_failed",
-                    "detail": (
-                        "The model's provider failed or refused the call, or could not be "
-                        "reached. Try again in a moment."
-                    ),
-                }
-            )
-        return
-    except _ChecksUnavailable:
-        refused(
-            {
-                "code": "kind_work_unavailable",
-                "detail": "The server could not check the drafted kind. Try again in a moment.",
-            }
-        )
-        return
-    except (KindRefused, psycopg.Error):
-        # No free key, or the database while a key was chosen: after calls that were paid for.
-        refused(_FAILED)
-        return
-    except Exception as failed:  # anything else, named by its type, still shows what it cost
-        _LOG.warning("a kind draft failed: %s", type(failed).__qualname__)
-        refused(_FAILED)
-        return
-    if outcome.document is None or outcome.kind is None or outcome.report is None:
-        last = outcome.refusal
-        check = None if last is None else last.check
-        refused(
-            {
-                "code": "kind_not_drafted" if last is None else str(last.code.value),
-                # The last check's own sentence, which the page shows after its own words.
-                "detail": "" if last is None else (last.sentence or last.detail),
-                "check": None if check is None else check[0],
-                "where": None if check is None else check[1],
-            }
-        )
+    outcome = drafted_kind(
+        draft,
+        drafts,
+        client=client,
+        text=text,
+        placeholders=placeholders,
+        log=log,
+        key_for=_free_key(readable, workspace_id),
+    )
+    if outcome is None or outcome.kind is None or outcome.report is None:
         return
     try:
         with opened() as connection:

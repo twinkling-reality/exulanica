@@ -19835,7 +19835,7 @@
      "world"
     ],
     "summary": "Keep a creator's world kind in this workspace once its checks pass.",
-    "description": "Read the kind, build its sample worlds and keep it when every one passes.\n\nA body over :data:`UPLOAD_BODY_MAXIMUM` is refused 413 before it is read; a document larger\nthan :data:`UPLOAD_BYTES_MAXIMUM`, one whose origin is not ``uploaded``, and any refusal of\neither stage answer 422 with the refusal's code, where and why (stage B's with its report so\nfar); a version or a document the workspace already holds, and a workspace already keeping as\nmany kind versions as it may, answer 409, before any sample world is built. Stage B runs in the\nkind worker (:mod:`exulanica.world.kinds.worker`), never on the request's thread: checks the\nworker does not finish within its limit, or cannot take, answer 503 ``kind_work_overran``,\n``kind_work_busy`` or ``kind_work_unavailable`` with a ``Retry-After``, and finished checks\nare kept, so sending the same kind again reads them.",
+    "description": "Read the kind, build its sample worlds and keep it when every one passes.\n\nA server whose deployment has not turned kinds from people on\n(``EXULANICA_KINDS_FROM_PEOPLE``) answers 403 ``kinds_from_people_not_offered`` before the\ndocument is read: a kept kind is a person's own document, and no removal reaches its row.\nA body over :data:`UPLOAD_BODY_MAXIMUM` is refused 413 before it is read; a document larger\nthan :data:`UPLOAD_BYTES_MAXIMUM`, one whose origin is not ``uploaded``, and any refusal of\neither stage answer 422 with the refusal's code, where and why (stage B's with its report so\nfar); a version or a document the workspace already holds, and a workspace already keeping as\nmany kind versions as it may, answer 409, before any sample world is built. Stage B runs in the\nkind worker (:mod:`exulanica.world.kinds.worker`), never on the request's thread: checks the\nworker does not finish within its limit, or cannot take, answer 503 ``kind_work_overran``,\n``kind_work_busy`` or ``kind_work_unavailable`` with a ``Retry-After``, and finished checks\nare kept, so sending the same kind again reads them.",
     "operationId": "upload_kind_worlds_kinds_post",
     "parameters": [
      {
@@ -19888,7 +19888,7 @@
      "world"
     ],
     "summary": "Draft a kind of world from a description, as a job the page polls.",
-    "description": "Admit the words and start the draft; answer at once, never waiting on the model.\n\n503 without a model credential; 429 ``budget_exceeded`` with its ``spending`` member when the\nworkspace's allowance for the drafting model admits no attempt (spent, or below what one\nreserves); 409 ``kind_cap_reached`` when the\nworkspace keeps as many kinds as it may, each before anything is spent; 409\n``kind_draft_busy`` while a draft runs in this workspace, with its ``draft_id`` when the caller\nstarted it; 429 ``kind_draft_limit`` with a ``Retry-After`` when the caller has started as many\ndrafts this hour as one person may; 503 ``kind_draft_capacity`` with a ``Retry-After`` when\nthe server runs as many drafts as it may. Saved names are replaced before the job starts, and\nthe workspace's rules, releasing no place's name, are applied again as each request leaves.",
+    "description": "Admit the words and start the draft; answer at once, never waiting on the model.\n\n403 ``kinds_from_people_not_offered`` on a server whose deployment has not turned kinds from\npeople on (``EXULANICA_KINDS_FROM_PEOPLE``), before anything is read;\n503 without a model credential; 429 ``budget_exceeded`` with its ``spending`` member when the\nworkspace's allowance for the drafting model admits no attempt (spent, or below what one\nreserves); 409 ``kind_cap_reached`` when the\nworkspace keeps as many kinds as it may, each before anything is spent; 409\n``kind_draft_busy`` while a draft runs in this workspace, with its ``draft_id`` when the caller\nstarted it; 429 ``kind_draft_limit`` with a ``Retry-After`` when the caller has started as many\ndrafts this hour as one person may; 503 ``kind_draft_capacity`` with a ``Retry-After`` when\nthe server runs as many drafts as it may. Saved names are replaced before the job starts, and\nthe workspace's rules, releasing no place's name, are applied again as each request leaves.",
     "operationId": "start_kind_draft_worlds_kinds_drafts_post",
     "parameters": [
      {
@@ -20175,6 +20175,174 @@
       "content": {
        "application/json": {
         "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/drafts": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Make a world from a description, as a job the page polls.",
+    "description": "Admit the words and start the draft; answer at once, never waiting on a model.\n\n403 ``kinds_from_people_not_offered`` on a server whose deployment has not turned kinds from\npeople on; 503 without a model credential; 429 ``budget_exceeded`` with its ``spending``\nmember when the workspace's allowance admits no attempt; 409 ``world_limit_reached`` when the\nworkspace holds as many generated worlds as it may; 403 ``worlds_read_only`` where the\ndatabase role cannot register a world: each before anything is spent, and each said by\n``GET /worlds/drafts`` before anything is typed. 409 ``kind_draft_busy`` while a draft runs in\nthis workspace, with its ``draft_id`` when the caller started it as a world's draft; 429\n``kind_draft_limit`` with a ``Retry-After`` when the caller has started as many drafts this\nhour as one person may; 503 ``kind_draft_capacity`` with a ``Retry-After`` when the server\nruns as many drafts as it may. The three figures are the world draft policy's\nbudgets. A body over 16,384 bytes is refused 413 before it is read. Saved names are replaced\nin the words before the job starts.",
+    "operationId": "start_world_draft_worlds_drafts_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DraftWorldBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MadeWorldDraftView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Whether a draft of a world would be taken now, and what one may spend.",
+    "description": "What starting a draft would meet, for this person in this workspace, before a word is\ntyped: ``offered`` or the first refusal a start would give, by code and sentence, in the\norder the start asks them; the most times one draft asks a model (``calls_at_most``); this\nperson's starts this hour, how many are left and when the next frees; and their own draft of\na world still running here, by id. Nothing is said of anybody else: another person's running\ndraft is ``kind_draft_busy`` with no id. The server's own capacity changes from moment to\nmoment and is answered when a draft starts.",
+    "operationId": "read_world_draft_offer_worlds_drafts_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WorldDraftOfferView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/drafts/{draft_id}": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Where a draft of a world has got to, for the person who started it.",
+    "description": "The draft's state: choosing, drafting, making, ready with the saved world, or refused by\nname. 404 ``world_draft_unknown`` for an id the server holds for nobody here to read:\nanother person's, another workspace's, a kind's draft, one a restart lost, or none.",
+    "operationId": "read_world_draft_worlds_drafts__draft_id__get",
+    "parameters": [
+     {
+      "name": "draft_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Draft Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MadeWorldDraftView"
+        }
        }
       }
      },
@@ -25395,6 +25563,24 @@
     "title": "ClauseType",
     "description": "What kind of thing a clause is claiming, which decides what it must carry."
    },
+   "CodeView": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "meaning": {
+      "type": "string",
+      "title": "Meaning"
+     }
+    },
+    "type": "object",
+    "required": [
+     "code",
+     "meaning"
+    ],
+    "title": "CodeView"
+   },
    "CompactResult": {
     "properties": {
      "profile": {
@@ -27216,6 +27402,75 @@
      "detail"
     ],
     "title": "DraftRefusalView"
+   },
+   "DraftStartsView": {
+    "properties": {
+     "an_hour": {
+      "type": "integer",
+      "title": "An Hour"
+     },
+     "left": {
+      "type": "integer",
+      "title": "Left"
+     },
+     "retry_after_seconds": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Retry After Seconds"
+     }
+    },
+    "type": "object",
+    "required": [
+     "an_hour",
+     "left",
+     "retry_after_seconds"
+    ],
+    "title": "DraftStartsView",
+    "description": "This person's starts of a draft in this workspace, counted over the last hour."
+   },
+   "DraftToolView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "chosen_by": {
+      "type": "string",
+      "enum": [
+       "model",
+       "unsure"
+      ],
+      "title": "Chosen By"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "chosen_by"
+    ],
+    "title": "DraftToolView"
+   },
+   "DraftWorldBody": {
+    "properties": {
+     "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Description"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "description"
+    ],
+    "title": "DraftWorldBody"
    },
    "Edit": {
     "properties": {
@@ -31093,6 +31348,201 @@
     ],
     "title": "LookOfferView",
     "description": "The look the words ask for, offered for the person to keep or change, or why there is none.\n\n``offered`` names a library pack at its current version (``pack_id``, ``version`` and\n``manifest_sha256``, so the page binds exactly what was offered) and the person's own words\nthat chose it, as typed. ``none``: the step found no listed look in the words, or its answer\nwas refused twice (``reason`` ``answer_refused``). ``unavailable``: the step could not be\nasked or did not answer (``reason`` ``timed_out``, ``failed``, ``request_refused`` or\n``no_allowance``). Either way the world is made in the library's default unless the person\npicks a look, and the draft is unchanged."
+   },
+   "MadePartView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "form": {
+      "type": "string",
+      "title": "Form"
+     },
+     "look": {
+      "type": "string",
+      "title": "Look"
+     },
+     "drawn": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Drawn"
+     },
+     "box_mm": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "integer"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Box Mm"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "form",
+     "look",
+     "drawn",
+     "box_mm"
+    ],
+    "title": "MadePartView",
+    "description": "One part of the world that was made, in the document's own words."
+   },
+   "MadeWorldDraftView": {
+    "properties": {
+     "draft_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Draft Id"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "choosing",
+       "drafting",
+       "making",
+       "ready",
+       "refused"
+      ],
+      "title": "State"
+     },
+     "description": {
+      "type": "string",
+      "title": "Description"
+     },
+     "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Started At"
+     },
+     "elapsed_seconds": {
+      "type": "integer",
+      "title": "Elapsed Seconds"
+     },
+     "poll_after_seconds": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Poll After Seconds"
+     },
+     "deadline_seconds": {
+      "type": "integer",
+      "title": "Deadline Seconds"
+     },
+     "tool": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DraftToolView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "entry": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SavedWorldEntryView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "made": {
+      "items": {
+       "$ref": "#/components/schemas/MadePartView"
+      },
+      "type": "array",
+      "title": "Made"
+     },
+     "left_out": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Left Out"
+     },
+     "refusal": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/WorldDraftRefusalView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "model_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Name"
+     },
+     "execution": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ExecutionView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "refusals": {
+      "items": {
+       "$ref": "#/components/schemas/CodeView"
+      },
+      "type": "array",
+      "title": "Refusals"
+     }
+    },
+    "type": "object",
+    "required": [
+     "draft_id",
+     "state",
+     "description",
+     "started_at",
+     "elapsed_seconds",
+     "poll_after_seconds",
+     "deadline_seconds",
+     "tool",
+     "entry",
+     "made",
+     "left_out",
+     "refusal",
+     "model_name",
+     "execution",
+     "refusals"
+    ],
+    "title": "MadeWorldDraftView"
    },
    "MemberPersonRegionRow": {
     "properties": {
@@ -42743,6 +43193,133 @@
      "limits"
     ],
     "title": "WorldCountPolicyView"
+   },
+   "WorldDraftOfferView": {
+    "properties": {
+     "offered": {
+      "type": "boolean",
+      "title": "Offered"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail"
+     },
+     "calls_at_most": {
+      "type": "integer",
+      "title": "Calls At Most"
+     },
+     "starts": {
+      "$ref": "#/components/schemas/DraftStartsView"
+     },
+     "description_characters": {
+      "type": "integer",
+      "title": "Description Characters"
+     },
+     "running_draft_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Running Draft Id"
+     },
+     "refusals": {
+      "items": {
+       "$ref": "#/components/schemas/CodeView"
+      },
+      "type": "array",
+      "title": "Refusals"
+     }
+    },
+    "type": "object",
+    "required": [
+     "offered",
+     "code",
+     "detail",
+     "calls_at_most",
+     "starts",
+     "description_characters",
+     "running_draft_id",
+     "refusals"
+    ],
+    "title": "WorldDraftOfferView",
+    "description": "Whether a draft of a world would be taken from this person now, and what one may spend:\nread before a word is typed, and shown before the words are sent."
+   },
+   "WorldDraftRefusalView": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "detail": {
+      "type": "string",
+      "title": "Detail"
+     },
+     "check": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Check"
+     },
+     "where": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Where"
+     },
+     "spending": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "string"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spending"
+     }
+    },
+    "type": "object",
+    "required": [
+     "code",
+     "detail"
+    ],
+    "title": "WorldDraftRefusalView"
    },
    "WorldDraftView": {
     "properties": {

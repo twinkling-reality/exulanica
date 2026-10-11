@@ -11,7 +11,8 @@ data that one grammar realises rather than code per kind.
 Contents: [the document](#the-kind-document), [roles](#engine-roles-and-look-roles),
 [checks](#checks), [the site grammar](#the-site-grammar), [people](#people-in-a-site-world),
 [the receipt](#a-world-made-from-a-kind), [the drawing](#the-drawing),
-[storage and routes](#storage-and-routes), [the town](#the-town-as-a-kind),
+[storage and routes](#storage-and-routes),
+[a world from a sentence](#a-world-made-from-a-sentence), [the town](#the-town-as-a-kind),
 [limits](#limits).
 
 ## The kind document
@@ -386,6 +387,80 @@ as each request leaves. A draft takes at most the longest its client takes for o
 and the checks' bound, for each of its three attempts. Making a world of the kept kind is
 `POST /worlds/kinds/{kind}/worlds`.
 
+## A world made from a sentence
+
+A person says the world they want and it is made, with no kind, preset or value met on the way.
+`POST /worlds/drafts` (world write and model invoke) takes the words (1 to 1,000 characters; a body
+over 16,384 bytes is refused 413 before it is read) and answers 202 with a draft's id at once;
+`GET /worlds/drafts/{draft_id}` (world read) is polled. A job in the API process
+([`world_making.py`](../exulanica/api/world_making.py)) does three things and says which it is at:
+
+| State | What the job is doing |
+| --- | --- |
+| `choosing` | Asks which tool should make the place: a forced choice among the entries of the [world tool catalog](../assets/catalogs/world-tools/world-tool.v1.json), each a composer with its drafter and its own words for what it can make and what it cannot, which is all the chooser is shown ([`tool_choosing.py`](../exulanica/selection/tool_choosing.py), role `world_tool_chooser`). Where the chooser answers none, is refused twice or fails, the catalog's tool for an unsure choice is taken, the site grammar's, and the answer says so (`tool.chosen_by` `unsure`) |
+| `drafting` | That tool's drafter writes what its composer takes: the kind drafter a whole kind document, held to both stages of the checks as above, or the specification drafter a town's preset and values, held to the gate every town passes |
+| `making` | The world is composed and its entry saved, as `POST /worlds/kinds/{kind}/worlds` and `POST /worlds/generated` make one |
+| `ready` | `entry` is the saved world; `made` lists every part that was made, with its words, form and look role, how many slots the world's drawing draws for it and the largest box among them (a town's parts state none); `left_out` the phrases of the description nothing in the made world says, in the person's own words |
+| `refused` | `refusal` names why by code and sentence, and no world was written. `refusals` lists every code of the draft's own routes and job with what each means; a refusal by the composer or by a town's values carries that check's own code and sentence |
+
+Ready and refused both carry what the draft cost, every call included. A world that was made
+always ends `ready`: nothing that happens after its making reports it as not made. A further
+generator is one more entry of the tool catalog and no change to the choosing.
+
+**Before a word is typed.** `GET /worlds/drafts` (world read) says what a start would meet, for
+this person in this workspace: `offered`, or the first refusal a start would give by `code` and
+`detail`, in the order the start asks them; `calls_at_most`, the most times one draft asks a model,
+counted from the steps' own bounds (the chooser's call and its repair, then the attempts of
+whichever tool's drafter makes the most); `starts`, how many drafts this person may start in an
+hour, how many are left and when the next frees; `description_characters`; and
+`running_draft_id`, this person's own draft of a world still running here. A page shows the calls
+and the starts before the words are sent. Another person's running draft is `kind_draft_busy`
+with no id. Every refusal that is known before a model is asked is answered by the start before
+one is, so nobody is charged to be told no: the server's switch, a missing model credential, an
+allowance that admits no attempt (429 `budget_exceeded`), a workspace holding as many generated
+worlds as it may (409 `world_limit_reached`), and a database role that cannot register a world
+(403 `worlds_read_only`). The world limit is asked again where it holds, as the world is
+registered. A draft cannot be withdrawn once started: it runs to its end, one at a time in a
+workspace.
+
+**Where a server keeps a kind from a person.** A kind of place a person brings is the person's
+own document, drafted from their words or written by them, and it is kept in rows no removal
+reaches. A server takes one only where its deployment says so (`EXULANICA_KINDS_FROM_PEOPLE=on`,
+[deployment](deployment.md)). Elsewhere every route that would keep one answers 403
+`kinds_from_people_not_offered` before anything is read, and `GET /worlds/drafts` and the
+library's `drafting` say so:
+
+| Route | Covered | What it keeps of a person's |
+| --- | --- | --- |
+| `POST /worlds/drafts` | Yes | The drafted kind document in the made world's receipt, and what the table below lists |
+| `POST /worlds/kinds/drafts` | Yes | The drafted kind document as a version the workspace keeps (`world_kind_version`) |
+| `POST /worlds/kinds` | Yes | The uploaded kind document as a version the workspace keeps |
+| `POST /worlds/specification/drafts` | No | Nothing: it answers a proposal and writes no row, and the town a person then makes from it holds a preset and values |
+
+**No kind is kept.** A place made this way appends nothing to the workspace's kinds: its receipt
+carries the whole kind document, so the world regenerates from its receipt alone, and the kinds a
+workspace keeps are the ones a person chose to keep. The draft runs under the same holder and the
+same three budgets as a kind's draft; while one runs in a workspace the other is answered 409
+`kind_draft_busy`. Only the person who started a draft reads it, and only through this route.
+
+**What is kept of the words.** The words themselves are held in the API process while the draft
+runs and forgotten when it ends; the job writes them to no table, and a refused draft keeps
+nothing of them anywhere on the server. They are sent to the hosted models that choose and draft,
+every saved name replaced first; a request already sent is beyond any deletion here. What a made
+world keeps that was written from the words:
+
+| Where | What |
+| --- | --- |
+| The world's receipt (`world_generation_receipt`), appended once and never changed | For a place, the whole kind document: its key, label and summary, every part's and use's key and label, and `provenance.words_sha256`, the SHA-256 of the words as sent. The label and summary may repeat the words closely. For a town, its preset and values only |
+| The saved entry's title and the first version's title | The same label |
+| The world's structure records and its stored drawing | The document's part keys and look roles |
+| The API process, for an hour after the draft ends | A town's `left_out` phrases as they were typed, saved names included, read by the person who started the draft and nobody else |
+
+The world's registration (`world_identity`), which outlives a removal, states that the world was
+generated from a world kind and names no kind. Spending rows hold amounts, models and times, and
+no text. No erasure rewrites a receipt and no removal reaches the rows above, which is why
+taking a kind from a person is a deployment's stated choice.
+
 ## The town as a kind
 
 The library lists the town through an adapter (`exulanica.world-kind-adapter/v1`,
@@ -417,9 +492,16 @@ town's receipt or digest depends on the adapter.
   running when its process stops is lost, what it had spent stands, and its page reads
   `kind_draft_unknown` and offers to start again. A ready draft's kind is kept in the workspace and
   outlives the process; an ended draft's state is answered for an hour after it ended, and one
-  still drafting past its deadline and two minutes ends as `kind_draft_failed`. One workspace runs
-  one draft at a time, one person starts at most 12 an hour and the process runs two. Running
-  drafts on the durable job queue is planned work, not delivered.
+  still drafting past its deadline and two minutes ends as `kind_draft_failed`. How many
+  drafts one workspace and the process run at once and how many one person starts in an hour
+  are the [world draft policy](../exulanica/world/world-draft-policy.v1.json)'s chosen budgets
+  (one, two and twelve), each with its reason and a deployment's own figure in the variable it
+  names. Running drafts on the durable job queue is planned work, not delivered.
+- A world made from a sentence is drawn in the host's default look: the look and the setting a
+  description asks for are offered by the town's own draft route and not yet taken by this job. A
+  place's draft names nothing it left out. A draft a process restart lost is answered 404
+  `world_draft_unknown`; what it had spent stands, and a world it had already made is among the
+  person's worlds.
 - A drafted kind is kept once it passes, without a separate accept, and takes one of the
   workspace's kind versions; no kind is removed. Hiding a kind no world uses is planned work.
 - The library ships the town's adapter and no site-grammar kind. The three kinds under

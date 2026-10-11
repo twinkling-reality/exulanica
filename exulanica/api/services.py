@@ -138,6 +138,7 @@ from exulanica.store.base import ContentAddressedStore
 from exulanica.store.configured import ContentStores, content_stores
 from exulanica.store.namespaces import WorkspaceStores
 from exulanica.world.decision_roles import DecisionContract, DecisionRole, decision_roles
+from exulanica.world.draft_policy import current_world_draft_policy
 from exulanica.world.material_recipes import MaterialRuntime
 from exulanica.world.society import world_society_seed
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
@@ -162,6 +163,7 @@ if TYPE_CHECKING:
 __all__ = [
     "DATA_DIR_ENV",
     "DERIVATIVE_WORKER_ENV",
+    "KINDS_FROM_PEOPLE_ENV",
     "PLAYBACK_WORKERS_ENV",
     "PLAYBACK_WORKER_ENV",
     "READONLY_DATABASE_URL_ENV",
@@ -235,6 +237,7 @@ SOCIETY_MINUTE_COST_SCALE_ENV: Final = env_name("MINUTE_COST_SCALE")
 SOCIETY_SETTING_REFUSALS: Final = {
     "society_control_worker_not_boolean": "must be an explicit boolean",
     "society_of_things_not_boolean": "must be an explicit boolean",
+    "kinds_from_people_not_boolean": "must be an explicit boolean",
     "society_control_workspaces_not_json": "must be a JSON array of workspace ids",
     "society_control_workspaces_not_array": "must be a JSON array of workspace ids",
     "society_control_workspaces_not_uuid": "names an entry that is not a workspace id",
@@ -278,6 +281,11 @@ SOCIETY_AUTHORED_WORLDS_ENV: Final = env_name("SOCIETY_AUTHORED_WORLDS")
 #: on, since its people do not yet pick things up, hand them over or follow anybody, and a society
 #: made now is one every later version of its engine must keep replaying.
 SOCIETY_OF_THINGS_ENV: Final = env_name("SOCIETY_OF_THINGS")
+#: Whether the routes take a kind of place from a person and keep its document: drafted from
+#: their words (``POST /worlds/drafts``, ``POST /worlds/kinds/drafts``) or written by them
+#: (``POST /worlds/kinds``). Off unless it is set on. The document is the person's own and is kept
+#: in rows no removal reaches, so a deployment states this only where it can be destroyed again.
+KINDS_FROM_PEOPLE_ENV: Final = env_name("KINDS_FROM_PEOPLE")
 
 #: The registration file's own profile, so a file written for a later shape is refused here
 #: rather than half-read.
@@ -417,6 +425,10 @@ class Services:
     #: Whether the routes make a society of things (:data:`SOCIETY_OF_THINGS_ENV`); off for a
     #: hand-built Services, as for a host that does not set it.
     societies_of_things: bool = False
+    #: Whether the routes take and keep a kind of place from a person, drafted or uploaded
+    #: (:data:`KINDS_FROM_PEOPLE_ENV`); off for a hand-built Services, as for a host that does
+    #: not set it.
+    kinds_from_people: bool = False
     #: How a society that is made opens (:data:`SOCIETY_OPENING_ENV`, read by
     #: :mod:`exulanica.api.society_opening`): advanced until a share of its people is outdoors or,
     #: for a society of things, doing something, or not at all. Nothing for a hand-built
@@ -1386,6 +1398,7 @@ def build_services(
             "society_of_things_not_boolean",
             SOCIETY_OF_THINGS_ENV,
         ),
+        kinds_from_people=_kinds_from_people(environ),
         society_opening=_society_opening(env_get("SOCIETY_OPENING", environ)),
         comparison_seeds=development_seeds(load_comparison_catalogs()),
         runs_comparison_worker=comparison_player == "here",
@@ -1555,6 +1568,18 @@ def _comparison_player(value: str | None) -> str:
 def _enabled(value: str | None) -> bool:
     """Absent means on. Only an explicit off is off, and it has to be spelled like one."""
     return (value or "").strip().lower() not in ("0", "false", "off", "no")
+
+
+def _kinds_from_people(environ: Mapping[str, str] | None) -> bool:
+    """Whether this instance keeps a kind of place from a person, or a named refusal. The draft
+    budgets a deployment states are read here too, once, so a figure that is no whole number
+    stops the start by name instead of failing the first request that asks for it."""
+    current_world_draft_policy().check(environ)
+    return _explicitly_enabled(
+        env_get("KINDS_FROM_PEOPLE", environ),
+        "kinds_from_people_not_boolean",
+        KINDS_FROM_PEOPLE_ENV,
+    )
 
 
 def _explicitly_enabled(

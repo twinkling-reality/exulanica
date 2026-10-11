@@ -505,6 +505,7 @@ _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     "POST /world/versions/{version_id}/society/models",
     "POST /world/versions/{version_id}/traffic/comparisons",
     "POST /world/versions/{version_id}/traffic/comparisons/{comparison_id}/cancel",
+    "POST /worlds/drafts",
     "POST /worlds/kinds/drafts",
 )
 
@@ -715,6 +716,8 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/traffic/comparisons/{comparison_id}/runs/{run_id}/replay",
     "GET /worlds",
     "GET /worlds/capabilities",
+    "GET /worlds/drafts",
+    "GET /worlds/drafts/{draft_id}",
     "GET /worlds/kinds",
     "GET /worlds/kinds/drafts",
     "GET /worlds/kinds/drafts/{draft_id}",

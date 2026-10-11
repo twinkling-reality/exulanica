@@ -102,7 +102,7 @@ import { applyDocumentAppearance, applyDocumentWorldStyle } from './theme.js';
 import { worldArtProfile } from '@exulanica/presentation';
 import { initialWorldShell, updateWorldShell, type WorldShellEvent } from './world-shell.js';
 import { mountPersonalIntake } from './composition/personal-intake.js';
-import { requireMetadataOnlyEntryUpdate } from './world-entry-api.js';
+import { requireMetadataOnlyEntryUpdate, type SavedWorldEntry } from './world-entry-api.js';
 import { mountCharacter } from './composition/character.js';
 import { mountAppearance } from './composition/appearance.js';
 import { mountObjects } from './composition/objects.js';
@@ -376,17 +376,19 @@ function showWorldRecipes(
       const looks = readLookLibrary(credentials);
       const look = buildTownLook({ library: looks, host: shell });
       const setting = buildTownSetting({ library: looks });
+      // A world that was made, by a recipe, a kind or a sentence, opens the same way.
+      const openMade = async (entry: SavedWorldEntry): Promise<void> => {
+        panel.root.remove();
+        state.savedWorldEntries = await client.entries();
+        await openWorldEntryContext(state, entry);
+        state.worldEntryError = null;
+        shell.removeAttribute('data-world-state');
+        await mount();
+      };
       const panel = buildWorldRecipes({
         specification: () => specification.specification(),
         make: (preset, values) => client.makeGenerated(preset.key, preset.label, values, setting.madeIn(look.binding())),
-        open: async (entry) => {
-          panel.root.remove();
-          state.savedWorldEntries = await client.entries();
-          await openWorldEntryContext(state, entry);
-          state.worldEntryError = null;
-          shell.removeAttribute('data-world-state');
-          await mount();
-        },
+        open: (entry) => openMade(entry),
         onClose,
         // A world of a kind of place is titled by the kind, as a town is by its recipe.
         kinds: {
@@ -407,9 +409,36 @@ function showWorldRecipes(
       // takes it once attached (composition/world-description.ts).
       panel.lookSlot.append(look.row, setting.row);
       panel.focus();
-      attachWorldDescription(panel, {
-        credentials, specification: () => specification.specification(), look: look.drafted, setting: setting.drafted,
-      });
+      const describe = (): void => {
+        attachWorldDescription(panel, {
+          credentials, specification: () => specification.specification(), look: look.drafted, setting: setting.drafted,
+        });
+        panel.root.style.removeProperty('visibility');
+        panel.focus();
+      };
+      // Where this person can draft here, the sheet is the one box that makes any world from a
+      // sentence (composition/world-sentence.ts); where they never can (no model on the server, or
+      // no right to ask one), it stays the recipes with Describe it. A sheet opened on a saved
+      // town's own values is that town's values, so it stays the recipes too. Until the server has
+      // said which, the sheet draws nothing, so the recipes are never shown and then taken away.
+      if (start !== null) describe();
+      else {
+        panel.root.style.visibility = 'hidden';
+        // The offer is read with the box's code, and a server that does not serve it (or a read
+        // that fails) leaves the recipes.
+        void import('./composition/world-sentence.js').then(async (sentence) => {
+          const offer = await sentence.readWorldDraftOffer(credentials);
+          if (!panel.root.isConnected) return;
+          // A refusal that passes (a draft running, the hour's starts, the allowance, the worlds
+          // held) is said by the box before a word is typed.
+          if (!sentence.sentenceOffered(offer)) {
+            describe();
+            return;
+          }
+          panel.root.style.removeProperty('visibility');
+          sentence.attachWorldSentence(panel, { credentials, offer, open: openMade });
+        }).catch(describe);
+      }
       // A saved world's own values, loaded as a person's edit is: what is out of range now is said
       // by the panel's own check, and the world they came from never changes.
       if (start !== null) {

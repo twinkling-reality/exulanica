@@ -32,7 +32,6 @@ import functools
 import json
 import math
 import uuid
-from collections.abc import Mapping
 from datetime import datetime
 from typing import Annotated, Any, Final, Literal
 
@@ -51,6 +50,8 @@ from exulanica.api.dependencies import (
 )
 from exulanica.api.kind_drafts import (
     KIND_DRAFT_CODES,
+    KINDS_FROM_PEOPLE_NOT_OFFERED,
+    KINDS_FROM_PEOPLE_NOT_OFFERED_DETAIL,
     KindDraft,
     KindDraftBusy,
     KindDraftCapacity,
@@ -69,7 +70,7 @@ from exulanica.epistemics.hosted_requests import no_place_released
 from exulanica.models.manifest import load_manifest
 from exulanica.selection.kind_drafting import kind_drafting_prompt
 from exulanica.selection.world_drafting import sendable
-from exulanica.world.composers import ComposedWorld, GeneratedWorldRefused, UnknownWorldComposer
+from exulanica.world.composers import GeneratedWorldRefused, UnknownWorldComposer
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.generated_worlds import generation_receipt, states_site
 from exulanica.world.kinds.document import (
@@ -89,17 +90,15 @@ from exulanica.world.kinds.repository import (
 from exulanica.world.kinds.samples import SiteRefused
 from exulanica.world.kinds.worker import (
     CHECK_SECONDS,
-    COMPOSE_SECONDS,
     DRAWING_SECONDS,
     JobOutcome,
     KindWorkWaiting,
+    WorkerComposer,
     check_job,
     check_key,
-    compose_job,
     drawing_job,
     drawing_key,
     kind_worker,
-    place_key,
 )
 from exulanica.world.saved_entries import InvalidSavedWorldTitle, SavedWorldEntryRepository
 from exulanica.world.world_recipes import (
@@ -383,11 +382,14 @@ def _drafting(
     connection: Any,
     workspace_id: uuid.UUID,
     actor: uuid.UUID,
+    guest: bool,
 ) -> KindDraftingView:
     """Whether a draft would be taken from this caller, by the codes the draft route answers, in
     the order it asks them."""
     code: str | None = None
-    if not {Permission.WORLD_WRITE, Permission.MODEL_INVOKE} <= held:
+    if not services.kinds_from_people:
+        code = KINDS_FROM_PEOPLE_NOT_OFFERED
+    elif not {Permission.WORLD_WRITE, Permission.MODEL_INVOKE} <= held:
         code = "not_authorised"
     elif services.model_client is None:
         code = ModelNotConfigured.code
@@ -404,7 +406,7 @@ def _drafting(
         except KindCapReached as exc:
             code = exc.code
         else:
-            code = services.kind_drafts.refusal(workspace_id, actor)
+            code = services.kind_drafts.refusal(workspace_id, actor, guest=guest)
     return KindDraftingView(
         offered=code is None,
         code=code,
@@ -418,6 +420,7 @@ def library(
     session: CurrentSession,
     held: HeldPermissions,
     services: Annotated[Services, Depends(get_services)],
+    guest: Annotated[bool, Depends(holds_as_guest)],
 ) -> KindLibraryView:
     """The town, the shipped kinds and the workspace's own kinds, each in plain words, and whether
     this caller may draft a new kind of place here."""
@@ -431,7 +434,7 @@ def library(
         profile=LIBRARY_PROFILE,
         kinds=kinds,
         refusals=[KindRefusalView(code=code, meaning=meaning) for code, meaning in KIND_CODES],
-        drafting=_drafting(services, held, connection, session.workspace_id, session.actor),
+        drafting=_drafting(services, held, connection, session.workspace_id, session.actor, guest),
     )
 
 
@@ -443,10 +446,16 @@ def library(
     responses={422: {"description": "Refused by name; nothing was written."}},
 )
 def upload_kind(
-    body: UploadKindBody, connection: ScopedConnection, session: CurrentSession
+    body: UploadKindBody,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
 ) -> UploadedKindView | JSONResponse:
     """Read the kind, build its sample worlds and keep it when every one passes.
 
+    A server whose deployment has not turned kinds from people on
+    (``EXULANICA_KINDS_FROM_PEOPLE``) answers 403 ``kinds_from_people_not_offered`` before the
+    document is read: a kept kind is a person's own document, and no removal reaches its row.
     A body over :data:`UPLOAD_BODY_MAXIMUM` is refused 413 before it is read; a document larger
     than :data:`UPLOAD_BYTES_MAXIMUM`, one whose origin is not ``uploaded``, and any refusal of
     either stage answer 422 with the refusal's code, where and why (stage B's with its report so
@@ -457,6 +466,8 @@ def upload_kind(
     ``kind_work_busy`` or ``kind_work_unavailable`` with a ``Retry-After``, and finished checks
     are kept, so sending the same kind again reads them.
     """
+    if not services.kinds_from_people:
+        return _problem(403, KINDS_FROM_PEOPLE_NOT_OFFERED, KINDS_FROM_PEOPLE_NOT_OFFERED_DETAIL)
     if len(json.dumps(body.document)) > UPLOAD_BYTES_MAXIMUM:
         return _problem(
             422, "kind_document_invalid", f"a kind is at most {UPLOAD_BYTES_MAXIMUM} bytes"
@@ -587,9 +598,12 @@ def start_kind_draft(
     connection: ReadOnlyConnection,
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
+    guest: Annotated[bool, Depends(holds_as_guest)],
 ) -> KindDraftView | JSONResponse:
     """Admit the words and start the draft; answer at once, never waiting on the model.
 
+    403 ``kinds_from_people_not_offered`` on a server whose deployment has not turned kinds from
+    people on (``EXULANICA_KINDS_FROM_PEOPLE``), before anything is read;
     503 without a model credential; 429 ``budget_exceeded`` with its ``spending`` member when the
     workspace's allowance for the drafting model admits no attempt (spent, or below what one
     reserves); 409 ``kind_cap_reached`` when the
@@ -601,6 +615,8 @@ def start_kind_draft(
     the workspace's rules, releasing no place's name, are applied again as each request leaves.
     """
     workspace_id = session.workspace_id
+    if not services.kinds_from_people:
+        return _problem(403, KINDS_FROM_PEOPLE_NOT_OFFERED, KINDS_FROM_PEOPLE_NOT_OFFERED_DETAIL)
     if services.model_client is None:
         raise ModelNotConfigured()
     # An allowance that admits no attempt answers as every model route's does (429
@@ -642,11 +658,12 @@ def start_kind_draft(
                 placeholders=sent.placeholders,
             ),
             deadline=draft_deadline_seconds(client),
+            guest=guest,
         )
     except KindDraftBusy as busy:
-        # The running draft's id is told only to the person who started it: its words are theirs.
-        mine = {"draft_id": str(busy.draft_id)} if busy.actor == session.actor else {}
-        return _problem(409, "kind_draft_busy", str(busy), **mine)
+        # The running draft's id is told only to the person who started it, and only where it is
+        # a kind's: a world's draft is read by its own route.
+        return _problem(409, "kind_draft_busy", str(busy), **busy.told_to(session.actor, "kind"))
     except KindDraftLimit as limit:
         return _problem(
             429,
@@ -713,48 +730,6 @@ def read_kind_draft(
     return _draft_view(draft, connection, session.workspace_id, services.kind_drafts.clock())
 
 
-class _WorkerComposer:
-    """Composes one identity's world of a kind in the kind worker for one workspace, and keeps the
-    drawing and the society's place of the last world it made, which is the world saved when the
-    making succeeds."""
-
-    def __init__(self, workspace: uuid.UUID) -> None:
-        self.workspace = str(workspace)
-        #: The last world's drawing and its society's place, each by where the worker keeps it.
-        self.drawn: tuple[str, dict[str, Any]] | None = None
-        self.placed: tuple[str, dict[str, Any]] | None = None
-
-    def __call__(
-        self, kind: KindDocument, values: Mapping[str, int], world_id: str
-    ) -> ComposedWorld:
-        outcome = kind_worker().run(
-            f"compose:{self.workspace}:{kind.sha256}:{world_id}:"
-            f"{json.dumps(dict(values), sort_keys=True)}",
-            COMPOSE_SECONDS,
-            compose_job,
-            self.workspace,
-            dict(kind.document),
-            dict(values),
-            world_id,
-            workspace=self.workspace,
-        )
-        if outcome.status != "done" or outcome.value is None:
-            raise KindWorkWaiting(outcome.status, kept=False, reason=outcome.reason)
-        answer = outcome.value
-        if answer["status"] == "refused":
-            raise SiteRefused(answer["code"], answer["refusals"])
-        composed: ComposedWorld = answer["composed"]
-        self.drawn = (
-            drawing_key(self.workspace, composed.receipt_sha256),
-            {"status": "done", "body": answer["body"], "sha256": answer["sha256"]},
-        )
-        self.placed = (
-            place_key(self.workspace, composed.receipt_sha256, answer["place_id"]),
-            answer["placed"],
-        )
-        return composed
-
-
 def _find_kind(
     connection: Any, workspace_id: uuid.UUID, key: str, version: int | None
 ) -> KindDocument | None:
@@ -814,7 +789,7 @@ def create_kind_world(
             if found is None:
                 return _problem(404, "unknown_world_kind", f"no world kind is named {kind!r}")
             values = found.values(body.preset, body.values)
-            composer = _WorkerComposer(session.workspace_id)
+            composer = WorkerComposer(session.workspace_id)
             created = entries.create_from_kind(
                 title=body.title,
                 kind=found,
@@ -822,13 +797,8 @@ def create_kind_world(
                 created_by=session.actor,
                 compose=composer,
             )
-            worker = kind_worker()
-            if composer.drawn is not None:
-                # The page reads the new world's drawing next: it is kept, made with the world.
-                worker.drawings.put(*composer.drawn)
-            if composer.placed is not None:
-                # Bringing people in reads the place its society walks: kept, made with the world.
-                worker.places.put(*composer.placed)
+            # The drawing the page reads next and the place its people walk, made with the world.
+            composer.keep()
     except UnknownWorldRecipe as exc:
         return _problem(404, exc.code, str(exc))
     except KindValueRefused as exc:

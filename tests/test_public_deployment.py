@@ -538,6 +538,21 @@ def test_the_api_alone_is_handed_this_host_s_minute_cost_scale():
     assert "EXULANICA_MINUTE_COST_SCALE" not in OVERLAY_SERVICES["api"]
 
 
+def test_no_composition_takes_a_kind_of_place_from_a_person():
+    """A kind a person brings, drafted from their words or written by them, is kept in rows no
+    removal reaches (docs/world-kinds-contract.md, "A world made from a sentence"), so a server
+    deployed from these files takes none until its operator says so: no service names the setting
+    but the API, and there only as off unless public.env sets it."""
+    for name, block in {**BASE_SERVICES, **OVERLAY_SERVICES}.items():
+        for line in block.splitlines():
+            if "EXULANICA_KINDS_FROM_PEOPLE" not in line:
+                continue
+            assert name == "api", name
+            assert re.fullmatch(
+                r" +EXULANICA_KINDS_FROM_PEOPLE: \$\{EXULANICA_KINDS_FROM_PEOPLE:-off\}", line
+            ), line
+
+
 def test_only_the_api_makes_a_society_of_things_and_prepare_towns_dresses_the_arrival():
     """A guest's arrival town is dressed with a scene whose beings live in a society of things
     (exulanica/api/arrival_dressing.py): only the API is handed the setting, off by default; the

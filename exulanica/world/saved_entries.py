@@ -517,6 +517,7 @@ class SavedWorldEntryRepository:
         values: Mapping[str, int],
         created_by: uuid.UUID,
         compose: Callable[[KindDocument, Mapping[str, int], str], ComposedWorld] | None = None,
+        fixed_world_id: str | None = None,
     ) -> SavedWorldEntry:
         """Make a world from a world kind with ``values`` (already held to the kind's parameters by
         :meth:`~exulanica.world.kinds.document.KindDocument.values`), and save its entry, in one
@@ -529,7 +530,9 @@ class SavedWorldEntryRepository:
         makes a world for any identity drawn is refused by name
         (:class:`~exulanica.world.kinds.samples.SiteRefused`, every candidate's sentence).
         ``compose`` makes one identity's world (by default here, in this process); the API hands
-        the kind worker's, so no generation runs on a request's thread.
+        the kind worker's, so no generation runs on a request's thread. ``fixed_world_id`` fixes
+        the identity instead of drawing one, as :meth:`create_generated` takes it: a fixed identity
+        is tried alone, and the same identity gives the same world. No route passes one.
         """
         from exulanica.world.composers.site_plan import compose_kind
         from exulanica.world.generated_worlds import create_kind_world_authorities
@@ -539,8 +542,8 @@ class SavedWorldEntryRepository:
         refuse_past_limit(self.connection, self.workspace_id, GENERATED, guest=self.guest)
         refusals: list[dict[str, object]] = []
         code = "kind_generation_refused"
-        for _ in range(GENERATED_WORLD_DRAWS):
-            world_id = new_world_id(GENERATED)
+        for _ in range(1 if fixed_world_id is not None else GENERATED_WORLD_DRAWS):
+            world_id = fixed_world_id if fixed_world_id is not None else new_world_id(GENERATED)
             try:
                 composed = (compose or compose_kind)(kind, values, world_id)
             except SiteRefused as exc:

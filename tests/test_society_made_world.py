@@ -335,6 +335,8 @@ def made(tmp_path, repository, spine_schema) -> Iterator[personal.Api]:
         tokens=load_token_directory({"EXULANICA_API_TOKENS": json.dumps(grants)}),
         executor_shares_the_write_role=False,
         model_client=None,
+        # A deployment that takes a person's own kind of place, as the tests of kinds upload one.
+        kinds_from_people=True,
         society_runtime=SocietyRuntime(
             store=store, authored_bindings=[], reviewed_affordances=reviewed_affordance_registry()
         ),

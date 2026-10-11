@@ -1,0 +1,1068 @@
+{
+ "offer": {
+  "offered": true,
+  "code": null,
+  "detail": null,
+  "calls_at_most": 5,
+  "starts": {
+   "an_hour": 12,
+   "left": 12,
+   "retry_after_seconds": null
+  },
+  "description_characters": 1000,
+  "running_draft_id": null,
+  "refusals": [
+   {
+    "code": "budget_exceeded",
+    "meaning": "The workspace's allowance for the drafting model is spent."
+   },
+   {
+    "code": "kind_cap_reached",
+    "meaning": "The workspace already keeps as many kinds of place as it may."
+   },
+   {
+    "code": "kind_draft_busy",
+    "meaning": "The workspace already has a draft running."
+   },
+   {
+    "code": "kind_draft_capacity",
+    "meaning": "The server is drafting as many kinds of place as it may."
+   },
+   {
+    "code": "kind_draft_failed",
+    "meaning": "The draft stopped before a kind of place was made."
+   },
+   {
+    "code": "kind_draft_limit",
+    "meaning": "This person has started as many drafts this hour as they may."
+   },
+   {
+    "code": "kind_draft_model_failed",
+    "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "kind_draft_unanswered",
+    "meaning": "The model did not answer in time."
+   },
+   {
+    "code": "kind_draft_unknown",
+    "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "kind_not_drafted",
+    "meaning": "No kind of place people can live, walk and work in was drafted."
+   },
+   {
+    "code": "kind_version_exists",
+    "meaning": "The workspace already keeps this kind of place."
+   },
+   {
+    "code": "kind_work_unavailable",
+    "meaning": "The server could not check the drafted kind of place."
+   },
+   {
+    "code": "kinds_from_people_not_offered",
+    "meaning": "This server keeps no kind of place from a person, drafted from their words or written by them."
+   },
+   {
+    "code": "not_authorised",
+    "meaning": "This credential may not draft: drafting needs world.write and model.invoke."
+   },
+   {
+    "code": "provider_credential_absent",
+    "meaning": "This server holds no model credential to draft with."
+   },
+   {
+    "code": "tile_budget_reached",
+    "meaning": "The workspace's worlds have come to as many tiles as a day allows."
+   },
+   {
+    "code": "unknown_reference",
+    "meaning": "This credential may not read drafts here: reading needs world.read."
+   },
+   {
+    "code": "world_draft_failed",
+    "meaning": "The draft stopped before a world was made."
+   },
+   {
+    "code": "world_draft_model_failed",
+    "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "world_draft_unanswered",
+    "meaning": "The model did not answer in time."
+   },
+   {
+    "code": "world_draft_unknown",
+    "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "world_limit_reached",
+    "meaning": "The workspace already holds as many worlds as it may."
+   },
+   {
+    "code": "world_not_a_place",
+    "meaning": "The words ask for no place where people could live, walk or work."
+   },
+   {
+    "code": "world_not_drafted",
+    "meaning": "No world could be drafted from the words."
+   },
+   {
+    "code": "worlds_read_only",
+    "meaning": "This server's database role cannot register a world."
+   }
+  ]
+ },
+ "started": {
+  "draft_id": "00000000-0000-0000-0000-000000000001",
+  "state": "choosing",
+  "description": "a small farm with a farmhouse, a barn and a duck pond",
+  "started_at": "2026-01-01T00:00:00Z",
+  "elapsed_seconds": 0,
+  "poll_after_seconds": 3,
+  "deadline_seconds": 570,
+  "tool": null,
+  "entry": null,
+  "made": [],
+  "left_out": [],
+  "refusal": null,
+  "model_name": null,
+  "execution": null,
+  "refusals": [
+   {
+    "code": "budget_exceeded",
+    "meaning": "The workspace's allowance for the drafting model is spent."
+   },
+   {
+    "code": "kind_cap_reached",
+    "meaning": "The workspace already keeps as many kinds of place as it may."
+   },
+   {
+    "code": "kind_draft_busy",
+    "meaning": "The workspace already has a draft running."
+   },
+   {
+    "code": "kind_draft_capacity",
+    "meaning": "The server is drafting as many kinds of place as it may."
+   },
+   {
+    "code": "kind_draft_failed",
+    "meaning": "The draft stopped before a kind of place was made."
+   },
+   {
+    "code": "kind_draft_limit",
+    "meaning": "This person has started as many drafts this hour as they may."
+   },
+   {
+    "code": "kind_draft_model_failed",
+    "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "kind_draft_unanswered",
+    "meaning": "The model did not answer in time."
+   },
+   {
+    "code": "kind_draft_unknown",
+    "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "kind_not_drafted",
+    "meaning": "No kind of place people can live, walk and work in was drafted."
+   },
+   {
+    "code": "kind_version_exists",
+    "meaning": "The workspace already keeps this kind of place."
+   },
+   {
+    "code": "kind_work_unavailable",
+    "meaning": "The server could not check the drafted kind of place."
+   },
+   {
+    "code": "kinds_from_people_not_offered",
+    "meaning": "This server keeps no kind of place from a person, drafted from their words or written by them."
+   },
+   {
+    "code": "not_authorised",
+    "meaning": "This credential may not draft: drafting needs world.write and model.invoke."
+   },
+   {
+    "code": "provider_credential_absent",
+    "meaning": "This server holds no model credential to draft with."
+   },
+   {
+    "code": "tile_budget_reached",
+    "meaning": "The workspace's worlds have come to as many tiles as a day allows."
+   },
+   {
+    "code": "unknown_reference",
+    "meaning": "This credential may not read drafts here: reading needs world.read."
+   },
+   {
+    "code": "world_draft_failed",
+    "meaning": "The draft stopped before a world was made."
+   },
+   {
+    "code": "world_draft_model_failed",
+    "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "world_draft_unanswered",
+    "meaning": "The model did not answer in time."
+   },
+   {
+    "code": "world_draft_unknown",
+    "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "world_limit_reached",
+    "meaning": "The workspace already holds as many worlds as it may."
+   },
+   {
+    "code": "world_not_a_place",
+    "meaning": "The words ask for no place where people could live, walk or work."
+   },
+   {
+    "code": "world_not_drafted",
+    "meaning": "No world could be drafted from the words."
+   },
+   {
+    "code": "worlds_read_only",
+    "meaning": "This server's database role cannot register a world."
+   }
+  ]
+ },
+ "offer_while_mine_runs": {
+  "offered": false,
+  "code": "kind_draft_busy",
+  "detail": "A draft is already running in this workspace.",
+  "calls_at_most": 5,
+  "starts": {
+   "an_hour": 12,
+   "left": 11,
+   "retry_after_seconds": null
+  },
+  "description_characters": 1000,
+  "running_draft_id": "00000000-0000-0000-0000-000000000001",
+  "refusals": [
+   {
+    "code": "budget_exceeded",
+    "meaning": "The workspace's allowance for the drafting model is spent."
+   },
+   {
+    "code": "kind_cap_reached",
+    "meaning": "The workspace already keeps as many kinds of place as it may."
+   },
+   {
+    "code": "kind_draft_busy",
+    "meaning": "The workspace already has a draft running."
+   },
+   {
+    "code": "kind_draft_capacity",
+    "meaning": "The server is drafting as many kinds of place as it may."
+   },
+   {
+    "code": "kind_draft_failed",
+    "meaning": "The draft stopped before a kind of place was made."
+   },
+   {
+    "code": "kind_draft_limit",
+    "meaning": "This person has started as many drafts this hour as they may."
+   },
+   {
+    "code": "kind_draft_model_failed",
+    "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "kind_draft_unanswered",
+    "meaning": "The model did not answer in time."
+   },
+   {
+    "code": "kind_draft_unknown",
+    "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "kind_not_drafted",
+    "meaning": "No kind of place people can live, walk and work in was drafted."
+   },
+   {
+    "code": "kind_version_exists",
+    "meaning": "The workspace already keeps this kind of place."
+   },
+   {
+    "code": "kind_work_unavailable",
+    "meaning": "The server could not check the drafted kind of place."
+   },
+   {
+    "code": "kinds_from_people_not_offered",
+    "meaning": "This server keeps no kind of place from a person, drafted from their words or written by them."
+   },
+   {
+    "code": "not_authorised",
+    "meaning": "This credential may not draft: drafting needs world.write and model.invoke."
+   },
+   {
+    "code": "provider_credential_absent",
+    "meaning": "This server holds no model credential to draft with."
+   },
+   {
+    "code": "tile_budget_reached",
+    "meaning": "The workspace's worlds have come to as many tiles as a day allows."
+   },
+   {
+    "code": "unknown_reference",
+    "meaning": "This credential may not read drafts here: reading needs world.read."
+   },
+   {
+    "code": "world_draft_failed",
+    "meaning": "The draft stopped before a world was made."
+   },
+   {
+    "code": "world_draft_model_failed",
+    "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "world_draft_unanswered",
+    "meaning": "The model did not answer in time."
+   },
+   {
+    "code": "world_draft_unknown",
+    "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "world_limit_reached",
+    "meaning": "The workspace already holds as many worlds as it may."
+   },
+   {
+    "code": "world_not_a_place",
+    "meaning": "The words ask for no place where people could live, walk or work."
+   },
+   {
+    "code": "world_not_drafted",
+    "meaning": "No world could be drafted from the words."
+   },
+   {
+    "code": "worlds_read_only",
+    "meaning": "This server's database role cannot register a world."
+   }
+  ]
+ },
+ "ready_place": {
+  "draft_id": "00000000-0000-0000-0000-000000000001",
+  "state": "ready",
+  "description": "",
+  "started_at": "2026-01-01T00:00:00Z",
+  "elapsed_seconds": 0,
+  "poll_after_seconds": null,
+  "deadline_seconds": 570,
+  "tool": {
+   "key": "place",
+   "chosen_by": "model"
+  },
+  "entry": {
+   "entry_id": "00000000-0000-0000-0000-000000000002",
+   "world_id": "world:generated:00000000-0000-0000-0000-000000000003",
+   "title": "A test farm",
+   "source_kind": "generated",
+   "source_snapshot_id": "00000000-0000-0000-0000-000000000004",
+   "source_snapshot_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+   "authored_scene": null,
+   "declared_floor": null,
+   "generated_ground": null,
+   "generated_site": {
+    "kind": "fixture_farm",
+    "kind_version": 1,
+    "kind_label": "A test farm",
+    "region_id": "region:generated",
+    "arrival_mm": [
+     48000,
+     0,
+     -4500
+    ],
+    "arrival_facing_mm": [
+     0,
+     -1
+    ]
+   },
+   "society_engine": "exulanica-society/v5",
+   "authored_version_id": "00000000-0000-0000-0000-000000000005",
+   "authored_state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+   "authored_edit_seq": 0,
+   "current_authored_state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+   "current_authored_edit_seq": 0,
+   "style_version_id": "00000000-0000-0000-0000-000000000006",
+   "revision": 1,
+   "availability": "available",
+   "unavailable_reason": null,
+   "source_attachments": [],
+   "previous_source_attachments": [],
+   "created_by": "00000000-0000-0000-0000-000000000007",
+   "created_at": "2026-01-01T00:00:00Z",
+   "updated_at": "2026-01-01T00:00:00Z",
+   "takes_photographs": false,
+   "arrival": null,
+   "arrival_unavailable_reason": null,
+   "arrival_scene": null
+  },
+  "made": [
+   {
+    "key": "farm_track",
+    "label": "farm track",
+    "form": "path",
+    "look": "path.track",
+    "drawn": 1,
+    "box_mm": [
+     4000,
+     127000,
+     0
+    ]
+   },
+   {
+    "key": "fence",
+    "label": "fence",
+    "form": "boundary",
+    "look": "boundary.fence_wood",
+    "drawn": 8,
+    "box_mm": [
+     128000,
+     100,
+     1200
+    ]
+   },
+   {
+    "key": "table",
+    "label": "table",
+    "form": "fixture",
+    "look": "fixture.table",
+    "drawn": 1,
+    "box_mm": [
+     1600,
+     900,
+     750
+    ]
+   },
+   {
+    "key": "kitchen",
+    "label": "kitchen",
+    "form": "room",
+    "look": "ground.floor_tile",
+    "drawn": 1,
+    "box_mm": [
+     9100,
+     4850,
+     0
+    ]
+   },
+   {
+    "key": "bed",
+    "label": "bed",
+    "form": "fixture",
+    "look": "fixture.bed",
+    "drawn": 3,
+    "box_mm": [
+     1000,
+     2000,
+     600
+    ]
+   },
+   {
+    "key": "bedroom",
+    "label": "bedroom",
+    "form": "room",
+    "look": "ground.floor_wood",
+    "drawn": 2,
+    "box_mm": [
+     9100,
+     3350,
+     0
+    ]
+   },
+   {
+    "key": "farmhouse",
+    "label": "farmhouse",
+    "form": "structure",
+    "look": "structure.farmhouse",
+    "drawn": 1,
+    "box_mm": [
+     12000,
+     9500,
+     5600
+    ]
+   },
+   {
+    "key": "barn",
+    "label": "barn",
+    "form": "structure",
+    "look": "structure.barn",
+    "drawn": 1,
+    "box_mm": [
+     13500,
+     11500,
+     4500
+    ]
+   },
+   {
+    "key": "bench",
+    "label": "bench",
+    "form": "fixture",
+    "look": "fixture.bench",
+    "drawn": 2,
+    "box_mm": [
+     1800,
+     500,
+     900
+    ]
+   },
+   {
+    "key": "hay_bale",
+    "label": "hay bale",
+    "form": "fixture",
+    "look": "prop.hay_bale",
+    "drawn": 6,
+    "box_mm": [
+     1200,
+     1200,
+     1000
+    ]
+   },
+   {
+    "key": "field",
+    "label": "field",
+    "form": "area",
+    "look": "ground.crop_rows",
+    "drawn": 3,
+    "box_mm": [
+     39500,
+     28000,
+     0
+    ]
+   },
+   {
+    "key": "duck_pond",
+    "label": "duck pond",
+    "form": "area",
+    "look": "water.pond",
+    "drawn": 1,
+    "box_mm": [
+     35100,
+     32500,
+     0
+    ]
+   },
+   {
+    "key": "pond_rail",
+    "label": "pond rail",
+    "form": "fixture",
+    "look": "fixture.rail",
+    "drawn": 1,
+    "box_mm": [
+     2400,
+     200,
+     1000
+    ]
+   }
+  ],
+  "left_out": [],
+  "refusal": null,
+  "model_name": "DeepSeek V4 Flash",
+  "execution": null,
+  "refusals": [
+   {
+    "code": "budget_exceeded",
+    "meaning": "The workspace's allowance for the drafting model is spent."
+   },
+   {
+    "code": "kind_cap_reached",
+    "meaning": "The workspace already keeps as many kinds of place as it may."
+   },
+   {
+    "code": "kind_draft_busy",
+    "meaning": "The workspace already has a draft running."
+   },
+   {
+    "code": "kind_draft_capacity",
+    "meaning": "The server is drafting as many kinds of place as it may."
+   },
+   {
+    "code": "kind_draft_failed",
+    "meaning": "The draft stopped before a kind of place was made."
+   },
+   {
+    "code": "kind_draft_limit",
+    "meaning": "This person has started as many drafts this hour as they may."
+   },
+   {
+    "code": "kind_draft_model_failed",
+    "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "kind_draft_unanswered",
+    "meaning": "The model did not answer in time."
+   },
+   {
+    "code": "kind_draft_unknown",
+    "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "kind_not_drafted",
+    "meaning": "No kind of place people can live, walk and work in was drafted."
+   },
+   {
+    "code": "kind_version_exists",
+    "meaning": "The workspace already keeps this kind of place."
+   },
+   {
+    "code": "kind_work_unavailable",
+    "meaning": "The server could not check the drafted kind of place."
+   },
+   {
+    "code": "kinds_from_people_not_offered",
+    "meaning": "This server keeps no kind of place from a person, drafted from their words or written by them."
+   },
+   {
+    "code": "not_authorised",
+    "meaning": "This credential may not draft: drafting needs world.write and model.invoke."
+   },
+   {
+    "code": "provider_credential_absent",
+    "meaning": "This server holds no model credential to draft with."
+   },
+   {
+    "code": "tile_budget_reached",
+    "meaning": "The workspace's worlds have come to as many tiles as a day allows."
+   },
+   {
+    "code": "unknown_reference",
+    "meaning": "This credential may not read drafts here: reading needs world.read."
+   },
+   {
+    "code": "world_draft_failed",
+    "meaning": "The draft stopped before a world was made."
+   },
+   {
+    "code": "world_draft_model_failed",
+    "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "world_draft_unanswered",
+    "meaning": "The model did not answer in time."
+   },
+   {
+    "code": "world_draft_unknown",
+    "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "world_limit_reached",
+    "meaning": "The workspace already holds as many worlds as it may."
+   },
+   {
+    "code": "world_not_a_place",
+    "meaning": "The words ask for no place where people could live, walk or work."
+   },
+   {
+    "code": "world_not_drafted",
+    "meaning": "No world could be drafted from the words."
+   },
+   {
+    "code": "worlds_read_only",
+    "meaning": "This server's database role cannot register a world."
+   }
+  ]
+ },
+ "ready_town": {
+  "draft_id": "00000000-0000-0000-0000-000000000001",
+  "state": "ready",
+  "description": "",
+  "started_at": "2026-01-01T00:00:00Z",
+  "elapsed_seconds": 0,
+  "poll_after_seconds": null,
+  "deadline_seconds": 570,
+  "tool": {
+   "key": "town",
+   "chosen_by": "model"
+  },
+  "entry": {
+   "entry_id": "00000000-0000-0000-0000-000000000002",
+   "world_id": "world:generated:00000000-0000-0000-0000-000000000003",
+   "title": "A small town",
+   "source_kind": "generated",
+   "source_snapshot_id": "00000000-0000-0000-0000-000000000004",
+   "source_snapshot_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+   "authored_scene": null,
+   "declared_floor": null,
+   "generated_ground": {
+    "recipe_key": "small_town",
+    "recipe_label": "A small town",
+    "region_id": "region:generated",
+    "arrival_mm": [
+     132177,
+     -44,
+     -56200
+    ],
+    "arrival_facing_mm": [
+     0,
+     -7800
+    ],
+    "tiles": [
+     {
+      "tile_x": 0,
+      "tile_y": 0,
+      "tile_inputs_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "baked_tile_id": null,
+      "state": "baking"
+     },
+     {
+      "tile_x": 1,
+      "tile_y": 0,
+      "tile_inputs_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "baked_tile_id": null,
+      "state": "baking"
+     }
+    ],
+    "specification": "world-specification.v2",
+    "values": {
+     "block_length_mm": 90000,
+     "city_extent_x_mm": 256000,
+     "cross_street_hierarchy": "local_street",
+     "ground_floor_use_weight_bakery_permille": 500,
+     "ground_floor_use_weight_bookshop_permille": 500,
+     "ground_floor_use_weight_cafe_permille": 500,
+     "ground_floor_use_weight_grocery_permille": 500,
+     "ground_floor_use_weight_office_permille": 500,
+     "ground_floor_use_weight_pharmacy_permille": 500,
+     "ground_floor_use_weight_restaurant_permille": 500,
+     "ground_floor_use_weight_workshop_permille": 500,
+     "high_street_count": 1,
+     "storey_band_high": 4,
+     "storey_band_low": 2,
+     "typology_weight_apartment_block_permille": 500,
+     "typology_weight_loft_building_permille": 500,
+     "typology_weight_mansion_block_permille": 500,
+     "typology_weight_rowhouse_permille": 500,
+     "typology_weight_shophouse_permille": 500
+    }
+   },
+   "generated_site": null,
+   "society_engine": "exulanica-society/v5",
+   "authored_version_id": "00000000-0000-0000-0000-000000000005",
+   "authored_state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+   "authored_edit_seq": 0,
+   "current_authored_state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+   "current_authored_edit_seq": 0,
+   "style_version_id": "00000000-0000-0000-0000-000000000006",
+   "revision": 1,
+   "availability": "available",
+   "unavailable_reason": null,
+   "source_attachments": [],
+   "previous_source_attachments": [],
+   "created_by": "00000000-0000-0000-0000-000000000007",
+   "created_at": "2026-01-01T00:00:00Z",
+   "updated_at": "2026-01-01T00:00:00Z",
+   "takes_photographs": false,
+   "arrival": null,
+   "arrival_unavailable_reason": null,
+   "arrival_scene": null
+  },
+  "made": [
+   {
+    "key": "street",
+    "label": "street",
+    "form": "path",
+    "look": "road.local_street",
+    "drawn": null,
+    "box_mm": null
+   },
+   {
+    "key": "footway",
+    "label": "footway",
+    "form": "path",
+    "look": "path.footway",
+    "drawn": null,
+    "box_mm": null
+   },
+   {
+    "key": "home",
+    "label": "home",
+    "form": "structure",
+    "look": "structure.apartment_block",
+    "drawn": null,
+    "box_mm": null
+   },
+   {
+    "key": "shop",
+    "label": "shop",
+    "form": "structure",
+    "look": "structure.shophouse",
+    "drawn": null,
+    "box_mm": null
+   },
+   {
+    "key": "workplace",
+    "label": "workplace",
+    "form": "structure",
+    "look": "structure.office_block",
+    "drawn": null,
+    "box_mm": null
+   },
+   {
+    "key": "bench",
+    "label": "bench",
+    "form": "fixture",
+    "look": "fixture.bench",
+    "drawn": null,
+    "box_mm": null
+   },
+   {
+    "key": "street_tree",
+    "label": "street tree",
+    "form": "fixture",
+    "look": "plant.street_tree",
+    "drawn": null,
+    "box_mm": null
+   },
+   {
+    "key": "street_lamp",
+    "label": "street lamp",
+    "form": "fixture",
+    "look": "fixture.street_lamp",
+    "drawn": null,
+    "box_mm": null
+   }
+  ],
+  "left_out": [
+   "two cafes"
+  ],
+  "refusal": null,
+  "model_name": "Nemotron 3 Super 120B",
+  "execution": null,
+  "refusals": [
+   {
+    "code": "budget_exceeded",
+    "meaning": "The workspace's allowance for the drafting model is spent."
+   },
+   {
+    "code": "kind_cap_reached",
+    "meaning": "The workspace already keeps as many kinds of place as it may."
+   },
+   {
+    "code": "kind_draft_busy",
+    "meaning": "The workspace already has a draft running."
+   },
+   {
+    "code": "kind_draft_capacity",
+    "meaning": "The server is drafting as many kinds of place as it may."
+   },
+   {
+    "code": "kind_draft_failed",
+    "meaning": "The draft stopped before a kind of place was made."
+   },
+   {
+    "code": "kind_draft_limit",
+    "meaning": "This person has started as many drafts this hour as they may."
+   },
+   {
+    "code": "kind_draft_model_failed",
+    "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "kind_draft_unanswered",
+    "meaning": "The model did not answer in time."
+   },
+   {
+    "code": "kind_draft_unknown",
+    "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "kind_not_drafted",
+    "meaning": "No kind of place people can live, walk and work in was drafted."
+   },
+   {
+    "code": "kind_version_exists",
+    "meaning": "The workspace already keeps this kind of place."
+   },
+   {
+    "code": "kind_work_unavailable",
+    "meaning": "The server could not check the drafted kind of place."
+   },
+   {
+    "code": "kinds_from_people_not_offered",
+    "meaning": "This server keeps no kind of place from a person, drafted from their words or written by them."
+   },
+   {
+    "code": "not_authorised",
+    "meaning": "This credential may not draft: drafting needs world.write and model.invoke."
+   },
+   {
+    "code": "provider_credential_absent",
+    "meaning": "This server holds no model credential to draft with."
+   },
+   {
+    "code": "tile_budget_reached",
+    "meaning": "The workspace's worlds have come to as many tiles as a day allows."
+   },
+   {
+    "code": "unknown_reference",
+    "meaning": "This credential may not read drafts here: reading needs world.read."
+   },
+   {
+    "code": "world_draft_failed",
+    "meaning": "The draft stopped before a world was made."
+   },
+   {
+    "code": "world_draft_model_failed",
+    "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "world_draft_unanswered",
+    "meaning": "The model did not answer in time."
+   },
+   {
+    "code": "world_draft_unknown",
+    "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "world_limit_reached",
+    "meaning": "The workspace already holds as many worlds as it may."
+   },
+   {
+    "code": "world_not_a_place",
+    "meaning": "The words ask for no place where people could live, walk or work."
+   },
+   {
+    "code": "world_not_drafted",
+    "meaning": "No world could be drafted from the words."
+   },
+   {
+    "code": "worlds_read_only",
+    "meaning": "This server's database role cannot register a world."
+   }
+  ]
+ },
+ "refused": {
+  "draft_id": "00000000-0000-0000-0000-000000000001",
+  "state": "refused",
+  "description": "",
+  "started_at": "2026-01-01T00:00:00Z",
+  "elapsed_seconds": 0,
+  "poll_after_seconds": null,
+  "deadline_seconds": 570,
+  "tool": {
+   "key": "place",
+   "chosen_by": "model"
+  },
+  "entry": null,
+  "made": [],
+  "left_out": [],
+  "refusal": {
+   "code": "kind_not_drafted",
+   "detail": "No kind of world was drafted from these words that people could live, walk and work in.",
+   "check": null,
+   "where": null,
+   "spending": null
+  },
+  "model_name": null,
+  "execution": null,
+  "refusals": [
+   {
+    "code": "budget_exceeded",
+    "meaning": "The workspace's allowance for the drafting model is spent."
+   },
+   {
+    "code": "kind_cap_reached",
+    "meaning": "The workspace already keeps as many kinds of place as it may."
+   },
+   {
+    "code": "kind_draft_busy",
+    "meaning": "The workspace already has a draft running."
+   },
+   {
+    "code": "kind_draft_capacity",
+    "meaning": "The server is drafting as many kinds of place as it may."
+   },
+   {
+    "code": "kind_draft_failed",
+    "meaning": "The draft stopped before a kind of place was made."
+   },
+   {
+    "code": "kind_draft_limit",
+    "meaning": "This person has started as many drafts this hour as they may."
+   },
+   {
+    "code": "kind_draft_model_failed",
+    "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "kind_draft_unanswered",
+    "meaning": "The model did not answer in time."
+   },
+   {
+    "code": "kind_draft_unknown",
+    "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "kind_not_drafted",
+    "meaning": "No kind of place people can live, walk and work in was drafted."
+   },
+   {
+    "code": "kind_version_exists",
+    "meaning": "The workspace already keeps this kind of place."
+   },
+   {
+    "code": "kind_work_unavailable",
+    "meaning": "The server could not check the drafted kind of place."
+   },
+   {
+    "code": "kinds_from_people_not_offered",
+    "meaning": "This server keeps no kind of place from a person, drafted from their words or written by them."
+   },
+   {
+    "code": "not_authorised",
+    "meaning": "This credential may not draft: drafting needs world.write and model.invoke."
+   },
+   {
+    "code": "provider_credential_absent",
+    "meaning": "This server holds no model credential to draft with."
+   },
+   {
+    "code": "tile_budget_reached",
+    "meaning": "The workspace's worlds have come to as many tiles as a day allows."
+   },
+   {
+    "code": "unknown_reference",
+    "meaning": "This credential may not read drafts here: reading needs world.read."
+   },
+   {
+    "code": "world_draft_failed",
+    "meaning": "The draft stopped before a world was made."
+   },
+   {
+    "code": "world_draft_model_failed",
+    "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "world_draft_unanswered",
+    "meaning": "The model did not answer in time."
+   },
+   {
+    "code": "world_draft_unknown",
+    "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "world_limit_reached",
+    "meaning": "The workspace already holds as many worlds as it may."
+   },
+   {
+    "code": "world_not_a_place",
+    "meaning": "The words ask for no place where people could live, walk or work."
+   },
+   {
+    "code": "world_not_drafted",
+    "meaning": "No world could be drafted from the words."
+   },
+   {
+    "code": "worlds_read_only",
+    "meaning": "This server's database role cannot register a world."
+   }
+  ]
+ }
+}

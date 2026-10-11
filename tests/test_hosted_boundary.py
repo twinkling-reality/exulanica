@@ -91,12 +91,14 @@ from exulanica.selection.question import answer_question
 from exulanica.selection.request_names import RequestNames
 from exulanica.selection.setting_choosing import SettingAxis, SettingOption, choose_setting
 from exulanica.selection.society_question import answer_about_society, build_scene
+from exulanica.selection.tool_choosing import choose_tool
 from exulanica.selection.world_drafting import (
     propose_world_specification,
     sendable,
     specification_view,
 )
 from exulanica.world.society_decision_contract import decision_contract, person_role
+from exulanica.world.world_tools import world_tools
 
 from conftest import ingest_observed, write_photo
 from creature_support import form_of
@@ -144,6 +146,7 @@ HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
     ),
     "look chooser": ("exulanica.selection.look_choosing", "choose_look"),
     "setting chooser": ("exulanica.selection.setting_choosing", "choose_setting"),
+    "tool chooser": ("exulanica.selection.tool_choosing", "choose_tool"),
     "query embedding": ("exulanica.selection.embeddings", "embed_query"),
     "caption embedding": ("exulanica.epistemics.caption_embeddings", "embed_capture"),
     "vision": ("exulanica.ingest.vision", "NebiusVisionModel.observe"),
@@ -602,6 +605,21 @@ def run_setting_choosing(world: World) -> Witness:
     return transport
 
 
+def run_tool_choosing(world: World) -> Witness:
+    """The tool chooser, handed the description as a draft of a world hands it: every saved name
+    replaced, with the world tool catalog's tools."""
+    answer = {"tool": "place", "tool_words": ["a harbour with a quay"]}
+    client, transport = world.hosted([_json_reply(answer, Role.WORLD_TOOL_CHOOSER)])
+    sent = sendable(
+        world.connection,
+        world.repository.workspace_id,
+        f"a harbour with a quay where {PERSON} works beside {PLACE}",
+    )
+    choice = choose_tool(client, sent.text, world_tools(), placeholders=sent.placeholders)
+    assert choice.tool == "place", choice.refused
+    return transport
+
+
 def run_creature_drafting(world: World) -> Witness:
     """The creature drafter, handed a person's words as the creature route will hand them."""
     form = form_of("horse", label="striped hill beast")
@@ -822,6 +840,7 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "specification drafter": (run_specification, "a harbour town"),
     "look chooser": (run_look_choosing, "a cozy harbour town"),
     "setting chooser": (run_setting_choosing, "a harbour town at dusk"),
+    "tool chooser": (run_tool_choosing, "a harbour with a quay"),
     "caption embedding": (run_caption, "RUNNING CLUB"),
     "vision": (run_vision, "Describe this photograph"),
     "role decision": (run_person, "wait here a minute"),

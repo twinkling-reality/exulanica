@@ -857,6 +857,10 @@ def api_environment(
         environment["EXULANICA_DOOR_BRIDGES"] = door_bridges
     if society_of_things:
         environment["EXULANICA_SOCIETY_OF_THINGS"] = "on"
+    # An acceptance stack takes kinds of place from a person (a world's draft, a kind's draft, an
+    # uploaded kind): its database is this run's own and is destroyed with it. A public
+    # composition leaves the setting off.
+    environment["EXULANICA_KINDS_FROM_PEOPLE"] = "on"
     if reference_pictures:
         # The workspaces references are served to, with a person's own pictures turned on, so the
         # list states the consent a picture's reading right is granted against.

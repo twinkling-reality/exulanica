@@ -1,0 +1,26 @@
+{
+  "policy_id": "exulanica.world-draft",
+  "version": 1,
+  "budgets": {
+    "drafts_at_once": {
+      "scope": "process",
+      "figure": 2,
+      "environment": "EXULANICA_DRAFTS_AT_ONCE",
+      "reason": "A CHOSEN BUDGET, not a measured cost. Each draft holds one thread of the API process while a model reasons, a call of up to its role's timeout, and spends the hosted allowance as it goes. Two at once keep the process's other work and its rate of spending in reach on the development machine; a deployment with more processes or a larger allowance states its own figure in the variable named here."
+    },
+    "workspace_drafts_at_once": {
+      "scope": "workspace",
+      "figure": 1,
+      "environment": "EXULANICA_WORKSPACE_DRAFTS_AT_ONCE",
+      "reason": "A CHOSEN BUDGET. One workspace drafts one place at a time, so one workspace cannot hold every draft the process runs; a deployment that raises drafts at once may raise this with it."
+    },
+    "starts_an_hour": {
+      "scope": "person",
+      "figure": 12,
+      "guest_figure": 12,
+      "environment": "EXULANICA_DRAFT_STARTS_AN_HOUR",
+      "guest_environment": "EXULANICA_GUEST_DRAFT_STARTS_AN_HOUR",
+      "reason": "A CHOSEN BUDGET over money: every start may call a model several times: a kind's draft up to three, a world's draft up to five (GET /worlds/drafts states the figure), and a model withdrawn mid-call may be asked again through its fallback. Twelve an hour lets a person try a place a dozen ways and stops a loop; the workspace's own spending allowance is the bound that counts dollars, and it is checked before every start. A deployment states its own figure for a signed-in person and for a guest in the variables named here."
+    }
+  }
+}

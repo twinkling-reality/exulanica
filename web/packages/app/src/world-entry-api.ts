@@ -845,7 +845,8 @@ function parseComposedPersonalWorld(value: unknown): ComposedPersonalWorld {
   });
 }
 
-function parseEntry(value: unknown): SavedWorldEntry {
+/** A saved world entry as the server serves it, read and checked. */
+export function parseEntry(value: unknown): SavedWorldEntry {
   const row = record(value, 'saved world entry');
   const sourceKind = row['source_kind'];
   const availability = row['availability'];

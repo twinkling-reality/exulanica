@@ -144,6 +144,7 @@ from exulanica.api.routes import (
     world_flight,
     world_generation,
     world_kinds,
+    world_making,
     world_models,
     world_objects,
     world_projects,
@@ -473,6 +474,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         BodyLimit,
         routes=(
             *world_kinds.BODY_LIMITS,
+            *world_making.BODY_LIMITS,
             *door.BODY_LIMITS,
             *workspace_assets.BODY_LIMITS,
             *workspace_style_packs.BODY_LIMITS,
@@ -548,6 +550,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(generated_worlds.tiles_router)
     app.include_router(world_kinds.router)
     app.include_router(world_kinds.site_router)
+    app.include_router(world_making.router)
     app.include_router(references.router)
     app.include_router(piece_requests.router)
     app.include_router(world_drafts.router)

@@ -476,6 +476,41 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldRecipes.setting.fromWords':
     '{titles}. From your words {phrases}. You can change it any time later in Design.',
   'worldRecipes.setting.clear': 'Draw it as the look has it',
+  // One sentence makes a world (POST /worlds/drafts; docs/world-kinds-contract.md, "A world made
+  // from a sentence"): the one box Create a world shows where the server offers drafting.
+  'worldSentence.field': 'Say the world you want',
+  'worldSentence.placeholder': 'A harbour with fishing boats, a market on the quay and a lighthouse',
+  'worldSentence.notice':
+    'Your words are sent to an AI model to draft the world. A short description of what you asked '
+    + 'for is kept with the world.',
+  // What a draft may spend, from the server's own figures (GET /worlds/drafts), shown before the
+  // words are sent.
+  'worldSentence.spend':
+    'Making a world asks an AI model up to {calls} times. Once started it runs to its end, one '
+    + 'world at a time. You have {left} of {anHour} starts left this hour.',
+  'worldSentence.limit':
+    'You have started as many worlds this hour as one person may. The next can start in about '
+    + '{minutes} minutes.',
+  'worldSentence.notNow': '{meaning} No world can be started from here now.',
+  'worldSentence.make': 'Make this world',
+  'worldSentence.choosing': 'Working out how to make it, {elapsed} so far.',
+  'worldSentence.drafting':
+    'Drafting your world, {elapsed} so far. A town takes about ten seconds; another kind of place '
+    + 'can take a couple of minutes.',
+  'worldSentence.making': 'Making it, {elapsed} so far.',
+  'worldSentence.ready': 'Made: {title}.',
+  'worldSentence.made': 'In it: {parts}.',
+  'worldSentence.leftOut': 'Not in it yet: {phrases}.',
+  'worldSentence.open': 'Open this world',
+  'worldSentence.refused': '{meaning} Nothing was made.',
+  'worldSentence.refused.detail': '{meaning} {detail} Nothing was made.',
+  'worldSentence.busy': 'A world of yours is already being made.',
+  'worldSentence.busy.other': 'A world is already being drafted in this workspace. Try again when it is done.',
+  'worldSentence.follow': 'See it',
+  'worldSentence.capacity': 'Many worlds are being drafted on this server right now. Try again in a minute.',
+  'worldSentence.lost':
+    'The server no longer holds this draft, so it stopped. Look among your worlds; if it is not '
+    + 'there, say it again.',
   // Kinds of place (GET /worlds/kinds): the workspace's own kinds as cards under the recipes, and
   // the last card, a new kind of place drafted from a person's words (docs/world-kinds-contract.md).
   'worldKinds.heading': 'Or a kind of place',
