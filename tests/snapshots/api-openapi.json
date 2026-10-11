@@ -31485,6 +31485,26 @@
       "type": "array",
       "title": "Left Out"
      },
+     "look": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/TakenLookView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "setting": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/TakenSettingView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "refusal": {
       "anyOf": [
        {
@@ -41950,6 +41970,81 @@
      "entity_id"
     ],
     "title": "SupportView"
+   },
+   "TakenLookView": {
+    "properties": {
+     "pack_id": {
+      "type": "string",
+      "title": "Pack Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "words": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Words"
+     }
+    },
+    "type": "object",
+    "required": [
+     "pack_id",
+     "title",
+     "words"
+    ],
+    "title": "TakenLookView",
+    "description": "The look the made world is drawn in because the words asked for it."
+   },
+   "TakenPartView": {
+    "properties": {
+     "axis": {
+      "type": "string",
+      "title": "Axis"
+     },
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     }
+    },
+    "type": "object",
+    "required": [
+     "axis",
+     "key",
+     "title"
+    ],
+    "title": "TakenPartView"
+   },
+   "TakenSettingView": {
+    "properties": {
+     "parts": {
+      "items": {
+       "$ref": "#/components/schemas/TakenPartView"
+      },
+      "type": "array",
+      "title": "Parts"
+     },
+     "words": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Words"
+     }
+    },
+    "type": "object",
+    "required": [
+     "parts",
+     "words"
+    ],
+    "title": "TakenSettingView",
+    "description": "The named parts of a setting the made world stands in because the words asked for them."
    },
    "ThingKindBody": {
     "properties": {

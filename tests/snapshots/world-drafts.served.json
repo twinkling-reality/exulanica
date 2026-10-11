@@ -3,7 +3,7 @@
   "offered": true,
   "code": null,
   "detail": null,
-  "calls_at_most": 5,
+  "calls_at_most": 9,
   "starts": {
    "an_hour": 12,
    "left": 12,
@@ -126,6 +126,8 @@
   "entry": null,
   "made": [],
   "left_out": [],
+  "look": null,
+  "setting": null,
   "refusal": null,
   "model_name": null,
   "execution": null,
@@ -236,7 +238,7 @@
   "offered": false,
   "code": "kind_draft_busy",
   "detail": "A draft is already running in this workspace.",
-  "calls_at_most": 5,
+  "calls_at_most": 9,
   "starts": {
    "an_hour": 12,
    "left": 11,
@@ -391,7 +393,7 @@
    "current_authored_state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "current_authored_edit_seq": 0,
    "style_version_id": "00000000-0000-0000-0000-000000000006",
-   "revision": 1,
+   "revision": 2,
    "availability": "available",
    "unavailable_reason": null,
    "source_attachments": [],
@@ -563,6 +565,8 @@
    }
   ],
   "left_out": [],
+  "look": null,
+  "setting": null,
   "refusal": null,
   "model_name": "DeepSeek V4 Flash",
   "execution": null,
@@ -750,7 +754,7 @@
    "current_authored_state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "current_authored_edit_seq": 0,
    "style_version_id": "00000000-0000-0000-0000-000000000006",
-   "revision": 1,
+   "revision": 2,
    "availability": "available",
    "unavailable_reason": null,
    "source_attachments": [],
@@ -832,6 +836,8 @@
   "left_out": [
    "two cafes"
   ],
+  "look": null,
+  "setting": null,
   "refusal": null,
   "model_name": "Nemotron 3 Super 120B",
   "execution": null,
@@ -953,6 +959,8 @@
   "entry": null,
   "made": [],
   "left_out": [],
+  "look": null,
+  "setting": null,
   "refusal": {
    "code": "kind_not_drafted",
    "detail": "No kind of world was drafted from these words that people could live, walk and work in.",

@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { NEVER_DRAFTS, attachWorldSentence, sentenceOffered } from '../src/composition/world-sentence.js';
 import { fill, say } from '../src/ui/copy.js';
 import { buildWorldRecipes } from '../src/ui/world-recipes.js';
-import { buildWorldSentence, madeWords, refusedNowWords, spendWords } from '../src/ui/world-sentence.js';
+import { buildWorldSentence, madeWords, refusedNowWords, spendWords, takenWords } from '../src/ui/world-sentence.js';
 import {
   WorldMakingClient,
   parseWorldDraftOffer,
@@ -47,7 +47,7 @@ const wire = (state: string, extra: Record<string, unknown> = {}) => ({
   draft_id: DRAFT, state, description: state === 'ready' || state === 'refused' ? '' : WORDS,
   started_at: '2026-10-10T12:00:00Z', elapsed_seconds: 4,
   poll_after_seconds: state === 'ready' || state === 'refused' ? null : 3, deadline_seconds: 240,
-  tool: null, entry: null, made: [], left_out: [], refusal: null, model_name: null, execution: null,
+  tool: null, entry: null, made: [], left_out: [], look: null, setting: null, refusal: null, model_name: null, execution: null,
   refusals: REFUSALS, ...extra,
 });
 
@@ -414,6 +414,43 @@ describe('the one box', () => {
     await settle();
     expect(h.open).toHaveBeenCalledTimes(1);
     expect((h.open.mock.calls[0] as unknown[])[0]).toMatchObject({ title: 'A busy harbour', worldId: 'world:generated-harbour' });
+  });
+
+  it('says what was taken from the words beside the words that chose it, and where it is changed', async () => {
+    const dressed = parseWorldMakingDraft({
+      ...ready,
+      look: { pack_id: 'exulanica.toon-town', title: 'Toon town', words: ['drawn like a cartoon'] },
+      setting: {
+        parts: [{ axis: 'sky', key: 'dusk', title: 'Dusk' }, { axis: 'ground', key: 'sea', title: 'By the sea' }],
+        words: ['at dusk', 'by the sea'],
+      },
+    });
+    expect(dressed.look).toEqual({ packId: 'exulanica.toon-town', title: 'Toon town', words: ['drawn like a cartoon'] });
+    expect(dressed.setting!.parts.map((part) => [part.axis, part.key])).toEqual([['sky', 'dusk'], ['ground', 'sea']]);
+    const h = box([dressed]);
+    h.type(WORDS);
+    h.make.click();
+    await settle();
+    await h.tick();
+    const taken = h.built.root.querySelector<HTMLElement>('.world-sentence-taken')!;
+    expect(taken.hidden).toBe(false);
+    expect(taken.textContent).toBe(
+      'Drawn as Toon town, for your words \u201cdrawn like a cartoon\u201d. '
+      + 'Set in: Dusk, By the sea, for your words \u201cat dusk\u201d, \u201cby the sea\u201d. You can change this later in Design.');
+    // One of the two alone is said alone; neither, and the line is not shown.
+    expect(takenWords(parseWorldMakingDraft({ ...ready, setting: { parts: [{ axis: 'sky', key: 'dusk', title: 'Dusk' }], words: ['at dusk'] } })))
+      .toBe('Set in: Dusk, for your words \u201cat dusk\u201d. You can change this later in Design.');
+    expect(takenWords(parseWorldMakingDraft(ready))).toBe('');
+    const plain = box([parseWorldMakingDraft(ready)]);
+    plain.type(WORDS);
+    plain.make.click();
+    await settle();
+    await plain.tick();
+    expect(plain.built.root.querySelector<HTMLElement>('.world-sentence-taken')!.hidden).toBe(true);
+    // A taken setting names a part; an answer from a server that takes none carries neither member.
+    expect(() => parseWorldMakingDraft({ ...ready, setting: { parts: [], words: [] } })).toThrow('taken setting');
+    const { look: _look, setting: _setting, ...older } = ready as Record<string, unknown>;
+    expect([parseWorldMakingDraft(older).look, parseWorldMakingDraft(older).setting]).toEqual([null, null]);
   });
 
   it('shows no line for what was left out when nothing was', async () => {

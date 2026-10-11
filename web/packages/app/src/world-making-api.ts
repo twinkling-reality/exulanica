@@ -30,6 +30,20 @@ export interface MadePart {
   readonly boxMm: readonly [number, number, number] | null;
 }
 
+/** The look the made world is drawn in because the words asked for it. */
+export interface TakenLook {
+  readonly packId: string;
+  readonly title: string;
+  /** The person's own words that chose it. */
+  readonly words: readonly string[];
+}
+
+/** The named parts of a setting the made world stands in because the words asked for them. */
+export interface TakenSetting {
+  readonly parts: readonly { readonly axis: string; readonly key: string; readonly title: string }[];
+  readonly words: readonly string[];
+}
+
 export interface WorldMakingRefusal {
   readonly code: string;
   readonly detail: string;
@@ -51,6 +65,10 @@ export interface WorldMakingDraft {
   readonly made: readonly MadePart[];
   /** What the words asked for that the made world does not say, each the person's own words. */
   readonly leftOut: readonly string[];
+  /** What the job took from the words for how the world is drawn and where it stands; null where
+   * the words asked for none, and on a server that takes none. */
+  readonly look: TakenLook | null;
+  readonly setting: TakenSetting | null;
   readonly refusal: WorldMakingRefusal | null;
   /** Every code a draft answers with, and what each means. */
   readonly refusals: readonly { readonly code: string; readonly meaning: string }[];
@@ -139,6 +157,34 @@ export function parseWorldDraftOffer(raw: unknown): WorldDraftOffer {
   });
 }
 
+function phrases(value: unknown, what: string): readonly string[] {
+  return Object.freeze(list(value, what).map((one) => text(one, what)));
+}
+
+function takenLook(value: unknown): TakenLook | null {
+  if (value === null || value === undefined) return null;
+  const look = object(value, 'taken look');
+  return Object.freeze({
+    packId: text(look['pack_id'], 'taken look'), title: text(look['title'], 'taken look'),
+    words: phrases(look['words'], 'taken look words'),
+  });
+}
+
+function takenSetting(value: unknown): TakenSetting | null {
+  if (value === null || value === undefined) return null;
+  const setting = object(value, 'taken setting');
+  const parts = list(setting['parts'], 'taken setting parts').map((one) => {
+    const part = object(one, 'taken setting part');
+    return Object.freeze({
+      axis: text(part['axis'], 'taken setting part'), key: text(part['key'], 'taken setting part'),
+      title: text(part['title'], 'taken setting part'),
+    });
+  });
+  // A setting that was taken names at least one part.
+  if (parts.length === 0) fail('taken setting parts');
+  return Object.freeze({ parts: Object.freeze(parts), words: phrases(setting['words'], 'taken setting words') });
+}
+
 export function parseWorldMakingDraft(raw: unknown): WorldMakingDraft {
   const held = object(raw, 'draft of a world');
   const state = held['state'] as WorldMakingState;
@@ -175,6 +221,8 @@ export function parseWorldMakingDraft(raw: unknown): WorldMakingDraft {
       });
     })),
     leftOut: Object.freeze(list(held['left_out'], 'left out phrases').map((one) => text(one, 'left out phrase'))),
+    look: takenLook(held['look']),
+    setting: takenSetting(held['setting']),
     refusal: refusal === null ? null : Object.freeze({
       code: text(refusal['code'], 'refusal code'),
       detail: text(refusal['detail'], 'refusal detail'),

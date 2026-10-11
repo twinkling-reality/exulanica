@@ -14,7 +14,8 @@
  * A person says the world they want and presses once. The route answers at once, so the page
  * follows the draft and says which step it is at with the time the server counts (never the
  * page's own clock): working out how to make it, drafting, making. Ready shows the world's title,
- * what is in it and what the words asked for that is not in it yet, each from the answer, with
+ * what is in it, what was taken from the words for its look and its setting beside the words
+ * that chose it, and what the words asked for that is not in it yet, each from the answer, with
  * one press to open it. Refused says why in the server's closed list's words, with the check's
  * own sentence where a check refused, and the words stay in the field: the server keeps none of
  * a refused draft's. No kind, preset or value is shown on the way. One plain line says what
@@ -41,6 +42,23 @@ export interface WorldSentencePanel {
 /** The labels of what was made, each once, in the order made: "farmhouse, barn, duck pond". */
 export function madeWords(draft: WorldMakingDraft): string {
   return [...new Set(draft.made.map((part) => part.label))].join(', ');
+}
+
+const quoted = (words: readonly string[]): string => words.map((phrase) => `\u201c${phrase}\u201d`).join(', ');
+
+/**
+ * What the job took from the words for how the world is drawn and where it stands, each beside
+ * the person's own words that chose it, and where it is changed; empty where it took nothing.
+ */
+export function takenWords(draft: WorldMakingDraft): string {
+  const said: string[] = [];
+  if (draft.look !== null) said.push(fill('worldSentence.taken.look', { look: draft.look.title, words: quoted(draft.look.words) }));
+  if (draft.setting !== null) {
+    said.push(fill('worldSentence.taken.setting', {
+      parts: draft.setting.parts.map((part) => part.title).join(', '), words: quoted(draft.setting.words),
+    }));
+  }
+  return said.length === 0 ? '' : [...said, say('worldSentence.taken.change')].join(' ');
 }
 
 /** What a draft may spend, in one line, from the offer's own figures. */
@@ -88,6 +106,7 @@ export function buildWorldSentence(options: {
   const status = el('p', { class: 'world-description-status world-sentence-status', role: 'status', 'aria-live': 'polite', tabindex: '-1' });
   const madeLine = el('p', { class: 'world-sentence-made', hidden: true });
   const leftOutLine = el('p', { class: 'world-description-not-supported world-sentence-left-out', hidden: true });
+  const takenLine = el('p', { class: 'world-sentence-taken', hidden: true });
   const open = el('button', { type: 'button', class: 'world-description-use world-sentence-open', text: say('worldSentence.open'), hidden: true });
   const follow = el('button', { type: 'button', class: 'world-description-use world-sentence-follow', text: say('worldSentence.follow'), hidden: true });
   const toRecipes = el('button', { type: 'button', class: 'world-description-use world-sentence-recipes', text: say('worldSentence.recipes'), hidden: true });
@@ -101,7 +120,7 @@ export function buildWorldSentence(options: {
     spend,
     make,
     status,
-    el('div', { class: 'world-description-result' }, [follow, madeLine, leftOutLine, open, toRecipes]),
+    el('div', { class: 'world-description-result' }, [follow, madeLine, takenLine, leftOutLine, open, toRecipes]),
   ]);
 
   let following: string | null = null;
@@ -121,7 +140,7 @@ export function buildWorldSentence(options: {
 
   const clearResult = (): void => {
     made = null;
-    for (const line of [madeLine, leftOutLine, open, follow]) line.hidden = true;
+    for (const line of [madeLine, takenLine, leftOutLine, open, follow]) line.hidden = true;
   };
 
   /**
@@ -168,6 +187,8 @@ export function buildWorldSentence(options: {
       madeLine.hidden = parts === '';
       leftOutLine.textContent = fill('worldSentence.leftOut', { phrases: answer.leftOut.map((phrase) => `“${phrase}”`).join(', ') });
       leftOutLine.hidden = answer.leftOut.length === 0;
+      takenLine.textContent = takenWords(answer);
+      takenLine.hidden = takenLine.textContent === '';
       open.hidden = false;
       field.value = '';
       reflect();

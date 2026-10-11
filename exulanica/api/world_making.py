@@ -31,14 +31,23 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any, Final
 
 from exulanica.api.kind_drafts import KindDraft, KindDrafts, Opener, drafted_kind
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import BudgetExceededError, ModelError
-from exulanica.selection import kind_drafting, tool_choosing, world_drafting
+from exulanica.selection import (
+    kind_drafting,
+    look_choosing,
+    setting_choosing,
+    tool_choosing,
+    world_drafting,
+)
 from exulanica.selection.calls import CallLog
+from exulanica.selection.look_choosing import LookOption, choose_look
+from exulanica.selection.setting_choosing import SettingAxis, SettingOption, choose_setting
 from exulanica.selection.tool_choosing import choose_tool
 from exulanica.selection.world_drafting import (
     SentDescription,
@@ -47,11 +56,17 @@ from exulanica.selection.world_drafting import (
 )
 from exulanica.world import specification_source
 from exulanica.world.composers import GeneratedWorldRefused
+from exulanica.world.creation_look import name_creation_look
+from exulanica.world.errors import StyleWriteBusy
 from exulanica.world.kinds.document import KindDocument
 from exulanica.world.kinds.library import town_adapter
 from exulanica.world.kinds.samples import SiteRefused
 from exulanica.world.kinds.worker import KindWorkWaiting, WorkerComposer
+from exulanica.world.models import StylePackBinding
 from exulanica.world.saved_entries import SavedWorldEntryRepository
+from exulanica.world.style_pack_library import style_pack_context, style_pack_library
+from exulanica.world.style_packs import StylePackRefused
+from exulanica.world.world_settings import SettingRefused, bound_setting, setting_parts
 from exulanica.world.world_tools import WorldTool, tool_for_unsure, world_tools
 from exulanica.world.worlds import WorldLimitReached, WorldsReadOnly
 
@@ -59,6 +74,7 @@ __all__ = [
     "STAGES",
     "WORLD_DRAFT_CODES",
     "calls_at_most",
+    "guarded",
     "make_world",
     "site_parts",
     "town_parts",
@@ -100,7 +116,186 @@ def calls_at_most() -> int:
         "kind": kind_drafting.DRAFT_ATTEMPTS,
         "specification": world_drafting.DRAFT_ATTEMPTS,
     }
-    return tool_choosing.ATTEMPTS + max(drafting[tool.drafter] for tool in world_tools())
+    return (
+        tool_choosing.ATTEMPTS
+        + max(drafting[tool.drafter] for tool in world_tools())
+        + look_choosing.ATTEMPTS
+        + setting_choosing.ATTEMPTS
+    )
+
+
+Span = tuple[int, int]
+
+
+def guarded(
+    look: str | None,
+    look_words_at: Sequence[Span],
+    parts: Mapping[str, str],
+    words_at: Sequence[Span],
+) -> tuple[str | None, dict[str, str]]:
+    """What the job TAKES of the two steps' answers: stricter than what a person is offered,
+    since nobody picks. A part invented is worse than a part missed, so:
+
+    *   the parts of a setting are taken only when the answer copied at least as many phrases as
+        it names parts, and otherwise none is: one phrase list serves every axis, so a single
+        phrase can carry a part for each axis and only one of them be the person's;
+    *   a look is not taken when every phrase that chose it overlaps a phrase that chose a kept
+        part of the setting: words about the hour or the weather ask for a sky, not a look.
+
+    It counts phrases and binds none to an axis, so it bounds an invention and does not prove
+    each part: an answer padded with as many phrases as parts passes it."""
+    kept = dict(parts) if len(words_at) >= len(parts) else {}
+
+    def overlaps(one: Span, other: Span) -> bool:
+        return one[0] < other[1] and other[0] < one[1]
+
+    weather = bool(kept and look_words_at) and all(
+        any(overlaps(mine, theirs) for theirs in words_at) for mine in look_words_at
+    )
+    return (None if weather else look), kept
+
+
+@dataclass(frozen=True, slots=True)
+class _Taken:
+    """The look and the parts of a setting the job took from the words, as a draft says them."""
+
+    look: dict[str, Any] | None = None
+    setting: dict[str, Any] | None = None
+    #: Where in the words as sent the phrases stand that chose what was taken.
+    spans: tuple[Span, ...] = ()
+
+    @property
+    def pack_id(self) -> str | None:
+        return None if self.look is None else str(self.look["pack_id"])
+
+    @property
+    def parts(self) -> dict[str, str]:
+        chosen = [] if self.setting is None else self.setting["parts"]
+        return {str(part["axis"]): str(part["key"]) for part in chosen}
+
+
+def _take(client: ModelClient, sent: SentDescription, log: CallLog) -> _Taken:
+    """Ask the look chooser and the setting chooser what the words as sent ask for, as the town's
+    draft route asks them, and take what the guards leave. Either step failing, being refused or
+    answering none takes nothing and never fails the draft, an allowance that ran out included:
+    the draft itself is paid for and good, and a world in the default look is better than none."""
+    # Only the looks the step's recorded runs were measured with, as the town's draft route
+    # offers it (the library file lists them): any other pack is a look a person chooses.
+    library = style_pack_library()
+    packs = {pack.pack_id: pack for pack in library.packs if pack.pack_id in library.chooser_offers}
+    listed = setting_parts()
+    look, look_at = None, ()
+    parts: Mapping[str, str] = {}
+    words_at: Sequence[Span] = ()
+    if packs:
+        try:
+            choice = choose_look(
+                client.with_attempts(log.attempt),
+                sent.text,
+                tuple(LookOption(p.pack_id, p.title, p.description) for p in packs.values()),
+                placeholders=sent.placeholders,
+                log=log,
+            )
+            look, look_at = choice.look, choice.look_words_at
+        except Exception as failed:
+            _LOG.warning("the look chooser took nothing: %s", type(failed).__qualname__)
+    if listed.parts:
+        try:
+            answer = choose_setting(
+                client.with_attempts(log.attempt),
+                sent.text,
+                tuple(SettingAxis(key, title) for key, title in listed.axes),
+                tuple(SettingOption(**part) for part in listed.listed()),
+                placeholders=sent.placeholders,
+                log=log,
+            )
+            parts, words_at = answer.parts, answer.words_at
+        except Exception as failed:
+            _LOG.warning("the setting chooser took nothing: %s", type(failed).__qualname__)
+    kept_look, kept_parts = guarded(look, look_at, parts, words_at)
+    titles = {(part["axis"], part["key"]): part["title"] for part in listed.listed()}
+    try:
+        # The person's own words, every saved name put back; a phrase that cuts a replaced name
+        # cannot be said back, and what it chose is then not taken either.
+        said_look = [sent.typed_words(start, end) for start, end in look_at]
+        said_parts = [sent.typed_words(start, end) for start, end in words_at]
+    except Exception as failed:
+        _LOG.warning("a chosen phrase could not be said back: %s", type(failed).__qualname__)
+        return _Taken()
+    return _Taken(
+        look=None
+        if kept_look is None
+        else {"pack_id": kept_look, "title": packs[kept_look].title, "words": said_look},
+        setting=None
+        if not kept_parts
+        else {
+            "parts": [
+                {"axis": axis, "key": key, "title": titles[(axis, key)]}
+                for axis, key in kept_parts.items()
+            ],
+            "words": said_parts,
+        },
+        spans=(*(look_at if kept_look is not None else ()), *(words_at if kept_parts else ())),
+    )
+
+
+def _left_out(
+    sent: SentDescription, spans: Sequence[Span], taken: Sequence[Span]
+) -> tuple[str, ...]:
+    """The phrases of the description nothing in the made world says, in the person's own words.
+    A phrase that chose a look or a part of the setting the job took is said by that and is not
+    left out. A phrase that cuts a replaced name cannot be said back and is dropped, never the
+    failure of a draft that is paid for."""
+    said = []
+    for start, end in spans:
+        if any(start < theirs_end and theirs_start < end for theirs_start, theirs_end in taken):
+            continue
+        try:
+            said.append(sent.typed_words(start, end))
+        except Exception as failed:
+            _LOG.warning("a left-out phrase could not be said back: %s", type(failed).__qualname__)
+    return tuple(said)
+
+
+def _dress(
+    opened: Opener,
+    draft: KindDraft,
+    store: Any,
+    guest: bool,
+    actor: uuid.UUID,
+    created: Any,
+    taken: _Taken,
+) -> _Taken:
+    """Name the look the made world is drawn in, as ``POST /worlds/generated`` names a town's: the
+    look that was taken or else the library's default, with the parts of the setting that were
+    taken composed for that pack. Answers what the world then wears. A setting the pack cannot be
+    drawn in is left off and the world keeps the look; a look that cannot be written now leaves
+    the world as made, in the default look. Never a refusal: the world exists."""
+    library = style_pack_library()
+    packs = {pack.pack_id: pack for pack in library.packs}
+    pack = packs.get(taken.pack_id or "", library.default_pack)
+    setting = None
+    worn = taken
+    if taken.parts:
+        chain = library.chain(pack.manifest_sha256)
+        try:
+            setting = (
+                None
+                if chain is None
+                else bound_setting(chain, style_pack_context(), chosen=taken.parts)
+            )
+        except (SettingRefused, StylePackRefused) as refused:
+            _LOG.warning("a taken setting was left off: %s", type(refused).__qualname__)
+        if setting is None:
+            worn = _Taken(look=taken.look)
+    binding = StylePackBinding(pack.pack_id, pack.version, pack.manifest_sha256, setting=setting)
+    try:
+        with opened() as connection:
+            entries = SavedWorldEntryRepository(connection, draft.workspace_id, store, guest=guest)
+            name_creation_look(entries, created, binding, actor)
+    except StyleWriteBusy:
+        return _Taken()
+    return worn
 
 
 def site_parts(kind: KindDocument, drawing: object) -> tuple[dict[str, Any], ...]:
@@ -174,6 +369,24 @@ def _model_refusal(failed: ModelError) -> dict[str, Any]:
             "Try again in a moment."
         ),
     }
+
+
+def _worn(
+    opened: Opener,
+    draft: KindDraft,
+    store: Any,
+    guest: bool,
+    actor: uuid.UUID,
+    created: Any,
+    taken: _Taken,
+) -> _Taken:
+    """What the made world wears once its look is named, or nothing where naming it failed: the
+    world exists, so whatever happens here it is ready."""
+    try:
+        return _dress(opened, draft, store, guest, actor, created, taken)
+    except Exception as failed:
+        _LOG.warning("a made world's look was not named: %s", type(failed).__qualname__)
+        return _Taken()
 
 
 def make_world(
@@ -286,6 +499,7 @@ def _make_place(
     if outcome is None or outcome.kind is None:
         return
     kind = outcome.kind
+    taken = _take(client, sent, log)
     if drafts.closing:
         # The server is stopping: nothing new is composed, and nothing was made.
         drafts.finish(draft, state="refused", refusal=dict(_FAILED), calls=log.calls)
@@ -305,7 +519,15 @@ def _make_place(
                 fixed_world_id=fixed_world_id,
             )
 
-    created = _saved(draft, drafts, log, make)
+    def made_or_once_more() -> Any:
+        # A worker busy or slow for a moment is asked once more before a paid draft is discarded:
+        # its finished work is kept, so the second ask usually reads it.
+        try:
+            return make()
+        except KindWorkWaiting:
+            return make()
+
+    created = _saved(draft, drafts, log, made_or_once_more)
     if created is None:
         return
     # The world exists from here on, so the draft ends ready whatever follows.
@@ -317,11 +539,14 @@ def _make_place(
     except Exception as failed:
         _LOG.warning("a made world's parts were not counted: %s", type(failed).__qualname__)
         made = site_parts(kind, None)
+    worn = _worn(opened, draft, store, guest, actor, created, taken)
     drafts.made(
         draft,
         entry_id=created.entry_id,
         made=made,
         left_out=(),
+        look=worn.look,
+        setting=worn.setting,
         calls=log.calls,
         model_id=outcome.model_id,
     )
@@ -379,7 +604,8 @@ def _make_town(
     )
     # Said before the making, so a world that was made is never then reported as not made.
     made = town_parts()
-    left_out = tuple(sent.typed_words(start, end) for start, end in outcome.not_supported_at)
+    taken = _take(client, sent, log)
+    left_out = _left_out(sent, outcome.not_supported_at, taken.spans)
     if drafts.closing:
         refused(_FAILED)
         return
@@ -399,11 +625,14 @@ def _make_town(
     created = _saved(draft, drafts, log, make)
     if created is None:
         return
+    worn = _worn(opened, draft, store, guest, actor, created, taken)
     drafts.made(
         draft,
         entry_id=created.entry_id,
         made=made,
         left_out=left_out,
+        look=worn.look,
+        setting=worn.setting,
         calls=log.calls,
         model_id=outcome.model_id,
     )

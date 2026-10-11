@@ -32,11 +32,20 @@ from exulanica.api import world_making
 from exulanica.api.routes import world_making as world_making_routes
 from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.transport import HttpResponse
-from exulanica.selection import kind_drafting, tool_choosing, world_drafting
+from exulanica.selection import (
+    kind_drafting,
+    look_choosing,
+    setting_choosing,
+    tool_choosing,
+    world_drafting,
+)
 from exulanica.selection.tool_choosing import CHOOSER_ROLE
 from exulanica.world import saved_entries, specification_source, worlds
 from exulanica.world.generated_worlds import generation_receipt
 from exulanica.world.kinds.library import town_adapter
+from exulanica.world.repository import WorldStyleRepository
+from exulanica.world.style_pack_library import style_pack_library
+from exulanica.world.world_settings import setting_parts
 from exulanica.world.worlds import WorldsReadOnly
 from fastapi.testclient import TestClient
 
@@ -67,6 +76,22 @@ def _json(value: Any) -> HttpResponse:
 
 def _tool(key: str | None, *words: str) -> HttpResponse:
     return _json({"tool": key, "tool_words": list(words)})
+
+
+def _look(pack_id: str | None, *words: str) -> HttpResponse:
+    """The look chooser's answer: a listed look and the words that chose it, or none."""
+    return _json({"look": pack_id, "look_words": list(words)})
+
+
+def _setting(*words: str, **parts: str) -> HttpResponse:
+    """The setting chooser's answer: a part for the axes named, and the words that chose them."""
+    axes = {key: parts.get(key) for key, _title in setting_parts().axes}
+    return _json({**axes, "words": list(words)})
+
+
+def _plain() -> list[HttpResponse]:
+    """The two steps' answers for words that ask for no look and no setting."""
+    return [_look(None), _setting()]
 
 
 def _town_form(**changes: Any) -> dict[str, Any]:
@@ -148,7 +173,7 @@ def _receipt(client: TestClient, entry: dict[str, Any]) -> dict[str, Any]:
 def test_a_sentence_becomes_a_place_made_with_no_kind_kept(drafts, fixed_identities):
     app, transport = drafts
     transport.release.clear()
-    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm())])
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
     with app() as client:
         started = _start(client, FARM_WORDS)
         assert started.status_code == 202, started.text
@@ -188,7 +213,9 @@ def test_a_sentence_becomes_a_place_made_with_no_kind_kept(drafts, fixed_identit
         assert any(made["form"] == "structure" and made["box_mm"] for made in ended["made"])
         # Both steps' calls are shown with what they cost: the chooser's, then the drafter's.
         roles = [call["role"] for call in ended["execution"]["calls"]]
-        assert roles == ["world_tool_chooser", "kind_drafter"]
+        assert roles == ["world_tool_chooser", "kind_drafter", "look_chooser", "setting_chooser"]
+        # The words asked for no look and no setting, and none was taken.
+        assert (ended["look"], ended["setting"]) == (None, None)
         # The page reads the made world's drawing next: it was kept with the world.
         site = client.get(
             f"/world/versions/{entry['authored_version_id']}/site?world_id={entry['world_id']}",
@@ -199,7 +226,7 @@ def test_a_sentence_becomes_a_place_made_with_no_kind_kept(drafts, fixed_identit
 
 def test_where_the_chooser_is_unsure_the_place_tool_is_taken_and_said(drafts, fixed_identities):
     app, transport = drafts
-    transport.responses.extend([_tool(None), _brief(_farm())])
+    transport.responses.extend([_tool(None), _brief(_farm()), *_plain()])
     with app() as client:
         ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
         assert ended["state"] == "ready", ended
@@ -211,7 +238,11 @@ def test_a_sentence_that_asks_for_a_town_is_made_by_the_town_tool(drafts, fixed_
     app, transport = drafts
     left_out = ["two cafes"]
     transport.responses.extend(
-        [_tool("town", "a quiet town"), _json(_town_form(fit="part", not_supported=left_out))]
+        [
+            _tool("town", "a quiet town"),
+            _json(_town_form(fit="part", not_supported=left_out)),
+            *_plain(),
+        ]
     )
     with app() as client:
         ended = _ended(client, _start(client, TOWN_WORDS).json()["draft_id"])
@@ -264,7 +295,7 @@ def test_words_that_ask_for_no_place_are_refused_by_the_town_tool_by_name(drafts
 def test_a_world_s_draft_is_read_by_its_own_person_and_its_own_route_only(drafts, fixed_identities):
     app, transport = drafts
     transport.release.clear()
-    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm())])
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
     with app() as client:
         draft_id = _start(client, FARM_WORDS).json()["draft_id"]
         assert transport.arrived.wait(10), "the job never asked a model"
@@ -296,7 +327,7 @@ def _offer(client: TestClient, token: str = TOKEN) -> dict[str, Any]:
 def test_the_offer_says_what_a_draft_may_spend_before_a_word_is_typed(drafts, fixed_identities):
     app, transport = drafts
     transport.release.clear()
-    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm())])
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
     with app() as client:
         registry = client.app.state.services.kind_drafts
         registry.starts_per_hour = 2
@@ -305,7 +336,9 @@ def test_the_offer_says_what_a_draft_may_spend_before_a_word_is_typed(drafts, fi
         # The most calls a draft makes is counted from the steps' own bounds: the chooser's call
         # and its repair, then the attempts of whichever tool's drafter makes the most.
         most = max(kind_drafting.DRAFT_ATTEMPTS, world_drafting.DRAFT_ATTEMPTS)
-        assert before["calls_at_most"] == tool_choosing.ATTEMPTS + most
+        assert before["calls_at_most"] == (
+            tool_choosing.ATTEMPTS + most + look_choosing.ATTEMPTS + setting_choosing.ATTEMPTS
+        )
         assert before["starts"] == {"an_hour": 2, "left": 2, "retry_after_seconds": None}
         assert before["description_characters"] == 1000
         assert before["running_draft_id"] is None
@@ -330,7 +363,7 @@ def test_the_offer_says_what_a_draft_may_spend_before_a_word_is_typed(drafts, fi
         after = _offer(client)
         assert (after["offered"], after["running_draft_id"]) == (True, None)
         # The hour's starts used up are said before a word is typed, with when the next frees.
-        transport.responses.extend([_tool("place", "a small farm"), _brief(_farm())])
+        transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
         _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
         spent = _offer(client)
         assert (spent["offered"], spent["code"]) == (False, "kind_draft_limit")
@@ -351,6 +384,8 @@ def test_a_server_that_takes_no_kind_from_a_person_drafts_no_world_and_says_so(d
         offer = _offer(client)
         assert (offer["offered"], offer["code"]) == (False, "kinds_from_people_not_offered")
         assert offer["code"] in {code["code"] for code in offer["refusals"]}
+        # Said first and to everybody, as the kinds library says it: also to one who may not draft.
+        assert _offer(client, NO_MODEL_TOKEN)["code"] == "kinds_from_people_not_offered"
         assert _count(client, "world_identity") == 0
     assert not transport.arrived.is_set()
     assert transport.requests == []
@@ -360,7 +395,7 @@ def test_a_workspace_at_its_world_limit_is_told_before_any_model_is_asked(
     drafts, fixed_identities, monkeypatch
 ):
     app, transport = drafts
-    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm())])
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
     with app() as client:
         assert _ended(client, _start(client, FARM_WORDS).json()["draft_id"])["state"] == "ready"
         asked = len(transport.requests)
@@ -405,7 +440,7 @@ def test_a_guest_makes_a_world_through_the_route_and_is_held_to_a_guest_s_figure
     # A signed-in person's figures, which a guest is never read by.
     monkeypatch.setenv("EXULANICA_DRAFT_STARTS_AN_HOUR", "9")
     monkeypatch.setenv("EXULANICA_WORLDS_HELD", "9")
-    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm())])
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
     with app(guest=True) as client:
         assert _offer(client)["starts"] == {"an_hour": 2, "left": 2, "retry_after_seconds": None}
         ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
@@ -427,7 +462,7 @@ def test_a_making_that_is_refused_ends_refused_by_name_and_leaves_nothing_behind
     """The world limit asked again where it holds, at the registration: reached between the
     start and the making, the making writes nothing and the draft says why with what it cost."""
     app, transport = drafts
-    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm())])
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
     with app() as client:
         assert _ended(client, _start(client, FARM_WORDS).json()["draft_id"])["state"] == "ready"
         held = _count(client, "world_identity")
@@ -436,7 +471,7 @@ def test_a_making_that_is_refused_ends_refused_by_name_and_leaves_nothing_behind
         monkeypatch.setenv("EXULANICA_WORLDS_HELD", str(held + 1))
         transport.release.clear()
         transport.arrived.clear()
-        transport.responses.extend([_tool("place", "a small farm"), _brief(_farm())])
+        transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
         draft_id = _start(client, FARM_WORDS).json()["draft_id"]
         assert transport.arrived.wait(10), "the job never asked a model"
         # The limit falls while the model reasons.
@@ -445,7 +480,7 @@ def test_a_making_that_is_refused_ends_refused_by_name_and_leaves_nothing_behind
         ended = _ended(client, draft_id)
         assert (ended["state"], ended["refusal"]["code"]) == ("refused", "world_limit_reached")
         assert ended["entry"] is None and ended["made"] == []
-        assert len(ended["execution"]["calls"]) == 2
+        assert len(ended["execution"]["calls"]) == 4
         assert _count(client, "world_identity") == held
         assert _count(client, "world_generation_receipt") == receipts
         assert _count(client, "saved_world_entry") == entries
@@ -463,7 +498,7 @@ def test_a_world_that_was_made_ends_ready_whatever_follows_its_making(
         return counted(kind, drawing)
 
     monkeypatch.setattr(world_making, "site_parts", failing)
-    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm())])
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
     with app() as client:
         ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
         # Never "say it again" for a world that exists: ready, with its parts by name and no box.
@@ -483,7 +518,7 @@ def test_a_chooser_that_fails_for_any_reason_leaves_the_unsure_tool_standing(
         raise RuntimeError("the chooser's own fault, no model's")
 
     monkeypatch.setattr(world_making, "choose_tool", broken)
-    transport.responses.extend([_brief(_farm())])
+    transport.responses.extend([_brief(_farm()), *_plain()])
     with app() as client:
         ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
         assert ended["state"] == "ready", ended
@@ -533,7 +568,7 @@ def test_every_call_of_a_draft_is_reserved_and_settled_against_the_workspace_s_g
             )
         )
     durable = DurableSpending(database, witness, holder=holder_label("world-drafts"))
-    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm())])
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
     with app(spending=durable) as client:
         assert _offer(client)["offered"] is True
         ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
@@ -544,7 +579,7 @@ def test_every_call_of_a_draft_is_reserved_and_settled_against_the_workspace_s_g
             "select state, grant_id from spending_reservation where workspace_id = %s",
             (workspace,),
         ).fetchall()
-    assert len(reservations) == len(calls) == len(transport.requests) == 2
+    assert len(reservations) == len(calls) == len(transport.requests) == 4
     assert {row["state"] for row in reservations} == {"settled"}
     assert {row["grant_id"] for row in reservations} <= grants
 
@@ -592,7 +627,7 @@ def test_the_page_s_fixture_is_what_the_draft_routes_answer(drafts, fixed_identi
     with app() as client:
         served["offer"] = _as_served(_offer(client))
         transport.release.clear()
-        transport.responses.extend([_tool("place", "a small farm"), _brief(_farm())])
+        transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
         started = _start(client, FARM_WORDS).json()
         served["started"] = _as_served(started)
         assert transport.arrived.wait(10), "the job never asked a model"
@@ -603,6 +638,7 @@ def test_the_page_s_fixture_is_what_the_draft_routes_answer(drafts, fixed_identi
             [
                 _tool("town", "a quiet town"),
                 _json(_town_form(fit="part", not_supported=["two cafes"])),
+                *_plain(),
             ]
         )
         served["ready_town"] = _as_served(
@@ -621,3 +657,219 @@ def test_the_page_s_fixture_is_what_the_draft_routes_answer(drafts, fixed_identi
         "what the draft routes answer moved: write the snapshot again "
         f"({WRITE_SERVED}=1 with this test), run the page's tests, and commit both with the change"
     )
+
+
+def _wears(client: TestClient, entry: dict[str, Any]) -> tuple[str | None, list[dict[str, str]]]:
+    """The look the world's appearance names and the named parts of its setting, read from the
+    world's own current appearance."""
+    database = client.app.state.services.database
+    workspace = _workspace()
+    with database.session(workspace) as connection:
+        pack = WorldStyleRepository(connection, workspace, world_id=entry["world_id"]).current()
+    binding = pack.style_pack
+    if binding is None:
+        return None, []
+    setting = [] if binding.setting is None else json.loads(binding.setting)["parts"]
+    return binding.pack_id, setting
+
+
+TOON = "exulanica.toon-town"
+
+
+def test_what_the_words_ask_for_is_taken_said_in_their_words_and_worn_by_the_world(
+    drafts, fixed_identities
+):
+    """The look and the setting are taken, not offered: the draft says each with the person's own
+    words, and the made world's appearance names them, for a place and a town alike."""
+    app, transport = drafts
+    words = FARM_WORDS + ", at dusk by the sea, drawn like a cartoon"
+    transport.responses.extend(
+        [
+            _tool("place", "a small farm"),
+            _brief(_farm()),
+            _look(TOON, "drawn like a cartoon"),
+            _setting("at dusk", "by the sea", sky="dusk", ground="sea"),
+        ]
+    )
+    with app() as client:
+        ended = _ended(client, _start(client, words).json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        titles = {pack.pack_id: pack.title for pack in style_pack_library().packs}
+        assert ended["look"] == {
+            "pack_id": TOON,
+            "title": titles[TOON],
+            "words": ["drawn like a cartoon"],
+        }
+        named = {(part["axis"], part["key"]): part["title"] for part in setting_parts().listed()}
+        assert ended["setting"] == {
+            "parts": [
+                {"axis": "sky", "key": "dusk", "title": named[("sky", "dusk")]},
+                {"axis": "ground", "key": "sea", "title": named[("ground", "sea")]},
+            ],
+            "words": ["at dusk", "by the sea"],
+        }
+        assert _wears(client, ended["entry"]) == (
+            TOON,
+            [{"axis": "sky", "key": "dusk"}, {"axis": "ground", "key": "sea"}],
+        )
+        # A town the same way.
+        town_words = TOWN_WORDS + " under an overcast sky"
+        transport.responses.extend(
+            [
+                _tool("town", "a quiet town"),
+                _json(_town_form()),
+                _look(None),
+                _setting("overcast sky", sky="overcast"),
+            ]
+        )
+        town = _ended(client, _start(client, town_words).json()["draft_id"])
+        assert town["state"] == "ready", town
+        assert town["look"] is None
+        assert [part["key"] for part in town["setting"]["parts"]] == ["overcast"]
+        default = style_pack_library().default_pack.pack_id
+        assert _wears(client, town["entry"]) == (default, [{"axis": "sky", "key": "overcast"}])
+
+
+def test_the_look_step_is_offered_only_the_looks_it_was_measured_with(drafts, fixed_identities):
+    """The library may hold a look the step never saw in a recorded run; the job offers it only
+    the ones the library file lists, as the town's draft route does."""
+    library = style_pack_library()
+    listed = set(library.chooser_offers)
+    others = {pack.pack_id for pack in library.packs} - listed
+    assert listed and others, "the library offers the step some of its looks and holds another"
+    app, transport = drafts
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
+    with app() as client:
+        assert _ended(client, _start(client, FARM_WORDS).json()["draft_id"])["state"] == "ready"
+    asked = [
+        json.dumps(request["payload"]["messages"])
+        for request in transport.requests
+        if "The looks:" in json.dumps(request["payload"]["messages"])
+    ]
+    assert len(asked) == 1
+    assert all(pack_id in asked[0] for pack_id in listed)
+    assert not any(pack_id in asked[0] for pack_id in others)
+
+
+def test_words_that_ask_for_nothing_make_a_world_in_the_default_look_with_no_setting(
+    drafts, fixed_identities
+):
+    app, transport = drafts
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
+    with app() as client:
+        ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
+        assert (ended["state"], ended["look"], ended["setting"]) == ("ready", None, None)
+        # Made already wearing a look, so a later change of the default restyles no made world.
+        assert _wears(client, ended["entry"]) == (style_pack_library().default_pack.pack_id, [])
+
+
+def test_one_phrase_carries_no_three_parts(drafts, fixed_identities):
+    """The answer the setting step gave a farm with wheat fields when it was measured on places
+    (night, wheat fields and snow, on the one phrase "wheat fields"): the job takes none of it,
+    since a part invented is worse than a part missed."""
+    assert world_making.guarded(None, (), {"sky": "night", "ground": "wheat_fields"}, [(3, 9)]) == (
+        None,
+        {},
+    )
+    app, transport = drafts
+    words = "a farm with a farmhouse, two barns, wheat fields and a duck pond"
+    transport.responses.extend(
+        [
+            _tool("place", "a farm"),
+            _brief(_farm()),
+            _look(None),
+            _setting("wheat fields", sky="night", ground="wheat_fields", cover="snow"),
+        ]
+    )
+    with app() as client:
+        ended = _ended(client, _start(client, words).json()["draft_id"])
+        assert (ended["state"], ended["setting"]) == ("ready", None)
+        assert _wears(client, ended["entry"])[1] == []
+
+
+def test_weather_words_ask_for_a_sky_and_never_for_a_look(drafts, fixed_identities):
+    """The look step took a look on "at dusk" when it was measured; the same words chose the
+    sky, so the job takes the sky and no look. Words of their own still choose a look."""
+    assert world_making.guarded("a.look", [(10, 17)], {"sky": "dusk"}, [(10, 17)]) == (
+        None,
+        {"sky": "dusk"},
+    )
+    assert world_making.guarded("a.look", [(20, 30)], {"sky": "dusk"}, [(10, 17)]) == (
+        "a.look",
+        {"sky": "dusk"},
+    )
+    assert world_making.guarded("a.look", [(20, 30)], {}, ()) == ("a.look", {})
+    app, transport = drafts
+    transport.responses.extend(
+        [
+            _tool("place", "a small farm"),
+            _brief(_farm()),
+            _look("exulanica.cozy-town", "at dusk"),
+            _setting("at dusk", sky="dusk"),
+        ]
+    )
+    with app() as client:
+        ended = _ended(client, _start(client, FARM_WORDS + ", at dusk").json()["draft_id"])
+        assert (ended["state"], ended["look"]) == ("ready", None)
+        assert [part["key"] for part in ended["setting"]["parts"]] == ["dusk"]
+
+
+def test_a_step_that_fails_takes_nothing_and_the_world_is_made_all_the_same(
+    drafts, fixed_identities
+):
+    app, transport = drafts
+    transport.responses.extend(
+        [
+            _tool("place", "a small farm"),
+            _brief(_farm()),
+            HttpResponse(status_code=500, text="the provider failed"),
+            HttpResponse(status_code=500, text="the provider failed"),
+        ]
+    )
+    with app() as client:
+        ended = _ended(client, _start(client, FARM_WORDS + ", at dusk").json()["draft_id"])
+        assert (ended["state"], ended["look"], ended["setting"]) == ("ready", None, None)
+        assert ended["entry"]["generated_site"] is not None
+
+
+def test_a_phrase_the_setting_took_is_not_also_said_to_be_left_out(drafts, fixed_identities):
+    """A town's drafter names what no value says; the setting step takes some of the same words.
+    What was taken is said by the setting, so it is not then listed as not in the world."""
+    app, transport = drafts
+    words = TOWN_WORDS + " on the slopes, with snow on the roofs"
+    transport.responses.extend(
+        [
+            _tool("town", "a quiet town"),
+            _json(_town_form(fit="part", not_supported=["on the slopes", "snow on the roofs"])),
+            _look(None),
+            _setting("snow on the roofs", cover="snow"),
+        ]
+    )
+    with app() as client:
+        ended = _ended(client, _start(client, words).json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        assert ended["setting"]["words"] == ["snow on the roofs"]
+        assert ended["left_out"] == ["on the slopes"]
+
+
+def test_a_worker_busy_for_a_moment_is_asked_once_more_before_a_paid_draft_is_lost(
+    drafts, fixed_identities, monkeypatch
+):
+    from exulanica.world.kinds import worker
+
+    app, transport = drafts
+    composed = worker.WorkerComposer.__call__
+    asked = []
+
+    def busy_once(self: Any, *args: Any, **kwargs: Any) -> Any:
+        asked.append(1)
+        if len(asked) == 1:
+            raise worker.KindWorkWaiting("busy")
+        return composed(self, *args, **kwargs)
+
+    monkeypatch.setattr(worker.WorkerComposer, "__call__", busy_once)
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
+    with app() as client:
+        ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        assert len(asked) >= 2

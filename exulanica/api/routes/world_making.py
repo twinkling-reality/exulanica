@@ -125,6 +125,30 @@ class DraftToolView(BaseModel):
     chosen_by: Literal["model", "unsure"]
 
 
+class TakenLookView(BaseModel):
+    """The look the made world is drawn in because the words asked for it."""
+
+    pack_id: str
+    title: str
+    #: The person's own words that chose it.
+    words: list[str]
+
+
+class TakenPartView(BaseModel):
+    #: The setting's axis (``sky``, ``ground``, ``cover``) and the key of its named part.
+    axis: str
+    key: str
+    title: str
+
+
+class TakenSettingView(BaseModel):
+    """The named parts of a setting the made world stands in because the words asked for them."""
+
+    parts: list[TakenPartView]
+    #: The person's own words that chose them, in the description's order.
+    words: list[str]
+
+
 class WorldDraftRefusalView(BaseModel):
     code: str
     detail: str
@@ -155,6 +179,11 @@ class MadeWorldDraftView(BaseModel):
     made: list[MadePartView]
     #: The parts of the description nothing in the made world says, each the person's own words.
     left_out: list[str]
+    #: What the job took from the words for how the world is drawn and where it stands, each
+    #: with the words that chose it; null where the words asked for none. Taken, not offered:
+    #: a person changes either afterwards in the world's look.
+    look: TakenLookView | None = None
+    setting: TakenSettingView | None = None
     refusal: WorldDraftRefusalView | None
     model_name: str | None
     execution: ExecutionView | None
@@ -286,6 +315,8 @@ def _draft_view(
         entry=entry,
         made=[MadePartView(**part) for part in draft.made],
         left_out=list(draft.left_out),
+        look=None if draft.look is None else TakenLookView(**draft.look),
+        setting=None if draft.setting is None else TakenSettingView(**draft.setting),
         refusal=None if draft.refusal is None else WorldDraftRefusalView(**draft.refusal),
         model_name=None if draft.model_id is None else load_manifest().model_name(draft.model_id),
         execution=_execution(draft.calls, (), prompt_version=prompt_version)
@@ -407,7 +438,10 @@ def read_world_draft_offer(
     mine = running is not None and running.actor == session.actor and running.purpose == "world"
     code: str | None
     detail: str | None
-    if not {Permission.WORLD_WRITE, Permission.MODEL_INVOKE} <= held:
+    if not services.kinds_from_people:
+        # First, as the kinds library answers it: what the server takes is true for everybody.
+        code, detail = KINDS_FROM_PEOPLE_NOT_OFFERED, KINDS_FROM_PEOPLE_NOT_OFFERED_DETAIL
+    elif not {Permission.WORLD_WRITE, Permission.MODEL_INVOKE} <= held:
         code, detail = "not_authorised", dict(KIND_DRAFT_CODES)["not_authorised"]
     else:
         no = _unstartable(services, connection, workspace_id, guest=guest)

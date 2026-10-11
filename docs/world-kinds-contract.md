@@ -398,9 +398,9 @@ over 16,384 bytes is refused 413 before it is read) and answers 202 with a draft
 | State | What the job is doing |
 | --- | --- |
 | `choosing` | Asks which tool should make the place: a forced choice among the entries of the [world tool catalog](../assets/catalogs/world-tools/world-tool.v1.json), each a composer with its drafter and its own words for what it can make and what it cannot, which is all the chooser is shown ([`tool_choosing.py`](../exulanica/selection/tool_choosing.py), role `world_tool_chooser`). Where the chooser answers none, is refused twice or fails, the catalog's tool for an unsure choice is taken, the site grammar's, and the answer says so (`tool.chosen_by` `unsure`) |
-| `drafting` | That tool's drafter writes what its composer takes: the kind drafter a whole kind document, held to both stages of the checks as above, or the specification drafter a town's preset and values, held to the gate every town passes |
+| `drafting` | That tool's drafter writes what its composer takes: the kind drafter a whole kind document, held to both stages of the checks as above, or the specification drafter a town's preset and values, held to the gate every town passes. Then two short steps ask what the same words say of how the world is drawn and where it stands: the look chooser among the library's looks and the setting chooser among the named parts of a setting ([the setting offer](style-pack-contract.md#121-a-setting-offered-from-a-description)). Neither can fail the draft |
 | `making` | The world is composed and its entry saved, as `POST /worlds/kinds/{kind}/worlds` and `POST /worlds/generated` make one |
-| `ready` | `entry` is the saved world; `made` lists every part that was made, with its words, form and look role, how many slots the world's drawing draws for it and the largest box among them (a town's parts state none); `left_out` the phrases of the description nothing in the made world says, in the person's own words |
+| `ready` | `entry` is the saved world; `look` and `setting` are what the job took from the words, each with the person's own words that chose it, or null; `made` lists every part that was made, with its words, form and look role, how many slots the world's drawing draws for it and the largest box among them (a town's parts state none); `left_out` the phrases of the description nothing in the made world says, in the person's own words |
 | `refused` | `refusal` names why by code and sentence, and no world was written. `refusals` lists every code of the draft's own routes and job with what each means; a refusal by the composer or by a town's values carries that check's own code and sentence |
 
 Ready and refused both carry what the draft cost, every call included. A world that was made
@@ -410,8 +410,8 @@ generator is one more entry of the tool catalog and no change to the choosing.
 **Before a word is typed.** `GET /worlds/drafts` (world read) says what a start would meet, for
 this person in this workspace: `offered`, or the first refusal a start would give by `code` and
 `detail`, in the order the start asks them; `calls_at_most`, the most times one draft asks a model,
-counted from the steps' own bounds (the chooser's call and its repair, then the attempts of
-whichever tool's drafter makes the most); `starts`, how many drafts this person may start in an
+counted from the steps' own bounds (the chooser's call and its repair, the attempts of whichever
+tool's drafter makes the most, then the look chooser's and the setting chooser's call and repair); `starts`, how many drafts this person may start in an
 hour, how many are left and when the next frees; `description_characters`; and
 `running_draft_id`, this person's own draft of a world still running here. A page shows the calls
 and the starts before the words are sent. Another person's running draft is `kind_draft_busy`
@@ -422,6 +422,23 @@ worlds as it may (409 `world_limit_reached`), and a database role that cannot re
 (403 `worlds_read_only`). The world limit is asked again where it holds, as the world is
 registered. A draft cannot be withdrawn once started: it runs to its end, one at a time in a
 workspace.
+
+**The look and the setting are taken, not offered.** The town's own draft
+(`POST /worlds/specification/drafts`) offers what the two steps chose and the person picks. This
+job has no second screen, so it takes what the words asked for, says what it took and in whose
+words, and names it in the made world's appearance as `POST /worlds/generated` names a town's: the
+look that was taken or else the library's default, with the parts of the setting composed for that
+look. A person changes either afterwards in the world's appearance. Because nobody picks, the job
+holds the steps' answers to a stricter rule than an offer: a part invented is worse than a part
+missed. The parts of a setting are taken only when the answer copied at least as many phrases as it
+names parts, and otherwise none is taken, since one list of phrases serves all three axes and one
+phrase can carry a part for each; and a look is not taken when every phrase that chose it overlaps
+a phrase that chose a kept part of the setting, since words about the hour or the weather ask for
+a sky and not for a look. The rule counts phrases and binds none to an axis, so it bounds an
+invention and does not prove each part. A step that fails, is refused or runs out of allowance
+takes nothing, and the world is made in the default look. A setting the look cannot be drawn in is
+left off. A made world's setting reaches a page through its appearance, whose setting states its
+named parts (`parts`, each an `axis` and a `key`).
 
 **Where a server keeps a kind from a person.** A kind of place a person brings is the person's
 own document, drafted from their words or written by them, and it is kept in rows no removal
@@ -454,9 +471,11 @@ world keeps that was written from the words:
 | --- | --- |
 | The world's receipt (`world_generation_receipt`), appended once and never changed | For a place, the whole kind document: its key, label and summary, every part's and use's key and label, and `provenance.words_sha256`, the SHA-256 of the words as sent. The label and summary may repeat the words closely. For a town, its preset and values only |
 | The saved entry's title (`saved_world_entry`) and the first version's title (`world_alternate_version`) | For a place, the same label. A town's are its preset's label, which is not the person's |
-| The world's structure records (`world_structure_snapshot` and the element tables under it) and its stored drawing | For a place, the document's part keys and look roles. A town's records are the city grammar's, generated from its preset, values and seed |
+| The world's structure records (`world_structure_snapshot` and the element tables under it) | For a place, the document's part keys and look roles. A town's records are the city grammar's, generated from its preset, values and seed |
 | A town's tile bake jobs (`job`) | Ids, a digest and a tile in each payload, and nothing of the words |
-| The API process, for an hour after the draft ends | A town's `left_out` phrases as they were typed, saved names included, read by the person who started the draft and nobody else |
+| The world's appearance (`world_style_version`) | The look's id and the keys of the setting's named parts: catalog keys, none of the person's words |
+| The API process, until it restarts or the entry is the least recently read | A made place's drawing and its society's place, and the checks of a drafted document, a refused one's included: built from the document, never written to storage or to a file |
+| The API process, for an hour after the draft ends | A town's `left_out` phrases and the phrases that chose a look or a setting, as they were typed, saved names included, read by the person who started the draft and nobody else |
 
 The world's registration (`world_identity`), which outlives a removal, states that the world was
 generated from a world kind and names no kind. Spending rows hold amounts, models and times, and

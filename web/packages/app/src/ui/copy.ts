@@ -502,6 +502,11 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldSentence.ready': 'Made: {title}.',
   'worldSentence.made': 'In it: {parts}.',
   'worldSentence.leftOut': 'Not in it yet: {phrases}.',
+  // What the job took from the words, each beside the person's own words that chose it. Taken, not
+  // offered, so the line also says where it is changed.
+  'worldSentence.taken.look': 'Drawn as {look}, for your words {words}.',
+  'worldSentence.taken.setting': 'Set in: {parts}, for your words {words}.',
+  'worldSentence.taken.change': 'You can change this later in Design.',
   'worldSentence.open': 'Open this world',
   'worldSentence.refused': '{meaning} Nothing was made.',
   'worldSentence.refused.detail': '{meaning} {detail} Nothing was made.',

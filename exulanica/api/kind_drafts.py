@@ -261,6 +261,10 @@ class KindDraft:
     entry_id: uuid.UUID | None = None
     made: tuple[Mapping[str, Any], ...] = ()
     left_out: tuple[str, ...] = ()
+    #: For a world: the look and the parts of a setting the words asked for and the job took,
+    #: each with the person's own words that chose it; None where none was taken.
+    look: Mapping[str, Any] | None = None
+    setting: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
