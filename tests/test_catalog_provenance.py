@@ -108,7 +108,9 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # recorded and said of each kind of its activity, the legacy identities of the first three
     # engines, a person's decision contract's two in seven versions each, six versions of a
     # person's score, four of the protocol, six of the seeds a comparison of models reads,
-    # and a catalog of measured typical comparison costs),
+    # and a catalog of measured typical comparison costs), what an ask of a model mind typically
+    # costs and how often a being whose mind is a model is asked, the shapes a sentence that sets
+    # a world's budget for its minds may have,
     # the grounds a society stands on, the words both the inspector and the
     # Companion say of a simulated person and of each kind of activity, the world object
     # catalog's three versions and its arrangements, the flight kind catalog, the local
@@ -140,7 +142,7 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # actions a person may take on a world and what is in it, by their stable ids,
     # and the tools a world is made by from a person's words, each in the words a chooser is
     # shown.
-    assert len(found[ENTRY_SHAPE]) == 134
+    assert len(found[ENTRY_SHAPE]) == 136
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
     # mappings, the road derivation and the signal placement.
     assert len(found[CITED_SHAPE]) == 7

@@ -354,6 +354,77 @@ def test_a_kind_that_already_stands_names_what_a_thing_goes_beside():
     ]
 
 
+def _both_standing() -> plan._World:
+    """The things world with a knight standing in it beside the well."""
+    read = _read()
+    knight = things.PlacedRead(
+        "knight-1",
+        "knight",
+        None,
+        "region:starter",
+        Transform(2_000, 0, 1_000, 0, 1000),
+        WELL,
+        kind="knight",
+    )
+    return _world(
+        dataclasses.replace(
+            read,
+            placed=(*read.placed, knight),
+            placed_count=2,
+            placed_ids=frozenset({"well", "knight-1"}),
+        )
+    )
+
+
+def _placed_from_words(world: plan._World, words: str | None, *options: str) -> plan._Verdict:
+    return plan._typed_from_draft(
+        [{"operation": "place_thing", "options": list(options)}], world, words
+    )
+
+
+def test_where_both_kinds_stand_the_person_s_words_say_which_the_other_goes_beside():
+    """A knight and a well both stand here, and the drafter names both by their kinds. The words
+    "by the well" make the well what the new knight goes beside, in either order the draft names
+    them; the same holds for beside, near and next to, with or without an article."""
+    world = _both_standing()
+    for words in (
+        "Add a knight by the well.",
+        "Put another knight beside the well",
+        "a knight near a well please",
+        "Add a knight next to the well.",
+    ):
+        for options in (("knight", "well"), ("well", "knight")):
+            verdict = _placed_from_words(world, words, *options)
+            assert verdict.refusal is None and verdict.clarification is None, words
+            [action] = verdict.actions
+            assert (action.kind, action.near) == ("knight", "thing:well"), words
+    # The other way round: a well by the knight is a well, beside the knight that stands here.
+    [action] = _placed_from_words(world, "Add a well by the knight.", "knight", "well").actions
+    assert (action.kind, action.near) == ("well", "thing:knight-1")
+
+
+def test_where_the_words_put_neither_or_both_beside_the_kind_is_still_asked_about():
+    world = _both_standing()
+    for words in (
+        "Add a knight and a well.",
+        "Add a knight by the well by the knight.",
+        None,
+    ):
+        verdict = _placed_from_words(world, words, "knight", "well")
+        assert verdict.clarification is not None, words
+        assert verdict.clarification["code"] == "kind_ambiguous"
+        assert [c["value"] for c in verdict.clarification["candidates"]] == ["knight", "well"]
+
+
+def test_the_words_decide_only_where_both_kinds_stand():
+    """Where one of the two stands, it is what the other goes beside whatever the words say, as
+    before; where neither stands, the kind is asked about, as before."""
+    [action] = _placed_from_words(_world(), "Add a well by the knight.", "knight", "well").actions
+    assert (action.kind, action.near) == ("knight", "thing:well")
+    neither = _placed_from_words(_world(), "Add a knight by the lantern.", "knight", "lantern")
+    assert neither.clarification["code"] == "kind_ambiguous"
+
+
 def test_a_step_drafted_again_with_the_same_options_means_the_same_again():
     """Two lanterns by the well, as a drafter writes it: the same options twice are two lanterns
     beside the well, not a well beside the first lantern."""

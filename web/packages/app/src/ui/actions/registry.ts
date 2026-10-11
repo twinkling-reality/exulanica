@@ -76,6 +76,10 @@ const PIECES = 'POST /world/piece-requests';
 /** Who decides for a society's people: the models route, bound to the people's role. */
 const MIND = 'POST /world/versions/{version_id}/models/{role_key}';
 const PEOPLE_ROLE = 'society_decision';
+/** What a world may spend on its AI minds in an hour: the world's own setting, no version's. */
+const MINDS_BUDGET = 'POST /world/versions/{version_id}/models/{role_key}/budget';
+/** A living town's people taking in what was placed after they came. */
+const TAKE_IN = 'POST /world/versions/{version_id}/society/take-in';
 const THING_MOVE = 'POST /world/versions/{version_id}/things/{thing_id}/move';
 const THING_REMOVE = 'POST /world/versions/{version_id}/things/{thing_id}/remove';
 const PRESENCE = 'POST /world/versions/{version_id}/society/presence';
@@ -316,6 +320,78 @@ const PLAY_REFUSALS: Readonly<Record<string, RefusalWords>> = {
 };
 
 /** What sending everyone away, or bringing them back, can meet: the presence route's names. */
+/** What setting a world's budget for its minds can meet. */
+const BUDGET_REFUSALS: Readonly<Record<string, RefusalWords>> = {
+  no_change: { happened: 'This world’s budget for AI minds is already that.', next: 'Nothing needed to change.' },
+  budget_usd_not_a_figure: {
+    happened: 'That amount of money is not one a budget can hold.',
+    next: 'Say it as dollars or cents an hour, such as 50 cents an hour.',
+  },
+  budget_decisions_not_a_figure: {
+    happened: 'That number of decisions is not one a budget can hold.',
+    next: 'Say it as a whole number an hour, such as 600 decisions an hour.',
+  },
+  budget_key_reused: {
+    happened: 'This world’s budget changed while I was preparing that.',
+    next: 'Ask again and I will prepare it against what it is now.',
+  },
+  budget_changed: {
+    happened: 'Somebody set this world’s budget after you were shown this plan, so it was not sent.',
+    next: 'Nothing was changed. Ask again to see it against the budget as it is now.',
+  },
+  budget_not_for_this_role: {
+    happened: 'A budget is set for the AI minds of a world’s beings only.',
+    next: 'Ask for what the world may spend on minds in an hour.',
+  },
+  action_not_permitted: {
+    happened: 'This world’s budget for AI minds can only be set by someone allowed to change the world and to ask AI models in it.',
+    next: 'Ask the owner of this workspace.',
+  },
+  unknown_reference: { happened: 'This world is no longer there.', next: 'Reload the page, then ask again.' },
+};
+
+const NOTHING_ERASED = 'Nothing was erased: the town is as it was.';
+/** What a living town taking its newcomers in can meet: its own refusals, then the making's, after which nothing is erased. */
+const TAKE_IN_REFUSALS: Readonly<Record<string, RefusalWords>> = {
+  society_unavailable: NOBODY_HERE,
+  nothing_to_take_in: {
+    happened: 'There is nothing here for the people of this town to take in.',
+    next: 'Place a thing or a being in the town first, then ask again.',
+  },
+  society_takes_in_already: {
+    happened: 'The people of this world already live with what is placed here.',
+    next: 'Nothing needed to change.',
+  },
+  restore_sealed: {
+    happened: 'This server is being restored from a backup, so nothing can be erased right now.',
+    next: 'Ask again once it is running normally.',
+  },
+  unavailable_society_input: {
+    happened: 'The people of this town cannot be made again: what the town was built on is not available.',
+    next: NOTHING_ERASED,
+  },
+  society_engine_not_offered: { happened: 'This server does not offer people who live with placed things.', next: NOTHING_ERASED },
+  society_engine_differs: { happened: 'What this world holds changed while I was preparing that.', next: `${NOTHING_ERASED} Ask again.` },
+  no_reachable_targets: {
+    happened: 'There is nowhere in this town its people could reach from where they would start.',
+    next: NOTHING_ERASED,
+  },
+  engine_not_for_this_ground: { happened: 'This kind of world does not take people who live with placed things.', next: NOTHING_ERASED },
+  society_engine_retired: { happened: 'This server no longer makes that kind of people.', next: NOTHING_ERASED },
+  society_lives_elsewhere: { happened: 'The people of this world live in another version of it.', next: NOTHING_ERASED },
+  population_not_recorded: { happened: 'This town does not record how many people it holds.', next: NOTHING_ERASED },
+  population_over_tick_budget: {
+    happened: 'This town holds more people than this server can play with placed things.',
+    next: NOTHING_ERASED,
+  },
+  world_holds_no_residents: { happened: 'This town holds no homes for its people.', next: NOTHING_ERASED },
+  invalid_society_state: { happened: 'The people of this town could not be read.', next: NOTHING_ERASED },
+  action_not_permitted: {
+    happened: 'Taking newcomers in erases the town’s day so far, and your access does not include erasing.',
+    next: 'Ask the owner of this workspace.',
+  },
+};
+
 const PRESENCE_REFUSALS: Readonly<Record<string, RefusalWords>> = {
   nobody_to_send_away: { happened: 'Nobody is here to send away.', next: 'Nothing needed to change.' },
   already_here: { happened: 'They are already here.', next: 'Nothing needed to change.' },
@@ -428,6 +504,19 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     icon: 'people', group: 'people', placement: ['companion'], operation: PLAY_GIVE_BACK, worldScoped: true,
     spendsNothing: true,
     refusals: PLAY_REFUSALS,
+  },
+  {
+    id: 'minds.budget', label: 'Set the budget for AI minds',
+    hint: 'Set what this world may spend on the AI minds of its beings in an hour, after seeing what it comes to',
+    icon: 'spends', group: 'people', placement: ['companion'], operation: MINDS_BUDGET, bind: { role_key: PEOPLE_ROLE },
+    worldScoped: true, spendsNothing: true,
+    refusals: BUDGET_REFUSALS,
+  },
+  {
+    id: 'people.take-in', label: 'Take the newcomers in',
+    hint: 'The people of a town take in what was placed after they came; their day starts again and this cannot be undone',
+    icon: 'people', group: 'people', placement: ['companion'], operation: TAKE_IN,
+    refusals: TAKE_IN_REFUSALS,
   },
   {
     id: 'people.send-away', label: 'Send everyone away',

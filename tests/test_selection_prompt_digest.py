@@ -62,6 +62,12 @@ PINNED = {
     # a listed being or give it back (`play_being`, `give_back`); the simulation drafter may send
     # everyone away or bring them back; the classifier counts playing a being as a world edit.
     "action-plan-12": "0d41046441d43eb2ef3e290e68a5298a9484ae605fecd348930cd892ef0fd64d",
+    # `action-plan-13`: the world-edit drafter may set what the world spends on its AI minds in an
+    # hour (`set_minds_budget`), naming amounts code read from the request and never a figure of
+    # its own; the simulation drafter may have the people who live in a world take in what was
+    # placed after they came (`take_in`); the classifier counts the first as a world edit and
+    # the second as simulation.
+    "action-plan-13": "bc4ae72e68a3b9765d801ab3ac4d844a77d4170ea86a208bf31360f00dd4daf7",
     # The appearance drafter for a design choice drawn from no evidence; its own family, so the
     # evidence drafter's texts and `proposal-4` are untouched.
     "proposal-authored-1": "7b840134c24bc8152ab423f0665362b1d37bdd3cfb9b96cf208cfc6a46308d9a",

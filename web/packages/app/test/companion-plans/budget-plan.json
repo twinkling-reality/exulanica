@@ -1,0 +1,147 @@
+{
+  "profile": "exulanica.companion-action-plan/v1",
+  "outcome": "plan",
+  "kind": "world_edit",
+  "world_id": "world:authored:test",
+  "version_id": "00000000-0000-0000-0000-000000000007",
+  "plan_sha256": "6b1972d6647663f5c7601056cdbe9e7f084db4527676fe6cace10c76892d74cb",
+  "atomic": false,
+  "steps": [
+    {
+      "index": 0,
+      "action": {
+        "operation": "set_minds_budget",
+        "usd_per_hour": "0.500000",
+        "decisions_per_hour": 600,
+        "figures_named": [
+          "usd_per_hour"
+        ]
+      },
+      "state": "prepared",
+      "code": null,
+      "operation": "POST /world/versions/{version_id}/models/{role_key}/budget",
+      "bind": {
+        "version_id": "00000000-0000-0000-0000-000000000007",
+        "role_key": "society_decision"
+      },
+      "bind_from": null,
+      "query": {
+        "world_id": "world:authored:test"
+      },
+      "body": {
+        "idempotency_key": "a1f14cbd-4e83-5b0b-a8df-46d7ead94763",
+        "usd_per_hour": "0.500000",
+        "decisions_per_hour": 600,
+        "after_budget_seq": 0
+      },
+      "body_from": null,
+      "requires": [
+        "model.invoke",
+        "world.write"
+      ],
+      "permitted": true,
+      "spends": false,
+      "preview": null,
+      "pins": {
+        "budget_seq": null
+      },
+      "effects": [],
+      "confirmation": "required",
+      "titles": {},
+      "estimate": null,
+      "mind": null,
+      "cost": null,
+      "budget": {
+        "default": {
+          "usd_per_hour": "0.250000",
+          "decisions_per_hour": 600,
+          "set_by_a_person": false
+        },
+        "hour_so_far": {
+          "decisions": 12,
+          "usd": "0.003400"
+        },
+        "left_this_hour": {
+          "decisions": 588,
+          "usd": "0.496600"
+        },
+        "minded": 2,
+        "models": [
+          {
+            "provider": "nebius_token_factory",
+            "model_id": "example/nano",
+            "name": "Nano",
+            "beings": 2,
+            "usd_per_answer_at_most": "0.00310000",
+            "usd_per_answer_typical": "0.00028162",
+            "typical": {
+              "rate_class": "estimate",
+              "price_class": "measured"
+            }
+          }
+        ],
+        "answers_for_usd": {
+          "at_most_price": 161,
+          "at_typical_price": 1765
+        },
+        "binds": {
+          "at_most_price": "usd",
+          "at_typical_price": "decisions"
+        },
+        "demand": {
+          "simulated_minutes_per_real_hour": 450,
+          "minded": {
+            "beings": 2,
+            "asks_per_real_hour": 233,
+            "minutes_covered": 60
+          },
+          "everyone": {
+            "beings": 5,
+            "asks_per_real_hour": 582,
+            "minutes_covered": 60
+          },
+          "rate_class": "estimate"
+        },
+        "refused_now": null,
+        "host": {
+          "refusal": null,
+          "allowance": null,
+          "allowance_below_an_hour_of_budget": null
+        },
+        "now": {
+          "usd_per_hour": "0.250000",
+          "decisions_per_hour": 600,
+          "set_by_a_person": false,
+          "budget_seq": null,
+          "set_by_you": false
+        },
+        "asked": {
+          "usd_per_hour": "0.500000",
+          "decisions_per_hour": 600,
+          "hour": "real_time"
+        },
+        "beings": 5,
+        "named": [
+          "usd_per_hour"
+        ]
+      },
+      "erases": null,
+      "replay": "same_key_returns_the_recorded_budget",
+      "receipt": "minds_budget",
+      "compensation": null
+    }
+  ],
+  "spends": false,
+  "spends_by": [],
+  "clarification": null,
+  "refusal": null,
+  "capabilities": null,
+  "proposal_speech": null,
+  "clock": null,
+  "execution": {
+    "prompt_version": "action-plan-13",
+    "calls": [],
+    "rejections": []
+  },
+  "names": {}
+}

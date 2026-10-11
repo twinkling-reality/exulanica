@@ -798,9 +798,10 @@ each step's options moved last under a 640-token ceiling, are in
 prompt `action-plan-9` adds things and beings and a being's hands acts, asks each step's
 options to name what a thing goes beside or where a being goes as well as what is added or asked
 (what stands in the world by its listed label; a visit to a place as using it); `action-plan-10`
-adds new pieces of the world's look; `action-plan-11` adds who decides for a being or a group; the
-current prompt, `action-plan-12`, adds moving and removing a placed thing, playing a being and
-sending everyone away. None of the four is measured by those records.
+adds new pieces of the world's look; `action-plan-11` adds who decides for a being or a group;
+`action-plan-12` adds moving and removing a placed thing, playing a being and sending everyone
+away; the current prompt, `action-plan-13`, adds a budget for the world's minds and a living town
+taking in what was placed after its people came. None of the five is measured by those records.
 
 ### Things and beings
 
@@ -812,7 +813,10 @@ can name it before it exists), a pose and the person's origin role. The drafter 
 what it goes beside: a listed thing, object or being, or the kind of thing an earlier step of the
 request adds. Of two kinds named in one step, where no earlier step adds either and exactly one
 already stands in the world, that one is what the other goes beside (a knight by the well, where a
-well stands); two things or beings of that kind are asked about by name. A later step drafted with
+well stands); two things or beings of that kind are asked about by name. Where both kinds
+already stand in the world (a knight by the well, where a knight and a well stand), the person's
+own words decide: the kind they say right after "by", "beside", "near" or "next to" is what the
+other goes beside, and where the words say neither or both the kind is asked about. A later step drafted with
 the same options as an earlier one means the same again: two lanterns by the well are two lanterns
 beside the well, not a well beside the first lantern. A kind whose first look
 draws a reviewed object's own container is offered as that
@@ -937,12 +941,20 @@ The step always needs the person's yes. Choosing asks no model; playing the worl
 chosen model at each of a being's own choice points. A step naming a model says so (`spends:
 true`) and carries `cost`: per simulated minute, the most the choice may reserve (the figure the
 playback host reserves for one answer of that model under the society's contract, once for each
-being named), no typical figure while no record holds one for the world (`usd_typical` null), and
+being named), what those beings typically cost a simulated minute where that engine and model were
+measured (`usd_typical`, with `usd_per_answer_typical` and `typical`, which states each figure's
+class and the evaluation record it is read from; null for an engine and model nobody measured, and
+a rate from a measurement cut short is served as an estimate and said as one), and
 the world's own ceilings, in dollars and in decisions over any hour of real time (the host counts
 the hour just past, whatever the world's speed), past which the routine decides whatever was
 chosen. The ceilings are the world's budget for its minds, with whether a person set it
 (`cost.ceilings.set_by_a_person`) or it is the policy's figures
-([a world's budget for its minds](decision-roles-contract.md#a-worlds-budget-for-its-minds)). Where this host asks no model for the world, or none of the chosen model's provider, the
+([a world's budget for its minds](decision-roles-contract.md#a-worlds-budget-for-its-minds)). The
+cost also states what the hour just past holds (`hour_so_far`) and what the host would answer one
+more ask of the model now (`refused_now`: `world_hour_decisions_spent` or
+`world_hour_spend_spent`, a budget of nothing among them, else null), because the role's
+capability read says nothing of the hour: a mind chosen while the world's hour is used up is told
+before the yes that nobody is asked until the hour moves on or the budget is raised. Where this host asks no model for the world, or none of the chosen model's provider, the
 step says why by code (`mind.host_refusal`, `mind.model_refusal`): the choice is recorded and the
 routine decides until the host asks. The step still carries `cost`, the bound it would meet once
 the host asks, and the page shows no figure while nothing is asked. A step naming
@@ -996,6 +1008,145 @@ read gave. An engine that keeps its people (a society of things) is refused with
 read's own code (`engine_keeps_its_people`), and what the society's state already holds with the
 route's own name (`nobody_to_send_away`, `already_here`), by the route's pure check run in process.
 The world and its history stay; the step reads back as the presence request recorded under its key.
+
+**A budget for the world's minds.** A world edit may set what the world spends on the model minds
+of its beings in any hour of real time (`set_minds_budget`), the request
+`POST .../models/{role_key}/budget` takes
+([a world's budget for its minds](decision-roles-contract.md#a-worlds-budget-for-its-minds)). The
+budget is the world's and no version's, so no capability read lists the route and the plan states
+its descriptor from the caller's grant (`world.write` and `model.invoke`).
+
+The drafter writes no number. The amounts are read from the person's sentence by code
+(`exulanica.selection.action_budget`) and listed as options beside two budgets with no figure:
+nothing, and what a world has before anyone sets one. What code reads is a stated limit: digits,
+or plain English number words up to the thousands, beside `$`, `USD`, dollars, bucks, cents or `c`
+for money, and beside decisions, answers, asks, calls, questions or "times an hour" for a count.
+
+The rule is that a sentence plans a figure only where the whole of it, in order, is one of a
+short list of shapes. The shapes are data (`assets/catalogs/minds-budget-shapes/`): each is a
+pattern of slots in order, with the sentences it was written for and a reason, and each slot is a
+closed list of words that is allowed in that slot and nowhere else. A shape is made of amounts in a
+form listed above, the hour a budget is by ("an hour", "per hour", "every hour", "each hour",
+"hourly", "/h", "/hr", "in any one hour"), and slot words. They are:
+
+- an amount alone, or both amounts ("50 cents an hour", "$2 and 3000 decisions an hour");
+- a verb that sets, what is set, a word that leads into the most that may be spent, the amounts
+  ("Set the minds budget to $2", "cap the minds at 40 cents an hour");
+- a verb that moves a figure, then "to" and the amounts, or "from" one amount "to" another ("Raise
+  the minds budget to 50 cents an hour", "raise it from 25 cents to 50 cents"). A verb that says
+  which way (raise, increase; lower, decrease, reduce, drop) is held to it: with a figure on the
+  other side of the world's budget now ("Drop the budget to 5 dollars an hour" where it is one
+  dollar) the figure is asked for;
+- "let" or "allow", whose budget it is, a verb of spending, the amounts ("Let this world spend up to
+  40 cents an hour on AI minds"), or "allow" and the amounts alone;
+- whose budget it is, "may" or "can", a verb of spending, the amounts ("The minds may make at most
+  1,500 decisions an hour"); "must" and "should" may mean a floor and make no shape;
+- "spend" or "use" and the amounts ("Spend a dollar an hour on the minds"), and "give" to the
+  minds, the world or the town ("Give the minds a budget of 2 dollars"), never to a budget noun,
+  which would read as an amount added;
+- the shapes of a budget of nothing ("Spend nothing on minds", "Turn the minds off", "Stop the
+  minds", "Set the budget to zero") and of the default ("Reset the minds budget", "Put the budget
+  back to its default", "Use the default budget"). The default is put back to a budget, a limit
+  or a cap by its own word: "Reset the world" is another request.
+
+Every character of the sentence is read. Plain punctuation is silent; anything that is no number,
+no plain word and no known sign (a word in another script, "+", "%", another currency's sign) is a
+token no shape holds. A question mark is read too: a question is asked back, not planned. A sentence that is none of the shapes is asked for its figure; it is never
+refused for its amount and no figure is guessed. A question costs nothing and a wrong budget spends
+money. So a span ("for 24h", "until Friday", "for just this one hour"), a report ("The minds spend
+3 dollars an hour", "That cost 3 dollars"), a figure for each of something or for everyone ("Give
+every knight a dollar an hour"), a move with no end ("Lower the budget from 2 dollars") and a
+preface that looks like a count need no rule of their own: no shape holds them. Whose budget it is
+comes from a closed list (the minds, the AI, the world, the town, the budget, "it"); no shape has a
+slot for a being, a kind or "everyone". A shape is added one at a time, with its sentences and its
+reason.
+
+One compound is read. A sentence that sets a budget and asks for something else names what the
+other step acts on (a being, a kind, a model). Such a name counts only whole and in order, as the
+form listed it up to its first bracket or comma, or as a group's own label; it is found by the
+labels the draft named in the lists the form was made from, never from a word a model wrote; and a
+number inside a name is never an amount. Names may stand only in the other step's own clause, before
+the "and" that opens the budget's clause, among the few words such a clause holds; and the budget's
+clause must then be a shape that says whose figure it is, by a word of its own: after a name, "it",
+"its" and "their" point at what was named, so a clause that holds one is asked about ("Give Aldric
+Nemotron 3 Nano 30B and let it spend 2 dollars an hour"). "Give the knight Nemotron 3 Nano 30B and
+let the minds spend 3 dollars an hour" plans three dollars; "Give every knight Nemotron 3 Nano 30B
+and a dollar an hour" is asked about, since the dollar may be each knight's.
+
+What makes a figure doubtful only chooses the question, by its code:
+
+- `budget_period`: an amount over a span the words name that is not one hour of real time (a
+  counted span, a span word, a part of an hour, an hour of the world's own time, the whole, a rate
+  for each of something). It is never converted: a day's figure over twenty-four is not what was
+  said.
+- `budget_ambiguous`, with both as candidates: a sentence that is a shape and holds two amounts
+  of one kind. Two amounts with "or" between them, or a range in digits ("50 to 60 cents"), are a
+  choice the sentence offers: a choice is never planned, and is asked about with both. An amount
+  said after "from" is what the budget is changed from, and is set aside only where it is the
+  world's budget now ("from 25 cents to 50 cents").
+- `budget_required`, with the budget the world has now: everything else. A sentence that is none
+  of the shapes; no amount was read; an amount the words do not state plainly (a change, more of a
+  number beside it, a sum of parts, a report of what was charged or paid, another country's
+  dollars); a choice that is not between two amounts of one kind; a figure the budget's record
+  cannot hold; two kinds of amount each said twice.
+
+The two budgets with no figure are held to the same rule and to the person's own words. Nothing
+is planned only where the draft names it and the whole sentence is one of the shapes of nothing; the
+default only where the draft names it and the whole sentence is one of the shapes of the default.
+The minds can be turned off or stopped; the world, the town and "it" cannot, since stopping a world
+is another request. A word inside an amount
+states neither ("zero dollars" is an amount). "Off", "stop" and "none" said of a limit or of the
+budget itself take a limit away and state neither ("turn the cap off"), and a sentence that speaks
+of no limit ("no limit", "unlimited", "as much as") is asked for its figure. Where the sentence
+says one of these words and also states an amount, the figure is asked for whatever the draft
+names. A figure the words do not name is kept as the world has it, and the step says which
+figures were named (`budget.named`). "As the world has it" is read when the step is: a typed
+budget that names one figure takes the other from the budget now, so a question answered later
+keeps what somebody set in between. The request names the budget it was planned against
+(`after_budget_seq`), so a budget set by anyone between the plan and its yes refuses the step
+(`budget_changed`); and a budget that is a later step of a plan, prepared again at the yes, is
+not sent by the page where the budget's sequence has moved since its sheet was shown.
+
+The step carries `budget`, every figure the page says before the yes, computed by the server for the
+world as it stands: the budget now (with whether a person set it, and whether that was the caller,
+never an account's identifier) and the one asked for; the hour just past and what the asked budget
+leaves of it; how many beings the society holds, by its own state, and how many a model decides for;
+for each model that decides here, the most one answer can cost and what one typically cost where
+that was measured; what the dollars pay for and which of the two ceilings runs out first, stated
+twice, at the most an answer can cost and at the typical price, because the host weighs each ask at
+its bound before it is made and the two can differ; how often those beings typically ask in a real
+hour at the speed the world's control holds, for the beings a model decides for and for everyone
+here, and how many minutes of the hour the budget covers, a figure projected from the measured rate
+and this world's head count and speed, never called measured for this world; what the host would
+answer the next ask under the asked budget (`refused_now`); and above the budget, why this host asks
+no model here if so, and under the durable spending authority what the workspace's allowance has
+left. A typical figure is served only for an engine and model that were measured, with its class;
+nothing is carried from one model to another. Setting a budget asks no model and spends nothing. The
+budget the world already has is `blocked` with `no_change`. A budget after another step of the same
+plan states the same on the plan, and its figures are its typed action's, so preparing it again
+cannot change them. The request's key follows the world's newest budget, the two figures and the
+account that asks. The step reads back as the budget its answer names (`budget_seq`), recorded by
+the caller under the step's key with the figures it named, `superseded` once a later budget is the
+world's. The page sends a budget only where its plan showed this sheet: a step confirmed with none
+is not sent (`budget_unshown`).
+
+**A living town taking its newcomers in.** A simulation request may ask `take_in`, the one request
+`POST .../society/take-in` takes, which has no body ([synthetic society
+contract](synthetic-society-contract.md)). It is offered only where the capability read says the
+route would take it, and refused with the read's own state and code anywhere else
+(`society_unavailable`, `nothing_to_take_in`, `unavailable_society_input`,
+`society_takes_in_already`). The request erases, so the step is alone in its plan under its own yes
+and carries `erases`: what is lost (the day so far and the clock's position, whether the town was
+playing and its speed, the models chosen for people, the looks saved for residents, comparisons and
+experiments run from that society, and the Companion's answers about it), what is kept (the same
+people with their homes, jobs, roles and shifts, the world, everything placed, door grants and
+programs, and the world's look), and `undo: false`: the route gives no way back, and the step states
+no compensation. Its pins are the minute the day would be lost at. No other refusal names it as an
+alternative: the planner does not propose an erasure for a sentence that did not ask for one. Asked
+again, the route refuses by name and erases nothing. The step reads back as applied when the society
+its answer names is the version's and is no longer a living one. The page sends the request only
+where its plan showed what is lost and kept: a step confirmed with no `erases` is not sent
+(`erases_unshown`).
 
 ### The browser's path
 

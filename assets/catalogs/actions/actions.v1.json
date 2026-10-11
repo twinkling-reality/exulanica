@@ -289,6 +289,58 @@
       "reason": "A person gives back the being they play, which is then decided for as it was before."
     },
     {
+      "key": "minds.budget",
+      "id": "minds.budget",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Set the budget for AI minds",
+        "hint": "Set what this world may spend on the AI minds of its beings in an hour, after seeing what it comes to"
+      },
+      "route": "POST /world/versions/{version_id}/models/{role_key}/budget",
+      "bind": {
+        "role_key": "society_decision"
+      },
+      "plan_word": "set_minds_budget",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Sets what a world may spend on the model minds of its beings in an hour; setting it asks no model."
+    },
+    {
+      "key": "people.take-in",
+      "id": "people.take-in",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Take the newcomers in",
+        "hint": "The people of a town take in what was placed after they came; their day starts again and this cannot be undone"
+      },
+      "route": "POST /world/versions/{version_id}/society/take-in",
+      "bind": {},
+      "plan_word": "take_in",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [
+        "day_so_far",
+        "clock_position",
+        "playing_and_speed",
+        "models_chosen",
+        "looks_saved_for_residents",
+        "comparisons_and_experiments",
+        "companion_answers"
+      ],
+      "protected": false,
+      "reason": "A living town's people take in what was placed after they came; their day so far is erased and nothing undoes it."
+    },
+    {
       "key": "people.send-away",
       "id": "people.send-away",
       "status": "offered",

@@ -1,0 +1,43 @@
+{
+  "catalog_id": "society-minds-typical-cost",
+  "catalog_version": 1,
+  "source_build": "Derived from the immutable evaluation record each entry names: the counts of one arm of it, from which the reader works out how often a being whose mind is the model is asked and what one ask cost. Each entry is one model in one society engine of this product; no figure here sets one model beside another.",
+  "fallback": "For an engine and model with no entry, show no typical figure: only the most one answer can cost.",
+  "entries": [
+    {
+      "key": "exulanica-society/v5|nebius_token_factory|nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "engine": "exulanica-society/v5",
+      "provider": "nebius_token_factory",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "source": "docs/evaluation/2026-10-10-minds-ask-rates.json",
+      "source_sha256": "2ebb227e3e9b4cd9b743e059a613df482948bc8fb03050862c617a6a15d74f11",
+      "arm": "living_town",
+      "asks": 43,
+      "beings": 8,
+      "simulated_minutes": 120,
+      "usd": "0.00494160",
+      "beings_in_the_world": 40,
+      "rate_class": "measured",
+      "price_class": "measured",
+      "reason": "A measured cost: a valid arm of the record, eight people of a living town of forty given the model and played for 120 simulated minutes. It is that town's figure on one morning. A longer arm, a larger town or another day's prices would move it, as a new version of this catalog."
+    },
+    {
+      "key": "exulanica-society/v7|nebius_token_factory|nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "engine": "exulanica-society/v7",
+      "provider": "nebius_token_factory",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "source": "docs/evaluation/2026-10-10-minds-ask-rates.json",
+      "source_sha256": "2ebb227e3e9b4cd9b743e059a613df482948bc8fb03050862c617a6a15d74f11",
+      "arm": "society_of_things",
+      "asks": 91,
+      "beings": 8,
+      "simulated_minutes": 44,
+      "usd": "0.02562756",
+      "beings_in_the_world": 9,
+      "rate_class": "estimate",
+      "price_class": "measured",
+      "reason": "The price of an ask is a measured cost, read from 91 receipts and seen again in the record's second run of 360 asks. The rate is an ESTIMATE: the arm was cut by its own stop rule after 44 simulated minutes, and its registration says a cut arm's rate is not used for a default, so every reader of it says estimate. A whole arm with the stop rule counting a model's refused answers apart from provider errors replaces it, as a new version of this catalog."
+    }
+  ],
+  "schema_version": 1
+}

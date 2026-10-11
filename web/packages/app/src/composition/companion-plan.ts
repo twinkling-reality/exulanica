@@ -38,7 +38,7 @@ import { performPlanned, type ActionHost } from '../ui/actions/surfaces.js';
 import { plannedStepView, thePlace, type PlanSheet, type PlanStepView } from '../ui/companion-plan.js';
 import { OBJECT_ROLE_LABELS, isObjectRole } from '../world-objects-api.js';
 import {
-  LATER_MIND_JUDGED_NOW, MIND_GREW, MIND_UNSHOWN, PLAN_WAITED, PLAN_WORDS, midRunQuestionWords, planRefusalWords, prepareFailureWords,
+  BUDGET_UNSHOWN, ERASES_UNSHOWN, LATER_MIND_JUDGED_NOW, MIND_GREW, MIND_UNSHOWN, PLAN_WAITED, PLAN_WORDS, midRunQuestionWords, planRefusalWords, prepareFailureWords,
 } from '../ui/words/companion-plan.js';
 
 /**
@@ -181,7 +181,9 @@ function refusedWords(plan: ActionPlan): RefusalWords {
   if (refusal.operation !== null) {
     const id = Object.values(PLAN_ACTIONS).find((candidate) => candidate !== null && actionSpec(candidate).operation === refusal.operation);
     if (id !== undefined && id !== null) {
-      for (const code of [own, refusal.code]) {
+      // The refused operation's own capability code names why (nothing here to take in), where
+      // the action has words for it; then the plan's code.
+      for (const code of [own, refusal.capabilityCode, refusal.code]) {
         if (code !== null && actionSpec(id).refusals?.[code] !== undefined) return refusalWords(actionSpec(id), code);
       }
     }
@@ -206,6 +208,13 @@ function capabilitySentences(plan: ActionPlan): string[] {
     now.length === 0 ? 'I cannot change anything in this world right now.' : `Here I can: ${now.join(', ')}.`,
     ...(notNow.length === 0 ? [] : [`Not right now: ${notNow.join(', ')}.`]),
   ];
+}
+
+/** The sequence of the budget a budget step was prepared against, where it pins one; null for none. */
+function budgetSeq(step: PlanStep): number | null {
+  const pins = step.raw['pins'];
+  const seq = pins !== null && typeof pins === 'object' ? (pins as Record<string, unknown>)['budget_seq'] : null;
+  return typeof seq === 'number' ? seq : null;
 }
 
 export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
@@ -287,6 +296,17 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
         stopped = true;
         continue;
       }
+      // The same holds for a step that erases and for a budget: each is confirmed with its sheet.
+      if (step.action.operation === 'take_in' && (step.erases === null || step.erases.loses.length === 0)) {
+        deps.sheet.setStep(step.index, { kind: 'not-done', words: ERASES_UNSHOWN, code: 'erases_unshown' });
+        stopped = true;
+        continue;
+      }
+      if (step.action.operation === 'set_minds_budget' && step.budget === null) {
+        deps.sheet.setStep(step.index, { kind: 'not-done', words: BUDGET_UNSHOWN, code: 'budget_unshown' });
+        stopped = true;
+        continue;
+      }
       let sending: PlanStep | null = step;
       // A later world edit is prepared against the state the one before it left, and a step asking
       // one of the world's beings always just before it is sent: the world moves on every minute.
@@ -324,6 +344,16 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
             deps.sheet.setStep(step.index, unshown
               ? { kind: 'not-done', words: MIND_UNSHOWN, code: 'mind_choice_unshown' }
               : { kind: 'not-done', words: MIND_GREW, code: 'mind_choice_grew' });
+            stopped = true;
+            continue;
+          }
+          // A later budget was confirmed against the budget its sheet showed: prepared again after
+          // somebody set another, it would put back the figure the words did not name, so it is not sent.
+          if (sending !== null && step.action.operation === 'set_minds_budget' && sending.state === 'prepared'
+            && budgetSeq(sending) !== budgetSeq(step)) {
+            deps.sheet.setStep(step.index, {
+              kind: 'not-done', words: refusalWords(actionSpec('minds.budget'), 'budget_changed'), code: 'budget_changed',
+            });
             stopped = true;
             continue;
           }
@@ -385,7 +415,9 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
         const played = step.action['subject_id'];
         if (step.action.operation === 'play_being' && typeof played === 'string') deps.onPlay?.(played);
         if (step.action.operation === 'give_back') deps.onPlay?.(null);
-        if (step.action.operation === 'choose_mind') deps.onMinds?.();
+        // A budget set, and a town's people made again without the models chosen for them: who
+        // decides, and under what budget, is read again at once.
+        if (['choose_mind', 'set_minds_budget', 'take_in'].includes(step.action.operation)) deps.onMinds?.();
       } else if (result.kind === 'refused' && result.status !== null) {
         answers[step.index] = stepAnswer(operation, { status: result.status, code: result.code });
       }

@@ -671,6 +671,63 @@ describe('two minds chosen under one Confirm', () => {
     expect(stepStates(second.sheet)).toEqual(['done', 'not-done']);
   });
 
+  it('sends no budget and no taking-in whose sheet the plan did not show', async () => {
+    const cases = [
+      ['budget-plan', 'budget', 'What this budget comes to in this world was not shown'],
+      ['take-in-plan', 'erases', 'What this step erases and what it keeps was not shown'],
+    ] as const;
+    for (const [name, member, words] of cases) {
+      const drafted = fixture(name) as { steps: Record<string, unknown>[] };
+      const unshown = { ...drafted, steps: [{ ...drafted.steps[0]!, [member]: null }] };
+      const h = harness({ plan: async () => unshown, send: async () => ({ budget: { budget_seq: 1 } }) });
+      await h.plans.route('a sentence');
+      await confirmAndWait(h);
+      expect(h.sent, name).toEqual([]);
+      expect(stepStates(h.sheet), name).toEqual(['not-done']);
+      expect(h.sheet.root.textContent, name).toContain(words);
+      // The same plan with its sheet is sent.
+      const whole = harness({ plan: async () => drafted, send: async () => ({ budget: { budget_seq: 1 } }) });
+      await whole.plans.route('a sentence');
+      await confirmAndWait(whole);
+      expect(whole.sent.length, name).toBe(1);
+    }
+    // A taking-in whose sheet states no loss at all showed nothing of what it erases: not sent.
+    const taken = fixture('take-in-plan') as { steps: Record<string, unknown>[] };
+    const lossless = { ...taken, steps: [{ ...taken.steps[0]!, erases: { undo: false, loses: [], keeps: ['world'] } }] };
+    const none = harness({ plan: async () => lossless, send: async () => ({}) });
+    await none.plans.route('a sentence');
+    await confirmAndWait(none);
+    expect(none.sent).toEqual([]);
+    expect(stepStates(none.sheet)).toEqual(['not-done']);
+  });
+
+  it('does not send a later budget when the world’s budget was set again since its sheet was shown', async () => {
+    // A mind, then a budget: the budget's sheet was shown against the world's first budget.
+    const shown = (): unknown => {
+      const minds = fixture('mind-two-steps-plan') as { steps: Record<string, unknown>[] };
+      const budget = (fixture('budget-plan') as { steps: Record<string, unknown>[] }).steps[0]!;
+      return { ...minds, steps: [minds.steps[0]!, { ...budget, index: 1, state: 'pending', body: null, pins: { budget_seq: 1 } }] };
+    };
+    const again = (seq: number): unknown => {
+      const drafted = fixture('budget-plan') as { steps: Record<string, unknown>[] };
+      return { ...drafted, steps: [{ ...drafted.steps[0]!, pins: { budget_seq: seq } }] };
+    };
+    // Somebody set another budget while the sheet was open: prepared again, the step is held to
+    // that newer budget, and the figure the words did not name would be put back. Not sent.
+    const moved = harness({ plan: async () => shown(), prepare: async () => again(2), send: async () => ({ choice_seq: 5, budget: { budget_seq: 3 } }) });
+    await moved.plans.route('give the knight nano and let the minds spend 50 cents an hour');
+    await confirmAndWait(moved);
+    expect(moved.sent.map((request) => request.actionId)).toEqual(['minds.choose']);
+    expect(stepStates(moved.sheet)).toEqual(['done', 'not-done']);
+    expect(moved.sheet.root.textContent).toContain('Somebody set this world’s budget after you were shown this plan');
+    // Nobody did: it is sent.
+    const same = harness({ plan: async () => shown(), prepare: async () => again(1), send: async () => ({ choice_seq: 5, budget: { budget_seq: 2 } }) });
+    await same.plans.route('give the knight nano and let the minds spend 50 cents an hour');
+    await confirmAndWait(same);
+    expect(same.sent.map((request) => request.actionId)).toEqual(['minds.choose', 'minds.budget']);
+    expect(stepStates(same.sheet)).toEqual(['done', 'done']);
+  });
+
   it('cannot be confirmed while a later choice is blocked, and says it was judged alone', async () => {
     const blocked = (): unknown => {
       const drafted = fixture('mind-two-steps-plan') as { steps: Record<string, unknown>[] };

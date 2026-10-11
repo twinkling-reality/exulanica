@@ -86,7 +86,7 @@ def test_every_action_the_page_sends_by_a_route_is_an_entry_with_the_same_words_
     registry = _registry()
     routed = {ident: entry for ident, entry in registry.items() if entry["route"] is not None}
     # Counted from the page's own file, so a registry that changes shape fails here by name.
-    assert len(registry) == 35 and len(routed) == 21
+    assert len(registry) == 37 and len(routed) == 23
     offered = {action.id: action for action in action_catalog.offered()}
     assert set(offered) == set(routed)
     for ident, entry in routed.items():
@@ -147,6 +147,7 @@ def test_each_plan_word_is_the_planner_s_and_commits_by_the_action_s_route():
         plan.CONTROL_STEP,
         plan.BRING_PEOPLE,
         plan.PRESENCE,
+        plan.TAKE_IN,
     }
     words = set()
     for action in action_catalog.offered():
@@ -165,6 +166,11 @@ def test_each_plan_word_is_the_planner_s_and_commits_by_the_action_s_route():
     assert planner - words == {"other"}
     assert set(_plan_words()) - planner == NEVER_SENT - {"other"}
     assert {word for word, ident in _plan_words().items() if ident is None} == NEVER_SENT
+
+
+def test_what_taking_in_destroys_is_the_planner_s_own_list_of_what_is_lost():
+    [take_in] = [action for action in action_catalog.offered() if action.id == "people.take-in"]
+    assert take_in.destroys == plan.TAKE_IN_LOSES
 
 
 # -- the catalog against the route table ---------------------------------------------------------
@@ -195,6 +201,7 @@ def test_everything_that_spends_or_destroys_runs_as_a_plan_step_under_a_yes():
         "objects.undo",
         "objects.remove",
         "things.remove",
+        "people.take-in",
     }
     assert all(action.plan_word is not None for action in touched.values())
 
@@ -213,7 +220,7 @@ def _changed(ident: str, **members) -> dict:
     ("document", "said"),
     [
         (_changed("minds.choose", plan_word=None), "spends or destroys and runs as no plan step"),
-        (_changed("things.remove", plan_word=None), "spends or destroys and runs as no plan step"),
+        (_changed("people.take-in", plan_word=None), "spends or destroys and runs as no plan step"),
         (_changed("clock.play", route=None), "is offered and names no route"),
         (_changed("world.leave", route="POST /somewhere"), "still names a way to run"),
         (_changed("clock.play", cost_class="a little"), "a member this catalog cannot hold"),

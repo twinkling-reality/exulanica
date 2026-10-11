@@ -46,6 +46,10 @@ export const PLAN_ACTIONS: Readonly<Record<string, string | null>> = Object.free
   give_back: 'beings.give-back',
   send_away: 'people.send-away',
   bring_back: 'people.bring-back',
+  // What the world may spend on its AI minds in an hour, and a living town taking in what was
+  // placed after its people came (MAKE's package 1b): each sheet says what it comes to first.
+  set_minds_budget: 'minds.budget',
+  take_in: 'people.take-in',
   other: null,
 });
 
@@ -136,6 +140,8 @@ const ANSWER_FIELDS: Readonly<Record<string, { readonly at: string | null; reado
   'POST /world/versions/{version_id}/things/{thing_id}/remove': { at: null, fields: ['edit_seq', 'state_sha256'] },
   'POST /world/versions/{version_id}/society/play': { at: null, fields: ['choice_seq'] },
   'POST /world/versions/{version_id}/society/play/{subject_id}/give-back': { at: null, fields: ['choice_seq'] },
+  'POST /world/versions/{version_id}/models/{role_key}/budget': { at: 'budget', fields: ['budget_seq'] },
+  'POST /world/versions/{version_id}/society/take-in': { at: null, fields: ['society_id'] },
 };
 
 /**

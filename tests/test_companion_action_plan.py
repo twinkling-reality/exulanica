@@ -272,6 +272,9 @@ def test_every_code_a_plan_can_carry_is_declared():
         "mind_required",
         "mind_ambiguous",
         "too_many_people_for_models",
+        "budget_required",
+        "budget_ambiguous",
+        "budget_period",
     } == plan.CLARIFICATIONS
     assert "no_change" in plan.ACTION_REFUSALS
     json.dumps(sorted(plan.ACTION_REFUSALS))
@@ -283,7 +286,7 @@ def test_the_outcome_route_takes_exactly_the_operations_a_plan_names():
     from exulanica.api.routes.selection_actions import OutcomeOperation
 
     named = {row.commit for row in plan._MATRIX.values()} | {plan.STYLE_PREVIEW, plan.STYLE_APPLY}
-    named |= {plan.CONTROL, plan.CONTROL_STEP, plan.BRING_PEOPLE, plan.PRESENCE}
+    named |= {plan.CONTROL, plan.CONTROL_STEP, plan.BRING_PEOPLE, plan.PRESENCE, plan.TAKE_IN}
     assert set(get_args(OutcomeOperation)) == named
 
 

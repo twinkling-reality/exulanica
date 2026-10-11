@@ -51,6 +51,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from decimal import Decimal, InvalidOperation
 from typing import Any, Final
 
 import psycopg
@@ -58,6 +59,7 @@ import psycopg
 from exulanica.selection.action_plan import (
     ARRANGE,
     BRING_PEOPLE,
+    BUDGET,
     CONTROL,
     CONTROL_STEP,
     DIRECT,
@@ -71,6 +73,7 @@ from exulanica.selection.action_plan import (
     REMOVE,
     STYLE_APPLY,
     STYLE_PREVIEW,
+    TAKE_IN,
     THING_MOVE,
     THING_PLACE,
     THING_REMOVE,
@@ -83,6 +86,7 @@ from exulanica.selection.validation import Session
 from exulanica.world.decision_roles import decision_roles
 from exulanica.world.object_edit_preview import read_only_snapshot
 from exulanica.world.object_repository import WorldObjectRepository
+from exulanica.world.society_engines import society_engine
 from exulanica.world.society_model_choice_repository import decider_of
 
 __all__ = ["OUTCOME_PROFILE", "STEP_STATES", "InvalidOutcomeStep", "action_outcome"]
@@ -196,6 +200,10 @@ def _one_step(
         return _play_step(connection, session, world_id, version_id, step)
     if operation == PRESENCE:
         return _presence_step(connection, session, world_id, version_id, step)
+    if operation == BUDGET:
+        return _budget_step(connection, session, world_id, step)
+    if operation == TAKE_IN:
+        return _take_in_step(connection, session, world_id, version_id, step)
     raise InvalidOutcomeStep(f"{operation!r} is not an operation a Companion plan names")
 
 
@@ -251,6 +259,114 @@ def _mind_step(
         "subjects": len(subjects),
     }
     return _step(step, "applied", receipts=[receipt])
+
+
+def _dollars(value: Any) -> Decimal:
+    """A step's dollars as a decimal; a value that is none is a malformed step."""
+    try:
+        return Decimal(str(value))
+    except InvalidOperation as malformed:
+        raise ValueError("not a decimal") from malformed
+
+
+def _budget_step(
+    connection: psycopg.Connection,
+    session: Session,
+    world_id: str,
+    step: Mapping[str, Any],
+) -> dict[str, Any]:
+    """A budget for the world's minds: ``applied`` when the budget its answer names is this
+    world's, recorded by the caller under the step's own key with the two figures the step's
+    body named; ``superseded`` when it is so and a later budget has been set since, which is
+    then the world's; ``not_applied`` when its answer names none or it is not so, and for a
+    step that holds no request."""
+    if not step.get("body"):
+        return _step(step, "not_applied")
+    with _client_shape(step):
+        body = step.get("body") or {}
+        key = uuid.UUID(str(body["idempotency_key"]))
+        usd = _dollars(body["usd_per_hour"])
+        decisions = int(body["decisions_per_hour"])
+        role_key = str((step.get("bind") or {})["role_key"])
+        answer = _answer(step)
+        named = None if answer is None else answer.get("budget_seq")
+        sequence = None if named is None else int(named)
+    if sequence is None:
+        return _step(step, "not_applied")
+    row = connection.execute(
+        "select b.budget_seq,b.request_id,b.document,b.document_sha256,b.set_by,"
+        "(select max(n.budget_seq) from world_minds_budget n where n.workspace_id=b.workspace_id "
+        "and n.world_id=b.world_id and n.role_key=b.role_key) as newest "
+        "from world_minds_budget b "
+        "where b.workspace_id=%s and b.world_id=%s and b.role_key=%s and b.request_id=%s",
+        (session.workspace_id, world_id, role_key, key),
+    ).fetchone()
+    if (
+        row is None
+        or int(row["budget_seq"]) != sequence
+        or row["set_by"] != session.actor
+        or Decimal(str(row["document"]["usd_per_hour"])) != usd
+        or int(row["document"]["decisions_per_hour"]) != decisions
+    ):
+        return _step(step, "not_applied")
+    receipt = {
+        "operation": step.get("operation"),
+        "world_id": world_id,
+        "role_key": role_key,
+        "request_id": str(row["request_id"]),
+        "budget_seq": int(row["budget_seq"]),
+        "document_sha256": row["document_sha256"],
+        "usd_per_hour": str(row["document"]["usd_per_hour"]),
+        "decisions_per_hour": int(row["document"]["decisions_per_hour"]),
+    }
+    state = "applied" if int(row["newest"]) == sequence else "superseded"
+    return _step(step, state, receipts=[receipt])
+
+
+def _take_in_step(
+    connection: psycopg.Connection,
+    session: Session,
+    world_id: str,
+    version_id: uuid.UUID,
+    step: Mapping[str, Any],
+) -> dict[str, Any]:
+    """A living town's people taking their newcomers in: ``applied`` when the society the step's
+    answer names is this version's and is no longer a living one (the route made it again as a
+    society of things under the same id); ``not_applied`` when the answer names none, the
+    version holds another society or none, or its society is still a living one."""
+    with _client_shape(step):
+        answer = _answer(step)
+        named = (
+            None
+            if answer is None or answer.get("society_id") is None
+            else str(answer["society_id"])
+        )
+    row = connection.execute(
+        "select society_id,region_id,engine_version from world_society "
+        "where workspace_id=%s and world_id=%s and version_id=%s",
+        (session.workspace_id, world_id, version_id),
+    ).fetchone()
+    if (
+        named is None
+        or row is None
+        or str(row["society_id"]) != named
+        or society_engine(str(row["engine_version"])).state_family == "living"
+    ):
+        return _step(step, "not_applied")
+    return _step(
+        step,
+        "applied",
+        receipts=[
+            {
+                "operation": TAKE_IN,
+                "world_id": world_id,
+                "version_id": str(version_id),
+                "society_id": str(row["society_id"]),
+                "region_id": row["region_id"],
+                "engine": row["engine_version"],
+            }
+        ],
+    )
 
 
 def _play_step(

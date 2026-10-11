@@ -107,6 +107,9 @@ class MindsBudgetBody(BaseModel):
     ]
     #: Model decisions in any hour of real time.
     decisions_per_hour: Annotated[int, Field(ge=0, le=DECISIONS_MAXIMUM)]
+    #: The budget this request was prepared against, where the caller holds it to that: the
+    #: sequence of the world's newest budget as the caller read it, 0 where it had none.
+    after_budget_seq: Annotated[int, Field(ge=0, strict=True)] | None = None
 
 
 def _version(
@@ -334,7 +337,9 @@ def set_world_minds_budget(
 
     One appended record of the world, naming who set it; the newest is the budget, and the same
     request asked again answers the record it made (``budget`` is that record, also when a later
-    request has set another since). It asks no model and spends nothing. The process's own
+    request has set another since). A request that names the budget it was prepared against
+    (``after_budget_seq``) is refused where another has been set since (``budget_changed``).
+    It asks no model and spends nothing. The process's own
     budget and its reserve, a deployment's allowance and the workspace's grant still bound every
     call: a budget is never above them, whatever it reads.
     """
@@ -362,10 +367,11 @@ def set_world_minds_budget(
             usd_per_hour=body.usd_per_hour,
             decisions_per_hour=body.decisions_per_hour,
             set_by=session.actor,
+            after_budget_seq=body.after_budget_seq,
         )
     except MindsBudgetRefused as exc:
         return JSONResponse(
-            status_code=409 if exc.code == "budget_key_reused" else 422,
+            status_code=409 if exc.code in ("budget_key_reused", "budget_changed") else 422,
             content={"code": exc.code, "detail": exc.detail},
         )
     context = RoleContext(

@@ -1,0 +1,102 @@
+{
+  "profile": "exulanica.companion-action-plan/v1",
+  "outcome": "plan",
+  "kind": "simulation",
+  "world_id": "world:authored:test",
+  "version_id": "00000000-0000-0000-0000-000000000007",
+  "plan_sha256": "3e783a8d438bcddf649e331df6d3a30f67dab37b590aeafd1e504dc946126827",
+  "atomic": false,
+  "steps": [
+    {
+      "index": 0,
+      "action": {
+        "operation": "take_in",
+        "speed": null,
+        "minutes": null,
+        "region_id": null
+      },
+      "state": "prepared",
+      "code": null,
+      "operation": "POST /world/versions/{version_id}/society/take-in",
+      "bind": {
+        "version_id": "00000000-0000-0000-0000-000000000007"
+      },
+      "bind_from": null,
+      "query": {
+        "world_id": "world:authored:test"
+      },
+      "body": {},
+      "body_from": null,
+      "requires": [
+        "world.write"
+      ],
+      "permitted": true,
+      "spends": false,
+      "preview": null,
+      "pins": {
+        "clock_revision": 0,
+        "tick": 12,
+        "society_state_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "effects": [],
+      "confirmation": "required",
+      "titles": null,
+      "estimate": null,
+      "mind": null,
+      "cost": null,
+      "budget": null,
+      "erases": {
+        "undo": false,
+        "loses": [
+          "day_so_far",
+          "clock_position",
+          "playing_and_speed",
+          "models_chosen",
+          "looks_saved_for_residents",
+          "comparisons_and_experiments",
+          "companion_answers"
+        ],
+        "keeps": [
+          "people_homes_jobs_roles_shifts",
+          "world",
+          "things_placed",
+          "door_grants_and_programs",
+          "world_look"
+        ]
+      },
+      "replay": "asked_again_is_refused",
+      "receipt": "society_taken_in",
+      "compensation": null
+    }
+  ],
+  "spends": false,
+  "spends_by": [],
+  "clarification": null,
+  "refusal": null,
+  "capabilities": null,
+  "proposal_speech": null,
+  "clock": {
+    "profile": "exulanica.world-clock/v1",
+    "clock_profile": "exulanica.world-clock/legacy-v1",
+    "revision": 0,
+    "state": "paused",
+    "presented_through_tick": null,
+    "traffic": null,
+    "society": {
+      "control_revision": 4,
+      "engine": "exulanica-society/v5",
+      "mode": "paused",
+      "society_id": "00000000-0000-0000-0000-000000000009",
+      "speed": 1,
+      "state_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "tick": 12,
+      "tick_interval_ms": null
+    }
+  },
+  "execution": {
+    "prompt_version": "action-plan-13",
+    "calls": [],
+    "rejections": []
+  },
+  "names": {}
+}

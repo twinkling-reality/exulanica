@@ -38,6 +38,8 @@ export interface StepAnswer {
   readonly piece_request_ids?: readonly string[];
   /** The choice a mind choice was answered with, by its sequence in its society. */
   readonly choice_seq?: number;
+  /** The budget a budget's step was answered with, by its sequence in its world. */
+  readonly budget_seq?: number;
 }
 
 /**
@@ -67,8 +69,67 @@ export interface MindCost {
   readonly usdPerAnswerAtMost: string;
   readonly usdAtMost: string;
   readonly usdTypical: string | null;
+  /** Whether the typical figure rests on an estimated rate (a measurement cut short), not a measured one. */
+  readonly typicalIsEstimate: boolean;
   readonly usdPerWorldHour: string | null;
   readonly decisionsPerWorldHour: number | null;
+  /**
+   * Why the server would ask no model for one more answer right now, by its own reason: the
+   * world's hour of decisions or of dollars is used up (a budget of nothing among them); null
+   * while it would ask.
+   */
+  readonly refusedNow: string | null;
+}
+
+/** What a figure the server states twice reads at the most an answer can cost, and typically. */
+export interface AtBothPrices<T> {
+  readonly atMostPrice: T | null;
+  readonly atTypicalPrice: T | null;
+}
+
+/** How often some beings ask in an hour of real time, and how much of the hour the budget covers. */
+export interface BudgetDemand {
+  readonly beings: number;
+  readonly asksPerRealHour: number;
+  readonly minutesCovered: number;
+}
+
+/**
+ * What a budget for a world's minds comes to, stated on its step before the yes: the budget now
+ * and the one asked for, which figures the person's words named, what the last hour holds, how
+ * many beings are here and how many a model decides for, what the dollars pay for and which
+ * ceiling runs out first (at the most an answer can cost, and at the typical price where one is
+ * measured), how long the budget lasts, and what the server allows above any budget.
+ */
+export interface BudgetSheet {
+  readonly now: {
+    readonly usdPerHour: string; readonly decisionsPerHour: number;
+    readonly setByAPerson: boolean; readonly setByYou: boolean;
+  };
+  readonly asked: { readonly usdPerHour: string; readonly decisionsPerHour: number };
+  readonly named: readonly string[];
+  readonly hourSoFar: { readonly decisions: number; readonly usd: string };
+  readonly beings: number | null;
+  readonly minded: number;
+  /** The models that decide for beings here now; one name is said, several are never set side by side. */
+  readonly models: readonly { readonly name: string; readonly beings: number; readonly typical: boolean }[];
+  readonly answersForUsd: AtBothPrices<number>;
+  readonly binds: AtBothPrices<'usd' | 'decisions'>;
+  readonly demand: {
+    readonly minded: BudgetDemand; readonly everyone: BudgetDemand | null; readonly estimate: boolean;
+  } | null;
+  readonly refusedNow: string | null;
+  readonly hostRefusal: string | null;
+  /** The least the workspace's allowance has left on a provider asked here, where one bounds it. */
+  readonly allowanceLeftUsd: string | null;
+  readonly allowanceBelowBudget: boolean;
+}
+
+/** What a step that erases loses and keeps, by code, and whether anything undoes it. */
+export interface Erases {
+  readonly undo: boolean;
+  readonly loses: readonly string[];
+  readonly keeps: readonly string[];
 }
 
 /**
@@ -124,6 +185,10 @@ export interface PlanStep {
   /** For a mind chosen, what the choice comes to and what it may cost; null otherwise. */
   readonly mind: MindFacts | null;
   readonly cost: MindCost | null;
+  /** For a budget for the world's minds, what it comes to; null otherwise. */
+  readonly budget: BudgetSheet | null;
+  /** For a step that erases, what is lost and kept; null otherwise. */
+  readonly erases: Erases | null;
   /** The step as the server sent it, for the outcome read and the technical record. */
   readonly raw: Readonly<Record<string, unknown>>;
 }
@@ -133,6 +198,8 @@ export interface PlanRefusal {
   readonly detail: string;
   readonly step: number | null;
   readonly operation: string | null;
+  /** The code of the refused operation's capability descriptor, where the refusal carries one. */
+  readonly capabilityCode: string | null;
   readonly alternatives: readonly string[];
 }
 
@@ -247,6 +314,8 @@ function parseStep(value: unknown): PlanStep {
     estimate: pieceEstimate(row['estimate']),
     mind: mindFacts(row['mind']),
     cost: mindCost(row['cost']),
+    budget: budgetSheet(row['budget']),
+    erases: erases(row['erases']),
     raw: Object.freeze({ ...row }),
   });
 }
@@ -296,8 +365,81 @@ function mindCost(value: unknown): MindCost | null {
     usdPerAnswerAtMost: one,
     usdAtMost: most,
     usdTypical: dollars(row['usd_typical']),
+    typicalIsEstimate: dollars(row['usd_typical']) !== null && part(row['typical'])['rate_class'] !== 'measured',
     usdPerWorldHour: dollars(ceilings['usd_per_world_hour']),
     decisionsPerWorldHour: whole(ceilings['decisions_per_world_hour']),
+    refusedNow: nullableText(row['refused_now']),
+  });
+}
+
+/** A member that should be an object, as one; an empty one where it is not. */
+function part(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function bothPrices<T>(value: unknown, read: (found: unknown) => T | null): AtBothPrices<T> {
+  const row = part(value);
+  return Object.freeze({ atMostPrice: read(row['at_most_price']), atTypicalPrice: read(row['at_typical_price']) });
+}
+
+function budgetDemand(value: unknown): BudgetDemand | null {
+  const row = part(value);
+  const beings = whole(row['beings']); const asks = whole(row['asks_per_real_hour']); const minutes = whole(row['minutes_covered']);
+  return beings === null || asks === null || minutes === null ? null
+    : Object.freeze({ beings, asksPerRealHour: asks, minutesCovered: minutes });
+}
+
+/** A budget step's sheet, or null where the step states none or one whose two budgets do not read whole. */
+function budgetSheet(value: unknown): BudgetSheet | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  const now = part(row['now']); const asked = part(row['asked']); const hour = part(row['hour_so_far']);
+  const figures = (found: Record<string, unknown>): { usdPerHour: string; decisionsPerHour: number } | null => {
+    const usd = dollars(found['usd_per_hour']); const decisions = whole(found['decisions_per_hour']);
+    return usd === null || decisions === null ? null : { usdPerHour: usd, decisionsPerHour: decisions };
+  };
+  const held = figures(now); const wanted = figures(asked);
+  if (held === null || wanted === null) return null;
+  const binding = (found: unknown): 'usd' | 'decisions' | null => (found === 'usd' || found === 'decisions' ? found : null);
+  const demand = part(row['demand']);
+  const minded = budgetDemand(demand['minded']);
+  const host = part(row['host']);
+  const left = (Array.isArray(host['allowance']) ? host['allowance'] : [])
+    .flatMap((entry) => { const usd = dollars(part(entry)['available_usd']); return usd === null ? [] : [usd]; })
+    .sort((a, b) => Number(a) - Number(b))[0] ?? null;
+  return Object.freeze({
+    now: Object.freeze({ ...held, setByAPerson: now['set_by_a_person'] === true, setByYou: now['set_by_you'] === true }),
+    asked: Object.freeze(wanted),
+    named: Object.freeze(strings(row['named'])),
+    hourSoFar: Object.freeze({ decisions: whole(hour['decisions']) ?? 0, usd: dollars(hour['usd']) ?? '0' }),
+    beings: whole(row['beings']),
+    minded: whole(row['minded']) ?? 0,
+    models: Object.freeze((Array.isArray(row['models']) ? row['models'] : []).flatMap((model) => {
+      const found = part(model); const beings = whole(found['beings']);
+      return typeof found['name'] === 'string' && beings !== null
+        ? [Object.freeze({ name: found['name'], beings, typical: dollars(found['usd_per_answer_typical']) !== null })] : [];
+    })),
+    answersForUsd: bothPrices(row['answers_for_usd'], whole),
+    binds: bothPrices(row['binds'], binding),
+    demand: minded === null ? null : Object.freeze({
+      minded, everyone: budgetDemand(demand['everyone']), estimate: demand['rate_class'] !== 'measured',
+    }),
+    refusedNow: nullableText(row['refused_now']),
+    hostRefusal: nullableText(host['refusal']),
+    allowanceLeftUsd: left,
+    allowanceBelowBudget: host['allowance_below_an_hour_of_budget'] === true,
+  });
+}
+
+/** What a step erases, or null where it states nothing of the kind. */
+function erases(value: unknown): Erases | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  return Object.freeze({
+    // Only a server that says so plainly is read as offering a way back.
+    undo: row['undo'] === true,
+    loses: Object.freeze(strings(row['loses'])),
+    keeps: Object.freeze(strings(row['keeps'])),
   });
 }
 
@@ -361,6 +503,8 @@ export function parseActionPlan(value: unknown): ActionPlan {
       detail: typeof refusal['detail'] === 'string' ? refusal['detail'] : '',
       step: typeof refusal['step'] === 'number' ? refusal['step'] : null,
       operation: nullableText(refusal['operation']),
+      capabilityCode: refusal['capability'] !== null && typeof refusal['capability'] === 'object'
+        ? nullableText((refusal['capability'] as Record<string, unknown>)['code']) : null,
       alternatives: Object.freeze(strings(refusal['alternatives'])),
     }),
     capabilities: Array.isArray(row['capabilities'])

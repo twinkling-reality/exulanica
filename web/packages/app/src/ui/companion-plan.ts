@@ -15,8 +15,8 @@ import type { RefusalWords } from './actions/registry.js';
 import { button, panel, stateChip, technicalRecord, type InterfaceState } from './system/components.js';
 import { icon, type IconName } from './system/icon.js';
 import {
-  PLAN_CLARIFY_SLOT_WORDS, PLAN_CLARIFY_WORDS, PLAN_HANDS_WORDS, PLAN_WORDS, mindChoiceWords, mindDetailWords, pieceEstimateWords,
-  tooManyForModelsWords,
+  PLAN_CLARIFY_SLOT_WORDS, PLAN_CLARIFY_WORDS, PLAN_HANDS_WORDS, PLAN_WORDS, budgetDetailWords, budgetQuestionWords, budgetSheetWords,
+  erasesWords, mindChoiceWords, mindDetailWords, pieceEstimateWords, tooManyForModelsWords,
 } from './words/companion-plan.js';
 import { filled, isObjectActivity, objectActivity } from '../society-activity-words.js';
 
@@ -99,6 +99,11 @@ export function thingDetail(step: PlanStep): string | null {
   if (step.action.operation === 'choose_mind' && titles['whom'] !== undefined && titles['mind'] !== undefined) {
     return mindDetailWords(titles['whom'], titles['mind'], step.action['mind'] === 'routine');
   }
+  // A budget for the world's minds: its two figures, as the step's own typed action states them.
+  if (step.action.operation === 'set_minds_budget' && typeof step.action['usd_per_hour'] === 'string'
+    && typeof step.action['decisions_per_hour'] === 'number') {
+    return budgetDetailWords(step.action['usd_per_hour'], step.action['decisions_per_hour']);
+  }
   // New pieces: the things they are for, as the server's reads label them ("gate, sword, well").
   if (step.action.operation === 'request_pieces' && titles['kinds'] !== undefined) return capital(titles['kinds']);
   if (step.action.operation === 'place_thing' && titles['kind'] !== undefined) {
@@ -137,6 +142,13 @@ export function stepDetail(step: PlanStep): string | null {
     return `At ${action['speed']}× speed`;
   }
   return null;
+}
+
+/** The society's minute a step was pinned to, where the plan states one. */
+function pinnedMinute(step: PlanStep): number | null {
+  const pins = step.raw['pins'];
+  const tick = pins !== null && typeof pins === 'object' ? (pins as Record<string, unknown>)['tick'] : null;
+  return typeof tick === 'number' && Number.isInteger(tick) ? tick : null;
 }
 
 export function buildPlanSheet(options: PlanSheetOptions): PlanSheet {
@@ -207,6 +219,16 @@ export function buildPlanSheet(options: PlanSheetOptions): PlanSheet {
             icon('spends', 'sm'), mindChoiceWords(step.mind, step.cost, step.action['mind'] === 'routine'),
           ]),
         ])),
+        // What a budget for the world's AI minds comes to, a sentence a line, before the one Confirm.
+        ...plan.steps.flatMap((step) => (step.budget === null ? [] : budgetSheetWords(step.budget).map((line, at) =>
+          el('p', { class: 'companion-plan-estimate', 'data-step': String(step.index), 'data-kind': 'budget' }, [
+            ...(at === 0 ? [icon('spends', 'sm')] : []), line,
+          ])))),
+        // What a step that erases loses and keeps, whole, before the one Confirm.
+        ...plan.steps.flatMap((step) => (step.erases === null ? [] : erasesWords(step.erases, pinnedMinute(step)).map((line, at) =>
+          el('p', { class: 'companion-plan-estimate', 'data-step': String(step.index), 'data-kind': 'erases' }, [
+            ...(at === 0 ? [icon('warning', 'sm')] : []), line,
+          ])))),
         el('p', { class: 'companion-plan-summary', role: 'status', 'aria-live': 'polite' }),
         record(plan),
       );
@@ -235,6 +257,7 @@ export function buildPlanSheet(options: PlanSheetOptions): PlanSheet {
         el('p', { class: 'companion-plan-utterance', text: `“${utterance}”` }),
         el('p', { class: 'companion-plan-intro', text: clarification.code === 'too_many_people_for_models'
           ? tooManyForModelsWords(clarification.facts)
+          : clarification.code.startsWith('budget_') ? budgetQuestionWords(clarification.code, clarification.facts)
           : PLAN_CLARIFY_SLOT_WORDS[`${clarification.code}:${clarification.slot ?? ''}`]
             ?? PLAN_CLARIFY_WORDS[clarification.code] ?? PLAN_CLARIFY_WORDS['asset_ambiguous']! }),
         ...(clarification.candidates.length === 0 ? [] : [choices]),

@@ -1,0 +1,627 @@
+{
+  "catalog_id": "minds-budget-shapes",
+  "catalog_version": 1,
+  "schema_version": 1,
+  "profile": "exulanica.minds-budget-shapes/v1",
+  "source_build": "Authored. The short list of shapes a sentence that sets a world's budget for its minds may have, each a pattern of slots in order with the sentences it was written for, and the closed word lists of each slot. A sentence is planned only where the whole of it, in order, is one of these shapes; a word of one slot is allowed in that slot and nowhere else. In a pattern, <slot> is one entry of that slot's list and <slot>? may be absent; a plain word is that word; AMOUNTS is one amount, or an amount of each kind with or without 'and' between them, each with the hour after it where it is said; two amounts with 'or' or 'to' between them are a choice, which is asked about and never planned; FROM_TO is 'from' an amount 'to' an amount. A slot may state a direction for some of its words (the move slot does). A shape is added one at a time, with its sentences and a reason.",
+  "fallback": "A sentence that is none of these shapes is asked about and never planned.",
+  "entries": [
+    {
+      "key": "slot:please",
+      "kind": "slot",
+      "name": "please",
+      "words": [
+        "please"
+      ],
+      "reason": "The one word of asking a sentence may open or close with; it says nothing of how much."
+    },
+    {
+      "key": "slot:set",
+      "kind": "slot",
+      "name": "set",
+      "words": [
+        "set",
+        "make",
+        "keep",
+        "cap",
+        "limit",
+        "leave",
+        "hold",
+        "put"
+      ],
+      "reason": "Verbs that set a figure, in the form of an instruction. A sentence that reports what the minds do is not made with these in this place."
+    },
+    {
+      "key": "slot:move",
+      "kind": "slot",
+      "name": "move",
+      "words": [
+        "raise",
+        "lower",
+        "increase",
+        "decrease",
+        "reduce",
+        "change",
+        "bring",
+        "move",
+        "drop"
+      ],
+      "reason": "Verbs that move a figure. They stand only in the shapes where the amount follows the word to, or from one amount to another, since elsewhere the amount may be the size of the move. A word that says a direction is held to it: said with a figure on the other side of the world's budget now (lower to more than it is, raise to less), the figure is asked for.",
+      "direction": {
+        "raise": "up",
+        "increase": "up",
+        "lower": "down",
+        "decrease": "down",
+        "reduce": "down",
+        "drop": "down"
+      }
+    },
+    {
+      "key": "slot:give",
+      "kind": "slot",
+      "name": "give",
+      "words": [
+        "give"
+      ],
+      "reason": "The verb that hands a figure to the minds, the world or the town, as in give the minds 40 cents; never to a being, a kind or everyone, and never to a budget noun, which would read as an amount added to it."
+    },
+    {
+      "key": "slot:let",
+      "kind": "slot",
+      "name": "let",
+      "words": [
+        "let",
+        "allow"
+      ],
+      "reason": "The two verbs that permit spending; with them the subject of the closed list does the spending."
+    },
+    {
+      "key": "slot:modal",
+      "kind": "slot",
+      "name": "modal",
+      "words": [
+        "may",
+        "can"
+      ],
+      "reason": "The words that make a sentence about the subject a rule and not a report: the minds may spend is a budget, the minds spend is what happened. Must and should are not among them: each may mean a floor, and a budget is a ceiling."
+    },
+    {
+      "key": "slot:spend",
+      "kind": "slot",
+      "name": "spend",
+      "words": [
+        "spend",
+        "use",
+        "make",
+        "answer",
+        "ask",
+        "have",
+        "get"
+      ],
+      "reason": "What the subject is let do with the figure. They stand only after let, allow or a modal, or as the first word of an instruction."
+    },
+    {
+      "key": "slot:spend_first",
+      "kind": "slot",
+      "name": "spend_first",
+      "words": [
+        "spend",
+        "use"
+      ],
+      "reason": "The two verbs an instruction may open with to set the figure itself, as in spend a dollar an hour on the minds."
+    },
+    {
+      "key": "slot:subject",
+      "kind": "slot",
+      "name": "subject",
+      "words": [
+        "the minds",
+        "minds",
+        "the ai",
+        "ai",
+        "the ai minds",
+        "ai minds",
+        "the models",
+        "this world",
+        "the world",
+        "this town",
+        "the town",
+        "it",
+        "the budget",
+        "the minds budget",
+        "the ai budget",
+        "this worlds budget",
+        "the world budget",
+        "the town budget",
+        "the worlds budget",
+        "the towns budget",
+        "this towns budget",
+        "the limit",
+        "the cap",
+        "the spending",
+        "the minds spending",
+        "the minds limit",
+        "the minds cap",
+        "the worlds minds",
+        "the towns minds",
+        "this worlds minds",
+        "this towns minds",
+        "my towns minds",
+        "my worlds minds",
+        "the world s minds",
+        "the town s minds",
+        "this world s minds",
+        "this town s minds",
+        "my town s minds",
+        "my world s minds",
+        "the world s budget",
+        "the town s budget",
+        "this world s budget",
+        "this town s budget",
+        "its budget",
+        "their budget"
+      ],
+      "reason": "The one closed list of whose figure it is: the minds, the models, this world or town, the budget itself, with their possessive forms as the reader's tokens spell them. No word here is one being, one kind or everyone, so a figure for each of something has no subject to stand on."
+    },
+    {
+      "key": "slot:budget",
+      "kind": "slot",
+      "name": "budget",
+      "words": [
+        "the budget",
+        "the minds budget",
+        "the ai budget",
+        "this worlds budget",
+        "the world budget",
+        "the town budget",
+        "the worlds budget",
+        "the towns budget",
+        "this towns budget",
+        "the limit",
+        "the cap",
+        "the minds limit",
+        "the minds cap",
+        "the world s budget",
+        "the town s budget",
+        "this world s budget",
+        "this town s budget",
+        "its budget",
+        "their budget"
+      ],
+      "reason": "The entries of whose-figure-it-is that name a budget, a limit or a cap itself. The shapes that put a budget back to the default take these only: reset the budget is a budget's, reset the world is another request."
+    },
+    {
+      "key": "slot:given",
+      "kind": "slot",
+      "name": "given",
+      "words": [
+        "the minds",
+        "minds",
+        "the ai",
+        "ai",
+        "the ai minds",
+        "ai minds",
+        "the models",
+        "this world",
+        "the world",
+        "this town",
+        "the town",
+        "the worlds minds",
+        "the towns minds",
+        "this worlds minds",
+        "this towns minds",
+        "my towns minds",
+        "my worlds minds",
+        "the world s minds",
+        "the town s minds",
+        "this world s minds",
+        "this town s minds",
+        "my town s minds",
+        "my world s minds"
+      ],
+      "reason": "The entries of whose-figure-it-is that a figure can be given to: the minds, the models, this world or town. Not a budget noun, not the spending, and not it."
+    },
+    {
+      "key": "slot:minds",
+      "kind": "slot",
+      "name": "minds",
+      "words": [
+        "the minds",
+        "minds",
+        "the ai",
+        "ai",
+        "the ai minds",
+        "ai minds",
+        "the models",
+        "the spending",
+        "the minds spending",
+        "ai spending",
+        "the ai spending",
+        "spending"
+      ],
+      "reason": "The subjects that can be turned off: the minds and their spending. The world, the town and it are not among them, so stop the world is no budget of nothing."
+    },
+    {
+      "key": "slot:lead",
+      "kind": "slot",
+      "name": "lead",
+      "words": [
+        "to",
+        "at",
+        "up to",
+        "at most",
+        "no more than",
+        "a maximum of",
+        "to at most",
+        "to a maximum of"
+      ],
+      "reason": "Words that lead into a figure as the most that may be spent. None makes a floor, a total or a change."
+    },
+    {
+      "key": "slot:lead_bare",
+      "kind": "slot",
+      "name": "lead_bare",
+      "words": [
+        "up to",
+        "at most",
+        "no more than",
+        "a maximum of"
+      ],
+      "reason": "The same bounds from above where no verb stands before the amount, as in at most 600 decisions an hour."
+    },
+    {
+      "key": "slot:whom",
+      "kind": "slot",
+      "name": "whom",
+      "words": [
+        "for the minds",
+        "on the minds",
+        "on minds",
+        "on ai",
+        "on ai minds",
+        "on the ai",
+        "for ai",
+        "for the ai",
+        "for minds",
+        "for ai minds",
+        "on the models",
+        "for the models"
+      ],
+      "reason": "What the money is for, said after the figure. Each names the minds as a whole; none names a being, a kind or everyone."
+    },
+    {
+      "key": "slot:budget_of",
+      "kind": "slot",
+      "name": "budget_of",
+      "words": [
+        "a budget of",
+        "a limit of",
+        "a cap of"
+      ],
+      "reason": "The words between give the minds and the figure, naming the figure as the budget."
+    },
+    {
+      "key": "slot:other_step",
+      "kind": "slot",
+      "name": "other_step",
+      "words": [
+        "give",
+        "let",
+        "make",
+        "have",
+        "use",
+        "put",
+        "add",
+        "place",
+        "the",
+        "a",
+        "an",
+        "to",
+        "for",
+        "by",
+        "beside",
+        "near",
+        "next",
+        "decide",
+        "as",
+        "its",
+        "their",
+        "mind",
+        "be"
+      ],
+      "reason": "The few words of another step's clause, which may stand only among the names that step's options listed, before the word and that opens the budget's own clause."
+    },
+    {
+      "key": "slot:turn",
+      "kind": "slot",
+      "name": "turn",
+      "words": [
+        "turn",
+        "switch"
+      ],
+      "reason": "The two verbs that turn the minds off."
+    },
+    {
+      "key": "slot:none",
+      "kind": "slot",
+      "name": "none",
+      "words": [
+        "nothing",
+        "zero",
+        "none"
+      ],
+      "reason": "The words for a figure of nothing after set the budget to."
+    },
+    {
+      "key": "slot:to_default",
+      "kind": "slot",
+      "name": "to_default",
+      "words": [
+        "to the default",
+        "to its default",
+        "to their default",
+        "to default",
+        "to the default budget",
+        "to its default budget"
+      ],
+      "reason": "The ways the default is named after reset or back."
+    },
+    {
+      "key": "slot:the_default",
+      "kind": "slot",
+      "name": "the_default",
+      "words": [
+        "the default",
+        "the default budget",
+        "default budget"
+      ],
+      "reason": "The default named after use."
+    },
+    {
+      "key": "shape:bare",
+      "kind": "shape",
+      "name": "bare",
+      "budget": "amounts",
+      "pattern": "<please>? <lead_bare>? AMOUNTS <whom>? <please>?",
+      "examples": [
+        "50 cents an hour",
+        "600 decisions an hour",
+        "$2 and 3000 decisions an hour",
+        "at most 600 decisions an hour",
+        "$5 hourly for the minds",
+        "please 50 cents an hour"
+      ],
+      "after_names": false,
+      "reason": "A bare amount or two, with or without the hour: the answer to the reader's own question. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:set",
+      "kind": "shape",
+      "name": "set",
+      "budget": "amounts",
+      "pattern": "<please>? <set> <subject>? <lead> AMOUNTS <whom>? <please>?",
+      "examples": [
+        "Set the minds budget to $2 and 3000 decisions an hour",
+        "cap the minds at 40 cents an hour",
+        "Set it to $0.50 per hour",
+        "keep it at a dollar an hour"
+      ],
+      "after_names": true,
+      "reason": "An instruction that sets the subject's figure to, at or up to an amount. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:move_to",
+      "kind": "shape",
+      "name": "move_to",
+      "budget": "amounts",
+      "pattern": "<please>? <move> <subject>? to AMOUNTS <please>?",
+      "examples": [
+        "Raise the minds budget to 50 cents an hour",
+        "Lower the budget to 10 cents an hour"
+      ],
+      "after_names": true,
+      "reason": "A figure moved to an amount; without the word to the amount may be the size of the move, which is no shape. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:move_from_to",
+      "kind": "shape",
+      "name": "move_from_to",
+      "budget": "from_to",
+      "pattern": "<please>? <move>? <subject>? FROM_TO <please>?",
+      "examples": [
+        "raise it from 25 cents to 50 cents",
+        "from 25 cents to 50 cents an hour"
+      ],
+      "after_names": true,
+      "reason": "A figure moved from one amount to another; the first is what the budget is now, and is set aside only where it is. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:let",
+      "kind": "shape",
+      "name": "let",
+      "budget": "amounts",
+      "pattern": "<please>? <let> <subject> <spend> <lead_bare>? AMOUNTS <whom>? <please>?",
+      "examples": [
+        "Let this world spend up to 40 cents an hour on AI minds",
+        "Let the minds make 1,000 decisions an hour",
+        "Let the minds answer 600 times an hour"
+      ],
+      "after_names": true,
+      "reason": "The subject is let spend, make or answer up to an amount. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:allow",
+      "kind": "shape",
+      "name": "allow",
+      "budget": "amounts",
+      "pattern": "<please>? <let> <lead_bare>? AMOUNTS <whom>? <please>?",
+      "examples": [
+        "Allow 300 model decisions per hour and 20 cents"
+      ],
+      "after_names": false,
+      "reason": "An amount allowed, with no subject said. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:may",
+      "kind": "shape",
+      "name": "may",
+      "budget": "amounts",
+      "pattern": "<please>? <subject> <modal> <spend> <lead_bare>? AMOUNTS <whom>? <please>?",
+      "examples": [
+        "The minds may make at most 1,500 decisions an hour"
+      ],
+      "after_names": true,
+      "reason": "A rule about the subject, made a rule by its modal: what the minds may spend, not what they spend. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:spend",
+      "kind": "shape",
+      "name": "spend",
+      "budget": "amounts",
+      "pattern": "<please>? <spend_first> <lead_bare>? AMOUNTS <whom>? <please>?",
+      "examples": [
+        "Spend a dollar an hour on the minds"
+      ],
+      "after_names": false,
+      "reason": "An instruction that opens with spend or use and the figure. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:give",
+      "kind": "shape",
+      "name": "give",
+      "budget": "amounts",
+      "pattern": "<please>? <give> <given> <budget_of>? AMOUNTS <please>?",
+      "examples": [
+        "Give the minds 40 cents",
+        "Give the minds a budget of 2 dollars"
+      ],
+      "after_names": true,
+      "reason": "The minds, the world or the town is given a figure. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:nothing_spend",
+      "kind": "shape",
+      "name": "nothing_spend",
+      "budget": "nothing",
+      "pattern": "<please>? spend nothing <whom>? <please>?",
+      "examples": [
+        "Spend nothing on minds"
+      ],
+      "after_names": false,
+      "reason": "Nothing is to be spent on the minds. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:nothing_stop",
+      "kind": "shape",
+      "name": "nothing_stop",
+      "budget": "nothing",
+      "pattern": "<please>? stop spending anything? <whom>? <please>?",
+      "examples": [
+        "Stop spending anything on AI minds"
+      ],
+      "after_names": false,
+      "reason": "Spending on the minds is to stop. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:nothing_off",
+      "kind": "shape",
+      "name": "nothing_off",
+      "budget": "nothing",
+      "pattern": "<please>? <turn> <minds> off <please>?",
+      "examples": [
+        "Turn the minds off",
+        "Turn the minds' spending off"
+      ],
+      "after_names": false,
+      "reason": "The minds or their spending turned off. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:nothing_off_first",
+      "kind": "shape",
+      "name": "nothing_off_first",
+      "budget": "nothing",
+      "pattern": "<please>? <turn> off <minds> <please>?",
+      "examples": [
+        "Turn off the minds"
+      ],
+      "after_names": false,
+      "reason": "The same with off said first. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:nothing_stop_minds",
+      "kind": "shape",
+      "name": "nothing_stop_minds",
+      "budget": "nothing",
+      "pattern": "<please>? stop <minds> <please>?",
+      "examples": [
+        "Stop the minds"
+      ],
+      "after_names": false,
+      "reason": "The minds stopped. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:nothing_set",
+      "kind": "shape",
+      "name": "nothing_set",
+      "budget": "nothing",
+      "pattern": "<please>? <set> <subject> to <none> <please>?",
+      "examples": [
+        "Set the budget to nothing",
+        "Set the minds budget to zero"
+      ],
+      "after_names": false,
+      "reason": "The subject's figure set to nothing in a word. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:default_reset",
+      "kind": "shape",
+      "name": "default_reset",
+      "budget": "default",
+      "pattern": "<please>? reset <budget> <to_default>? <please>?",
+      "examples": [
+        "Reset the minds budget",
+        "Reset the budget to its default"
+      ],
+      "after_names": false,
+      "reason": "The subject's figure reset. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:default_back",
+      "kind": "shape",
+      "name": "default_back",
+      "budget": "default",
+      "pattern": "<please>? <set> <budget> back <to_default> <please>?",
+      "examples": [
+        "Put the minds budget back to the default",
+        "Put the budget back to its default"
+      ],
+      "after_names": false,
+      "reason": "The subject's figure put back to the default. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:default_go_back",
+      "kind": "shape",
+      "name": "default_go_back",
+      "budget": "default",
+      "pattern": "<please>? go? back <to_default> <please>?",
+      "examples": [
+        "Go back to the default",
+        "back to the default"
+      ],
+      "after_names": false,
+      "reason": "Back to the default, with no subject said. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    },
+    {
+      "key": "shape:default_use",
+      "kind": "shape",
+      "name": "default_use",
+      "budget": "default",
+      "pattern": "<please>? use <the_default> <please>?",
+      "examples": [
+        "Use the default budget"
+      ],
+      "after_names": false,
+      "reason": "The default asked for by name. It stands for exactly the sentences its pattern spells and no other order of the same words."
+    }
+  ]
+}

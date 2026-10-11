@@ -1,0 +1,142 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "arms": {
+      "living_town": {
+        "answers_not_among_the_offered": 0,
+        "answers_refused_at_the_answer_bound": 0,
+        "answers_taken": 43,
+        "asks": 43,
+        "asks_per_being_minute": "0.0448",
+        "asks_that_failed": 0,
+        "asks_whose_call_was_not_sent": 0,
+        "base_tick_interval_ms": 4000,
+        "beings_in_the_world": 40,
+        "beings_with_the_model": 8,
+        "ended_by": "simulated minutes",
+        "engine": "exulanica-society/v5",
+        "first_poll": "2026-10-10T14:20:45Z",
+        "last_poll": "2026-10-10T14:31:09Z",
+        "machine_slept_inside": false,
+        "preregistration_sha256": "bdf8051d7408bc23b838ad927eb8131a800cbdc3e91e3940e09e274e60a7c2d0",
+        "price_class": "measured",
+        "rate_class": "measured",
+        "receipts_file_sha256": "1a11a216ebd39cfc04830fe71a8be8678c8f0a95a872e8ff2d33c8e9329304cc",
+        "result_file_sha256": "24ab6ab23a1ad9ab368d5258adccbbc0bd0bccbfaa654f510fc10e4ff476c2bc",
+        "result_record_sha256": "a0397e2317e80695b40491b7fd1bbe07cde99a1dcb716686d44269590d49b8a9",
+        "simulated_minutes": 120,
+        "sleep_entries_inside": 0,
+        "status": "valid",
+        "status_reason": "ended by its registered length with no failed ask",
+        "tree": {
+          "head": "f830b38dd5631ab2bf0abd4a3a908cfddb355c31",
+          "uncommitted_paths": 0
+        },
+        "usd": "0.00494160",
+        "usd_per_ask": "0.00011492"
+      },
+      "society_of_things": {
+        "answers_not_among_the_offered": 0,
+        "answers_refused_at_the_answer_bound": 5,
+        "answers_taken": 86,
+        "asks": 91,
+        "asks_per_being_minute": "0.2585",
+        "asks_that_failed": 5,
+        "asks_whose_call_was_not_sent": 0,
+        "base_tick_interval_ms": 4000,
+        "beings_in_the_world": 9,
+        "beings_with_the_model": 8,
+        "ended_by": "its stop rule for failed asks",
+        "engine": "exulanica-society/v7",
+        "first_poll": "2026-10-10T14:33:16Z",
+        "last_poll": "2026-10-10T14:39:58Z",
+        "machine_slept_inside": false,
+        "preregistration_sha256": "95f7ff24525c8239756b1b200c42ceddd76ec19855223137e4354660772b6b31",
+        "price_class": "measured",
+        "rate_class": "estimate",
+        "receipts_file_sha256": "0f99fc380af8089fd34f789c5d20ac52fd243811a72a95e81a3571980e9f50d0",
+        "result_file_sha256": "08ee69be02b6a0031a29be04ccf0ae9a91fd6646202fcdc3d69bd23ad9df7eda",
+        "result_record_sha256": "b30849d34d33096d4628a3c7b13d9f7320a24d59a47902b01f736705691c03dd",
+        "simulated_minutes": 44,
+        "sleep_entries_inside": 0,
+        "status": "cut",
+        "status_reason": "ended by its own stop rule at its fifth failed ask; each of the five was the model's own answer running to the answer bound and being refused by the host, which the rule counts as a failed ask; its registration says a cut arm's rate is not used for a default",
+        "tree": {
+          "head": "f830b38dd5631ab2bf0abd4a3a908cfddb355c31",
+          "uncommitted_paths": 0
+        },
+        "usd": "0.02562756",
+        "usd_per_ask": "0.00028162"
+      },
+      "society_of_things_first_run": {
+        "answers_not_among_the_offered": 1,
+        "answers_refused_at_the_answer_bound": 2,
+        "answers_taken": 23,
+        "asks": 36,
+        "asks_per_being_minute": "0.2812",
+        "asks_that_failed": 12,
+        "asks_whose_call_was_not_sent": 10,
+        "base_tick_interval_ms": 4000,
+        "beings_in_the_world": 9,
+        "beings_with_the_model": 8,
+        "ended_by": "its stop rule for failed asks",
+        "engine": "exulanica-society/v7",
+        "first_poll": "2026-10-10T13:58:40Z",
+        "last_poll": "2026-10-10T14:05:58Z",
+        "machine_slept_inside": true,
+        "preregistration_sha256": "bdf8051d7408bc23b838ad927eb8131a800cbdc3e91e3940e09e274e60a7c2d0",
+        "price_class": "not_used",
+        "rate_class": "not_used",
+        "receipts_file_sha256": "38788b8d72ee8dd2a7ca981a5f367455fdf32787b935da3356d2163b5f85efc4",
+        "result_file_sha256": "7feaa4b985a7819bdd4506ea7e1943ba90e95e2fd3fd97ba12f4adddfd1d8983",
+        "result_record_sha256": "02db22bc360a9914dfe4f59be3e73432d788facd638558599899be664cb388d4",
+        "simulated_minutes": 16,
+        "sleep_entries_inside": 2,
+        "status": "void",
+        "status_reason": "the machine slept inside the arm, by its power log. Of its 12 failed asks, 10 were calls that were never sent: they failed on this machine as it woke, with no token and no cost; 2 were the model's own answers running to the answer bound. The arm is used for nothing",
+        "tree": {
+          "head": "f830b38dd5631ab2bf0abd4a3a908cfddb355c31",
+          "uncommitted_paths": 0
+        },
+        "usd": "0.00798024",
+        "usd_per_ask": "0.00022167"
+      }
+    },
+    "kind": "exulanica.minds-ask-rates/v1",
+    "model": {
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "provider": "nebius_token_factory"
+    },
+    "note": "How often the playback host asks a being whose mind is an open model, a simulated minute, and what one ask cost, in two society engines of this product. In each arm eight beings of one world had the model as their mind while the host played the world, and every figure is read from the decision receipts the host recorded.",
+    "price_seen_again": {
+      "arms_of_one_prompt": 4,
+      "asks": 360,
+      "asks_answered_in_two_calls": 1,
+      "billed_calls": 361,
+      "engine": "exulanica-society/v7",
+      "note": "A second run of the same model in the same engine as the cut arm: recorded situations of a society of things asked again by a script, under four arms whose prompts differed by one sentence. Its dollars an ask are stated beside the cut arm's so a reader can see two runs agree; its asks are not a town's, so it states no rate.",
+      "preregistration_sha256": "e9297582dcc17236df8ff60be3177c6f03fadd94ec1934e4dd6332142792965d",
+      "results_file_sha256": "1bd9da531c52a64f128376426aba82648ed4816212f1990c7109612a8d340a50",
+      "run_file_sha256": "d2bef793f019b97b8e37411d225edc8e01ae3bade02ccb780b3fa2f04b7661c6",
+      "tree": {
+        "head": "8e2c54d63be0cddf7090263bacf58b5400082648",
+        "uncommitted_paths": 16
+      },
+      "usd": "0.09836772",
+      "usd_per_ask": "0.00027324"
+    },
+    "provider": "Nebius Token Factory",
+    "what_this_is_not": {
+      "compares_models": false,
+      "limits": "Eight beings an arm, one town an arm, one morning. The rate is these two worlds'; a town whose beings talk more or stand nearer each other may be asked more often.",
+      "measures_the_provider": false,
+      "models_measured": 1,
+      "statement": "One model in two engines. Nothing here sets one model beside another, and nothing here is a test of the service that served it: the figures are what this product's own asking cost on one morning."
+    },
+    "window": {
+      "ended": "2026-10-10T15:45:09Z",
+      "started": "2026-10-10T13:58:40Z"
+    }
+  },
+  "record_sha256": "c396cfc52dbfcddecf00e0f7666aee64b618c67938299f623f2174f915e26b1e"
+}

@@ -43,6 +43,7 @@ __all__ = [
     "MindsBudget",
     "MindsBudgetRefused",
     "MindsBudgetRepository",
+    "budget_figures",
     "default_budget",
 ]
 
@@ -59,6 +60,8 @@ BUDGET_REFUSALS: Final[Mapping[str, str]] = {
     "budget_decisions_not_a_figure": "the decisions an hour are not a figure that can be "
     "recorded: a whole number from 0",
     "budget_key_reused": "this request id recorded another budget for this world",
+    "budget_changed": "this world's budget was set again after this request was prepared, so "
+    "it is not the budget this request was made against; read the budget and ask again",
 }
 
 
@@ -135,6 +138,13 @@ def _figures(usd_per_hour: Any, decisions_per_hour: Any) -> tuple[Decimal, int]:
     return usd, decisions_per_hour
 
 
+def budget_figures(usd_per_hour: Any, decisions_per_hour: Any) -> tuple[Decimal, int]:
+    """A budget's two figures as a row can hold them, or :class:`MindsBudgetRefused` by the code
+    the budget route answers: the check ``record`` makes, for a caller that states a budget
+    before it is sent (a Companion plan's step)."""
+    return _figures(usd_per_hour, decisions_per_hour)
+
+
 class MindsBudgetRepository:
     """One world's budgets for its minds, under the workspace's row security."""
 
@@ -169,10 +179,14 @@ class MindsBudgetRepository:
         usd_per_hour: Any,
         decisions_per_hour: Any,
         set_by: uuid.UUID,
+        after_budget_seq: int | None = None,
     ) -> MindsBudget:
         """Record the world's budget for ``role``, or answer the one this request id already
         recorded. A request id that recorded other figures, or another account's, is refused
-        (``budget_key_reused``)."""
+        (``budget_key_reused``). A request that names the budget it was prepared against
+        (``after_budget_seq``: that record's sequence, 0 where the world had none) is refused
+        where the world's newest is another (``budget_changed``), so a figure left as it was
+        never puts back what somebody set in between."""
         usd, decisions = _figures(usd_per_hour, decisions_per_hour)
         with self.connection.transaction():
             # The lock the insert's trigger takes, taken first: one setter a world and role reads
@@ -198,7 +212,10 @@ class MindsBudgetRepository:
                     raise MindsBudgetRefused("budget_key_reused")
                 return held
             newest = self._newest(role.key)
-            sequence = (0 if newest is None else int(newest["budget_seq"])) + 1
+            latest = 0 if newest is None else int(newest["budget_seq"])
+            if after_budget_seq is not None and after_budget_seq != latest:
+                raise MindsBudgetRefused("budget_changed")
+            sequence = latest + 1
             document: dict[str, Any] = {
                 "profile": PROFILE,
                 "world_id": self.world_id,

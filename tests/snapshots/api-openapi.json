@@ -16664,7 +16664,7 @@
      "world"
     ],
     "summary": "Set World Minds Budget",
-    "description": "Set what this world may spend on the model minds of its beings, in any hour of real time.\n\nOne appended record of the world, naming who set it; the newest is the budget, and the same\nrequest asked again answers the record it made (``budget`` is that record, also when a later\nrequest has set another since). It asks no model and spends nothing. The process's own\nbudget and its reserve, a deployment's allowance and the workspace's grant still bound every\ncall: a budget is never above them, whatever it reads.",
+    "description": "Set what this world may spend on the model minds of its beings, in any hour of real time.\n\nOne appended record of the world, naming who set it; the newest is the budget, and the same\nrequest asked again answers the record it made (``budget`` is that record, also when a later\nrequest has set another since). A request that names the budget it was prepared against\n(``after_budget_seq``) is refused where another has been set since (``budget_changed``).\nIt asks no model and spends nothing. The process's own\nbudget and its reserve, a deployment's allowance and the workspace's grant still bound every\ncall: a budget is never above them, whatever it reads.",
     "operationId": "set_world_minds_budget_world_versions__version_id__models__role_key__budget_post",
     "parameters": [
      {
@@ -22781,6 +22781,34 @@
        }
       ],
       "title": "Cost"
+     },
+     "budget": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Budget"
+     },
+     "erases": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Erases"
      },
      "replay": {
       "type": "string",
@@ -31698,6 +31726,18 @@
       "maximum": 2147483647.0,
       "minimum": 0.0,
       "title": "Decisions Per Hour"
+     },
+     "after_budget_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "After Budget Seq"
      }
     },
     "additionalProperties": false,
@@ -32531,6 +32571,18 @@
        }
       ],
       "title": "Choice Seq"
+     },
+     "budget_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Budget Seq"
      }
     },
     "additionalProperties": false,
@@ -32650,6 +32702,18 @@
        }
       ],
       "title": "Choice Seq"
+     },
+     "budget_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Budget Seq"
      }
     },
     "additionalProperties": false,
@@ -32728,7 +32792,9 @@
        "POST /world/versions/{version_id}/things/{thing_id}/remove",
        "POST /world/versions/{version_id}/society/presence",
        "POST /world/versions/{version_id}/society/play",
-       "POST /world/versions/{version_id}/society/play/{subject_id}/give-back"
+       "POST /world/versions/{version_id}/society/play/{subject_id}/give-back",
+       "POST /world/versions/{version_id}/models/{role_key}/budget",
+       "POST /world/versions/{version_id}/society/take-in"
       ],
       "title": "Operation"
      },
@@ -34154,7 +34220,9 @@
          "remove_object": "#/components/schemas/TypedActionBody",
          "remove_thing": "#/components/schemas/TypedActionBody",
          "send_away": "#/components/schemas/TypedSimulationBody",
+         "set_minds_budget": "#/components/schemas/TypedActionBody",
          "set_speed": "#/components/schemas/TypedSimulationBody",
+         "take_in": "#/components/schemas/TypedSimulationBody",
          "undo_last_edit": "#/components/schemas/TypedActionBody"
         }
        }
@@ -42272,7 +42340,8 @@
        "move_thing",
        "remove_thing",
        "play_being",
-       "give_back"
+       "give_back",
+       "set_minds_budget"
       ],
       "title": "Operation"
      },
@@ -42459,6 +42528,51 @@
        }
       ],
       "title": "Mind"
+     },
+     "usd_per_hour": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 13,
+        "minLength": 1,
+        "pattern": "^[0-9]{1,6}(\\.[0-9]{1,6})?$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Usd Per Hour"
+     },
+     "decisions_per_hour": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decisions Per Hour"
+     },
+     "figures_named": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string",
+         "enum": [
+          "usd_per_hour",
+          "decisions_per_hour"
+         ]
+        },
+        "type": "array",
+        "maxItems": 2
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Figures Named"
      }
     },
     "additionalProperties": false,
@@ -42480,7 +42594,8 @@
        "advance",
        "bring_people",
        "send_away",
-       "bring_back"
+       "bring_back",
+       "take_in"
       ],
       "title": "Operation"
      },

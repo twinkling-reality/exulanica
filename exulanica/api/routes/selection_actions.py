@@ -148,6 +148,7 @@ class TypedActionBody(BaseModel):
         "remove_thing",
         "play_being",
         "give_back",
+        "set_minds_budget",
     ]
     asset_key: str | None = Field(default=None, max_length=200, pattern=r"^[a-z][a-z0-9.-]*$")
     object_id: str | None = Field(default=None, max_length=200, pattern=OBJECT_ID_PATTERN)
@@ -170,6 +171,24 @@ class TypedActionBody(BaseModel):
     #: and a model id).
     whom: str | None = Field(default=None, min_length=1, max_length=300)
     mind: str | None = Field(default=None, min_length=1, max_length=300)
+    #: A budget for the world's minds: US dollars (a decimal of at most six places) and model
+    #: decisions in any hour of real time, and which of the two the person's words named. The
+    #: planner checks both as the budget route's body is checked.
+    usd_per_hour: str | None = Field(
+        default=None, min_length=1, max_length=13, pattern=r"^[0-9]{1,6}(\.[0-9]{1,6})?$"
+    )
+    decisions_per_hour: Annotated[int, Field(ge=0)] | None = None
+    figures_named: list[Literal["usd_per_hour", "decisions_per_hour"]] | None = Field(
+        default=None, max_length=2
+    )
+
+    @field_validator("decisions_per_hour", mode="before")
+    @classmethod
+    def _candidate_decisions(cls, value: Any) -> Any:
+        """A ``budget_ambiguous`` candidate's value is the count written as text, and a client
+        fills the open slot with it; it means the same whole number."""
+        whole = isinstance(value, str) and value.isascii() and value.isdigit() and len(value) <= 10
+        return int(value) if whole else value
 
 
 class TypedSimulationBody(BaseModel):
@@ -178,7 +197,14 @@ class TypedSimulationBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     operation: Literal[
-        "play", "pause", "set_speed", "advance", "bring_people", "send_away", "bring_back"
+        "play",
+        "pause",
+        "set_speed",
+        "advance",
+        "bring_people",
+        "send_away",
+        "bring_back",
+        "take_in",
     ]
     #: A listed speed, as an integer or as the clarification candidate's value says it.
     speed: Literal[SPEEDS] | None = None  # type: ignore[valid-type]
@@ -232,6 +258,8 @@ OutcomeOperation = Literal[
     "POST /world/versions/{version_id}/society/presence",
     "POST /world/versions/{version_id}/society/play",
     "POST /world/versions/{version_id}/society/play/{subject_id}/give-back",
+    "POST /world/versions/{version_id}/models/{role_key}/budget",
+    "POST /world/versions/{version_id}/society/take-in",
 ]
 
 
@@ -251,6 +279,9 @@ class OutcomePinsBody(BaseModel):
     society_state_sha256: str | None = Field(default=None, pattern=_SHA256)
     #: A mind choice's step: the society's newest choice when the plan was made.
     choice_seq: int | None = Field(default=None, ge=0)
+    #: A budget's step: the world's newest budget when the plan was made, null for a world
+    #: nobody set one for.
+    budget_seq: int | None = Field(default=None, ge=1)
 
 
 class OutcomeAnswerBody(BaseModel):
@@ -280,6 +311,8 @@ class OutcomeAnswerBody(BaseModel):
     piece_request_ids: list[uuid.UUID] | None = Field(default=None, max_length=16)
     #: The choice a mind choice was answered with, by its sequence in its society.
     choice_seq: int | None = Field(default=None, ge=1)
+    #: The budget a budget's step was answered with, by its sequence in its world.
+    budget_seq: int | None = Field(default=None, ge=1)
 
 
 class OutcomeStepBody(BaseModel):
@@ -399,6 +432,16 @@ class ActionStepView(BaseModel):
     #: the spender's own reservation, the typical figure where a record holds one (else null),
     #: and the world's own hourly ceilings; absent otherwise.
     cost: dict[str, JsonValue] | None = None
+    #: For a budget for the world's minds, what it comes to before the person confirms: the
+    #: budget now and asked and which figures the words named, the hour so far and what is left
+    #: of it, how many beings are here and how many a model decides for, what the dollars pay for
+    #: and which ceiling runs out first at the most an answer can cost and at the typical price,
+    #: how long the budget lasts, what the host would answer the next ask, and what this server
+    #: allows above any budget; absent otherwise.
+    budget: dict[str, JsonValue] | None = None
+    #: For a step that erases, what is lost and what is kept, by code, and whether anything
+    #: undoes it; absent otherwise.
+    erases: dict[str, JsonValue] | None = None
     replay: str
     receipt: str
     compensation: dict[str, str] | None

@@ -739,7 +739,11 @@ decimals. It asks no model and spends nothing. Each setting is one appended row 
 `world_minds_budget` (`exulanica.world-minds-budget/v1`: the world, the role, the two figures,
 who set it, its digest), never changed or deleted; the newest is the budget and the history
 stays. The same request asked again answers the record it made; its key with other figures is
-refused (`budget_key_reused`). A budget names a world and no society, so it outlives the society
+refused (`budget_key_reused`). A request may name the budget it was prepared against
+(`after_budget_seq`: that record's sequence, 0 where the world had none); it is then refused where
+the world's newest budget is another (`budget_changed`, 409) and appends nothing, so a caller that
+changes one figure and repeats the other never puts back what somebody set in between. A budget
+names a world and no society, so it outlives the society
 of the day. Another role's asks are bounded by its own contract's figures, and a budget for one
 is refused (`budget_not_for_this_role`).
 
@@ -751,6 +755,18 @@ bounds. Two settings at once are taken one after the other, and a request answer
 made, also when another has been set since. A restore brings back the budget its backup held, as
 it brings back the model choices it held; the host's bounds bind either way. A budget of nothing asks no model: every being decides by
 its routine and each choice point's receipt names the hour's bound.
+
+What an ask typically costs, and how often a being is asked, is data beside the bound: one entry
+an engine and model in `assets/catalogs/society-minds-cost/society-minds-typical-cost.v1.json`,
+each naming the immutable evaluation record it is read from
+(`docs/evaluation/2026-10-10-minds-ask-rates.json`) and the counts of that record's arm, from
+which the reader works out dollars an ask and asks a being a simulated minute
+(`exulanica.world.minds_typical`). Each figure carries its class: a rate from an arm its own
+registration calls cut is an estimate, and every read of it says so. An engine and model nobody
+measured has no typical figure, and nothing is carried from one model or engine to another. A
+person setting a budget in a sentence is told both the bound and the typical figure, and which of
+the budget's two ceilings runs out first at each
+([the Companion's budget step](companion-question.md#steps-that-spend-nothing)).
 
 The host reads the world's budget once a claim, before it reserves a minute's asks
 (`MindsBudgetRepository.current`), and weighs each ask against it as it weighed the catalog's

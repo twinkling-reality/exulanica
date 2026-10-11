@@ -71,7 +71,7 @@ def _budget_path(world, role_key: str) -> tuple[dict, str]:
     return scope, root + f"/models/{role_key}/budget"
 
 
-def _set(client, world, usd: str, decisions: int, *, key: str | None = None, role=None):
+def _set(client, world, usd: str, decisions: int, *, key: str | None = None, role=None, after=None):
     scope, path = _budget_path(world, role or minds._people_entry()["key"])
     return client.post(
         path,
@@ -81,6 +81,7 @@ def _set(client, world, usd: str, decisions: int, *, key: str | None = None, rol
             "idempotency_key": key or str(uuid.uuid4()),
             "usd_per_hour": usd,
             "decisions_per_hour": decisions,
+            **({} if after is None else {"after_budget_seq": after}),
         },
     )
 
@@ -188,6 +189,43 @@ def test_a_budget_is_one_appended_record_under_its_key_and_the_newest_is_the_bud
         "decisions_per_world_hour": 1200,
         "set_by_a_person": True,
     }
+
+
+def test_a_request_held_to_the_budget_it_was_prepared_against_is_refused_once_another_is_set(
+    companion,
+):
+    """A request may name the budget it was prepared against. One set in between refuses it and
+    appends nothing, so a figure the request left as it was never puts back what somebody set."""
+    world, client, _transport = companion
+    minds._town(client, world)
+    # Held to there being none, on a world nobody set a budget for: recorded.
+    first = _set(client, world, "0.5", 600, after=0)
+    assert first.status_code == 200 and first.json()["budget"]["budget_seq"] == 1
+    # A request prepared before that one, with the decisions as they then were, arrives late.
+    late = _set(client, world, "0.25", 1200, after=0)
+    assert (late.status_code, late.json()["code"]) == (409, "budget_changed")
+    assert "set again" in late.json()["detail"]
+    assert [row["budget_seq"] for row in _rows(world)] == [1]
+    read = minds._models_read(client, world)["budget"]
+    assert (read["usd_per_hour"], read["decisions_per_hour"]) == ("0.500000", 600)
+    # A sequence the world never reached is refused the same way.
+    assert _set(client, world, "0.25", 1200, after=7).json()["code"] == "budget_changed"
+    # Held to the newest, it is recorded; its retry answers that record, though the newest is
+    # by then the record itself.
+    key = str(uuid.uuid4())
+    second = _set(client, world, "0.25", 1200, after=1, key=key)
+    assert second.status_code == 200 and second.json()["budget"]["budget_seq"] == 2
+    again = _set(client, world, "0.25", 1200, after=1, key=key)
+    assert again.status_code == 200 and again.json()["budget"] == second.json()["budget"]
+    assert [row["budget_seq"] for row in _rows(world)] == [1, 2]
+    # The sequence is a whole number and nothing that reads as one: true and "2" are refused.
+    for loose in (True, "2", 2.0):
+        refused = _set(client, world, "0.25", 1200, after=loose)
+        assert refused.status_code == 422, (loose, refused.text)
+    assert [row["budget_seq"] for row in _rows(world)] == [1, 2]
+    # A request that names no budget is taken whatever the newest is, as before.
+    free = _set(client, world, "0.75", 300)
+    assert free.status_code == 200 and free.json()["budget"]["budget_seq"] == 3
 
 
 def test_a_budget_is_for_the_people_s_role_in_a_world_and_a_version_that_exist(companion):

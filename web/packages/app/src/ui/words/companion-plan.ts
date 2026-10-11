@@ -7,7 +7,7 @@
  */
 
 import type { RefusalWords } from '../actions/registry.js';
-import type { MindCost, MindFacts, PieceEstimate } from '../../companion-actions-api.js';
+import type { BudgetDemand, BudgetSheet, Erases, MindCost, MindFacts, PieceEstimate } from '../../companion-actions-api.js';
 
 export const PLAN_WORDS = Object.freeze({
   title: 'Check this plan',
@@ -111,7 +111,21 @@ export const PLAN_CLARIFY_WORDS: Readonly<Record<string, string>> = Object.freez
   mind_required: 'Which mind should decide for them?',
   mind_ambiguous: 'Which mind did you mean?',
   too_many_people_for_models: 'That is more beings than AI models run in this world at once. Who instead?',
+  budget_required: 'How much may this world spend on AI minds in an hour? Say an amount, such as 50 cents an hour, or a number of decisions an hour.',
+  budget_ambiguous: 'Which amount did you mean?',
+  budget_period: 'A world’s budget for AI minds is by the hour of real time, and I will not work an hour’s figure out of another span. What may it spend in an hour?',
 });
+
+/**
+ * A question about a budget, with the budget the world has now where the plan states it
+ * (`usd_per_hour_microusd`, `decisions_per_hour`), so a new figure is said against the old one.
+ */
+export function budgetQuestionWords(code: string, facts: Readonly<Record<string, number>>): string {
+  const asked = PLAN_CLARIFY_WORDS[code] ?? PLAN_CLARIFY_WORDS['budget_required']!;
+  const micro = facts['usd_per_hour_microusd']; const decisions = facts['decisions_per_hour'];
+  if (micro === undefined || decisions === undefined) return asked;
+  return `${asked} Now it is ${budgetWords((micro / 1_000_000).toFixed(6), decisions)} an hour.`;
+}
 
 /**
  * The question a choice past the world's bound asks, with its figures where the plan states them:
@@ -226,14 +240,161 @@ export function mindChoiceWords(facts: MindFacts, cost: MindCost | null, routine
     return `${who} This server does not ask this model here now, so they keep their own routine until it does. The choice is kept.`;
   }
   if (cost === null) return `${who} Choosing asks no model. While the world plays, each is asked at their own choices, which can cost money.`;
+  // The world's budget for this hour asks nobody now: said first, whatever the role's capability reads.
+  if (cost.refusedNow !== null) {
+    return `${who} ${BUDGET_REFUSED_NOW[cost.refusedNow] ?? BUDGET_REFUSED_NOW['world_hour_decisions_spent']!} `
+      + 'Until then they keep their own routine. The choice is kept.';
+  }
   const ceiling = cost.usdPerWorldHour === null ? ''
     : ` This world stops asking models at ${atMostDollarsWords(cost.usdPerWorldHour)}`
       + `${cost.decisionsPerWorldHour === null ? '' : ` or ${cost.decisionsPerWorldHour} decisions`} in any hour of real time, whatever is chosen.`;
-  const typical = cost.usdTypical === null ? ' No typical figure is measured for this world yet.'
-    : ` Typically about ${smallDollarsWords(cost.usdTypical)}.`;
+  const typical = cost.usdTypical === null ? ' No typical figure is measured for this model here yet.'
+    : ` Typically about ${smallDollarsWords(cost.usdTypical)} a simulated minute${cost.typicalIsEstimate ? ', an estimate from a measurement that was cut short' : ', as measured in a world like this one'}.`;
   return `${who} Choosing asks no model. While the world plays, at most ${atMostDollarsWords(cost.usdAtMost)} a simulated minute `
     + `(at most ${atMostDollarsWords(cost.usdPerAnswerAtMost)} each time a being is asked, at most once a minute). `
     + `${MIND_UNFINISHED_BILLED}${typical}${ceiling}`;
+}
+
+/** Why a world's budget asks no AI model right now, by the server's own reason. */
+const BUDGET_REFUSED_NOW: Readonly<Record<string, string>> = Object.freeze({
+  world_hour_decisions_spent: 'This world’s budget of AI decisions for the hour is used up, so no AI model is asked until the hour moves on or the budget is raised.',
+  world_hour_spend_spent: 'This world’s budget of money for AI minds this hour is used up, so no AI model is asked until the hour moves on or the budget is raised.',
+});
+
+/** A budget's two figures: "$0.50 and 600 decisions". Dollars are never said below themselves. */
+export function budgetWords(usdPerHour: string, decisionsPerHour: number): string {
+  return `${atMostDollarsWords(usdPerHour)} and ${decisionsPerHour.toLocaleString('en-US')} decision${decisionsPerHour === 1 ? '' : 's'}`;
+}
+
+const count = (value: number, one: string, many = `${one}s`): string => `${value.toLocaleString('en-US')} ${value === 1 ? one : many}`;
+
+function demandWords(demand: BudgetDemand, estimate: boolean): string {
+  const asks = `about ${count(demand.asksPerRealHour, 'ask')} an hour at this speed${estimate ? ' (an estimate)' : ''}`;
+  return demand.minutesCovered >= 60 ? `${asks}, which this budget covers`
+    : `${asks}, so this budget is used up after about ${count(demand.minutesCovered, 'minute')} of each hour`;
+}
+
+/**
+ * What a budget for a world's AI minds comes to, said before the yes, one sentence a line: the
+ * budget now (and whose it is: the world's, whoever has it open) and after; which of its two
+ * ceilings runs out first, at the typical price of an answer and at the most one can cost, since
+ * the server weighs each ask at the most before making it; how long it lasts for the beings a
+ * model decides for here, by this world's own head count; what the last hour already holds; and
+ * what the server allows above any budget. Where several models decide here no model's figures
+ * are set beside another's: the dearest decides, and the words say so.
+ */
+export function budgetSheetWords(sheet: BudgetSheet): string[] {
+  const lines: string[] = [];
+  const whose = !sheet.now.setByAPerson ? 'what every world starts with'
+    : sheet.now.setByYou ? 'you set this' : 'someone with the right to change this world set this';
+  lines.push(`Now: ${budgetWords(sheet.now.usdPerHour, sheet.now.decisionsPerHour)} in any hour of real time (${whose}).`);
+  const kept = sheet.named.length === 2 ? ''
+    : sheet.named.includes('usd_per_hour') ? ' You named the money; the decisions stay as they are.'
+      : sheet.named.includes('decisions_per_hour') ? ' You named the decisions; the money stays as it is.' : '';
+  lines.push(`After: ${budgetWords(sheet.asked.usdPerHour, sheet.asked.decisionsPerHour)}.${kept}`);
+  const money = atMostDollarsWords(sheet.asked.usdPerHour);
+  const decisions = count(sheet.asked.decisionsPerHour, 'decision');
+  const most = sheet.answersForUsd.atMostPrice; const typical = sheet.answersForUsd.atTypicalPrice;
+  if (sheet.asked.decisionsPerHour === 0 || Number(sheet.asked.usdPerHour) === 0) {
+    lines.push('With nothing to spend, no AI model is asked: everyone follows their own routine. The models you chose are kept.');
+  } else if (sheet.minded === 0) {
+    lines.push('No being here has an AI model yet, so nothing is asked whatever the budget. Which of the two runs out first depends on the model you choose.');
+  } else if (sheet.models.length === 0 || most === null) {
+    lines.push('This server cannot price an answer of the AI model chosen here right now, so which of the two runs out first cannot be said.');
+  } else {
+    const which = sheet.models.length === 1 ? `With ${sheet.models[0]!.name} deciding here:` : 'Several AI models decide here; by the dearest of them:';
+    if (typical === null) {
+      lines.push(`${which} if every answer costs the most it can, ${money} pays for about ${count(most, 'answer')}, so ${sheet.binds.atMostPrice === 'usd' ? 'the money' : `the ${decisions}`} would run out first. No typical price is measured for this model here yet.`);
+    } else if (sheet.binds.atMostPrice === sheet.binds.atTypicalPrice) {
+      lines.push(sheet.binds.atTypicalPrice === 'decisions'
+        ? `${which} the ${decisions} run out before the ${money} does, even if every answer costs the most it can.`
+        : `${which} the ${money} runs out before the ${decisions} do: after about ${count(typical, 'answer')} at the typical price, ${most.toLocaleString('en-US')} if every answer costs the most it can.`);
+    } else {
+      lines.push(`${which} at the typical price of an answer the ${decisions} run out first. If answers cost the most they can, the ${money} runs out first, after about ${count(most, 'answer')}. The server sets aside the most before each ask, so both are true.`);
+    }
+  }
+  if (sheet.beings !== null) {
+    const here = `This world has ${count(sheet.beings, 'being')}; an AI model decides for ${sheet.minded === 0 ? 'none of them' : sheet.minded}.`;
+    // Under a budget of nothing the line above has said nobody is asked: how often they would ask
+    // and how soon nothing runs out is not said again.
+    const nothing = sheet.asked.decisionsPerHour === 0 || Number(sheet.asked.usdPerHour) === 0;
+    if (sheet.demand === null || nothing) lines.push(here);
+    else {
+      const all = sheet.demand.everyone !== null && sheet.demand.everyone.beings !== sheet.demand.minded.beings
+        ? ` With that model for all ${sheet.demand.everyone.beings}: ${demandWords(sheet.demand.everyone, sheet.demand.estimate)}.` : '';
+      lines.push(`${here} They make ${demandWords(sheet.demand.minded, sheet.demand.estimate)}.${all} When a budget is used up, everyone follows their own routine until the hour moves on.`);
+    }
+  }
+  if (sheet.hourSoFar.decisions > 0) {
+    lines.push(`In the last hour this world asked AI models ${count(sheet.hourSoFar.decisions, 'time')}, for ${smallDollarsWords(sheet.hourSoFar.usd)}.`);
+  }
+  if (sheet.refusedNow !== null && sheet.asked.decisionsPerHour > 0 && Number(sheet.asked.usdPerHour) > 0) {
+    lines.push(`Even under this budget no AI model is asked right now: ${sheet.refusedNow === 'world_hour_spend_spent' ? 'the last hour’s spending already reaches it' : 'the last hour’s decisions already reach it'}. Asking starts again as the hour moves on.`);
+  }
+  lines.push(sheet.hostRefusal !== null ? 'This server does not ask AI models in this world right now, whatever the budget.'
+    : sheet.allowanceBelowBudget && sheet.allowanceLeftUsd !== null
+      ? `Your allowance on this server has ${smallDollarsWords(sheet.allowanceLeftUsd)} left in all, which stops the asking before this budget does.`
+      : 'This server’s own limits still apply above any budget.');
+  lines.push('Setting a budget asks no AI and spends nothing. It is this world’s, for everyone in it, until someone allowed to change it sets another.');
+  return lines;
+}
+
+/** A budget step's row: "$0.50 and 600 decisions an hour". */
+export function budgetDetailWords(usdPerHour: string, decisionsPerHour: number): string {
+  return `${budgetWords(usdPerHour, decisionsPerHour)} an hour`;
+}
+
+/** What a living town taking its newcomers in loses, by the plan's code. */
+const TAKE_IN_LOSES: Readonly<Record<string, string>> = Object.freeze({
+  day_so_far: 'what everybody has done so far',
+  clock_position: 'where the clock stands (their day starts again)',
+  playing_and_speed: 'whether the town was playing, and how fast',
+  models_chosen: 'the AI models chosen for people',
+  looks_saved_for_residents: 'the looks saved for residents',
+  comparisons_and_experiments: 'comparisons and experiments run with these people',
+  companion_answers: 'the Companion’s answers about them',
+});
+
+/** What it keeps, by the plan's code. */
+const TAKE_IN_KEEPS: Readonly<Record<string, string>> = Object.freeze({
+  people_homes_jobs_roles_shifts: 'the same people, with their homes, jobs, roles and shifts',
+  world: 'the world',
+  things_placed: 'everything placed in it',
+  door_grants_and_programs: 'door grants and programs',
+  world_look: 'the world’s look',
+});
+
+/** A step that erases, confirmed with nothing shown of what it loses and keeps: never sent. */
+export const ERASES_UNSHOWN: RefusalWords = {
+  happened: 'What this step erases and what it keeps was not shown when you confirmed, so it was not sent.',
+  next: 'Nothing was changed. Ask for it on its own.',
+};
+
+/** A budget confirmed with nothing shown of what it comes to here: never sent. */
+export const BUDGET_UNSHOWN: RefusalWords = {
+  happened: 'What this budget comes to in this world was not shown when you confirmed, so it was not sent.',
+  next: 'Nothing was changed. Ask for it on its own.',
+};
+
+/**
+ * What a step that erases comes to, said before the one yes: what is lost, whole, what stays, and
+ * whether anything undoes it. A code this page has no words for is never left out: the loss is
+ * then said to be more than the page can name. A way back is said only when the server states one.
+ */
+export function erasesWords(erases: Erases, minute: number | null): string[] {
+  const list = (codes: readonly string[], words: Readonly<Record<string, string>>): { said: string; unknown: boolean } => ({
+    said: codes.flatMap((code) => (words[code] === undefined ? [] : [words[code]!])).join('; '),
+    unknown: codes.some((code) => words[code] === undefined),
+  });
+  const lost = list(erases.loses, TAKE_IN_LOSES); const kept = list(erases.keeps, TAKE_IN_KEEPS);
+  const day = minute === null || minute <= 0 ? '' : ` Their day so far is ${count(minute, 'minute')} long.`;
+  return [
+    `The people of this town take the newcomers in and live with them from now on. They stay who they are.${day}`,
+    ...(lost.said === '' && !lost.unknown ? []
+      : [`Not kept: ${lost.said}${lost.unknown ? `${lost.said === '' ? '' : '; '}and more that this page cannot name` : ''}.`]),
+    ...(kept.said === '' ? [] : [`Kept: ${kept.said}.`]),
+    erases.undo ? 'This can be taken back.' : 'This cannot be undone.',
+  ];
 }
 
 export function planRefusalWords(code: string): RefusalWords {

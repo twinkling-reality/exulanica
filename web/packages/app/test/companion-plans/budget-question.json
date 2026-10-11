@@ -1,0 +1,40 @@
+{
+  "profile": "exulanica.companion-action-plan/v1",
+  "outcome": "clarify",
+  "kind": "world_edit",
+  "world_id": "world:authored:test",
+  "version_id": "00000000-0000-0000-0000-000000000007",
+  "plan_sha256": "7c60489b6983c3d58bd28f6dcaaf048616d255d84682def8d7f045400f65af9f",
+  "atomic": false,
+  "steps": [],
+  "spends": false,
+  "spends_by": [],
+  "clarification": {
+    "code": "budget_required",
+    "step": 0,
+    "slot": null,
+    "candidates": [],
+    "actions": [
+      {
+        "operation": "set_minds_budget",
+        "usd_per_hour": null,
+        "decisions_per_hour": null,
+        "figures_named": []
+      }
+    ],
+    "facts": {
+      "usd_per_hour_microusd": 250000,
+      "decisions_per_hour": 600
+    }
+  },
+  "refusal": null,
+  "capabilities": null,
+  "proposal_speech": null,
+  "clock": null,
+  "execution": {
+    "prompt_version": "action-plan-13",
+    "calls": [],
+    "rejections": []
+  },
+  "names": {}
+}

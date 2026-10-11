@@ -299,12 +299,13 @@ def test_the_read_lists_every_offered_action_by_its_id_with_its_operation_s_stat
         assert action["projected"] is True, ident
         assert (action["state"], action["code"]) == (row["state"], row["code"]), ident
         assert (action["requires"], action["permitted"]) == (row["requires"], row["permitted"])
-    # The four whose subject is one being, or the world apart from any version: "ask where its
+    # The five whose subject is one being, or the world apart from any version: "ask where its
     # subject is read", never "not permitted" (the owner here holds every permission).
     assert unprojected == {
         "pieces.request",
         "beings.play",
         "beings.give-back",
+        "minds.budget",
         "world.make",
     }
     assert all(actions[ident]["permitted"] for ident in unprojected)
