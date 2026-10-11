@@ -541,14 +541,21 @@ def test_a_renamed_table_is_read_under_its_new_name():
 
 
 def test_the_workspace_tables_are_the_schema_s(repository):
-    """The migration reading above against the migrated schema's own list."""
+    """The migration reading above against the migrated schema's own list.
+
+    A partition is left out, by the catalog's own flag: it is not a table the migrations create.
+    ``embedding`` is partitioned by workspace, and each workspace that writes a vector gains a
+    partition of its own, so a schema other tests have used holds one for each of theirs.
+    """
     rows = repository.connection.execute(
-        "select distinct c.table_name from information_schema.columns c "
-        "join information_schema.tables t on t.table_schema=c.table_schema "
-        "and t.table_name=c.table_name and t.table_type='BASE TABLE' "
-        "where c.table_schema=current_schema() and c.column_name='workspace_id'"
+        "select c.relname as table_name from pg_class c "
+        "join pg_attribute a on a.attrelid=c.oid and a.attname='workspace_id' "
+        "and a.attnum > 0 and not a.attisdropped "
+        "where c.relnamespace=current_schema()::regnamespace "
+        "and c.relkind in ('r','p') and not c.relispartition"
     ).fetchall()
     schema = frozenset(row["table_name"] for row in rows)
+    assert "embedding" in schema, "the partitioned table itself is one the migrations create"
     assert len(schema) > 150, "the schema answered almost nothing; the query is wrong"
     assert tables_with("workspace_id", migrations()) == schema
 
