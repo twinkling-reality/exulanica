@@ -1,6 +1,7 @@
 export { PACK_ENGINE, linearRgb, renderLookOfPreset } from './preset-look.js';
 export { applyUp, swatchMaterial, upChunks } from './swatch-material.js';
 export { applyPattern, patternChunks } from './pattern-material.js';
+export { BORDER_PARAMETERS, applyBorder, bordersRun, clearPlaneBorder, setPlaneBorder, withBorder } from './border-material.js';
 export type { TownLookRoles, TownSurfaceDressing } from './town-surfaces.js';
 export { dressTownSurfaces } from './town-surfaces.js';
 export type { OpeningSlot, SlotRecord } from './opening-slots.js';

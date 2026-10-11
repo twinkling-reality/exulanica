@@ -1,14 +1,16 @@
 import type * as pc from 'playcanvas';
 import {
-  materialOfLeaf, resolveLookRole, resolveSurfaceLookRole, unknownSurfaceLeaf,
-  type LookFamily, type ResolvedStylePack, type StylePackSurface, type SurfaceMaterials, type SurfacePattern, type SurfacePatterns,
+  materialOfLeaf, planBorders, resolveLookRole, resolveSurfaceLookRole, unknownSurfaceLeaf,
+  type GroundBorders, type GroundPlane, type LookFamily, type ResolvedStylePack, type StylePackSurface, type SurfaceMaterials,
+  type SurfacePattern, type SurfacePatterns,
 } from '@exulanica/atlas-core';
 import type { SiteDrawing, SiteSlot } from '../generated-site/site-drawing.js';
-import type { SiteDresser } from '../generated-site/site-mount.js';
+import { baseGroundSlot, type SiteDresser } from '../generated-site/site-mount.js';
 import { SCENERY_STONES, SCENERY_TREES } from '../generated-site/site-scenery.js';
 import { attachTileInk } from '../generated-tile/ink.js';
 import type { RenderShading } from '../generated-tile/look.js';
 import { applyShading } from '../generated-tile/shading.js';
+import { applyBorder, bordersRun, clearPlaneBorder, setPlaneBorder } from './border-material.js';
 import { dressSlots, type PieceSlot } from './dresser.js';
 import { applyPattern } from './pattern-material.js';
 import { uploadPackPieces, type FetchedPieces } from './pieces.js';
@@ -60,6 +62,12 @@ export interface SitePackDressing {
   readonly materials?: SurfaceMaterials;
   /** The surface pattern catalog a material's colour is patterned by; none, or no `materials`, draws every surface flat. */
   readonly patterns?: SurfacePatterns;
+  /**
+   * The ground border catalog the edges of a site's grounds are broken by, where two meet and at the
+   * site's outer edge (`border-material.ts`); none, or no `materials`, draws every ground to its ruled
+   * rectangle as before.
+   */
+  readonly borders?: GroundBorders;
   /** Told what one site's dressing drew, each time a site is dressed. */
   readonly told?: (summary: SiteDressingSummary) => void;
 }
@@ -84,6 +92,10 @@ export interface SiteDressingSummary {
   readonly inkSegments: number;
   /** Pieces of the pack standing as scenery beyond the place (its own tree at each tree); 0 where it has none. */
   readonly sceneryPieces: number;
+  /** Ground planes drawn with a broken border, their own or a neighbour's over them. */
+  readonly bordered: number;
+  /** Neighbours left out of a plane's working because it has more than the working carries. */
+  readonly borderNeighboursLeftOut: number;
 }
 
 /**
@@ -120,6 +132,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
   const { families, shading } = dressing;
   const catalog = dressing.materials ?? null;
   const patterns = catalog === null ? null : dressing.patterns ?? null;
+  const borders = catalog === null ? null : dressing.borders ?? null;
   /** The pattern of the material a slot's leaf names, where the catalogs state one. */
   const patternOf = (slot: SiteSlot): SurfacePattern | null => {
     if (catalog === null || patterns === null) return null;
@@ -230,6 +243,60 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       undressed += 1;
     }
 
+    // The borders between the site's grounds: each ground plane is given what lies over it and its
+    // own edge, in whatever it now wears (the pack's own surface, a material's colour or a plain
+    // one), and drawn larger by as far as any edge may reach. The base ground's outer edge breaks
+    // only where a ground beyond is drawn for it to break over. On a device the working is not
+    // written for, no ground is touched: each keeps its ruled rectangle.
+    const bordered: (readonly [pc.MeshInstance, pc.Entity, number, number])[] = [];
+    let borderNeighboursLeftOut = 0;
+    if (catalog !== null && borders !== null && bordersRun(device)) {
+      const drawnPlanes = new Map<string, { readonly instance: pc.MeshInstance; readonly shape: pc.Entity; readonly plane: GroundPlane }>();
+      for (const slot of drawing.slots) {
+        if (slot.primitive !== 'plane') continue;
+        const shape = drawn.entities.get(slot.identity)?.findByName(`${slot.identity}:shape`) as pc.Entity | null | undefined;
+        const instance = shape?.render?.meshInstances[0];
+        if (shape == null || instance === undefined) continue;
+        const turned = slot.yawQuarterTurns % 2 !== 0;
+        const east = (turned ? slot.boxMm[1] : slot.boxMm[0]) / 2, north = (turned ? slot.boxMm[0] : slot.boxMm[1]) / 2;
+        const [x, y] = slot.positionMm;
+        const material = slot.leaf === 'default' ? null : materialOfLeaf(catalog, slot.family, slot.leaf);
+        drawnPlanes.set(slot.identity, {
+          instance, shape,
+          plane: {
+            identity: slot.identity, rectMm: [x - east, y - north, x + east, y + north], layerMm: slot.positionMm[2],
+            border: material === null ? null : borders.byMaterial.get(material.key) ?? null,
+          },
+        });
+      }
+      // The ground laid over the whole extent breaks at the place's outer edge only out of doors and
+      // only where a ground beyond is drawn: indoors its edge is at the walls, with nothing under it.
+      const base = baseGroundSlot(drawing);
+      const beyond = drawing.extent.enclosure === 'open' && host.app.root.findByName('generated-tile:edge-ground') !== null;
+      const plan = planBorders([...drawnPlanes.values()].map((one) => one.plane), base?.identity ?? null, beyond, borders.greatestReachMm);
+      const grow = 2 * borders.greatestReachMm / 1000;
+      const origin = drawn.root.getPosition();
+      for (const [identity, planeBorder] of plan) {
+        const { instance, shape, plane } = drawnPlanes.get(identity)!;
+        // The working goes into a material this dressing made: a ground still in a material that is
+        // not its own (the engine's plain one, where the shading changes nothing) wears a copy of it.
+        if (!made.includes(instance.material as pc.StandardMaterial)) {
+          const copy = (instance.material as pc.StandardMaterial).clone();
+          copy.name = `style-pack:bordered:${instance.material.name}`;
+          made.push(copy);
+          replaced.push([instance, instance.material]);
+          instance.material = copy;
+        }
+        applyBorder(device, instance.material as pc.StandardMaterial);
+        setPlaneBorder(instance, plane.rectMm, planeBorder, [origin.x, origin.z]);
+        const scale = shape.getLocalScale();
+        bordered.push([instance, shape, scale.x, scale.z]);
+        shape.setLocalScale(scale.x + grow, scale.y, scale.z + grow);
+        borderNeighboursLeftOut += planeBorder.overLeftOut;
+      }
+    }
+
+
     // Scenery beyond the place: the pack's own tree stands at each tree where the pack has one, in
     // its own mesh beside the site's (it is none of the site's slots, and far trees are not inked);
     // plain trees the pack cannot stand in, and stones, keep their plain shapes in the pack's shading.
@@ -258,7 +325,9 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       if (stones !== null) wear(stones, SCENERY_STONES, shaded);
     }
 
-    const ink = shading.ink === null ? null : attachTileInk(device, drawn.root, shading.ink, undefined, ['']);
+    // A ground with a broken border is left out of the ink: its mesh's edge is not the edge drawn.
+    const brokenGrounds = new Set(bordered.map(([instance]) => instance));
+    const ink = shading.ink === null ? null : attachTileInk(device, drawn.root, shading.ink, undefined, [''], (instance) => brokenGrounds.has(instance));
     const unknown = [...unknownLooks].sort();
     const canvas = device.canvas as HTMLCanvasElement | undefined;
     if (catalog !== null && canvas?.dataset !== undefined) {
@@ -268,6 +337,8 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     }
     // How many of the scenery's pieces are the pack's own, said beside what the mount says of it.
     if (sceneryPieces !== null && canvas?.dataset !== undefined) canvas.dataset['siteSceneryPieces'] = String(sceneryPieces.placed);
+    // How many grounds are drawn with a broken border.
+    if (bordered.length > 0 && canvas?.dataset !== undefined) canvas.dataset['siteBorders'] = String(bordered.length);
     dressing.told?.({
       surfaces,
       materials,
@@ -278,6 +349,8 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       undressed,
       inkSegments: ink?.segments ?? 0,
       sceneryPieces: sceneryPieces?.placed ?? 0,
+      bordered: bordered.length,
+      borderNeighboursLeftOut,
     });
 
     let undone = false;
@@ -290,6 +363,12 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         delete canvas.dataset['sitePatterned'];
       }
       if (sceneryPieces !== null && canvas?.dataset !== undefined) delete canvas.dataset['siteSceneryPieces'];
+      if (bordered.length > 0 && canvas?.dataset !== undefined) delete canvas.dataset['siteBorders'];
+      // Every bordered ground is its full rectangle again, with nothing stated on it.
+      for (const [instance, shape, x, z] of bordered.splice(0)) {
+        clearPlaneBorder(instance);
+        shape.setLocalScale(x, shape.getLocalScale().y, z);
+      }
       ink?.dispose();
       sceneryPieces?.dispose();
       placed.dispose();

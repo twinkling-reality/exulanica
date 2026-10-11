@@ -14,8 +14,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import {
-  readSiteInterior, readSiteScenery, readStylePackManifest, readSurfaceMaterials, readSurfacePatterns, resolveStylePack, sceneryBeyond,
-  type LookFamily, type ResolvedStylePack, type SiteInteriorCatalog, type SiteSceneryCatalog, type StylePackFile, type SurfaceMaterials, type SurfacePatterns,
+  borderReachMm, readGroundBorders, readSiteInterior, readSiteScenery, readStylePackManifest, readSurfaceMaterials, readSurfacePatterns, resolveStylePack, sceneryBeyond,
+  type GroundBorders, type LookFamily, type ResolvedStylePack, type SiteInteriorCatalog, type SiteSceneryCatalog, type StylePackFile, type SurfaceMaterials, type SurfacePatterns,
 } from '@exulanica/atlas-core';
 import { baseGroundSlot, ceilingRests, parseSiteDrawing, sceneryOf, siteMount, siteNavigationWorld, type SiteDrawing } from '../src/playcanvas/generated-site/index.js';
 import type { RenderShading } from '../src/playcanvas/generated-tile/look.js';
@@ -36,6 +36,7 @@ const MATERIALS = readSurfaceMaterials(readFileSync('../assets/catalogs/world-ki
 const PATTERNS = readSurfacePatterns(readFileSync('../assets/catalogs/world-kinds/surface-pattern.v1.json', 'utf8'));
 const SCENERY = readSiteScenery(readFileSync('../assets/catalogs/world-kinds/site-scenery.v1.json', 'utf8'));
 const INTERIOR = readSiteInterior(readFileSync('../assets/catalogs/world-kinds/site-interior.v1.json', 'utf8'));
+const BORDERS = readGroundBorders(readFileSync('../assets/catalogs/world-kinds/ground-border.v1.json', 'utf8'));
 /** The colour chunk a material was given, or undefined where it draws its plain colour. */
 const colourChunk = (material: pc.Material): string | undefined => (material as pc.StandardMaterial).getShaderChunks(pc.SHADERLANGUAGE_GLSL).get('diffusePS') as string | undefined;
 const colourOf = (key: string): number[] => [...MATERIALS.materials.find((material) => material.key === key)!.swatch.srgb8];
@@ -175,7 +176,7 @@ function nullApp(): { app: pc.AppBase; camera: pc.Entity; environmentRoot: pc.En
 
 async function dressedSite(
   shading: RenderShading, materials?: SurfaceMaterials, site: SiteDrawing = drawing, patterns?: SurfacePatterns,
-  beyondIt: { readonly scenery?: SiteSceneryCatalog; readonly plant?: boolean; readonly interior?: SiteInteriorCatalog } = {},
+  beyondIt: { readonly scenery?: SiteSceneryCatalog; readonly plant?: boolean; readonly interior?: SiteInteriorCatalog; readonly borders?: GroundBorders } = {},
 ) {
   const pack = sitePack(beyondIt.plant === true);
   const pieces: FetchedPieces = await fetchPackPieces(pack, Object.keys(pack.modules), TABLE, async (file: StylePackFile) => PIECES[file.path]!);
@@ -183,7 +184,7 @@ async function dressedSite(
   const { app, camera, environmentRoot } = nullApp();
   // The pack's own light, with a ground beyond the world stated where the pack states none.
   const look = renderLookOfPreset(pack.light.presets[pack.light.default_preset]!, pack.shading, pack.edge ?? { ground: [136, 165, 96], drop_mm: 600, reach_mm: 3_000_000 });
-  const mount = siteMount(site, { servedBytes: 1, look, dress: packSiteDresser({ pack, families, pieces, shading, ...(materials === undefined ? {} : { materials }), ...(patterns === undefined ? {} : { patterns }), told: (summary) => summaries.push(summary) }), ...(materials === undefined || beyondIt.scenery === undefined ? {} : { materials, scenery: beyondIt.scenery }), ...(beyondIt.interior === undefined ? {} : { interior: beyondIt.interior }) });
+  const mount = siteMount(site, { servedBytes: 1, look, dress: packSiteDresser({ pack, families, pieces, shading, ...(materials === undefined ? {} : { materials }), ...(patterns === undefined ? {} : { patterns }), ...(beyondIt.borders === undefined ? {} : { borders: beyondIt.borders }), told: (summary) => summaries.push(summary) }), ...(materials === undefined || beyondIt.scenery === undefined ? {} : { materials, scenery: beyondIt.scenery }), ...(beyondIt.interior === undefined ? {} : { interior: beyondIt.interior }) });
   const attachment = mount.attach({ app, camera, environmentRoot });
   const canvas = app.graphicsDevice.canvas as HTMLCanvasElement;
   const root = environmentRoot.findByName(`generated-site:${site.worldId}`) as pc.Entity;
@@ -207,7 +208,7 @@ describe('a site dressed in a pack that carries the surface material catalog', (
     expect(site.shape('shed:wall:0').material.name).toBe('style-pack:material:wall.brick');
     // The pieces stand as before: a leaf's material never takes a slot a piece fills.
     expect((site.root.findByName('fence') as pc.Entity).enabled).toBe(false);
-    expect(site.summaries).toEqual([{ surfaces: 0, materials: 3, unknownLooks: ['boundary.picket'], patterned: 0, pieces: 2, placed: 4, undressed: 2, inkSegments: 0, sceneryPieces: 0 }]);
+    expect(site.summaries).toEqual([{ surfaces: 0, materials: 3, unknownLooks: ['boundary.picket'], patterned: 0, pieces: 2, placed: 4, undressed: 2, inkSegments: 0, sceneryPieces: 0, bordered: 0, borderNeighboursLeftOut: 0 }]);
     // The ground beyond the site wears the very material the dressed ground wears: soil to the horizon.
     expect(site.beyond()).toBe(site.shape('ground').material);
     expect(site.beyond().name).toBe('style-pack:material:ground.soil');
@@ -338,7 +339,7 @@ describe('a site dressed in a pack', () => {
     expect(pieces.render!.meshInstances[0]!.mesh.primitive[0]!.count).toBe(4 * 6);
     expect((site.root.findByName('fence') as pc.Entity).enabled).toBe(false);
     expect(site.root.findByName('barn')).toBeNull();
-    expect(site.summaries).toEqual([{ surfaces: 3, materials: 0, unknownLooks: [], patterned: 0, pieces: 2, placed: 4, undressed: 2, inkSegments: 0, sceneryPieces: 0 }]);
+    expect(site.summaries).toEqual([{ surfaces: 3, materials: 0, unknownLooks: [], patterned: 0, pieces: 2, placed: 4, undressed: 2, inkSegments: 0, sceneryPieces: 0, bordered: 0, borderNeighboursLeftOut: 0 }]);
     site.attachment.dispose();
   });
 
@@ -645,6 +646,285 @@ describe('the inside of an indoor made place', () => {
     expect(on.attachment.metrics.triangles).toBe(off.attachment.metrics.triangles);
     expect(on.attachment.metrics.drawBatches).toBe(off.attachment.metrics.drawBatches);
     expect(on.summaries[0]).toEqual(off.summaries[0]);
+    on.attachment.dispose();
+    off.attachment.dispose();
+  });
+});
+
+describe('the borders between a made place\'s grounds', () => {
+  // A camp, 40 m by 30 m: a forest floor over all of it, a clearing and a shore side by side, a
+  // path up the middle over both (laid turned a quarter), a lake in the shore, a tent's floor.
+  // With `lane`, a lane whose leaf names no material lies under the clearing's corner: a ruled ground
+  // no pack dresses, which gives way to the grass over it.
+  const camp = (enclosure: 'open' | 'indoor' = 'open', lane = false): SiteDrawing => parseSiteDrawing({
+    profile: 'exulanica.site-drawing/v1', world_id: 'world:generated:camp', receipt_sha256: 'a'.repeat(64),
+    kind: { kind: 'fixture_camp', version: 1, label: 'Camp' },
+    extent: { widthMm: 40_000, depthMm: 30_000, enclosure },
+    arrival: { positionMm: [20_000, 3000, 0], facingMm: [0, 1] },
+    slots: [
+      slot('ground', 'ground.forest_floor', 'plane', [20_000, 15_000, 0], 0, [40_000, 30_000, 0], 'surface'),
+      slot('clearing', 'ground.clearing', 'plane', [9500, 15_000, 6], 0, [19_000, 30_000, 0], 'surface'),
+      slot('path', 'path.dirt_path', 'plane', [20_000, 15_000, 12], 1, [30_000, 2000, 0], 'surface'),
+      slot('shore', 'ground.lake_shore', 'plane', [30_500, 15_000, 6], 0, [19_000, 30_000, 0], 'surface'),
+      slot('lake', 'water.lake', 'plane', [32_000, 15_000, 18], 0, [14_000, 26_000, 0], 'surface'),
+      slot('tent', 'ground.tent_floor', 'plane', [8000, 8000, 24], 0, [4000, 4000, 0], 'surface'),
+      slot('hut:wall:0', 'wall.timber', 'box', [8000, 20_000, 0], 0, [4000, 200, 2400], 'surface'),
+      ...(lane ? [slot('lane', 'path.lane', 'plane', [9500, 29_000, 3], 0, [19_000, 4000, 0], 'surface')] : []),
+    ],
+    walk: { floorMm: [0, 0, 40_000, 30_000], blockersMm: [[6000, 19_900, 10_000, 20_100]], keepOutMm: [] },
+    seats: [],
+  });
+  const value = (instance: pc.MeshInstance, name: string): number[] | undefined => {
+    const held = instance.getParameter(name) as { data: number[] } | undefined;
+    return held === undefined ? undefined : [...held.data];
+  };
+  const shapeOf = (key: string, read: number): number[] => {
+    const one = BORDERS.byMaterial.get(key)!;
+    return [one.edgeMm / 1000, one.wanderMm / 1000, one.periodMm / 1000, read];
+  };
+  const scaleOf = (instance: pc.MeshInstance): number[] => {
+    const { x, z } = instance.node.getLocalScale();
+    return [x, z];
+  };
+  const grow = 2 * BORDERS.greatestReachMm / 1000;
+  const OFF = [0, 0, 0, 0];
+  /** Every value a plane states for its border. */
+  const BORDER_VALUES = ['exuBorder', 'exuBorderShape', ...[0, 1, 2, 3].flatMap((n) => [`exuOver${n}`, `exuOverShape${n}`])];
+
+  it('gives each ground its own edge and what it is worked against, in the world\'s metres, and draws it larger by what an edge may reach', async () => {
+    const site = await dressedSite(PBR, MATERIALS, camp(), PATTERNS, { borders: BORDERS });
+    // The path: turned a quarter, so its 30 m lie north and south. East 19 to 21, south 0 to 30
+    // (the world's z runs south, so north 30 is z -30). Nothing lies over it.
+    expect(value(site.shape('path'), 'exuBorder')).toEqual([19, -30, 21, 0]);
+    expect(value(site.shape('path'), 'exuBorderShape')).toEqual(shapeOf('soil', 1));
+    expect(value(site.shape('path'), 'exuOverShape0')).toEqual(OFF);
+    expect(scaleOf(site.shape('path'))).toEqual([30 + grow, 2 + grow]);
+    // The clearing gives way to the path.
+    expect(value(site.shape('clearing'), 'exuBorder')).toEqual([0, -30, 19, 0]);
+    expect(value(site.shape('clearing'), 'exuBorderShape')).toEqual(shapeOf('grass', 1));
+    expect(value(site.shape('clearing'), 'exuOver0')).toEqual([19, -30, 21, 0]);
+    expect(value(site.shape('clearing'), 'exuOverShape0')).toEqual(shapeOf('soil', 1));
+    expect(value(site.shape('clearing'), 'exuOverShape1')).toEqual(OFF);
+    // The shore gives way to the path (read 1) and reaches the lake (read 2): the land breaks over the water.
+    expect(value(site.shape('shore'), 'exuOverShape0')).toEqual(shapeOf('soil', 1));
+    expect(value(site.shape('shore'), 'exuOver1')).toEqual([25, -28, 39, -2]);
+    expect(value(site.shape('shore'), 'exuOverShape1')).toEqual(shapeOf('lake', 2));
+    // The lake lies under (its own read is 2) and is worked against the shore's edge, never its own past its line.
+    expect(value(site.shape('lake'), 'exuBorderShape')).toEqual(shapeOf('lake', 2));
+    expect(value(site.shape('lake'), 'exuOver0')).toEqual([21, -30, 40, 0]);
+    expect(value(site.shape('lake'), 'exuOverShape0')).toEqual(shapeOf('sand', 1));
+    // The ground over the whole place breaks over the ground beyond, by its own edge.
+    expect(value(site.shape('ground'), 'exuBorder')).toEqual([0, -30, 40, 0]);
+    expect(value(site.shape('ground'), 'exuBorderShape')).toEqual(shapeOf('forest_floor', 1));
+    expect(scaleOf(site.shape('ground'))).toEqual([40 + grow, 30 + grow]);
+    // No ground is drawn farther from its ruled line than the catalog's greatest reach.
+    expect(grow / 2 * 1000).toBeGreaterThanOrEqual(borderReachMm(BORDERS.byMaterial.get('sand')!));
+    expect(site.summaries[0]).toMatchObject({ bordered: 5, borderNeighboursLeftOut: 0 });
+    expect(site.canvas.dataset['siteBorders']).toBe('5');
+    site.attachment.dispose();
+    expect('siteBorders' in site.canvas.dataset).toBe(false);
+  });
+
+  it('sets the working into whatever colour a ground wears: a pattern\'s, the pack\'s own surface, a plain one', async () => {
+    const site = await dressedSite(PBR, MATERIALS, camp(), PATTERNS, { borders: BORDERS });
+    // Soil's grain and the cut in one colour function: the cut first, once.
+    const path = colourChunk(site.shape('path').material)!;
+    expect(path).toContain('exuPattern');
+    expect(path.split('exuBorderCut();')).toHaveLength(2);
+    expect(path.indexOf('exuBorderCut();')).toBeLessThan(path.indexOf('exuPattern', path.indexOf('void getAlbedo() {')));
+    // The clearing is grass, which is the pack's own ground: its surface carries the cut too.
+    expect(site.shape('clearing').material.name).toBe('style-pack:surface:ground.default:grass');
+    expect(colourChunk(site.shape('clearing').material)).toContain('exuBorderCut();');
+    site.attachment.dispose();
+    // With no patterns a ground has no colour chunk of its own: the cut is set into a plain one.
+    const flat = await dressedSite(PBR, MATERIALS, camp(), undefined, { borders: BORDERS });
+    const plain = colourChunk(flat.shape('path').material)!;
+    expect(plain).toContain('dAlbedo = material_diffuse.rgb;');
+    expect(plain).toContain('exuBorderCut();');
+    flat.attachment.dispose();
+  });
+
+  it('draws a ground that is given no values whole: the working is off in the material until a plane states its own', async () => {
+    const site = await dressedSite(PBR, MATERIALS, camp(), PATTERNS, { borders: BORDERS });
+    for (const identity of ['ground', 'clearing', 'path', 'shore', 'lake']) {
+      const material = site.shape(identity).material as pc.StandardMaterial;
+      // What the material itself states, which any other mesh wearing it draws by: off.
+      expect([...(material.getParameter('exuBorderShape') as { data: number[] }).data], identity).toEqual(OFF);
+    }
+    // The ground beyond wears the base ground's very material and states nothing: it is drawn whole.
+    const beyond = (site.app.root.findByName('generated-tile:edge-ground') as pc.Entity).render!.meshInstances[0]!;
+    expect(beyond.material).toBe(site.shape('ground').material);
+    expect(value(beyond, 'exuBorderShape')).toBeUndefined();
+    // A tent's floor is laid to a line: no values, its rectangle as drawn, no cut in its colour.
+    expect(value(site.shape('tent'), 'exuBorderShape')).toBeUndefined();
+    expect(scaleOf(site.shape('tent'))).toEqual([4, 4]);
+    expect(colourChunk(site.shape('tent').material) ?? '').not.toContain('exuBorderCut');
+    site.attachment.dispose();
+  });
+
+  it('draws every ground\'s full rectangle where the borders are off, and again once the dressing is taken back', async () => {
+    // Off: no catalog handed, or no materials to read a leaf by.
+    for (const off of [await dressedSite(PBR, MATERIALS, camp(), PATTERNS), await dressedSite(PBR, undefined, camp(), undefined, { borders: BORDERS })]) {
+      for (const [identity, rect] of [['ground', [40, 30]], ['clearing', [19, 30]], ['path', [30, 2]], ['shore', [19, 30]], ['lake', [14, 26]]] as const) {
+        expect(scaleOf(off.shape(identity)), identity).toEqual(rect);
+        expect(value(off.shape(identity), 'exuBorderShape'), identity).toBeUndefined();
+        expect(colourChunk(off.shape(identity).material) ?? '', identity).not.toContain('exuBorderCut');
+      }
+      expect(off.summaries[0]).toMatchObject({ bordered: 0 });
+      expect('siteBorders' in off.canvas.dataset).toBe(false);
+      off.attachment.dispose();
+    }
+    // Taken back before the slots go (a look change): each ground is its rectangle again, stating
+    // nothing, in what it wore before.
+    const pack = sitePack();
+    const pieces = await fetchPackPieces(pack, Object.keys(pack.modules), TABLE, async (file: StylePackFile) => PIECES[file.path]!);
+    const dresser = packSiteDresser({ pack, families, pieces, shading: PBR, materials: MATERIALS, patterns: PATTERNS, borders: BORDERS });
+    const identities = ['ground', 'clearing', 'path', 'shore', 'lake'];
+    // On a device the working is not written for (WebGPU) no ground is touched: each is its ruled
+    // rectangle in its own colour, and nothing is left undrawn by a text that never ran there.
+    const other = nullApp();
+    (other.app.graphicsDevice as { isWebGPU: boolean }).isWebGPU = true;
+    let onOther: { scales: number[][]; cut: boolean[] } | null = null;
+    siteMount(camp(), {
+      servedBytes: 1,
+      dress: (host, drawn, dressing) => {
+        const undress = dresser(host, drawn, dressing);
+        const grounds = identities.map((identity) => (drawn.root.findByName(`${identity}:shape`) as pc.Entity).render!.meshInstances[0]!);
+        onOther = { scales: grounds.map(scaleOf), cut: grounds.map((instance) => (colourChunk(instance.material) ?? '').includes('exuBorderCut') || instance.getParameter('exuBorderShape') !== undefined) };
+        return undress;
+      },
+    }).attach(other).dispose();
+    expect(onOther!.scales).toEqual([[40, 30], [19, 30], [30, 2], [19, 30], [14, 26]]);
+    expect(onOther!.cut).toEqual([false, false, false, false, false]);
+    const { app, camera, environmentRoot } = nullApp();
+    let dressed: { scales: number[][]; stated: boolean[] } | null = null;
+    let takenBack: { scales: number[][]; stated: boolean[]; materials: string[] } | null = null;
+    const mount = siteMount(camp(), {
+      servedBytes: 1,
+      dress: (host, drawn, dressing) => {
+        const grounds = identities.map((identity) => (drawn.root.findByName(`${identity}:shape`) as pc.Entity).render!.meshInstances[0]!);
+        const stated = (): boolean[] => grounds.map((instance) => BORDER_VALUES.some((name) => instance.getParameter(name) !== undefined));
+        const undress = dresser(host, drawn, dressing);
+        dressed = { scales: grounds.map(scaleOf), stated: stated() };
+        return () => {
+          undress();
+          takenBack = { scales: grounds.map(scaleOf), stated: stated(), materials: grounds.map((instance) => instance.material.name) };
+        };
+      },
+    });
+    mount.attach({ app, camera, environmentRoot }).dispose();
+    // Positive control: dressed, each stated its values and was drawn larger. All but the ground over
+    // the whole place: this mount draws no ground beyond, so its outer edge has nothing to break over.
+    expect(dressed!.stated).toEqual([false, true, true, true, true]);
+    expect(dressed!.scales[0]).toEqual([40, 30]);
+    expect(dressed!.scales[2]).toEqual([30 + grow, 2 + grow]);
+    expect(takenBack!.stated).toEqual([false, false, false, false, false]);
+    expect(takenBack!.scales).toEqual([[40, 30], [19, 30], [30, 2], [19, 30], [14, 26]]);
+    for (const name of takenBack!.materials) expect(name).toMatch(/^generated-site-colour:/);
+  });
+
+  it('sets the working into a copy where a ground wears a material that is not the dressing\'s own, and puts the ground back in it', async () => {
+    const pack = sitePack();
+    const pieces = await fetchPackPieces(pack, Object.keys(pack.modules), TABLE, async (file: StylePackFile) => PIECES[file.path]!);
+    const dresser = packSiteDresser({ pack, families, pieces, shading: PBR, materials: MATERIALS, patterns: PATTERNS, borders: BORDERS });
+    const { app, camera, environmentRoot } = nullApp();
+    // The site lies 100 m east and 50 m south of the world's origin: its edges are worked where it lies.
+    environmentRoot.setPosition(100, 0, 50);
+    let seen: { own: pc.Material; worn: string; ownCut: boolean; wornCut: boolean; over: number[] | undefined; stated: number[] | undefined; back: boolean } | null = null;
+    siteMount(camp('open', true), {
+      servedBytes: 1,
+      dress: (host, drawn, dressing) => {
+        const lane = (drawn.root.findByName('lane:shape') as pc.Entity).render!.meshInstances[0]!;
+        // The pack states no path and the leaf names no material: the lane is the engine's plain colour.
+        const own = lane.material;
+        const undress = dresser(host, drawn, dressing);
+        const dressedIn = lane.material;
+        const partly = {
+          own, worn: dressedIn.name, ownCut: (colourChunk(own) ?? '').includes('exuBorderCut'), wornCut: (colourChunk(dressedIn) ?? '').includes('exuBorderCut();'),
+          over: value(lane, 'exuOver0'), stated: value(lane, 'exuBorderShape'),
+        };
+        return () => {
+          undress();
+          seen = { ...partly, back: lane.material === own };
+        };
+      },
+    }).attach({ app, camera, environmentRoot }).dispose();
+    expect(seen!.own.name).toMatch(/^generated-site-colour:/);
+    // The engine's material, which any other shape of that colour wears, is not touched.
+    expect(seen!.ownCut).toBe(false);
+    expect(seen!.worn).toBe(`style-pack:bordered:${seen!.own.name}`);
+    expect(seen!.wornCut).toBe(true);
+    // A ruled ground: its own edge is no edge, and it gives way to the clearing over it.
+    expect(seen!.stated).toEqual([0, 0, 1, 1]);
+    expect(seen!.over).toEqual([100, 20, 119, 50]);
+    expect(seen!.back).toBe(true);
+  });
+
+  it('says how many neighbours were left out of a ground that has more than its working carries', async () => {
+    // A field with six tracks across it: four are worked against, two are counted.
+    const field = parseSiteDrawing({
+      profile: 'exulanica.site-drawing/v1', world_id: 'world:generated:field', receipt_sha256: 'a'.repeat(64),
+      kind: { kind: 'fixture_field', version: 1, label: 'Field' },
+      extent: { widthMm: 60_000, depthMm: 30_000, enclosure: 'open' },
+      arrival: { positionMm: [3000, 3000, 0], facingMm: [0, 1] },
+      slots: [
+        slot('ground', 'ground.sand', 'plane', [30_000, 15_000, 0], 0, [60_000, 30_000, 0], 'surface'),
+        slot('field', 'ground.grass', 'plane', [30_000, 15_000, 6], 0, [60_000, 30_000, 0], 'surface'),
+        ...[0, 1, 2, 3, 4, 5].map((n) => slot(`track-${n}`, 'path.dirt_path', 'plane', [5000 + n * 10_000, 15_000, 12], 0, [2000, 30_000, 0], 'surface')),
+      ],
+      walk: { floorMm: [0, 0, 60_000, 30_000], blockersMm: [], keepOutMm: [] },
+      seats: [],
+    });
+    const site = await dressedSite(PBR, MATERIALS, field, PATTERNS, { borders: BORDERS });
+    expect(value(site.shape('field'), 'exuOverShape3')).toEqual(shapeOf('soil', 1));
+    expect(site.summaries[0]).toMatchObject({ bordered: 8, borderNeighboursLeftOut: 2 });
+    site.attachment.dispose();
+  });
+
+  it('never breaks an indoor floor at its walls, where nothing is under it', async () => {
+    const hall = await dressedSite(PBR, MATERIALS, camp('indoor'), PATTERNS, { borders: BORDERS });
+    expect(value(hall.shape('ground'), 'exuBorderShape')).toBeUndefined();
+    expect(scaleOf(hall.shape('ground'))).toEqual([40, 30]);
+    // The grounds laid on it are worked as anywhere.
+    expect(hall.summaries[0]).toMatchObject({ bordered: 4 });
+    hall.attachment.dispose();
+  });
+
+  it('leaves a ground with a broken edge out of the ink, whose line would be the ruled one', async () => {
+    const ruled = await dressedSite(TOON, MATERIALS, camp(), PATTERNS);
+    const broken = await dressedSite(TOON, MATERIALS, camp(), PATTERNS, { borders: BORDERS });
+    expect(broken.summaries[0]!.inkSegments).toBeLessThan(ruled.summaries[0]!.inkSegments);
+    // Only the five grounds: the tent's floor and the hut's wall keep their lines.
+    const alone = await dressedSite(TOON, MATERIALS, placeOn('ground.tent_floor'), PATTERNS, { borders: BORDERS });
+    const same = await dressedSite(TOON, MATERIALS, placeOn('ground.tent_floor'), PATTERNS);
+    expect(alone.summaries[0]).toMatchObject({ bordered: 0, inkSegments: same.summaries[0]!.inkSegments });
+    for (const site of [ruled, broken, alone, same]) site.attachment.dispose();
+  });
+
+  it('is no part of the world: the drawing, the walk, the site\'s own shapes and what the site counts are the same with it as without', async () => {
+    const place = camp();
+    const before = JSON.stringify(place);
+    const off = await dressedSite(PBR, MATERIALS, place, PATTERNS, { scenery: SCENERY });
+    const on = await dressedSite(PBR, MATERIALS, place, PATTERNS, { scenery: SCENERY, borders: BORDERS });
+    // The drawing is the same object, untouched: what hides a being and a click read its boxes, and
+    // the walk its floor and blockers, none of which a border touches.
+    expect(on.mount.drawing).toBe(place);
+    expect(JSON.stringify(place)).toBe(before);
+    expect(JSON.stringify(on.mount.navigationWorld.polygonObstacles)).toBe(JSON.stringify(off.mount.navigationWorld.polygonObstacles));
+    expect(on.mount.navigationWorld.fieldRadius).toBe(off.mount.navigationWorld.fieldRadius);
+    // A point a metre inside the lake's ruled line walks as it did, whatever is drawn there.
+    expect(on.mount.navigationWorld.surface.sample(-26, -15)).toEqual(off.mount.navigationWorld.surface.sample(-26, -15));
+    const named = (root: pc.Entity) => root.find(() => true).map((entity) => entity.name).sort();
+    expect(named(on.root)).toEqual(named(off.root));
+    expect(named(on.environmentRoot)).toEqual(named(off.environmentRoot));
+    // Every ground lies where it lay: only how wide it is drawn changes.
+    for (const identity of ['ground', 'clearing', 'path', 'shore', 'lake', 'tent']) {
+      expect(on.shape(identity).node.getPosition().toString(), identity).toBe(off.shape(identity).node.getPosition().toString());
+    }
+    expect(on.attachment.metrics.triangles).toBe(off.attachment.metrics.triangles);
+    expect(on.attachment.metrics.drawBatches).toBe(off.attachment.metrics.drawBatches);
+    expect(on.canvas.dataset['siteScenery']).toBe(off.canvas.dataset['siteScenery']);
+    expect({ ...on.summaries[0]!, bordered: 0 }).toEqual(off.summaries[0]);
     on.attachment.dispose();
     off.attachment.dispose();
   });

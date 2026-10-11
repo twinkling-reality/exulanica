@@ -125,6 +125,8 @@ export function attachTileInk(
   colour: Rgb,
   options: InkOptions = INK_OPTIONS,
   prefixes: readonly string[] = ['generated-tile:'],
+  /** Mesh instances left out of the ink, such as a ground whose drawn edge is not its mesh's. */
+  leftOut: (instance: pc.MeshInstance) => boolean = () => false,
 ): TileInk {
   const material = new pc.StandardMaterial();
   material.name = 'generated-tile:ink';
@@ -138,7 +140,7 @@ export function attachTileInk(
     if (!prefixes.some((prefix) => render.entity.name.startsWith(prefix)) || render.entity.name === 'generated-tile:ink') continue;
     for (const instance of render.meshInstances) {
       const drawn = instance.material as pc.StandardMaterial;
-      if (drawn.blendType !== pc.BLEND_NONE || drawn.alphaTest > 0) continue;
+      if (drawn.blendType !== pc.BLEND_NONE || drawn.alphaTest > 0 || leftOut(instance)) continue;
       const positions: number[] = [];
       instance.mesh.getPositions(positions);
       const indices: number[] = [];

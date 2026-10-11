@@ -711,6 +711,9 @@ export {
 export type { RidgeRuns, RoofForm, RoofForms } from './roof-form.js';
 export { ROOF_FORM_CATALOG_ID, readRoofForms } from './roof-form.js';
 export type { MaterialDressing, SurfaceMaterial, SurfaceMaterials } from './surface-material.js';
+export type { BorderNeighbour, GroundBorder, GroundBorders, GroundPlane, PlaneBorder } from './ground-border.js';
+export { BORDER_NEIGHBOURS_MOST, GROUND_BORDER_CATALOG_ID, borderReachMm, planBorders, readGroundBorders } from './ground-border.js';
+
 export type { SiteInterior, SiteInteriorCatalog } from './site-interior.js';
 export { SITE_INTERIOR_CATALOG_ID, readSiteInterior } from './site-interior.js';
 

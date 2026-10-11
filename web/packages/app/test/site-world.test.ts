@@ -6,10 +6,12 @@ import type { GeneratedTileHost } from '@exulanica/atlas-react/generated-tile';
 import type { GeneratedSiteMount } from '@exulanica/atlas-react/generated-site';
 import { DRAWING_ASKS, loadSiteWorld, openSiteWorld, switchableSite, type SiteWorld } from '../src/composition/site-world.js';
 import { redrawWorldLook } from '../src/composition/world-look-redraw.js';
+import { GROUND_BORDERS } from '../src/ground-borders.js';
 import { ROOF_FORMS } from '../src/roof-forms.js';
 import { SITE_INTERIOR } from '../src/site-interior.js';
 import { SITE_SCENERY } from '../src/site-scenery.js';
 import { SURFACE_MATERIALS } from '../src/surface-materials.js';
+import { SURFACE_PATTERNS } from '../src/surface-patterns.js';
 import { STYLE_PACK_LIST_PROFILE, type WorldLookChoice } from '../src/world-look.js';
 import type { SavedWorldEntry } from '../src/world-entry-api.js';
 
@@ -23,6 +25,18 @@ vi.mock('@exulanica/atlas-react/generated-site', async (importOriginal) => {
     siteMount: (...asked: Parameters<typeof actual.siteMount>) => {
       mounts.asked.push(asked[1]);
       return actual.siteMount(...asked);
+    },
+  };
+});
+// The pack's dresser is wrapped the same way, so a test sees the catalogs the page hands it.
+const dressers = vi.hoisted(() => ({ asked: [] as { materials?: unknown; patterns?: unknown; borders?: unknown }[] }));
+vi.mock('@exulanica/atlas-react/style-pack', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@exulanica/atlas-react/style-pack')>();
+  return {
+    ...actual,
+    packSiteDresser: (...asked: Parameters<typeof actual.packSiteDresser>) => {
+      dressers.asked.push(asked[0]);
+      return actual.packSiteDresser(...asked);
     },
   };
 });
@@ -186,6 +200,9 @@ describe('the look a site world is drawn in', () => {
     expect((options as { scenery?: unknown }).scenery).toBe(SITE_SCENERY);
     // And the interior catalog, so an indoor place has its ceiling and light in the pack's look too.
     expect((options as { interior?: unknown }).interior).toBe(SITE_INTERIOR);
+    // The dresser reads a leaf by the same materials, patterns each and breaks the borders between grounds.
+    expect(dressers.asked.at(-1)).toMatchObject({ materials: SURFACE_MATERIALS, patterns: SURFACE_PATTERNS, borders: GROUND_BORDERS });
+    expect(GROUND_BORDERS.byMaterial.get('lake')?.lies).toBe('under');
     expect(ROOF_FORMS.byMaterial.get('canvas')?.ridge?.eaves).toBe('ground');
   });
 

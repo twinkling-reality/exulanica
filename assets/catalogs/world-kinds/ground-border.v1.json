@@ -1,0 +1,237 @@
+{
+ "schema_version": 1,
+ "catalog_id": "ground-border",
+ "catalog_version": 1,
+ "entries": [
+  {
+   "key": "grass",
+   "lies": "over",
+   "edge_mm": 240,
+   "wander_mm": 260,
+   "wander_period_mm": 5200,
+   "reason": "Authored: turf ends raggedly, in tufts a hand or two across, along a line that wanders a little over several metres; the wander is kept well under a path's width so a path beside it keeps its width and its direction. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "meadow",
+   "lies": "over",
+   "edge_mm": 320,
+   "wander_mm": 300,
+   "wander_period_mm": 6000,
+   "reason": "Authored: a meadow's edge is looser than a lawn's: longer tufts and a slightly wider wander. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "crop",
+   "lies": "over",
+   "edge_mm": 160,
+   "wander_mm": 120,
+   "wander_period_mm": 9000,
+   "reason": "Authored: a crop is sown to a line: its edge is broken by the plants' own width and barely wanders. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "soil",
+   "lies": "over",
+   "edge_mm": 200,
+   "wander_mm": 240,
+   "wander_period_mm": 4500,
+   "reason": "Authored: bare earth, trodden or tilled, has a crumbled edge and a worn, slightly uneven line; as a path it must still read as a path, so its wander is small against its width. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "forest_floor",
+   "lies": "over",
+   "edge_mm": 300,
+   "wander_mm": 300,
+   "wander_period_mm": 6000,
+   "reason": "Authored: leaf litter spreads over whatever it meets in loose patches. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "sand",
+   "lies": "over",
+   "edge_mm": 260,
+   "wander_mm": 320,
+   "wander_period_mm": 7000,
+   "reason": "Authored: sand drifts over its neighbours in soft tongues, the widest wander of any ground here and still within a step. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "gravel",
+   "lies": "over",
+   "edge_mm": 140,
+   "wander_mm": 160,
+   "wander_period_mm": 5000,
+   "reason": "Authored: gravel scatters a little past where it was laid. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "snow",
+   "lies": "over",
+   "edge_mm": 280,
+   "wander_mm": 320,
+   "wander_period_mm": 6500,
+   "reason": "Authored: snow lies in drifts with soft uneven edges. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "cobble",
+   "lies": "over",
+   "edge_mm": 90,
+   "wander_mm": 30,
+   "wander_period_mm": 4000,
+   "reason": "Authored: set stones end where a stone ends: an edge broken by a stone's width, on a line that barely moves. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "paving",
+   "lies": "over",
+   "edge_mm": 50,
+   "wander_mm": 0,
+   "wander_period_mm": 4000,
+   "reason": "Authored: laid slabs end on a nearly true line; the break is a joint's width, enough that the edge is not a ruled hairline. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "sea",
+   "lies": "under",
+   "edge_mm": 120,
+   "wander_mm": 150,
+   "wander_period_mm": 6000,
+   "shore_reach_most_mm": 600,
+   "reason": "Authored: the sea's own edge, where it meets only the ground beyond a place. Water lies under whatever ground it meets: the land breaks over the water by the land's own width and the water never over the land, so the picture may show a tongue of land where the walk says water and never water where a person walks. No ground may reach farther over it than 0.6 m (a step: the greatest distance by which the picture and the walk then disagree anywhere, since the reader refuses a catalog in which any ground's reach is more), and where its own edge meets nothing but the ground beyond a place it breaks less than land does. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "harbour",
+   "lies": "under",
+   "edge_mm": 120,
+   "wander_mm": 150,
+   "wander_period_mm": 6000,
+   "shore_reach_most_mm": 600,
+   "reason": "Authored: a harbour's water against its quay and its beach. Water lies under whatever ground it meets: the land breaks over the water by the land's own width and the water never over the land, so the picture may show a tongue of land where the walk says water and never water where a person walks. No ground may reach farther over it than 0.6 m (a step: the greatest distance by which the picture and the walk then disagree anywhere, since the reader refuses a catalog in which any ground's reach is more), and where its own edge meets nothing but the ground beyond a place it breaks less than land does. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "lake",
+   "lies": "under",
+   "edge_mm": 120,
+   "wander_mm": 150,
+   "wander_period_mm": 6000,
+   "shore_reach_most_mm": 600,
+   "reason": "Authored: a lake's edge. Water lies under whatever ground it meets: the land breaks over the water by the land's own width and the water never over the land, so the picture may show a tongue of land where the walk says water and never water where a person walks. No ground may reach farther over it than 0.6 m (a step: the greatest distance by which the picture and the walk then disagree anywhere, since the reader refuses a catalog in which any ground's reach is more), and where its own edge meets nothing but the ground beyond a place it breaks less than land does. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "river",
+   "lies": "under",
+   "edge_mm": 120,
+   "wander_mm": 150,
+   "wander_period_mm": 6000,
+   "shore_reach_most_mm": 600,
+   "reason": "Authored: a river's edge. Water lies under whatever ground it meets: the land breaks over the water by the land's own width and the water never over the land, so the picture may show a tongue of land where the walk says water and never water where a person walks. No ground may reach farther over it than 0.6 m (a step: the greatest distance by which the picture and the walk then disagree anywhere, since the reader refuses a catalog in which any ground's reach is more), and where its own edge meets nothing but the ground beyond a place it breaks less than land does. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  },
+  {
+   "key": "pond",
+   "lies": "under",
+   "edge_mm": 120,
+   "wander_mm": 150,
+   "wander_period_mm": 6000,
+   "shore_reach_most_mm": 600,
+   "reason": "Authored: a pond's edge. Water lies under whatever ground it meets: the land breaks over the water by the land's own width and the water never over the land, so the picture may show a tongue of land where the walk says water and never water where a person walks. No ground may reach farther over it than 0.6 m (a step: the greatest distance by which the picture and the walk then disagree anywhere, since the reader refuses a catalog in which any ground's reach is more), and where its own edge meets nothing but the ground beyond a place it breaks less than land does. Each figure is a chosen default, picked by eye on a forest camp, an island village and a desert outpost; none is measured from a source.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+   }
+  }
+ ]
+}
