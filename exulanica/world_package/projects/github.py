@@ -77,13 +77,51 @@ class Snapshot:
     writable_owned: bool
 
 
+def _missing_file(path: list[Any]) -> bool:
+    """A file lookup on a branch commit: GitHub reports a path the commit lacks as NOT_FOUND."""
+    return (
+        len(path) == 4
+        and path[0] == "repository"
+        and path[1] in ("ref", "base", "head")
+        and path[2] == "target"
+        and path[3] in ("file", "evidence")
+    )
+
+
+def _missing_repository(path: list[Any]) -> bool:
+    return path == ["viewer", "repository"]
+
+
+def _absent_only(response: Any, absent: Callable[[list[Any]], bool]) -> dict[str, Any] | None:
+    """The data when every error is NOT_FOUND at an expected path whose value is null."""
+    if not isinstance(response, dict) or not isinstance(response.get("data"), dict):
+        return None
+    if not response.get("errors"):
+        return None  # Nothing to excuse: the exit status and the plain reading decide.
+    for error in response["errors"]:
+        path = error.get("path") if isinstance(error, dict) else None
+        if error.get("type") != "NOT_FOUND" or not isinstance(path, list) or not absent(path):
+            return None
+        value: Any = response["data"]
+        for key in path:
+            value = value.get(key) if isinstance(value, dict) else None
+        if value is not None:
+            return None
+    return response["data"]
+
+
 def gh_graphql(
-    query: str, variables: dict[str, Any], *, tolerate_not_found: bool = False
+    query: str,
+    variables: dict[str, Any],
+    *,
+    absent: Callable[[list[Any]], bool] = _missing_file,
 ) -> dict[str, Any]:
     """Use the user's CLI credential store; never return CLI stderr or retry a write.
 
-    With `tolerate_not_found`, a response whose only errors are NOT_FOUND returns its data:
-    asking whether a repository exists is answered by GitHub as such an error.
+    GitHub answers a lookup of something that does not exist (a file a commit lacks, a repository
+    name that is free) with a NOT_FOUND error, partial data and a failing exit. Such a response is
+    accepted only when every error is NOT_FOUND at a path `absent` expects and that value is null;
+    anything else fails closed.
     """
     environment = dict(os.environ)
     for name in ("GH_DEBUG", "GH_HOST", "GH_REPO"):
@@ -104,16 +142,12 @@ def gh_graphql(
             "GitHub request did not complete; a publication may have succeeded. "
             "Read the branch before preparing another review."
         ) from exc
-    if tolerate_not_found:
-        try:
-            response = json.loads(result.stdout)
-            errors = response.get("errors") or []
-            if isinstance(response.get("data"), dict) and all(
-                isinstance(e, dict) and e.get("type") == "NOT_FOUND" for e in errors
-            ):
-                return response["data"]
-        except (ValueError, AttributeError):
-            pass
+    try:
+        accepted = _absent_only(json.loads(result.stdout), absent)
+    except ValueError:
+        accepted = None
+    if accepted is not None:
+        return accepted
     if result.returncode != 0:
         raise ProjectError(
             "GitHub refused or failed the request. Check CLI access and branch state; "
@@ -133,9 +167,9 @@ def gh_graphql(
 class GitHubProjects:
     def __init__(
         self,
-        request: Callable[[str, dict[str, Any]], dict[str, Any]] = gh_graphql,
+        request: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
     ) -> None:
-        self.request = request
+        self.request = request or gh_graphql
 
     def read(self, target: Target) -> Snapshot:
         owner, name = target.repository.split("/")
@@ -718,7 +752,7 @@ class RepositoryCreation:
         rest: Callable[[str, str, dict[str, Any]], dict[str, Any]] | None = None,
     ) -> None:
         self.request = request or (
-            lambda query, variables: gh_graphql(query, variables, tolerate_not_found=True)
+            lambda query, variables: gh_graphql(query, variables, absent=_missing_repository)
         )
         self.rest = rest or gh_rest
 

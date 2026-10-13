@@ -519,22 +519,78 @@ def test_each_unpublished_checkpoint_becomes_its_own_commit(tmp_path):
     assert [c["message"] for c in review["commits"]] == ["Put the knight back where it was saved"]
 
 
+def answering(body, code=1):
+    return lambda *a, **k: SimpleNamespace(returncode=code, stdout=json.dumps(body), stderr="")
+
+
 def test_a_free_repository_name_is_a_not_found_answer_and_nothing_else(monkeypatch):
-    from exulanica.world_package.projects.github import gh_graphql
+    from exulanica.world_package.projects.github import RepositoryCreation, gh_graphql
 
     free = {
         "data": {"viewer": {"login": "learner", "repository": None}},
-        "errors": [{"type": "NOT_FOUND", "message": "Could not resolve to a Repository"}],
+        "errors": [
+            {"type": "NOT_FOUND", "path": ["viewer", "repository"], "message": "not resolved"}
+        ],
     }
-    denied = {"data": None, "errors": [{"type": "FORBIDDEN"}]}
-
-    def answer(body):
-        return lambda *a, **k: SimpleNamespace(returncode=1, stdout=json.dumps(body), stderr="")
-
-    monkeypatch.setattr(subprocess, "run", answer(free))
-    assert gh_graphql("q", {}, tolerate_not_found=True)["viewer"]["repository"] is None
-    with pytest.raises(ProjectError):
+    monkeypatch.setattr(subprocess, "run", answering(free))
+    assert RepositoryCreation().review("world")["repository"] == "learner/world"
+    with pytest.raises(ProjectError):  # The default reading excuses file lookups only.
         gh_graphql("q", {})
-    monkeypatch.setattr(subprocess, "run", answer(denied))
-    with pytest.raises(ProjectError):
-        gh_graphql("q", {}, tolerate_not_found=True)
+    for body in (
+        {"data": None, "errors": [{"type": "FORBIDDEN"}]},
+        {**free, "errors": [{**free["errors"][0], "type": "FORBIDDEN"}]},
+        {"data": {"viewer": {"login": "learner", "repository": None}}},
+    ):
+        monkeypatch.setattr(subprocess, "run", answering(body))
+        with pytest.raises(ProjectError):
+            RepositoryCreation().review("world")
+
+
+def fresh_base(errors):
+    """GitHub's reply for a repository whose main holds only a README and no project branch."""
+    return {
+        "data": {
+            "viewer": {"login": "learner"},
+            "repository": {
+                "id": "R_1",
+                "nameWithOwner": "learner/world",
+                "owner": {"login": "learner"},
+                "viewerPermission": "ADMIN",
+                "isArchived": False,
+                "isDisabled": False,
+                "base": {"target": {"oid": "a" * 40, "file": None, "evidence": None}},
+                "head": None,
+                "pullRequests": {"nodes": []},
+            },
+        },
+        "errors": errors,
+    }
+
+
+MISSING = [
+    {"type": "NOT_FOUND", "path": ["repository", "base", "target", "file"], "message": "no file"},
+    {"type": "NOT_FOUND", "path": ["repository", "base", "target", "evidence"], "message": "no"},
+]
+
+
+def test_a_fresh_base_branch_without_project_files_reads_as_empty(monkeypatch):
+    from exulanica.world_package.projects.github import BranchTarget, RollingPullRequests
+
+    target = BranchTarget("learner/world", "main", "exulanica/world")
+    monkeypatch.setattr(subprocess, "run", answering(fresh_base(MISSING)))
+    remote = RollingPullRequests().read(target)
+    assert remote.base_files == {} and remote.branch_head is None
+    refusals = [
+        [{**MISSING[0], "type": "FORBIDDEN"}],
+        [{**MISSING[0], "path": ["repository", "pullRequests"]}],
+        [{**MISSING[0], "path": ["viewer", "repository"]}],
+    ]
+    for errors in refusals:
+        monkeypatch.setattr(subprocess, "run", answering(fresh_base(errors)))
+        with pytest.raises(ProjectError):
+            RollingPullRequests().read(target)
+    present = fresh_base(MISSING[:1])
+    present["data"]["repository"]["base"]["target"]["file"] = {"mode": 33188}
+    monkeypatch.setattr(subprocess, "run", answering(present))
+    with pytest.raises(ProjectError):  # A NOT_FOUND for a value GitHub nevertheless returned.
+        RollingPullRequests().read(target)
