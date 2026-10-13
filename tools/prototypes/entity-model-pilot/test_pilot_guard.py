@@ -41,7 +41,7 @@ def case(tmp_path):
         "http://localhost:20031",
         "http://localhost:20032",
         "c" * 64,
-        212,
+        pg.code_schema_version(),
         "durable",
         uuid4(),
         Decimal(".25"),
@@ -86,6 +86,12 @@ def test_primary_endpoint_cannot_be_bound(case, field, port):
     scheme = "postgresql" if field == "database_url" else "http"
     with pytest.raises(pg.PilotStop, match="target_endpoint_not_isolated"):
         replace(case.binding, **{field: f"{scheme}://localhost:{port}/target"}).validate()
+
+
+def test_target_migrated_below_the_code_is_refused(case):
+    behind = pg.code_schema_version() - 1
+    with pytest.raises(pg.PilotStop, match="source_preflight_missing"):
+        replace(case.binding, schema_version=behind).validate()
 
 
 def test_baseline_is_not_counted_and_pending_prevents_next_host(case):

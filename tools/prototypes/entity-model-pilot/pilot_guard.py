@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from exulanica.migrations import migrations
 from exulanica.models.usage import CallUsage, CostBasis
 
 
@@ -69,6 +70,12 @@ class Snapshot:
     playing_versions: tuple[uuid.UUID, ...]
     pending_background_jobs: int = 0
     refusal: str | None = None
+
+
+def code_schema_version() -> int:
+    """The newest migration this code carries. A target database must be migrated exactly to it."""
+    *_, newest = migrations()
+    return int(newest.version)
 
 
 @dataclass(frozen=True)
@@ -135,7 +142,7 @@ class TargetBinding:
             if not safe:
                 raise PilotStop("target_endpoint_not_isolated")
         if (
-            self.schema_version != 212
+            self.schema_version != code_schema_version()
             or len(self.source_inputs_sha256) != 64
             or any(c not in "0123456789abcdef" for c in self.source_inputs_sha256)
         ):

@@ -40,7 +40,7 @@ def rig(tmp_path, monkeypatch):
         "http://localhost:20031",
         "http://localhost:20032",
         "c" * 64,
-        212,
+        pg.code_schema_version(),
         "durable",
         uuid4(),
         Decimal(".25"),

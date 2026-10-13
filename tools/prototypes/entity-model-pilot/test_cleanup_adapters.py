@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 from cleanup_adapters import CleanupAdapters
-from pilot_guard import Identity, PilotStop, TargetBinding
+from pilot_guard import Identity, PilotStop, TargetBinding, code_schema_version
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ def cleanup(tmp_path):
         "http://localhost:20031",
         "http://localhost:20032",
         "c" * 64,
-        212,
+        code_schema_version(),
         "durable",
         uuid4(),
         Decimal(".25"),
