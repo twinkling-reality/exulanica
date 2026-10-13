@@ -1860,7 +1860,9 @@ export function mountEnvironmentSelection(
     if (phase === 'disposed') return;
     if (societyControl === null) {
       // A read that really failed is tried again by itself while people are here, each wait twice the last.
-      if (controlUnheld !== 'failed' || current === null || (liveSociety?.view.snapshot ?? null) === null) return;
+      // A saved world's version is read again by the next try (`versionToObserve`); a district's is not.
+      if (controlUnheld !== 'failed' || (current === null && savedWorld === null)
+        || (liveSociety?.view.snapshot ?? null) === null) return;
       const wait = Math.min(CONTROL_RETRY_MOST_MS, CONTROL_POLL_MS * 2 ** Math.min(controlFailures - 1, 10));
       controlTimer = window.setTimeout(() => void (savedWorld !== null ? pollPlayback() : refreshPlayback(true)), wait);
       return;
@@ -1878,11 +1880,13 @@ export function mountEnvironmentSelection(
    */
   async function pollPlayback(): Promise<void> {
     controlTimer = null;
-    if (phase === 'disposed' || current === null || controlBusy) return;
+    if (phase === 'disposed' || controlBusy) return;
     const epoch = controlEpoch;
     const started = performance.now();
     try {
-      const read = await controlClient.read(current.versionId);
+      const version = await versionToObserve();
+      if ((phase as string) === 'disposed' || epoch !== controlEpoch) return;
+      const read = await controlClient.read(version.versionId);
       if ((phase as string) === 'disposed' || epoch !== controlEpoch) return;
       holdControl(read);
       if (read.currentTick !== liveSociety?.view.snapshot?.currentTick) await liveSociety?.refresh();
@@ -1896,13 +1900,27 @@ export function mountEnvironmentSelection(
     }
   }
 
+  /**
+   * The version whose playback is read: the one held, or a saved world's read again where its last
+   * read failed, so one failed read never ends observation. Throws while it still cannot be read,
+   * which the caller counts as a failed read and tries again after its longer wait.
+   */
+  async function versionToObserve(): Promise<AlternateVersion> {
+    if (current === null && savedWorld !== null) {
+      await readSavedVersion();
+      if (current !== null && (phase as string) !== 'disposed') reflectVersion();
+    }
+    if (current === null) throw new Error('The saved world could not be read.');
+    return current;
+  }
+
   async function refreshPlayback(refreshSocietyState = false): Promise<void> {
-    if (phase === 'disposed' || deps.env.preview || current === null || controlBusy) return;
+    if (phase === 'disposed' || deps.env.preview || (current === null && savedWorld === null) || controlBusy) return;
     controlEpoch += 1;
     stopControlPoll(); controlBusy = true; reflectPlayback();
     try {
       if (refreshSocietyState) await liveSociety?.refresh();
-      holdControl(await controlClient.read(current.versionId));
+      holdControl(await controlClient.read((await versionToObserve()).versionId));
     } catch (error) {
       holdControl(null);
       playbackStatus.textContent = problemSentence(error, PEOPLE_PROBLEMS, CLOCK_UNREAD);
@@ -2571,7 +2589,8 @@ export function mountEnvironmentSelection(
     events: LiveSocietyView['events'] | null,
   ): void {
     const control = societyControl;
-    const playing = control?.mode === 'playing' && control.hostPlayback?.running === true;
+    // The world's own mode, whoever plays it: a minute another process advances is learnt of as late.
+    const playing = control?.mode === 'playing';
     const intervalMs = control?.hostPlayback?.intervalMs ?? control?.tickIntervalMs;
     const timing = {
       ...(intervalMs === undefined ? {} : { intervalMs }),

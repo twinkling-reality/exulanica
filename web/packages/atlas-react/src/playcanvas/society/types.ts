@@ -194,6 +194,15 @@ export interface OwnedSocietyState {
   readonly things?: readonly SocietyThingSnapshot[];
   /** v7: the ability modules its first input recorded, such as `exulanica-ability/hands/v1`. */
   readonly modules?: readonly string[];
+  /** v7: the movement modules its first input recorded, such as `exulanica-movement/walking/v2`. */
+  readonly movement_modules?: readonly string[];
+  /** v7: what the society runs of each kind its workspace keeps (its run form), by the kind's digest. */
+  readonly kinds?: Readonly<Record<string, KindRunForm>>;
+}
+
+/** The part of a kept kind's run form the crowd reads: how it moves, each move's module and figures. */
+export interface KindRunForm {
+  readonly moves?: readonly { readonly module: string; readonly parameters?: Readonly<Record<string, unknown>> }[];
 }
 
 export type CrowdDetail = 'near' | 'far';

@@ -5,7 +5,9 @@
  * plan at rest, each a direct child of the scene root with no rotation or scale, its parts its
  * children (the look kinds catalog). Here every joint is hung from its nearest dressed ancestor in
  * the plan's parent table at its rest offset from it (`./skeleton.ts`), so a look may leave optional
- * bones out, and posed every frame by `./motion.ts` from what the thing is doing. A socket's place
+ * bones out, and posed every frame by `./motion.ts` from what the thing is doing: walking, holding,
+ * and the posture the body motion table draws its state's activity in (`postureFor`), settled into
+ * over the table's blend and taken at once under reduced motion or after a jump. A socket's place
  * is the container's `socket:<key>` node under the socket's bone node where it has one (its grip at
  * the node's origin, its axis along the node's slot +z), else the bone node's origin.
  */
@@ -13,7 +15,7 @@
 import * as pc from 'playcanvas';
 import type { BodyExtent, Grip } from './documents.js';
 import { HALF_TURN, bodyCarry, nodeCarry, placeHeld, quat, quatOf, type PickVolume, type ThingFigure, type ThingPose } from './figures.js';
-import { bodyGround, type BodyMotion, type Footprint } from './body-motion.js';
+import { PostureBlend, bodyGround, postureFor, type BodyMotion, type BodyPosture, type Footprint } from './body-motion.js';
 import { bodyTravel, mul, solvePose, type Pose } from './motion.js';
 import { dressSkeleton, type BodyPlanEntry, type DressedSkeleton, type Vec3 } from './skeleton.js';
 
@@ -39,6 +41,8 @@ export class RigidOnBonesFigure implements ThingFigure {
   private previous: readonly [number, number, number] | null = null;
   private solved: Pose | null = null;
   private offering = 0;
+  private readonly settling = new PostureBlend();
+  private posture: BodyPosture | null = null;
 
   /**
    * `model` is the look's container instantiated for this figure; `lookHeightMm` the look's natural
@@ -99,6 +103,10 @@ export class RigidOnBonesFigure implements ThingFigure {
     }
     this.previous = pose.position;
     this.time += pose.reducedMotion ? 0 : dt;
+    const table = this.motion?.postures ?? null;
+    this.posture = table === null ? null : this.settling.step(
+      postureFor(this.motion, pose.activity), dt, table.blendSeconds, pose.reducedMotion === true || pose.discontinuity === true,
+    );
     this.root.setLocalPosition(x, y, z);
     this.root.setLocalEulerAngles(0, (pose.facing * 180) / Math.PI, 0);
     this.solve(pose);
@@ -113,8 +121,9 @@ export class RigidOnBonesFigure implements ThingFigure {
       time: this.time,
       holding: pose.holding ?? new Set(),
       reach,
-      talking: pose.talking === true,
+      talking: pose.talking === true || this.posture?.speaks === true,
       ...(pose.reducedMotion ? { reducedMotion: true } : {}),
+      posture: this.posture,
     }, this.motion);
     for (const bone of this.skeleton.order) this.joints.get(bone)!.setLocalRotation(quat(this.solved.local.get(bone)!));
     const at = this.solved.rootPosition;

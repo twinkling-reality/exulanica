@@ -300,6 +300,68 @@ describe('what the people panel says of a saved world\'s playback', () => {
     }
   });
 
+  it('walks a minute another process plays as late as it is learnt of, so walkers do not stop between minutes', async () => {
+    vi.useFakeTimers();
+    const { mounted, controlClient, societyClient, crowd, panel } = mount();
+    try {
+      await mounted.begin();
+      let tick = 0;
+      const hostPlayback = { running: false, intervalMs: 4000, reason: 'This host does not play worlds on its own.', code: null };
+      controlClient.read.mockImplementation(async () => ({
+        ...control(tick), mode: tick === 0 ? 'paused' : 'playing', hostPlayback,
+      }));
+      bringIn(panel);
+      await vi.advanceTimersByTimeAsync(0);
+      const lagOf = (call: unknown[] | undefined) => (call?.[2] as { startLagMs: number }).startLagMs;
+      // Paused, the minute drawn was read at once: no lag.
+      expect(lagOf(crowd.setSociety.mock.calls.at(-1))).toBe(0);
+      tick = 1;
+      societyClient.read.mockResolvedValue(society(1, true));
+      await vi.advanceTimersByTimeAsync(2000);
+      expect((crowd.setSociety.mock.calls.at(-1) as unknown[])[0]).toEqual(society(1, true).state);
+      // Played elsewhere, the minute was learnt of up to one control read late: walks start that late.
+      expect(lagOf(crowd.setSociety.mock.calls.at(-1))).toBeGreaterThanOrEqual(2000);
+    } finally {
+      mounted.dispose();
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps observing after a failed read of the saved world itself, reading it again after the longer wait', async () => {
+    vi.useFakeTimers();
+    const { mounted, controlClient, worldClient, panel } = mount();
+    try {
+      const answer = worldClient.connect.getMockImplementation()!;
+      const down = new ApiError(503, 'unavailable', 'the store is restarting');
+      // The version cannot be read when the world opens, nor when its playback is first read, nor
+      // when people come in.
+      worldClient.connect.mockRejectedValueOnce(down).mockRejectedValueOnce(down).mockRejectedValueOnce(down);
+      await mounted.begin();
+      bringIn(panel);
+      for (let i = 0; i < 6; i += 1) await vi.advanceTimersByTimeAsync(0);
+      expect(worldClient.connect).toHaveBeenCalledTimes(3);
+      expect(controlClient.read).not.toHaveBeenCalled();
+      expect(says(panel)).toContain(PLAYBACK_UNREAD_WORDS);
+      // Tried again by itself after two seconds: the version is read, then its playback.
+      await vi.advanceTimersByTimeAsync(2100);
+      expect(worldClient.connect).toHaveBeenCalledTimes(4);
+      expect(controlClient.read).toHaveBeenCalledTimes(1);
+      expect(answer).toBeTypeOf('function');
+      expect(says(panel)).not.toContain('could not be read');
+      // Observation goes on at its usual pace, and stops when the page is disposed.
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(controlClient.read.mock.calls.length).toBeGreaterThan(1);
+      mounted.dispose();
+      const stopped = controlClient.read.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(controlClient.read).toHaveBeenCalledTimes(stopped);
+      expect(worldClient.connect).toHaveBeenCalledTimes(4);
+    } finally {
+      mounted.dispose();
+      vi.useRealTimers();
+    }
+  });
+
   it('does not keep asking for the playback of a world nobody lives in', async () => {
     vi.useFakeTimers();
     try {

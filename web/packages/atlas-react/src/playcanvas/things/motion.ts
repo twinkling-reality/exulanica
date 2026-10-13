@@ -21,6 +21,12 @@
  * The gait is clocked by distance walked, never by time, so feet stay planted while a figure moves:
  * one cycle covers the stride divided by the share of the cycle a foot is on the ground.
  *
+ * A posture (`MotionInput.posture`, from the body motion table by what the state says the body is
+ * doing) lowers the hips by a share of how far the legs reach down, never further than every leg
+ * that bends to reach its foot can keep that foot where it stands, so the knees bend and the feet
+ * stay put; it bows a head the plan names (a head chain read from the skeleton's shape, or a skull),
+ * and a posture that speaks nods and opens the jaw as a line of speech does. No posture is standing.
+ *
  * Positions are in the figure's frame (`./skeleton.ts`): metres, +Y up, +Z front, +X the figure's
  * left. Rotations are quaternions `[x, y, z, w]`. Pure: no renderer.
  */
@@ -128,6 +134,11 @@ export interface MotionInput {
   readonly talking: boolean;
   /** Reduced motion: stand, carry and reach without breathing, swaying or nodding. */
   readonly reducedMotion?: boolean;
+  /**
+   * The posture drawn now, as far as the body has settled into it: its hips lowered by this share
+   * of its legs' drop and a named head bowed this far, radians. Absent or null: standing.
+   */
+  readonly posture?: { readonly lowerShare: number; readonly headBow: number } | null;
 }
 
 export interface JointPose {
@@ -230,6 +241,35 @@ export function gaitOf(skeleton: DressedSkeleton, motion: BodyMotion | null = nu
   return { stride, cycle: stride > 0 ? stride / DUTY : 0, lift: 0.14 * mean, crouch, bob, fullSpeed };
 }
 
+/** How much longer than the shortest it can make a bending leg keeps its reach while its hips are lowered. */
+const LOWERED_REACH_MARGIN = 1.05;
+
+/**
+ * How far a body's hips may be lowered, metres, by `share` of its legs' drop: no further than every
+ * stepping limb that reaches for its foot can still reach it from hips lowered that far and sunk
+ * into a walk (`walkDepth`), so a posture never lifts a foot off the ground or pushes it through.
+ * None for a body that steps on nothing, or on tentacles, which hang while it stands.
+ */
+export function loweredBy(skeleton: DressedSkeleton, share: number, walkDepth: number): number {
+  const legs = skeleton.steps;
+  if (share <= 0 || legs.length === 0 || legs.some((leg) => leg.role === 'tentacle')) return 0;
+  let drop = Number.POSITIVE_INFINITY;
+  let room = Number.POSITIVE_INFINITY;
+  for (const leg of legs) {
+    const bones = leg.bones;
+    const first = skeleton.rest.get(bones[0]!)!, last = skeleton.rest.get(bones.at(-1)!)!;
+    const vertical = first[1] - last[1];
+    drop = Math.min(drop, vertical);
+    // One segment swings about its hip and keeps its foot's height however low the hips are.
+    if (skeleton.stated && bones.length === 2) continue;
+    const middle = Math.max(1, Math.floor((bones.length - 1) / 2));
+    const shortest = LOWERED_REACH_MARGIN * Math.abs(chainLength(skeleton, bones.slice(0, middle + 1)) - chainLength(skeleton, bones.slice(middle)));
+    const across = Math.hypot(last[0] - first[0], last[2] - first[2]);
+    room = Math.min(room, vertical - walkDepth - Math.sqrt(Math.max(0, shortest * shortest - across * across)));
+  }
+  return clamp(share * Math.max(0, drop), 0, Math.max(0, room));
+}
+
 /** How far the hips yaw with the legs and how far an upright body leans into its walk, radians at full walk. */
 const SWAY = 0.07;
 const LEAN = 0.05;
@@ -298,12 +338,15 @@ export function solvePose(skeleton: DressedSkeleton, input: MotionInput, motion:
   const lean = skeleton.lying ? IDENTITY : axisAngle([1, 0, 0], LEAN * walk);
   const sway = axisAngle([0, 1, 0], swayAngle);
   const rootRest = skeleton.rest.get(skeleton.root)!;
+  const posture = input.posture ?? null;
+  const lowered = posture === null ? 0 : loweredBy(skeleton, posture.lowerShare, crouch + bobDepth);
+  const bow = posture === null ? 0 : posture.headBow;
   // A legless body's wave is fixed to the ground: a point `s` along the spine is over the ground
   // at `travelled + s`, turned as the wave is there, and the root swings to the side with it.
   const wave = spineWave(skeleton, motion);
   const waveTurn = (s: number) => (wave === null ? 0 : wave.steepest * Math.cos((2 * Math.PI * (s + input.travelled)) / wave.length));
   const waveAside = wave === null ? 0 : ((wave.steepest * wave.length) / (2 * Math.PI)) * Math.sin((2 * Math.PI * input.travelled) / wave.length);
-  const rootPosition = add(rootRest, [waveAside, bob, 0]);
+  const rootPosition = add(rootRest, [waveAside, bob - lowered, 0]);
   /** How far each bone is turned about the upright by the body's sway or its wave, radians. */
   const turned = new Map<string, number>([[skeleton.root, wave === null ? swayAngle : waveTurn(wave.rootMiddle)]]);
 
@@ -423,7 +466,7 @@ export function solvePose(skeleton: DressedSkeleton, input: MotionInput, motion:
       let turn: Quat = IDENTITY;
       if (limb.role === 'head') {
         const nod = input.talking && !quiet ? 0.09 * Math.sin(2 * Math.PI * 2.1 * t) : 0;
-        turn = mul(axisAngle([0, 1, 0], quiet ? 0 : 0.06 * Math.sin(0.37 * t)), axisAngle([1, 0, 0], nod));
+        turn = mul(axisAngle([0, 1, 0], quiet ? 0 : 0.06 * Math.sin(0.37 * t)), axisAngle([1, 0, 0], nod + (i === 0 ? bow : 0)));
       } else if (limb.role === 'trunk') {
         turn = mul(axisAngle([0, 1, 0], -0.6 * 0.07 * walk * Math.sin(2 * Math.PI * leadPhase)), axisAngle([1, 0, 0], quiet ? 0 : 0.012 * Math.sin(2 * Math.PI * 0.24 * t)));
       } else if (!quiet) {
@@ -474,7 +517,7 @@ export function solvePose(skeleton: DressedSkeleton, input: MotionInput, motion:
         const look = live ? motion.lookAbout * Math.sin(cycleAt(motion.lookAboutPeriod, neck?.order ?? 0)) * share : 0;
         const nod = live && input.talking ? motion.nod * Math.sin(2 * Math.PI * motion.speechBeats * t) : 0;
         after[0] = 0;
-        local[0] = mul(axisAngle(UP, look - carried), axisAngle(ACROSS, nod));
+        local[0] = mul(axisAngle(UP, look - carried), axisAngle(ACROSS, nod + bow));
         break;
       }
       case 'jaw': {

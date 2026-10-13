@@ -23,7 +23,7 @@ import type {
   OwnedSocietyState,
   SocietyInhabitantSnapshot,
 } from './types.js';
-import { pickReach } from './types.js';
+import { isMadeKind, pickReach } from './types.js';
 
 /**
  * The whole synthetic population, drawn by distance.
@@ -41,8 +41,8 @@ import { pickReach } from './types.js';
  * person walks, and a person's recorded path is usually much shorter than the bound: walked at the
  * bound it would be a burst, and spread over the presented minute a short one would be a creep, feet
  * stepping over ground that hardly moves. So such a person walks what they have still to walk at
- * their own walking pace (`walkSpeedOf`: the pace the figure drawing them states, else the catalog
- * person's), arrives, and stands where their activity is drawn until the next minute is read. A
+ * their own walking pace (`walkSpeedOf`: the pace the figure drawing them states, else the pace the
+ * engine walks their kind at, else the catalog person's), arrives, and stands where their activity is drawn until the next minute is read. A
  * walk too long to finish at that pace by the time the next tick's path is expected (the interval
  * and the caller's start lag) is walked evenly over that time instead: faster than a walk only
  * because the minute's distance needs it, and never faster than `CATCH_UP_SPEED_LIMIT` times the
@@ -339,6 +339,33 @@ function heading(a: readonly [number, number], b: readonly [number, number], hel
   return Math.hypot(dx, dz) < 1e-6 ? held : Math.atan2(-dx, -dz);
 }
 
+/** The walking module whose walkers each walk at the pace their kind states. */
+const PACED_WALKING = 'exulanica-movement/walking/v2';
+/** The pace a kind states is in thousandths of the society's. */
+const PACE_PER = 1000;
+
+/**
+ * What one tick lets this person walk, millimetres, where their society's walking paces each body
+ * by its kind: the society's bound times the pace their kind states over a thousand, floored, and
+ * at least one. Null where the state records no bound, its walking paces nobody, or the person's
+ * kind states no pace; they then walk the society's bound, as the engine walks them (a kind that
+ * states none walks the module's reference pace, a thousand in a thousand). A copy of the engine's
+ * rule, whose authority is `tick_budgets` in `exulanica/world/society_planner.py` (with
+ * `own_budget_mm` in `exulanica/movement/walking_v2.py`): change both together.
+ */
+export function ownWalkBudgetMm(state: OwnedSocietyState, person: SocietyInhabitantSnapshot): number | null {
+  const bound = state.movement_budget_mm_per_tick;
+  if (bound === undefined || !(state.movement_modules ?? []).includes(PACED_WALKING)) return null;
+  const kind = person.kind;
+  if (kind === undefined || !isMadeKind(kind)) return null;
+  for (const move of state.kinds?.[kind.sha256]?.moves ?? []) {
+    const pace = move.parameters?.['pace_permille'];
+    if (pace === undefined) continue;
+    return typeof pace === 'number' && Number.isInteger(pace) && pace > 0 ? Math.max(1, Math.floor((bound * pace) / PACE_PER)) : null;
+  }
+  return null;
+}
+
 /** The activity a snapshot states for a person: the kind of an action that is under way. */
 function stateActivity(person: SocietyInhabitantSnapshot): string | null {
   return person.action?.status === 'active' ? person.action.kind : null;
@@ -384,6 +411,8 @@ export class SocietyCrowd {
   private readonly nearRadius: number;
   private readonly farRadius: number;
   private readonly far: FarFigures;
+  /** Metres a second each body the engine paces by its kind walks at, from the latest state. */
+  private ownPaces: ReadonlyMap<string, number> = new Map();
   private readonly near = new Map<string, CrowdRenderable>();
   /** The figure key each full character was made with, so a changed look makes it again. */
   private readonly nearKeys = new Map<string, string>();
@@ -510,6 +539,8 @@ export class SocietyCrowd {
     // input writes each person's path, and a legacy state carries none, so no profile is listed here.
     const pathful = state.inhabitants.every((person) => Array.isArray(person.motion_path_mm));
     const walkers = new Map<string, Walker>();
+    const ownPaces = new Map<string, number>();
+    this.ownPaces = ownPaces;
     const jumps: CrowdJump[] = [];
     const misses: CrowdSeatingMiss[] = [];
     for (const person of state.inhabitants) {
@@ -522,7 +553,13 @@ export class SocietyCrowd {
       const end = [person.position_mm[0] / 1000, person.position_mm[1] / 1000] as const;
       const recorded = person.motion_path_mm?.map(([x, z]) => [x / 1000, z / 1000] as const);
       const previous = continuing ? this.walkers.get(person.id) : undefined;
-      const pace = person.walk_speed_mm_per_tick ?? state.movement_budget_mm_per_tick;
+      // A body the engine paces by its kind walks its own bound, and that bound over the tick's
+      // simulated seconds is the pace it walks at when nothing hurries it (`walkSpeedOf`).
+      const own = person.walk_speed_mm_per_tick === undefined ? ownWalkBudgetMm(state, person) : null;
+      if (own !== null && state.tick_seconds !== undefined && state.tick_seconds > 0) {
+        ownPaces.set(person.id, own / 1000 / state.tick_seconds);
+      }
+      const pace = person.walk_speed_mm_per_tick ?? own ?? state.movement_budget_mm_per_tick;
       const budget = pace === undefined ? null : pace / 1000;
       // A recorded speed is walked at; a recorded bound is only a bound (see the class comment).
       const boundOnly = budget !== null && person.walk_speed_mm_per_tick === undefined;
@@ -814,12 +851,13 @@ export class SocietyCrowd {
 
   /**
    * How fast a person walks when nothing hurries them, metres a second: the pace the figure drawing
-   * them states (`CrowdRenderable.walkSpeed`, a rigged thing's declared walk), else the catalog
-   * person's of their id, its walk clip's measured ground speed at their height.
+   * them states (`CrowdRenderable.walkSpeed`, a rigged thing's declared walk), else the pace the
+   * engine walks their kind at (`ownWalkBudgetMm` over the tick's simulated seconds), else the
+   * catalog person's of their id, its walk clip's measured ground speed at their height.
    */
   private walkSpeedOf(id: string): number {
     const stated = this.near.get(id)?.walkSpeed ?? null;
-    return stated !== null && stated > 0 ? stated : this.far.walkSpeedOf(id);
+    return stated !== null && stated > 0 ? stated : this.ownPaces.get(id) ?? this.far.walkSpeedOf(id);
   }
 
   /**

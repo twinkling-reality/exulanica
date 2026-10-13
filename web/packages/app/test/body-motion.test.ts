@@ -7,8 +7,13 @@ import { BODY_MOTION } from '../src/body-motion.js';
  * value here is read from the file again, by its key.
  */
 const CATALOG = JSON.parse(readFileSync(
-  new URL('../../../../assets/catalogs/thing-presentation/body-motion.v1.json', import.meta.url), 'utf8',
-)) as { entries: { key: string; value: number }[] };
+  new URL('../../../../assets/catalogs/thing-presentation/body-motion.v2.json', import.meta.url), 'utf8',
+)) as {
+  entries: { key: string; value: number }[];
+  posture_blend: { value: number };
+  postures: { key: string; lower_share: number; head_bow_rad: number; speaks: boolean }[];
+  activity_postures: { activity: string; posture: string }[];
+};
 const stated = (key: string) => CATALOG.entries.find((entry) => entry.key === key)!.value;
 
 describe('the body motion table the page hands its figures', () => {
@@ -30,7 +35,20 @@ describe('the body motion table the page hands its figures', () => {
       spineWave: stated('spine_wave_rad'),
       spineWavelength: stated('spine_wavelength_share'),
       turnEndSpeed: stated('turn_end_speed_mm_per_second') / 1000,
+      postures: {
+        blendSeconds: CATALOG.posture_blend.value,
+        postures: new Map(CATALOG.postures.map((one) => [one.key, { lowerShare: one.lower_share, headBow: one.head_bow_rad, speaks: one.speaks }])),
+        activities: new Map(CATALOG.activity_postures.map((one) => [one.activity, one.posture])),
+      },
     });
-    expect(Object.keys(BODY_MOTION)).toHaveLength(CATALOG.entries.length);
+    // Every figure of the file, and the postures beside them.
+    expect(Object.keys(BODY_MOTION)).toHaveLength(CATALOG.entries.length + 1);
+  });
+
+  it('draws a resting body settled and a talking one speaking, as the catalog says, and anything else standing', () => {
+    const table = BODY_MOTION.postures!;
+    expect(table.postures.get(table.activities.get('rest')!)!.lowerShare).toBeGreaterThan(0);
+    expect(table.postures.get(table.activities.get('talk')!)!.speaks).toBe(true);
+    expect(table.activities.has('idle')).toBe(false);
   });
 });
