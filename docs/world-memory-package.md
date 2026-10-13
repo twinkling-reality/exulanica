@@ -831,13 +831,36 @@ only the local project folder, never the world and never a remote.
 
 ### GitHub transport
 
-The transport uses the user's authenticated GitHub CLI, an explicitly supplied repository and an
-existing branch. It reads or writes only the root `world-project.json`; it never scans a working
-directory, stages files, executes repository code or infers a destination from the source checkout.
-Evidence files and dependency files are not published by it. Publication supports repositories
-personally owned by the authenticated CLI user with write permission. Organization ownership,
-repository creation, branch creation, pull requests and whole-repository forking are outside this
-transport. Fetch may read an accessible repository without write permission.
+Both GitHub paths use the user's authenticated GitHub CLI and an explicitly supplied repository;
+neither scans a working directory, stages files, executes repository code or infers a destination
+from the source checkout. Publication supports repositories personally owned by the authenticated
+CLI user with write permission. Organization ownership, repository creation and whole-repository
+forking are outside both. Dependency bytes are never published. Fetch may read an accessible
+repository without write permission.
+
+**Rolling pull request.** A project folder publishes its last saved commit, never pending edits,
+to one project branch with one open pull request against a base branch, the way dependency bots
+group updates:
+
+```sh
+uv run python -m exulanica.world_package.projects review-branch ./my-project --repository OWNER/REPOSITORY --base main --branch exulanica/my-project --message 'Move the knight'
+uv run python -m exulanica.world_package.projects publish-branch ./my-project --repository OWNER/REPOSITORY --base main --branch exulanica/my-project --message 'Move the knight' --review-sha256 REVIEW_DIGEST --allow-publication
+```
+
+`review-branch` writes nothing. It reads the base branch, the project branch and its open pull
+request, refuses a branch holding another project or evidence the folder does not hold, and lists
+the actions publication would take: create the branch from the base head, commit the changed
+`world-project.json` and `evidence/` files with `expectedHeadOid`, then open the pull request or
+update its text. The pull request text describes, against the base branch, the changes to the
+world and, separately, the decision evidence, which is never called part of the world. When the
+saved project again equals the base branch, the open pull request is closed instead. Unchanged
+files make no commit and unchanged text is not rewritten. The review digest binds the target,
+both branch heads, the pull request, file digests, message and text; `publish-branch` recomputes
+it and refuses any difference. A failed step stops publication, names the steps already done and
+is not retried.
+
+**Single file.** The first transport writes only the root `world-project.json` to an existing
+branch:
 
 ```sh
 uv run python -m exulanica.world_package.projects fetch --repository OWNER/REPOSITORY --branch BRANCH --output reopened.json

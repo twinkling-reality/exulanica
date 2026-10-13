@@ -164,9 +164,9 @@ def subject(before: Any | None, after: Any, evidence: Sequence[str] = ()) -> str
     if not lines:
         return ""
     text = lines[0]
-    for line in lines[1:]:
+    for index, line in enumerate(lines[1:], start=1):
         if len(text) + len(line) + 2 > 100:
-            text += ", and more"
+            text += f", and {_plural(len(lines) - index, 'more change')}"
             break
         text += f", {line}"
     return (text[0].upper() + text[1:])[:120]

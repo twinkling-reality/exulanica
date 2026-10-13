@@ -25,7 +25,12 @@ from exulanica.world_package.projects.checkpoint import (
     read,
     save,
 )
-from exulanica.world_package.projects.github import GitHubProjects, Target
+from exulanica.world_package.projects.github import (
+    BranchTarget,
+    GitHubProjects,
+    RollingPullRequests,
+    Target,
+)
 from exulanica.world_package.projects.repository import Author, Project, create, fork_project
 from exulanica.world_package.projects.schema import Checkpoint, Evidence, Source
 from exulanica.world_package.projects.watch import Policy, Watcher
@@ -89,6 +94,16 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument("--settle-seconds", type=float, default=120.0)
             command.add_argument("--max-pending-seconds", type=float, default=1800.0)
             command.add_argument("--daily-cap", type=int, default=48)
+    for name in ("review-branch", "publish-branch"):
+        command = commands.add_parser(name, help="one rolling pull request for a project folder")
+        command.add_argument("folder", type=Path)
+        command.add_argument("--repository", required=True)
+        command.add_argument("--base", required=True)
+        command.add_argument("--branch", required=True)
+        command.add_argument("--message", required=True)
+        if name == "publish-branch":
+            command.add_argument("--review-sha256", required=True)
+            command.add_argument("--allow-publication", action="store_true")
     command = commands.add_parser("capture", help="read a selection from a running world (GET)")
     _world_arguments(command)
     command.add_argument("--project-id", required=True)
@@ -221,6 +236,21 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "evidence-schema":
             print(json.dumps(Evidence.model_json_schema(), indent=2, sort_keys=True))
+            return 0
+        if args.command in ("review-branch", "publish-branch"):
+            target = BranchTarget(args.repository, args.base, args.branch)
+            client, project = RollingPullRequests(), Project(args.folder)
+            if args.command == "review-branch":
+                result = client.review(target, project, args.message)
+            else:
+                result = client.publish(
+                    target,
+                    project,
+                    args.message,
+                    reviewed_sha256=args.review_sha256,
+                    allow_publication=args.allow_publication,
+                )
+            print(json.dumps(result, indent=2, sort_keys=True))
             return 0
         if args.command in (*PROJECT_COMMANDS, "capture"):
             print(json.dumps(project_command(args), indent=2, sort_keys=True))

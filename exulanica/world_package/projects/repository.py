@@ -340,7 +340,7 @@ class Project:
             raise Conflict("this folder holds another project; fork into a new folder instead")
         base = self.working_sessions() if checkpoint is None else saved
         sessions = self._merge(base, evidence)
-        _append_only(saved, sessions)
+        append_only(saved, sessions)
         changed_sessions = {n: s for n, s in sessions.items() if saved.get(n) != s}
         present = self.dependencies()
         new_dependencies = {
@@ -401,7 +401,7 @@ def session_file(session_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "-", session_id) + ".json"
 
 
-def _append_only(saved: Sessions, sessions: Sessions) -> None:
+def append_only(saved: Sessions, sessions: Sessions) -> None:
     for name, old in saved.items():
         new = sessions.get(name)
         if new is None:
@@ -434,7 +434,7 @@ def create(
         raise Conflict("project folder exists; choose a new folder")
     selected = document(checkpoint)
     sessions = Project._merge({}, evidence)
-    _append_only({}, sessions)
+    append_only({}, sessions)
     folder.mkdir(parents=True)
     project = Project(folder, author=author)
     try:
