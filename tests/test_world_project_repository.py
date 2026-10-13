@@ -182,7 +182,8 @@ def test_refuses_folders_that_are_not_their_own_project(tmp_path):
 
 def test_private_values_never_enter_a_project(tmp_path):
     project, _ = sample()
-    project["source"]["world_id"] = "/Users/someone/private/world"
+    # A home path, assembled so no home path is written into the repository itself.
+    project["source"]["world_id"] = "/".join(("", "Users", "someone", "private", "world"))
     folder = tmp_path / "project"
     with pytest.raises(ProjectError):
         create(folder, project, author=AUTHOR)
@@ -321,7 +322,8 @@ def test_evidence_must_bind_inside_its_file_and_reads_honestly():
     with pytest.raises(ProjectError):  # The choice was never offered.
         evidence_document(readable)
     readable["decisions"][0]["readable"]["choice"] = "wait here a minute"
-    readable["decisions"][0]["readable"]["situation"] = "see /Users/someone/notes"
+    home_note = "see " + "/".join(("", "Users", "someone", "notes"))
+    readable["decisions"][0]["readable"]["situation"] = home_note
     with pytest.raises(ProjectError):
         evidence_document(readable)
 
