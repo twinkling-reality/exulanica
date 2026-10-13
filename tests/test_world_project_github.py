@@ -14,6 +14,60 @@ from test_world_project import sample
 
 TARGET = Target("learner/world", "main")
 
+#: The mutation input fields this adapter may send, each confirmed against GitHub's GraphQL schema
+#: by introspection on 13 October 2026. The fakes refuse any other field, so a misspelled input
+#: (the adapter once sent CommittableBranch.refName) fails here instead of on GitHub.
+INPUTS = {
+    "createCommitOnBranch": "CreateCommitOnBranchInput",
+    "createRef": "CreateRefInput",
+    "createPullRequest": "CreatePullRequestInput",
+    "updatePullRequest": "UpdatePullRequestInput",
+    "closePullRequest": "ClosePullRequestInput",
+}
+FIELDS = {
+    "CreateCommitOnBranchInput": {
+        "branch": "CommittableBranch",
+        "fileChanges": "FileChanges",
+        "message": "CommitMessage",
+        "expectedHeadOid": None,
+    },
+    "CommittableBranch": {"id": None, "repositoryNameWithOwner": None, "branchName": None},
+    "FileChanges": {"additions": "FileAddition"},
+    "FileAddition": {"path": None, "contents": None},
+    "CommitMessage": {"headline": None},
+    "CreateRefInput": {"repositoryId": None, "name": None, "oid": None},
+    "CreatePullRequestInput": {
+        "repositoryId": None,
+        "baseRefName": None,
+        "headRefName": None,
+        "title": None,
+        "body": None,
+    },
+    "UpdatePullRequestInput": {"pullRequestId": None, "title": None, "body": None},
+    "ClosePullRequestInput": {"pullRequestId": None},
+}
+
+
+def conforms(type_name, value):
+    """Refuse any input field the schema type does not declare, at every depth."""
+    fields = FIELDS[type_name]
+    unknown = set(value) - set(fields)
+    assert not unknown, f"{type_name} has no input field {sorted(unknown)}"
+    for key, child in value.items():
+        nested = fields[key]
+        if nested is None:
+            continue
+        for item in child if isinstance(child, list) else [child]:
+            conforms(nested, item)
+
+
+def mutation(query, variables):
+    """The mutation's name, after checking its input against the pinned schema."""
+    name = next(n for n in INPUTS if f"{n}(input:" in query)
+    assert f"$input:{INPUTS[name]}!" in query
+    conforms(INPUTS[name], variables["input"])
+    return name
+
 
 class Server:
     def __init__(self, checkpoint=None):
@@ -51,6 +105,7 @@ class Server:
                     },
                 },
             }
+        assert mutation(query, variables) == "createCommitOnBranch"
         values = variables["input"]
         if self.move_during_write:
             self.head = "c" * 40
@@ -297,14 +352,14 @@ class Repository:
                 },
             }
         values = variables["input"]
-        self.writes.append(query.split("(")[0].split()[-1] if "mutation" in query else query)
+        self.writes.append(mutation(query, variables))
         if "createRef" in query:
             name = values["name"].removeprefix("refs/heads/")
             source = next(b for b in self.branches.values() if b["oid"] == values["oid"])
             self.branches[name] = {"oid": values["oid"], "files": dict(source["files"])}
             return {"createRef": {"ref": {"name": name}}}
         if "createCommitOnBranch" in query:
-            branch = self.branches[values["branch"]["refName"]]
+            branch = self.branches[values["branch"]["branchName"]]
             if branch["oid"] != values["expectedHeadOid"]:
                 raise Conflict("server atomically refused stale head")
             for entry in values["fileChanges"]["additions"]:
@@ -594,3 +649,28 @@ def test_a_fresh_base_branch_without_project_files_reads_as_empty(monkeypatch):
     monkeypatch.setattr(subprocess, "run", answering(present))
     with pytest.raises(ProjectError):  # A NOT_FOUND for a value GitHub nevertheless returned.
         RollingPullRequests().read(target)
+
+
+def test_the_pinned_schema_refuses_a_misspelled_input():
+    with pytest.raises(AssertionError, match="no input field"):
+        conforms("CommittableBranch", {"repositoryNameWithOwner": "a/b", "refName": "x"})
+    with pytest.raises(AssertionError, match="no input field"):
+        conforms(
+            "CreateCommitOnBranchInput",
+            {"fileChanges": {"additions": [{"path": "p", "body": "x"}]}},
+        )
+
+
+def test_publication_resumes_on_a_branch_created_before_a_failed_commit(tmp_path):
+    from exulanica.world_package.projects.github import BranchTarget, RollingPullRequests
+
+    target = BranchTarget("learner/world", "main", "exulanica/world")
+    remote = Repository()
+    client = RollingPullRequests(remote.request)
+    local, _, _ = local_project(tmp_path)
+    # A first attempt created the branch at main's commit and stopped before committing.
+    remote.branches["exulanica/world"] = deepcopy(remote.branches["main"])
+    review, result = publish(client, target, local, None)
+    assert review["actions"] == ["commit", "open-pull-request"]
+    assert result["actions"] == ["commit", "open-pull-request"]
+    assert client.review(target, local)["actions"] == []

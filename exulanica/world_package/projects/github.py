@@ -269,7 +269,7 @@ class GitHubProjects:
                 "input": {
                     "branch": {
                         "repositoryNameWithOwner": target.repository,
-                        "refName": target.branch,
+                        "branchName": target.branch,
                     },
                     "expectedHeadOid": review["expected_head"],
                     "message": {"headline": message},
@@ -641,7 +641,7 @@ class RollingPullRequests:
                             "input": {
                                 "branch": {
                                     "repositoryNameWithOwner": target.repository,
-                                    "refName": target.branch,
+                                    "branchName": target.branch,
                                 },
                                 "expectedHeadOid": head,
                                 "message": {"headline": text},
