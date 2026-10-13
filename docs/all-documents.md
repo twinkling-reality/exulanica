@@ -85,7 +85,7 @@ Read the contract for the state or operation being changed.
 | [Workspace asset admission](workspace-asset-admission.md) | contract | A person's own uploaded 3D assets: profile, declaration and rights, preparation, delivery, withdrawal and erasure |
 | [World version authorities](world-version-authorities.md) | contract | Versioned structure, appearance and comfort-settings authorities |
 | [One place across captures and time](place-identity.md) | contract | Place identity, coordinate frames and cross-capture alignment |
-| [World Memory Package v1](world-memory-package.md) | contract | Portable package profiles, integrity, projections and permissions |
+| [World Memory Package v1](world-memory-package.md) | contract | Portable package profiles, integrity, projections, permissions and editable repository checkpoints |
 
 <a id="environments"></a>
 

@@ -2,7 +2,8 @@
 
 This contract owns the World Memory Package (WMP): the signed, portable projection of one world
 and the authorized workspace state it draws on, under profile `exulanica-wmp-1.0`; its two optional
-extensions for authored state; and the separately selected training dataset profile. Verifying a
+extensions for authored state; the separately selected training dataset profile; and the distinct
+editable repository checkpoint boundary. Verifying a
 package never loads a world, and a package is never the live store.
 
 **Authored world state:** [product direction](product-direction.md#package-and-api-boundaries)
@@ -47,6 +48,7 @@ rights, carry missing asset bytes or establish a runnable import.
 - [Authored-world extension 1.0](#authored-world-extension-10)
 - [Environment-instances extension 1.0](#environment-instances-extension-10)
 - [Explicit training dataset profile](#explicit-training-dataset-profile)
+- [Editable repository checkpoints](#editable-repository-checkpoints)
 
 </details>
 
@@ -690,3 +692,112 @@ The acceptance tests (`tests/test_training_export_postgres.py`,
 scripted recovered cameras and calibration, sparse observations, a structurally valid scripted
 trained SOG, frozen split and provenance. No real COLMAP, CUDA training or vision-model execution is
 claimed, and whether anyone would license such a dataset is not established.
+
+## Editable repository checkpoints
+
+The separate `exulanica.world-project/v1` profile carries a reviewed selection of authored
+things, model bindings and decision summaries in `world-project.json`. It changes no WMP profile
+or signature guarantee. `uv run python -m exulanica.world_package.projects schema` prints its closed JSON
+schema. The adapter is an offline project-data workflow; it does not install a runnable world.
+The connected learning journey remains a requirement in
+[product direction](product-direction.md#repository-backed-learning-and-development).
+
+### Selection and provenance
+
+`select_checkpoint` in `exulanica/world_package/projects/projection.py` accepts an already-authorized
+`AlternateVersion`, explicit thing IDs and explicitly supplied dependencies, model bindings and
+selected evidence. It verifies the native state's digest, refuses an invalidated source and
+omits unselected things, actor records, edit history and other runtime data. Its caller must use
+the world's existing authorized read boundary and establish rights to export the selection.
+The pure adapter grants no permission and has no database or world API route.
+
+A checkpoint names its source world, version, source snapshot ID, source state digest and source
+snapshot digest. Its selected things retain native IDs, kind references, region-local fixed-point
+poses, origins and removal state, validated through the existing placed-thing contract. Shipped
+kinds must match the installed catalog. Workspace kinds retain a digest reference. Support-bound
+placements, authored mesh objects, environment instances, point maps, complete world definitions
+and simulation state are unsupported; unknown fields are refused rather than silently dropped.
+A selection's source state digest covers the native source version, not just its selected things.
+The checkpoint has a separate content digest.
+
+Dependencies declare a content digest, source identifier, licence identifier and one of four
+kinds: source snapshot, thing kind, decision contract or model identity manifest. No dependency
+bytes or fetch credentials enter the checkpoint. `inspect` accepts local files named by digest,
+checks their bytes and JSON object shape, and resolves shipped kinds from the installed catalog.
+It checks supplied kind documents, declared model deciders, registered decision contracts and
+model identity manifests. A manifest contains only `provider`, `model_id` and `revision`; its
+presence does not prove provider availability, immutable hosted weights, an open-source licence
+or model-role eligibility. Those remain checks for the execution authority. Source snapshot
+semantics, transitive rendering dependencies and source-use authorization are not validated here.
+`dependencies_ready` describes the declared dependencies only; `runtime_loadable`,
+`source_binding_verified` and `model_availability_verified` remain false.
+
+Selected decision summaries bind to their selected model assignment and source-record digest.
+They carry an observation digest, offered action/target identifiers, the chosen option, recorded
+applied/refused/not-applied outcome, reason code, elapsed time and token counts when supplied.
+They carry neither observation text nor prompts, private conversations, raw logs, hidden model
+reasoning or model weights. `playback` orders these summaries without provider calls. It reports
+`source_records_verified: false` and `engine_replay_verified: false`: this is evidence playback,
+not the native engine's verified deterministic replay. An editable summary cannot prove the
+source record was authentic. Inference reruns are not implemented by this adapter.
+
+### Local save, reopen and review
+
+```sh
+uv run python -m exulanica.world_package.projects save selected.json --output checkpoint.json
+uv run python -m exulanica.world_package.projects inspect checkpoint.json --dependencies ./dependency-by-digest
+uv run python -m exulanica.world_package.projects diff checkpoint.json edited.json
+uv run python -m exulanica.world_package.projects fork checkpoint.json --project-id project:my-fork --output fork.json
+uv run python -m exulanica.world_package.projects playback checkpoint.json
+```
+
+Local save creates a new file with private permissions and refuses an existing destination.
+Reopening validates the closed profile; duplicate JSON keys, floats, unknown fields, symlink
+checkpoint files and oversized documents are refused. The maximum file size is 2 MiB. Stable
+sorting and Exulanica canonical JSON give unchanged selections the same digest. A fork creates
+a distinct project ID and records its parent project and checkpoint digest while preserving
+source lineage. It does not remap runtime identities or create a GitHub repository.
+
+`inspect --expected-source source.json` compares all source fields with a separately supplied
+base and refuses a mismatch. Missing dependency bytes, corrupt bytes and unsupported bindings
+are reported separately; unresolved dependencies produce exit status 2. No command applies
+checkpoint edits to live state. A future live importer must repeat authorization, source validity,
+identity mapping, dependency and optimistic-concurrency checks through existing world writers.
+Local base comparison does not replace those checks.
+
+### GitHub transport
+
+The transport uses the user's authenticated GitHub CLI, an explicitly supplied repository and an
+existing branch. It reads or writes only the root `world-project.json`; it never scans a working
+directory, stages files, executes repository code or infers a destination from the source checkout.
+Publication supports repositories personally owned by the authenticated CLI user with write
+permission. Organization ownership, repository creation, branch creation and whole-repository
+forking are outside this profile. Fetch may read an accessible repository without write permission.
+
+```sh
+uv run python -m exulanica.world_package.projects fetch --repository OWNER/REPOSITORY --branch BRANCH --output reopened.json
+uv run python -m exulanica.world_package.projects review edited.json --repository OWNER/REPOSITORY --branch BRANCH --message 'Move the knight'
+uv run python -m exulanica.world_package.projects publish edited.json --repository OWNER/REPOSITORY --branch BRANCH --message 'Move the knight' --review-sha256 REVIEW_DIGEST --allow-publication
+```
+
+Review returns a field diff and a digest binding the selected content, destination, exact branch
+head and one-line commit subject. Publication is a separate explicit action: it rereads the head,
+recomputes the review and refuses any change. GitHub's
+[`createCommitOnBranch`](https://docs.github.com/en/graphql/reference/commits#createcommitonbranch)
+mutation uses `expectedHeadOid` to refuse a concurrent branch move atomically. An unchanged
+selection creates no commit. A successful response supplies the commit and GitHub compare links.
+A failed or timed-out request is not automatically retried because its outcome may be unknown;
+read the branch again before preparing a new review. The transport uses
+[`gh api` structured input](https://cli.github.com/manual/gh_api), never shell interpolation.
+
+Review every selected value and its publication rights before publishing. The closed schema and
+WMP prohibited-field scan reduce accidental inclusion; they cannot recognize every secret or
+private identifier placed into an otherwise valid field. Selected identifiers and evidence digests
+can still be private. Local saves, GitHub access and native world permissions are separate.
+Publication cannot recall copies already fetched by others.
+
+Synthetic tests cover native selection, local editing/reopening/forking, dependency failures,
+base conflicts, evidence playback, review binding and concurrent publication refusal through a
+fake GitHub server. They do not establish hosted publication, live-world restoration, real model
+behavior, verified engine replay, or educational/portfolio value. The latter requires a learner
+completing the connected task and explaining a behavior change from authentic execution evidence.
