@@ -3,6 +3,7 @@ import { ACTION_LABELS, ACTIVITY_LABELS } from '/src/society-activity-words.ts';
 import { buildInventoryRows, inventoryDetailPath, rowForSceneSelection } from './inventory-records.ts';
 import { assertSelectedOffer, inspectionFacts } from './entity-inspection.mjs';
 import { mountEntitySheet } from './entity-sheet.ts';
+import { mountFrameMeasurement } from './frame-measurement.mjs';
 import { DECIDER_MARKS } from '/src/decider-marks.ts';
 import { DISCOVERY, attentionCandidates, inspectionReach, promptPresentation, layoutDiscovery, markerAt } from './discovery-policy.mjs';
 import './entity-sheet.css';
@@ -22,14 +23,17 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   try {
     const view = JSON.parse(sessionStorage.getItem(viewKey) || 'null');
     if (view && Number.isFinite(view.yaw) && Number.isFinite(view.pitch) && Math.abs(view.pitch) <= Math.PI * .49) {
-      b.controls.state.yaw = view.yaw; b.controls.state.pitch = view.pitch; b.invalidate();
+      if (view.pose && ['x','y','z','yaw','pitch'].every(key => Number.isFinite(view.pose[key])) && ['ground','altitude'].includes(view.hold)) b.controls.setView(view.pose, view.hold);
+      else { b.controls.state.yaw = view.yaw; b.controls.state.pitch = view.pitch; }
+      b.invalidate();
     }
   } catch { /* Camera memory is optional and never world state. */ }
   const rememberView = () => {
-    try { sessionStorage.setItem(viewKey, JSON.stringify({ yaw: b.controls.state.yaw, pitch: b.controls.state.pitch })); } catch {}
+    const pose = following?.pose || b.controls.state, hold = following?.hold || b.controls.hold;
+    try { sessionStorage.setItem(viewKey, JSON.stringify({ yaw: pose.yaw, pitch: pose.pitch, pose: { ...pose }, hold })); } catch {}
   };
   window.addEventListener('beforeunload', rememberView, { signal: lifetime.signal });
-  window.addEventListener('keyup', event => { if (event.code.startsWith('Arrow')) rememberView(); }, { signal: lifetime.signal });
+  window.addEventListener('keyup', event => { if (event.code.startsWith('Arrow') || ['KeyW','KeyA','KeyS','KeyD'].includes(event.code)) rememberView(); }, { signal: lifetime.signal });
   selection.closePanels(); objects.close();
   document.body.classList.remove('ux-world-active', 'ux-review');
   document.body.classList.add('ux-world-cleared');
@@ -43,6 +47,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     <section class="cw-panel" hidden role="dialog" aria-modal="true" aria-labelledby="cw-panel-title"></section>
     <p class="cw-notice" role="status" hidden></p>`;
   document.body.append(root);
+  root.dataset.navigation = JSON.stringify({ ground: b.worldKind.ground.form, centre: b.navigationWorld.centre,
+    fieldRadius: b.navigationWorld.fieldRadius, blockers: b.navigationWorld.polygonObstacles });
+  const disposeFrameMeasurement = mountFrameMeasurement(b, root);
+  if (import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1') {
+    const observerLabel = document.createElement('p'); observerLabel.className = 'cw-observer-label';
+    observerLabel.textContent = 'Pilot copy · Read only'; root.append(observerLabel);
+  }
   const $ = (selector) => root.querySelector(selector);
   const prompt = $('.cw-prompt'), discovery = $('.cw-discovery'), panel = $('.cw-panel');
   const guidance = $('.cw-guidance'), mouseHint = $('.cw-mouse-hint');
@@ -51,6 +62,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   const activityLabels = new Map([...Object.entries(ACTION_LABELS), ...ACTIVITY_LABELS]);
   const offers = new Map(), offerReads = new Map(), offerSerials = new Map();
   let entitySheet = null, targetReachable = false;
+  let following = null;
   let visibleMarkers = [], lastDiscovery = -Infinity, pointerIntent = false;
   const surfaceSizes = new Map();
   const sizeObserver = new ResizeObserver(entries => { for (const { target, borderBoxSize } of entries) { const size = borderBoxSize[0]; if (size) surfaceSizes.set(target, { width: size.inlineSize, height: size.blockSize }); } });
@@ -127,6 +139,40 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!bounds?.length) return null;
     point.set(...[0, 1, 2].map(axis => overhead && axis === 1 ? Math.max(...bounds.map(value => value[axis])) : bounds.reduce((sum, value) => sum + value[axis], 0) / bounds.length));
     return point;
+  }
+  function visitorGround(row) {
+    if (row?.scene.type !== 'being') return null;
+    const point = b.camera.getPosition().clone();
+    if (!b.authoredSociety?.groundOf(row.scene.id, point)) return null;
+    const camera = b.camera.getPosition(), origin = b.interactionRay().origin;
+    return point.add(point.clone().set(origin[0] - camera.x, origin[1] - camera.y, origin[2] - camera.z));
+  }
+  function stopFollowing() {
+    if (!following) return;
+    b.controls.setView(following.pose, following.hold); following = null; b.invalidate();
+    root.dataset.following = 'false';
+  }
+  const followView = {
+    active: () => following !== null,
+    toggle: () => {
+      if (following) { stopFollowing(); return; }
+      const ground = visitorGround(held); if (!ground) return;
+      following = { pose: { ...b.controls.state }, hold: b.controls.hold, ground };
+      b.controls.setView({ ...b.controls.state }, 'altitude');
+      root.dataset.following = 'true'; b.invalidate();
+    },
+  };
+  function trackHeld() {
+    if (!following) return;
+    const ground = visitorGround(held);
+    if (!ground) { stopFollowing(); notice('This character is no longer visible here. Your viewpoint was restored.'); return; }
+    const delta = ground.clone().sub(following.ground);
+    if (delta.lengthSq() > 0) {
+      const pose = b.controls.state;
+      b.controls.setView({ ...pose, x: pose.x + delta.x, y: pose.y + delta.y, z: pose.z + delta.z }, 'altitude');
+      b.invalidate();
+    }
+    following.ground.copy(ground);
   }
   function targetLabel(row) {
     const known = offers.get(row.key)?.offer;
@@ -245,7 +291,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     entitySheet?.dispose();
     const view = inspectionFacts(row, offer, null, activityLabels);
     entitySheet = mountEntitySheet({ panel, row, offer, title: view.title, entry, inventory, credentials: state.credentials, read, isCurrent: current,
-      close: closeInspect, societyNames: () => selection.societyNames(),
+      close: closeInspect, societyNames: () => selection.societyNames(), followView: row.scene.type === 'being' ? followView : null,
       refresh: async () => {
         await refreshInventory();
         const fresh = rows.find(item => item.key === row.key);
@@ -283,6 +329,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     }
   }
   function closeInspect() {
+    stopFollowing();
     entitySheet?.dispose(); entitySheet = null; panel.classList.remove('cw-entity-sheet');
     ++serial; panel.hidden = true; panel.replaceChildren(); held = null; dragging = null; overPrompt = false;
     canvas.inert = false; b.setFreeCursorActive(false); b.setControlsEnabled(current());
@@ -357,7 +404,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   function frame(now) {
     const workStart = performance.now();
     if (state.atlas?.binding !== b || !root.isConnected) { disposePrior(); return; }
+    trackHeld();
     root.dataset.camera = [b.controls.state.yaw, b.controls.state.pitch].map(value => value.toFixed(6)).join(',');
+    root.dataset.viewerPosition = JSON.stringify([b.controls.state.x, b.controls.state.y, b.controls.state.z]);
     if (now - lastDiscovery >= 160) {
       lastDiscovery = now;
       const discoveryStart = performance.now(); refreshDiscovery();
@@ -418,6 +467,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     frameId = requestAnimationFrame(frame);
   }
   disposePrior = () => {
+    stopFollowing();
+    disposeFrameMeasurement();
     entitySheet?.dispose(); entitySheet = null;
     lifetime.abort(); sizeObserver.disconnect(); cancelAnimationFrame(frameId); ++serial; root.remove(); canvas.inert = false;
     b.controls.onPointerPick = priorCallbacks.pick; b.controls.onInteract = priorCallbacks.interact;

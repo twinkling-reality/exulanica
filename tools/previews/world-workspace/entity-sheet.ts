@@ -7,13 +7,15 @@ import { ACTION_LABELS, ACTIVITY_LABELS } from '/src/society-activity-words.ts';
 import { modelRunState, runSelectedModel, readEntityActivity, decisionView } from './entity-execution.mjs';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { openThingLibrary } from '/src/things-library.ts';
-import { choiceRefusalWords, HOST_REFUSAL_WORDS, MODEL_REFUSAL_WORDS, decisionWordsFor } from '/src/ui/society-models.ts';
+import { choiceRefusalWords, HOST_REFUSAL_WORDS, MODEL_REFUSAL_WORDS } from '/src/ui/society-models.ts';
 import { problemSentence } from '/src/ui/words/problems.ts';
 import { entityProperties, assignmentSubject } from './entity-properties.mjs';
 import { recordEntityModel } from './entity-model-actions.mjs';
+import { explainDecision, decisionSummaryWords } from './decision-explanation.mjs';
+import { DECISION_WORDS, REASON_WORDS } from '/src/society-inhabitant-words.ts';
 
 /** The entity sheet has one selected identity and uses native model clients for writes. */
-export function mountEntitySheet({ panel, row, offer, title, entry, inventory, credentials, read, refresh, close, isCurrent, societyNames }) {
+export function mountEntitySheet({ panel, row, offer, title, entry, inventory, credentials, read, refresh, close, isCurrent, societyNames, followView }) {
   const observerOnly = import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1';
   let live = true, tab = 'properties', mode = 'summary', models = null, roleRead = null;
   let kind = null, kindFailure = '', modelFailure = '', picked = null, message = '', busy = false, assignmentKey = null;
@@ -22,6 +24,7 @@ export function mountEntitySheet({ panel, row, offer, title, entry, inventory, c
   const societyClient = new SocietyClient({ ...credentials, worldId: entry.worldId });
   let requestSerial = 0, companionAnswer = null, companionQuestion = '', companionFailure = '';
   let decisionReturn = 'summary';
+  let heldDecision = null, decisionFailure = '';
   const companion = new CompanionAskClient({ ...credentials, worldId: entry.worldId });
   offer ||= { subject: {}, properties: [], actions: [] };
   const client = new SocietyModelsClient({ ...credentials, worldId: entry.worldId });
@@ -55,6 +58,10 @@ export function mountEntitySheet({ panel, row, offer, title, entry, inventory, c
     const focusText = preserveTaskState && panel.contains(document.activeElement) ? document.activeElement.textContent : null;
     panel.replaceChildren(); panel.classList.add('cw-entity-sheet'); panel.dataset.view = tab === 'properties' && mode === 'summary' ? 'details' : 'task';
     const header = $('header', '', 'es-header'), heading = $('h2', title); heading.id = 'cw-panel-title'; heading.tabIndex = -1; header.append(heading); panel.append(header);
+    if (followView) {
+      const follow = button(followView.active() ? 'Return to my viewpoint' : 'Follow in view', () => { followView.toggle(); render(true); }, 'es-follow');
+      follow.setAttribute('aria-pressed', String(followView.active())); header.append(follow);
+    }
     const content = $('div', '', 'es-content');  panel.append(content);
     if (mode === 'companion') renderCompanion(content);
     else if (tab === 'properties') renderProperties(content);
@@ -131,7 +138,7 @@ export function mountEntitySheet({ panel, row, offer, title, entry, inventory, c
     const refusal = choice?.refusal || models.hostRefusal;
     if (choice?.model && !observerOnly) rowValue(fields, 'Connection', refusal === 'provider_credential_absent' ? 'Not connected' : refusal ? 'Unavailable' : 'Connected');
     content.append(fields);
-    if (observerOnly) content.append($('p', 'This viewer shows recorded activity. Model and run controls are unavailable here.', 'es-note'));
+    if (observerOnly) content.append($('p', 'Read-only pilot copy. This viewer reads stored activity; it does not run the model.', 'es-note'));
     else if (choice?.model && refusal) content.append($('p', refusal === 'provider_credential_absent' ? 'The AI service needs a connection before this model can make decisions.' : HOST_REFUSAL_WORDS[refusal] || MODEL_REFUSAL_WORDS[refusal] || 'This model cannot make decisions here right now.', 'es-note'));
     const actions = $('div', '', 'es-actions');
     const change = button(choice?.model ? 'Change model' : 'Assign model', () => { mode = 'pick'; picked = null; message = ''; render(); }, 'es-action', 'M');
@@ -144,7 +151,7 @@ export function mountEntitySheet({ panel, row, offer, title, entry, inventory, c
     const decision = models.latest.find(item => item.subjectId === subjectId);
     if (!decision && choice?.model) content.append($('p', 'No AI decisions recorded for this entity.', 'es-note'));
     else if (decision) {
-      content.append($('p', decisionWordsFor(models, subjectId) || 'A model decision is recorded.', 'es-note'));
+      content.append($('p', decisionSummaryWords(decision, DECISION_WORDS), 'es-note'));
       if (decision.requestId) content.append(button('Inspect decision', () => openDecision(decision), 'es-secondary', 'D'));
     }
   }
@@ -178,29 +185,31 @@ export function mountEntitySheet({ panel, row, offer, title, entry, inventory, c
     content.append($('p', 'Activity', 'es-section-title'));
     if (!activity) { content.append($('p', activityFailure || 'Reading this character’s activity…', 'es-note')); return; }
     const readiness = modelRunState(models, playback, subjectId);
-    const state = $('p', (!observerOnly && readiness.reason) || (playback.mode === 'playing' ? 'The world is running.' : 'The world is paused.'), 'es-note'); content.append(state);
+    content.append($('p', `${playback.mode === 'playing' ? 'Playback is set to run.' : 'The world is paused.'} Minute ${activity.tick}.`, 'es-note'));
+    if (!observerOnly && readiness.reason) content.append($('p', readiness.reason, 'es-note'));
     const facts = $('dl', '', 'es-properties'), action = activity.person.action;
     const assignedName = currentChoice()?.model?.name || (offer.decided_by?.kind === 'routine' ? 'Routine' : 'None');
     rowValue(facts, 'Assigned model', assignedName);
     rowValue(facts, 'Now', ACTION_LABELS[action?.kind] || ACTIVITY_LABELS.get(action?.kind) || action?.kind);
+    if (REASON_WORDS[action?.reason]) rowValue(facts, 'Why now', REASON_WORDS[action.reason]);
     if (activity.latest) {
       if (activity.latest.name !== assignedName) rowValue(facts, 'Last decision by', activity.latest.name);
       rowValue(facts, 'Chosen action', activity.latest.chose);
-      rowValue(facts, 'Result', decisionWordsFor(models, subjectId));
+      rowValue(facts, 'Last model result', decisionSummaryWords(activity.latest, DECISION_WORDS));
     }
     content.append(facts);
     if (!activity.latest) content.append($('p', 'No AI decisions have been recorded for this character.', 'es-note'));
     else if (activity.latest.requestId) content.append(button('See decision inputs and result', () => openDecision(activity.latest), 'es-action', 'D'));
-    if (activity.events.length) {
+    if (activity.events.some(event => event.document?.summary)) {
       const records = $('details', '', 'es-record'); records.append($('summary', 'Recent actions'));
-      for (const event of activity.events) records.append($('p', event.document.summary, 'es-note'));
+      for (const event of activity.events) if (event.document?.summary) records.append($('p', event.document.summary, 'es-note'));
       content.append(records);
     }
     if (!observerOnly) {
       if (readiness.playing) content.append(button('Pause world', () => void pauseWorld(), 'es-action'));
       else { const run = button('Run world', () => void startAI(currentChoice()?.model), 'es-action'); run.disabled = !readiness.ready || busy; content.append(run); }
     }
-    content.append($('p', observerOnly ? 'This viewer shows recorded activity. Run controls are unavailable here.' : 'Running advances the characters in this world.', 'es-note'));
+    content.append($('p', observerOnly ? 'Read-only pilot copy. Model execution is managed separately.' : 'Running advances the characters in this world.', 'es-note'));
     if (activityFailure) content.append($('p', activityFailure, 'es-message'));
   }
   async function startAI(model) {
@@ -280,7 +289,7 @@ export function mountEntitySheet({ panel, row, offer, title, entry, inventory, c
     } finally { busy = false; if (live) render(); }
   }
   function openDecision(decision) {
-    decisionReturn = mode; mode = 'decision'; ++activityEpoch; clearTimeout(activityTimer); render(); void loadDecision(decision);
+    decisionReturn = mode; mode = 'decision'; heldDecision = null; decisionFailure = ''; ++activityEpoch; clearTimeout(activityTimer); render(); void loadDecision(decision);
   }
   async function loadDecision(decision) {
     const request = ++requestSerial;
@@ -288,17 +297,38 @@ export function mountEntitySheet({ panel, row, offer, title, entry, inventory, c
       const data = await client.readDecision(entry.authoredVersionId, decision.requestId);
       const detail = decisionView(data, entry, subjectId);
       if (!live || request !== requestSerial || mode !== 'decision') return;
-      const content = panel.querySelector('.es-content'); content.replaceChildren();
-      const facts = $('dl', '', 'es-properties'); rowValue(facts, 'Model', decision.name); rowValue(facts, 'Result', decision.chose || 'No action selected'); rowValue(facts, 'Record status', data.status === 'completed' ? 'Recorded' : 'Pending'); content.append(facts);
-      if (detail.options.length) {
-        const options = $('details', '', 'es-record'); options.append($('summary', 'Actions it could choose'));
-        const list = $('ul'); for (const words of detail.options) list.append($('li', words)); options.append(list); content.append(options);
-      }
-      if (detail.context) { const input = $('details', '', 'es-record'); input.append($('summary', 'Recorded inputs'), $('pre', JSON.stringify(detail.context, null, 2))); content.append(input); }
-      const details = $('details', '', 'es-record'); details.append($('summary', 'Full decision record'), $('pre', JSON.stringify(data, null, 2))); content.append(details);
-    } catch (error) { if (live && mode === 'decision') { message = 'The recorded decision could not be loaded. Try again.'; render(); } }
+      heldDecision = { data, detail, summary: decision, explanation: explainDecision(data, decision, { actionWords: { ...ACTION_LABELS, ...Object.fromEntries(ACTIVITY_LABELS) }, reasonWords: DECISION_WORDS }) };
+      render();
+    } catch (error) { if (live && request === requestSerial && mode === 'decision') { decisionFailure = 'The recorded decision could not be loaded. Return to Activity and try again.'; render(); } }
   }
-  function renderDecision(content) { content.append($('p', 'Loading recorded decision…', 'es-note')); }
+  function renderDecision(content) {
+    if (!heldDecision) { content.append($('p', decisionFailure || 'Loading recorded decision…', 'es-note')); return; }
+    const { data, detail, summary, explanation: explained } = heldDecision;
+    const facts = $('dl', '', 'es-properties');
+    rowValue(facts, 'Asked model', summary.name);
+    rowValue(facts, 'Chosen action', explained.chosen || 'No action recorded');
+    rowValue(facts, 'World result', explained.result);
+    if (summary.consumedTick !== null) rowValue(facts, 'Applied at', explained.result === 'Applied by the world.' ? `Minute ${summary.consumedTick}` : null);
+    if (explained.line) rowValue(facts, 'Proposed line', explained.line);
+    content.append(facts);
+    for (const words of explained.limitations) content.append($('p', words, 'es-note'));
+    const input = $('details', '', 'es-record'); input.append($('summary', 'What it was told'));
+    for (const words of explained.inputs) input.append($('p', words, 'es-note'));
+    if (!explained.inputs.length) input.append($('p', 'No plain-language summary is available for this input format. The recorded inputs are below.', 'es-note'));
+    input.append($('p', 'A summary of recorded inputs, not internal thoughts.', 'es-note')); content.append(input);
+    if (explained.options.length) {
+      const options = $('details', '', 'es-record'); options.append($('summary', `Actions it could choose (${explained.options.length})`));
+      const list = $('ul'); for (const option of explained.options) list.append($('li', option.label)); options.append(list); content.append(options);
+    }
+    const execution = $('details', '', 'es-record'); execution.append($('summary', 'Model response details'));
+    const metrics = $('dl', '', 'es-properties'); rowValue(metrics, 'Served model', explained.servedModel || 'Not reported');
+    if (explained.latencyMs !== null) rowValue(metrics, 'Response time', `${(explained.latencyMs / 1000).toFixed(2)} s`);
+    rowValue(metrics, 'Calls recorded', explained.calls);
+    if (explained.cost) rowValue(metrics, explained.costKnown ? 'Recorded cost' : 'Cost bound', `$${explained.cost}`);
+    execution.append(metrics); content.append(execution);
+    if (detail.context) { const raw = $('details', '', 'es-record'); raw.append($('summary', 'Recorded inputs'), $('pre', JSON.stringify(detail.context, null, 2))); content.append(raw); }
+    const record = $('details', '', 'es-record'); record.append($('summary', 'Full decision record'), $('pre', JSON.stringify(data, null, 2))); content.append(record);
+  }
   render(); panel.querySelector('h2').focus({ preventScroll: true });
   if (offer.subject.kind?.sha256) void openThingLibrary(credentials).then(library => library.kindDocument(offer.subject.kind)).then(document => { if (live) { kind = document; render(); } }).catch(() => { if (live) { kindFailure = 'Physical properties unavailable.'; render(); } });
   else kind = {};
