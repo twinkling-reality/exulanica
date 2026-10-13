@@ -417,6 +417,7 @@ product scope; the API and package contracts determine which operations and outp
 | Build inside a world | An interactive place, activity or authored scenario with supported objects and behaviors | Accepted edits and behavior bindings survive reopening, and unsupported actions remain explicit |
 | Build on world state | An application or external tool that reads selected subjects and proposes authorized changes | An independent client uses the same identities and versions without relying on browser-private state |
 | Experiment with a world | Paired scenarios, recorded interventions and inspectable comparisons | Both runs bind exact starting conditions; controls, failures, raw outcomes and replay are retained |
+| Develop a repository-backed world project | A user-owned GitHub project with editable world definitions, model-role configuration and selected execution evidence | Reviewed checkpoints create meaningful commits; reopening or forking preserves supported identities, dependencies and replay without publishing private runtime state |
 | Produce data from a world | Task-specific observations and annotations for permitted training or evaluation | Labels match the rendered observations, lineage and splits are explicit, and usefulness is measured on held-out cases |
 
 For example, a perception project can vary lighting, object placement and camera views in a
@@ -426,6 +427,51 @@ effects on synthetic inhabitants. These examples describe project capabilities t
 they do not assert a delivered dataset generator, general rule editor or validated human-behavior
 predictor. Using a world does not require training a model.
 
+### Repository-backed learning and development
+
+**Requirement:** connect creating and editing a world to a project the person keeps as a local
+repository and can publish to their own GitHub repository. Saving, comparing and forking work
+locally without an account; publishing needs a GitHub account, which GitHub's terms limit to people
+aged 13 or older. The connected journey creates a character, object or other entity, inspects its
+declared capabilities, discovers and assigns a compatible open model where it has a supported
+decision role, and observes the resulting interactions. Inspection follows actual observations,
+available actions, model choices, engine acceptance or refusal and applied outcomes. Model
+identity, relevant configuration, timing and usage accompany the recorded result. Scenery without
+a decision role does not gain agency merely by receiving a model label.
+
+A project checkpoint saves a reviewed selection of world definitions, supported behavior and
+model-role settings, dependency references and execution evidence. The interface explains the
+meaningful changes before creating a commit and distinguishes saving locally from publishing to
+GitHub. Continuous world activity remains in the runtime event history; it does not create a commit
+for every tick. Repository changes must be validated against a named base version before they can
+change a running world, with conflicts and unsupported content reported explicitly.
+
+The first complete project demonstrates this round trip: create and inspect an entity, assign a
+model, observe and explain a real applied or refused action, save a checkpoint, inspect its GitHub
+diff, change the project, and reopen the supported result from a checkout. Forking retains source
+lineage while creating a distinct editable project. Selected recorded runs replay without provider
+calls; rerunning inference is a separate operation with its own execution authorization.
+
+The repository contains only content selected and permitted for that project. Credentials,
+private source material, runtime databases and raw private logs are excluded. Large assets use
+explicit dependency references with integrity and availability checks; a fresh checkout reports
+missing private dependencies rather than pretending it contains a complete saved installation.
+The existing World Memory Package remains a partial export with its declared compatibility;
+this workflow needs its own verified project representation and does not silently expand that
+package's guarantees.
+
+**Learning hypothesis:** a visible create, observe, debug and improve loop can make open models
+understandable to beginners, including students, and produce portfolio projects whose results can
+be inspected, reproduced and forked by others. Acceptance includes a learner completing a bounded
+project and explaining one behavior change from its recorded evidence. Attractive motion,
+repository activity or a model assignment alone does not establish learning or model competence.
+
+**Implementation boundary:** the end-to-end GitHub project connection is planned. Existing saved
+worlds, model-role assignment, decision records, replay, APIs and partial exports supply foundations;
+they do not establish repository synchronization, a runnable project checkout or this connected
+learning journey. Development of the project connection can proceed alongside the live-character
+milestone, while its model-behavior acceptance depends on that milestone's real execution evidence.
+
 ### Project delivery sequence
 
 | Dependency order | Deliverable | Acceptance |
@@ -433,6 +479,7 @@ predictor. Using a world does not require training a model.
 | Saved world | Create or select a supported world, inspect it, make a supported edit and reopen it | World identity, authored state and source availability remain consistent across sessions |
 | Bounded project | Bind one supported interaction or controlled comparison to that saved state | Recorded inputs explain the result; a no-op control and invalid-input case test the claimed behavior |
 | Independent consumer | Read the supported state or result through an authenticated API or compatible export | A second client reproduces the declared interpretation and reports unsupported content |
+| Repository project | Connect the entity-to-model journey to reviewed checkpoints in a user-owned GitHub repository | A real model outcome is inspectable; a meaningful edit produces a reviewed commit/diff, and a checkout or fork reopens the supported project with explicit dependencies, conflict handling and provider-free recorded replay |
 | Dataset workflow | Export one task-specific observation/annotation format for an external training or evaluation tool | Independent annotation checks and a held-out baseline comparison establish correctness and task benefit |
 
 These dependencies sequence the project capability without adding every output to the minimum
