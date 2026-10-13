@@ -361,6 +361,12 @@ approach and reviewing a proposed change belong alongside the canvas rather than
 introductory form. The interface shows actual progress and actionable failures where they occur;
 a successful upload does not promise a finished scene.
 
+The product interface is the world workspace: the world and the focused entity stay in view, and
+each control is added as its own reviewed feature built from real entity and role data. Its
+current form is the opt-in workspace under [`tools/previews/world-workspace`](../tools/previews/world-workspace),
+which uses the production renderer. The earlier application shell in `web/packages/app` remains
+until the workspace replaces it as the application's entry, and it gains no new interface features.
+
 A starter space has its own persistent authored identity and does not imply an observed place, a
 completed reconstruction or a generated environment. A world is made from photographs through the
 personal-source path: the server composes the person's reviewed photographs into a world of its
@@ -439,12 +445,19 @@ available actions, model choices, engine acceptance or refusal and applied outco
 identity, relevant configuration, timing and usage accompany the recorded result. Scenery without
 a decision role does not gain agency merely by receiving a model label.
 
-A project checkpoint saves a reviewed selection of world definitions, supported behavior and
-model-role settings, dependency references and execution evidence. The interface explains the
-meaningful changes before creating a commit and distinguishes saving locally from publishing to
-GitHub. Continuous world activity remains in the runtime event history; it does not create a commit
-for every tick. Repository changes must be validated against a named base version before they can
-change a running world, with conflicts and unsupported content reported explicitly.
+A project checkpoint saves a selection of world definitions, supported behavior and model-role
+settings, dependency references and execution evidence. Tracking is continuous, with no save
+button: a checkpoint is recorded once the selected content has stopped changing for a settle period
+and at the end of a session, edits that cancel out leave nothing to record, the rate is bounded, and
+continuous world activity stays in the runtime event history rather than creating a commit for every
+tick. A source-control panel shows pending changes in plain words, the checkpoint history with its
+branches and merges, and each branch's publication state; a person can name, restore or fork from
+any checkpoint. Execution evidence lives in session files beside the world definition, so a world's
+diff stays short as runs accumulate. Saving stays local; publishing to GitHub is a separate act that
+keeps one rolling pull request per branch, updated by later checkpoints rather than opened anew. A
+merged pull request becomes a new world version through the existing world writers, validated
+against the version it was based on, with conflicts and unsupported content reported explicitly; it
+never edits a running world in place.
 
 The first complete project demonstrates this round trip: create and inspect an entity, assign a
 model, observe and explain a real applied or refused action, save a checkpoint, inspect its GitHub
