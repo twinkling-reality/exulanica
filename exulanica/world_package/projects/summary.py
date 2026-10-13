@@ -66,12 +66,12 @@ def summarize(before: Any | None, after: Any) -> list[str]:
     """Sentences for each meaningful selected change, in a stable order; empty when unchanged."""
     new = document(after)
     if before is None:
-        return [
-            f"started project {new['project_id']} with "
-            f"{_plural(len(new['things']), 'thing')}, "
-            f"{_plural(len(new['models']), 'model assignment')} and "
-            f"{_plural(len(new['decisions']), 'decision record')}"
+        parts = [
+            _plural(len(new["things"]), "thing"),
+            _plural(len(new["models"]), "model assignment"),
+            *([_plural(len(new["decisions"]), "decision record")] if new["decisions"] else []),
         ]
+        return [f"started project {new['project_id']} with {', '.join(parts[:-1])} and {parts[-1]}"]
     old = document(before)
     lines: list[str] = []
     if old["project_id"] != new["project_id"]:

@@ -380,7 +380,8 @@ def test_one_rolling_pull_request_collects_saved_checkpoints(tmp_path):
     review, result = publish(client, target, local, "Move the knight")
     # The commit carries its own sentence; the request's text against main is unchanged.
     assert result["actions"] == ["commit"]
-    assert list(review["files"]) == ["world-project.json"]
+    assert [list(c["files"]) for c in review["commits"]] == [["world-project.json"]]
+    assert review["commits"][0]["message"] == "Moved the knight 2 m east"
     assert len(remote.pulls) == 1 and "moved the knight 2 m east" not in pr["body"]
     assert "- started project" in pr["body"]  # Against the base branch, which has no project.
 
@@ -488,3 +489,31 @@ def test_publish_branch_command_needs_explicit_authorization_before_any_request(
     ]
     assert main(arguments) == 1
     assert "authorization" in capsys.readouterr().out
+
+
+def test_each_unpublished_checkpoint_becomes_its_own_commit(tmp_path):
+    from exulanica.world_package.projects.github import BranchTarget, RollingPullRequests
+
+    target = BranchTarget("learner/world", "main", "exulanica/world")
+    remote = Repository()
+    client = RollingPullRequests(remote.request)
+    local, world, _ = local_project(tmp_path)
+    for x_mm in (1000, 3000):
+        moved = deepcopy(world)
+        moved["things"][0]["transform"]["x_mm"] = x_mm
+        local.save(moved)
+    review, result = publish(client, target, local, None)
+    assert [c["message"] for c in review["commits"]] == [
+        "Start project project:synthetic",
+        "Moved the knight 1 m east",
+        "Moved the knight 2 m east",
+    ]
+    assert result["actions"] == ["create-branch", "commit", "commit", "commit", "open-pull-request"]
+    # Someone else's commit makes the branch match no local checkpoint: one commit, given words.
+    branch = remote.branches["exulanica/world"]
+    branch["files"]["world-project.json"] = branch["files"]["world-project.json"].replace(
+        b'"x_mm": 3000', b'"x_mm": 3500'
+    )
+    branch["oid"] = remote.oid()
+    review = client.review(target, local, "Put the knight back where it was saved")
+    assert [c["message"] for c in review["commits"]] == ["Put the knight back where it was saved"]

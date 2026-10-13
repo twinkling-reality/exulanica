@@ -256,6 +256,8 @@ class GitHubProjects:
 # request against a base branch, the way dependency bots group their updates.
 
 EVIDENCE_PATH = "evidence"
+# Unpublished checkpoints beyond this many are published as one commit of the last saved state.
+MAX_REPLAYED = 50
 _FILES = """
   file(path:"world-project.json") { mode object { ... on Blob { text byteSize isTruncated } } }
   evidence: file(path:"evidence") { mode object { ... on Tree { entries {
@@ -424,20 +426,65 @@ class RollingPullRequests:
         except (KeyError, TypeError, AttributeError) as exc:
             raise ProjectError("GitHub returned incomplete repository metadata") from exc
 
-    def review(self, target: BranchTarget, project: Any, message: str) -> dict[str, Any]:
+    def review(
+        self, target: BranchTarget, project: Any, message: str | None = None
+    ) -> dict[str, Any]:
         """What publication would do, bound to what the remote holds now. Writes nothing."""
         return self._prepare(target, project, message)[0]
 
+    @staticmethod
+    def _snapshot(project: Any, revision: str) -> dict[str, bytes]:
+        files = {PROJECT_PATH: pretty(project.at(revision))}
+        files.update(
+            {
+                f"{EVIDENCE_PATH}/{name}": pretty_evidence(session)
+                for name, session in project.sessions_at(revision).items()
+            }
+        )
+        return files
+
+    def _steps(
+        self, project: Any, current: dict[str, bytes], message: str | None
+    ) -> list[tuple[str, dict[str, bytes]]]:
+        """Each unpublished local checkpoint as its own commit, with its own message.
+
+        The remote branch is matched to the newest local checkpoint whose files it holds; the
+        checkpoints after it are replayed in order. A branch matching no local checkpoint, or a
+        long backlog, is published as one commit of the last saved state.
+        """
+        published = {
+            path: data
+            for path, data in current.items()
+            if path == PROJECT_PATH or path.startswith(f"{EVIDENCE_PATH}/")
+        }
+        history = list(reversed(project.history()))
+        start: int | None = -1 if not published else None
+        for index in range(len(history) - 1, -1, -1):
+            if start is not None:
+                break
+            if self._snapshot(project, history[index]["commit"]) == published:
+                start = index
+        pending = [] if start is None else history[start + 1 :]
+        if start is None or len(pending) > MAX_REPLAYED:
+            text = message or history[-1]["message"]
+            pending = [{"commit": history[-1]["commit"], "message": text}]
+        steps, state = [], dict(published)
+        for entry in pending:
+            files = self._snapshot(project, entry["commit"])
+            changed = {path: data for path, data in files.items() if state.get(path) != data}
+            if changed:
+                steps.append((check_message(entry["message"]), changed))
+                state.update(changed)
+        return steps
+
     def _prepare(
-        self, target: BranchTarget, project: Any, message: str
-    ) -> tuple[dict[str, Any], dict[str, bytes], Remote]:
-        check_message(message)
+        self, target: BranchTarget, project: Any, message: str | None
+    ) -> tuple[dict[str, Any], list[tuple[str, dict[str, bytes]]], Remote]:
+        if message is not None:
+            check_message(message)
         world = project.at("HEAD")
         sessions = project.sessions_at("HEAD")
-        local = {PROJECT_PATH: pretty(world)}
-        local.update(
-            {f"{EVIDENCE_PATH}/{name}": pretty_evidence(s) for name, s in sessions.items()}
-        )
+        local = self._snapshot(project, "HEAD")
         remote = self.read(target)
         if not remote.writable_owned:
             raise ProjectError("publication requires a writable repository owned by the CLI user")
@@ -450,7 +497,7 @@ class RollingPullRequests:
             ):
                 raise Conflict("remote branch belongs to another project or source world")
         append_only(_sessions(current), sessions)
-        changed = sorted(path for path, data in local.items() if current.get(path) != data)
+        steps = self._steps(project, current, message)
         base_world = _world(remote.base_files)
         words = summarize(base_world, world)
         evidence = evidence_summary(_sessions(remote.base_files), sessions)
@@ -460,7 +507,7 @@ class RollingPullRequests:
         else:
             actions = [
                 *(["create-branch"] if remote.branch_head is None else []),
-                *(["commit"] if changed else []),
+                *(["commit"] * len(steps)),
                 *(["open-pull-request"] if remote.pull_request is None else []),
             ]
         title = f"World changes for {world['project_id']}"
@@ -486,8 +533,13 @@ class RollingPullRequests:
             "base_head": remote.base_head,
             "branch_head": remote.branch_head,
             "pull_request": None if remote.pull_request is None else remote.pull_request["number"],
-            "files": {path: digest(local[path]) for path in changed},
-            "message": message,
+            "commits": [
+                {
+                    "message": text,
+                    "files": {path: digest(data) for path, data in sorted(files.items())},
+                }
+                for text, files in steps
+            ],
             "title": title,
             "body": body,
             "actions": actions,
@@ -496,13 +548,13 @@ class RollingPullRequests:
             "publication": "Only saved checkpoints and their evidence are published. Review all "
             "values and rights first; published copies cannot be recalled.",
         }
-        return {**review, "review_sha256": digest(canonical_json(review))}, local, remote
+        return {**review, "review_sha256": digest(canonical_json(review))}, steps, remote
 
     def publish(
         self,
         target: BranchTarget,
         project: Any,
-        message: str,
+        message: str | None = None,
         *,
         reviewed_sha256: str,
         allow_publication: bool = False,
@@ -511,11 +563,13 @@ class RollingPullRequests:
             raise ProjectError(
                 "publication requires explicit authorization separate from local save"
             )
-        review, files, remote = self._prepare(target, project, message)
+        review, steps, remote = self._prepare(target, project, message)
         if review["review_sha256"] != reviewed_sha256:
             raise Conflict("destination, heads, content or message changed; review again")
         pull_request = remote.pull_request or {}
         done: list[str] = []
+        head = review["branch_head"] or review["base_head"]
+        pending = list(steps)
         try:
             for action in review["actions"]:
                 if action == "create-branch":
@@ -530,7 +584,7 @@ class RollingPullRequests:
                         },
                     )
                 elif action == "commit":
-                    expected = review["branch_head"] or review["base_head"]
+                    text, files = pending.pop(0)
                     data = self.request(
                         _MUTATION,
                         {
@@ -539,15 +593,15 @@ class RollingPullRequests:
                                     "repositoryNameWithOwner": target.repository,
                                     "refName": target.branch,
                                 },
-                                "expectedHeadOid": expected,
-                                "message": {"headline": message},
+                                "expectedHeadOid": head,
+                                "message": {"headline": text},
                                 "fileChanges": {
                                     "additions": [
                                         {
                                             "path": path,
                                             "contents": base64.b64encode(files[path]).decode(),
                                         }
-                                        for path in sorted(review["files"])
+                                        for path in sorted(files)
                                     ]
                                 },
                             }

@@ -843,19 +843,22 @@ to one project branch with one open pull request against a base branch, the way 
 group updates:
 
 ```sh
-uv run python -m exulanica.world_package.projects review-branch ./my-project --repository OWNER/REPOSITORY --base main --branch exulanica/my-project --message 'Move the knight'
-uv run python -m exulanica.world_package.projects publish-branch ./my-project --repository OWNER/REPOSITORY --base main --branch exulanica/my-project --message 'Move the knight' --review-sha256 REVIEW_DIGEST --allow-publication
+uv run python -m exulanica.world_package.projects review-branch ./my-project --repository OWNER/REPOSITORY --base main --branch exulanica/my-project
+uv run python -m exulanica.world_package.projects publish-branch ./my-project --repository OWNER/REPOSITORY --base main --branch exulanica/my-project --review-sha256 REVIEW_DIGEST --allow-publication
 ```
 
 `review-branch` writes nothing. It reads the base branch, the project branch and its open pull
 request, refuses a branch holding another project or evidence the folder does not hold, and lists
-the actions publication would take: create the branch from the base head, commit the changed
-`world-project.json` and `evidence/` files with `expectedHeadOid`, then open the pull request or
-update its text. The pull request text describes, against the base branch, the changes to the
+the actions publication would take: create the branch from the base head, commit, then open the
+pull request or update its text. Each saved checkpoint not yet on the branch becomes its own commit
+with its own plain-word message and only the `world-project.json` and `evidence/` files it
+changed, each chained by `expectedHeadOid`. The branch is matched to the newest saved checkpoint
+whose files it holds; a branch matching none, or more than 50 unpublished checkpoints, is
+published as one commit of the last saved state, using `--message` when given. The pull request text describes, against the base branch, the changes to the
 world and, separately, the decision evidence, which is never called part of the world. When the
 saved project again equals the base branch, the open pull request is closed instead. Unchanged
 files make no commit and unchanged text is not rewritten. The review digest binds the target,
-both branch heads, the pull request, file digests, message and text; `publish-branch` recomputes
+both branch heads, the pull request, each commit's message and file digests, and the text; `publish-branch` recomputes
 it and refuses any difference. A failed step stops publication, names the steps already done and
 is not retried.
 

@@ -100,7 +100,9 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--repository", required=True)
         command.add_argument("--base", required=True)
         command.add_argument("--branch", required=True)
-        command.add_argument("--message", required=True)
+        command.add_argument(
+            "--message", help="only when the branch matches no saved checkpoint and is squashed"
+        )
         if name == "publish-branch":
             command.add_argument("--review-sha256", required=True)
             command.add_argument("--allow-publication", action="store_true")
