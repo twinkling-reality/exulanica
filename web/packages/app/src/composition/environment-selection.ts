@@ -129,7 +129,7 @@ const dispositionWords = (disposition: string): string =>
 const activityLabel = (kind: string): string =>
   ACTIVITY_LABELS.get(kind) ?? ACTION_LABELS[kind] ?? `an activity the page has no words for (${kind})`;
 /**
- * While a world plays on its own the page reads its playback control about every two seconds, a
+ * While a saved world is open the page reads its playback control about every two seconds, a
  * cheap read, and reads the society only when the control says the tick moved. A pace faster than
  * that is read at half its interval, so a minute is rarely missed, and never more often than every
  * half second, so a fast pace cannot become a stream of requests.
@@ -1849,7 +1849,7 @@ export function mountEnvironmentSelection(
     });
   }
 
-  /** How long between control reads while this world plays: see `CONTROL_POLL_MS`. */
+  /** How long between saved-world control reads: see `CONTROL_POLL_MS`. */
   function pollDelayMs(): number {
     const interval = societyControl?.hostPlayback?.intervalMs ?? societyControl?.tickIntervalMs ?? CONTROL_POLL_MS;
     return Math.max(CONTROL_POLL_FLOOR_MS, Math.min(CONTROL_POLL_MS, interval / 2));
@@ -1865,15 +1865,15 @@ export function mountEnvironmentSelection(
       controlTimer = window.setTimeout(() => void (savedWorld !== null ? pollPlayback() : refreshPlayback(true)), wait);
       return;
     }
-    // Keep reading a saved world's control while paused: another client may start its host.
-    if (savedWorld !== null && societyControl.hostPlayback?.running !== true) return;
+    // A saved world may advance through another process, even when this API runs no playback.
+    // Keep observing it while paused too, so another client's Play becomes visible.
     if (savedWorld === null && societyControl.mode !== 'playing') return;
     controlTimer = window.setTimeout(() => void (savedWorld !== null ? pollPlayback() : refreshPlayback(true)),
       savedWorld !== null ? pollDelayMs() : Math.max(CONTROL_POLL_FLOOR_MS, societyControl.tickIntervalMs));
   }
 
   /**
-   * One background read while a saved world plays: the control, and the society only when the
+   * One background read of an open saved world: the control, and the society only when the
    * control's tick is not the one drawn. It never disables a control the person could be using.
    */
   async function pollPlayback(): Promise<void> {

@@ -214,11 +214,54 @@ describe('what the people panel says of a saved world\'s playback', () => {
       expect(controlClient.read.mock.calls.length).toBe(before + 3);
       expect(answer).toBeTypeOf('function');
       expect(says(panel)).not.toContain('could not be read');
-      // Recovered, the page stops trying: a paused world on a host that says nothing more is not read again.
-      await turn(60_000);
-      expect(controlClient.read.mock.calls.length).toBe(before + 3);
+      // Recovered, the page resumes bounded observation even while the saved world is paused.
+      await turn(500);
+      expect(controlClient.read.mock.calls.length).toBe(before + 4);
       mounted.dispose();
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('observes an external worker and redraws its new minute when the API does not run playback', async () => {
+    vi.useFakeTimers();
+    const { mounted, controlClient, societyClient, crowd, panel } = mount();
+    try {
+      await mounted.begin();
+      let tick = 0;
+      const hostPlayback = { running: false, intervalMs: 4000, reason: 'This host does not play worlds on its own.', code: null };
+      controlClient.read.mockImplementation(async () => ({
+        ...control(tick), mode: tick === 0 ? 'paused' : 'playing', hostPlayback,
+      }));
+      bringIn(panel);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(crowd.setSociety).toHaveBeenCalledTimes(1);
+      const reads = controlClient.read.mock.calls.length;
+      const snapshots = societyClient.read.mock.calls.length;
+
+      // The observer makes no writes; the next control read discovers another process's minute.
+      tick = 1;
+      societyClient.read.mockResolvedValue(society(1, true));
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(controlClient.read).toHaveBeenCalledTimes(reads);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(controlClient.read).toHaveBeenCalledTimes(reads + 1);
+      expect(societyClient.read).toHaveBeenCalledTimes(snapshots + 1);
+      expect((crowd.setSociety.mock.calls.at(-1) as unknown[])[0]).toEqual(society(1, true).state);
+      expect(panel().querySelector('.world-inhabitants-summary')?.textContent).toMatch(/Minute 1;/);
+      expect(hostPlayback.running).toBe(false);
+      expect(controlClient.configure).not.toHaveBeenCalled();
+      expect(controlClient.step).not.toHaveBeenCalled();
+
+      // An unchanged tick reads only control; disposing stops observation entirely.
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(societyClient.read).toHaveBeenCalledTimes(snapshots + 1);
+      mounted.dispose();
+      const stopped = controlClient.read.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(controlClient.read).toHaveBeenCalledTimes(stopped);
+    } finally {
+      mounted.dispose();
       vi.useRealTimers();
     }
   });

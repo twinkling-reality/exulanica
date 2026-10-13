@@ -217,13 +217,18 @@ describe('watching a saved world live', () => {
     mounted.dispose();
   });
 
-  it('never polls a world its host does not play, and says why in the server\'s words', async () => {
+  it('keeps watching a world its host does not play, draws a minute another process ran, and says why in the server\'s words', async () => {
     const reason = 'This host does not play this workspace.';
-    const { mounted, controlClient, panel } = mount({ mode: 'playing', host: { running: false, interval_ms: HOST_INTERVAL_MS, reason } });
+    const { mounted, server, controlClient, panel, drawnTicks } = mount({ mode: 'playing', host: { running: false, interval_ms: HOST_INTERVAL_MS, reason } });
     await mounted.begin();
     const reads = controlClient.read.mock.calls.length;
+    expect(drawnTicks()).toEqual([5]);
+    // Another process (a separate playback worker or driver) runs minute 6 against the same database.
+    server.tick = 6;
+    server.events = [walked(6)];
     await vi.advanceTimersByTimeAsync(10_000);
-    expect(controlClient.read.mock.calls.length).toBe(reads);
+    expect(controlClient.read.mock.calls.length).toBeGreaterThan(reads);
+    expect(drawnTicks()).toEqual([5, 6]);
     expect(panel().textContent).toContain(`${reason} Use Next minute to move on one minute at a time instead.`);
     mounted.dispose();
   });
