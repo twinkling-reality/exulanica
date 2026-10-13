@@ -33,6 +33,10 @@ from things_society_support import SEED, SOCIETY, arrival, compose, thing
 
 GATE = thing("gate", "gate", 1, 0, 9_000, yaw=3_141_593)
 KNIGHT = thing("knight", "knight", 2, 3_000, 3_000)
+#: The memory version a new society records: the first's figures, and the being's own choices.
+REMEMBER_CHOICES = "exulanica-ability/remember/v2"
+#: A memory version no table states, written by a test to show a later row changes nothing.
+LATER_MEMORY = "exulanica-ability/remember/v3"
 #: The modules a society of things recorded before the notice and memory modules were built.
 EARLIER = [
     "exulanica-ability/crossing/v1",
@@ -98,10 +102,13 @@ def _spoken(document):
 
 
 def test_a_new_society_records_the_notice_and_memory_modules():
+    """A new society records notice and the newest memory version, which also keeps a being's own
+    choices (tests/test_society_remembered_choices.py)."""
     document = compose((GATE, KNIGHT))
-    assert {NOTICE, REMEMBER} <= set(document["modules"])
+    assert {NOTICE, REMEMBER_CHOICES} <= set(document["modules"])
+    assert REMEMBER not in document["modules"]
     state = initial_things_society(SOCIETY, SEED, document, population=6)
-    assert {NOTICE, REMEMBER} <= set(state["modules"])
+    assert {NOTICE, REMEMBER_CHOICES} <= set(state["modules"])
 
 
 def test_a_being_a_model_decides_for_is_shown_what_it_notices_and_remembers():
@@ -148,7 +155,7 @@ def test_a_visitor_its_own_program_decides_for_remembers_from_its_arrival():
     state = initial_things_society(SOCIETY, SEED, document, population=6)
     after, _ = _minute(state, document, crossings=[arrival(1)])
     visitor = next(p for p in after["inhabitants"] if p["came_by"] == "crossed")
-    assert visitor["recollection"] == {"met": [], "places": [], "handed": []}
+    assert visitor["recollection"] == {"met": [], "places": [], "handed": [], "choices": []}
 
 
 def test_a_being_only_the_routine_decides_for_keeps_no_memory_however_long_it_lives():
@@ -188,29 +195,29 @@ def _two_lines(document):
 
 def test_a_society_reads_the_figures_of_the_memory_version_it_recorded(monkeypatch, tmp_path):
     """A later row of a module never changes a society that recorded an earlier one: a society
-    that recorded a second memory version keeping one being keeps one, and one that recorded the
-    first keeps both."""
+    that recorded a later memory version keeping one being keeps one, and one that recorded the
+    version before it keeps both."""
     from exulanica.abilities import registry
 
-    # Both inputs are written before the second version exists, as a stored society's was; a new
+    # Both inputs are written before the later version exists, as a stored society's was; a new
     # input would record the newest version.
-    recorded_first = compose((GATE, KNIGHT))
-    recorded_second = copy.deepcopy(recorded_first)
-    recorded_second["modules"] = sorted(
-        "exulanica-ability/remember/v2" if module == REMEMBER else module
-        for module in recorded_second["modules"]
+    recorded_now = compose((GATE, KNIGHT))
+    recorded_later = copy.deepcopy(recorded_now)
+    recorded_later["modules"] = sorted(
+        LATER_MEMORY if module == REMEMBER_CHOICES else module
+        for module in recorded_later["modules"]
     )
-    recorded_second["document_sha256"] = input_sha256(recorded_second)
+    recorded_later["document_sha256"] = input_sha256(recorded_later)
     table = json.loads(registry.MODULES_PATH.read_text(encoding="utf-8"))
-    [first] = [row for row in table["modules"] if row["module"] == REMEMBER]
-    second = copy.deepcopy(first)
-    second["module"] = "exulanica-ability/remember/v2"
-    for parameter in second["parameters"]:
+    [now] = [row for row in table["modules"] if row["module"] == REMEMBER_CHOICES]
+    later = copy.deepcopy(now)
+    later["module"] = LATER_MEMORY
+    for parameter in later["parameters"]:
         if parameter["name"] == "beings_maximum":
             parameter["value"] = 1
-    table["modules"].append(second)
+    table["modules"].append(later)
     path = tmp_path / "ability-modules.v1.json"
     path.write_text(json.dumps(table), encoding="utf-8")
     monkeypatch.setattr(registry, "ability_modules", lambda: registry.load_ability_modules(path))
-    assert len(_two_lines(recorded_first)["met"]) == 2
-    assert len(_two_lines(recorded_second)["met"]) == 1
+    assert len(_two_lines(recorded_now)["met"]) == 2
+    assert len(_two_lines(recorded_later)["met"]) == 1

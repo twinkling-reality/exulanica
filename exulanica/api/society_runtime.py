@@ -1796,6 +1796,59 @@ class SocietyRuntime:
         living_routine: RoutineModel | None = None,
         arrival: ArrivalDescriptor | None = None,
     ) -> dict:
+        """Compose a saved world's input (:meth:`_authored_composed`), and where it is a things
+        input of a society that records the character module, with the newest character its
+        world's owner wrote for each placed being (:meth:`_with_characters`). Every input of a
+        version is composed here, its first, an edit's and an authorization's alike, so a stored
+        one and its recomposition agree."""
+        document = self._authored_composed(
+            connection, binding, ground, version, seq, read, composition, living_routine, arrival
+        )
+        return self._with_characters(connection, binding, document)
+
+    @staticmethod
+    def _with_characters(
+        connection: psycopg.Connection, binding: AuthoredWorldSocietyBinding, document: dict
+    ) -> dict:
+        """``document`` with its placed beings' characters, where it is an available things input
+        of a society that records the character module: a first input by the modules it records,
+        a later one by its society's first input. Any other input is answered as composed, so a
+        society made before the module reads exactly what it always read. Rows only."""
+        from exulanica.world.society_thing_inputs import CHARACTER_MODULE, with_characters
+        from exulanica.world.thing_characters import newest_characters, society_reads_characters
+
+        if document["profile"] not in THING_INPUTS or document["availability"] != "available":
+            return document
+        if document["input_seq"] == 1:
+            records = CHARACTER_MODULE in document.get("modules", ())
+        else:
+            records = (
+                society_reads_characters(
+                    connection, binding.workspace_id, binding.world_id, binding.version_id
+                )
+                == "runs_characters"
+            )
+        if not records:
+            return document
+        return with_characters(
+            document,
+            newest_characters(
+                connection, binding.workspace_id, binding.world_id, binding.version_id
+            ),
+        )
+
+    def _authored_composed(
+        self,
+        connection: psycopg.Connection,
+        binding: AuthoredWorldSocietyBinding,
+        ground: SocietyGround,
+        version: AlternateVersion,
+        seq: int,
+        read: _ReadFirst,
+        composition: str | None = None,
+        living_routine: RoutineModel | None = None,
+        arrival: ArrivalDescriptor | None = None,
+    ) -> dict:
         """Compose a saved world's input under the asset read lock, from rows and ``read``.
 
         ``composition`` is the composition a world's own walking surfaces are composed under: the

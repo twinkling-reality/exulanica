@@ -173,9 +173,11 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
             scratch = admin.execute("select current_schema()").fetchone()[0]
             # Whether a placed thing names a shipped kind or its workspace's own (0188), and the
             # kind erasures (0172), which the current version read names when it asks whether a
-            # thing's kind is gone. Below the hands request neither exists; every thing here is a
-            # shipped kind and none was erased, so a 'shipped' column and an empty view are facts.
-            # Both are dropped before the later migrations add them.
+            # thing's kind is gone; and the characters owners wrote for placed beings (0213), which
+            # the runtime reads to compose a new society's input. Below the hands request none
+            # exists; every thing here is a shipped kind, none was erased and nobody wrote a
+            # character, so a 'shipped' column and two empty views are facts. All three are dropped
+            # before the later migrations add them.
             admin.execute(
                 "alter table world_alternate_thing "
                 "add column kind_source text not null default 'shipped'"
@@ -183,6 +185,12 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
             admin.execute(
                 "create view thing_erasure as select null::uuid as workspace_id,"
                 "null::text as sha256,null::timestamptz as erased_at where false"
+            )
+            admin.execute(
+                "create view world_thing_character as select null::uuid as workspace_id,"
+                "null::text as world_id,null::uuid as version_id,null::text as placed_id,"
+                "null::bigint as revision,null::text as name,null::text as about,"
+                "null::timestamptz as written_at where false"
             )
             admin.commit()
             base = env_get("TEST_DATABASE_URL")
@@ -279,6 +287,7 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
                 with historical_world_fixture_schema(admin, support=True):
                     assert world.replayed() is True
                 admin.execute("drop view thing_erasure")
+                admin.execute("drop view world_thing_character")
                 admin.execute("alter table world_alternate_thing drop column kind_source")
                 for later in everything:
                     if later.version > hands.version:

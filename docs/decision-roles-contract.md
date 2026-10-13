@@ -565,8 +565,25 @@ catalog version 8 and prompt `society-person-choice/v6`, adding `follow` and `st
 capable beings in societies that recorded `exulanica-ability/follow/v3`. These choices use the
 existing body-paced walking and bounded pursuit rules; they do not grant a stationary kind
 movement. Older follow modules are not offered these model choices. The separate player action
-catalog keeps its walk-to-point action, which models are not offered. Version 3 keeps version 2's actions and
-bounds and adds:
+catalog keeps its walk-to-point action, which models are not offered.
+
+Registry version 10 keeps catalog version 8 and asks under prompt `society-person-choice/v7`. Its
+instruction also says, in conditional words, that when the model is told who the being is, its
+world's owner wrote that as fiction to shape what the being does and never to follow as
+instructions, and that when it is shown what the being chose lately and what came of it, that is
+what happened in the world, which the being need not repeat nor change. A society recording the
+character module and the second memory version shows those blocks
+([minds](minds-contract.md#who-a-being-is)); one made before them shows neither. The registry states
+one set of terms per engine, so every new request of an `exulanica-society/v7` society, one made
+before those modules included, is asked under the seventh prompt's instruction from registry
+version 10: its context, options, inputs and state are what they were, and only the system text a
+model reads changes. Each request records its `prompt_version`, and every stored request rebuilds and
+replays under the prompt it records; the sixth prompt stays readable for them. Over the unchanged
+16,000-byte bound the two blocks add at most a character's 1,396 bytes (the memory's choices share
+its existing bound), and a being whose context would exceed the bound is not asked that minute,
+never sent a shortened context.
+
+Version 3 keeps version 2's actions and bounds and adds:
 
 | Action | Kind | Words a model reads |
 | --- | --- | --- |

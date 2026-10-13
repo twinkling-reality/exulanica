@@ -164,7 +164,7 @@ def test_a_said_line_is_accepted_beside_its_option_and_bound_by_the_receipt():
         "option": say.as_record(),
         "line": "Good morning.",
     }
-    assert result["provider"]["prompt_version"] == "society-person-choice/v6"
+    assert result["provider"]["prompt_version"] == "society-person-choice/v7"
     validate_decision_receipt(receipt_for(request, 1, result), request)
     # Asked under the engine's own terms: a choice with a line, and its instruction.
     (sent,) = transport.requests

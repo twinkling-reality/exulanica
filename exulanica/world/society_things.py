@@ -88,8 +88,10 @@ from exulanica.world.society_planner import (
 )
 from exulanica.world.society_summaries import SIMULATED, crossing_name, summary_name
 from exulanica.world.society_thing_inputs import (
+    CHARACTER_FIELD,
     MOVEMENT_MODULES_FIELD,
     arrival_points,
+    check_character,
     placed_beings,
     placed_objects,
 )
@@ -874,6 +876,7 @@ def _reconcile(minute: _Minute) -> None:
         == {name: held[name] for name in ("placed_id", "kind", "placed_at_mm")}
     ]
     _place_beings(minute, record=True)
+    _characters(minute)
     if _runs_hands(state):
         state["things"] = _moved_things(state, document)
         if "carried_out" in state:
@@ -891,6 +894,46 @@ def _reconcile(minute: _Minute) -> None:
         *_things_of(document),
         *(thing for thing in state["things"] if thing["held_by"] is not None),
     ]
+
+
+def _runs_character(state: Mapping[str, Any]) -> bool:
+    """Whether a society of things records the character module, so its placed beings keep the
+    character their inputs carry."""
+    from exulanica.abilities.registry import recorded_row
+
+    return recorded_row(state.get("modules", ()), "character") is not None
+
+
+def _character_bounds(state: Mapping[str, Any]) -> tuple[int, int]:
+    """The name and about bounds of the character version the society recorded."""
+    from exulanica.abilities.registry import recorded_row
+
+    row = recorded_row(state.get("modules", ()), "character")
+    assert row is not None
+    return row.value("name_characters_maximum"), row.value("about_characters_maximum")
+
+
+def _characters(minute: _Minute) -> None:
+    """Each placed being here keeps the character its input carries, as it arrives and whenever
+    its owner wrote it again, and keeps none once the input carries none: only in a society that
+    records the character module, and only from an available input (an unavailable one changes
+    nobody). Nothing is recorded: the input that carried it is the record."""
+    state, document = minute.state, minute.document
+    if not _runs_character(state) or document["availability"] != "available":
+        return
+    written = {
+        entry["placed_id"]: entry[CHARACTER_FIELD]
+        for entry in placed_beings(document)
+        if CHARACTER_FIELD in entry
+    }
+    for person in state["inhabitants"]:
+        if person["came_by"] != "placed":
+            continue
+        character = written.get(person["placed_id"])
+        if character is None:
+            person.pop(CHARACTER_FIELD, None)
+        else:
+            person[CHARACTER_FIELD] = dict(character)
 
 
 def _visitor_kind(reference: Mapping[str, Any]) -> ThingKind | None:
@@ -1140,6 +1183,7 @@ def initial_things_society(
     minute = _Minute(state, state, seed, document, ())
     # The author's beings first, where they were put; then the population steps aside from them.
     _place_beings(minute, record=False, before_population=True)
+    _characters(minute)
     _population_steps_aside(state, document)
     _settle_kinds(state)
     validate_things_state(state)
@@ -1293,7 +1337,8 @@ def _remember(minute: _Minute, decisions: Sequence[tuple[Mapping[str, Any], Any]
     the order it recorded them, written into the recollections of the beings that keep one
     (:func:`exulanica.world.society_recollection.remember`). A being starts keeping one the first
     minute a model or a program decides for it: one a receipt the minute consumed names, or a
-    visitor its own program decides for. Bounded by the row of the version the society recorded."""
+    visitor its own program decides for. Bounded by the row of the version the society recorded;
+    from the second version it also keeps each being's own choices, from the minute's receipts."""
     from exulanica.abilities.registry import recorded_row
     from exulanica.world.society_decision_contract import _activity_label
     from exulanica.world.society_planner import _input_value, routine_of
@@ -1306,6 +1351,9 @@ def _remember(minute: _Minute, decisions: Sequence[tuple[Mapping[str, Any], Any]
         places_maximum=row.value("places_maximum"),
         handed_maximum=row.value("handed_maximum"),
         bytes_maximum=row.value("bytes_maximum"),
+        choices_maximum=(
+            row.value("choices_maximum") if "choices_maximum" in row.parameters else None
+        ),
     )
     minds = {str(receipt["subject_id"]) for receipt, _disposition in decisions}
     minds |= {person["id"] for person in minute.state["inhabitants"] if _program_decides(person)}
@@ -1319,6 +1367,7 @@ def _remember(minute: _Minute, decisions: Sequence[tuple[Mapping[str, Any], Any]
         bounds,
         minds,
         lambda target: _activity_label(routine, target)[1],
+        decisions,
     )
 
 
@@ -2058,13 +2107,32 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
         _optional_movement(person)
         _optional_lines(person)
         if "recollection" in person:
+            from exulanica.abilities.registry import recorded_row
             from exulanica.world.society_recollection import validate_recollection
 
             _require(_remembers(state), "only a society running memory keeps a recollection")
+            row = recorded_row(state.get("modules", ()), "remember")
+            assert row is not None
             try:
-                validate_recollection(person["recollection"])
+                validate_recollection(
+                    person["recollection"], choices="choices_maximum" in row.parameters
+                )
             except ValueError as exc:
                 raise ValueError(f"a being's recollection is out of shape: {exc}") from exc
+        if CHARACTER_FIELD in person:
+            _require(
+                _runs_character(state) and person["came_by"] == "placed",
+                "only a placed being of a society running the character module keeps a character",
+            )
+            name_maximum, about_maximum = _character_bounds(state)
+            try:
+                check_character(
+                    person[CHARACTER_FIELD],
+                    name_maximum=name_maximum,
+                    about_maximum=about_maximum,
+                )
+            except ValueError as exc:
+                raise ValueError(f"a being's character is out of shape: {exc}") from exc
         following = person.get("following")
         _require(
             following is None

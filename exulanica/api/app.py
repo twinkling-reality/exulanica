@@ -130,6 +130,7 @@ from exulanica.api.routes import (
     spending,
     style_packs,
     subjects,
+    thing_characters,
     thing_creatures,
     thing_store,
     things,
@@ -592,6 +593,7 @@ def create_app(
     app.include_router(world_entity_query.router)
     app.include_router(world_environments.router)
     app.include_router(world_things.router)
+    app.include_router(thing_characters.router)
     app.include_router(world_support_placement.router)
     app.include_router(world_objects.router)
     app.include_router(world_compositions.router)

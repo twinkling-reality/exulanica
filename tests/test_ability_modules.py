@@ -150,6 +150,9 @@ def test_a_table_that_breaks_a_rule_is_refused_by_name(tmp_path, change, message
 #: row joins this list with its digest.
 ROWS_SHA256 = {
     "exulanica-ability/day/v1": "94c0e966985e536b373affa61af743b6bd1891f7554aa93044c3bf0b2e91bbc7",
+    "exulanica-ability/character/v1": (
+        "a5f76a0032c597133159051de3a4b53a54b1a28f86f387115b054321da94f992"
+    ),
     "exulanica-ability/crossing/v1": (
         "fa49cfcedc547827a63dd9376ad2fd3f3b0c6401d810db711986f2ae4c086c27"
     ),
@@ -185,6 +188,9 @@ ROWS_SHA256 = {
     ),
     "exulanica-ability/remember/v1": (
         "b81b95345ce5f21521cc1f93cdf9c0f080bfe90aad9ee95cb75d0c1d7f01b1af"
+    ),
+    "exulanica-ability/remember/v2": (
+        "c7d2c4543f297ee48569b3b94430dc909c66f6c452b97deb86eb6f37069e5f1b"
     ),
     "exulanica-ability/say/v1": (
         "8732fe7e835dfcc80892e8218c2d4817bbe200c5ee113de4158a48b6fe584778"

@@ -216,6 +216,7 @@ TABLE_PRIVILEGES = {
     "world_style_state": {"SELECT", "DELETE"},
     "world_style_version": {"SELECT", "DELETE"},
     "world_thing_look": {"SELECT", "DELETE"},
+    "world_thing_character": {"SELECT", "DELETE"},
     "world_topology_contract": {"SELECT", "DELETE"},
     "world_topology_region": {"SELECT", "DELETE"},
     "world_topology_source": {"SELECT", "DELETE"},

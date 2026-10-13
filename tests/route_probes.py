@@ -650,6 +650,10 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"base_state_sha256": _ZERO_DIGEST},
     },
+    "POST /world/versions/{version_id}/things/{thing_id}/character": {
+        **_IN_WORLD,
+        "json": {"base_revision": None, "character": {"name": "Probe"}},
+    },
     "POST /world/versions/{version_id}/things/{thing_id}/move": {
         **_IN_WORLD,
         "json": {"base_state_sha256": _ZERO_DIGEST, "pose": _POSE},

@@ -3,7 +3,9 @@
 The card is read, never stored: what the thing is (its kind, in the kind's own words), what it can
 do here and what others can do with it (only what a module this society runs acts on), where it
 is and what it holds, who decides for it, how it is drawn and what else it could be drawn as, the
-lines it said lately, and the society's minute and state digest as the card was read. A look is
+lines it said lately, for a being its author placed who its world's owner wrote it to be
+(:mod:`exulanica.world.thing_characters`), and the society's minute and state digest as the card
+was read. A look is
 chosen beside a thing, never in it (ADR-0030), so changing one (:func:`choose_look`) writes only
 the look table and answers the card again: the minute and digest it states are the proof that
 nothing the thing does changed.
@@ -33,6 +35,7 @@ from exulanica.world.society_model_choice_repository import SocietyModelChoiceRe
 from exulanica.world.society_planner import routine_withheld
 from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.society_things import kind_allows
+from exulanica.world.thing_characters import character_of
 from exulanica.world.thing_library import shipped_looks
 from exulanica.world.thing_looks import (
     LookReference,
@@ -163,6 +166,7 @@ def _card(
             if person is not None and left_out
             else {}
         ),
+        "character": _character(connection, workspace_id, world_id, version_id, state, person),
         "society": {"tick": int(state["tick"]), "state_sha256": snapshot["state_sha256"]},
     }
     return card, held
@@ -266,6 +270,7 @@ def _made_card(
             if left_out
             else {}
         ),
+        "character": _character(connection, workspace_id, world_id, version_id, state, person),
         "society": {"tick": int(state["tick"]), "state_sha256": snapshot["state_sha256"]},
     }
 
@@ -356,6 +361,29 @@ def choose_look(
     )
     # The choice just appended is the newest one the thing may wear, so it is the one worn.
     return {**card, "look": _look_entry(connection, workspace_id, chosen, kind, owner=True)}
+
+
+def _character(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    version_id: uuid.UUID,
+    state: Mapping[str, Any],
+    person: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Who the world's owner wrote a being its author placed to be: the newest record, read from
+    the character table rather than the society (whose next minute takes it in), its revision for
+    the next write, and whether this society shows it (``shown``: it records the character module).
+    None for anything that is not a placed being."""
+    if person is None or person["came_by"] != "placed":
+        return None
+    record = character_of(connection, workspace_id, world_id, version_id, person["placed_id"])
+    return {
+        "revision": None if record is None else record.revision,
+        "character": None if record is None or record.character is None else dict(record.character),
+        "written_at": None if record is None else record.document()["written_at"],
+        "shown": recorded_row(list(recorded_modules(state)), "character") is not None,
+    }
 
 
 def _running(module: str, runs: Sequence[str]) -> str | None:

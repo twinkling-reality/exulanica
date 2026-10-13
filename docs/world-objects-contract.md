@@ -1071,6 +1071,13 @@ version's placed things ([society contract](synthetic-society-contract.md#the-so
 its placed beings live there, and its placed objects block walking and offer rests and visits as
 their kinds say.
 
+Who the owner wrote a placed being to be is not part of the placed thing, its edits or the
+version's delta: it is a record beside it in `world_thing_character` (migration 0213), as a look
+choice is, appended and never changed, the newest per placed id read
+([things contract](things-contract.md#who-a-placed-being-is)). Writing one changes no version digest
+and is not undone by the version's undo; it belongs to the version it was written in, which a
+branch or a carry onto new photographs leaves it in, and the world's erasure deletes it.
+
 ### Explicit support-bound placement
 
 `POST /world/versions/{version_id}/things/on-support` places a passive rigid object-class thing

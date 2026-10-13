@@ -14228,6 +14228,94 @@
     }
    }
   },
+  "/world/versions/{version_id}/things/{thing_id}/character": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The world's owner writes or clears who a placed being is; answers the record.",
+    "operationId": "thing_character_write_world_versions__version_id__things__thing_id__character_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "thing_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[a-z0-9]([a-z0-9:._-]{0,198}[a-z0-9])?$",
+       "title": "Thing Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ThingCharacterBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/things/on-support/preview": {
    "post": {
     "tags": [
@@ -27378,6 +27466,36 @@
      "label"
     ],
     "title": "ChannelAnswerBody"
+   },
+   "CharacterBody": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "about": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "About"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "CharacterBody",
+    "description": "What the owner writes: a name, words about the being, or both."
    },
    "CharacterRecipe": {
     "properties": {
@@ -44584,6 +44702,38 @@
     ],
     "title": "TakenSettingView",
     "description": "The named parts of a setting the made world stands in because the words asked for them."
+   },
+   "ThingCharacterBody": {
+    "properties": {
+     "base_revision": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Revision"
+     },
+     "character": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/CharacterBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_revision",
+     "character"
+    ],
+    "title": "ThingCharacterBody"
    },
    "ThingKindBody": {
     "properties": {

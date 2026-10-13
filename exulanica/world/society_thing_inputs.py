@@ -14,6 +14,13 @@ states how high above the ground's elevation it stands (``height_mm``); one on t
 none. A kind's semantics or run form rides in the input, so a stored society replays from its
 inputs alone and never reads the kind library or a workspace's store again.
 
+A placed being's entry may also carry who its world's owner wrote it to be (``character``: a
+``name``, words ``about`` it, or both, each one plain line within :data:`CHARACTER_NAME_MAXIMUM` and
+:data:`CHARACTER_ABOUT_MAXIMUM` characters), and only in the inputs of a society whose first input
+records the character module (:data:`CHARACTER_MODULE`): the composer adds the newest character of
+each placed being to such a society's inputs (:func:`with_characters`), and to no other society's,
+so a society made before the module reads its inputs as it always did.
+
 A society's first input, and no later one, records what its minutes run for its whole life:
 the ability modules (``modules``) and the movement modules that move its people
 (``movement_modules``), each by version. :func:`record_modules` writes both, and every composer of
@@ -34,6 +41,7 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any, Final
 
+from exulanica.things.lines import LineRefused, check_line
 from exulanica.world.objects import MAX_YAW_MICRORADIANS
 from exulanica.world.placed_things import PLACED_THING_ID_PATTERN
 from exulanica.world.society_kinds import (
@@ -44,17 +52,23 @@ from exulanica.world.society_kinds import (
 )
 
 __all__ = [
+    "CHARACTER_ABOUT_MAXIMUM",
+    "CHARACTER_FIELD",
+    "CHARACTER_MODULE",
+    "CHARACTER_NAME_MAXIMUM",
     "ENTRY_FIELDS",
     "MOVEMENT_MODULES_FIELD",
     "SEMANTIC_FIELDS",
     "THINGS_BOUND",
     "arrival_points",
+    "check_character",
     "input_things",
     "placed_beings",
     "placed_objects",
     "record_modules",
     "things_engine",
     "validate_input_things",
+    "with_characters",
 ]
 
 #: The fields of one placed thing as an input states it, and the one it states only off the ground.
@@ -62,6 +76,16 @@ ENTRY_FIELDS: Final = frozenset(
     {"placed_id", "kind", "position_mm", "yaw_microradians", "arrival_mm"}
 )
 OFF_GROUND_FIELD: Final = "height_mm"
+#: The field a placed being's entry states who its world's owner wrote it to be in, where its
+#: society records :data:`CHARACTER_MODULE`.
+CHARACTER_FIELD: Final = "character"
+#: The module whose societies carry, keep and show an owner-written character.
+CHARACTER_MODULE: Final = "exulanica-ability/character/v1"
+#: The most characters of a character's name and of the words about the being, as the line rule
+#: counts them: the bounds of its shape, which the module's own figures never exceed.
+CHARACTER_NAME_MAXIMUM: Final = 40
+CHARACTER_ABOUT_MAXIMUM: Final = 300
+_CHARACTER_PARTS: Final = ("about", "name")
 #: What a kind's semantics hold: its document without its looks, origin, summary and ``ext``, and
 #: its reference by key, version and digest.
 SEMANTIC_FIELDS: Final = frozenset(
@@ -139,6 +163,47 @@ def _check_kind(kind: Any) -> None:
         isinstance(offer, dict) and isinstance(offer.get("key"), str) for offer in kind["offers"]
     ):
         raise ValueError("a placed thing's kind states its offers")
+
+
+def check_character(value: object, *, name_maximum: int, about_maximum: int) -> dict[str, str]:
+    """``value`` as a character: a ``name``, words ``about`` the being, or both, each one plain
+    line (:func:`~exulanica.things.lines.check_line`) of at most ``name_maximum`` and
+    ``about_maximum`` characters, keyed in order; else ``ValueError`` saying what is wrong."""
+    if not isinstance(value, Mapping) or not value or not set(value) <= set(_CHARACTER_PARTS):
+        raise ValueError("a character holds a name, words about the being, or both")
+    for key, maximum in (("name", name_maximum), ("about", about_maximum)):
+        if key in value:
+            try:
+                check_line(value[key], maximum=maximum)
+            except LineRefused as exc:
+                raise ValueError(f"a character's {key}: {exc}") from exc
+    return {key: str(value[key]) for key in _CHARACTER_PARTS if key in value}
+
+
+def with_characters(
+    document: Mapping[str, Any], characters: Mapping[str, Mapping[str, str]]
+) -> dict[str, Any]:
+    """``document`` with each placed being's character from ``characters`` (by placed id) in its
+    entry, and none in any other entry, sealed again: what a society recording the character
+    module reads. Objects and gates never carry one."""
+    from exulanica.world.society_planner import input_sha256
+
+    sealed = {key: value for key, value in document.items() if key != "document_sha256"}
+    things = []
+    for entry in document.get("things", ()):
+        kept = {key: value for key, value in entry.items() if key != CHARACTER_FIELD}
+        character = characters.get(entry["placed_id"])
+        if character is not None and _class(entry) == "being":
+            kept[CHARACTER_FIELD] = check_character(
+                character,
+                name_maximum=CHARACTER_NAME_MAXIMUM,
+                about_maximum=CHARACTER_ABOUT_MAXIMUM,
+            )
+        things.append(kept)
+    if "things" in document:
+        sealed["things"] = things
+    sealed["document_sha256"] = input_sha256(sealed)
+    return sealed
 
 
 def things_engine() -> str:
@@ -235,7 +300,10 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
     names = []
     made: set[str] = set()
     for entry in things:
-        if not isinstance(entry, dict) or set(entry) - {OFF_GROUND_FIELD} != ENTRY_FIELDS:
+        if (
+            not isinstance(entry, dict)
+            or set(entry) - {OFF_GROUND_FIELD, CHARACTER_FIELD} != ENTRY_FIELDS
+        ):
             raise ValueError("invalid placed thing fields")
         if OFF_GROUND_FIELD in entry and (
             type(entry[OFF_GROUND_FIELD]) is not int
@@ -265,6 +333,14 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
             raise ValueError("a gate states where visitors arrive, and nothing else does")
         if _class(entry) == "being" and arrives:
             raise ValueError("a being is no gate")
+        if CHARACTER_FIELD in entry:
+            if _class(entry) != "being":
+                raise ValueError("only a placed being carries a character")
+            check_character(
+                entry[CHARACTER_FIELD],
+                name_maximum=CHARACTER_NAME_MAXIMUM,
+                about_maximum=CHARACTER_ABOUT_MAXIMUM,
+            )
         names.append(placed_id)
     if names != sorted(set(names)):
         raise ValueError("placed things must be unique and sorted")

@@ -56,6 +56,14 @@ simulation of that person. An explicitly authored fictional derivative has its o
 identity and derivation; generated dialogue, actions and history remain fictional. Synthetic people
 are never made to resemble a real person: no face recognition, and no likeness from photographs.
 
+Who a being is, beyond its body, comes from one place: a name and a few words its world's owner
+writes for a being they placed ([things contract](things-contract.md#who-a-placed-being-is)). It is
+fiction for whoever decides for the being, shown to that being's decider alone, quoted and never as
+instructions. It is never derived from photographs, a kind's description or a person, and a
+character carrying a name the account holder saved is refused. A character changes what a decider
+reads, not what the being is or how it is drawn; it establishes neither memory of a person nor a
+simulated personality of anyone real.
+
 ## Extensible asset and customization pipeline
 
 Character content is supplied by versioned asset catalogs and generator adapters. A catalog

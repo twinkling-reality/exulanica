@@ -706,6 +706,8 @@ PUBLISHED_REGISTRIES = {
     "decision-roles.v6.json": "032d55a2b260d8aeb5f17e73c771c649608ac9f62c8db86ac07a02d8c267ad57",
     "decision-roles.v7.json": "0caac20c8cab7e07d28115b72fc70e2bc8eaa5427b17be66e769da3885b04ca7",
     "decision-roles.v8.json": "2e2e53a8402db44d4974f7e69e73b0c4e5135c7895e43fcb7f859c3244c6a5a8",
+    "decision-roles.v9.json": "69228db40433e855d23caca3c65a84d7193e01196faefda04b939b24df5f2121",
+    "decision-roles.v10.json": "36144cb5efe68c11e5cf11c848bbef79c53fc91bc878a05e7837b6f3c33a0380",
 }
 
 
@@ -725,8 +727,15 @@ def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
     assert things.versions == {"society-decision-action": 8, "society-decision-policy": 8}
     assert (own.prompt_version, things.prompt_version) == (
         "society-person-choice/v1",
-        "society-person-choice/v6",
+        "society-person-choice/v7",
     )
+    # The sixth prompt, which every request made before the seventh records, stays readable with
+    # the same catalogs; the seventh speaks of a character and of past choices only where shown.
+    sixth = person.terms_with_prompt("society-person-choice/v6")
+    assert sixth is not None and sixth.versions == things.versions
+    assert "When you are told who the being is" in things.instruction
+    assert "When you are shown what the being chose lately" in things.instruction
+    assert "who the being is" not in sixth.instruction
     contract = person.contract(things.versions)
     assert {"carry_on", "say_to", "say_all", "leave"} <= set(contract.words)
     assert {"pick_up", "put_down", "give", "take"} <= set(contract.words)

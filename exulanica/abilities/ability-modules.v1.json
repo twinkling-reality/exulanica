@@ -245,6 +245,56 @@
       "reason": "What a being a model or a program decides for remembers: written last in each minute's things phase from that minute's events alone, never by a model, and kept bounded in its state; shown to its decider as what happened here, not instructions. A being the routine alone decides for keeps none."
     },
     {
+      "module": "exulanica-ability/remember/v2",
+      "abilities": [],
+      "parameters": [
+        {
+          "name": "beings_maximum",
+          "value": 8,
+          "minimum": 1,
+          "maximum": 16,
+          "unit": "beings",
+          "reason": "The most beings a being remembers meeting, each with how and the last line each said to the other; a new one replaces the one noted longest ago."
+        },
+        {
+          "name": "places_maximum",
+          "value": 8,
+          "minimum": 1,
+          "maximum": 16,
+          "unit": "places",
+          "reason": "The most places a being remembers arriving at; a new one replaces the one noted longest ago."
+        },
+        {
+          "name": "handed_maximum",
+          "value": 6,
+          "minimum": 1,
+          "maximum": 16,
+          "unit": "hand-overs",
+          "reason": "The most hand-overs a being remembers; a new one replaces the oldest."
+        },
+        {
+          "name": "choices_maximum",
+          "value": 6,
+          "minimum": 1,
+          "maximum": 16,
+          "unit": "choices",
+          "reason": "The most of its own recent decisions a being remembers, each with the minute, the option words it chose, what the minute did with the choice and what came of it; a new one replaces the oldest."
+        },
+        {
+          "name": "bytes_maximum",
+          "value": 2600,
+          "minimum": 512,
+          "maximum": 8000,
+          "unit": "bytes",
+          "reason": "The most bytes of canonical JSON the block a decider is shown takes, the entry noted longest ago dropped first, whether a being met, a place, a hand-over or a choice: the choices share the first version's budget, so a context grows by no byte for them."
+        }
+      ],
+      "events": [],
+      "status": "built",
+      "refusal": null,
+      "reason": "What a being a model or a program decides for remembers, as the first version keeps it, and also its own last few decisions: the minute, the option words it chose, whether the minute applied the choice, refused it as no longer possible, did not take it up, or had no answer, and what came of an applied choice, read from that minute's events and the being's state at its end until the being next stands at a choice point (the metres it walked, the place it reached, and what it said, began or handed). Written last in each minute's things phase, never by a model, kept bounded in its state, and shown to its decider as its own past choices, not instructions. Only new societies record it; the first version stays for every society that recorded it."
+    },
+    {
       "module": "exulanica-ability/purposeful/v2",
       "abilities": [
         "wait",
@@ -453,6 +503,32 @@
       "status": "built",
       "refusal": null,
       "reason": "The purposeful planner retains version 2's capability gates and reads each kind's wait, stand, talk, rest and visit weights for its autonomous choices. Missing weights are zero, and no weighted activity available means waiting. Both beings must prefer talk for a routine pairing. Tiredness still prefers reachable rest where the kind can rest; waiting still yields occupied places. Explicit owner and decider choices are not restricted by preference, and other abilities' weights remain unexecuted. Earlier module versions retain their recorded choices."
+    },
+    {
+      "module": "exulanica-ability/character/v1",
+      "abilities": [],
+      "parameters": [
+        {
+          "name": "name_characters_maximum",
+          "value": 40,
+          "minimum": 1,
+          "maximum": 40,
+          "unit": "characters",
+          "reason": "The most characters of the name a world's owner writes for a being they placed, as the line rule counts them: a name, never a passage."
+        },
+        {
+          "name": "about_characters_maximum",
+          "value": 300,
+          "minimum": 1,
+          "maximum": 300,
+          "unit": "characters",
+          "reason": "The most characters of what a world's owner writes about a being they placed, as the line rule counts them: a few sentences, so the block stays a small part of a request's context bound."
+        }
+      ],
+      "events": [],
+      "status": "built",
+      "refusal": null,
+      "reason": "Who a being its world's owner placed is, as the owner writes it beside the placed thing: a name, a few words about it, or both, held to the line rule and refused where it carries a name the account holder saved. A society that records it carries the newest character of each placed being in its inputs, copies it into the being's state, and shows it to that being's decider alone, quoted as fiction its owner wrote and never as instructions; every other being still calls it by what it is. It holds nothing a society derives and records no event. A society made before it shows no character."
     }
   ]
 }

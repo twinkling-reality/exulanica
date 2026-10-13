@@ -866,6 +866,7 @@ _WORLD_WRITES: Final = _every(
     "POST /world/versions/{version_id}/things/on-support",
     "POST /world/versions/{version_id}/things/on-support/preview",
     "POST /world/versions/{version_id}/things/undo",
+    "POST /world/versions/{version_id}/things/{thing_id}/character",
     "POST /world/versions/{version_id}/things/{thing_id}/move",
     "POST /world/versions/{version_id}/things/{thing_id}/remove",
     "POST /worlds/generated",

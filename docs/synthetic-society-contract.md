@@ -1138,8 +1138,10 @@ The erasure leaves a door grant, its revisions and its program's declaration, ma
 manifest, and the deliveries and gone notices keyed by the grant: the owner's configuration and the
 things carried out, with no society text. It leaves event ids in a world project item's
 references; the looks a minute recorded for visitors' arrivals (a world version's rows naming a
-thing id, a crossing id and a look digest, no text, as a visitor's departure leaves them); and every
-copy already sent to a hosted model provider or an outside program.
+thing id, a crossing id and a look digest, no text, as a visitor's departure leaves them); the
+characters the world's owner wrote for its placed beings, which are the world's records and not the
+society's (the world's erasure deletes them; a new society on the version carries them again); and
+every copy already sent to a hosted model provider or an outside program.
 
 A society made again on a version after its erasure has the erased society's identity, since a
 society's identity derives from its version alone. A restore from a backup taken after it was made
@@ -1947,14 +1949,31 @@ its author removes does. Code from before
 these fields refuses an input carrying one, so a society that has taken such a being in cannot be
 read by an older release.
 
+**A placed being's character.** In a society whose first input records the character module, the
+entry of a placed being whose owner wrote who it is also states it (`character`: `{name?, about?}`,
+each one plain line of at most 40 and 300 characters), composed from the newest record
+([things contract](things-contract.md#who-a-placed-being-is)); no other society's input states one,
+so its inputs keep their bytes, and an object's or a gate's entry never does. The things phase
+copies it into the placed being's state field `character` as the being arrives, and sets, changes
+or removes it whenever a later available input carries another or none; nothing is recorded as an
+event, since the input that carried it is the record. A populated or visiting being never keeps
+one. Code from before the field refuses an input carrying one. It is fiction the world's owner
+wrote, shown to that being's decider alone ([minds](minds-contract.md#who-a-being-is)); it is
+never derived from a photograph or a person, and inhabitants still never impersonate remembered
+people.
+
 **The modules it runs.** A society's first input records the ability modules it runs, by version
 (`modules`: sorted, each once, each a built row of
 [`ability-modules.v1.json`](../exulanica/abilities/ability-modules.v1.json)), and its minutes run
 exactly those for its whole life, whatever a later table adds; no later input states them. A new
 society records the default modules at their newest built versions: purposeful
 (`exulanica-ability/purposeful/v3`, below), say, crossing, hands (`exulanica-ability/hands/v2`,
-below), follow (`exulanica-ability/follow/v3`), notice (`exulanica-ability/notice/v1`) and memory (`exulanica-ability/remember/v1`), the
-last two as the [minds contract](minds-contract.md) states.
+below), follow (`exulanica-ability/follow/v3`), notice (`exulanica-ability/notice/v1`), memory
+(`exulanica-ability/remember/v2`, which also keeps a being's recent choices) and character
+(`exulanica-ability/character/v1`), the last three as the [minds contract](minds-contract.md)
+states. A society made before a module was built never runs it, so the first society of a world
+made before the character module never carries a character: a character its owner writes reaches
+a being only in the society of a new version, which a new version starts.
 A society whose first input names none, made before modules were
 recorded, runs purposeful, say and crossing (`BEFORE_RECORDED`), so its people never use their
 hands and its things never move, and records every minute as it did then: a line's event and its

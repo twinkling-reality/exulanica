@@ -254,7 +254,8 @@ def test_an_hour_of_the_routine_s_talks_and_arrivals_is_kept_as_it_happened():
             "times": len(ticks),
         }
     for being_id in minds:
-        validate_recollection(_person(state, being_id)["recollection"])
+        # A new society records the second memory version, which also keeps the being's choices.
+        validate_recollection(_person(state, being_id)["recollection"], choices=True)
 
 
 def test_a_hand_over_is_kept_by_both_beings_with_the_thing_and_who():
@@ -274,7 +275,12 @@ def test_a_hand_over_is_kept_by_both_beings_with_the_thing_and_who():
     after = hands._beside(after, other, there)
     giver = hands._knight(after)
     for being in (giver, other):
-        _person(after, being["id"])["recollection"] = {"met": [], "places": [], "handed": []}
+        _person(after, being["id"])["recollection"] = {
+            "met": [],
+            "places": [],
+            "handed": [],
+            "choices": [],
+        }
     options = choice_options(after, document, giver["id"], hands._contract(), seed=SEED)
     [give] = [o for o in options if o.kind == "give" and o.addressee_id == other["id"]]
     state, _events, _ = hands._minute(after, document, [hands._receipt(giver, give)])

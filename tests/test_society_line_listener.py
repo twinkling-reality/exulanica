@@ -80,7 +80,7 @@ def test_a_society_of_things_is_asked_under_its_newest_prompt_with_the_listener_
     person = decision_roles().role("society_decision")
     things = person.terms(THINGS_PROFILE)
     assert decision_roles().version >= 8
-    assert things.prompt_version == "society-person-choice/v6"
+    assert things.prompt_version == "society-person-choice/v7"
     assert things.line_rules == frozenset({"names_no_listener"}) <= LINE_RULES
     assert "without naming or describing them" in things.instruction
     assert "(the knight, a villager)" not in things.instruction

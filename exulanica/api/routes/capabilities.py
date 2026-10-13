@@ -704,6 +704,11 @@ NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
             "/world/versions/{version_id}/society/things/{thing_id}), which names the looks it "
             "may wear; its subject is a society's thing, which no version operation enumerates"
         ),
+        ("POST", "/world/versions/{version_id}/things/{thing_id}/character"): (
+            "written from the thing's card (GET /world/versions/{version_id}/society/things/"
+            "{thing_id}), which states the character and its revision; its subject is one placed "
+            "being, which no version operation enumerates"
+        ),
         ("POST", "/world/versions/{version_id}/society/play"): (
             "its subject is one being of a society of things, which no version operation "
             "enumerates; the being's card (GET /world/versions/{version_id}/society/things/"

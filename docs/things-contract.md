@@ -351,6 +351,11 @@ answers 424 `unavailable_society_input`, as the society read does. The card stat
   that no longer authorizes (one naming something withdrawn since) is left out, and the card says
   how many and why (`lines_left_out: {count, reason}`, stated only where some were): the society's
   own inputs decide whether it may be read at all, so one old line never refuses the whole card;
+- for a being its author placed, who its world's owner wrote it to be (`character`: the newest
+  record's `revision`, `character` and `written_at`, each null where nobody wrote one, and `shown`,
+  whether this society shows a character at all), read from the character table rather than the
+  society, whose next minute takes a new one in ([below](#who-a-placed-being-is)); null for anything
+  else;
 - the society's minute and state digest as the card was read (`society: {tick, state_sha256}`).
 
 `POST /world/versions/{version_id}/society/things/{thing_id}/look` (`world.write`) records the
@@ -368,6 +373,43 @@ for another body, or for another kind of object, `look_unfit`; nothing is writte
 dress any thing or being of the world, a visitor another program decides for included: a look is
 how this world draws it, never anything its program or its game reads, and the look its crossing
 brought stays recorded and listed, so the owner can choose it again.
+
+### Who a placed being is
+
+A world's owner may write who a being they placed is (`exulanica.thing-character/v1`): a `name` of
+1 to 40 characters, words `about` it of 1 to 300, or both, each one plain line under the
+[line rule](#lines), stored in Unicode normal form C. It is fiction the owner writes for whoever
+decides for the being, and the one way a being is given a temperament. Nothing derives one from a
+photograph, a kind's description or a person. A character carrying any name the account holder
+saved, of any kind, is refused, since no right releases a saved name to a decider
+([`thing_characters.py`](../exulanica/world/thing_characters.py)).
+
+`POST /world/versions/{version_id}/things/{thing_id}/character` (`world.write`) appends a record for
+the being placed under `thing_id`, the author's placed id as the move and remove routes take it,
+over the newest record the writer read: `{base_revision, character}`, `base_revision` null where it
+read none and `character` null to clear it. It answers the record (`profile`, `version_id`,
+`placed_id`, `revision`, `character`, `written_at`) and whether the version's society shows it
+(`society`: `runs_characters`, `began_before_characters`, or `none` while the version holds no
+society). It refuses by name, writing nothing: `character_changed` (409, with the newest
+`revision`) for a writer that read an older record, `no_change` (409) for one that says what the
+newest already says, `character_out_of_bounds` and `character_carries_a_saved_name` (422) for the
+text, `character_for_beings_only` (422) for an object, and 404 for a thing the version does not hold.
+
+Records are appended to `world_thing_character` (migration 0213) with the actor who wrote each and
+the record it replaced, never changed, and only the newest may be replaced: the database holds
+that too. A record belongs to one version, as a look choice does: a version branched or carried
+from it starts with none, and its owner writes the character there again. A world's erasure and its
+workspace's deletion delete every record.
+
+A society whose first input records the character module (`exulanica-ability/character/v1`, every
+society of things made since it was built) carries the newest character of each placed being in its
+inputs: writing one composes the society's next input in the same transaction (or answers 424
+`unavailable_society_input` and writes nothing where that input cannot be composed). The being keeps
+it in its state from the society's next minute, and its decider alone is shown it, quoted as
+fiction ([minds](minds-contract.md#who-a-being-is)). Every other being still calls it by what it
+is. A society made before the module, the first society of any existing world among them,
+carries, keeps and shows none: a character reaches such a being only in a new version's society,
+since a new version starts a new society.
 
 
 The looks this repository authors are recipe documents, profile `exulanica.look-recipe/v1`, under
@@ -1245,6 +1287,22 @@ from a speed its own stride sets (`full_walk_strides_per_second`), where a shipp
 its other chains at rest. Under reduced motion nothing waves, sways, nods or looks about; a wing
 stays folded and a legless body keeps the curve it lies in.
 
+The second version of the table,
+[`body-motion.v2.json`](../assets/catalogs/thing-presentation/body-motion.v2.json)
+(`exulanica.body-motion/v2`), keeps every figure of the first and adds postures: what a body is drawn
+in while its state says it is doing something. A society's action kind names the posture (rest is
+drawn settled, talk speaking, stand standing; any other activity stands). Settled lowers the hips by
+a stated share of how far the legs reach down, never further than every bending leg can keep its
+foot where it stands, and bows a head the plan names; speaking nods and opens the jaw on the beat of
+speech. A body settles into a posture and rises out of it over the table's blend, at once under
+reduced motion or after a move without walking. Postures are presentation only and change no
+recorded position, action or event.
+
+A body whose society's walking paces each kind (`exulanica-movement/walking/v2`) walks its own bound
+each minute, the society's bound times its kind's `pace_permille` over a thousand, as the engine's
+`tick_budgets` does, and walks at that bound over the minute's simulated seconds when nothing
+hurries it; any other body walks at the pace its figure states or the catalog person's.
+
 A kind that states its body's extent (`body.extent_mm`, as a drafted kind does) is drawn at that
 size on the ground. Its pick volume is its width by its length to its look's height, so the ring
 around a picked or played one takes its body in, and in a society's crowd it is picked over that
@@ -1473,8 +1531,10 @@ These are material limits of the boundary above, not partial behaviour:
   versions retain world-routine selection. A wait preference does not remove movement or rest
   capability, and tiredness and making room remain exceptions to ordinary waiting. A creature
   whose kind lists none of rest, visit, stand and talk waits where it is. A decider is told its
-  body, never a temperament: nothing drafts or carries one. In a society made before paces were
-  read, which moves every body at the people's pace, a small body's legs step as often as that
+  body; nothing drafts a temperament. Only the world's owner gives a being one, as the character
+  they write for a being they placed ([who a placed being is](#who-a-placed-being-is)), shown to
+  that being's decider alone in a society recording the character module. In a society made
+  before paces were read, which moves every body at the people's pace, a small body's legs step as often as that
   pace asks of its short stride, and a large body's seldom. A leg of one segment does not lift as it swings forward. A sketch is posed
   in full at any distance within the crowd's far radius; how many the page poses in a frame is not
   measured. Its owner may choose another admitted workspace look on its exact held body plan.
