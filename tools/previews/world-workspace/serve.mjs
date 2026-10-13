@@ -2,6 +2,7 @@ import { createServer, loadConfigFromFile } from '../../../web/packages/app/node
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { observerRequestGuard } from './observer-request-guard.mjs';
+import { patchSource } from './seams.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url)).replace(/\/$/, '');
 const here = fileURLToPath(new URL('.', import.meta.url)).replace(/\/$/, '');
@@ -21,30 +22,12 @@ process.env.VITE_EXULANICA_TOKEN = token;
 process.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY = observerOnly ? '1' : '0';
 process.env.EXULANICA_API_URL = api;
 const loaded = await loadConfigFromFile({ command: 'serve', mode: 'development' }, root + '/web/packages/app/vite.config.ts');
-const mountHook = 'void objects.begin(state.activeWorldEntry?.authoredVersionId);';
-const startHook = '    await mountNoWorld({ retry: () => start(token, csrfToken) });';
-const pickHook = '    const pickAlong = (';
 const plugin = {
   name: 'private-blank-world-workspace',
   enforce: 'pre',
+  // The edits and their seams live in seams.mjs, which the app's tests check against the sources.
   transform(code, id) {
-    if (id === root + '/web/packages/app/src/composition/environment-selection.ts') {
-      if (!code.includes(pickHook)) throw Error('Native read-only picker seam changed.');
-      return code.replace(pickHook, '    atlas.__workspacePick = pickedAlong;\n' + pickHook);
-    }
-    if (id !== root + '/web/packages/app/src/main.ts') return;
-    if (![mountHook, startHook, 'void environmentSelection.begin();'].every(seam => code.includes(seam))) throw Error('Native workspace seam changed.');
-    return `import { mountContextualWorld } from '/@fs/${here}/contextual-world.ts';\n` + code
-      .replace(startHook, `    const reviewEntryId = new URLSearchParams(location.search).get('entry');
-    if (reviewEntryId) {
-      const reviewEntry = state.savedWorldEntries.find(entry => entry.entryId === reviewEntryId);
-      if (reviewEntry) { await openWorldEntryContext(state, reviewEntry); state.worldEntryError = null; shell.removeAttribute('data-world-state'); await mount(); return; }
-      pendingEntryProblem = 'This saved world is no longer available. Choose a world here.';
-    }
-` + startHook)
-      .replace('void environmentSelection.begin();', 'await environmentSelection.begin();')
-      .replace(mountHook, `await objects.begin(state.activeWorldEntry?.authoredVersionId);
-      if (state.activeWorldEntry) await mountContextualWorld({state, renderer, selection: environmentSelection, objects});`);
+    return id.startsWith(root + '/') ? patchSource(id.slice(root.length + 1), code, here) : null;
   },
   configureServer(server) {
     if (observerOnly) server.middlewares.use('/api', observerRequestGuard);

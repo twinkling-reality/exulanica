@@ -82,7 +82,7 @@ describe('a recorded decision, explained', () => {
     expect(view.changed).toEqual([
       'Walked about 60 m along its recorded path (40 m in minute 4, 20 m in minute 5), ending about 42 m in a straight line from where it started.',
       'Arrived in minute 5.',
-      'In minute 5 it began the chosen activity (rest).',
+      'In minute 5 it began the chosen activity (resting).',
       'In minute 9 it finished resting.',
       'Its next applied decision was in minute 10.',
     ]);

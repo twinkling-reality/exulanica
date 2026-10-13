@@ -12,7 +12,8 @@
  */
 
 import type { PersonDecision, SocietyDecisionDetail } from '../society-models-api.js';
-import { DECISION_WORDS } from '../society-inhabitant-words.js';
+import { DECISION_WORDS, outcomeWords } from '../society-inhabitant-words.js';
+import { ACTION_LABELS, ACTIVITY_LABELS } from '../society-activity-words.js';
 
 
 /** One event of the society's history, as much of it as a record reads. */
@@ -158,15 +159,12 @@ function pathLength(path: readonly (readonly [number, number])[]): number {
   return total;
 }
 
-/** What finishing an action is called, by the event's outcome code, said of "it". */
-const FINISHED: Readonly<Record<string, string>> = {
-  rest_completed: 'finished resting',
-  stand_completed: 'finished standing a while',
-  visit_completed: 'finished visiting',
-  talk_completed: 'finished talking',
-  move_completed: 'finished walking',
-  idle_completed: 'finished waiting',
-};
+/**
+ * An activity or action code in the catalogs' words, or the code named as a code where the page
+ * has no words for it: never respelled.
+ */
+const activityWords = (code: string): string =>
+  ACTION_LABELS[code] ?? ACTIVITY_LABELS.get(code) ?? `an activity recorded as ${code}`;
 
 /**
  * What the being's own events record from the minute that applied a decision until the next
@@ -205,10 +203,10 @@ export function decisionChange(
   for (const event of window) {
     if (event.kind === 'route_progressed' && event.reason === 'arrived_at_access_node') lines.push(`Arrived in minute ${event.tick}.`);
     if (event.outcome === 'action_started') {
-      lines.push(`In minute ${event.tick} it began ${activity === null ? 'what it came to do' : `the chosen activity (${activity.replaceAll('_', ' ')})`}.`);
+      lines.push(`In minute ${event.tick} it began ${activity === null ? 'what it came to do' : `the chosen activity (${activityWords(activity)})`}.`);
     }
     if (event.kind === 'action_completed' && event.outcome !== null) {
-      lines.push(`In minute ${event.tick} it ${FINISHED[event.outcome] ?? event.outcome.replaceAll('_', ' ')}.`);
+      lines.push(`In minute ${event.tick} it ${outcomeWords(event.outcome) ?? `recorded an outcome this page has no words for (${event.outcome})`}.`);
     }
   }
   if (nextDecision !== undefined && start !== null) lines.push(`Its next applied decision was in minute ${nextDecision.tick}.`);
@@ -228,7 +226,7 @@ function told(context: Held): string[] {
   if (summary !== null) inputs.push(sentence(summary));
   const doing = held(context['doing']);
   const doingKind = words(doing?.['kind']);
-  if (doingKind !== null) inputs.push(`What it was doing: ${doingKind.replaceAll('_', ' ')}.`);
+  if (doingKind !== null) inputs.push(`What it was doing: ${activityWords(doingKind)}.`);
   if (context['under_way'] === true) inputs.push('An action was already under way.');
   const need = whole(context['need_milli']);
   const restAt = whole(context['rest_at_need_milli']);
