@@ -15172,6 +15172,98 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/world/versions/{version_id}/things/{thing_id}/character",
+    "method": "post",
+    "id": "thing_character_write_world_versions__version_id__things__thing_id__character_post",
+    "title": "The world's owner writes or clears who a placed being is; answers the record.",
+    "description": "",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "thing_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([a-z0-9:._-]{0,198}[a-z0-9])?$",
+          "title": "Thing Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/ThingCharacterBody"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/world/versions/{version_id}/things/on-support/preview",
     "method": "post",
     "id": "preview_supported_thing_world_versions__version_id__things_on_support_preview_post",
@@ -22665,7 +22757,7 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     "method": "get",
     "id": "read_kind_draft_worlds_kinds_drafts__draft_id__get",
     "title": "A kind's draft: drafting, ready with the kept kind, or refused by name.",
-    "description": "The draft's state; 404 ``kind_draft_unknown`` for an id this server does not hold for this\ncaller in this workspace (another person's draft reads so too), which a draft lost when the\nserver restarted reads as too.",
+    "description": "The requester's retained draft, including after another process takes over.",
     "group": "world",
     "permission": {
       "requires": [
@@ -22924,7 +23016,7 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     "method": "get",
     "id": "read_site_drawing_world_versions__version_id__site_get",
     "title": "A site world's drawing, for the world whose snapshot names its receipt.",
-    "description": "The drawing a site world's records make, generated again from the receipt the version's own\nsnapshot names, in the kind worker, and served with its digest as its entity tag. A drawing the\nworker does not finish in time, or cannot take, answers 503 ``kind_work_*`` with a\n``Retry-After``; a finished one is kept, so asking again reads it.",
+    "description": "Serve the version's exact drawing after worker/cache and final current-source checks.",
     "group": "world",
     "permission": {
       "requires": [
