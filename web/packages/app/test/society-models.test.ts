@@ -111,7 +111,7 @@ describe('reading who decides', () => {
     expect(choiceWords(view, 'ada')).toBe('Nemotron 3 Nano 30B, which you chose.');
     expect(choiceWords(view, 'grace')).toBe('Their own routine.');
     expect(latestDecisionWords(view.latest[0]!))
-      .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, and they did it.');
+      .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, and the world applied it.');
     expect(latestDecisionWords({ ...view.latest[0]!, disposition: 'rejected', dispositionReason: 'place_taken_this_minute' }))
       .toBe('At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, but someone else took that place first, so their routine decided.');
     expect(latestDecisionWords({ ...view.latest[0]!, status: 'unavailable', reason: 'model_timed_out', disposition: 'unavailable', chose: null }))
@@ -242,7 +242,7 @@ describe('the mounted section', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(mounted.personDetails('ada')).toEqual([
       ['Decided by', 'Nemotron 3 Nano 30B, which you chose.'],
-      ['Latest decision', 'At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, and they did it.'],
+      ['Latest decision', 'At simulated minute 7, Nemotron 3 Nano 30B chose “rest, 4 m away”, and the world applied it.'],
     ]);
     const box = mounted.root.querySelector<HTMLInputElement>('input[type=checkbox]')!;
     box.checked = true;

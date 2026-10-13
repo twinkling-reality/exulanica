@@ -354,7 +354,7 @@ describe('marks over the people of a saved world\'s society', () => {
       await refresh();
       expect(marks.decisions.length).toBe(2);
       expect(marks.decisions[1]!.subjectId).toBe('knight-0');
-      expect(marks.decisions[1]!.chose).toMatch(/^Not followed: .+\. Its routine decided\.$/u);
+      expect(marks.decisions[1]!.chose).toMatch(/^Not followed: .+\. Nothing was applied from it; no minute has taken it up yet\.$/u);
       mounted.dispose();
     } finally {
       latestDecisions = [];

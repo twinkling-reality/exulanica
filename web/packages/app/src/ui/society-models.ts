@@ -188,16 +188,23 @@ export function decisionWordsFor(view: SocietyModels, subjectId: string): string
 export function latestDecisionWords(decision: PersonDecision): string {
   const { name } = decision;
   // The routine decided in the decision's own minute when the model was not followed, however
-  // late its receipt was closed; a followed decision is told by the minute that took it up.
+  // late its receipt was closed, but only once a minute has taken it up: until then no minute has
+  // run without it, and an answer that never came is nobody's decision. A followed decision is
+  // told by the minute that took it up.
   const minute = `At simulated minute ${decision.status !== 'accepted' || decision.consumedTick === null
     ? decision.baseTick + 1
     : decision.consumedTick}`;
   if (decision.status !== 'accepted') {
+    if (decision.consumedTick === null) {
+      return `Asked at simulated minute ${decision.baseTick}, ${name} was not followed because ${decisionWords(decision.reason)}. `
+        + 'Nothing was applied from it; no minute has taken it up yet.';
+    }
     return `${minute}, their routine decided: ${name} was not followed because ${decisionWords(decision.reason)}.`;
   }
   const chose = `${name} chose “${decision.chose ?? 'an action'}”`;
-  if (decision.disposition === null) return `${chose}. They act on it at the next simulated minute.`;
-  if (decision.disposition === 'applied') return `${minute}, ${chose}, and they did it.`;
+  if (decision.disposition === null) return `${chose}. No minute has acted on it yet.`;
+  // Applied sets what they do next; any walking it causes is recorded by later minutes.
+  if (decision.disposition === 'applied') return `${minute}, ${chose}, and the world applied it.`;
   const why = decisionWords(decision.dispositionReason ?? decision.disposition);
   // A person's own request, or another decision, came first: neither is their routine.
   if (decision.disposition === 'superseded') return `${minute}, ${chose}, but ${why}, and that came first.`;
@@ -211,7 +218,11 @@ export function latestDecisionWords(decision: PersonDecision): string {
  * reason of its decider's. Where it was not acted on, the why is the minute's, by its code.
  */
 export function decisionLineWords(decision: PersonDecision): string | null {
-  if (decision.status !== 'accepted') return `Not followed: ${decisionWords(decision.reason)}. Its routine decided.`;
+  if (decision.status !== 'accepted') {
+    return decision.consumedTick === null
+      ? `Not followed: ${decisionWords(decision.reason)}. Nothing was applied from it; no minute has taken it up yet.`
+      : `Not followed: ${decisionWords(decision.reason)}. Its routine decided.`;
+  }
   if (decision.disposition === null) return null;
   const chose = `Chose “${decision.chose ?? 'an action'}”`;
   if (decision.disposition === 'applied') return `${chose}.`;

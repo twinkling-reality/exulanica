@@ -475,7 +475,7 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     const inspector = mounted.root.querySelector<HTMLElement>('.living-world-inspector')!;
     const details = [...inspector.querySelectorAll('dt')].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
     expect(details).toContainEqual(['Decided by', 'Nemotron 3 Nano 30B, which you chose.']);
-    expect(details).toContainEqual(['Latest decision', 'At simulated minute 1, Nemotron 3 Nano 30B chose “rest, 4 m away”, and they did it.']);
+    expect(details).toContainEqual(['Latest decision', 'At simulated minute 1, Nemotron 3 Nano 30B chose “rest, 4 m away”, and the world applied it.']);
     // Another surface's view of the selected person (the thing card) takes the top of Selected
     // when it can, given the inspector's words and who runs them; the inspector stays under it
     // with the person's controls and its record, which then reads "How we know".
