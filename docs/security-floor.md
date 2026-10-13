@@ -312,8 +312,9 @@ This is a development and deployment safety rail, described as one, and it is no
 the network's own limit. **A process-level allowlist is not a network-level one.** Egress is
 allowlisted for the model transport, the catalog preflight, Google sign-in and the reference
 sources, whose adapters send through the model transport narrowed to their one origin
-([reference notes](reference-notes-contract.md#3-the-boundary-on-every-outgoing-query)), and for
-nothing else:
+([reference notes](reference-notes-contract.md#3-the-boundary-on-every-outgoing-query)), the
+world project capture client (`exulanica/world_package/projects/capture.py`), held to the single
+World API origin its caller names, and for nothing else:
 
 - `exulanica/environment/nyc_open_data.py`, `exulanica/environment/owned_district.py` and
   `exulanica/evaluation/benchmark.py` open URLs with `urllib` and do not pass through it.

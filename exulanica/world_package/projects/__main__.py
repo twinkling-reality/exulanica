@@ -4,22 +4,33 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import signal
+import threading
+from datetime import UTC, datetime
 from pathlib import Path
 
+from exulanica.world_package.projects.capture import Capture, WorldReader, capture, read_token
 from exulanica.world_package.projects.checkpoint import (
     MAX_BYTES,
     Conflict,
     ProjectError,
     changes,
     decode,
+    evidence_digest,
     fork,
     inspect,
     playback,
+    pretty_evidence,
     read,
     save,
 )
 from exulanica.world_package.projects.github import GitHubProjects, Target
-from exulanica.world_package.projects.schema import Checkpoint, Source
+from exulanica.world_package.projects.repository import Author, Project, create, fork_project
+from exulanica.world_package.projects.schema import Checkpoint, Evidence, Source
+from exulanica.world_package.projects.watch import Policy, Watcher
+
+PROJECT_COMMANDS = ("create", "record", "changes", "reopen", "fork-project", "history", "watch")
 
 
 def parser() -> argparse.ArgumentParser:
@@ -50,7 +61,156 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("--repository", required=True)
     command.add_argument("--branch", required=True)
     command.add_argument("--output", type=Path, required=True)
+    commands.add_parser("evidence-schema", help="print the session evidence file's JSON schema")
+
+    # Project folders: plain local git repositories, no account and no remote.
+    for name in PROJECT_COMMANDS:
+        command = commands.add_parser(name)
+        command.add_argument("folder", type=Path)
+        if name in ("create", "record", "fork-project", "watch"):
+            command.add_argument("--author-name")
+            command.add_argument("--author-email")
+        if name in ("create", "record"):
+            command.add_argument("--from", dest="source", type=Path, required=name == "create")
+            command.add_argument("--evidence", type=Path, action="append", default=[])
+            command.add_argument("--dependencies", type=Path)
+            command.add_argument("--message")
+        if name == "changes":
+            command.add_argument("--from", dest="before", default="HEAD~1")
+            command.add_argument("--to", dest="after", default="HEAD")
+        if name == "fork-project":
+            command.add_argument("--to", dest="destination", type=Path, required=True)
+            command.add_argument("--project-id", required=True)
+        if name == "history":
+            command.add_argument("--limit", type=int, default=50)
+        if name == "watch":
+            _world_arguments(command)
+            command.add_argument("--poll-seconds", type=float, default=15.0)
+            command.add_argument("--settle-seconds", type=float, default=120.0)
+            command.add_argument("--max-pending-seconds", type=float, default=1800.0)
+            command.add_argument("--daily-cap", type=int, default=48)
+    command = commands.add_parser("capture", help="read a selection from a running world (GET)")
+    _world_arguments(command)
+    command.add_argument("--project-id", required=True)
+    command.add_argument("--output", type=Path, required=True)
+    command.add_argument("--session")
+    command.add_argument("--evidence-output", type=Path)
+    command.add_argument("--dependencies-output", type=Path)
     return root
+
+
+def _world_arguments(command: argparse.ArgumentParser) -> None:
+    command.add_argument("--api", required=True, help="http://localhost:PORT or an https origin")
+    command.add_argument("--token-file", type=Path, required=True)
+    command.add_argument("--world", required=True)
+    command.add_argument("--version", required=True)
+    command.add_argument("--thing", action="append", required=True)
+    command.add_argument("--readable", action="store_true")
+
+
+def _author(args: argparse.Namespace) -> Author | None:
+    if args.author_name is None and args.author_email is None:
+        return None  # The user's own git identity applies.
+    return Author(args.author_name or "", args.author_email or "")
+
+
+def _json_file(path: Path) -> object:
+    if path.is_symlink() or not path.is_file():
+        raise ProjectError("input must be a regular file")
+    with path.open("rb") as stream:
+        return decode(stream.read(MAX_BYTES + 1))
+
+
+def _local_dependencies(folder: Path | None) -> dict[str, bytes]:
+    found: dict[str, bytes] = {}
+    if folder is None:
+        return found
+    for path in folder.iterdir():
+        if len(path.name) == 64 and path.is_file() and not path.is_symlink():
+            with path.open("rb") as stream:
+                found[path.name] = stream.read(MAX_BYTES + 1)
+    return found
+
+
+def _reader(args: argparse.Namespace) -> WorldReader:
+    return WorldReader(args.api, read_token(args.token_file), args.world)
+
+
+def _capture(
+    args: argparse.Namespace, reader: WorldReader, project_id: str, session: str | None
+) -> Capture:
+    return capture(
+        reader,
+        version_id=args.version,
+        project_id=project_id,
+        thing_ids=args.thing,
+        readable=args.readable,
+        session_id=session,
+    )
+
+
+def project_command(args: argparse.Namespace) -> dict[str, object]:
+    if args.command == "capture":
+        with _reader(args) as reader:
+            result = _capture(args, reader, args.project_id, args.session)
+        saved = {"checkpoint_sha256": save(args.output, result.checkpoint)}
+        if result.evidence is not None:
+            if args.evidence_output is None:
+                raise ProjectError("a session capture needs --evidence-output")
+            descriptor = os.open(args.evidence_output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(pretty_evidence(result.evidence))
+            saved["evidence_sha256"] = evidence_digest(result.evidence)
+        if args.dependencies_output is not None:
+            args.dependencies_output.mkdir(mode=0o700, exist_ok=True)
+            for sha, data in result.dependencies.items():
+                (args.dependencies_output / sha).write_bytes(data)
+        return {**saved, "report": result.report, "published": False}
+    if args.command == "create":
+        return create(
+            args.folder,
+            _json_file(args.source),
+            author=_author(args),
+            message=args.message,
+            dependencies=_local_dependencies(args.dependencies),
+            evidence=[_json_file(path) for path in args.evidence],
+        )
+    project = Project(args.folder, author=_author(args) if "author_name" in args else None)
+    if args.command == "record":
+        return project.save(
+            None if args.source is None else _json_file(args.source),
+            evidence=[_json_file(path) for path in args.evidence],
+            message=args.message,
+            dependencies=_local_dependencies(args.dependencies),
+        )
+    if args.command == "changes":
+        return project.compare(args.before, args.after)
+    if args.command == "reopen":
+        return project.reopen()
+    if args.command == "history":
+        return project.timeline(args.limit)
+    if args.command == "fork-project":
+        return fork_project(args.folder, args.destination, args.project_id, author=_author(args))
+    # watch: a session per run, recorded locally only.
+    policy = Policy(
+        poll_seconds=args.poll_seconds,
+        settle_seconds=args.settle_seconds,
+        max_pending_seconds=args.max_pending_seconds,
+        daily_cap=args.daily_cap,
+    )
+    project_id = project.at("HEAD")["project_id"]
+    session = "session:" + datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    stop = threading.Event()
+    signal.signal(signal.SIGINT, lambda *_: stop.set())
+    signal.signal(signal.SIGTERM, lambda *_: stop.set())
+    with _reader(args) as reader:
+        watcher = Watcher(project, lambda: _capture(args, reader, project_id, session), policy)
+        final = watcher.run(stop, lambda outcome: print(json.dumps(_brief(outcome)), flush=True))
+    return {"session_id": session, "final": _brief(final)}
+
+
+def _brief(outcome: dict[str, object]) -> dict[str, object]:
+    return {k: v for k, v in outcome.items() if k != "diff"}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -58,6 +218,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "schema":
             print(json.dumps(Checkpoint.model_json_schema(), indent=2, sort_keys=True))
+            return 0
+        if args.command == "evidence-schema":
+            print(json.dumps(Evidence.model_json_schema(), indent=2, sort_keys=True))
+            return 0
+        if args.command in (*PROJECT_COMMANDS, "capture"):
+            print(json.dumps(project_command(args), indent=2, sort_keys=True))
             return 0
         if args.command == "diff":
             print(changes(read(args.before), read(args.after)), end="")

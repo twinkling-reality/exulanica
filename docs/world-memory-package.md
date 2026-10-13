@@ -696,10 +696,11 @@ claimed, and whether anyone would license such a dataset is not established.
 ## Editable repository checkpoints
 
 The separate `exulanica.world-project/v1` profile carries a reviewed selection of authored
-things, model bindings and decision summaries in `world-project.json`. It changes no WMP profile
-or signature guarantee. `uv run python -m exulanica.world_package.projects schema` prints its closed JSON
-schema. The adapter is an offline project-data workflow; it does not install a runnable world.
-The connected learning journey remains a requirement in
+things and model bindings in `world-project.json`. Decision evidence lives beside it in session
+files of the sibling profile `exulanica.world-project-evidence/v1`. Neither changes any WMP
+profile or signature guarantee. `uv run python -m exulanica.world_package.projects schema` and
+`... evidence-schema` print the closed JSON schemas. The adapter keeps project data; it does not
+install a runnable world. The connected learning journey remains a requirement in
 [product direction](product-direction.md#repository-backed-learning-and-development).
 
 ### Selection and provenance
@@ -732,47 +733,111 @@ semantics, transitive rendering dependencies and source-use authorization are no
 `dependencies_ready` describes the declared dependencies only; `runtime_loadable`,
 `source_binding_verified` and `model_availability_verified` remain false.
 
-Selected decision summaries bind to their selected model assignment and source-record digest.
-They carry an observation digest, offered action/target identifiers, the chosen option, recorded
-applied/refused/not-applied outcome, reason code, elapsed time and token counts when supplied.
-They carry neither observation text nor prompts, private conversations, raw logs, hidden model
-reasoning or model weights. `playback` orders these summaries without provider calls. It reports
-`source_records_verified: false` and `engine_replay_verified: false`: this is evidence playback,
-not the native engine's verified deterministic replay. An editable summary cannot prove the
-source record was authentic. Inference reruns are not implemented by this adapter.
+Every string in a checkpoint or evidence file is also scanned by value. A value shaped like a
+local filesystem path or a credential (token prefixes, bearer values, private key headers) is
+refused, naming the field and never echoing the value. The scan reduces accidental inclusion; it
+cannot recognize every private identifier placed in an otherwise valid field.
 
-### Local save, reopen and review
+### Decision evidence
+
+A decision record binds to a model assignment by the digest of that binding and to its source
+record by digest. It carries an observation digest, offered action/target identifiers, the chosen
+option, the recorded applied/refused/not-applied outcome, reason code, elapsed time and token
+counts when supplied. An optional `readable` addition carries what the source record itself
+stores, made readable: the situation text rebuilt from the record's own context, the offered
+labels, the choice and spoken line, receipt status and reason, the minute the society consumed it
+and its disposition, the served model and recorded cost with `cost_known`. Leaving `readable` out
+keeps a record's digest unchanged. No record carries system instructions, raw provider bodies,
+hidden model reasoning, private conversations, raw logs or model weights.
+
+An evidence file holds one session's records with the model assignments they were made under, so
+a record stays bound after the checkpoint's assignment changes. Each file has its own digest,
+separate from the checkpoint's; evidence is what happened, never part of the world definition. A
+file holds at most 1024 records; `watch` continues a longer session in numbered files.
+`playback` orders the checkpoint's and the session files' records without provider calls. It
+reports `source_records_verified: false` and `engine_replay_verified: false`: this is evidence
+playback, not the native engine's verified deterministic replay. An editable record cannot prove
+the source record was authentic. Inference reruns are not implemented by this adapter.
+
+### Project folders
+
+A project is a plain local git repository: `world-project.json`, `evidence/<session>.json` and
+optional `dependencies/<sha256>` files. No account, remote or hook is involved. Every git call
+names the folder's own `.git` directory with environment overrides removed, so it cannot reach an
+enclosing checkout; a folder with a remote is refused.
 
 ```sh
-uv run python -m exulanica.world_package.projects save selected.json --output checkpoint.json
-uv run python -m exulanica.world_package.projects inspect checkpoint.json --dependencies ./dependency-by-digest
-uv run python -m exulanica.world_package.projects diff checkpoint.json edited.json
-uv run python -m exulanica.world_package.projects fork checkpoint.json --project-id project:my-fork --output fork.json
-uv run python -m exulanica.world_package.projects playback checkpoint.json
+uv run python -m exulanica.world_package.projects create ./my-project --from selected.json
+uv run python -m exulanica.world_package.projects record ./my-project --from edited.json --evidence session.json
+uv run python -m exulanica.world_package.projects changes ./my-project --from HEAD~1
+uv run python -m exulanica.world_package.projects history ./my-project
+uv run python -m exulanica.world_package.projects reopen ./my-project
+uv run python -m exulanica.world_package.projects fork-project ./my-project --to ./my-fork --project-id project:my-fork
 ```
 
-Local save creates a new file with private permissions and refuses an existing destination.
-Reopening validates the closed profile; duplicate JSON keys, floats, unknown fields, symlink
-checkpoint files and oversized documents are refused. The maximum file size is 2 MiB. Stable
-sorting and Exulanica canonical JSON give unchanged selections the same digest. A fork creates
-a distinct project ID and records its parent project and checkpoint digest while preserving
-source lineage. It does not remap runtime identities or create a GitHub repository.
+`record` commits only when the selected world or its evidence differs from the last commit; an
+unchanged selection makes no commit, however long the world ran. Without `--from` it records the
+folder's edited files. Commit messages are one line without an em dash or attribution trailer;
+when none is given, the message is drawn from the plain-word summary. Evidence files are
+append-only: a saved record cannot be changed or removed.
 
-`inspect --expected-source source.json` compares all source fields with a separately supplied
-base and refuses a mismatch. Missing dependency bytes, corrupt bytes and unsupported bindings
-are reported separately; unresolved dependencies produce exit status 2. No command applies
-checkpoint edits to live state. A future live importer must repeat authorization, source validity,
-identity mapping, dependency and optimistic-concurrency checks through existing world writers.
-Local base comparison does not replace those checks.
+Every comparison reports world changes and evidence apart, in plain words, with the raw field
+diff underneath: "moved the knight 2 m east", "assigned a model to the knight", "recorded 3 more
+decision records from session S". `history` returns the read model a history panel uses: pending
+world changes and pending evidence, the session files with record counts, digests and warnings,
+and checkpoints newest first with their summaries. `reopen` validates the last commit offline,
+reports missing, corrupt and unsupported dependencies, uncommitted edits, and a labelled warning
+for a session file of another project or one made under assignments no longer current. It
+installs nothing and reports `installed: false`. A fork is a new folder and project identity
+whose checkpoint records its parent project and checkpoint digest; the parent's evidence stays
+with the parent.
+
+The file-level commands from the first version remain: `save` writes a new private checkpoint
+file and refuses an existing destination, `diff` compares two files, `inspect` checks
+dependencies against `--dependencies` and `--expected-source`, `fork` writes a forked file and
+`playback` lists records. Reopening refuses duplicate JSON keys, floats, unknown fields, symlinks
+and documents over 2 MiB. No command applies checkpoint edits to live state. A future live
+importer must repeat authorization, source validity, identity mapping, dependency and
+optimistic-concurrency checks through existing world writers.
+
+### Capture and automatic tracking
+
+`capture` reads one version of a running world through the World API with GET requests only and
+builds the selection: the named placed things, each one's current model assignment, and the model
+decisions the society consumed for them, mapped back to placed things through the society's
+subject identity, at most the latest 256 consumed records per capture. `--session` puts the
+decisions in an evidence file; `--readable` adds the readable records. The bearer is read from a file into memory and sent only in the request header.
+Every request passes through the egress check held to the one origin the caller names
+([security floor](security-floor.md)); plain http is accepted only for `localhost`, and redirects
+are not followed. Errors name the route and status, never a value. Capture writes nothing to the
+world, reports `state_digest_verified: false` because the version view cannot recompute the
+native digest, and leaves source snapshot bytes as a missing dependency.
+
+```sh
+uv run python -m exulanica.world_package.projects capture --api http://localhost:PORT --token-file TOKEN --world WORLD --version VERSION --thing THING --project-id project:mine --session session:one --readable --output checkpoint.json --evidence-output session.json
+uv run python -m exulanica.world_package.projects watch ./my-project --api http://localhost:PORT --token-file TOKEN --world WORLD --version VERSION --thing THING
+```
+
+`watch` keeps a project's history without a save button. It captures at a bounded interval
+(5 to 300 seconds, default 15) into one evidence session per run and writes pending changes to
+the folder so they are visible before they are recorded. It records a checkpoint once the
+selection has stayed the same for a settle period (default 120 seconds), after a change has been
+pending for a maximum time (default 30 minutes, since evidence grows while models play), and
+once when stopped. Edits that cancel out before then record nothing. Each capture is merged into
+the session's saved and pending records, so a record the capture window no longer returns is kept,
+and a session past 1024 records continues as `session:S:2`, `session:S:3` and so on. A daily cap (default 48)
+holds further changes pending. An unreachable world is reported and retried. The watcher writes
+only the local project folder, never the world and never a remote.
 
 ### GitHub transport
 
 The transport uses the user's authenticated GitHub CLI, an explicitly supplied repository and an
 existing branch. It reads or writes only the root `world-project.json`; it never scans a working
 directory, stages files, executes repository code or infers a destination from the source checkout.
-Publication supports repositories personally owned by the authenticated CLI user with write
-permission. Organization ownership, repository creation, branch creation and whole-repository
-forking are outside this profile. Fetch may read an accessible repository without write permission.
+Evidence files and dependency files are not published by it. Publication supports repositories
+personally owned by the authenticated CLI user with write permission. Organization ownership,
+repository creation, branch creation, pull requests and whole-repository forking are outside this
+transport. Fetch may read an accessible repository without write permission.
 
 ```sh
 uv run python -m exulanica.world_package.projects fetch --repository OWNER/REPOSITORY --branch BRANCH --output reopened.json
@@ -790,14 +855,14 @@ A failed or timed-out request is not automatically retried because its outcome m
 read the branch again before preparing a new review. The transport uses
 [`gh api` structured input](https://cli.github.com/manual/gh_api), never shell interpolation.
 
-Review every selected value and its publication rights before publishing. The closed schema and
-WMP prohibited-field scan reduce accidental inclusion; they cannot recognize every secret or
-private identifier placed into an otherwise valid field. Selected identifiers and evidence digests
-can still be private. Local saves, GitHub access and native world permissions are separate.
-Publication cannot recall copies already fetched by others.
+Review every selected value and its publication rights before publishing. Selected identifiers
+and evidence digests can still be private. Local saves, GitHub access and native world
+permissions are separate. Publication cannot recall copies already fetched by others.
 
-Synthetic tests cover native selection, local editing/reopening/forking, dependency failures,
-base conflicts, evidence playback, review binding and concurrent publication refusal through a
-fake GitHub server. They do not establish hosted publication, live-world restoration, real model
-behavior, verified engine replay, or educational/portfolio value. The latter requires a learner
-completing the connected task and explaining a behavior change from authentic execution evidence.
+Synthetic tests cover native selection, project folders, append-only evidence, plain-word
+summaries, capture against a fake World API, automatic tracking with a fake clock, dependency
+failures, base conflicts, evidence playback, review binding and concurrent publication refusal
+through a fake GitHub server. They do not establish hosted publication, live-world restoration,
+real model behavior, verified engine replay, or educational/portfolio value. The latter requires
+a learner completing the connected task and explaining a behavior change from authentic
+execution evidence.

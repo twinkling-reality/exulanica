@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping, Sequence
 from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -19,6 +21,30 @@ from exulanica.world_package.package import scan_payload
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Name = Annotated[str, Field(min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9:._/-]+$")]
 Natural = Annotated[int, Field(ge=0)]
+Label = Annotated[str, Field(min_length=1, max_length=500)]
+
+# Values that would publish where a file lives on someone's machine or a credential. Field names
+# are checked by the WMP scan; these are checked by value, in every string of a project file.
+_PRIVATE_VALUE = re.compile(
+    r"(?i)(?:^|[\s\"'=(,])(?:/(?:users|home|private|var|tmp|etc|root|volumes|opt|mnt)/|~/"
+    r"|[a-z]:\\|file:)"
+    r"|\.exulanica/"
+    r"|\bgh[pousr]_[a-z0-9]{20,}|\bgithub_pat_[a-z0-9_]{20,}"
+    r"|\bsk-[a-z0-9_-]{16,}|\bxox[abprs]-[a-z0-9-]{10,}|\bakia[0-9a-z]{16}\b"
+    r"|\bbearer\s+[a-z0-9._~+/-]{16,}|-----begin [a-z ]*private key-----"
+)
+
+
+def scan_values(value: Any, where: str = "") -> None:
+    """Refuse a local path or credential-shaped value, naming the field and never the value."""
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            scan_values(child, f"{where}/{key}")
+    elif isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray):
+        for index, child in enumerate(value):
+            scan_values(child, f"{where}/{index}")
+    elif isinstance(value, str) and _PRIVATE_VALUE.search(value):
+        raise ValueError(f"{where or '/'} looks like a local path or a credential")
 
 
 class Closed(BaseModel):
@@ -110,6 +136,32 @@ class Option(Closed):
     target_id: Name | None
 
 
+class Readable(Closed):
+    """What a source decision record itself stores, made readable. Opt-in at capture.
+
+    The situation is the text the model was shown, rebuilt from the record's own context;
+    labels, choice and line are as recorded. Nothing comes from outside the record.
+    """
+
+    situation: Annotated[str, Field(max_length=20_000)]
+    options: Annotated[list[Label], Field(min_length=1, max_length=256)]
+    choice: Label | None
+    line: Annotated[str, Field(max_length=2_000)] | None
+    status: Literal["accepted", "rejected", "unavailable", "stale"]
+    reason: Name
+    consumed_tick: Natural
+    disposition: Name
+    served_model_id: Name | None
+    cost_usd: Annotated[str, Field(pattern=r"^[0-9]{1,6}(\.[0-9]{1,12})?$")] | None
+    cost_known: bool
+
+    @model_validator(mode="after")
+    def chosen(self) -> Self:
+        if self.choice is not None and self.choice not in self.options:
+            raise ValueError("a readable choice must be one of its offered labels")
+        return self
+
+
 class Decision(Closed):
     """Selected evidence, not a prompt, hidden reasoning, or executable engine receipt."""
 
@@ -126,6 +178,8 @@ class Decision(Closed):
     elapsed_ms: Natural | None
     input_tokens: Natural | None
     output_tokens: Natural | None
+    # Optional, so a checkpoint without it keeps its digest (see checkpoint.document).
+    readable: Readable | None = None
 
     @model_validator(mode="after")
     def choice(self) -> Self:
@@ -136,6 +190,8 @@ class Decision(Closed):
             raise ValueError("decision choice must be among its recorded options")
         if self.outcome == "applied" and self.chosen_option_id is None:
             raise ValueError("applied evidence requires a recorded choice")
+        if self.readable is not None and len(self.readable.options) != len(self.options):
+            raise ValueError("readable labels must match the recorded options one for one")
         return self
 
 
@@ -193,6 +249,45 @@ class Checkpoint(Closed):
         document = self.model_dump()
         canonical_json(document)
         scan_payload("world-project.json", document)
+        scan_values(document)
+        return self
+
+
+def binding_sha256(binding: ModelBinding) -> str:
+    from exulanica.canonical import sha256_of_canonical
+
+    return sha256_of_canonical(binding.model_dump()).hex()
+
+
+class Evidence(Closed):
+    """One session's decision records, kept beside the checkpoint rather than inside it.
+
+    Evidence is what happened while models played; it is not part of the world definition. Each
+    record binds to a model assignment carried in this same file, so it stays verifiable after
+    the checkpoint's assignment changes. A file has its own digest.
+    """
+
+    profile: Literal["exulanica.world-project-evidence/v1"]
+    project_id: Name
+    session_id: Name
+    source: Source
+    models: Annotated[list[ModelBinding], Field(min_length=1, max_length=256)]
+    decisions: Annotated[list[Decision], Field(min_length=1, max_length=1024)]
+
+    @model_validator(mode="after")
+    def references(self) -> Self:
+        validate_object_id(self.project_id)
+        validate_object_id(self.session_id)
+        unique([d.record_id for d in self.decisions], "decision")
+        bindings = [binding_sha256(model) for model in self.models]
+        unique(bindings, "model assignment")
+        for decision in self.decisions:
+            if decision.binding_sha256 not in bindings:
+                raise ValueError("evidence must match a model assignment in the same file")
+        document = self.model_dump()
+        canonical_json(document)
+        scan_payload("evidence.json", document)
+        scan_values(document)
         return self
 
 

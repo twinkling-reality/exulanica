@@ -409,6 +409,7 @@ def test_the_catalog_fetch_is_held_to_the_allowlist_too(monkeypatch, sockets):
 COVERED_NETWORK_MODULES = {
     "exulanica/models/transport.py",
     "exulanica/api/account_runtime.py",
+    "exulanica/world_package/projects/capture.py",
 }
 
 #: Modules that reach the network without the allowlist. docs/security-floor.md names them as

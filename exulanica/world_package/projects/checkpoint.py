@@ -16,7 +16,13 @@ from exulanica.canonical import canonical_json
 from exulanica.errors import ExulanicaError
 from exulanica.things.kinds import read_thing_kind, shipped_thing_kinds
 from exulanica.world.decision_roles import decision_roles
-from exulanica.world_package.projects.schema import Checkpoint, ShippedKind, Source
+from exulanica.world_package.projects.schema import (
+    Checkpoint,
+    Evidence,
+    ShippedKind,
+    Source,
+    binding_sha256,
+)
 
 MAX_BYTES = 2 * 1024 * 1024
 
@@ -78,7 +84,64 @@ def document(value: Any) -> dict[str, Any]:
         ("decisions", "record_id"),
     ):
         result[section].sort(key=lambda item: item[key])
+    _drop_absent_readable(result["decisions"])
     return result
+
+
+def _drop_absent_readable(decisions: list[dict[str, Any]]) -> None:
+    # The readable record is an optional addition: leaving it out must not change a digest.
+    for decision in decisions:
+        if decision.get("readable") is None:
+            decision.pop("readable", None)
+
+
+def validate_evidence(value: Any) -> Evidence:
+    try:
+        raw = value.model_dump() if isinstance(value, Evidence) else value
+        model = Evidence.model_validate(raw)
+        if len(canonical_json(model.model_dump())) > MAX_BYTES:
+            raise ProjectError("evidence file exceeds the 2 MiB limit")
+        return model
+    except (ValidationError, ValueError, ExulanicaError) as exc:
+        raise ProjectError("evidence violates its closed schema") from exc
+
+
+def evidence_document(value: Any) -> dict[str, Any]:
+    result = validate_evidence(value).model_dump()
+    result["models"].sort(key=lambda item: item["thing_id"] + "\x00" + item["model_id"])
+    result["decisions"].sort(key=lambda item: (item["tick"], item["record_id"]))
+    _drop_absent_readable(result["decisions"])
+    return result
+
+
+def evidence_digest(value: Any) -> str:
+    """A session file's own digest, separate from the checkpoint's."""
+    return digest(canonical_json(evidence_document(value)))
+
+
+def pretty_evidence(value: Any) -> bytes:
+    data = (
+        json.dumps(evidence_document(value), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    ).encode()
+    if len(data) > MAX_BYTES:
+        raise ProjectError("formatted evidence exceeds the 2 MiB limit")
+    return data
+
+
+def evidence_warnings(checkpoint: Any, sessions: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Labelled warnings for session files that no longer fit the checkpoint; none is dropped."""
+    project = validate(checkpoint)
+    current = {binding_sha256(model) for model in project.models}
+    warnings = []
+    for name, value in sorted(sessions.items()):
+        evidence = validate_evidence(value)
+        if evidence.project_id != project.project_id:
+            warnings.append({"session": name, "warning": "belongs to another project"})
+        elif not current & {binding_sha256(model) for model in evidence.models}:
+            warnings.append(
+                {"session": name, "warning": "made under model assignments no longer current"}
+            )
+    return warnings
 
 
 def checkpoint_digest(value: Any) -> str:
@@ -227,20 +290,17 @@ def inspect(
     }
 
 
-def playback(value: Any) -> dict[str, Any]:
-    """Return selected records in order. This is not deterministic simulation replay."""
+def playback(value: Any, sessions: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Return selected records in order, then each session file's. Not simulation replay."""
     project = validate(value)
+    records = document(project)["decisions"]
+    for _, session in sorted((sessions or {}).items()):
+        records.extend(evidence_document(session)["decisions"])
     return {
         "mode": "selected-evidence-playback",
         "checkpoint_sha256": checkpoint_digest(value),
         "provider_calls": 0,
         "engine_replay_verified": False,
         "source_records_verified": False,
-        "records": [
-            d.model_dump()
-            for d in sorted(
-                project.decisions,
-                key=lambda d: (d.tick, d.record_id),
-            )
-        ],
+        "records": sorted(records, key=lambda d: (d["tick"], d["record_id"])),
     }
