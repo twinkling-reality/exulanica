@@ -376,9 +376,9 @@ def test_deleting_a_source_item_deletes_its_copies_in_other_worlds(api, world):
 
 
 def test_a_workspace_tombstone_deletes_every_project_and_takes_no_new_one(api, world):
-    w, project_id = world["world_id"], world["project"]["project_id"]
+    w = world["world_id"]
     phrase = _secret("workspace")
-    item = _add(api, world, text=phrase)
+    _add(api, world, text=phrase)
     connection = api.repository.connection
     set_workspace(connection, api.workspace_id)
     tombstone = connection.execute(
@@ -386,24 +386,17 @@ def test_a_workspace_tombstone_deletes_every_project_and_takes_no_new_one(api, w
         "values (%s, 'workspace', %s, 'test') returning tombstone_id, effective_at",
         (api.workspace_id, api.owner),
     ).fetchone()
-    project = connection.execute(
-        "select title, withdrawn_at, withdrawn_by from world_project where project_id=%s",
-        (project_id,),
-    ).fetchone()
-    assert project == {
-        "title": None,
-        "withdrawn_at": tombstone["effective_at"],
-        "withdrawn_by": tombstone["tombstone_id"],
-    }
-    _erased(api, item["item_id"])
-    reason = connection.execute(
-        "select withdrawn_reason::text as r, withdrawn_by from world_project_item where item_id=%s",
-        (item["item_id"],),
-    ).fetchone()
-    assert reason == {"r": "workspace_deleted", "withdrawn_by": tombstone["tombstone_id"]}
+    for table in _PROJECT_TABLES:
+        assert connection.execute(f"select 1 from {table}").fetchall() == []
+    assert (
+        connection.execute(
+            "select tombstone_id, effective_at from tombstone where tombstone_id=%s",
+            (tombstone["tombstone_id"],),
+        ).fetchone()
+        == tombstone
+    )
     assert _spelled(api, phrase) == []
-    # The deletion invalidated every version's source too, so the route answers that first; the
-    # database's own guard is the wall behind it, for any path that reaches the table.
+    # Whole-world erasure removes the source identity; a direct insert remains forbidden too.
     refused = api.call(
         "POST",
         "/world/projects",
@@ -411,7 +404,7 @@ def test_a_workspace_tombstone_deletes_every_project_and_takes_no_new_one(api, w
         world=w,
         json={"title": "after", "version_id": world["project"]["binding"]["version_id"]},
     )
-    assert (refused.status_code, refused.json()["code"]) == (409, "invalidated_source_version")
+    assert (refused.status_code, refused.json()["code"]) == (404, "unknown_reference")
     refusal = pytest.raises(psycopg.errors.IntegrityConstraintViolation, match=TOMBSTONE_REFUSAL)
     with refusal, connection.transaction():
         connection.execute(

@@ -1485,6 +1485,48 @@
         "doing": "Nothing is recorded about what they are doing.",
         "why": ""
       }
+    },
+    {
+      "case": "routine_wait is deliberate waiting",
+      "person": {
+        "display_name": null,
+        "role": null,
+        "goal": null,
+        "action": {
+          "kind": "idle",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "routine_wait"
+        }
+      },
+      "expected": {
+        "who": "Someone",
+        "what": "A simulated inhabitant, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Waiting.",
+        "why": "Because their routine chose to wait."
+      }
+    },
+    {
+      "case": "no_weighted_activity is deliberate waiting",
+      "person": {
+        "display_name": null,
+        "role": null,
+        "goal": null,
+        "action": {
+          "kind": "idle",
+          "status": "active",
+          "target_id": null,
+          "remaining_ticks": 0,
+          "reason": "no_weighted_activity"
+        }
+      },
+      "expected": {
+        "who": "Someone",
+        "what": "A simulated inhabitant, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Waiting.",
+        "why": "Because their routine has no preferred activity available here."
+      }
     }
   ]
 }

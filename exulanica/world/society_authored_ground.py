@@ -1162,6 +1162,7 @@ def _things_one_by_one(
     ground: SocietyGround,
     version_id: uuid.UUID,
     height_above: Callable[[PlacedThing], int | None] | None = None,
+    omitted_support_ids: frozenset[str] = frozenset(),
 ) -> tuple[list[_UsableObject], list[Obstacle], list[dict[str, Any]]]:
     """Every placed object's obstacle and activity, decided for that thing alone.
 
@@ -1178,7 +1179,7 @@ def _things_one_by_one(
     obstacles: list[Obstacle] = []
     records: list[dict[str, Any]] = []
     for thing in things:
-        if thing.removed:
+        if thing.removed or thing.thing_id in omitted_support_ids:
             continue
         semantics = _semantics(kinds[thing.thing_id])
         if semantics["class"] != "object":
@@ -1241,6 +1242,7 @@ def _input_things(
     kinds: Mapping[str, ThingKind | MadeKind],
     ground: SocietyGround,
     height_above: Callable[[PlacedThing], int | None] | None = None,
+    omitted_support_ids: frozenset[str] = frozenset(),
 ) -> list[dict[str, Any]]:
     """The things list a v5 input states (:mod:`exulanica.world.society_thing_inputs`): a thing
     off the ground states its height above the ground's elevation, or above the surface under it
@@ -1248,7 +1250,7 @@ def _input_things(
     height = _height_above_plane(ground) if height_above is None else height_above
     entries = []
     for thing in things:
-        if thing.removed:
+        if thing.removed or thing.thing_id in omitted_support_ids:
             continue
         kind = kinds[thing.thing_id]
         semantics = _semantics(kind)
@@ -1265,6 +1267,88 @@ def _input_things(
             entry["height_mm"] = above
         entries.append(entry)
     return entries
+
+
+def supported_things_projection(
+    version: AlternateVersion,
+    ground: SocietyGround,
+    kinds: Mapping[str, Any],
+    source: Any,
+) -> tuple[frozenset[str], list[dict[str, Any]], str | None]:
+    """A closed input may omit only freshly proven disjoint objects with a real activity record.
+
+    The source and all current occupancy are checked on each projection. An absent/unknown or
+    overlapping source is unavailable, never a lost obstacle disguised as an available input.
+    """
+    from exulanica.world.placed_things import ThingPlacement
+    from exulanica.world.support_placement import (
+        PlacementContext,
+        SupportPlacementRefused,
+        validate_supported_placement,
+    )
+    from exulanica.world.support_placement_source import SupportPlacementSource, occupancy
+
+    bound = [
+        t
+        for t in version.things
+        if t.support is not None and not t.removed and t.region_id == ground.region_id
+    ]
+    if not bound:
+        return frozenset(), [], None
+    if (
+        not isinstance(source, SupportPlacementSource)
+        or source.world_id != version.world_id
+        or source.source_snapshot_id != version.source_snapshot_id
+        or source.region_id != ground.region_id
+    ):
+        return frozenset(), [], "supported_thing_source_unavailable"
+    omitted, records = set(), []
+    for thing in bound:
+        assert thing.support is not None
+        kind = kinds.get(thing.thing_id)
+        if not isinstance(kind, ThingKind):
+            return frozenset(), [], "supported_thing_kind_unavailable"
+        solids, unknown = occupancy(version, source, kinds, exclude_thing_id=thing.thing_id)
+        context = PlacementContext(
+            version.world_id,
+            version.version_id,
+            version.source_snapshot_id,
+            source.receipt_sha256,
+            version.state_sha256,
+            source.region_id,
+            source.network,
+            solids,
+            unknown,
+            source.actor_volumes,
+        )
+        try:
+            validate_supported_placement(
+                ThingPlacement(
+                    thing.thing_id, thing.kind, thing.region_id, thing.transform, thing.origin
+                ),
+                kind,
+                thing.support.document(),
+                context=context,
+            )
+        except SupportPlacementRefused:
+            return frozenset(), [], "supported_thing_clearance_unavailable"
+        offered = {offer["key"] for offer in kind.document["offers"]}
+        found = next(
+            ((key, activity) for key, activity in thing_activities() if key in offered), None
+        )
+        if found is None or _height_above_plane(ground)(thing) is None:
+            # The closed input has no truthful generic unsupported-thing record. Do not invent
+            # a rest/visit offer or label a ground-supported thing as off the ground plane.
+            return frozenset(), [], "supported_thing_projection_unavailable"
+        _, activity = found
+        item = _PlacedUse(thing.thing_id, thing.transform)
+        records.append(
+            _refused_activity(
+                version.version_id, item, {"affordance": activity}, OFF_GROUND, "thing"
+            )
+        )
+        omitted.add(thing.thing_id)
+    return frozenset(omitted), records, None
 
 
 def thing_dependency_refs(
@@ -1470,6 +1554,11 @@ def _authored_ground_input(
         )
     )
     placed = things_in_region(version, ground, made_kinds) if things else []
+    if any(
+        t.support is not None and not t.removed and t.region_id == ground.region_id
+        for t in version.things
+    ):
+        reason = reason or "supported_thing_source_unavailable"
     thing_kinds, thing_refusal = _thing_kinds(placed, made_kinds)
     refs.extend(thing_dependency_refs(version.version_id, placed, thing_kinds))
 

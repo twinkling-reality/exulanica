@@ -20,9 +20,12 @@ when it creates a society (:func:`society_population`), and making a society adm
 the cost of their minute on the host that makes it (:func:`admit_people_by_cost`); nothing else
 states them.
 
-A stored input records the navigation profile, the spacing and the area it was composed with, so
-replay never reads this catalog. A different figure for a ground is therefore a new entry with a
-new navigation profile, and an input names which one it was composed under.
+A stored input records the navigation profile, the spacing and the area it was composed with, and
+the population it gives, so replay never reads this catalog. A different lattice spacing or
+declared area for a ground is therefore a new entry with a new navigation profile, and an input
+names which one it was composed under. How many people a ground admits is not part of that: an
+input records its own population, so a catalog version may change what a ground admits (the sixth
+states no head count for a town) under the navigation profile it had.
 
 A composer or navigation profile the catalog does not state is refused by name, never read as one
 it resembles. Pure: no connection and no store. The catalog is read once per process.
@@ -362,8 +365,16 @@ def _entry_check_v6(where: str, values: Mapping[str, Any]) -> None:
             f"and the share of a host's slowest minute a society may take, 1 to {_WHOLE_MILLI} "
             "thousandths"
         )
-    # Every engine a society over a world's own walking surfaces is made with states its points,
-    # so an engine added to the table is measured before a town can be made with it.
+
+
+def _measures_the_engines_of_the_day(ground: SocietyGroundKind) -> None:
+    """Hold a ground that admits by cost to the engine table this host reads: every engine a
+    society over a world's own walking surfaces is made with states its points, so an engine
+    added to the table is measured before a town can be made with it. Asked of the catalog
+    version this host reads and of no released one: a released catalog is a document of its day
+    and stays readable whatever the engine table later states."""
+    if not ground.minute_cost:
+        return
     made_with = {
         engine.engine
         for engine in ENGINES
@@ -372,11 +383,11 @@ def _entry_check_v6(where: str, values: Mapping[str, Any]) -> None:
         and engine.takes_inputs
         and engine.state_family in WALKING_SURFACES_BY_FAMILY
     }
-    measured = {engine["engine"] for engine in cost}
+    measured = {cost.engine for cost in ground.minute_cost}
     if measured != made_with:
         raise CatalogError(
-            f"{where}: minute_cost states the engines a town's society is made with, "
-            f"{sorted(made_with)}, not {sorted(measured)}"
+            f"{CATALOG_ID} entry {ground.key}: minute_cost states the engines a town's society "
+            f"is made with, {sorted(made_with)}, not {sorted(measured)}"
         )
 
 
@@ -464,6 +475,9 @@ def load_society_grounds(
         for entry in catalog.entries
         for values in (dict(entry.values),)
     )
+    if version == CATALOG_VERSION:
+        for ground in grounds:
+            _measures_the_engines_of_the_day(ground)
     composers = [ground.composer_key for ground in grounds]
     if len(set(composers)) != len(composers):
         raise CatalogError(f"{CATALOG_ID}: two grounds name the same composer_key")

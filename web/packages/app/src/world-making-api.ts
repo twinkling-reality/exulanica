@@ -15,7 +15,7 @@
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
 import { parseEntry, type SavedWorldEntry } from './world-entry-api.js';
 
-export type WorldMakingState = 'choosing' | 'drafting' | 'making' | 'ready' | 'refused';
+export type WorldMakingState = 'queued' | 'choosing' | 'drafting' | 'making' | 'ready' | 'refused';
 
 /** One part of the world that was made, in the document's own words. */
 export interface MadePart {
@@ -53,6 +53,9 @@ export interface WorldMakingRefusal {
 
 export interface WorldMakingDraft {
   readonly draftId: string;
+  readonly requestId: string | null;
+  readonly operation: WorldDraftOperation | null;
+  readonly recovered: boolean;
   readonly state: WorldMakingState;
   /** The words, while the draft runs; a draft that ended keeps none. */
   readonly description: string;
@@ -74,8 +77,29 @@ export interface WorldMakingDraft {
   readonly refusals: readonly { readonly code: string; readonly meaning: string }[];
 }
 
+/** Exact sealed server quote, forwarded without rounding or rebuilding its economic terms. */
+export interface WorldDraftOperation {
+  readonly maximumUsd: string;
+  readonly expiresAt: number;
+  readonly document: Readonly<Record<string, unknown>>;
+}
+
+export interface WorldMakingStart {
+  readonly idempotencyKey: string;
+  readonly operation: WorldDraftOperation;
+  readonly maximumUsd: string;
+}
+
+/** Page-session state only. Private words survive solely while exact POST recovery needs them. */
+export interface WorldMakingMemory {
+  pending: { readonly kind: 'sending'; readonly description: string; readonly submission: WorldMakingStart | null }
+    | { readonly kind: 'following'; readonly draftId: string; readonly requestId: string | null } | null;
+}
+const memories = new WeakMap<object, WorldMakingMemory>();
+
 /** What starting a draft would meet, read before a word is typed (`GET /worlds/drafts`). */
 export interface WorldDraftOffer {
+  readonly operation: WorldDraftOperation | null;
   readonly offered: boolean;
   /** Why not, where a start would be refused now; `detail` says it in a sentence. */
   readonly code: string | null;
@@ -93,7 +117,7 @@ export interface WorldDraftOffer {
 
 type Json = Readonly<Record<string, unknown>>;
 
-const STATES: readonly WorldMakingState[] = ['choosing', 'drafting', 'making', 'ready', 'refused'];
+const STATES: readonly WorldMakingState[] = ['queued', 'choosing', 'drafting', 'making', 'ready', 'refused'];
 
 function fail(what: string): never {
   throw new TypeError(`The server returned an invalid ${what}.`);
@@ -130,6 +154,29 @@ function maybeText(value: unknown, what: string): string | null {
   return value === null || value === undefined ? null : text(value, what);
 }
 
+function operation(value: unknown): WorldDraftOperation | null {
+  if (value === null || value === undefined) return null;
+  const held = object(value, 'world draft operation');
+  const maximum = text(held['maximum_usd'], 'reservation ceiling');
+  const expires = Date.parse(text(held['expires_at'], 'operation expiry'));
+  const readAt = Date.parse(text(held['read_at'], 'operation date'));
+  if (held['profile'] !== 'exulanica.world-draft-operation/v1'
+    || held['basis'] !== 'full_context_reservation_ceiling' || held['estimate_is_expected_spend'] !== false
+    || !/^[0-9]{1,6}(\.[0-9]{1,8})?$/.test(maximum)
+    || Number(maximum) <= 0 || !Number.isFinite(expires) || !Number.isFinite(readAt) || expires <= readAt || expires > readAt + 60_000
+    || !/^[a-f0-9]{64}$/.test(text(held['document_sha256'], 'operation digest'))) fail('world draft operation');
+  // Clone the complete quote; sending it later must not depend on a caller mutating the response.
+  const freeze = (node: unknown): unknown => {
+    if (node !== null && typeof node === 'object') {
+      for (const child of Object.values(node)) freeze(child);
+      Object.freeze(node);
+    }
+    return node;
+  };
+  return Object.freeze({ maximumUsd: maximum, expiresAt: expires,
+    document: freeze(JSON.parse(JSON.stringify(held))) as Json });
+}
+
 export function parseWorldDraftOffer(raw: unknown): WorldDraftOffer {
   const held = object(raw, 'draft offer');
   if (typeof held['offered'] !== 'boolean') fail('draft offer');
@@ -143,6 +190,7 @@ export function parseWorldDraftOffer(raw: unknown): WorldDraftOffer {
   if (calls < 1 || characters < 1) fail('draft offer');
   return Object.freeze({
     offered: held['offered'],
+    operation: operation(held['operation']),
     code,
     detail: maybeText(held['detail'], 'draft offer detail'),
     callsAtMost: calls,
@@ -197,8 +245,13 @@ export function parseWorldMakingDraft(raw: unknown): WorldMakingDraft {
   if (state === 'ready' && entry === null) fail('made world');
   if (state === 'refused' && refusal === null) fail('draft refusal');
   const poll = held['poll_after_seconds'];
+  const recovered = held['recovered'] === undefined ? false : held['recovered'];
+  if (typeof recovered !== 'boolean') fail('recovered draft');
   return Object.freeze({
     draftId: text(held['draft_id'], 'draft id'),
+    requestId: maybeText(held['request_id'], 'request id'),
+    operation: operation(held['operation']),
+    recovered,
     state,
     description: text(held['description'], 'draft description'),
     elapsedSeconds: whole(held['elapsed_seconds'], 'draft elapsed seconds'),
@@ -234,9 +287,12 @@ export function parseWorldMakingDraft(raw: unknown): WorldMakingDraft {
 
 export class WorldMakingClient {
   readonly #transport: Transport;
+  readonly memory: WorldMakingMemory;
 
   constructor(options: TransportOptions) {
     this.#transport = new Transport(options);
+    this.memory = memories.get(options) ?? { pending: null };
+    memories.set(options, this.memory);
   }
 
   /** What starting a draft would meet now, and what one may spend. */
@@ -245,8 +301,14 @@ export class WorldMakingClient {
   }
 
   /** Start making a world from `description`; answers at once with the draft to follow. */
-  async start(description: string): Promise<WorldMakingDraft> {
-    return parseWorldMakingDraft(await this.#transport.postJson<unknown>('/worlds/drafts', { description }));
+  async start(description: string, submission?: WorldMakingStart): Promise<WorldMakingDraft> {
+    const body = submission === undefined ? { description } : {
+      description, idempotency_key: submission.idempotencyKey,
+      operation: submission.operation.document, maximum_usd: submission.maximumUsd,
+    };
+    const answer = parseWorldMakingDraft(await this.#transport.postJson<unknown>('/worlds/drafts', body));
+    if (submission !== undefined && answer.requestId !== submission.idempotencyKey) fail('world draft request identity');
+    return answer;
   }
 
   async read(draftId: string): Promise<WorldMakingDraft> {

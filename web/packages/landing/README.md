@@ -1,204 +1,201 @@
 # @exulanica/landing
 
-The public Exulanica title, Purpose, Capabilities, Research, and Waitlist surfaces. This package
-is deliberately not an Atlas shell. It contains no application state, Companion runtime, formation
-replay, graph client, or renderer.
+The public Exulanica website and documentation.
+This package owns the signed-out landing experience. Product scope and delivery order live in
+[product direction](../../../docs/product-direction.md).
 
-The waitlist is the only thing on the page that makes a network request, and only on submit. Every
-other surface is static.
+## Run and build
+
+From the repository root, with workspace dependencies installed:
 
 ```bash
 pnpm --dir web landing
 pnpm --dir web landing:build
 ```
 
-`DEPLOYING.md` records where the public site is hosted, the value each build-time variable is set to
-there, and the check to run before deploying. Neither variable below reaches the bundle from a file
-in `src/`, so this README describes what they mean and that file records what they are.
+[DEPLOYING.md](DEPLOYING.md) owns hosting configuration and deployment checks.
+The Vite production preview serves built Markdown exports as plain text, matching the published
+`public/_headers` rules so View Markdown and Download Markdown retain their distinct behavior.
 
-## Canonical Atlas handoff
+## Navigation and invitation
 
-The title's **Enter Exulanica** link opens the single application composition root in
-`@exulanica/app`.
-The destination is deployment-owned:
+The home page places a short product description inside two counter-rotating loops of circular image planes viewed in perspective.
+Twelve featured forms use application captures: three town configurations, each in Cozy town,
+Finished town, and Toon town, plus Apartment District, Loft Quarter, and Shophouse Quarter. Their
+receipts, creation values, appearance bindings, and image hashes live in `public/worlds/sources.json`
+on the rows marked featured. `node scripts/generate-world-catalog.mjs` validates the image bytes
+and derives the display catalog from those records. Names come from saved-world titles. Appearance
+comes from the captured style title. The captures show generated towns. They are not evidence that
+a model invented the town. There is no separately authored preview description.
+
+Hover, keyboard focus and tap replace the center invitation with the world's name and appearance.
+The center retains the invitation's type scale. Escape, an outside press, or tapping the selected
+world again restores the invitation. The underlined entry link carries recipe, configuration and
+exact appearance to the application's creation form for review; following it does not create a
+world. Without an application destination, the link opens installation instructions.
+
+Product, Use Cases and Documentation have independent
+landing links and adjacent colored-marker menu controls. Their shaped gradient menus open on mouse
+hover or marker activation. Arrow Down enters the links, Escape restores focus, and modified clicks
+retain browser behavior. Each dropdown has one reactive companion. Use Cases links to distinct project
+categories: Worldbuilding, Agent Experiments and Agent Development. Documentation links directly to guides and interfaces.
+The GitHub and Twinkling Reality utility icons remain independent links.
+
+The homepage invitation opens the configured application, or Installation when no destination is
+configured. The homepage is a single viewport containing the orbit, central description and application
+invitation. Product information and guides live on their own pages. Product explains the world, model decisions, recorded history and integrations through Overview and Capabilities. Use Cases connects those features to concrete projects. Documentation owns setup and operating instructions.
+
+Navigation and category headings use noun-based labels in Title Case. A use-case page heading matches its navigation label; action links use verbs. Body copy uses sentence case. Product and Use Cases share layout and image treatment through `feature-pages.css`, and ambient motion through `ui/ambient-field.ts`. Site colors and typography inherit the theme and reading tokens. Dropdowns share panel padding,
+row height and gaps; section-specific rules supply palette, shape and horizontal anchoring.
+The site does not publish a blog index. `JOURNAL` in `src/content/journal.ts` is empty, and
+`/blog`, `/research`, `/journal`, and `/roadmap` redirect to `/product#purpose`. Former article
+paths listed in `src/router.ts` redirect there as well. Do not invent publication dates, results,
+or endorsements.
+
+Public paths that render a page are `/`, `/product`, `/product/capabilities`, `/use-cases` and its
+category pages, and the documentation routes from `src/ui/docs/catalog.ts`.
+The endpoint catalog generates operation navigation, routes, search entries and Markdown exports.
+Old API section URLs redirect to their corresponding operation pages.
+About redirects to `/product#purpose`, and its model, comparison, and source anchors go to the
+capabilities page. Worlds redirects to `/product/capabilities#configurations`. Developers redirects
+to `/docs`. `/waitlist` and `/site-information` redirect to Installation (`/docs/self-hosting`) and
+to `/product#purpose` respectively. Query context survives redirects. Legacy world recipe paths
+retain their configured application handoff. Unknown paths show a missing-page message. Hidden
+surfaces are inert.
+
+The [interface system](../../../docs/interface-system.md#public-reading-and-controls) owns the
+public design rules. `reading-system.css` supplies semantic reading roles and shared control,
+page-action and disclosure treatments. Font stacks come from presentation's `--ui-font-brand` and
+`--ui-font-code`; reading motion aliases the navigation timing and shared quick duration.
+Use existing tokens before adding a component value. Keep layout rules in `documentation.css`
+and search layout in `documentation-search.css`; remove superseded declarations when revising a
+component. Do not append a corrective style layer.
+
+Use the shared `action` helper for public secondary destinations. Documentation's `routeLink`
+delegates to it; paging uses the same helper with a directional arrow. The visible label names the
+destination once. Previous and Next remain in accessible names and `rel` attributes. Inline prose
+links retain their underline. Primary application entry keeps its existing treatment.
+
+The secondary action has a 30px face with 4px corners inside a 44px target. Compact controls share
+presentation's 13px `--ui-text-compact` and 44px `--ui-control-target`; light hover and press reuse
+`--ui-light-action-hover` and `--ui-light-action-pressed`. Documentation utilities use 8px corners,
+content/code/table frames use 12px and search uses 16px. Small metadata tags use capsules; reading
+rows use 4px corners. Tags identify real categories, HTTP methods and response status. Do not add
+Guide, API or Source labels to ordinary destinations. Rails use ink and weight for selection, search
+uses a neutral selection wash, and reading surfaces follow the public light/dark preference.
+
+Copy and export actions pair text with small functional icons. Desktop menu rows use 36px
+targets; mobile rows retain 44px. Menu focus stays inset within each row. Search and disclosure icons communicate function and inherit
+ink and accessible names from their controls. All standalone controls have 44px targets and
+visible focus. Native disclosures preserve their semantics. Menus, disclosure content and request
+panels have brief state-driven reveals; reduced motion removes them. `ui/copy-feedback.ts` binds
+page and code copy feedback to clipboard completion, including pending and failure states. Code
+uses one inset surface in the selected scheme, with aligned label/text edges and a 44px toolbar.
+Copy reuses the secondary action with a quiet face at rest; its glyph and label confirm success.
+The live success message is visually hidden to avoid repeating that confirmation. Failure guidance
+stays visible in its own row without covering the example. Request tabs use stronger selected text
+and a fine lower rule, sharing the copy toolbar's target and hover proportions. Decorative tags are excluded from search text and Markdown labels.
+
+Pages share the navigation's outer gutter. Text shares its heading's left edge; documentation
+retains separate navigation and section rails. The orbit and shaped menus own the
+abstract visual identity, while inner pages use actual application imagery and text.
+
+Documentation follows four responsibilities: Getting Started, Worlds, Models and Agents, and
+Developer Tools. World structure, creation, assets, rules, model decisions and comparisons have
+focused guides. Content inputs sit within world-building workflows. Future mechanisms are described
+at their contract boundary without presenting them as installed operations.
+
+The shell uses the shared white canvas and IBM Plex typography, with a navigation rail, constrained
+article measure, page outline and sidebar search. Navigation and outlines become native disclosures
+on narrow screens. Search remains available above those disclosures. Page copying uses a split control with Markdown viewing
+and download actions in its keyboard-accessible dropdown. Documentation adds no second site header or
+site footer. Search opens a shared modal dialog with suggested guides, ranked section and API results,
+matching text and an explicit empty state. Arrow keys select results while focus stays in the search
+field; Enter opens the selection and Escape closes the dialog and restores launcher focus.
+Command/Ctrl K opens search on the active documentation page.
+
+`src/ui/docs/catalog.ts` owns guide membership, grouping, labels, descriptions, routes and reading
+order. Each content builder identifies its technical source in `sourcePath`. Builders supply the
+browser article, section search, copied Markdown and published exports; commands and examples must
+not be maintained in a separate Markdown copy. `documentation-contracts.test.ts` checks every internal
+document link, section target, source path, route and export, and the complete API operation inventory.
+Guide pagination and API example pagination remain separate. Moved section addresses redirect to
+their owners. The production build emits route-specific HTML metadata and a sitemap; page content
+is rendered by the browser.
+
+## Application destination
+
+World preview links open the canonical application in `@exulanica/app`. Its destination belongs
+to the deployment and has no development default:
 
 ```bash
 VITE_ATLAS_URL=https://atlas.example.com pnpm --dir web landing:build
 ```
 
-`VITE_ATLAS_URL` may also be a same-origin path such as `/atlas`. A production build without this
-value does not guess a domain and does not show the station at all: the waitlist leads the column
-instead. See **One way in** below.
-
-There is no development default. An earlier build defaulted to `http://127.0.0.1:5173/?preview=1`,
-which put an Enter Exulanica station on every local title screen whether or not anything served
-that port, and led nowhere when nothing did. Ask for the handoff by name instead:
+A same-origin path such as `/atlas` is also supported. An absent or invalid value sends world previews to the
+documentation. The homepage invitation opens the configured application, or the installation guide when no application is configured. A local development handoff can be configured explicitly:
 
 ```bash
 VITE_ATLAS_URL='http://127.0.0.1:5175/?preview=1' pnpm --dir web landing
 ```
 
-The preview query is only honored by the app's Vite development server. A production app build
-does not accept it.
+The application's preview query is honored only by its development server.
 
-## Waitlist endpoint
+## Access information
 
-The page holds no list. A deployment supplies the endpoint, exactly as it supplies the Atlas
-destination:
+The site has no email collection form, signup request or provider endpoint. Existing `/waitlist`
+bookmarks redirect to `/docs/self-hosting`. `/site-information` redirects to Product’s purpose section.
+
+## Artwork and motion
+
+The daylight palette is green `#cefa96`, yellow `#f4ff91` and blue `#c6e1ff` on a near-white
+`#fcfdf9` canvas. Bundled IBM Plex Sans provides display and reading type; IBM Plex Mono is reserved
+for code and small utility text. No remote fonts, images or rendering dependencies are required.
+
+The loops use a shared perspective projection for the rendered circles and native world buttons.
+Forms maintain equal angular spacing and travel in opposite directions over an 84-second period.
+A small WebGL surface renders the image planes across the full page. Nearby forms join the actual
+viewport boundary, with chromatic dispersion and softened sampling limited to their outer edges
+and connecting neck. There is no invisible inner clipping boundary. Worlds far from the viewport
+edge stay crisp. The shader and projection use no rendering framework.
+Hover or keyboard focus on a selectable world pauses the loops. Three smaller abstract forms remain
+decorative. The nine world controls keep equal angular spacing on the outer track. The selected
+world's text appears in the open center on desktop and mobile. There is no pointer-tracking camera.
+Page changes cross-fade without moving text. Reduced motion holds a static composition and suppresses
+spatial reveal and hover travel. Rendering pauses while hidden or on another route. If WebGL is
+unavailable, tilted native forms retain the world controls without the optical effect. Forced colors
+uses native controls instead of the rendered surface.
+The reusable vector forms module remains available independently but is not mounted by the site.
+
+## Package boundary and verification
+
+The only workspace dependency is `@exulanica/presentation`, used for shared CSS tokens.
+The landing bundle excludes the application renderer, world-style registry, formation replay,
+graph client and Companion runtime. Dependency rules and the production sourcemap test cover
+that boundary. No application state is constructed to render the public introduction.
 
 ```bash
-VITE_WAITLIST_URL=https://forms.example/f/abc pnpm --dir web landing:build
+pnpm --dir web typecheck
+pnpm --dir web boundaries
+pnpm --dir web exec vitest run packages/landing
+pnpm --dir web landing:build
 ```
 
-The submitted body is `email=<address>`, sent as `application/x-www-form-urlencoded`, which is what
-a hosted form endpoint accepts by default and which the fetch specification counts as a simple
-request, so no CORS preflight is issued. A provider wanting JSON needs `encode` in
-`src/ui/waitlist.ts` changed and nothing else. The endpoint must answer with a 2xx status and an
-`Access-Control-Allow-Origin` header that admits the deployed site, or the surface reports that the
-address did not send and hands the field back with the address still in it.
+Browser review should cover desktop and narrow layouts, menu keyboard behavior, page routes and legacy hash
+navigation, the configured application destination and the absence of email collection. Unit tests
+cover routing transitions, artwork invariants, disclosure behavior, documentation search and access information;
+they do not establish visual quality or verify a deployed application.
 
-**A build without `VITE_WAITLIST_URL` shows the line and a shut field, and says nothing about
-why.** It does not explain that the waitlist is unconnected: that is a fact about the build, not
-about the visitor, and reading an apology for it is worse than reading nothing. The cost of that
-choice is that a forgotten variable is silent, so check the surface once after deploying.
+## Reading exports
 
-Two rules differ from the Atlas handoff on purpose. There is no development default, because an
-Atlas default points a visitor at their own machine while a waitlist default would post somebody's
-address to whatever happened to be listening. And the endpoint must be `https`, since the request
-carries an email address; development may use `http` on a loopback host so the form can be
-exercised against a local stub. A build without a valid endpoint keeps the station and the surface,
-disables the field, and says the waitlist is not connected. It does not present a control that
-silently drops an address.
+Documentation and articles provide Copy page and Markdown links. The same content builders produce
+the browser content and the static `.md` files. `/llms.txt` indexes these pages; `/llms-full.txt`
+contains their full text. `/openapi.json` publishes the checked-in API contract. The schema on an
+installed server remains authoritative for that installation. No reading tools contact an AI service.
 
-## Boundaries
-
-The landing package's only workspace dependency is `@exulanica/presentation`, and it takes that
-package's `/companion` entry rather than its barrel. `web/.dependency-cruiser.cjs` enforces the
-dependency, the choice of entry, and separately prevents renderer imports;
-`test/bundle-boundary.test.ts` asserts the same property against the build's own sourcemap. What
-this keeps inside the canonical application is world-owned visual identity, Atlas navigation, the
-geometric Companion, evidence, Map, and Index.
-
-**The sentence that stood here also said the arrangement "keeps the public first paint lightweight",
-and that was measured and found false.** A package boundary is not a bundle boundary. The barrel
-re-exports `world-profiles.js`, which constructs the world style registry at module scope, and a
-module-scope constructor call cannot be dropped as unused, so one named Companion import shipped
-that registry and the modules behind it and ran them on every cold load, to draw one small avatar in
-the corner of a signed-out screen. When it was measured, 25,600 of 55,898 attributed bundle bytes
-were world style, `world-style-model.ts` was larger than any module this package had written, and
-taking the narrow entry halved the JavaScript from 62,637 bytes to 31,276. `pnpm run boundaries` was
-green throughout: the edge it forbids is a cross-package import and this was not one. The figures
-are history rather than a property, which is why the test and the rule are what hold it now.
-
-## Surfaces
-
-- **Title** places the Exulanica wordmark over a field of near-touching gradient forms, with a lower-left
-  navigation menu and one explicit entry into Exulanica. It uses no scenic or photographic
-  backdrop.
-- **Purpose** presents one uninterrupted paragraph about connecting scattered records of a life,
-  personal media, and the context a person contributes, and then places that against the
-  generative world models of 2026 which imagine a place for a session and forget it. It describes
-  the ambition; Capabilities explains the concrete actions that give it substance.
-- **Capabilities** presents two named sections: exploring connected memories and powering personal
-  agents with context through the World Memory Package. Both use the existing reading measure and
-  restrained typography, with space between outcomes and no dividers. Purpose remains a single
-  uninterrupted paragraph. Screen readers retain a named heading for each page.
-- **Spatial navigation** measures the wordmark and targets the space above its right end for Purpose
-  and above its left end for Capabilities. Return reverses that travel; switching reading pages uses
-  a shorter lateral movement.
-  Direct links open immediately, reduced motion uses an opacity fade, and interrupted transitions
-  settle on the latest destination.
-- **Research** states the project's position as recorded refusals and recorded measurements rather
-  than as ambition: generated geometry refused from the reconstruction ladder, a scene admitted at
-  the rung its evidence supports, and one measurement where views agreed with each other while
-  sitting well away from the truth. It names an open question rather than resolving it. Reached
-  from Resources, so it is not a fourth primary destination.
-- **Waitlist** is the one surface that asks the visitor for something. It uses the reading measure
-  and a single field, and reports its own connection state rather than presenting a dead control.
-- **Resources** is one Companion station that discloses ordinary Documentation, Research, and
-  GitHub links.
-- **Viewport boundary** states the product's current desktop input requirement rather than showing
-  a fake small-screen product.
-
-All surfaces share the same lower-left Companion navigation. The disclosure opens only by
-activating its native button and contextually replaces the destinations above Resources with Back,
-Documentation, and GitHub. It closes on Back, Escape, or an outside pointer press, restores button
-focus after Back or Escape, and keeps the Companion at Resources while focus is inside. The
-signed-out surfaces also share a neutral light canvas, visible keyboard focus, and reduced-motion
-rules. The landing palette is scoped locally so Atlas world profiles remain independent.
-
-Purpose, Capabilities, Research, Waitlist, and Return are native hash links, so direct URLs and
-browser history retain their ordinary meaning.
-
-### One way in
-
-The column leads with exactly one way in, and never both. With `VITE_ATLAS_URL` set, Enter
-Exulanica leads and no waitlist station is built. Without it, the waitlist leads and no Enter
-station is built. Two ways in when only one of them exists is the thing this replaced.
-
-An earlier build kept Enter Exulanica in place, greyed out, with a line underneath saying the world
-was not connected. The sentence was true, but it was attached to the most prominent promise on the
-page, and a visitor can act on it in neither version. Offering the thing they can act on is the
-honest form of the same fact. Nothing in the column is ever a dead control, so `.entry-status` and
-the disabled-entry branch are both gone.
-
-Capabilities describes the intended product experience in present tense, without a development-status
-footer. Reconstruction remains conditional on the source images. Current implementation evidence
-remains in the repository README and frontier roadmap.
-
-The world-model position lives in Purpose and not in Capabilities, and that placement is a rule
-rather than an editorial preference. `frontier-roadmap.md` records that the four capabilities which
-would make Exulanica the layer a generative model reads from "are tracked as work, not claimed",
-and the World Read API is in progress. Purpose is the surface written in the "is being built"
-tense, so it is the only one that can carry a position without asserting a capability. What
-Capabilities says about world models is limited to what is true of the package itself: it
-describes a real place rather than a plausible one.
-
-## Reusable gradient forms
-
-`src/ui/gradient-forms/` separates circle layout (`geometry.ts`), SVG material rendering and updates
-(`index.ts`), color motion (`style.css`), and art direction (`presets.ts`). The home page supplies a
-preset and positions the SVG through `.title-artwork`; no page coordinates live in the renderer.
-
-- Each shape has an id, radius, and light direction. Additional shapes attach to an earlier shape
-  by angle and edge gap. Layout rejects overlaps, including collisions with non-parent shapes.
-- Palette and alternate palette each accept three CSS colors. Strength, directional fade start, radial rim start, texture amount,
-  texture frequency, deterministic seed, cycle duration, and still/color motion are configurable.
-- SVG viewBox bounds follow the layout. A wrapper controls size, crop, and page placement. Single,
-  paired, or larger arrangements use the same API and remain independent when mounted together.
-- The home preset is still and uses independent elliptical color fields per form. Each field owns
-  its palette slot, center, two-axis spread, rotation, opacity, and ordered falloff stops. Blue,
-  yellow, and green therefore do not share a uniform rim mask. Their combined alpha masks the grain.
-  Unspecified materials retain the simpler directional/radial fallback for other presets. Optional color motion remains available to other presets. Rims never drift.
-  Deterministic vector grain shares the fade masks; no turbulence filter is evaluated during zoom.
-  There is no frame loop, image download, or application renderer dependency.
-- Title travel takes 600ms. Incoming text starts immediately, with shorter travel, and settles in
-  520ms. Reading-page switches skip title measurements. Temporary compositing hints are removed
-  after completion or interruption.
-- `createGradientForms(options)` returns `{ element, update }`. `update(nextOptions)` validates and
-  atomically replaces the material/layout while retaining the same outer SVG. Remove the element
-  normally; no listeners, timers, or other external resources need disposal.
-- Reduced motion disables the color cycle; forced colors hides decorative art. The SVG is hidden
-  from accessibility navigation and cannot capture pointer events.
-
-The landing composition uses one persistent `.landing-landscape` sibling behind all three panes.
-`main.ts` moves the title's artwork into that layer once. Both information views use the exact measured camera transform used by the wordmark. The same SVG
-moves for 600ms during navigation and stays at that camera position; page-specific crop offsets and
-orientation changes are not used. The title pane is transparent, and the
-stationary overlay clips the moving art. Reading scroll, navigation, and decorative motion are separate.
-Direct hash loads compose immediately, and reduced motion changes position without spatial animation.
-There is no ambient color exchange or pulse.
-
-For a separate surface outside this shared landing composition, derive a preset and place the
-component's `element` in that surface's decorative wrapper.
-
-## Named visual presets
-
-The UI theme lives in `src/themes.css` (`landing-light`). Artwork colors live in
-`ARTWORK_PALETTES.daylight`; shape layout and per-color material geometry live in
-`ARTWORK_COMPOSITIONS.diagonal`. `landingArtwork(palette, composition)` combines them without
-changing the UI theme. The same selection stays mounted across Title, Purpose, and Capabilities.
-The diagonal composition has exactly two dominant forms separated by an eight-unit edge gap.
-Their junction is placed above the wordmark in the home view. There is no hidden satellite.
-Resize recomputes the camera from the untransformed wordmark, and direct links use the same geometry. Palette changes preserve each
-color field's independent position and falloff; there is no automatic page-dependent color change.
+The guided World API reference derives field types and constraints from a selected subset of
+`tests/snapshots/api-openapi.json`. After that contract changes, regenerate the reference with
+`node web/packages/landing/scripts/sync-api-reference.mjs` from the repository root. The same generator derives the complete operation catalog from that schema and
+`tests/snapshots/api-routes.json`, preserving each route’s authorization rule. Tests check both
+outputs and the complete agent example against their underlying sources. A contract definition
+is labelled separately from sample or live response data.

@@ -170,6 +170,18 @@ class GeneratedSiteView(BaseModel):
     arrival_facing_mm: tuple[int, int]
 
 
+class GeneratedTerrainView(BaseModel):
+    """An exact terrain source and arrival, without a world-kind or society projection."""
+
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    region_id: str
+    arrival_mm: tuple[int, int, int]
+    arrival_facing_mm: tuple[int, int]
+    geometry_sha256: str
+    contact_sha256: str
+
+
 class SavedWorldEntryView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -187,6 +199,8 @@ class SavedWorldEntryView(BaseModel):
     generated_ground: GeneratedGroundView | None = None
     #: Set for a world made from a world kind: its kind, region and where a person arrives.
     generated_site: GeneratedSiteView | None = None
+    #: Set for an admitted terrain source whose drawing has explicit source contact.
+    generated_terrain: GeneratedTerrainView | None = None
     #: The engine a society over this world is created with, the engine table's for its ground
     #: (``POST /world/versions/{version_id}/society`` names it as its ``profile``); on a host that
     #: offers societies of things, the table's engine for a world holding things where its version
@@ -380,6 +394,8 @@ def _view(entry: SavedWorldEntry, *, societies_of_things: bool) -> SavedWorldEnt
         values["generated_ground"] = GeneratedGroundView.model_validate(entry.generated_ground)
     if entry.generated_site is not None:
         values["generated_site"] = GeneratedSiteView.model_validate(entry.generated_site)
+    if entry.generated_terrain is not None:
+        values["generated_terrain"] = GeneratedTerrainView.model_validate(entry.generated_terrain)
     values["source_attachments"] = [
         SavedWorldSourceAttachmentView.model_validate(attachment)
         for attachment in entry.source_attachments

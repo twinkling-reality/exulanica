@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 
 import pytest
-from exulanica.abilities.registry import FOLLOW_KEEPING_NEAR
+from exulanica.abilities.registry import FOLLOW_PERSISTENT
 from exulanica.world.society_controls import LEASE_SECONDS
 
 import test_outside_deciders_postgres as outside
@@ -30,7 +30,7 @@ def test_a_played_being_follows_another_from_its_turn_and_its_minute_records_it(
     world, client = app
     services = _services(client)
     snapshot, knight = play._knight_society(world, client, beside=True)
-    assert FOLLOW_KEEPING_NEAR in snapshot["state"]["modules"]
+    assert FOLLOW_PERSISTENT in snapshot["state"]["modules"]
     [other] = [p["id"] for p in snapshot["state"]["inhabitants"] if p["placed_id"] == "knight-2"]
     assert play._start(client, world, knight).status_code == 201
     scope, _, society = routes(world)

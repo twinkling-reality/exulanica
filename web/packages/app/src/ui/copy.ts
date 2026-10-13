@@ -446,7 +446,7 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
     + 'own words. Your empty square stays here too.',
   // Making a world from a recipe: the World menu's offer, and the panel that lists the recipes.
   'worldMenu.make': 'Create a world',
-  'worldMenu.make.detail': 'Start a new town',
+  'worldMenu.make.detail': 'Create another world',
   'worldMenu.worlds': 'Your worlds',
   'worldMenu.worlds.detail': 'Choose another world',
   'worldRecipes.heading': 'Create a world',
@@ -479,12 +479,27 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   // One sentence makes a world (POST /worlds/drafts; docs/world-kinds-contract.md, "A world made
   // from a sentence"): the one box Create a world shows where the server offers drafting.
   'worldSentence.field': 'Say the world you want',
+  'worldSentence.offer.missing': 'This server does not provide world creation. Ask the installation operator to update the API, then try again.',
+  'worldSentence.offer.session': 'Your session could not be verified. Return to Your worlds and sign in again.',
+  'worldSentence.offer.permission': 'This account is not permitted to create worlds. Ask the installation operator for access.',
+  'worldSentence.offer.server': 'The server could not check world creation. Try again; if it continues, contact the installation operator.',
+  'worldSentence.offer.unreadable': 'The server returned a creation offer this app cannot read. Ask the installation operator to check that the app and API versions match.',
+  'worldSentence.offer.connection': 'The creation service could not be reached. Check your connection, then try again.',
+  'worldSentence.progress.interrupted': 'Progress could not be checked. The draft may still be running; check its progress again.',
   'worldSentence.placeholder': 'A harbour with fishing boats, a market on the quay and a lighthouse',
   'worldSentence.notice':
     'Your words are sent to an AI model to draft the world. A short description of what you asked '
     + 'for is kept with the world.',
   // What a draft may spend, from the server's own figures (GET /worlds/drafts), shown before the
   // words are sent.
+  'worldSentence.spend.ceiling': 'Reservation limit: US${maximum}. This is a full-context ceiling, not expected spending.',
+  'worldSentence.spend.legacy': 'This server does not provide a USD reservation limit.',
+  'worldSentence.quote.updated': 'The reservation was refreshed. Review the limit, then press Create world to continue.',
+  'worldSentence.request.unknown': 'The request may have started. Check the same request before starting another world.',
+  'worldSentence.request.legacy': 'The request may have started. This server cannot safely repeat it; check for a running draft.',
+  'worldSentence.request.check': 'Check request',
+  'worldSentence.queued': 'Waiting to start, {elapsed} so far.',
+  'worldSentence.recovered': 'Resuming the saved request.',
   'worldSentence.spend':
     'Making a world asks an AI model up to {calls} times. Once started it runs to its end, one '
     + 'world at a time. You have {left} of {anHour} starts left this hour.',

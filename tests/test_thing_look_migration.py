@@ -27,7 +27,7 @@ from psycopg.conninfo import make_conninfo
 
 import pg_harness
 from world_structure_fixtures import structural_candidate
-from world_support import registered_world
+from world_support import historical_world_fixture_schema, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -84,7 +84,10 @@ def test_0156_keys_stored_placed_things_to_the_registry_they_already_name(monkey
                 _keys(admin, "world_alternate_thing", "world_alternate_version").values()
             ) == [True]
             assert _keys(admin, "world_alternate_thing") == {}
-            with database.session(workspace) as connection:
+            with (
+                historical_world_fixture_schema(admin, support=True),
+                database.session(workspace) as connection,
+            ):
                 world = registered_world(connection, workspace)
                 structures = WorldStructureRepository(connection, workspace, world_id=world)
                 preview = structures.preview(structural_candidate(), proposed_by=actor)

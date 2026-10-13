@@ -82,14 +82,20 @@ export function dressSlots(
   families: ReadonlyMap<string, LookFamily>,
   pieces: PackPieces,
   shading: RenderShading,
+  /** Opt-in copy of a selected slot's exact baked triangles, in the parent's frame. */
+  capture?: { readonly identities: ReadonlySet<string>; readonly maximumVertices: number; readonly triangles: (identity: string, positions: readonly number[], normals: readonly number[]) => void },
 ): SlotDressing {
   const batches = new Map<string, SwatchBatch>();
   const undressed: string[] = [];
   let placed = 0;
+  let capturedVertices = 0;
+  const captureLimit = capture !== undefined && Number.isSafeInteger(capture.maximumVertices) && capture.maximumVertices >= 0 ? capture.maximumVertices : 0;
   let device: pc.GraphicsDevice | null = null;
   const local = [0, 0, 0];
   const normal = [0, 0, 0];
   for (const slot of slots) {
+    const captured = capture?.identities.has(slot.identity) ? new SwatchBatch() : null;
+    let captureRefused = false;
     const dressing = resolveLookRole(pack, { identity: slot.identity, lookRole: slot.lookRole, positionMm: slot.positionMm, yawQuarterTurns: 0, boxMm: slot.boxMm }, families, 'module');
     const module = dressing?.kind === 'module' ? pack.modules[dressing.role] : undefined;
     const piece = dressing?.kind === 'module' && module !== undefined ? pieces.get(module, dressing.file) : undefined;
@@ -126,10 +132,27 @@ export function dressSlots(
           batch = new SwatchBatch();
           batches.set(group.swatch, batch);
         }
+        const from = batch.positions.length;
         bake(group, axes, shift, toRenderer, batch, local, normal);
+        if (captured !== null && !captureRefused) {
+          const count = (batch.positions.length - from) / 3;
+          if (capturedVertices + count > captureLimit) {
+            captured.positions.length = 0;
+            captured.normals.length = 0;
+            captureRefused = true;
+            continue;
+          }
+          capturedVertices += count;
+          for (let i = from; i < batch.positions.length; i += 1) {
+            // Match the Float32 upload that the batch mesh actually draws.
+            captured.positions.push(Math.fround(batch.positions[i]!));
+            captured.normals.push(Math.fround(batch.normals[i]!));
+          }
+        }
       }
       placed += 1;
     }
+    if (captured !== null) capture!.triangles(slot.identity, captured.positions, captured.normals);
   }
 
   const entity = new pc.Entity(`${PREFIX}pieces`);

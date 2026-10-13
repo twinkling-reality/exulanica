@@ -1,10 +1,10 @@
 import type * as pc from 'playcanvas';
 import {
   materialOfLeaf, planBorders, resolveLookRole, resolveSurfaceLookRole, unknownSurfaceLeaf,
-  type GroundBorders, type GroundPlane, type LookFamily, type ResolvedStylePack, type StylePackSurface, type SurfaceMaterials,
+  type GroundBorders, type GroundPlane, type LookFamily, type ResolvedStylePack, type SurfaceMaterials,
   type SurfacePattern, type SurfacePatterns,
 } from '@exulanica/atlas-core';
-import type { SiteDrawing, SiteSlot } from '../generated-site/site-drawing.js';
+import type { StructuredSiteDrawing, SiteSlot } from '../generated-site/site-drawing.js';
 import { baseGroundSlot, type SiteDresser } from '../generated-site/site-mount.js';
 import { SCENERY_STONES, SCENERY_TREES } from '../generated-site/site-scenery.js';
 import { attachTileInk } from '../generated-tile/ink.js';
@@ -15,6 +15,11 @@ import { dressSlots, type PieceSlot } from './dresser.js';
 import { applyPattern } from './pattern-material.js';
 import { uploadPackPieces, type FetchedPieces } from './pieces.js';
 import { swatchMaterial } from './swatch-material.js';
+import { SiteTextures } from './site-textures.js';
+import { WaterRipples } from './water-material.js';
+import type { PreparedTextureSet } from '../generated-tile/texture-materials.js';
+import { TILE_LOOK_V1, type TileLook } from '../generated-tile/look.js';
+import { seatGeometry, type SeatGeometry } from '../generated-site/site-seating.js';
 
 /**
  * A world made from a world kind, dressed in a style pack.
@@ -45,11 +50,10 @@ import { swatchMaterial } from './swatch-material.js';
  * (`pattern-material.ts`). A pack's surface that colours its upward faces apart keeps that instead.
  * The canvas says how many slots are patterned (`data-site-patterned`).
  *
- * A site holds no texture set's images, so it takes a pack's swatches and pieces only: a leaf the
- * pack dresses with a texture set is resolved as if the pack left it out, so it takes its material
- * where its words name one (a town pack's `wall.brick_running_bond` is brick) and otherwise its
- * family's `default`. Nothing here changes a slot, the walk or the seats; the disposer puts back every
- * material, shows every primitive again and frees everything it made, before the slots go.
+ * Texture surfaces reuse the tile's pinned texture uploads and material classes, with physical UVs
+ * on copies of the primitive meshes. A refused set draws the unavailable pattern, never a swatch
+ * substitute. Glass requests the environment's scene-colour copy only when it is drawn. Nothing
+ * here changes slots, walking or seats; disposal restores meshes and materials before freeing uploads.
  */
 
 /** A prepared pack, ready to dress any site. */
@@ -58,6 +62,8 @@ export interface SitePackDressing {
   readonly families: ReadonlyMap<string, LookFamily>;
   readonly pieces: FetchedPieces;
   readonly shading: RenderShading;
+  readonly textures?: ReadonlyMap<string, PreparedTextureSet>;
+  readonly look?: TileLook;
   /** The surface material catalog a leaf is read by before it takes its family's default; none reads no leaf. */
   readonly materials?: SurfaceMaterials;
   /** The surface pattern catalog a material's colour is patterned by; none, or no `materials`, draws every surface flat. */
@@ -107,15 +113,6 @@ const FRONTS: readonly (readonly [number, number])[] = Object.freeze([[0, 1], [-
 /** The look role a tree of the scenery beyond a place is dressed by: the pack's plant, whatever its leaf. */
 const SCENERY_TREE_ROLE = 'plant.tree';
 
-/** The pack as a site may draw it: its surfaces that are swatches, every texture set left out. */
-function swatchesOnly(pack: ResolvedStylePack): ResolvedStylePack {
-  const surfaces: Record<string, StylePackSurface> = {};
-  for (const [role, surface] of Object.entries(pack.surfaces)) {
-    if ('swatch' in surface) surfaces[role] = surface;
-  }
-  return { ...pack, surfaces };
-}
-
 function pieceSlot(slot: SiteSlot): PieceSlot {
   return {
     identity: slot.identity,
@@ -128,7 +125,7 @@ function pieceSlot(slot: SiteSlot): PieceSlot {
 
 /** The dresser that draws any site in `dressing`'s pack. */
 export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
-  const pack = swatchesOnly(dressing.pack);
+  const pack = dressing.pack;
   const { families, shading } = dressing;
   const catalog = dressing.materials ?? null;
   const patterns = catalog === null ? null : dressing.patterns ?? null;
@@ -139,8 +136,11 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     const material = materialOfLeaf(catalog, slot.family, slot.leaf);
     return material === null ? null : patterns.byMaterial.get(material.key) ?? null;
   };
-  return (host, drawn, drawing: SiteDrawing, scenery = null) => {
+  return (host, drawn, drawing: StructuredSiteDrawing, scenery = null, environment) => {
     const device = host.app.graphicsDevice;
+    const textures = new SiteTextures(device, dressing.look ?? TILE_LOOK_V1, dressing.textures);
+    const water = new WaterRipples(host.app);
+    const texturedSlots = new Set<string>();
     const made: pc.StandardMaterial[] = [];
     const replaced: (readonly [pc.MeshInstance, pc.Material])[] = [];
     const hidden: (readonly [pc.Entity, boolean])[] = [];
@@ -195,6 +195,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         let material = surfaceMaterials.get(resolved.role);
         if (material === undefined) {
           material = swatchMaterial(resolved.material.swatch, null, shading, `style-pack:material:${resolved.role}`);
+          if (slot.family === 'water' && shading.model === 'pbr') water.add(material);
           if (pattern !== null) applyPattern(material, pattern, shading.ink);
           made.push(material);
           surfaceMaterials.set(resolved.role, material);
@@ -203,6 +204,13 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         wear(entity, slot.identity, () => worn);
         materials += 1;
         if (pattern !== null) patterned += 1;
+       } else if (resolved?.kind === 'surface' && 'texture_set' in resolved.surface && entity !== undefined) {
+        const shape = entity.findByName(`${slot.identity}:shape`) as pc.Entity | null;
+        for (const instance of shape?.render?.meshInstances ?? []) {
+          if (textures.wear(instance, slot, resolved.surface.texture_set, resolved.up, drawn.root)) environment?.requestSceneColor();
+        }
+        texturedSlots.add(slot.identity);
+        surfaces += 1;
       } else if (resolved?.kind === 'surface' && resolved.swatch !== null && entity !== undefined) {
         // The pack's own surface takes its material's pattern too, unless it colours its upward faces apart.
         const pattern = resolved.up === null ? patternOf(slot) : null;
@@ -210,6 +218,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
         let material = surfaceMaterials.get(key);
         if (material === undefined) {
           material = swatchMaterial(resolved.swatch, resolved.up, shading, `style-pack:surface:${key}`);
+          if (slot.family === 'water' && shading.model === 'pbr') water.add(material);
           if (pattern !== null) applyPattern(material, pattern, shading.ink);
           made.push(material);
           surfaceMaterials.set(key, material);
@@ -224,7 +233,13 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     }
 
     const pieces = uploadPackPieces(device, dressing.pieces);
-    const placed = dressSlots(drawn.root, modules, pack, families, pieces, shading);
+    const seatTriangles = new Map<string, SeatGeometry>();
+    const placed = dressSlots(drawn.root, modules, pack, families, pieces, shading, {
+      identities: new Set(drawing.seats.map(seat => seat.identity)),
+      // Bound retained contact copies across the whole site; oversized seats remain unavailable.
+      maximumVertices: 100_000,
+      triangles: (identity, positions, normals) => seatTriangles.set(identity, seatGeometry(positions, normals)),
+    });
     const standing = new Set(modules.map((slot) => slot.identity));
     for (const identity of placed.undressed) standing.delete(identity);
     for (const identity of standing) {
@@ -253,7 +268,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     if (catalog !== null && borders !== null && bordersRun(device)) {
       const drawnPlanes = new Map<string, { readonly instance: pc.MeshInstance; readonly shape: pc.Entity; readonly plane: GroundPlane }>();
       for (const slot of drawing.slots) {
-        if (slot.primitive !== 'plane') continue;
+        if (slot.primitive !== 'plane' || texturedSlots.has(slot.identity) || slot.supportSurfaceId !== undefined) continue;
         const shape = drawn.entities.get(slot.identity)?.findByName(`${slot.identity}:shape`) as pc.Entity | null | undefined;
         const instance = shape?.render?.meshInstances[0];
         if (shape == null || instance === undefined) continue;
@@ -354,7 +369,7 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     });
 
     let undone = false;
-    return () => {
+    const dispose = () => {
       if (undone) return;
       undone = true;
       if (catalog !== null && canvas?.dataset !== undefined) {
@@ -376,6 +391,22 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       for (const [instance, material] of replaced.splice(0).reverse()) instance.material = material;
       for (const material of made.splice(0)) material.destroy();
       pieces.dispose();
+      water.dispose();
+      textures.dispose();
     };
+    return Object.defineProperty(Object.assign(dispose, {
+      seatTriangles,
+      animating: water.animating,
+      dressBeyond(instance: pc.MeshInstance, slot: SiteSlot): void {
+        const resolved = catalog === null
+          ? resolveLookRole(pack, slot, families, 'either')
+          : resolveSurfaceLookRole(pack, slot, families, 'either', catalog);
+        if (resolved?.kind === 'surface' && 'texture_set' in resolved.surface) {
+          if (textures.wear(instance, slot, resolved.surface.texture_set, resolved.up, host.environmentRoot)) {
+            environment?.requestSceneColor();
+          }
+        }
+      },
+    }), 'textureMetrics', { get: () => textures.metrics() });
   };
 }

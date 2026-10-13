@@ -17,7 +17,7 @@ import uuid
 from pathlib import Path
 
 import pytest
-from exulanica.abilities.registry import FOLLOW_KEEPING_NEAR, current_modules
+from exulanica.abilities.registry import FOLLOW_KEEPING_NEAR, FOLLOW_PERSISTENT, current_modules
 from exulanica.canonical import canonical_json
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_decision_contract import (
@@ -156,7 +156,7 @@ def test_a_society_made_before_follow_was_built_replays_as_it_ran():
     history = json.loads(HISTORY.read_text(encoding="utf-8"))
     document = compose(RECORDED)
     # The positive control: a society composed now records the module the stored one did not.
-    assert FOLLOW_KEEPING_NEAR in document["modules"] and FOLLOW_KEEPING_NEAR in current_modules()
+    assert FOLLOW_PERSISTENT in document["modules"] and FOLLOW_PERSISTENT in current_modules()
     document["modules"] = history["modules"]
     # Stored before a first input recorded its movement modules: it walks by the first walking.
     del document["movement_modules"]
@@ -178,14 +178,14 @@ def test_a_society_made_before_follow_was_built_replays_as_it_ran():
 def test_follow_is_offered_only_to_a_being_whose_kind_follows_toward_one_offered_to_be_followed():
     document = compose((WELL, KNIGHT, SQUIRE))
     state = initial_things_society(SOCIETY, SEED, document, population=POPULATION)
-    assert FOLLOW_KEEPING_NEAR in state["modules"]
+    assert FOLLOW_PERSISTENT in state["modules"]
     knight, squire = _placed(state, "knight"), _placed(state, "squire")
     villagers = [p for p in state["inhabitants"] if p["came_by"] == "populated"]
     offered = choice_options(state, document, knight["id"], _played(), seed=SEED)
     # Knight 2 offers to be followed; no villager does, whoever stands near.
     assert {o.addressee_id for o in offered if o.kind == "follow"} == {squire["id"]}
-    # A villager's kind does not follow, and the engine's own terms, which models are asked
-    # under, state no following at all.
+    # A villager's kind does not follow. Historical model terms stated no following at all;
+    # current terms admit the same capability-filtered follow options as the player's.
     for villager in villagers:
         assert not [
             o
@@ -193,12 +193,18 @@ def test_follow_is_offered_only_to_a_being_whose_kind_follows_toward_one_offered
             if o.kind in ("follow", "stop_following")
         ]
     role = person_role()
-    asked = role.contract(role.terms(THINGS_PROFILE).versions)
+    asked = role.contract({"society-decision-action": 5, "society-decision-policy": 5})
     assert not [
         o
         for o in choice_options(state, document, knight["id"], asked, seed=SEED)
         if o.kind in ("follow", "stop_following")
     ]
+    current = role.contract(role.terms(THINGS_PROFILE).versions)
+    assert {
+        o.addressee_id
+        for o in choice_options(state, document, knight["id"], current, seed=SEED)
+        if o.kind == "follow"
+    } == {squire["id"]}
 
 
 def test_a_follower_keeps_near_the_one_it_follows_as_it_is_moved():
@@ -235,6 +241,11 @@ def test_a_follower_keeps_near_the_one_it_follows_as_it_is_moved():
 )
 def test_a_follower_stops_by_name(reason):
     document = compose((WELL, KNIGHT, SQUIRE))
+    if reason == "not_kept":
+        document["modules"] = sorted(
+            FOLLOW_KEEPING_NEAR if m == FOLLOW_PERSISTENT else m for m in document["modules"]
+        )
+        document["document_sha256"] = input_sha256(document)
     state = _following(document)
     squire = _placed(state, "squire")
     now, previous, minutes = document, None, 1

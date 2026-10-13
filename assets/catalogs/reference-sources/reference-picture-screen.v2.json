@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "catalog_id": "reference-picture-screen",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "people",
+      "words": [
+        "person",
+        "people",
+        "persons",
+        "man",
+        "men",
+        "woman",
+        "women",
+        "boy",
+        "boys",
+        "girl",
+        "girls",
+        "child",
+        "children",
+        "kid",
+        "kids",
+        "baby",
+        "babies",
+        "face",
+        "faces",
+        "crowd",
+        "crowds",
+        "figure",
+        "figures",
+        "someone",
+        "somebody",
+        "he",
+        "she",
+        "him",
+        "her",
+        "his",
+        "hers",
+        "body",
+        "bodies",
+        "hand",
+        "hands",
+        "hair",
+        "skin",
+        "wearing",
+        "worn"
+      ],
+      "closes_aspects": [
+        "clothing"
+      ],
+      "reason": "The picture note screen preserves the same no-person words and closed clothing aspect for nonhuman things and creatures. Anatomy and part layout are available only in the versioned things picture vocabulary. The reader still refuses a picture containing a human person or readable writing; the word screen is an additional deterministic check, not a substitute for that refusal.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's picture note screen; see the entry reason"
+      }
+    }
+  ]
+}

@@ -28,7 +28,7 @@ import uuid
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Final
+from typing import Any, Final, Protocol
 
 import psycopg
 
@@ -42,6 +42,7 @@ __all__ = [
     "REFERENCE_BASES",
     "NotesForDraft",
     "NotesRefused",
+    "PictureNotesAuthority",
     "notes_for_draft",
 ]
 
@@ -73,6 +74,20 @@ class NotesForDraft:
     rendered: RenderedNotes
     #: What the drafted document keeps: never the notes' text.
     provenance: Mapping[str, Any]
+
+
+class PictureNotesAuthority(Protocol):
+    """An injected check under the worker's currency/lifecycle locks, without network work."""
+
+    def __call__(
+        self,
+        connection: psycopg.Connection,
+        workspace_id: uuid.UUID,
+        requester: uuid.UUID,
+        reference_id: uuid.UUID,
+        photographs: frozenset[uuid.UUID],
+        bound: Mapping[uuid.UUID, tuple[uuid.UUID, ...]] | None,
+    ) -> Mapping[uuid.UUID, tuple[uuid.UUID, ...]]: ...
 
 
 def notes_for_draft(

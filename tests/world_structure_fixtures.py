@@ -15,6 +15,29 @@ from exulanica.world import PlacementMigration, SpatialCandidate
 from world_support import FIXTURE_WORLD_ID
 
 
+def invalidate_snapshot_source(repository, world_id, snapshot_id, actor):
+    """Erase a live synthetic source dependency, leaving the fixture's world registered.
+
+    A workspace tombstone erases the world itself. Tests of source unavailability instead
+    declare one entity dependency on their synthetic snapshot and erase only that entity.
+    """
+    entity_id = repository.connection.execute(
+        "insert into entity(workspace_id,class) values(%s,'person') returning entity_id",
+        (repository.workspace_id,),
+    ).fetchone()["entity_id"]
+    repository.connection.execute(
+        "insert into world_structure_dependency "
+        "(workspace_id,world_id,snapshot_id,dependency_kind,dependency_ref) "
+        "values(%s,%s,%s,'entity',%s)",
+        (repository.workspace_id, world_id, snapshot_id, entity_id),
+    )
+    repository.insert_tombstone(
+        scope="entity", entity_id=entity_id, requested_by=actor,
+        reason="the synthetic snapshot's source was erased",
+    )
+    repository.connection.commit()
+
+
 def digest(label: str) -> str:
     return hashlib.sha256(label.encode()).hexdigest()
 

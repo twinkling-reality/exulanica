@@ -102,7 +102,7 @@ from exulanica.world.world_tools import world_tools
 
 from conftest import ingest_observed, write_photo
 from creature_support import form_of
-from kind_briefs import brief_of, fixture_kind, held_to_form
+from kind_briefs import current_farm_form
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
 from test_companion_saved_names import (
     PERSON,
@@ -642,7 +642,7 @@ def run_kind_drafting(world: World) -> Witness:
         kind = read_kind(document)
         return KindVerdict(True, kind, check_samples(kind))
 
-    form = held_to_form(brief_of(fixture_kind("farm")))
+    form = current_farm_form("duck pond")
     client, transport = world.hosted([_json_reply(form, Role.KIND_DRAFTER)])
     outcome = draft_kind(
         client,

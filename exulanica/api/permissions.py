@@ -66,6 +66,17 @@ account holds the creator grant, which the operator gives and revokes with
 its body is read. A bearer token is the operator's own grant to a program, so the permissions it
 names are enough there.
 
+**Acting as a being is its own permission.** ``being.act`` is what starting to play one being,
+answering for it and giving it back require, beside ``world.read``: the three routes of
+:mod:`exulanica.api.routes.society_play` that write. It is apart from ``world.write`` so that a
+credential may be let act as a being without being let edit the world, remove its objects or run
+its clock, and ``world.write`` alone does not act as a being. It opens those three routes and
+nothing else. It is a permission, a word of this closed vocabulary that a grant holds and the
+floor checks, not an action: the actions a page or a plan names (``beings.play``,
+``beings.answer``, ``beings.give-back``) are ids of what a person does, and each is carried out
+by a route that requires this. Both browser roles hold it; a bearer token plays only where its
+grant names it.
+
 **Consent withdrawal rides with consent.** ``POST /person-subjects/{subject_id}/consents`` records
 ``granted``, ``revoked`` and ``withdrawn`` alike, and ``/identity/subjects/unlink`` withdraws what
 ``/identity/subjects/link`` confirmed. Both sit under ``consent.write``, so a credential that may
@@ -113,8 +124,10 @@ __all__ = [
     "ROUTE_RULE_SECTIONS",
     "SELF_CHARGING_TILE_ROUTES",
     "Authentication",
+    "BrowserRequires",
     "Channel",
     "CreatorGrantRequired",
+    "Granted",
     "Permission",
     "PermissionRefused",
     "Public",
@@ -160,8 +173,15 @@ class Permission(StrEnum):
     ADMISSION_WRITE = "admission.write"
     #: The authored world: styles, interactions, reviewed assets, versions and society.
     WORLD_READ = "world.read"
+    #: Enter a human invitation's projected world. It grants no owner workspace read.
+    WORLD_ENTER = "world.enter"
     #: Every change to the authored world, and recording generated content against a scene.
     WORLD_WRITE = "world.write"
+    #: Acting as one being of a world's society: starting to play it, answering for it in its
+    #: minute and giving it back. It changes what that being does in its society and nothing of
+    #: the authored world, so it is isolated by name from ``world.write``. A permission, not an
+    #: action id.
+    BEING_ACT = "being.act"
     #: Derivative and reconstruction job status.
     OPERATIONS_READ = "operations.read"
     #: Retrying a reconstruction job.
@@ -270,6 +290,20 @@ class Channel:
             raise RouteDeclarationError("a channel route must say what its credential opens")
 
 
+@dataclass(frozen=True, slots=True)
+class BrowserRequires(Requires):
+    """Ordinary permissions held through a browser membership, optionally its owner only."""
+
+    owner_only: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class Granted(Requires):
+    """Authority comes from this browser principal's standing world invitation."""
+
+    check_sources: bool = True
+
+
 def _requires(*permissions: Permission) -> Requires:
     return Requires(frozenset(permissions))
 
@@ -299,7 +333,9 @@ ACCOUNT_OWNER_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
         _P.ADMISSION_READ,
         _P.ADMISSION_WRITE,
         _P.WORLD_READ,
+        _P.WORLD_ENTER,
         _P.WORLD_WRITE,
+        _P.BEING_ACT,
         _P.OPERATIONS_READ,
         _P.OPERATIONS_WRITE,
         _P.REFERENCES_REQUEST,
@@ -308,15 +344,18 @@ ACCOUNT_OWNER_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
 )
 
 #: What a guest's browser session holds (migration 0139): a visitor who entered with no account
-#: may make a world and open it, choose and swap the models that decide for its people, start and
-#: read a comparison, ask the Companion, keep and correct what it remembers, and delete what they
-#: made. Nothing else: no photograph intake, no consent or admission of a source, no operations
-#: read or write (capacity and installation facts are every workspace's), and no tile ceiling. A
-#: guest's allowance is read from ``GET /auth/session``, so it needs no ``operations.read``.
+#: may make a world and open it, choose and swap the models that decide for its people, play one
+#: of its beings, start and read a comparison, ask the Companion, keep and correct what it
+#: remembers, and delete what they made. Nothing else: no photograph intake, no consent or
+#: admission of a source, no operations read or write (capacity and installation facts are every
+#: workspace's), and no tile ceiling. A guest's allowance is read from ``GET /auth/session``, so
+#: it needs no ``operations.read``.
 GUEST_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
     {
+        _P.WORLD_ENTER,
         _P.WORLD_READ,
         _P.WORLD_WRITE,
+        _P.BEING_ACT,
         _P.MODEL_INVOKE,
         _P.LIBRARY_READ,
         _P.LIBRARY_WRITE,
@@ -496,6 +535,8 @@ _WORLD_READS_WITH_A_MODEL: Final = _every(
 #: to GPU time against its allowance.
 _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE),
+    "POST /models/probes/prepare",
+    "POST /models/probes/{probe_id}/start",
     "POST /things/creatures",
     "POST /world/piece-requests",
     "POST /world/versions/{version_id}/models/{role_key}",
@@ -617,8 +658,15 @@ _WORLD_READS: Final = _every(
     "GET /materials/recipes/{recipe_id}",
     "GET /materials/recipes/{recipe_id}/bake",
     "GET /materials/recipes/{recipe_id}/bake/bytes",
+    "GET /models",
+    "GET /models/bindings/{binding_sha256}",
+    "POST /models/preflight",
+    "GET /models/probes/{probe_id}",
+    "POST /models/probes/{probe_id}/replay",
     "POST /selection/actions/outcome",
     "POST /selection/actions/prepare",
+    "POST /selection/world-drafts/outcome",
+    "POST /selection/world-drafts/prepare",
     "GET /things/creatures/drafts",
     "GET /things/creatures/drafts/{draft_id}",
     "GET /things/creatures/offered",
@@ -684,6 +732,8 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/clock/events",
     "GET /world/versions/{version_id}/clock/verify",
     "GET /world/versions/{version_id}/flight",
+    "GET /world/versions/{version_id}/inventory",
+    "POST /world/versions/{version_id}/inventory/query",
     "GET /world/versions/{version_id}/models",
     "GET /world/versions/{version_id}/site",
     "GET /world/versions/{version_id}/society",
@@ -706,7 +756,10 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/society/play/{subject_id}/turn",
     "GET /world/versions/{version_id}/society/replay",
     "GET /world/versions/{version_id}/society/things/{thing_id}",
+    "GET /world/versions/{version_id}/subjects/{ref}",
+    "GET /world/versions/{version_id}/terrain-contact",
     "GET /world/versions/{version_id}/thing-looks",
+    "GET /world/versions/{version_id}/things/{thing_id}/support",
     "GET /world/versions/{version_id}/tiles/{baked_tile_id}/bytes",
     "GET /world/versions/{version_id}/traffic",
     "GET /world/versions/{version_id}/traffic/comparisons",
@@ -721,10 +774,12 @@ _WORLD_READS: Final = _every(
     "GET /worlds/kinds",
     "GET /worlds/kinds/drafts",
     "GET /worlds/kinds/drafts/{draft_id}",
+    "GET /worlds/kinds/versions/{document_sha256}/removal",
     "GET /worlds/recipes",
     "GET /worlds/references",
     "GET /worlds/references/{reference_id}",
     "GET /worlds/specification",
+    "GET /worlds/{world_id}/removal",
 )
 
 #: Metered against the workspace tile quota, by being declared here: the baked tiles of a generated
@@ -746,6 +801,9 @@ _WORLD_WRITES: Final = _every(
     "POST /materials/recipes",
     "POST /materials/recipes/{recipe_id}/bake",
     "POST /materials/recipes/{recipe_id}/withdraw",
+    "POST /models",
+    "POST /models/probes/{probe_id}/cancel",
+    "POST /models/remove",
     "POST /world-entries",
     "POST /world-entries/starter",
     "PUT /world-entries/{entry_id}",
@@ -801,17 +859,17 @@ _WORLD_WRITES: Final = _every(
     "POST /world/versions/{version_id}/society/decisions",
     "POST /world/versions/{version_id}/society/experiments",
     "POST /world/versions/{version_id}/society/experiments/{experiment_id}/attempts",
-    "POST /world/versions/{version_id}/society/play",
-    "POST /world/versions/{version_id}/society/play/{subject_id}/answer",
-    "POST /world/versions/{version_id}/society/play/{subject_id}/give-back",
     "POST /world/versions/{version_id}/society/presence",
     "POST /world/versions/{version_id}/society/steps",
     "POST /world/versions/{version_id}/society/things/{thing_id}/look",
     "POST /world/versions/{version_id}/things",
+    "POST /world/versions/{version_id}/things/on-support",
+    "POST /world/versions/{version_id}/things/on-support/preview",
     "POST /world/versions/{version_id}/things/undo",
     "POST /world/versions/{version_id}/things/{thing_id}/move",
     "POST /world/versions/{version_id}/things/{thing_id}/remove",
     "POST /worlds/generated",
+    "POST /worlds/generated/terrain",
     "POST /worlds/kinds",
     "POST /worlds/kinds/{kind}/worlds",
 )
@@ -839,6 +897,18 @@ _WORLD_READS_READING_ADMISSION: Final = _every(
     "GET /worlds/personal-source",
 )
 
+#: Acting as one being of a society of things: starting to play it, answering for it in the
+#: minute to come and giving it back. Each changes what that one being does and writes nothing of
+#: the authored world, so it asks for ``being.act`` beside the read of the world it acts in, and
+#: not for ``world.write``. The turn a played being is offered is a read
+#: (``GET .../society/play/{subject_id}/turn``, world.read).
+_BEING_ACTS: Final = _every(
+    _requires(_P.WORLD_READ, _P.BEING_ACT),
+    "POST /world/versions/{version_id}/society/play",
+    "POST /world/versions/{version_id}/society/play/{subject_id}/answer",
+    "POST /world/versions/{version_id}/society/play/{subject_id}/give-back",
+)
+
 #: Erasing a creature a workspace drafted from a person's words, or a world's society with every
 #: record of it, by itself or as a living town's people take in what was placed after they came
 #: (the society is erased and made again as a society of things): a change to the world, so
@@ -850,6 +920,8 @@ _WORLD_ERASURES: Final = _every(
     "DELETE /things/kinds/{kind_sha256}",
     "DELETE /world/versions/{version_id}/society",
     "POST /world/versions/{version_id}/society/take-in",
+    "DELETE /worlds/kinds/versions/{document_sha256}",
+    "DELETE /worlds/{world_id}",
 )
 
 #: Issuing, opening and revoking a door grant, and sending its visitors home: a change to who may
@@ -900,6 +972,35 @@ _GRANT_CHANNEL: Final[Mapping[str, Channel]] = MappingProxyType(
     }
 )
 
+# Browser membership and standing invitation are distinct authority requirements.
+_INVITATION_READS = _every(
+    BrowserRequires(frozenset({_P.WORLD_READ}), True),
+    "GET /world/invitations",
+    "GET /world/invitations/{grant_id}",
+)
+_INVITATION_WRITES = _every(
+    BrowserRequires(frozenset({_P.WORLD_WRITE, _P.DOOR_GRANT}), True),
+    "POST /world/invitations",
+    "POST /world/invitations/{grant_id}/revoke",
+)
+_PARTICIPATION_ENTRY = _every(
+    BrowserRequires(frozenset({_P.WORLD_ENTER})),
+    "GET /participation/notice",
+    "POST /participation/redeem",
+)
+_PARTICIPATION_READS = _every(
+    Granted(frozenset({_P.WORLD_ENTER})),
+    "GET /participation/{grant_id}",
+    "GET /participation/{grant_id}/society",
+    "GET /participation/{grant_id}/world",
+    "GET /participation/{grant_id}/world/files/{sha256}",
+    "GET /participation/{grant_id}/world/tiles/{baked_tile_id}/bytes",
+)
+_PARTICIPATION_LEAVE = _every(
+    Granted(frozenset({_P.WORLD_ENTER}), False),
+    "POST /participation/{grant_id}/leave",
+)
+
 #: Every section, in reading order. A route is declared by appearing in exactly one of them.
 ROUTE_RULE_SECTIONS: Final[
     tuple[Mapping[str, Public | Authentication | Requires | Channel], ...]
@@ -925,10 +1026,16 @@ ROUTE_RULE_SECTIONS: Final[
     _WORLD_WRITES,
     _WORLD_WRITES_READING_ADMISSION,
     _WORLD_READS_READING_ADMISSION,
+    _BEING_ACTS,
     _WORLD_ERASURES,
     _DOOR_GRANTS,
     _BRIDGE_CHANNEL,
     _GRANT_CHANNEL,
+    _INVITATION_READS,
+    _INVITATION_WRITES,
+    _PARTICIPATION_ENTRY,
+    _PARTICIPATION_READS,
+    _PARTICIPATION_LEAVE,
 )
 
 
@@ -1026,7 +1133,7 @@ def require(
     rule = rule_for(method, path)
     if isinstance(rule, Public | Authentication):
         return rule
-    if rule is None or isinstance(rule, Channel):
+    if rule is None or isinstance(rule, Channel | Granted):
         # No account permission reaches a channel route: its credential is the door's own.
         raise PermissionRefused(method=method, path=path, missing=frozenset())
     missing = rule.permissions - held

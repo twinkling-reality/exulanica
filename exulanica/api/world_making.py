@@ -544,7 +544,9 @@ def _make_place(
         draft,
         entry_id=created.entry_id,
         made=made,
-        left_out=(),
+        # Site omissions describe content/geometry/behavior. An overlapping setting phrase
+        # cannot fulfill one: sea beyond the site does not add a harbour basin or a boat.
+        left_out=_left_out(sent, outcome.not_supported_at, ()),
         look=worn.look,
         setting=worn.setting,
         calls=log.calls,

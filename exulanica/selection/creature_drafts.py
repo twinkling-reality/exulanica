@@ -36,6 +36,11 @@ A workspace tombstone ends the workspace's unfinished drafts in its own transact
 once that tombstone is written (:func:`create_draft`). A worker that drafted for a cancelled draft
 reads that its claim is gone and keeps nothing; a call it already sent finishes at the provider, and
 its answer is discarded.
+
+An optional reference ID is kept on the draft, never as copied note text in its job. Only the
+requester's completed or partial web notes for things may condition the draft. Usage distinguishes
+a response to that request, possible delivery without a response, and known non-delivery; neither
+the record nor the resulting origin ingredient claims a reference caused a particular field.
 """
 
 from __future__ import annotations
@@ -55,12 +60,23 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from exulanica.env import env_name
+from exulanica.epistemics.saved_names import PLACEHOLDER, redact_names, saved_names
 from exulanica.errors import ExulanicaError, TombstonedError
 from exulanica.models.client import ModelClient
-from exulanica.models.errors import ModelError
+from exulanica.models.errors import BudgetExceededError, ModelError
 from exulanica.models.manifest import Role
 from exulanica.models.policy import HostedRequestPolicy, HostedRequestRefused
 from exulanica.models.spending import SpendingRefused, spending_request_key
+from exulanica.models.usage import CallOutcome, CallUsage, CostBasis
+from exulanica.references import store as reference_store
+from exulanica.references.bundle import BASES, THINGS_PICTURE_PROFILE
+from exulanica.references.drafting import prompts_for_request
+from exulanica.references.for_drafting import (
+    NotesForDraft,
+    NotesRefused,
+    PictureNotesAuthority,
+    notes_for_draft,
+)
 from exulanica.selection.calls import CallLog
 from exulanica.selection.creature_drafting import (
     CHECK_SENTENCES,
@@ -146,6 +162,7 @@ FAILURE_CODES: Final = (
     "expired",
     "not_served",
     "request_refused",
+    "reference_withdrawn",
     "spending_refused",
     "stranded",
 )
@@ -164,7 +181,7 @@ _DURATION: Final = (
 _BLANKED: Final = "payload=jsonb_build_object('draft_id', payload->'draft_id')"
 _COLUMNS: Final = (
     "draft_id, owner_actor_id, job_id, status, kind_sha256, refusal_code, refusal_field, failure, "
-    "model_id, created_at, started_at, finished_at"
+    "model_id, created_at, started_at, finished_at, reference_id, reference_usage"
 )
 #: The code whose fixed sentence says only that a movement is not built; the grammar states each
 #: movement's own sentence, which a refusal naming that movement's field reads instead.
@@ -280,6 +297,8 @@ class CreatureDraft:
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    reference_id: uuid.UUID | None
+    reference_usage: Mapping[str, Any] | None
 
     @property
     def finished(self) -> bool:
@@ -335,6 +354,7 @@ def create_draft(
     words: str,
     sent: str,
     placeholders: Mapping[Any, str],
+    reference_id: uuid.UUID | None = None,
 ) -> CreatureDraft:
     """A new draft and its queued job.
 
@@ -383,9 +403,10 @@ def create_draft(
         ).fetchone()
         assert job is not None
         row = cursor.execute(
-            "insert into creature_draft (workspace_id, draft_id, owner_actor_id, job_id) "
-            f"values (%s, %s, %s, %s) returning {_COLUMNS}",
-            (workspace_id, draft_id, owner_actor_id, job["job_id"]),
+            "insert into creature_draft "
+            "(workspace_id, draft_id, owner_actor_id, job_id, reference_id) "
+            f"values (%s, %s, %s, %s, %s) returning {_COLUMNS}",
+            (workspace_id, draft_id, owner_actor_id, job["job_id"], reference_id),
         ).fetchone()
         assert row is not None
     return _draft(row)
@@ -487,6 +508,75 @@ def _holds(cursor: psycopg.Cursor[Any], claimed: ClaimedDraft) -> bool:
         (claimed.job_id, claimed.claim_token),
     ).fetchone()
     return row is not None
+
+
+class _ClaimLost(ExulanicaError):
+    """Another worker or workspace erasure ended this worker's authority."""
+
+
+def _unused_reference(code: str) -> dict[str, Any]:
+    return {"state": "not_used", "code": code, "bundle_sha256": None, "notes": 0, "basis": []}
+
+
+def _reference_usage(notes: NotesForDraft, *, completed: bool) -> dict[str, Any]:
+    return {
+        "state": "used" if completed else "unknown",
+        "code": None if completed else "reference_delivery_unknown",
+        "bundle_sha256": notes.provenance["bundle_sha256"],
+        "notes": notes.rendered.used,
+        "basis": list(notes.rendered.bases),
+    }
+
+
+def _record_reference_usage(
+    connection: psycopg.Connection, claimed: ClaimedDraft, usage: Mapping[str, Any]
+) -> None:
+    """Record only for the current claim, without extending a lock across a model request."""
+    with connection.transaction(), connection.cursor() as cursor:
+        if not _holds(cursor, claimed):
+            raise _ClaimLost()
+        cursor.execute(
+            "update creature_draft set reference_usage=%s where workspace_id=%s "
+            "and draft_id=%s and status='running'",
+            (Jsonb(dict(usage)), claimed.workspace_id, claimed.draft.draft_id),
+        )
+
+
+def _guard_reference(
+    connection: psycopg.Connection,
+    claimed: ClaimedDraft,
+    notes: NotesForDraft,
+    picture_guard: Callable[[psycopg.Connection], None] | None = None,
+) -> None:
+    """Inside each store transaction: workspace, optional privacy/lifecycle, claim, reference.
+
+    Picture-note authority uses no right-row or global asset-read lock here. Text-only checks
+    retain their reference-row boundary. No lock is held while a provider is called.
+    """
+    if picture_guard is not None:
+        _lock_picture_notes(connection, claimed.workspace_id)
+    with connection.cursor() as cursor:
+        if not _holds(cursor, claimed):
+            raise _ClaimLost()
+        cursor.execute(
+            "select reference_id from reference_request where workspace_id=%s "
+            "and reference_id=%s and owner_actor_id=%s for update",
+            (claimed.workspace_id, claimed.draft.reference_id, claimed.draft.owner_actor_id),
+        ).fetchone()
+    assert claimed.draft.reference_id is not None
+    current = notes_for_draft(
+        connection,
+        claimed.workspace_id,
+        claimed.draft.owner_actor_id,
+        claimed.draft.reference_id,
+        purpose="things",
+        bases=notes.rendered.bases,
+    )
+    if current.provenance != notes.provenance:
+        raise NotesRefused("reference_withdrawn")
+
+    if picture_guard is not None:
+        picture_guard(connection)
 
 
 def finish(
@@ -608,6 +698,15 @@ class _Database(Protocol):
     def session(self, workspace_id: uuid.UUID) -> AbstractContextManager[psycopg.Connection]: ...
 
 
+def _lock_picture_notes(connection: psycopg.Connection, workspace_id: uuid.UUID) -> None:
+    """Privacy currency before lifecycle, before the claim/reference rows; never right rows."""
+    connection.execute("select privacy_currency_lock(%s)", (workspace_id,))
+    connection.execute(
+        "select pg_advisory_xact_lock(hashtextextended(%s,0))",
+        (f"caption-vector-lifecycle:{workspace_id}",),
+    )
+
+
 class CreatureDraftWorker:
     """Plays the creature drafts of the workspaces it is given, one at a time per workspace."""
 
@@ -620,6 +719,7 @@ class CreatureDraftWorker:
         looks_for: Callable[[uuid.UUID], ContentAddressedStore],
         workspaces: Callable[[], Iterable[uuid.UUID]],
         worker: str = "creatures",
+        picture_notes_authority: PictureNotesAuthority | None = None,
     ) -> None:
         self._database = database
         self._client = client
@@ -627,6 +727,7 @@ class CreatureDraftWorker:
         self._looks_for = looks_for
         self._workspaces = workspaces
         self._worker = worker
+        self._picture_notes_authority = picture_notes_authority
 
     def run(self, stop: threading.Event, *, poll_seconds: float = 1.0) -> None:
         """Play every workspace's creature drafts until ``stop`` is set."""
@@ -657,64 +758,234 @@ class CreatureDraftWorker:
     def _play(self, claimed: ClaimedDraft) -> str:
         workspace_id = claimed.workspace_id
         client = self._client.with_policy(self._policy_for(workspace_id))
-        with self._database.session(workspace_id) as connection:
-            taken = frozenset(
-                row["key"]
-                for row in connection.execute(
-                    "select distinct key from thing_kind_version where workspace_id=%s",
-                    (workspace_id,),
-                ).fetchall()
-            )
         status = "failed"
         kind_sha256: str | None = None
         refusal: tuple[str, str | None] | None = None
         failure: str | None = None
         model_id: str | None = None
+        notes: NotesForDraft | None = None
+        reference_text: str | None = None
+        picture_rights: Mapping[uuid.UUID, tuple[uuid.UUID, ...]] | None = None
+        bases: tuple[str, ...] = ("web_description",)
+        selected_picture_request = False
+        placeholders = dict(claimed.placeholders)
+        # A reclaimed job must not call an earlier uncertain dispatch "not used" merely because
+        # durable spending refuses its repeated key. Only a known completed request upgrades it.
+        prior = claimed.draft.reference_usage
+        usage = dict(prior) if prior is not None else None
+        observed = False
+        uncertain = False
+
+        def record(value: Mapping[str, Any]) -> None:
+            nonlocal usage
+            with self._database.session(workspace_id) as connection:
+                _record_reference_usage(connection, claimed, value)
+            usage = dict(value)
+
+        def attempted(call: CallUsage) -> None:
+            nonlocal observed, uncertain
+            observed = True
+            assert notes is not None
+            if call.outcome is CallOutcome.COMPLETED:
+                record(_reference_usage(notes, completed=True))
+            elif (usage is not None and usage["state"] == "used") or uncertain:
+                return
+            elif call.cost_basis is CostBasis.NOT_SENT:
+                record(
+                    prior
+                    if prior and prior["state"] in ("used", "unknown")
+                    else _unused_reference("reference_not_sent")
+                )
+            else:
+                uncertain = True
+                record(_reference_usage(notes, completed=False))
+
+        def picture_guard(connection: psycopg.Connection) -> None:
+            nonlocal picture_rights
+            assert notes is not None and claimed.draft.reference_id is not None
+            if self._picture_notes_authority is None:
+                raise NotesRefused("reference_withdrawn")
+            picture_rights = self._picture_notes_authority(
+                connection,
+                workspace_id,
+                claimed.draft.owner_actor_id,
+                claimed.draft.reference_id,
+                notes.rendered.photographs,
+                picture_rights,
+            )
+
+        def before_attempt() -> None:
+            assert notes is not None and claimed.draft.reference_id is not None
+            with self._database.session(workspace_id) as connection, connection.transaction():
+                if notes.rendered.photographs:
+                    _lock_picture_notes(connection, workspace_id)
+                current = notes_for_draft(
+                    connection,
+                    workspace_id,
+                    claimed.draft.owner_actor_id,
+                    claimed.draft.reference_id,
+                    purpose="things",
+                    bases=bases,
+                )
+                if current.provenance != notes.provenance:
+                    raise NotesRefused("reference_withdrawn")
+                if notes.rendered.photographs:
+                    picture_guard(connection)
+            # Persist uncertainty before dispatch so a crash/reclaim cannot invent non-delivery.
+            record(
+                usage
+                if usage and usage["state"] == "used"
+                else _reference_usage(notes, completed=False)
+            )
+
         try:
+            with self._database.session(workspace_id) as connection:
+                taken = frozenset(
+                    row["key"]
+                    for row in connection.execute(
+                        "select distinct key from thing_kind_version where workspace_id=%s",
+                        (workspace_id,),
+                    ).fetchall()
+                )
+                if claimed.draft.reference_id is not None:
+                    source = reference_store.read_request(
+                        connection,
+                        workspace_id,
+                        claimed.draft.reference_id,
+                        owner_actor_id=claimed.draft.owner_actor_id,
+                    )
+                    if source is not None and source.purpose == "things":
+                        # New selected-picture requests fail closed after withdrawal, including
+                        # before their first attempt. Historical web-only fallback stays intact.
+                        selected_picture_request = source.prompts_sha256 == prompts_for_request(
+                            "things", pictures=True
+                        ).sha256 and any(
+                            step.get("step") == "read_picture" for step in source.steps
+                        )
+                        if (
+                            source.bundle is not None
+                            and source.bundle.get("profile") == THINGS_PICTURE_PROFILE
+                        ):
+                            selected_picture_request = bool(source.bundle.get("pictures"))
+                            if self._picture_notes_authority is not None:
+                                bases = BASES
+                    try:
+                        notes = notes_for_draft(
+                            connection,
+                            workspace_id,
+                            claimed.draft.owner_actor_id,
+                            claimed.draft.reference_id,
+                            purpose="things",
+                            bases=bases,
+                        )
+                    except NotesRefused as refused:
+                        if (
+                            prior and prior["state"] in ("used", "unknown")
+                        ) or selected_picture_request:
+                            raise
+                        _record_reference_usage(
+                            connection, claimed, _unused_reference(refused.code)
+                        )
+                    else:
+                        if selected_picture_request and self._picture_notes_authority is None:
+                            raise NotesRefused("reference_withdrawn")
+                        if (
+                            prior
+                            and prior["state"] in ("used", "unknown")
+                            and prior["bundle_sha256"] != notes.provenance["bundle_sha256"]
+                        ):
+                            raise NotesRefused("reference_withdrawn")
+                        sent_notes = redact_names(
+                            notes.rendered.text,
+                            saved_names(connection, workspace_id),
+                            placeholders,
+                            reserved=[
+                                match.group(0) for match in PLACEHOLDER.finditer(claimed.sent)
+                            ],
+                        )
+                        reference_text = sent_notes.text
+                        placeholders.update(sent_notes.placeholders)
+            if notes is not None:
+                client = client.with_attempts(attempted)
             outcome = draft_creature(
                 client,
                 claimed.sent,
                 role=Role.CREATURE_DRAFTER,
                 taken=taken,
-                placeholders=claimed.placeholders,
+                placeholders=placeholders,
                 log=CallLog(),
+                reference_text=reference_text,
+                reference_bundle_sha256=None
+                if notes is None
+                else str(notes.provenance["bundle_sha256"]),
+                before_attempt=None if notes is None else before_attempt,
+                photographs=frozenset() if notes is None else notes.rendered.photographs,
             )
             model_id = outcome.model_id
             if outcome.creature is not None:
                 with self._database.session(workspace_id) as connection:
-                    # A cancelled draft keeps nothing: its claim is read first, without holding a
-                    # lock across the keep, and a keep that races the workspace's tombstone is
-                    # refused by the store or erased with the workspace (migration 0161).
                     if not _claim_held(connection, claimed):
                         return "lost"
                     ThingStore(
                         connection, workspace_id, self._looks_for(workspace_id)
-                    ).keep_creature(outcome.creature, created_by=claimed.draft.owner_actor_id)
+                    ).keep_creature(
+                        outcome.creature,
+                        created_by=claimed.draft.owner_actor_id,
+                        guard=None
+                        if notes is None
+                        else lambda: _guard_reference(
+                            connection,
+                            claimed,
+                            notes,
+                            picture_guard if notes.rendered.photographs else None,
+                        ),
+                    )
                 status = "kept"
                 kind_sha256 = outcome.creature.kind.sha256
             else:
                 assert outcome.refusal is not None
                 check = outcome.refusal.check
                 status = "refused"
-                # The refusing check's code and the form's field it refused; never its sentence,
-                # which may quote the drafted label.
                 refusal = (
                     (str(outcome.refusal.code), None)
                     if check is None
                     else (check[0], refusal_field(check[1]))
                 )
+        except _ClaimLost:
+            return "lost"
+        except NotesRefused:
+            if not observed and not (prior and prior["state"] in ("used", "unknown")):
+                try:
+                    record(_unused_reference("reference_withdrawn"))
+                except _ClaimLost:
+                    return "lost"
+            failure = "reference_withdrawn"
         except ThingStoreRefused as refused:
             status, refusal = "refused", (refused.code, None)
-        except SpendingRefused:
-            failure = "spending_refused"
-        except HostedRequestRefused:
-            failure = "request_refused"
+        except (SpendingRefused, HostedRequestRefused, BudgetExceededError) as refused:
+            if notes is not None and not observed:
+                try:
+                    record(
+                        prior
+                        if prior and prior["state"] in ("used", "unknown")
+                        else _unused_reference("reference_not_sent")
+                    )
+                except _ClaimLost:
+                    return "lost"
+            failure = (
+                "spending_refused"
+                if isinstance(refused, SpendingRefused)
+                else (
+                    "request_refused"
+                    if isinstance(refused, HostedRequestRefused)
+                    else "drafter_unavailable"
+                )
+            )
         except ModelError:
             failure = "drafter_unavailable"
         if failure is not None:
             status = "failed"
         if refusal is not None and refusal[0] not in refusal_codes():
-            # The lists are closed: a refusal outside them is carried under the drafter's own code.
             refusal = ("creature_not_drafted", None)
         with self._database.session(workspace_id) as connection:
             finished = finish(

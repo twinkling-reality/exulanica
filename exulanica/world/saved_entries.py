@@ -45,6 +45,7 @@ from exulanica.world.style_structure import (
     StyleVersionRef,
     raise_for_incompatible_structure_style,
 )
+from exulanica.world.terrain_authoring import TERRAIN_COMPOSER_VERSIONS
 from exulanica.world.worlds import (
     AUTHORED_STARTER,
     GENERATED,
@@ -232,6 +233,8 @@ class SavedWorldEntry:
     #: What to draw of a world made from a world kind (``GeneratedSite``): its kind, region and
     #: where a person arrives; None for every other world.
     generated_site: object | None = None
+    #: The retained terrain source and entry, with no implicit flat kind or society.
+    generated_terrain: object | None = None
     #: The engine a society over this world is created with: the engine table's for the ground its
     #: snapshot's composer states (:func:`~exulanica.world.society_grounds.created_engine`); None
     #: for a world no ground is stated for.
@@ -573,6 +576,66 @@ class SavedWorldEntryRepository:
                 created_by=created_by,
                 source_kind="generated",
             )
+
+    def create_from_terrain(
+        self,
+        *,
+        title: str,
+        authoring: dict,
+        created_by: uuid.UUID,
+        compose: Callable[[dict, str], ComposedWorld] | None = None,
+        fixed_world_id: str | None = None,
+    ) -> SavedWorldEntry:
+        """Admit outside the write lock, then atomically save all generated-source authorities."""
+        from exulanica.db.read_check import lock_asset_reads_until_commit
+        from exulanica.world.composers.site_plan import compose_terrain, receipt_terrain
+        from exulanica.world.generated_worlds import create_terrain_world_authorities
+        from exulanica.world.kinds.worker import TerrainDressingWorkerCompiler
+        from exulanica.world.reviewed_catalog import ReviewedCatalog
+        from exulanica.world.terrain_authoring import read_terrain_authoring
+        from exulanica.world.terrain_dressing_authority import (
+            require_terrain_dressing_current,
+            resolve_terrain_dressing,
+        )
+
+        clean_title = _clean_title(title)
+        refuse_past_limit(self.connection, self.workspace_id, GENERATED, guest=self.guest)
+        world_id = fixed_world_id if fixed_world_id is not None else new_world_id(GENERATED)
+        source = read_terrain_authoring(authoring)
+        catalog = ReviewedCatalog(self.connection)
+        resolved = resolve_terrain_dressing(
+            catalog,
+            self.store,
+            source,
+            compile_coverage=TerrainDressingWorkerCompiler(self.workspace_id),
+        )
+        composed = (compose or compose_terrain)(authoring, world_id)
+        if receipt_terrain(composed.receipt).sha256 != source.sha256:
+            raise InvalidStructuralData("terrain composed source differs from admitted input")
+        with self.connection.transaction():
+            self._lock_workspace()
+            _, style, authored_version_id = create_terrain_world_authorities(
+                self.connection,
+                workspace_id=self.workspace_id,
+                actor=created_by,
+                title=clean_title,
+                composed=composed,
+                guest=self.guest,
+            )
+            created = self.create(
+                world_id=world_id,
+                title=clean_title,
+                authored_version_id=authored_version_id,
+                style_version_id=style.version_id,
+                created_by=created_by,
+                source_kind="generated",
+            )
+            if resolved is not None:
+                lock_asset_reads_until_commit(
+                    self.connection, outside="terrain creation requires its write transaction"
+                )
+                require_terrain_dressing_current(catalog, resolved)
+        return created
 
     def update(
         self,
@@ -1592,6 +1655,7 @@ class SavedWorldEntryRepository:
         from exulanica.world.generated_worlds import (
             generated_ground,
             generated_site,
+            generated_terrain,
             states_site,
             unreadable_reason,
         )
@@ -1614,6 +1678,11 @@ class SavedWorldEntryRepository:
         # of the listing every other world of the workspace is read in.
         ground: object | None = None
         site: object | None = None
+        terrain: object | None = None
+        is_terrain = (
+            row["composer_key"] == "site-plan"
+            and row["composer_version"] in TERRAIN_COMPOSER_VERSIONS
+        )
         unreadable: str | None = None
         if world_kind(str(row["world_kind"])).draws_generated_tiles:
             scope = (
@@ -1623,7 +1692,21 @@ class SavedWorldEntryRepository:
                 row["source_snapshot_id"],
             )
             try:
-                if states_site(*scope):
+                if is_terrain:
+                    terrain = generated_terrain(*scope)
+                    if row["composer_version"] == 4:
+                        from exulanica.world.composers.site_plan import receipt_terrain
+                        from exulanica.world.generated_worlds import generation_receipt
+                        from exulanica.world.reviewed_catalog import ReviewedCatalog
+                        from exulanica.world.terrain_dressing_authority import (
+                            require_terrain_dressing_available,
+                        )
+
+                        _, receipt = generation_receipt(*scope)
+                        require_terrain_dressing_available(
+                            ReviewedCatalog(self.connection), self.store, receipt_terrain(receipt)
+                        )
+                elif states_site(*scope):
                     site = generated_site(*scope)
                 else:
                     ground = generated_ground(*scope)
@@ -1631,6 +1714,8 @@ class SavedWorldEntryRepository:
                 unreadable = unreadable_reason(exc)
         unavailable = source_invalidated or authored_changed or unreadable is not None
         try:
+            if is_terrain:
+                raise UnknownSocietyGround("terrain_society_projection_unavailable")
             society_ground = society_ground_for_composer(str(row["composer_key"]))
         except UnknownSocietyGround:
             society_engine = holding_things = None
@@ -1666,9 +1751,10 @@ class SavedWorldEntryRepository:
             source_snapshot_id=row["source_snapshot_id"],
             source_snapshot_sha256=row["snapshot_sha256"],
             authored_scene=scene,
-            declared_floor=declared_floor(str(row["composer_key"])),
+            declared_floor=None if is_terrain else declared_floor(str(row["composer_key"])),
             generated_ground=ground,
             generated_site=site,
+            generated_terrain=terrain,
             society_engine=society_engine,
             society_engine_holding_things=holding_things,
             authored_version_id=row["authored_version_id"],

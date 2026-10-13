@@ -114,8 +114,10 @@ single project-sized specification and dozens of fragments needed to understand 
 
 Identify a thing by what it is, not by when someone looked at it. Titles name subjects, not
 sessions. Prefer present tense and concrete behavior. Avoid freshness claims such as "currently",
-"new", "soon" and "now supports". Use **requirement**, **implemented boundary**, **hypothesis** or
-**measured result** where readers need the distinction; these labels are not substitutes for proof.
+"new", "soon", "latest", "eventually", "as of this writing" and "now supports" when they describe
+a feature's age or a plan. Use **requirement**, **implemented boundary**,
+**hypothesis** or **measured result** where readers need the distinction; these labels are not
+substitutes for proof.
 
 Dates belong to measurements and decisions. Versions belong to actual contracts, model revisions
 and artifacts. Do not use a date or version number merely to imply that prose is up to date.
@@ -130,6 +132,42 @@ prose conventions. Explain a negative boundary when readers could otherwise assu
 Verify code paths, commands, route names and configuration against their definitions. Correct a
 false statement only with evidence; otherwise record the unresolved discrepancy. Do not rewrite
 facts to make prose smoother. Source and permission requirements remain visible after consolidation.
+
+Guides answer a task and link to the contract for rules and lookups. A decision record keeps one
+choice, the alternatives and the consequences. It is not a second specification, and a reversed
+decision stays marked superseded. Do not reorganize the tree to match an outside documentation
+diagram when that would change a stable address.
+
+## Comments and docstrings
+
+Comments and docstrings follow the same prose rules. State purpose, invariants, surprising
+decisions, units, contracts and failure behavior. Do not restate the next line, narrate a work
+session, or record who asked for a change.
+
+Leave license headers, type documentation, tool directives, lint and type suppressions, doctests,
+SQL hints and source maps as they are. Do not edit a comment in a way that changes a runtime
+string, an exception message, a served schema description or digest-bearing data. When a docstring
+is copied into a generated schema, change it through the owner that generates the schema and
+regenerate.
+
+## Public pages
+
+The public name is Worlds for AI Agents. [Product direction](product-direction.md) owns that name.
+A description of the world, the models, or a comparison does not replace it.
+
+The website may summarize a contract. It does not become a second specification. A sentence on
+the site that states a behavior, a permission, a default, or a limit must match the owner. When
+that behavior changes, update the sentence or replace it with a link. Do not copy contract tables
+onto the site in order to keep them aligned by hand.
+
+Write a public page for the person doing that task. Use short sentences, active voice, and "you"
+in procedures. Do not pre-announce a feature. State a limit as a present boundary.
+
+Documentation lives in Git as Markdown, with the same review as code and the checks below. Do not
+add another documentation toolchain for its own sake.
+
+The OpenAPI summary is served text. Change it only together with the snapshot the API surface
+test pins. Do not regenerate that snapshot from a tree whose routes are still unfinished.
 
 ## Evidence labels
 

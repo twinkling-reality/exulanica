@@ -1,3 +1,4 @@
+import { button } from '../ui/system/components.js';
 /** Choosing between saved worlds. The one-world states live in `ui/startup-state.ts`. */
 
 import { tierPolicy } from '@exulanica/companion-runtime';
@@ -7,12 +8,14 @@ import type {
   PersonalWorldState,
   SavedWorldEntry,
 } from '../world-entry-api.js';
-import { fill, say } from '../ui/copy.js';
-import { el } from '../ui/dom.js';
+import { say } from '../ui/copy.js';
+import { el, commandAction } from '../ui/dom.js';
+import { buildGenerationDetails } from '../ui/generation-details.js';
 import '../ui/your-worlds.css';
 
 export interface WorldEntrySurface {
   readonly entries: readonly SavedWorldEntry[];
+  readonly initialEntryId?: string;
   readonly open: (entry: SavedWorldEntry) => Promise<void>;
   readonly adoptLatest: (entry: SavedWorldEntry) => Promise<void>;
   /**
@@ -27,8 +30,8 @@ export interface WorldEntrySurface {
   /** A picture of a saved world, or null where there is none to show. */
   readonly picture?: (entry: SavedWorldEntry) => string | null;
   /**
-   * Opens Create a world holding the values a generated world was made with, so a new world can be
-   * made from them; the world itself never changes. Absent where nothing can be made.
+   * Opens the saved generation parameters for inspection. Creating a new world from them is a
+   * separate action; the world itself never changes. Absent where nothing can be shown.
    */
   readonly viewValues?: (entry: SavedWorldEntry) => void;
 }
@@ -45,18 +48,9 @@ export interface WorldEntrySurfaceHandle {
   setCreate(state: WorldEntryCreateState): void;
 }
 
-const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
-const SHORT_DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-
 /** The values a generated world was made with, as its entry serves them, or null where there are none. */
 function valuesOf(entry: SavedWorldEntry): Readonly<Record<string, number | string>> | null {
   return entry.generatedGround?.values ?? null;
-}
-
-/** A day as a person reads it, from an ISO time the server served; null when it is not one. */
-function servedDay(iso: string, format: Intl.DateTimeFormat): string | null {
-  const time = Date.parse(iso);
-  return Number.isNaN(time) ? null : format.format(time);
 }
 
 /**
@@ -69,29 +63,6 @@ export function onlyUntouchedStarter(entries: readonly SavedWorldEntry[]): boole
     && only.currentAuthoredEditSeq === 0;
 }
 
-/** What kind of world an entry is, and that it keeps its changes: a card's detail, said once. */
-function worldKind(entry: SavedWorldEntry): string {
-  if (entry.generatedGround != null) return fill('world.entry.generated', { recipe: entry.generatedGround.recipeLabel });
-  if (entry.generatedSite != null) return fill('world.entry.generated', { recipe: entry.generatedSite.kindLabel });
-  return `${say(entry.sourceKind === 'authored' ? 'yourWorlds.kind.authored' : 'yourWorlds.kind.personal')}`
-    + ' · saved changes and appearance';
-}
-
-/** The sentence under a world's title: what it is, and that it opens where it was left. */
-function worldAbout(entry: SavedWorldEntry): string {
-  if (entry.availability !== 'available') return unavailableMessage(entry.unavailableReason);
-  if (entry.generatedGround != null) {
-    const label = entry.generatedGround.recipeLabel;
-    return fill('yourWorlds.about.generated', { recipe: label.charAt(0).toLowerCase() + label.slice(1) });
-  }
-  if (entry.generatedSite != null) return fill('yourWorlds.about.site', { kind: entry.generatedSite.kindLabel });
-  return entry.sourceKind === 'authored'
-    ? (entry.currentAuthoredEditSeq === 0 ? say('yourWorlds.about.starter') : say('yourWorlds.about.authored'))
-    : say('yourWorlds.about.personal');
-}
-
-const kbd = (text: string): HTMLElement => el('kbd', { text });
-
 /** Whether a key press belongs to a field a person is typing in, where no shortcut may fire. */
 function typing(target: EventTarget | null): boolean {
   return target instanceof HTMLElement
@@ -101,11 +72,8 @@ function typing(target: EventTarget | null): boolean {
 /**
  * Your worlds: the first thing a signed-in person sees, before any world opens.
  *
- * The chosen world is named large with what it is, when it was established and its actions; under
- * it a strip of cards holds every saved world, newest first, and Create a world. Moving to a card
- * (pointer or arrow keys) chooses it; pressing a card, or Open, opens it. A person whose only world
- * is the untouched starter is asked to create one instead. Keys: arrows choose, Enter opens, N
- * creates; none fires while a person types.
+ * The chosen world is named large with Open World and View Parameters. A strip holds saved
+ * worlds newest first. Create World sits below the selected world's actions. Clicking a card selects it; Open World, Enter or a double click opens it. Keys: arrows choose, Enter opens, N creates; none fires in a field.
  *
  * Opening a world that fails says why in the status line under the title and leaves the choice
  * open. A world changed elsewhere keeps its reconciliation: the acknowledgement and the adopt
@@ -117,7 +85,6 @@ export function buildWorldEntrySurface(deps: WorldEntrySurface): HTMLElement {
 
 export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandle {
   const entries = [...deps.entries].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
-  const first = onlyUntouchedStarter(entries);
   const arrivalFailure = deps.arrivalFailure ?? null;
   const status = el('p', {
     class: 'gate-failure world-entry-status your-worlds-status', role: 'status', 'aria-live': 'polite',
@@ -125,65 +92,38 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
   status.hidden = arrivalFailure === null;
   if (arrivalFailure !== null) status.textContent = arrivalFailure;
 
-  const heading = el('h1', { class: 'your-worlds-title' });
-  const about = el('p', { class: 'your-worlds-about' });
-  const meta = el('p', { class: 'your-worlds-meta' });
-  const openButton = el('button', { type: 'button', class: 'your-worlds-open', 'data-action': 'worlds.open' }, [
-    el('span', { text: say('yourWorlds.open') }), kbd('↵'),
-  ]);
-  const values = el('button', {
-    type: 'button', class: 'your-worlds-secondary your-worlds-values', 'data-action': 'worlds.values',
-    'aria-describedby': 'your-worlds-values-why',
-  }, [el('span', { text: say('yourWorlds.values') }), kbd('V')]);
+  const heading = el('h1', { class: 'your-worlds-title', text: 'Your worlds' });
+  const openButton = button({ label: say('yourWorlds.open'), variant: 'primary', size: 'lg', className: 'your-worlds-open' });
+  openButton.dataset['action'] = 'worlds.open';
+  openButton.setAttribute('aria-keyshortcuts', 'Enter');
+  const values = button({ label: say('yourWorlds.values'), size: 'lg', className: 'your-worlds-values' });
+  values.dataset['action'] = 'worlds.values';
+  values.setAttribute('aria-describedby', 'your-worlds-values-why');
+  values.setAttribute('aria-keyshortcuts', 'V');
   const valuesWhy = el('span', { id: 'your-worlds-values-why', class: 'your-worlds-hint', text: say('yourWorlds.values.none') });
-  const createButton = el('button', {
-    type: 'button', class: 'your-worlds-secondary your-worlds-create-action', 'data-action': 'worlds.create',
-  }, [el('span', { text: say('yourWorlds.create') }), kbd('N')]);
+  const createButton = button({ label: say('yourWorlds.create'), variant: 'secondary', size: 'lg', className: 'your-worlds-create' });
+  createButton.dataset['action'] = 'worlds.create';
+  createButton.setAttribute('aria-keyshortcuts', 'N');
+  for (const control of [openButton, values, createButton]) control.classList.add('entry-command');
+  openButton.replaceChildren(...commandAction('↵', say('yourWorlds.open')));
+  values.replaceChildren(...commandAction('V', say('yourWorlds.values')));
+  createButton.replaceChildren(...commandAction('N', say('yourWorlds.create')));
   const reconcile = el('div', { class: 'your-worlds-reconcile' });
-  const actions = el('div', { class: 'your-worlds-actions' }, [openButton, values, createButton]);
+  const actions = el('div', { class: 'your-worlds-actions' }, [openButton, values]);
 
   const lede = el('section', { class: 'your-worlds-lede', 'aria-live': 'polite', 'aria-atomic': 'false' }, [
-    el('p', { class: 'your-worlds-overline' }),
-    heading, about, actions, valuesWhy, meta, status, reconcile,
+    actions, valuesWhy,
+    el('div', { class: 'your-worlds-create-row' }, [createButton]),
+    status, reconcile,
   ]);
   const list = el('section', { class: 'world-entry-list your-worlds-strip', 'aria-label': say('yourWorlds.strip') });
-  const keys = el('p', { class: 'your-worlds-keys', 'aria-hidden': 'true' }, [
-    el('span', {}, [kbd('← →'), say('yourWorlds.key.choose')]),
-    el('span', {}, [kbd('↵'), say('yourWorlds.key.open')]),
-    el('span', { class: 'your-worlds-key-create' }, [kbd('N'), say('yourWorlds.create')]),
-  ]);
   const corner = el('header', { class: 'your-worlds-corner' }, [
-    el('span', { class: 'your-worlds-mark', 'aria-hidden': 'true' }, [el('i'), el('i')]),
-    el('span', { class: 'your-worlds-rule', 'aria-hidden': 'true' }),
-    el('p', { class: 'world-entry-brand your-worlds-label' }, [
-      el('span', { text: 'Exulanica' }), el('span', { text: say('yourWorlds.label') }),
-    ]),
+    el('p', { class: 'world-entry-brand your-worlds-wordmark', text: 'exulanica' }),
+    heading,
   ]);
-  // The chosen world's picture behind the page, faded into it at the edges; two layers so a new
-  // choice fades in over the last. A world with no picture shows the plain page.
-  const layers = [el('img', { alt: '', decoding: 'async' }), el('img', { alt: '', decoding: 'async' })];
-  const backdrop = el('div', { class: 'your-worlds-backdrop', 'aria-hidden': 'true' }, layers);
-  let front = 0;
-  const showBackdrop = (picture: string | null): void => {
-    const current = layers[front]!;
-    if (picture === null) {
-      for (const layer of layers) layer.classList.remove('is-shown');
-      root.dataset['backdrop'] = 'none';
-      return;
-    }
-    root.dataset['backdrop'] = 'picture';
-    if (current.classList.contains('is-shown') && current.getAttribute('src') === picture) return;
-    front = 1 - front;
-    const next = layers[front]!;
-    next.setAttribute('src', picture);
-    next.classList.add('is-shown');
-    current.classList.remove('is-shown');
-  };
   const root = el('main', {
-    class: 'gate world-entry-gate your-worlds', 'data-variant': first ? 'first' : 'worlds',
-    // The way in is a stage: dark in every scheme (tokens.css), as the world keeps its own light.
-    'data-ui-stage': 'dark',
-  }, [backdrop, corner, keys, lede, list]);
+    class: 'gate world-entry-gate your-worlds entry-surface',
+  }, [corner, list, lede]);
 
   const cards: HTMLButtonElement[] = [];
   let chosen: SavedWorldEntry | null = null;
@@ -246,35 +186,20 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
     ]));
   };
 
-  const overline = lede.querySelector('.your-worlds-overline') as HTMLElement;
   const choose = (entry: SavedWorldEntry): void => {
     if (chosen === entry) return;
     chosen = entry;
     for (const card of cards) card.setAttribute('aria-current', String(card.dataset['entryId'] === entry.entryId));
-    overline.textContent = first ? '' : fill('yourWorlds.position', {
-      position: String(entries.indexOf(entry) + 1), count: String(entries.length),
-    });
-    heading.textContent = first ? say('yourWorlds.first.title') : entry.title;
-    about.textContent = first ? say('yourWorlds.first.about') : worldAbout(entry);
-    const established = servedDay(entry.createdAt, DAY);
-    meta.replaceChildren(...[
-      established === null ? null : el('b', { text: fill('yourWorlds.established', { day: established }) }),
-      el('span', {
-        text: entry.generatedGround != null
-          ? fill('yourWorlds.from', { recipe: entry.generatedGround.recipeLabel })
-          : entry.generatedSite != null
-          ? fill('yourWorlds.from', { recipe: entry.generatedSite.kindLabel })
-          : say(entry.sourceKind === 'authored' ? 'yourWorlds.kind.authored' : 'yourWorlds.kind.personal'),
-      }),
-    ].filter((part): part is HTMLElement => part !== null));
+    openButton.setAttribute('aria-label', `Open ${entry.title}`);
     openButton.disabled = entry.availability !== 'available';
-    openButton.querySelector('span')!.textContent = first
-      ? fill('yourWorlds.openNamed', { title: entry.title })
-      : say('yourWorlds.open');
-    // With only the untouched starter, creating is the action asked for and opening the starter
-    // the alternative, so the two swap places and weight.
-    actions.dataset['primary'] = first ? 'create' : 'open';
-    showBackdrop(first ? null : deps.picture?.(entry) ?? null);
+
+    if (entry.availability !== 'available') {
+      status.hidden = false;
+      status.textContent = unavailableMessage(entry.unavailableReason);
+    } else {
+      status.hidden = arrivalFailure === null;
+      status.textContent = arrivalFailure ?? '';
+    }
     values.hidden = entry.generatedGround == null || deps.viewValues === undefined;
     const viewable = valuesOf(entry) !== null;
     values.setAttribute('aria-disabled', String(!viewable));
@@ -284,7 +209,6 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
 
   for (const entry of entries) {
     const picture = deps.picture?.(entry) ?? null;
-    const established = servedDay(entry.createdAt, SHORT_DAY);
     const unavailable = entry.availability !== 'available';
     const card = el('button', {
       type: 'button', class: 'world-entry-choice your-worlds-card', 'data-entry-id': entry.entryId,
@@ -293,32 +217,18 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
       el('span', { class: 'your-worlds-picture', 'aria-hidden': 'true' }, picture === null ? [] : [
         el('img', { src: picture, alt: '', loading: 'lazy', decoding: 'async' }),
       ]),
-      el('span', { class: 'your-worlds-caption', text: established === null ? '' : fill('yourWorlds.caption', { day: established }) }),
       el('span', { class: 'world-entry-choice-title', text: entry.title }),
-      el('span', {
-        class: 'world-entry-choice-detail',
-        text: unavailable ? unavailableMessage(entry.unavailableReason) : worldKind(entry),
-      }),
+      ...(unavailable ? [el('span', {
+        class: 'world-entry-choice-detail', text: unavailableMessage(entry.unavailableReason),
+      })] : []),
     ]);
-    card.addEventListener('focus', () => choose(entry));
-    card.addEventListener('pointerenter', () => choose(entry));
-    card.addEventListener('click', () => {
-      choose(entry);
-      openEntry(entry, card);
-    });
+    const current = (): SavedWorldEntry => entries.find(item => item.entryId === entry.entryId)!;
+    card.addEventListener('focus', () => choose(current()));
+    card.addEventListener('click', () => choose(current()));
+    card.addEventListener('dblclick', () => openEntry(current(), card));
     cards.push(card);
     list.append(el('article', { class: 'world-entry-item' }, [card]));
   }
-
-  const createCard = el('button', {
-    type: 'button', class: 'your-worlds-card your-worlds-create', 'data-action': 'worlds.create-card',
-  }, [
-    el('span', { class: 'your-worlds-picture', 'aria-hidden': 'true' }, [el('span', { class: 'your-worlds-plus', text: '+' })]),
-    el('span', { class: 'your-worlds-caption', text: say('yourWorlds.create.caption') }),
-    el('span', { class: 'world-entry-choice-title', text: say('yourWorlds.create') }),
-    el('span', { class: 'world-entry-choice-detail your-worlds-create-detail', text: say('yourWorlds.create.detail') }),
-  ]);
-  list.append(el('article', { class: 'world-entry-item' }, [createCard]));
 
   const create = (): void => {
     if (deps.create === undefined) return;
@@ -329,7 +239,6 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
     }
     deps.create();
   };
-  createCard.addEventListener('click', create);
   createButton.addEventListener('click', create);
   openButton.addEventListener('click', () => {
     if (chosen === null) return;
@@ -343,18 +252,21 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
       status.textContent = say('yourWorlds.values.none');
       return;
     }
-    deps.viewValues?.(chosen);
+    const entry = chosen;
+    buildGenerationDetails({ entry, ...(deps.viewValues === undefined ? {} : {
+      createFrom: () => deps.viewValues!(entry),
+    }) }).show();
   };
   values.addEventListener('click', viewValues);
 
   root.addEventListener('keydown', (event) => {
     if (event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) return;
-    const all = [...cards, createCard];
+    const all = [...cards, createButton];
     const at = all.indexOf(document.activeElement as HTMLButtonElement);
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
       event.preventDefault();
       const step = event.key === 'ArrowRight' ? 1 : -1;
-      const from = at >= 0 ? at : Math.max(0, cards.findIndex((card) => card.dataset['entryId'] === chosen?.entryId));
+      const from = at >= 0 ? at : Math.max(0, all.findIndex((card) => card.dataset['entryId'] === chosen?.entryId));
       all[Math.min(all.length - 1, Math.max(0, from + step))]?.focus();
       return;
     }
@@ -369,7 +281,7 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
       return;
     }
     // Enter on a focused control is that control's own press; elsewhere it opens the chosen world.
-    if (event.key === 'Enter' && !(event.target instanceof HTMLButtonElement) && chosen !== null) {
+    if (event.key === 'Enter' && (!(event.target instanceof HTMLButtonElement) || event.target.classList.contains('your-worlds-card')) && chosen !== null) {
       event.preventDefault();
       openButton.click();
     }
@@ -383,21 +295,16 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
     createState = state;
     const offered = createOffered();
     root.dataset['create'] = deps.create === undefined ? 'unsupported' : state.state;
-    for (const control of [createCard, createButton]) {
+    for (const control of [createButton]) {
       if (offered) control.removeAttribute('aria-disabled');
       else control.setAttribute('aria-disabled', 'true');
     }
-    createCard.hidden = deps.create === undefined;
     createButton.hidden = deps.create === undefined;
-    (keys.querySelector('.your-worlds-key-create') as HTMLElement).hidden = deps.create === undefined;
-    const detail = createCard.querySelector('.your-worlds-create-detail') as HTMLElement;
-    detail.textContent = offered || state.words === null ? say('yourWorlds.create.detail') : state.words.happened;
+
   };
   setCreate(createState);
-  if (entries[0] !== undefined) choose(entries[0]);
-  // The first world's own card is the button of record when it is the untouched starter: creating
-  // is the action asked for, opening the starter the alternative.
-  root.dataset['first'] = String(first);
+  const initial = entries.find(entry => entry.entryId === deps.initialEntryId) ?? entries[0];
+  if (initial !== undefined) choose(initial);
   return { root, setCreate };
 }
 
@@ -497,6 +404,9 @@ export function buildPersonalWorldChoice(deps: PersonalWorldChoice): PersonalWor
     current = state;
     root.dataset['state'] = state === null ? 'unknown' : state.action ?? 'refused';
     const action = state?.action ?? null;
+    // The library offers photographs only when there is something to act on. Keep failures of
+    // an attempted action visible, including after the server refreshes an empty source.
+    root.hidden = action === null && (state === null || state.photographs.reviewed === 0) && failure.hidden;
     status.textContent = state === null
       ? 'Checking your reviewed photographs…'
       : state.refusal !== null
@@ -532,7 +442,6 @@ export function buildPersonalWorldChoice(deps: PersonalWorldChoice): PersonalWor
     try {
       // A refused press keeps its words on screen through this read; only a new press clears them.
       show(await deps.read());
-      root.hidden = false;
     } catch (error) {
       // A person whose access holds no photographs (a guest) is offered nothing about them.
       if (error instanceof ApiError && error.status === 403 && error.code === 'not_authorised') {
@@ -540,6 +449,7 @@ export function buildPersonalWorldChoice(deps: PersonalWorldChoice): PersonalWor
         return;
       }
       show(null);
+      root.hidden = false;
       status.textContent = entryFailure(error, 'Your photographs could not be checked.');
     }
   };

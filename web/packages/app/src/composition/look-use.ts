@@ -16,6 +16,7 @@
  * its Now card asks for the listed pack like any other.
  */
 
+import { lookChoiceId } from '../ui/look-sheet.js';
 import type { WorldStylePackBinding } from '../world-style-api.js';
 
 export interface LookUse {
@@ -28,7 +29,7 @@ export interface LookUse {
 }
 
 export function lookToUse(pressed: {
-  readonly option: { readonly packId: string; readonly title: string };
+  readonly option: { readonly packId: string; readonly choiceId?: string; readonly title: string };
   /** The card pressed is the one the world is drawn in now. */
   readonly isNow: boolean;
   /** The part chosen for each axis that has one; undefined from a sheet that shows no setting. */
@@ -41,14 +42,14 @@ export function lookToUse(pressed: {
   readonly earlierPackId: string | null;
 }): LookUse {
   const { option, setting, worn } = pressed;
-  const settingOnly = pressed.isNow && setting !== undefined && worn !== null && worn.own === undefined
+  const settingOnly = pressed.isNow && setting !== undefined && worn !== null && (worn.own === undefined || pressed.listed.own?.wearable === true)
     && worn.packId === option.packId;
   const pack: WorldStylePackBinding = settingOnly
-    ? { packId: worn.packId, version: worn.version, manifestSha256: worn.manifestSha256 }
-    : { packId: pressed.listed.packId, version: pressed.listed.version, manifestSha256: pressed.listed.manifestSha256 };
+    ? { packId: worn.packId, version: worn.version, manifestSha256: worn.manifestSha256, ...(worn.own === undefined ? {} : { own: worn.own }) }
+    : { packId: pressed.listed.packId, version: pressed.listed.version, manifestSha256: pressed.listed.manifestSha256, ...(pressed.listed.own === undefined ? {} : { own: pressed.listed.own }) };
   const binding: WorldStylePackBinding = setting === undefined || Object.keys(setting).length === 0
     ? pack : { ...pack, settingParts: setting };
   const named = settingOnly ? `${option.title}, in its new setting`
-    : pressed.earlierPackId === option.packId ? `version ${binding.version} of ${option.title}` : option.title;
+    : pressed.earlierPackId === lookChoiceId(option) ? `version ${binding.version} of ${option.title}` : option.title;
   return { binding, named, settingOnly };
 }

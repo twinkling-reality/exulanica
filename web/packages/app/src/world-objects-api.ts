@@ -37,6 +37,7 @@
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import { KIND_SIDES, type KindPlace, type KindSide, type KindUse } from '@exulanica/atlas-react/playcanvas';
+import type { PlacedThingSupportReference } from '@exulanica/atlas-react/things';
 import { problemSentence } from './ui/words/problems.js';
 import { worldPath } from './world-scope.js';
 
@@ -135,11 +136,12 @@ export interface AuthoredObject {
 }
 
 /**
- * A thing placed by its kind (version schema 5): the kind it is, a shipped kind by key, version and
+ * A thing placed by its kind (version schemas 5 and 6): the kind it is, a shipped kind by key, version and
  * digest or a kind its workspace keeps by its digest alone, and where it stands. Nothing here says
  * how it is drawn: that is a look's, read from the thing library.
  */
 export interface PlacedThing {
+  readonly profile?: 'exulanica.placed-thing/v2';
   readonly thingId: string;
   readonly kind:
     | { readonly source?: 'shipped'; readonly kind: string; readonly version: number; readonly sha256: string }
@@ -149,6 +151,8 @@ export interface PlacedThing {
   readonly origin: { readonly kind: string; readonly role: string };
   /** True while a removal is in force. */
   readonly removed: boolean;
+  /** A view6 support claim, preserved even when the renderer cannot draw the thing. */
+  readonly support?: PlacedThingSupportReference;
   /**
    * True for a thing of a workspace's own kind the workspace no longer holds, or erased after it was
    * placed: the server says so as it reads the version, and the page draws it nowhere. Absent, false.
@@ -379,10 +383,17 @@ const wireBehaviour = (value: ObjectBehaviour): Readonly<Record<string, unknown>
 
 // -- the client ----------------------------------------------------------------------------------
 
+/** Named server failures that invalidate a previously held version authority. */
+export function versionAuthorityLost(error: unknown): boolean {
+  return error instanceof ApiError && ([401, 403, 404].includes(error.status)
+    || ['invalidated_source_version', 'world_removed', 'stale_saved_world_entry'].includes(error.code));
+}
+
 export class WorldObjectsClient {
   readonly #transport: Transport;
   readonly #worldId: string | undefined;
   readonly #defaultVersionId: string | undefined;
+  readonly #onVersionObserved: ((version: AlternateVersion | null) => void) | undefined;
   readonly #onVersionChange: ((version: AlternateVersion) => Promise<void>) | undefined;
   readonly #savedEntry: (() => SavedEntryWriteBinding) | undefined;
   readonly #onSavedEntryAdvanced:
@@ -405,6 +416,8 @@ export class WorldObjectsClient {
      */
     readonly worldId?: string;
     readonly defaultVersionId?: string;
+    /** Runs synchronously before consumers can paint an observed version. */
+    readonly onVersionObserved?: (version: AlternateVersion | null) => void;
     readonly onVersionChange?: (version: AlternateVersion) => Promise<void>;
     readonly savedEntry?: () => SavedEntryWriteBinding;
     readonly onSavedEntryAdvanced?: (
@@ -415,6 +428,7 @@ export class WorldObjectsClient {
     this.#transport = new Transport(options);
     this.#worldId = options.worldId;
     this.#defaultVersionId = options.defaultVersionId;
+    this.#onVersionObserved = options.onVersionObserved;
     this.#onVersionChange = options.onVersionChange;
     this.#savedEntry = options.savedEntry;
     this.#onSavedEntryAdvanced = options.onSavedEntryAdvanced;
@@ -443,15 +457,20 @@ export class WorldObjectsClient {
 
   async readVersion(versionId: string): Promise<AlternateVersion> {
     this.#version = await this.#fetchVersion(versionId);
+    this.#onVersionObserved?.(this.#version);
     return this.#version;
   }
 
   async #fetchVersion(versionId: string): Promise<AlternateVersion> {
-    return parseVersion(
-      await this.#transport.getJson<unknown>(
+    try {
+      return parseVersion(await this.#transport.getJson<unknown>(
         this.#path(`/world/versions/${encodeURIComponent(versionId)}`),
-      ),
-    );
+      ));
+    } catch (error) {
+      // A failed refresh cannot preserve a live proof of the previously observed source.
+      this.#onVersionObserved?.(null);
+      throw error;
+    }
   }
 
   /**
@@ -488,6 +507,7 @@ export class WorldObjectsClient {
         && version.editSeq === expected.authoredEditSeq
         && !version.sourceInvalidated;
       if (!cursorStayedActive || !versionMatches) {
+        this.#onVersionObserved?.(version);
         this.#version = null;
         throw new WorldObjectsContractError(
           'saved_entry_reconciliation_required',
@@ -497,6 +517,7 @@ export class WorldObjectsClient {
       }
     }
     this.#version = version;
+    this.#onVersionObserved?.(version);
     return Object.freeze({ assets, version });
   }
 
@@ -530,8 +551,12 @@ export class WorldObjectsClient {
     if (input.parentVersionId !== undefined) body['parent_version_id'] = input.parentVersionId;
     if (input.styleVersionId !== undefined) body['style_version_id'] = input.styleVersionId;
     this.#version = parseVersion(
-      await this.#transport.postJson<unknown>(this.#path('/world/versions'), body),
+      await this.#transport.postJson<unknown>(this.#path('/world/versions'), body).catch(error => {
+        if (versionAuthorityLost(error)) this.#onVersionObserved?.(null);
+        throw error;
+      }),
     );
+    this.#onVersionObserved?.(this.#version);
     await this.#onVersionChange?.(this.#version);
     return this.#version;
   }
@@ -713,12 +738,16 @@ export class WorldObjectsClient {
           }),
         }));
         this.#version = version;
+        this.#onVersionObserved?.(version);
         await this.#onVersionChange?.(version);
         if (savedEntry !== undefined) {
           await this.#onSavedEntryAdvanced?.(version, savedEntry);
         }
         return Object.freeze({ kind: 'recorded' as const, version });
       } catch (error) {
+        if (versionAuthorityLost(error)) {
+          this.#onVersionObserved?.(null);
+        }
         if (error instanceof ApiError && (error.code === 'stale_object_base' || alsoStale(error))) {
           const current = await this.readVersion(base.versionId);
           return Object.freeze({ kind: 'stale' as const, current });
@@ -1082,6 +1111,10 @@ function parsePointMapInstance(value: unknown): PointMapInstance {
 
 export function parseVersion(value: unknown): AlternateVersion {
   const row = record(value, 'alternate world version');
+  const schemaVersion = integer(row['schema_version'], 'version schema version');
+  if (![1, 2, 3, 4, 5, 6].includes(schemaVersion)) {
+    throw invalid('unsupported version schema version');
+  }
   const rows = array(row['objects'], 'authored object list');
   const objects = rows.filter((item) => !namesWorkspaceAsset(item)).map(parseObject);
   const workspaceObjects = rows.filter(namesWorkspaceAsset).map(parseWorkspaceObject);
@@ -1089,11 +1122,21 @@ export function parseVersion(value: unknown): AlternateVersion {
   if (new Set(ids).size !== ids.length) {
     throw invalid('authored object list');
   }
+  const worldId = text(row['world_id'], 'world id');
+  const sourceSnapshotId = text(row['source_snapshot_id'], 'source snapshot id');
+  const things = array(row['things'] ?? [], 'placed thing list').map(parsePlacedThing);
+  for (const thing of things) {
+    if (thing.support === undefined) continue;
+    if (schemaVersion !== 6) throw invalid('support binding requires version schema 6');
+    if (thing.support.worldId !== worldId || thing.support.sourceSnapshotId !== sourceSnapshotId) {
+      throw invalid('placed thing support belongs to another version source');
+    }
+  }
   return Object.freeze({
-    schemaVersion: integer(row['schema_version'], 'version schema version'),
+    schemaVersion,
     versionId: text(row['version_id'], 'version id'),
-    worldId: text(row['world_id'], 'world id'),
-    sourceSnapshotId: text(row['source_snapshot_id'], 'source snapshot id'),
+    worldId,
+    sourceSnapshotId,
     parentVersionId: optionalText(row['parent_version_id'], 'parent version id'),
     title: anyText(row['title'], 'version title'),
     origin: text(row['origin'], 'version origin'),
@@ -1116,15 +1159,33 @@ export function parseVersion(value: unknown): AlternateVersion {
       array(row['point_map_instances'] ?? [], 'point map instance list')
         .map(parsePointMapInstance),
     ),
-    things: Object.freeze(array(row['things'] ?? [], 'placed thing list').map(parsePlacedThing)),
+    things: Object.freeze(things),
     edits: Object.freeze(array(row['edits'], 'version edit list').map(parseEdit)),
   });
 }
 
 export function parsePlacedThing(value: unknown): PlacedThing {
   const row = record(value, 'placed thing');
+  let support: PlacedThingSupportReference | undefined;
+  if (Object.hasOwn(row, 'profile') || Object.hasOwn(row, 'support')) {
+    const keys = ['profile', 'support', 'thing_id', 'kind', 'region_id', 'transform', 'origin', 'removed'];
+    closedSupportFields(row, keys, ['gone']);
+    if (row['profile'] !== 'exulanica.placed-thing/v2') throw invalid('placed thing support profile');
+    support = parseSupportReference(row['support']);
+    if (support.regionId !== row['region_id']) throw invalid('placed thing support region');
+  }
   const kind = record(row['kind'], 'placed thing kind');
   const origin = record(row['origin'], 'placed thing origin');
+  const transform = parseTransform(row['transform']);
+  if (support !== undefined) {
+    closedSupportFields(kind, kind['source'] === 'workspace' ? ['source', 'sha256'] : ['kind', 'version', 'sha256']);
+    closedSupportFields(origin, ['kind', 'role']);
+    closedSupportFields(record(row['transform'], 'placed thing transform'),
+      ['coordinate_space', 'coordinate_unit', 'x_mm', 'y_mm', 'z_mm', 'yaw_microradians', 'scale_milli']);
+    if (transform.coordinateSpace !== 'region_local' || transform.coordinateUnit !== 'millimetre'
+      || transform.scaleMilli !== 1000) throw invalid('supported thing transform frame or size');
+    assertTransform(transform);
+  }
   // A shipped kind's document names no source; 'shipped' is read as the same, as the type admits.
   if (kind['source'] !== undefined && kind['source'] !== 'workspace' && kind['source'] !== 'shipped') {
     throw invalid('placed thing kind source');
@@ -1139,14 +1200,46 @@ export function parsePlacedThing(value: unknown): PlacedThing {
         sha256: digest(kind['sha256'], 'placed thing kind digest'),
       }),
     regionId: text(row['region_id'], 'placed thing region'),
-    transform: parseTransform(row['transform']),
+    transform,
     origin: Object.freeze({
       kind: text(origin['kind'], 'placed thing origin kind'),
       role: text(origin['role'], 'placed thing origin role'),
     }),
     removed: flag(row['removed'], 'placed thing removal'),
+    ...(support === undefined ? {} : { profile: 'exulanica.placed-thing/v2' as const, support }),
     // Only a thing whose kind is gone says so; every other reads as it always did.
     ...(row['gone'] === undefined ? {} : { gone: flag(row['gone'], 'placed thing gone') }),
+  });
+}
+
+function closedSupportFields(row: Readonly<Record<string, unknown>>, required: readonly string[], optional: readonly string[] = []): void {
+  if (required.some((key) => !Object.hasOwn(row, key))
+    || Object.keys(row).some((key) => !required.includes(key) && !optional.includes(key))) {
+    throw invalid('closed saved thing support fields');
+  }
+}
+
+function parseSupportReference(value: unknown): PlacedThingSupportReference {
+  const row = record(value, 'placed thing support');
+  closedSupportFields(row, ['profile', 'world_id', 'source_snapshot_id', 'receipt_sha256', 'network_sha256', 'region_id', 'surface_id']);
+  if (row['profile'] !== 'exulanica.support-reference/v1') throw invalid('placed thing support reference profile');
+  const named = (key: string): string => {
+    const name = text(row[key], `support ${key}`);
+    if (name.length > 160) throw invalid(`support ${key}`);
+    return name;
+  };
+  const sourceSnapshotId = text(row['source_snapshot_id'], 'support source snapshot');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(sourceSnapshotId)) {
+    throw invalid('support source snapshot UUID');
+  }
+  return Object.freeze({
+    profile: 'exulanica.support-reference/v1',
+    worldId: named('world_id'),
+    sourceSnapshotId,
+    receiptSha256: digest(row['receipt_sha256'], 'support receipt digest'),
+    networkSha256: digest(row['network_sha256'], 'support network digest'),
+    regionId: named('region_id'),
+    surfaceId: named('surface_id'),
   });
 }
 

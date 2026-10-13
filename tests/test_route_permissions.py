@@ -59,6 +59,7 @@ from exulanica.db.roles import RUNTIME_ROLE, assert_runtime_role, provision_runt
 from exulanica.db.session import Database
 from exulanica.env import env_get
 from exulanica.migrations import migration_directory
+from exulanica.orchestration.judge_seed import JUDGE_PERMISSIONS
 from exulanica.selection.validation import Session
 from exulanica.store.local import LocalContentAddressedStore
 from fastapi import APIRouter
@@ -258,10 +259,16 @@ def test_the_consequential_surfaces_are_each_isolated():
 #: recorded; their tests hold every world, style and society table unchanged across them.
 READ_SHAPED_POSTS = frozenset(
     {
+        ("POST", "/models/probes/{probe_id}/replay"),
+        ("POST", "/models/preflight"),  # Eligibility only, no admission, network or inference.
         ("POST", "/selection"),
         ("POST", "/selection/packet"),
         ("POST", "/selection/actions/outcome"),
         ("POST", "/selection/actions/prepare"),
+        # These prepare/read back a durable draft; only its native start writes or dispatches.
+        ("POST", "/selection/world-drafts/prepare"),
+        ("POST", "/selection/world-drafts/outcome"),
+        ("POST", "/world/versions/{version_id}/inventory/query"),
     }
 )
 
@@ -312,6 +319,11 @@ def test_every_route_that_can_reach_a_model_requires_model_invoke():
     """
     found = _model_routes()
     assert sorted(found) == [
+        # Reads provider rate metadata and eligibility; it never asks a model or starts a job.
+        ("GET", "/worlds/drafts"),
+        # Probe preparation reads provider capabilities; start authorizes the paid worker job.
+        ("POST", "/models/probes/prepare"),
+        ("POST", "/models/probes/{probe_id}/start"),
         ("POST", "/selection/actions"),
         ("POST", "/selection/appearance"),
         ("POST", "/selection/ask"),
@@ -330,6 +342,9 @@ def test_every_route_that_can_reach_a_model_requires_model_invoke():
     assert found <= set(SWEPT)
     for key in found:
         rule = ROUTE_RULES[key]
+        if key == ("GET", "/worlds/drafts"):
+            assert isinstance(rule, Requires) and rule.permissions == {Permission.WORLD_READ}
+            continue
         assert isinstance(rule, Requires) and Permission.MODEL_INVOKE in rule.permissions, key
 
 
@@ -356,7 +371,17 @@ def test_the_refusal_ledger_check_names_exactly_the_vocabulary():
         for path in migration_directory().glob("*.sql")
         if "missing_permissions <@ array[" in path.read_text(encoding="utf-8")
     )
-    assert stating[0].name == "0061_route_permissions.sql"
+    # Exactly these state the check, typed here: migrations apply by what a database has not
+    # recorded and not in number order, so a file numbered below the newest that restated the
+    # list (0192 and 0193 are reserved and not landed) would be applied after it on a database
+    # already there and leave an older list standing. A migration that restates the check is
+    # added here by name, with the whole vocabulary in it.
+    assert [path.name for path in stating] == [
+        "0061_route_permissions.sql",
+        "0154_a_refusal_may_name_the_references_permission.sql",
+        "0194_acting_as_a_being_is_its_own_permission.sql",
+        "0199_a_person_enters_one_world_by_invitation.sql",
+    ]
     sql = stating[-1].read_text(encoding="utf-8")
     head, tail = sql.rsplit("missing_permissions <@ array[", 1)
     block = tail.split("]::text[]", 1)[0]
@@ -384,12 +409,15 @@ def test_every_membership_role_the_schema_allows_has_a_declared_grant():
 
 
 def test_a_guest_holds_the_journey_and_nothing_else():
-    """A visitor may make and open worlds, choose models, compare, ask and correct the Companion
-    and delete what they made; never intake, consent, admission, operations or tiles."""
+    """A visitor may make and open worlds, choose models, play one of a world's beings, compare,
+    ask and correct the Companion and delete what they made; never intake, consent, admission,
+    operations or tiles."""
     assert MEMBERSHIP_ROLE_PERMISSIONS["guest"] is GUEST_PERMISSIONS
     assert {
         Permission.WORLD_READ,
         Permission.WORLD_WRITE,
+        Permission.WORLD_ENTER,
+        Permission.BEING_ACT,
         Permission.MODEL_INVOKE,
         Permission.LIBRARY_READ,
         Permission.LIBRARY_WRITE,
@@ -420,6 +448,101 @@ def test_only_an_explicit_yes_reaches_a_creator_s_upload_route():
 def test_the_owner_grant_is_everything_but_tiles():
     assert set(Permission) - ACCOUNT_OWNER_PERMISSIONS == {Permission.TILES_MATERIALISE}
     assert MEMBERSHIP_ROLE_PERMISSIONS["owner"] is ACCOUNT_OWNER_PERMISSIONS
+
+
+#: The three acts of a being, as this file states them: the routes under
+#: ``/world/versions/{version_id}/society/play`` that write. Typed here and never read from the
+#: declaration, so a route that drifts into or out of the section fails by name.
+BEING_ACTS = frozenset(
+    {
+        ("POST", "/world/versions/{version_id}/society/play"),
+        ("POST", "/world/versions/{version_id}/society/play/{subject_id}/answer"),
+        ("POST", "/world/versions/{version_id}/society/play/{subject_id}/give-back"),
+    }
+)
+#: What each of the three asked for before acting as a being had a permission of its own.
+ASKED_BEFORE = frozenset({Permission.WORLD_WRITE})
+
+
+def _reached(held: frozenset[Permission]) -> set[tuple[str, str]]:
+    """Every declared route a grant holding ``held`` passes the floor on."""
+    return {
+        key
+        for key, rule in ROUTE_RULES.items()
+        if isinstance(rule, Requires) and rule.permissions <= held
+    }
+
+
+def _reached_before(held: frozenset[Permission]) -> set[tuple[str, str]]:
+    """The same under the declaration as it stood: the three acts asking :data:`ASKED_BEFORE`,
+    and no grant holding ``being.act``, which did not exist."""
+    return {
+        key
+        for key, rule in ROUTE_RULES.items()
+        if isinstance(rule, Requires)
+        and (ASKED_BEFORE if key in BEING_ACTS else rule.permissions)
+        <= held - {Permission.BEING_ACT}
+    }
+
+
+def test_acting_as_a_being_asks_for_its_own_permission_on_exactly_three_routes():
+    """``being.act`` is required by the three writes of a play, beside the read of the world they
+    act in, and by no other route; none of the three asks for ``world.write``; the turn a played
+    being is offered stays a read."""
+    asking = {
+        key
+        for key, rule in ROUTE_RULES.items()
+        if isinstance(rule, Requires) and Permission.BEING_ACT in rule.permissions
+    }
+    assert asking == BEING_ACTS
+    for key in sorted(BEING_ACTS):
+        rule = ROUTE_RULES[key]
+        assert isinstance(rule, Requires)
+        assert rule.permissions == {Permission.WORLD_READ, Permission.BEING_ACT}, key
+    turn = ROUTE_RULES[("GET", "/world/versions/{version_id}/society/play/{subject_id}/turn")]
+    assert isinstance(turn, Requires)
+    assert turn.permissions == {Permission.WORLD_READ}
+
+
+def test_being_act_opens_the_three_acts_and_nothing_else():
+    """Added to a grant, ``being.act`` adds exactly the three acts where the grant reads the
+    world, and nothing where it does not: held over the empty grant, every single permission and
+    every pair, so no route is opened by it together with something else."""
+    others = sorted(set(Permission) - {Permission.BEING_ACT})
+    grants = [frozenset()]
+    grants += [frozenset({one}) for one in others]
+    grants += [frozenset({one, two}) for one in others for two in others if one < two]
+    grants.append(frozenset(others))
+    # The sweep saw the vocabulary: a comparison over no grants agrees with everything.
+    assert Permission.WORLD_READ in others and len(grants) > len(others) > 1
+    for held in grants:
+        gained = _reached(held | {Permission.BEING_ACT}) - _reached(held)
+        assert gained == (BEING_ACTS if Permission.WORLD_READ in held else set()), sorted(held)
+
+
+@pytest.mark.parametrize(
+    ("who", "grant"),
+    [
+        ("owner", ACCOUNT_OWNER_PERMISSIONS),
+        ("guest", GUEST_PERMISSIONS),
+        ("judge", frozenset(Permission(name) for name in JUDGE_PERMISSIONS)),
+    ],
+)
+def test_moving_the_three_acts_changed_nobody_s_reach(who, grant):
+    """An owner, a guest and the judge's token reach exactly the routes they reached while the
+    three acts asked for ``world.write``: none lost a route and none gained one. Each played
+    before and plays now."""
+    assert Permission.BEING_ACT in grant and Permission.WORLD_WRITE in grant, who
+    assert _reached(grant) == _reached_before(grant), who
+    assert _reached(grant) >= BEING_ACTS, who
+
+
+def test_a_grant_that_edits_the_world_and_was_not_regranted_no_longer_acts_as_a_being():
+    """The one reach that changed, stated: a grant holding ``world.write`` and no ``being.act``
+    loses the three acts and nothing else, and gains nothing."""
+    held = frozenset({Permission.WORLD_READ, Permission.WORLD_WRITE})
+    assert _reached_before(held) - _reached(held) == BEING_ACTS
+    assert _reached(held) - _reached_before(held) == set()
 
 
 def test_a_refusal_is_404_on_an_id_and_403_elsewhere():
@@ -582,6 +705,8 @@ GRANTS: dict[str, tuple[str, list[str]]] = {
     "reads": ("a", sorted(str(p) for p in Permission if p.endswith(".read"))),
     "viewer": ("a", ["world.read"]),
     "world_writer": ("a", ["world.read", "world.write"]),
+    "player": ("a", ["being.act", "world.read"]),
+    "actor_only": ("a", ["being.act"]),
     "stranger": ("b", ALL_PERMISSIONS),
 }
 
@@ -965,6 +1090,74 @@ def test_a_world_reader_cannot_change_the_world(floor, method, path):
     row = _refusal_rows(floor, floor.workspace_a, "viewer")[(method, path)]
     assert row["refusals"] == (before["refusals"] if before else 0) + 1
     assert "world.write" in row["missing_permissions"]
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize(("method", "path"), sorted(BEING_ACTS))
+def test_a_world_writer_without_being_act_cannot_act_as_a_being(floor, method, path):
+    """A token that edits the world and holds no ``being.act`` is refused each of the three acts
+    before the route runs, as an invented id is answered, and the ledger names exactly what it
+    lacks: the name migration 0194 admits."""
+    before = _refusal_rows(floor, floor.workspace_a, "world_writer").get((method, path))
+    response = floor.request("world_writer", method, _fill(path), json={})
+    assert (response.status_code, response.json()) == (
+        404,
+        {"code": "unknown_reference", "detail": _OUR_404},
+    )
+    row = _refusal_rows(floor, floor.workspace_a, "world_writer")[(method, path)]
+    assert row["missing_permissions"] == ["being.act"]
+    assert row["refusals"] == (before["refusals"] if before else 0) + 1
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize(("method", "path"), sorted(BEING_ACTS))
+def test_being_act_alone_does_not_act_as_a_being(floor, method, path):
+    """A token holding ``being.act`` and no read of the world is refused each of the three acts
+    before the route runs, as an invented id is answered, and the ledger names the read it
+    lacks."""
+    assert GRANTS["actor_only"][1] == ["being.act"]
+    before = _refusal_rows(floor, floor.workspace_a, "actor_only").get((method, path))
+    response = floor.request("actor_only", method, _fill(path), json={})
+    assert (response.status_code, response.json()) == (
+        404,
+        {"code": "unknown_reference", "detail": _OUR_404},
+    )
+    row = _refusal_rows(floor, floor.workspace_a, "actor_only")[(method, path)]
+    assert row["missing_permissions"] == ["world.read"]
+    assert row["refusals"] == (before["refusals"] if before else 0) + 1
+
+
+@pytest.mark.postgres
+def test_a_player_reaches_the_three_acts_and_changes_nothing_else(floor):
+    """A token holding ``being.act`` and ``world.read`` alone: each of the three acts passes the
+    floor and is answered by its route's own validation of an empty body, and every other route
+    that changes state refuses it at the floor. One real request a route."""
+    assert set(GRANTS["player"][1]) == {"being.act", "world.read"}
+    reached = []
+    for method, path in AUTHENTICATED:
+        if method == "GET" or (method, path) in READ_SHAPED_POSTS:
+            continue
+        response = floor.request("player", method, _fill(path), **_probe_kwargs(method, path))
+        if _refused_by_the_floor(response):
+            continue
+        reached.append((method, path, response.status_code))
+    assert sorted(reached) == sorted((method, path, 422) for method, path in BEING_ACTS)
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize("role", ["owner", "guest"])
+def test_a_browser_session_of_either_role_still_acts_as_a_being(floor, role):
+    """An owner's and a guest's browser session pass the floor on each of the three acts, as
+    they did while the acts asked for ``world.write``: the answer is the route's own validation."""
+    cookie = {"Cookie": f"{SESSION_COOKIE}={floor.accounts.cookie}"}
+    held = floor.accounts.role
+    floor.accounts.role = role
+    try:
+        for method, path in sorted(BEING_ACTS):
+            response = floor.client.request(method, _fill(path), headers=cookie, json={})
+            assert response.status_code == 422, (role, method, path, response.text)
+    finally:
+        floor.accounts.role = held
 
 
 @pytest.mark.postgres

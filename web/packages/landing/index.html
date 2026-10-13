@@ -8,29 +8,30 @@
     <link rel="canonical" href="https://exulanica.com/" />
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      // Apply the saved public interface preference before the first paint.
+      try {
+        if (localStorage.getItem('exulanica.public.theme.v1') === 'dark') {
+          document.documentElement.dataset.theme = 'landing-dark';
+          document.documentElement.style.colorScheme = 'dark';
+        }
+      } catch { /* The site remains usable when storage is unavailable. */ }
+    </script>
     <title>Exulanica</title>
     <meta
       name="description"
-      content="Exulanica: worlds for AI agents. Build a world, let open models decide what its people do, then swap a model and run the same saved world again to see the difference."
+      content="Worlds for AI Agents. Create places and inhabitants, shape how they interact, and hand supported roles to open models."
     />
 
-    <!--
-      Link previews. The card image is a render of this page's own title screen, with the
-      navigation and publisher mark removed; nothing is drawn here that the page does not draw.
-
-      Absolute, against the registered origin. These were root-relative with no og:url while no
-      public origin existed; exulanica.com was registered on 2026-09-15 and is now the canonical
-      one. Several scrapers refuse a relative og:image outright, so a share card is only reliable
-      once this is a full URL. Moving the site means changing these four values.
-    -->
+    <!-- The share card uses the Exulanica wordmark and daylight palette. -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://exulanica.com/" />
     <meta property="og:site_name" content="Exulanica" />
     <meta property="og:title" content="Exulanica" />
     <meta
       property="og:description"
-      content="Exulanica: worlds for AI agents. Build a world, let open models decide what its people do, then swap a model and run the same saved world again to see the difference."
+      content="Worlds for AI Agents. Create places and inhabitants, shape how they interact, and hand supported roles to open models."
     />
     <meta property="og:image" content="https://exulanica.com/og-image.png" />
     <meta property="og:image:type" content="image/png" />
@@ -44,7 +45,7 @@
     <meta name="twitter:title" content="Exulanica" />
     <meta
       name="twitter:description"
-      content="Exulanica: worlds for AI agents. Build a world, let open models decide what its people do, then swap a model and run the same saved world again to see the difference."
+      content="Worlds for AI Agents. Create places and inhabitants, shape how they interact, and hand supported roles to open models."
     />
     <meta name="twitter:image" content="https://exulanica.com/og-image.png" />
   </head>

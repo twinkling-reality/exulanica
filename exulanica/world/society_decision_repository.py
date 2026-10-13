@@ -191,6 +191,7 @@ class SocietyDecisionRepository:
             played = is_person_ask(asked)
             decisions.append(
                 {
+                    "request_id": request["request_id"],
                     "decision_seq": receipt["decision_seq"],
                     "subject_id": receipt["subject_id"],
                     "base_tick": receipt["base_tick"],

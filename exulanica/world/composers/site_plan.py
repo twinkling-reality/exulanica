@@ -56,7 +56,12 @@ from exulanica.world.composers import (
 )
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.kinds.catalogs import load_kind_catalogs
-from exulanica.world.kinds.document import KindDocument, KindRefused, read_kind
+from exulanica.world.kinds.document import (
+    REQUIREMENTS_PROFILE,
+    KindDocument,
+    KindRefused,
+    read_kind,
+)
 from exulanica.world.kinds.routine import kind_overlay, overlay_routine
 from exulanica.world.kinds.samples import SiteWorld, compose_site, layout_budget
 from exulanica.world.society_catalogs import RoutineModel
@@ -67,6 +72,7 @@ from exulanica.world.society_site_place import (
 )
 from exulanica.world.starter import _EMPTY_GRAPH_SHA256, _EMPTY_RECONSTRUCTION_SHA256
 from exulanica.world.structure import SpatialCandidate
+from exulanica.world.terrain_authoring import TERRAIN_COMPOSER_VERSIONS
 
 __all__ = [
     "ARRIVAL_INSIDE_MM",
@@ -88,7 +94,7 @@ __all__ = [
 ]
 
 COMPOSER_KEY: Final = "site-plan"
-COMPOSER_VERSIONS: Final = (1,)
+COMPOSER_VERSIONS: Final = (1, 2, *TERRAIN_COMPOSER_VERSIONS)
 REGION_ID: Final = "region:generated"
 DESTINATION_ID: Final = "destination:region:generated"
 ELEMENT_ID: Final = "element:site"
@@ -131,8 +137,34 @@ def _candidate(
     digest: str,
     arrival: Mapping[str, Any],
     extent: SiteExtentRecord,
+    *,
+    composer_version: int = 1,
 ) -> SpatialCandidate:
     east, north = arrival["position_mm"]
+    return _site_candidate(
+        kind.kind,
+        kind.version,
+        world_id,
+        digest,
+        (east, 0, -north),
+        extent.width_mm,
+        extent.depth_mm,
+        composer_version=composer_version,
+    )
+
+
+def _site_candidate(
+    recipe_key: str,
+    recipe_version: int,
+    world_id: str,
+    digest: str,
+    arrival: tuple[int, int, int],
+    width: int,
+    depth: int,
+    *,
+    composer_version: int,
+) -> SpatialCandidate:
+    east, up, south = arrival
     topology = {
         "schema_version": 1,
         "world_id": world_id,
@@ -147,9 +179,9 @@ def _candidate(
                     "requested_key": SITE_MODULE,
                 },
                 "lineage": {
-                    "recipe_key": kind.kind,
-                    "recipe_version": kind.version,
-                    "slot_key": f"site:{extent.width_mm}:{extent.depth_mm}",
+                    "recipe_key": recipe_key,
+                    "recipe_version": recipe_version,
+                    "slot_key": f"site:{width}:{depth}",
                 },
                 "collision": {"kind": "none"},
                 "evidence": {"kind": "none"},
@@ -181,7 +213,7 @@ def _candidate(
             }
         ],
         "destinations": [
-            {"destination_id": DESTINATION_ID, "x_mm": east, "y_mm": 0, "z_mm": -north}
+            {"destination_id": DESTINATION_ID, "x_mm": east, "y_mm": up, "z_mm": south}
         ],
     }
     return SpatialCandidate(
@@ -203,8 +235,77 @@ def _candidate(
             ],
         },
         composer_key=COMPOSER_KEY,
-        composer_version=COMPOSER_VERSIONS[-1],
+        composer_version=composer_version,
     )
+
+
+def compose_terrain(authoring: dict, world_id: str) -> ComposedWorld:
+    """Compose an admitted terrain source without a flat kind or society claim."""
+    from exulanica.world.terrain_authoring import read_terrain_authoring
+
+    source = read_terrain_authoring(authoring)
+    receipt = {
+        "profile": RECEIPT_PROFILE,
+        "world_id": world_id,
+        "composer": {"key": COMPOSER_KEY, "version": source.composer_version},
+        "authoring": source.document(),
+        "authoring_sha256": source.sha256,
+        "arrival": source.arrival(),
+        "output_digest": source.sha256,
+        "record_count": 1,
+    }
+    sha = receipt_sha256(receipt)
+    geometry = source.contact.geometry
+    candidate = _site_candidate(
+        "terrain.authoring",
+        1,
+        world_id,
+        sha,
+        tuple(source.arrival()["position_mm"]),
+        geometry.east_mm[-1],
+        -geometry.south_mm[0],
+        composer_version=source.composer_version,
+    )
+    return ComposedWorld(receipt, sha, candidate, (source,))
+
+
+def receipt_terrain(receipt: Mapping[str, Any]) -> Any:
+    """Revalidate the complete retained source and exact arrival on cold replay."""
+    from exulanica.world.terrain_authoring import TerrainAuthoringRefused, read_terrain_authoring
+
+    expected = {
+        "profile",
+        "world_id",
+        "composer",
+        "authoring",
+        "authoring_sha256",
+        "arrival",
+        "output_digest",
+        "record_count",
+    }
+    try:
+        if (
+            set(receipt) != expected
+            or receipt["profile"] != RECEIPT_PROFILE
+            or receipt["composer"]
+            not in [
+                {"key": COMPOSER_KEY, "version": version} for version in TERRAIN_COMPOSER_VERSIONS
+            ]
+            or type(receipt["record_count"]) is not int
+            or receipt["record_count"] != 1
+        ):
+            raise ValueError("invalid terrain receipt fields")
+        source = read_terrain_authoring(receipt["authoring"])
+        if (
+            source.composer_version != receipt["composer"]["version"]
+            or source.sha256 != receipt["authoring_sha256"]
+            or source.sha256 != receipt["output_digest"]
+            or source.arrival() != receipt["arrival"]
+        ):
+            raise ValueError("terrain source or arrival binding differs")
+        return source
+    except (TerrainAuthoringRefused, ValueError, TypeError, KeyError) as exc:
+        raise InvalidStructuralData(f"generated_world_terrain_changed: {exc}") from exc
 
 
 def compose_kind(
@@ -214,6 +315,7 @@ def compose_kind(
     *,
     base_routine: RoutineModel | None = None,
     place_id: str | None = None,
+    support: Mapping[str, Any] | None = None,
 ) -> ComposedWorld:
     """The world ``kind`` makes with ``values`` for ``world_id``: its receipt, its structural
     candidate and its records, and with ``place_id`` the place its society walks there, the one its
@@ -233,13 +335,17 @@ def compose_kind(
         "world_id": world_id,
         "kind": {**kind.reference(), "document": dict(kind.document)},
         "values": dict(sorted(values.items())),
-        "composer": {"key": COMPOSER_KEY, "version": COMPOSER_VERSIONS[-1]},
+        "composer": {"key": COMPOSER_KEY, "version": 1},
         "grammar": {
             "grammar_id": SITE_GRAMMAR_ID,
             "grammar_version": SITE_GRAMMAR_VERSION,
             "descriptor_sha256": _descriptor_sha256(),
         },
-        "catalogs": dict(load_kind_catalogs().sha256),
+        "catalogs": dict(
+            load_kind_catalogs(
+                bounds_version=2 if kind.document["profile"] == REQUIREMENTS_PROFILE else 1
+            ).sha256
+        ),
         "plan_sha256": world.plan_sha256,
         "routine": {"base": base_routine.binding(), "overlay": overlay, "sha256": routine.sha256},
         "society": world.society.document(),
@@ -251,6 +357,32 @@ def compose_kind(
         "record_count": len(world.records),
         "arrival": arrival,
     }
+    supported_place = world.place
+    composer_version = 1
+    if support is not None:
+        from exulanica.world.site_drawing import _site_drawing_v1
+        from exulanica.world.support_site import BASE_SURFACE, attach_site_support
+
+        source_place = _placed_at(world.place, _support_place_id())
+        attached = attach_site_support(
+            support,
+            world_id=world_id,
+            records=world.records,
+            drawing=_site_drawing_v1(
+                world_id=world_id,
+                receipt=receipt,
+                receipt_sha256=receipt_sha256(receipt),
+                records=world.records,
+            ),
+            base_place=source_place,
+            routine=routine,
+        )
+        east, north = arrival["position_mm"]
+        attached.network.support_at(BASE_SURFACE, (east, -north))
+        receipt["supports"] = attached.document()
+        composer_version = 2
+        receipt["composer"]["version"] = 2
+        supported_place = attached.projection.place()
     digest = receipt_sha256(receipt)
     return ComposedWorld(
         receipt=receipt,
@@ -261,9 +393,10 @@ def compose_kind(
             digest,
             arrival,
             next(r for r in world.records if isinstance(r, SiteExtentRecord)),
+            composer_version=composer_version,
         ),
         records=world.records,
-        place=None if place_id is None else _placed_at(world.place, place_id),
+        place=None if place_id is None else _placed_at(supported_place, place_id),
     )
 
 
@@ -276,11 +409,57 @@ def _placed_at(place: Mapping[str, Any], place_id: str) -> dict[str, Any]:
     return seal_place({**stated, "place_id": place_id})
 
 
+def _support_place_id() -> str:
+    from exulanica.world.society_authored_ground import ground_place_id
+
+    return ground_place_id(REGION_ID)
+
+
+def receipt_support(receipt: Mapping[str, Any], generated: tuple[object, ...]) -> Any:
+    """Reconcile persisted supports against actual regenerated geometry and its base routine."""
+    from exulanica.world.site_drawing import _site_drawing_v1
+    from exulanica.world.support_site import read_site_support
+    from exulanica.world.support_surfaces import SupportRefused
+
+    try:
+        base = place_from_site_records(
+            place_id=_support_place_id(),
+            records=generated,
+            society=SiteSociety.read(receipt["society"]),
+            routine=receipt_routine(receipt),
+            node_limit=load_kind_catalogs().bound("walking_nodes")[1],
+        )
+        return read_site_support(
+            receipt["supports"],
+            world_id=receipt["world_id"],
+            records=generated,
+            drawing=_site_drawing_v1(
+                world_id=receipt["world_id"],
+                receipt=receipt,
+                receipt_sha256=receipt_sha256(receipt),
+                records=generated,
+            ),
+            base_place=base,
+            routine=receipt_routine(receipt),
+        )
+    except (SupportRefused, KeyError, TypeError, ValueError) as exc:
+        raise InvalidStructuralData(
+            "generated_world_support_changed: support binding no longer reconciles"
+        ) from exc
+
+
 def _check_current(receipt: Mapping[str, Any]) -> None:
     composer = receipt.get("composer", {})
     if composer.get("key") != COMPOSER_KEY or composer.get("version") not in COMPOSER_VERSIONS:
         raise InvalidStructuralData(
             "generated_world_composer_changed: unknown site composer version"
+        )
+    if composer["version"] in TERRAIN_COMPOSER_VERSIONS:
+        receipt_terrain(receipt)
+        return
+    if (composer["version"] == 2) != ("supports" in receipt):
+        raise InvalidStructuralData(
+            "generated_world_support_changed: composer/support binding mismatch"
         )
     grammar = receipt["grammar"]
     if (grammar["grammar_id"], grammar["grammar_version"]) != (
@@ -295,6 +474,8 @@ def _check_current(receipt: Mapping[str, Any]) -> None:
 
 def receipt_kind(receipt: Mapping[str, Any]) -> KindDocument:
     """The world kind a receipt carries, read again and held to the digest the receipt names."""
+    if receipt.get("composer", {}).get("version") in TERRAIN_COMPOSER_VERSIONS:
+        raise InvalidStructuralData("terrain_world_kind_unavailable")
     stated = receipt["kind"]
     document = {key: value for key, value in stated["document"].items()}
     try:
@@ -312,6 +493,8 @@ def receipt_routine(receipt: Mapping[str, Any]) -> RoutineModel:
     """The routine a receipt's world lives under: the town routine its binding names, with the
     kind's overlay, held to the digest the receipt records. Read once per binding: the catalogs it
     names are read from disk the first time only."""
+    if receipt.get("composer", {}).get("version") in TERRAIN_COMPOSER_VERSIONS:
+        raise InvalidStructuralData("terrain_society_projection_unavailable")
     return _routine_of(json.dumps(receipt["routine"], sort_keys=True, separators=(",", ":")))
 
 
@@ -338,6 +521,8 @@ def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
     """The records a stored receipt generates again, held to its plan and output digests, within
     the layout budget a world is made under (a world laid out within it then is within it again,
     unless the bounds catalog has since lowered it, which is refused by name)."""
+    if receipt.get("composer", {}).get("version") in TERRAIN_COMPOSER_VERSIONS:
+        return (receipt_terrain(receipt),)
     _check_current(receipt)
     kind = receipt_kind(receipt)
     try:
@@ -367,7 +552,10 @@ def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
             "generated_world_output_changed: generating this world's receipt again produced "
             "other records"
         )
-    return site_records(generation)
+    generated = site_records(generation)
+    if receipt["composer"]["version"] == 2:
+        receipt_support(receipt, generated)
+    return generated
 
 
 def society_place(
@@ -376,6 +564,11 @@ def society_place(
     """The place a receipt's world hands its society, under the routine the receipt names, its
     walking graph held to the bounds catalog's ``walking_nodes`` while it is built (refused as
     :class:`~exulanica.world.society_site_place.GraphOverBudget`), as a kind's checks hold it."""
+    if receipt["composer"]["version"] in TERRAIN_COMPOSER_VERSIONS:
+        receipt_terrain(receipt)
+        raise InvalidStructuralData("terrain_society_projection_unavailable")
+    if receipt["composer"]["version"] == 2:
+        return _placed_at(receipt_support(receipt, generated).projection.place(), place_id)
     return place_from_site_records(
         place_id=place_id,
         records=generated,

@@ -24,9 +24,9 @@
 
 import { ApiError } from '@exulanica/graph-client';
 import type { SavedWorldEntry } from '../world-entry-api.js';
-import type { WorldDraftOffer, WorldMakingDraft } from '../world-making-api.js';
+import type { WorldDraftOffer, WorldMakingDraft, WorldMakingMemory, WorldMakingStart } from '../world-making-api.js';
 import { fill, say } from './copy.js';
-import { el } from './dom.js';
+import { el, commandAction } from './dom.js';
 import { elapsedWords } from './kind-draft.js';
 import { problemSentence } from './words/problems.js';
 
@@ -63,9 +63,11 @@ export function takenWords(draft: WorldMakingDraft): string {
 
 /** What a draft may spend, in one line, from the offer's own figures. */
 export function spendWords(offer: WorldDraftOffer): string {
-  return fill('worldSentence.spend', {
+  const ceiling = offer.operation === null ? say('worldSentence.spend.legacy')
+    : fill('worldSentence.spend.ceiling', { maximum: offer.operation.maximumUsd });
+  return `${ceiling} ${fill('worldSentence.spend', {
     calls: String(offer.callsAtMost), left: String(offer.starts.left), anHour: String(offer.starts.anHour),
-  });
+  })}`;
 }
 
 /** Why a start would be refused now, in the page's words where it has them, else the server's. */
@@ -84,12 +86,15 @@ export function buildWorldSentence(options: {
   readonly offer: WorldDraftOffer;
   /** Read the offer again: after a draft ends, the hour's starts have changed. */
   readonly readOffer: () => Promise<WorldDraftOffer>;
-  readonly start: (description: string) => Promise<WorldMakingDraft>;
+  readonly start: (description: string, submission?: WorldMakingStart) => Promise<WorldMakingDraft>;
+  readonly memory?: WorldMakingMemory;
   readonly read: (draftId: string) => Promise<WorldMakingDraft>;
   /** Open the world that was made. */
   readonly open: (entry: SavedWorldEntry) => Promise<void>;
   /** Show the recipes in place of the box: offered where no draft can be started now. */
   readonly recipes?: () => void;
+  /** Workshop commands use modified Enter and keep lifecycle actions at the bottom. */
+  readonly workshop?: { readonly onReturn: () => void; readonly configure: () => void };
   /** Ask again after `ms`; returns a cancel. Tests pass their own. */
   readonly schedule?: (run: () => void, ms: number) => () => void;
 }): WorldSentencePanel {
@@ -123,6 +128,47 @@ export function buildWorldSentence(options: {
     el('div', { class: 'world-description-result' }, [follow, madeLine, takenLine, leftOutLine, open, toRecipes]),
   ]);
 
+  let configureControl: HTMLButtonElement | null = null;
+  if (options.workshop !== undefined) {
+    const workshop = options.workshop;
+    root.classList.add('world-creation-task');
+    make.classList.add('entry-command');
+    open.classList.add('entry-command');
+    field.removeAttribute('placeholder');
+    field.setAttribute('aria-label', 'Describe your world');
+    field.rows = 2;
+    const resize = (): void => {
+      field.style.height = 'auto';
+      field.style.height = `${Math.min(240, Math.max(80, field.scrollHeight))}px`;
+    };
+    field.addEventListener('input', resize);
+    const returnButton = el('button', { type: 'button', class: 'entry-command', 'aria-keyshortcuts': 'Escape' }, commandAction('Esc', 'Your worlds'));
+    returnButton.addEventListener('click', workshop.onReturn);
+    const configure = el('button', { type: 'button', class: 'world-creation-configure entry-command', text: 'AI connection' });
+    configure.replaceChildren(...commandAction(/Mac/.test(navigator.platform) ? '⌘ ↵' : 'Ctrl ↵', 'AI connection'));
+    configure.addEventListener('click', workshop.configure);
+    configure.hidden = options.offer.offered || options.offer.runningDraftId !== null;
+    configureControl = configure;
+    make.replaceChildren(...commandAction(/Mac/.test(navigator.platform) ? '⌘ ↵' : 'Ctrl ↵', 'Create world'));
+    open.replaceChildren(...commandAction('↵', 'Open world'));
+    root.replaceChildren(
+      el('div', { class: 'world-creation-content' }, [
+        el('h1', { text: 'Create a world' }),
+        el('label', { for: 'world-creation-description', text: 'Describe your world' }),
+        field,
+        spend,
+        el('details', { class: 'world-creation-disclosure' }, [el('summary', { text: 'Creation details' }), el('p', { text: say('worldSentence.notice') })]),
+        status,
+        el('div', { class: 'world-creation-result' }, [follow, madeLine, takenLine, leftOutLine]),
+      ]),
+      el('footer', { class: 'world-creation-commands' }, [returnButton, configure, make, open]),
+    );
+    field.id = 'world-creation-description';
+    resize();
+  }
+
+  const memory = options.memory ?? { pending: null };
+  let latestOffer = options.offer;
   let following: string | null = null;
   let cancel: (() => void) | null = null;
   let failures = 0;
@@ -134,8 +180,9 @@ export function buildWorldSentence(options: {
   let sending = false;
 
   const reflect = (): void => {
-    make.disabled = !offered || sending || following !== null || field.value.trim() === '';
-    field.readOnly = following !== null;
+    make.disabled = memory.pending !== null || !offered || sending || following !== null || busyDraft !== null || field.value.trim() === '';
+    field.readOnly = sending || memory.pending !== null || following !== null || busyDraft !== null;
+    follow.disabled = sending;
   };
 
   const clearResult = (): void => {
@@ -149,19 +196,29 @@ export function buildWorldSentence(options: {
    * own words stay in the status.
    */
   const offer = (answer: WorldDraftOffer, announce: boolean): void => {
+    latestOffer = answer;
     // A draft of the person's own still running is offered, since following it is what is next.
     offered = answer.offered || answer.runningDraftId !== null;
     spend.textContent = offered || announce ? spendWords(answer) : `${spendWords(answer)} ${refusedNowWords(answer)}`;
-    if (!offered && announce) status.textContent = refusedNowWords(answer);
+    if (!offered && announce && options.workshop === undefined) status.textContent = refusedNowWords(answer);
     // Where no draft can be started now, the recipes are one press away.
     toRecipes.hidden = offered || options.recipes === undefined;
+    if (configureControl !== null) {
+      const needsSetup = answer.code === 'provider_credential_absent';
+      if (!offered && needsSetup && announce) status.textContent = 'AI creation is not enabled here. You can still open and edit saved worlds.';
+      configureControl.hidden = offered || made !== null || !needsSetup;
+      if (!offered && !needsSetup && announce) status.textContent = refusedNowWords(answer);
+      make.hidden = !offered || made !== null;
+      const details = root.querySelector<HTMLElement>('.world-creation-disclosure');
+      if (details !== null) details.hidden = !offered;
+    }
     reflect();
   };
 
   const refresh = (): void => {
     // The words of how the draft ended stay; only the line of what is left moves.
     void options.readOffer().then((answer) => {
-      if (following === null) offer(answer, false);
+      if (following === null && memory.pending === null) offer(answer, false);
     }, () => undefined);
   };
 
@@ -175,10 +232,11 @@ export function buildWorldSentence(options: {
 
   const show = (answer: WorldMakingDraft): void => {
     const elapsed = { elapsed: elapsedWords(answer.elapsedSeconds) };
-    if (answer.state === 'choosing' || answer.state === 'drafting' || answer.state === 'making') {
-      status.textContent = fill(`worldSentence.${answer.state}`, elapsed);
+    if (answer.state === 'queued' || answer.state === 'choosing' || answer.state === 'drafting' || answer.state === 'making') {
+      status.textContent = `${answer.recovered ? `${say('worldSentence.recovered')} ` : ''}${fill(`worldSentence.${answer.state}`, elapsed)}`;
       return;
     }
+    memory.pending = null;
     if (answer.state === 'ready' && answer.entry !== null) {
       stop(fill('worldSentence.ready', { title: answer.entry.title }));
       made = answer.entry;
@@ -190,7 +248,9 @@ export function buildWorldSentence(options: {
       takenLine.textContent = takenWords(answer);
       takenLine.hidden = takenLine.textContent === '';
       open.hidden = false;
+      if (options.workshop !== undefined) make.hidden = true;
       field.value = '';
+      field.dispatchEvent(new Event('input', { bubbles: true }));
       reflect();
       open.focus({ preventScroll: true });
       refresh();
@@ -215,23 +275,44 @@ export function buildWorldSentence(options: {
       if (!root.isConnected || following !== draftId) return;
       void options.read(draftId).then((answer) => {
         if (following !== draftId) return;
+        checkIdentity(answer, draftId);
         failures = 0;
         show(answer);
         if (answer.pollAfterSeconds !== null) poll(draftId, answer.pollAfterSeconds);
-      }, (error: unknown) => {
+      }).catch((error: unknown) => {
         if (following !== draftId) return;
         if (error instanceof ApiError && error.status === 404) {
+          busyDraft = draftId;
           stop(say('worldSentence.lost'));
+          follow.textContent = 'Check progress';
+          follow.hidden = false;
           return;
         }
         failures += 1;
-        if (failures >= POLL_FAILURES) stop(problemSentence(error));
+        if (failures >= POLL_FAILURES) {
+          busyDraft = draftId;
+          stop(say('worldSentence.progress.interrupted'));
+          follow.textContent = 'Check progress';
+          follow.hidden = false;
+        }
         else poll(draftId, afterSeconds);
       });
     }, afterSeconds * 1000);
   };
 
+  const checkIdentity = (answer: WorldMakingDraft, draftId?: string): void => {
+    const pending = memory.pending;
+    const expected = pending?.kind === 'sending' ? pending.submission?.idempotencyKey
+      : pending?.requestId;
+    if ((draftId !== undefined && answer.draftId !== draftId)
+      || (expected != null && answer.requestId !== expected)) throw new TypeError('The server returned an invalid world draft identity.');
+  };
+
   const followDraft = (answer: WorldMakingDraft): void => {
+    checkIdentity(answer);
+    memory.pending = { kind: 'following', draftId: answer.draftId, requestId: answer.requestId };
+    if (answer.operation !== null) spend.textContent = spendWords({ ...latestOffer, operation: answer.operation });
+    busyDraft = null;
     clearResult();
     if (answer.pollAfterSeconds === null) {
       show(answer);
@@ -249,39 +330,96 @@ export function buildWorldSentence(options: {
     error instanceof ApiError && error.status === 404 ? say('worldSentence.lost') : problemSentence(error)
   );
 
-  const send = (): void => {
-    const words = field.value.trim();
-    if (words === '' || following !== null || !offered || sending) return;
+  const uncertain = (): void => {
+    status.textContent = say(memory.pending?.kind === 'sending' && memory.pending.submission === null
+      ? 'worldSentence.request.legacy' : 'worldSentence.request.unknown');
+    follow.textContent = say('worldSentence.request.check');
+    follow.hidden = false;
+    reflect();
+  };
+
+  const dispatch = (): void => {
+    const attempt = memory.pending;
+    if (attempt?.kind !== 'sending' || sending) return;
     sending = true;
-    make.disabled = true;
-    clearResult();
-    status.textContent = '';
-    void options.start(words).then((answer) => {
+    reflect();
+    const request = attempt.submission === null ? options.start(attempt.description)
+      : options.start(attempt.description, attempt.submission);
+    void request.then((answer) => {
       sending = false;
+      // Another open panel may already have followed this same request.
+      checkIdentity(answer);
       followDraft(answer);
-    }, (error: unknown) => {
+    }).catch((error: unknown) => {
       sending = false;
-      reflect();
+      // These admission refusals establish that this request did not dispatch.
+      const refused = error instanceof ApiError && [
+        'world_draft_price_expired', 'world_draft_operation_changed', 'kind_draft_busy',
+        'kind_draft_limit', 'kind_draft_capacity',
+      ].includes(error.code);
+      if (!refused) { uncertain(); return; }
+      if (memory.pending === attempt) memory.pending = null;
       if (error instanceof ApiError && error.code === 'kind_draft_busy') {
-        // The running draft's id is told only to the person who started it.
         const mine = error.extensions['draft_id'];
         busyDraft = typeof mine === 'string' ? mine : null;
         status.textContent = say(busyDraft === null ? 'worldSentence.busy.other' : 'worldSentence.busy');
         follow.hidden = busyDraft === null;
-        return;
+      } else {
+        status.textContent = error instanceof ApiError && error.code === 'kind_draft_capacity'
+          ? say('worldSentence.capacity') : problemSentence(error);
       }
-      status.textContent = error instanceof ApiError && error.code === 'kind_draft_capacity'
-        ? say('worldSentence.capacity')
-        : problemSentence(error);
-      // A refusal the offer would now state (the hour's starts, the allowance) is read again.
+      reflect();
       refresh();
     });
   };
 
+  const send = (): void => {
+    const words = field.value.trim();
+    if (words === '' || memory.pending !== null || following !== null || busyDraft !== null || !offered || sending) return;
+    const quote = latestOffer.operation;
+    if (quote !== null && quote.expiresAt <= Date.now()) {
+      sending = true;
+      reflect();
+      void options.readOffer().then(answer => {
+        offer(answer, false);
+        status.textContent = say('worldSentence.quote.updated');
+      }, error => { status.textContent = problemSentence(error); }).finally(() => { sending = false; reflect(); });
+      return;
+    }
+    clearResult();
+    status.textContent = '';
+    memory.pending = { kind: 'sending', description: words, submission: quote === null ? null : Object.freeze({
+      idempotencyKey: crypto.randomUUID(), operation: quote, maximumUsd: quote.maximumUsd,
+    }) };
+    dispatch();
+  };
+
   follow.addEventListener('click', () => {
-    if (busyDraft === null) return;
-    void options.read(busyDraft).then(followDraft, (error: unknown) => {
+    if (sending) return;
+    const pending = memory.pending;
+    if (pending?.kind === 'sending') {
+      if (pending.submission !== null) { dispatch(); return; }
+      // A legacy server cannot deduplicate a POST. Recover through its own running draft only.
+      sending = true;
+      reflect();
+      void options.readOffer().then(async answer => {
+        if (answer.runningDraftId === null) { uncertain(); return; }
+        const draft = await options.read(answer.runningDraftId);
+        checkIdentity(draft, answer.runningDraftId);
+        followDraft(draft);
+      }).catch(() => uncertain()).finally(() => { sending = false; reflect(); });
+      return;
+    }
+    const id = busyDraft ?? (pending?.kind === 'following' ? pending.draftId : null);
+    if (id === null) return;
+    void options.read(id).then(answer => { checkIdentity(answer, id); followDraft(answer); }).catch((error: unknown) => {
       status.textContent = lost(error);
+      if (error instanceof ApiError && error.isNotFound) {
+        busyDraft = id;
+        follow.hidden = false;
+        // Keep unknown request identity; a missing read is not proof that no work happened.
+        reflect();
+      }
     });
   });
   open.addEventListener('click', () => {
@@ -297,18 +435,38 @@ export function buildWorldSentence(options: {
   make.addEventListener('click', send);
   // Enter makes the world and Shift with Enter starts a new line.
   field.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.isComposing) {
+    const submit = options.workshop === undefined
+      ? !event.shiftKey && !event.metaKey && !event.ctrlKey
+      : event.metaKey || event.ctrlKey;
+    if (event.key === 'Enter' && submit && !event.isComposing) {
       event.preventDefault();
-      send();
+      if (configureControl !== null && !configureControl.hidden) configureControl.click();
+      else send();
     }
   });
 
   offer(options.offer, true);
   // A draft of the person's own that is still running is followed from where it is.
-  const running = options.offer.runningDraftId;
+  const pending = memory.pending;
+  if (pending?.kind === 'sending') {
+    field.value = pending.description;
+    if (pending.submission !== null) spend.textContent = spendWords({ ...latestOffer, operation: pending.submission.operation });
+    uncertain();
+  }
+  const running = pending?.kind === 'following' ? pending.draftId
+    : pending?.kind === 'sending' ? null : options.offer.runningDraftId;
   if (running !== null) {
-    void options.read(running).then(followDraft, (error: unknown) => {
+    busyDraft = running;
+    memory.pending ??= { kind: 'following', draftId: running, requestId: null };
+    reflect();
+    void options.read(running).then(answer => { checkIdentity(answer, running); followDraft(answer); }).catch((error: unknown) => {
       status.textContent = lost(error);
+      if (!(error instanceof ApiError && error.isNotFound) || memory.pending !== null) {
+        busyDraft = running;
+        follow.textContent = 'Check progress';
+        follow.hidden = false;
+        reflect();
+      }
       refresh();
     });
   }

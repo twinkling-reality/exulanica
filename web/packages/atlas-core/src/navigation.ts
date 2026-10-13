@@ -1,3 +1,6 @@
+import { at as terrainAt, sweep as terrainSweep, type HeightfieldContact, type HeightfieldContactResult, type HeightfieldRefusal } from './heightfield-contact.js';
+import { HeightfieldGeometryError, type HeightfieldPoint } from './heightfield-geometry.js';
+import { SupportNavigationError, type SupportNavigation, type SupportState } from './support-navigation.js';
 import type { AtlasVec3 } from './coords.js';
 import { atlasVec3 } from './coords.js';
 import type { IslandId } from './ids.js';
@@ -97,7 +100,88 @@ export interface SemanticTrace {
   readonly strength: number;
 }
 
+export interface VerifiedTerrainOccupancy {
+  readonly status: 'verified';
+  readonly worldId: string;
+  readonly versionId: string;
+  readonly receiptSha256: string;
+  readonly geometrySha256: string;
+  readonly contactSha256: string;
+  readonly authoredStateSha256: string;
+}
+export type TerrainOccupancyProof = VerifiedTerrainOccupancy | { readonly status: 'unavailable' };
+export interface TerrainState {
+  readonly worldId: string;
+  readonly versionId: string;
+  readonly receiptSha256: string;
+  readonly authoredStateSha256: string;
+  readonly geometrySha256: string;
+  readonly contactSha256: string;
+  readonly positionMm: HeightfieldPoint;
+}
+export interface TerrainNavigation {
+  readonly source: { readonly worldId: string; readonly receiptSha256: string };
+  /** Supplied by the current world/version authority, never inferred from a source digest. */
+  readonly occupancy: TerrainOccupancyProof;
+  readonly contact: HeightfieldContact;
+  readonly entryMm: HeightfieldPoint;
+}
+export interface TerrainGroundPose { readonly position: AtlasVec3; readonly state: TerrainState }
+
+/** Quantize the exact binary64 metre value using canonical round_half_down (ties toward zero). */
+export function terrainMillimetres(metres: number): number {
+  if (!Number.isFinite(metres)) throw new RangeError('Terrain position is finite.');
+  const view = new DataView(new ArrayBuffer(8)); view.setFloat64(0, metres);
+  const bits = view.getBigUint64(0), negative = (bits >> 63n) !== 0n;
+  const exponent = Number((bits >> 52n) & 2047n), fraction = bits & ((1n << 52n) - 1n);
+  let numerator = (exponent === 0 ? fraction : fraction + (1n << 52n)) * 1000n;
+  let denominator = 1n;
+  const shift = exponent === 0 ? -1074 : exponent - 1023 - 52;
+  if (shift >= 0) numerator <<= BigInt(shift); else denominator <<= BigInt(-shift);
+  let rounded = numerator / denominator;
+  if (2n * (numerator % denominator) > denominator) rounded++;
+  if (rounded > 512000n) throw new RangeError('Terrain position exceeds its millimetre bounds.');
+  return Number(negative ? -rounded : rounded);
+}
+function terrainPoint(pose: AtlasVec3): HeightfieldPoint { return [terrainMillimetres(pose.x), terrainMillimetres(pose.z)]; }
+function terrainConfigured(world: NavigationWorld): boolean {
+  const terrain = world.terrain;
+  if (terrain === undefined || terrain.occupancy.status !== 'verified') return false;
+  const proof = terrain.occupancy;
+  return proof.worldId === terrain.source.worldId && proof.receiptSha256 === terrain.source.receiptSha256
+    && proof.geometrySha256 === terrain.contact.geometry.sha256 && proof.contactSha256 === terrain.contact.sha256
+    && /^[0-9a-f]{64}$/.test(proof.authoredStateSha256) && /^[0-9a-f]{64}$/.test(proof.receiptSha256)
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(proof.versionId)
+    && world.support === undefined && world.cameraRadius === .34 && world.eyeHeight > 0 && world.eyeHeight <= 1.8
+    && world.obstacles.length === 0 && (world.polygonObstacles?.length ?? 0) === 0;
+}
+function terrainPinMatches(world: NavigationWorld, point: HeightfieldPoint, pin: TerrainState): boolean {
+  const proof = world.terrain!.occupancy;
+  return pin !== null && typeof pin === 'object' && proof.status === 'verified' && pin.worldId === proof.worldId && pin.versionId === proof.versionId
+    && pin.receiptSha256 === proof.receiptSha256 && pin.authoredStateSha256 === proof.authoredStateSha256
+    && pin.geometrySha256 === proof.geometrySha256 && pin.contactSha256 === proof.contactSha256
+    && Array.isArray(pin.positionMm) && pin.positionMm.length === 2 && pin.positionMm[0] === point[0] && pin.positionMm[1] === point[1];
+}
+function groundTerrainResult(world: NavigationWorld, point: HeightfieldPoint, result: HeightfieldContactResult): TerrainGroundPose | null {
+  if (result.status !== 'clear' || result.contact === null) return null;
+  const proof = world.terrain!.occupancy;
+  if (proof.status !== 'verified') return null;
+  const height = Number(result.contact.height_mm.numerator) / Number(result.contact.height_mm.denominator) / 1000;
+  return Object.freeze({ position: atlasVec3(point[0] / 1000, height + world.eyeHeight, point[1] / 1000), state: Object.freeze({ worldId: proof.worldId, versionId: proof.versionId, receiptSha256: proof.receiptSha256, authoredStateSha256: proof.authoredStateSha256, geometrySha256: proof.geometrySha256, contactSha256: proof.contactSha256, positionMm: Object.freeze([...point]) as HeightfieldPoint }) });
+}
+/** Explicitly validate an entry/current-source pose. A supplied stale pin never receives a new one. */
+export function terrainGroundPose(world: NavigationWorld, point: HeightfieldPoint, expected?: TerrainState): TerrainGroundPose | null {
+  if (!terrainConfigured(world) || (expected !== undefined && !terrainPinMatches(world, point, expected))) return null;
+  try { return groundTerrainResult(world, point, terrainAt(world.terrain!.contact, point)); }
+  catch (error) { if (!(error instanceof HeightfieldGeometryError)) throw error; return null; }
+}
+function terrainPoseMatches(pose: AtlasVec3, accepted: TerrainGroundPose): boolean {
+  return pose.x === accepted.position.x && pose.z === accepted.position.z && Number.isFinite(pose.y) && Math.abs(pose.y - accepted.position.y) <= .001;
+}
+
 export interface NavigationWorld {
+  readonly terrain?: TerrainNavigation;
+  readonly support?: SupportNavigation;
   readonly surface: NavigationSurface;
   readonly eyeHeight: number;
   readonly cameraRadius: number;
@@ -122,6 +206,10 @@ export function isNavigationPositionClear(
   position: AtlasVec3,
   radius = world.cameraRadius,
 ): boolean {
+  if (world.terrain !== undefined) {
+    try { const grounded = terrainGroundPose(world, terrainPoint(position)); return radius === .34 && grounded !== null && terrainPoseMatches(position, grounded); }
+    catch (error) { if (!(error instanceof RangeError)) throw error; return false; }
+  }
   return world.obstacles.every(
     (obstacle) => groundDistance(position, obstacle.centre) >= obstacle.radius + radius,
   ) && (world.polygonObstacles ?? []).every(
@@ -468,12 +556,22 @@ function nearestRegionEntry(world: NavigationWorld, from: AtlasVec3): AtlasVec3 
 }
 
 export interface GroundMovementInput {
+  readonly terrainState?: TerrainState;
+  readonly lastSafeTerrain?: TerrainState;
   readonly current: AtlasVec3;
   readonly desired: AtlasVec3;
   readonly lastSafe: AtlasVec3 | null;
+  readonly supportState?: SupportState;
+  readonly lastSafeSupport?: SupportState;
 }
 
 export interface GroundMovementResolution {
+  readonly terrainState?: TerrainState;
+  readonly lastSafeTerrain?: TerrainState;
+  readonly terrainResult?: HeightfieldContactResult;
+  readonly terrainFailure?: HeightfieldRefusal | 'stale_source' | 'invalid_pose' | 'unbound_occupancy';
+  readonly supportState?: SupportState;
+  readonly lastSafeSupport?: SupportState;
   readonly position: AtlasVec3;
   readonly lastSafe: AtlasVec3;
   readonly spatial: SpatialClassification;
@@ -531,6 +629,7 @@ export function isNavigationGroundPathContinuous(
   from: AtlasVec3,
   to: AtlasVec3,
 ): boolean {
+  if (world.terrain !== undefined) return isTerrainPathClear(world, from, to);
   return groundDistance(to, world.centre) <= world.fieldRadius
     && surfacePathFailure(world, from, to) === null;
 }
@@ -541,7 +640,16 @@ export function isNavigationPathClear(
   from: AtlasVec3,
   to: AtlasVec3,
 ): boolean {
-  if (!isNavigationGroundPathContinuous(world, from, to)) return false;
+  if (world.terrain !== undefined) return isTerrainPathClear(world, from, to);
+  if (world.support !== undefined) {
+    try {
+      const state = world.support.entry;
+      const height = world.support.at(state, [from.x * 1000, from.z * 1000]) / 1000 + world.eyeHeight;
+      if (Math.abs(from.y - height) > .001) return false;
+      const moved = world.support.move(state, [from.x * 1000, from.z * 1000], [to.x * 1000, to.z * 1000]);
+      if (moved.state.surfaceId !== state.surfaceId || Math.abs(to.y - moved.heightMm / 1000 - world.eyeHeight) > .001) return false;
+    } catch (error) { if (!(error instanceof SupportNavigationError)) throw error; return false; }
+  } else if (!isNavigationGroundPathContinuous(world, from, to)) return false;
   if (collideAndSlide(from, to, world.obstacles, world.cameraRadius).collided) return false;
   return !collidePolygonsAndSlide(
     from,
@@ -556,6 +664,8 @@ export function resolveGroundMovement(
   world: NavigationWorld,
   input: GroundMovementInput,
 ): GroundMovementResolution {
+  if (world.terrain !== undefined) return resolveTerrainMovement(world, input);
+  if (world.support !== undefined) return resolveSupportedMovement(world, input);
   const desiredDistance = groundDistance(input.desired, world.centre);
   const rawSample = world.surface.sample(input.desired.x, input.desired.z);
   if (rawSample === null || desiredDistance > world.recoveryRadius) {
@@ -634,6 +744,82 @@ export function resolveGroundMovement(
     recovered: false,
     recoveryReason: null,
   });
+}
+
+/** Terrain never enters the sampled-surface or approximate collision/slide paths. */
+function isTerrainPathClear(world: NavigationWorld, from: AtlasVec3, to: AtlasVec3): boolean {
+  if (!terrainConfigured(world)) return false;
+  try {
+    const start = terrainPoint(from), end = terrainPoint(to);
+    const first = terrainGroundPose(world, start);
+    if (first === null || !terrainPoseMatches(from, first)) return false;
+    const final = groundTerrainResult(world, end, terrainSweep(world.terrain!.contact, start, end));
+    return final !== null && terrainPoseMatches(to, final);
+  } catch (error) { if (!(error instanceof RangeError) && !(error instanceof HeightfieldGeometryError)) throw error; return false; }
+}
+function resolveTerrainMovement(world: NavigationWorld, input: GroundMovementInput): GroundMovementResolution {
+  const refuse = (failure: NonNullable<GroundMovementResolution['terrainFailure']>, query?: HeightfieldContactResult): GroundMovementResolution => Object.freeze({
+    position: input.current, lastSafe: input.lastSafe ?? input.current,
+    ...(input.terrainState === undefined ? {} : { terrainState: input.terrainState }),
+    ...(input.lastSafeTerrain === undefined ? {} : { lastSafeTerrain: input.lastSafeTerrain }),
+    ...(query === undefined ? {} : { terrainResult: query }), terrainFailure: failure,
+    spatial: classifySpatialPhase(world, input.current), collided: true, recovered: false, recoveryReason: null,
+  });
+  if (!terrainConfigured(world)) return refuse('unbound_occupancy');
+  try {
+    const start = terrainPoint(input.current), end = terrainPoint(input.desired);
+    if (input.terrainState === undefined) return refuse('invalid_pose');
+    if (!terrainPinMatches(world, start, input.terrainState)) return refuse('stale_source');
+    const standing = terrainAt(world.terrain!.contact, start);
+    if (standing.status !== 'clear') return refuse(standing.reason!, standing);
+    const current = groundTerrainResult(world, start, standing)!;
+    if (!terrainPoseMatches(input.current, current)) return refuse('invalid_pose');
+    const query = terrainSweep(world.terrain!.contact, start, end);
+    if (query.status !== 'clear') return refuse(query.reason!, query);
+    const accepted = groundTerrainResult(world, end, query)!;
+    return Object.freeze({ position: accepted.position, lastSafe: accepted.position, terrainState: accepted.state, lastSafeTerrain: accepted.state, terrainResult: query,
+      spatial: classifySpatialPhase(world, accepted.position), collided: false, recovered: false, recoveryReason: null });
+  } catch (error) { if (!(error instanceof RangeError) && !(error instanceof HeightfieldGeometryError)) throw error; return refuse('invalid_pose'); }
+}
+
+/** Keep position and support identity together; rejected speculative moves commit neither. */
+function resolveSupportedMovement(world: NavigationWorld, input: GroundMovementInput): GroundMovementResolution {
+  const support = world.support!, state = input.supportState ?? support.entry;
+  const point = (pose: AtlasVec3): readonly [number, number] => [pose.x * 1000, pose.z * 1000];
+  const fallbackState = input.lastSafeSupport ?? support.entry;
+  const recover = (reason: 'outside-field' | 'no-surface'): GroundMovementResolution => {
+    let safe = input.lastSafe;
+    let held = fallbackState;
+    try {
+      if (safe === null || !Number.isFinite(safe.y) || Math.abs(safe.y - world.eyeHeight - support.at(held, point(safe)) / 1000) > .001) safe = null;
+    } catch (error) { if (!(error instanceof SupportNavigationError)) throw error; safe = null; }
+    if (safe === null) {
+      const entry = support.nodes.get(support.document.entry_node_id)!;
+      held = support.entry;
+      safe = atlasVec3(entry.position_mm[0] / 1000, support.at(held, entry.position_mm) / 1000 + world.eyeHeight, entry.position_mm[1] / 1000);
+    }
+    return Object.freeze({ position: safe, lastSafe: safe, supportState: held, lastSafeSupport: held,
+      spatial: classifySpatialPhase(world, safe), collided: false, recovered: true, recoveryReason: reason });
+  };
+  try {
+    if (!Number.isFinite(input.current.y) || Math.abs(input.current.y - world.eyeHeight - support.at(state, point(input.current)) / 1000) > .001) return recover('no-surface');
+  } catch (error) { if (!(error instanceof SupportNavigationError)) throw error; return recover('no-surface'); }
+  if (groundDistance(input.desired, world.centre) > world.recoveryRadius) return recover('outside-field');
+  try {
+    // The first query is speculative. A clipped path is resolved again from the original state.
+    const wanted = support.move(state, point(input.current), point(input.desired));
+    const target = atlasVec3(input.desired.x, wanted.heightMm / 1000 + world.eyeHeight, input.desired.z);
+    const circles = collideAndSlide(input.current, target, world.obstacles, world.cameraRadius);
+    const polygons = collidePolygonsAndSlide(input.current, circles.position, world.polygonObstacles ?? [], world.cameraRadius);
+    const accepted = support.move(state, point(input.current), point(polygons.position));
+    const position = atlasVec3(polygons.position.x, accepted.heightMm / 1000 + world.eyeHeight, polygons.position.z);
+    return Object.freeze({ position, lastSafe: position, supportState: accepted.state, lastSafeSupport: accepted.state,
+      spatial: classifySpatialPhase(world, position), collided: circles.collided || polygons.collided, recovered: false, recoveryReason: null });
+  } catch (error) {
+    if (!(error instanceof SupportNavigationError)) throw error;
+    return Object.freeze({ position: input.current, lastSafe: input.current, supportState: state, lastSafeSupport: state,
+      spatial: classifySpatialPhase(world, input.current), collided: true, recovered: false, recoveryReason: null });
+  }
 }
 
 /**

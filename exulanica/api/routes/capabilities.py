@@ -670,10 +670,23 @@ VERSION_ADAPTERS: Final[tuple[Callable[[VersionContext], list[Operation]], ...]]
     signal_comparisons.capability_operations,
 )
 
-#: Mutating routes of a version no adapter projects, each with why. A test holds this table and the
-#: adapters to every mutating route under ``/world/versions/{version_id}/``.
+#: Non-GET version routes no adapter projects, each with why, including body-shaped reads.
+#: A test holds this table and the adapters to every such version route.
 NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
     {
+        ("POST", "/world/versions/{version_id}/inventory/query"): (
+            "reads current appearance facts for typed inventory entities without changing the "
+            "world; it is an inventory query, not a version action"
+        ),
+        ("POST", "/world/versions/{version_id}/things/on-support/preview"): (
+            "validates a chosen passive rigid kind, exact source support and authored base; "
+            "the version read does not enumerate source-bound placement candidates"
+        ),
+        ("POST", "/world/versions/{version_id}/things/on-support"): (
+            "places the passive rigid kind against the exact support and authored state "
+            "checked by POST /world/versions/{version_id}/things/on-support/preview; "
+            "generic version availability does not establish this placement's admission"
+        ),
         ("POST", "/world/versions/{version_id}/models/{role_key}/budget"): (
             "sets the world's budget for its minds, which is the world's and no version's; read "
             "with the world's models (GET /world/versions/{version_id}/models, the people's "
@@ -777,12 +790,19 @@ def version_context(
     )
 
 
-def _actions(operations: list[dict[str, Any]], held: frozenset[Permission]) -> list[dict[str, Any]]:
+def _actions(
+    operations: list[dict[str, Any]],
+    held: frozenset[Permission],
+    *,
+    facts: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
     """Every offered action of the catalog for a caller holding ``held``: what the catalog states
     of it, its route's own permissions, and the state of the operation among ``operations`` (the
     version's descriptors, as served) that projects its route and bind, where one does."""
     served = []
     for action in action_catalog.offered():
+        if action.subjects == ("workspace",):
+            continue
         assert action.route is not None  # an offered action names its route
         method, _, path = action.route.partition(" ")
         rule = rule_for(method, path)
@@ -797,14 +817,18 @@ def _actions(operations: list[dict[str, Any]], held: frozenset[Permission]) -> l
             None,
         )
         served.append(
-            {
-                **action.view(),
-                "requires": sorted(str(permission) for permission in required),
-                "permitted": required <= held,
-                "projected": projecting is not None,
-                "state": None if projecting is None else projecting["state"],
-                "code": None if projecting is None else projecting["code"],
-            }
+            action_catalog.narrow_offer(
+                action,
+                {
+                    **action.view(),
+                    "requires": sorted(str(permission) for permission in required),
+                    "permitted": required <= held,
+                    "projected": projecting is not None,
+                    "state": None if projecting is None else projecting["state"],
+                    "code": None if projecting is None else projecting["code"],
+                },
+                facts,
+            )
         )
     return served
 

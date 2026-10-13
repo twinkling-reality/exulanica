@@ -49,6 +49,23 @@ MIGRATION = next(
 
 #: What the owner may do to each table, read from the bodies (the migration's comments name them).
 TABLE_PRIVILEGES = {
+    # 0211: shared admission reads native starts; erasure/retention deletes only content.
+    "kind_draft_start": {"SELECT"},
+    "kind_draft_input": {"SELECT", "DELETE"},
+    "kind_draft_attempt": {"SELECT", "DELETE"},
+    "kind_draft_outcome": {"SELECT", "DELETE"},
+    # 0207: quota reads start timing; terminal/erasure functions delete only content.
+    "world_draft_start": {"SELECT"},
+    "world_draft_request": {"SELECT", "DELETE"},
+    "world_draft_input": {"SELECT", "DELETE"},
+    "world_draft_progress": {"SELECT", "DELETE"},
+    "world_draft_attempt": {"SELECT", "DELETE"},
+    "world_draft_outcome": {"SELECT", "DELETE"},
+    "capture": {"SELECT"},
+    "capture_reconstruction_authorization": {"SELECT"},
+    "personal_model_right": {"INSERT"},
+    "personal_model_right_use": {"SELECT", "INSERT"},
+    "workspace_model_binding_snapshot": {"SELECT", "DELETE"},
     "baked_tile": {"SELECT", "INSERT", "UPDATE"},
     "baked_tile_stage": {"SELECT"},
     # tg_thing_erasure_erases (0172) deletes a drafted creature's rows.
@@ -69,8 +86,8 @@ TABLE_PRIVILEGES = {
     # a workspace tombstone its style pack files.
     "purge_job": {"INSERT"},
     "restore_control": {"SELECT"},
-    "saved_world_source_attachment_operation": {"SELECT"},
-    "saved_world_source_current_membership": {"SELECT", "INSERT", "UPDATE"},
+    "saved_world_source_attachment_operation": {"SELECT", "DELETE"},
+    "saved_world_source_current_membership": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     "spending_authority": {"SELECT"},
     "spending_authority_revocation": {"SELECT"},
     "spending_authority_state": {"SELECT", "UPDATE"},
@@ -85,11 +102,11 @@ TABLE_PRIVILEGES = {
     "thing_kind_version": {"SELECT", "DELETE"},
     "tombstone": {"SELECT"},
     "tombstone_embedding_target": {"SELECT"},
-    "world_project": {"SELECT", "UPDATE"},
-    "world_project_item": {"SELECT", "UPDATE"},
-    "world_project_item_revision": {"SELECT", "UPDATE"},
-    "world_project_item_source": {"SELECT"},
-    "world_project_share": {"SELECT", "UPDATE"},
+    "world_project": {"SELECT", "UPDATE", "DELETE"},
+    "world_project_item": {"SELECT", "UPDATE", "DELETE"},
+    "world_project_item_revision": {"SELECT", "UPDATE", "DELETE"},
+    "world_project_item_source": {"SELECT", "DELETE"},
+    "world_project_share": {"SELECT", "UPDATE", "DELETE"},
     # reference_lookup_clear_queries reads a workspace's search records.
     "reference_lookup": {"SELECT"},
     "installation_style_pack_day": {"SELECT", "INSERT", "UPDATE"},
@@ -140,8 +157,87 @@ TABLE_PRIVILEGES = {
     "world_society_transition_action": {"SELECT", "DELETE"},
     "world_society_transition_decision": {"SELECT", "DELETE"},
     "companion_answer": {"SELECT"},
-    "companion_answer_simulation_citation": {"SELECT"},
     "society_erasure": {"SELECT"},
+    # world_erase_rows (0195) deletes every row of one world, its registration last, and
+    # tg_world_erases_on_tombstone the kinds a workspace kept; door_secret's is 0161's above, and
+    # the DELETE on a project's tables and a saved entry's membership tables above is its too.
+    "companion_answer_simulation_citation": {"SELECT", "DELETE"},
+    "companion_answer_simulation_label": {"SELECT", "DELETE"},
+    "door_delivery": {"SELECT", "DELETE"},
+    "door_grant": {"SELECT", "DELETE"},
+    "door_grant_revision": {"SELECT", "DELETE"},
+    "door_grant_revocation": {"SELECT", "DELETE"},
+    "door_presence": {"SELECT", "DELETE"},
+    "door_visitor_gone": {"SELECT", "DELETE"},
+    "piece_look_step": {"SELECT", "DELETE"},
+    "piece_request": {"SELECT", "DELETE"},
+    "piece_settlement": {"SELECT", "DELETE"},
+    "piece_erasure_settlement": {"SELECT", "INSERT"},
+    "saved_world_entry": {"SELECT", "DELETE"},
+    "saved_world_source_attachment": {"SELECT", "DELETE"},
+    "saved_world_source_detach": {"SELECT", "DELETE"},
+    "saved_world_source_detach_operation": {"SELECT", "DELETE"},
+    "signal_comparison": {"SELECT", "DELETE"},
+    "signal_comparison_decision": {"SELECT", "DELETE"},
+    "signal_comparison_outcome": {"SELECT", "DELETE"},
+    "signal_comparison_run": {"SELECT", "DELETE"},
+    "signal_comparison_start": {"SELECT", "DELETE"},
+    "world_alternate_element_override": {"SELECT", "DELETE"},
+    "world_alternate_environment_instance": {"SELECT", "DELETE"},
+    "world_alternate_object": {"SELECT", "DELETE"},
+    "world_alternate_point_map_instance": {"SELECT", "DELETE"},
+    "world_alternate_thing": {"SELECT", "DELETE"},
+    "world_alternate_version": {"SELECT", "DELETE"},
+    "world_alternate_version_edit": {"SELECT", "DELETE"},
+    "world_generation_receipt": {"SELECT", "DELETE"},
+    "world_identity": {"SELECT", "DELETE"},
+    "world_interaction_policy_audit_event": {"SELECT", "DELETE"},
+    "world_interaction_policy_preview": {"SELECT", "DELETE"},
+    "world_interaction_policy_proposal": {"SELECT", "DELETE"},
+    "world_interaction_policy_state": {"SELECT", "DELETE"},
+    "world_interaction_policy_version": {"SELECT", "DELETE"},
+    "world_kind_version": {"SELECT", "DELETE"},
+    "world_package_export": {"SELECT", "DELETE"},
+    "world_project_binding": {"SELECT", "DELETE"},
+    "world_region_style_version": {"SELECT", "DELETE"},
+    "world_structure_audit_event": {"SELECT", "DELETE"},
+    "world_structure_dependency": {"SELECT", "DELETE"},
+    "world_structure_element_identity": {"SELECT", "DELETE"},
+    "world_structure_invalidation": {"SELECT", "DELETE"},
+    "world_structure_placement_migration": {"SELECT", "DELETE"},
+    "world_structure_preview": {"SELECT", "DELETE"},
+    "world_structure_snapshot": {"SELECT", "DELETE"},
+    "world_structure_snapshot_element": {"SELECT", "DELETE"},
+    "world_structure_snapshot_region": {"SELECT", "DELETE"},
+    "world_structure_state": {"SELECT", "DELETE"},
+    "world_style_audit_event": {"SELECT", "DELETE"},
+    "world_style_preview": {"SELECT", "DELETE"},
+    "world_style_proposal": {"SELECT", "DELETE"},
+    "world_style_state": {"SELECT", "DELETE"},
+    "world_style_version": {"SELECT", "DELETE"},
+    "world_thing_look": {"SELECT", "DELETE"},
+    "world_topology_contract": {"SELECT", "DELETE"},
+    "world_topology_region": {"SELECT", "DELETE"},
+    "world_topology_source": {"SELECT", "DELETE"},
+    "world_traffic_signal_choice": {"SELECT", "DELETE"},
+    "world_traffic_signal_decision": {"SELECT", "DELETE"},
+    "world_traffic_signal_decision_request": {"SELECT", "DELETE"},
+    "world_traffic_signal_segment": {"SELECT", "DELETE"},
+    "workspace_model": {"SELECT", "DELETE"},
+    "world_minds_budget": {"SELECT", "DELETE"},
+    "world_erasure": {"SELECT"},
+    "world_grant": {"SELECT", "DELETE"},
+    "world_grant_revision": {"SELECT", "DELETE"},
+    "world_grant_principal": {"SELECT", "DELETE"},
+    "world_grant_revocation": {"SELECT", "DELETE"},
+    "world_grant_departure": {"SELECT", "DELETE"},
+    "world_grant_entry": {"SELECT", "DELETE"},
+    "participation_redemption_refusal": {"SELECT", "DELETE"},
+    "job": {"SELECT"},
+    "model_probe": {"SELECT", "DELETE"},
+    "model_probe_start": {"SELECT", "DELETE"},
+    "model_probe_receipt": {"SELECT", "DELETE"},
+    "model_probe_outcome": {"SELECT", "DELETE"},
 }
 
 #: Single columns the owner may reach beyond its table privileges: the search query that
@@ -149,6 +245,20 @@ TABLE_PRIVILEGES = {
 #: tg_society_erasure_erases writes, and the column whose UPDATE lets society_erase_rows lock a
 #: society's parent rows before it deletes (FOR UPDATE), which no body writes.
 COLUMN_PRIVILEGES: dict[str, dict[str, set[str]]] = {
+    "world_grant_entry": {"revoked_at": {"UPDATE"}},
+    "job": {
+        name: {"UPDATE"}
+        for name in (
+            "state",
+            "payload",
+            "completed_at",
+            "lease_expires_at",
+            "claim_token",
+            "claimed_by",
+            "last_error",
+            "failure_class",
+        )
+    },
     "reference_lookup": {"query": {"UPDATE"}},
     "companion_answer": {name: {"UPDATE"} for name in ("status", "withdrawn_at", "withdrawn_by")},
     **{
@@ -160,6 +270,20 @@ COLUMN_PRIVILEGES: dict[str, dict[str, set[str]]] = {
             "society_experiment_definition",
             "world_society",
             "world_society_decision_request",
+            # world_erase_rows (0195) locks a world's parent rows before it deletes.
+            "saved_world_entry",
+            "world_alternate_version",
+            "world_style_state",
+            "world_style_preview",
+            "world_structure_state",
+            "world_structure_preview",
+            "world_interaction_policy_state",
+            "world_interaction_policy_preview",
+            "piece_request",
+            "signal_comparison_start",
+            "signal_comparison_run",
+            "door_grant",
+            "world_identity",
         )
     },
 }
@@ -181,6 +305,8 @@ DEFINERS = {
             "look_purge_is_authorized(uuid,uuid,text)",
             "material_bake_purge_is_authorized(uuid,uuid,bytea)",
             "reference_lookup_clear_queries(uuid)",
+            "grant_creature_note_model_right(uuid,uuid,jsonb,jsonb)",
+            "tg_workspace_model_binding_erases()",
             "spending_admit(uuid,uuid,text,uuid,text,text,text,numeric,text,jsonb)",
             "spending_authority_facts()",
             "spending_close_bound(uuid,uuid,text,text)",
@@ -200,8 +326,27 @@ DEFINERS = {
             "tg_spending_event_ends_guest_policies()",
             "tg_thing_erasure_erases()",
             "tg_thing_store_erases_on_tombstone()",
+            "tg_tombstone_erases_models_and_minds_budgets()",
             "tg_tombstone_erases_piece_batches()",
             "tg_tombstone_withdraws_project_context()",
+            "world_erase_rows(uuid,text)",
+            "participation_erase(uuid,text)",
+            "participation_prune(integer)",
+            "tg_participation_erasure()",
+            "tg_participation_departure()",
+            "tg_participation_revocation()",
+            "participant_scope()",
+            "tg_world_erases_on_tombstone()",
+            "tg_world_erasure_erases()",
+            "tg_world_kind_erasure_erases()",
+            "tg_world_draft_person_quota()",
+            "tg_world_draft_erasure()",
+            "world_draft_forget_input(uuid)",
+            "draft_person_allowance(uuid,integer)",
+            "kind_draft_forget_input(uuid)",
+            "kind_draft_prune()",
+            "tg_kind_draft_erasure()",
+            "tg_model_probe_erases_on_workspace_tombstone()",
             "tg_world_project_item_erases_on_withdrawal()",
             "tg_world_project_withdraws_its_items()",
             "workspace_asset_purge_is_authorized(uuid,uuid,text)",
@@ -516,7 +661,7 @@ def test_exulanica_db_stops_a_deployment_whose_definer_drifted(admin, monkeypatc
         # Reach beyond the bodies' use, each kind a deployment would otherwise trust.
         ("grant delete on spending_event to {role}", r"spending_event DELETE beyond"),
         ("grant update (embedding_id) on embedding to {role}", r"embedding UPDATE beyond"),
-        ("grant select on capture to {role}", r"capture SELECT beyond"),
+        ("grant update on capture to {role}", r"capture UPDATE beyond"),
         ("grant execute on function spending__genesis to {role}", "spending__genesis executable"),
         # A grant the bodies need, stripped by a later migration or by hand.
         ("revoke update on baked_tile from {role}", "baked_tile UPDATE missing"),
@@ -667,20 +812,20 @@ LATER, LATEST = "9998", "9999"
 @pytest.fixture
 def later_migrations(monkeypatch):
     """Two later migrations this code ships, which the fixture's database does not record until a
-    test does. The first grants SELECT on capture and UPDATE of embedding.embedding_id, and takes
+    test does. The first grants UPDATE on capture and UPDATE of embedding.embedding_id, and takes
     back SELECT on tombstone and EXECUTE on spending__charge. The second takes back that column
-    grant, and revokes and grants back SELECT on capture in one migration."""
+    grant, and revokes and grants back UPDATE on capture in one migration."""
     grants = {
         **definer_role.GRANTS_BY_MIGRATION,
         LATER: definer_role.DefinerGrants(
-            tables={"capture": frozenset({"SELECT"})},
+            tables={"capture": frozenset({"UPDATE"})},
             columns={"embedding": {"embedding_id": frozenset({"UPDATE"})}},
             revoked_tables={"tombstone": frozenset({"SELECT"})},
             revoked_functions=frozenset({"spending__charge"}),
         ),
         LATEST: definer_role.DefinerGrants(
-            tables={"capture": frozenset({"SELECT"})},
-            revoked_tables={"capture": frozenset({"SELECT"})},
+            tables={"capture": frozenset({"UPDATE"})},
+            revoked_tables={"capture": frozenset({"UPDATE"})},
             revoked_columns={"embedding": {"embedding_id": frozenset({"UPDATE"})}},
         ),
     }
@@ -741,7 +886,7 @@ def test_a_database_behind_the_code_is_held_to_the_grants_it_records(
     with pytest.raises(DefinerRoleUnsafe) as refused:
         assert_definer_role(admin)
     for finding in (
-        "capture SELECT missing",
+        "capture UPDATE missing",
         "embedding.embedding_id UPDATE missing",
         "tombstone SELECT beyond",
         "spending__charge executable beyond",
@@ -751,7 +896,7 @@ def test_a_database_behind_the_code_is_held_to_the_grants_it_records(
         start()
     assert maintenance() == ["definer_role_unsafe"]
     # Applied: each as the first says, the revoked function and column included.
-    admin.execute(sql.SQL("grant select on capture to {}").format(role))
+    admin.execute(sql.SQL("grant update on capture to {}").format(role))
     admin.execute(sql.SQL("grant update (embedding_id) on embedding to {}").format(role))
     admin.execute(sql.SQL("revoke select on tombstone from {}").format(role))
     admin.execute(
@@ -759,7 +904,7 @@ def test_a_database_behind_the_code_is_held_to_the_grants_it_records(
     )
     assert_definer_role(admin)
     start()
-    # The second recorded: the column grant it takes back is now beyond, and the capture SELECT
+    # The second recorded: the column grant it takes back is now beyond, and the capture UPDATE
     # it revoked and granted back in one migration is still expected.
     _record(admin, LATEST)
     with pytest.raises(DefinerRoleUnsafe, match=r"embedding\.embedding_id UPDATE beyond"):
@@ -767,7 +912,7 @@ def test_a_database_behind_the_code_is_held_to_the_grants_it_records(
     admin.execute(sql.SQL("revoke update (embedding_id) on embedding from {}").format(role))
     assert_definer_role(admin)
     # The caller may name what is applied instead of the records.
-    with pytest.raises(DefinerRoleUnsafe, match="capture SELECT beyond"):
+    with pytest.raises(DefinerRoleUnsafe, match=r"capture (\w+/)*UPDATE(/\w+)* beyond"):
         assert_definer_role(admin, applied=[DEFINER_MIGRATION])
 
 
@@ -833,7 +978,7 @@ def _move_owner(admin, held: definer_role.ExpectedGrants, wanted: definer_role.E
 def _newest_entry_passes_until_recorded(admin, monkeypatch, tmp_path) -> None:
     """The drop_last case for whatever entry the newest shipped migration has: the harness really
     applied it, so what it grants or takes back is first undone on the owner, as if it had not run.
-    Its entry is then given one more grant (SELECT on capture), so recording it must refuse."""
+    Its entry is then given one more grant (UPDATE on capture), so recording it must refuse."""
     import shutil
 
     from exulanica import migrations as migrations_module
@@ -842,7 +987,7 @@ def _newest_entry_passes_until_recorded(admin, monkeypatch, tmp_path) -> None:
     newest = max(shipped)
     without = definer_role.expected_grants(shipped - {newest})
     _move_owner(admin, definer_role.expected_grants(shipped), without)
-    assert "SELECT" not in without.tables.get("capture", frozenset())
+    assert "UPDATE" not in without.tables.get("capture", frozenset())
     trimmed = tmp_path / "migrations"
     trimmed.mkdir()
     for path in migrations_module.migration_directory().glob("*.sql"):
@@ -855,7 +1000,7 @@ def _newest_entry_passes_until_recorded(admin, monkeypatch, tmp_path) -> None:
             real,
             tables={
                 **real.tables,
-                "capture": real.tables.get("capture", frozenset()) | {"SELECT"},
+                "capture": real.tables.get("capture", frozenset()) | {"UPDATE"},
             },
         ),
     }
@@ -866,8 +1011,8 @@ def _newest_entry_passes_until_recorded(admin, monkeypatch, tmp_path) -> None:
     assert_definer_role(admin)
     start()
     _record(admin, newest)
-    # SELECT alone, or beside what the newest entry itself grants on capture.
-    with pytest.raises(DefinerRoleUnsafe, match=r"capture (\w+/)*SELECT(/\w+)* missing"):
+    # An additional privilege beside the newest entry's actual capture privileges.
+    with pytest.raises(DefinerRoleUnsafe, match=r"capture (\w+/)*UPDATE(/\w+)* missing"):
         assert_definer_role(admin)
 
 
@@ -927,7 +1072,7 @@ def test_the_newest_entry_is_undone_whatever_kind_of_grant_it_holds(admin, monke
     with pytest.raises(DefinerRoleUnsafe) as refused:
         assert_definer_role(admin)
     for finding in (
-        "capture INSERT/SELECT missing",
+        "capture INSERT/UPDATE missing",
         "embedding.embedding_id INSERT missing",
         "embedding.embedding_id UPDATE beyond",
         "tombstone SELECT beyond",

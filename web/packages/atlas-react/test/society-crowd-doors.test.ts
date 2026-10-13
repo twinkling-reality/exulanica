@@ -58,6 +58,43 @@ const minute = (tick: number, path: readonly (readonly [number, number])[], indo
 });
 
 describe('a walk to a door', () => {
+  const atDestination = (state: OwnedSocietyState, indoors: boolean): OwnedSocietyState => ({
+    ...state,
+    inhabitants: state.inhabitants.map(person => ({ ...person, location_destination: { id: indoors ? 'home' : 'field', indoors } })),
+  });
+
+  it.each([undefined, 0])('keeps an outdoor worker visible and selectable after arrival (near limit %s)', (nearLimit) => {
+    const { crowd, done } = setup(nearLimit);
+    crowd.set(minute(0, [[0, 0]], false), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
+    // The living engine marks a destination stay indoors even when the destination is a field.
+    crowd.set(atDestination(minute(1, [[0, 0], [30, 0]], true), false), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
+    crowd.update(31_000);
+    expect(crowd.positionOf('resident')).toEqual([30, 0]);
+    expect(crowd.detailOf('resident')).toBe(nearLimit === 0 ? 'far' : 'near');
+    expect(crowd.counts).toMatchObject({ population: 1, outdoors: 1, indoors: 0, drawn: 1 });
+    expect(crowd.drawnIds).toEqual(['resident']);
+    expect(crowd.anchorOf('resident', new pc.Vec3())).toBe(true);
+    done();
+  });
+
+  it('uses indoor destination facts only at arrival and releases the figure on return outdoors', () => {
+    const { crowd, done } = setup();
+    crowd.set(minute(0, [[0, 0]], false), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
+    crowd.set(atDestination(minute(1, [[0, 0], [30, 0]], false), true), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });
+    crowd.update(15_000);
+    expect(crowd.detailOf('resident')).toBe('near');
+    expect(crowd.anchorOf('resident', new pc.Vec3())).toBe(true);
+    crowd.update(31_000);
+    expect(crowd.detailOf('resident')).toBe('indoors');
+    expect(crowd.counts).toMatchObject({ indoors: 1, drawn: 0 });
+    expect(crowd.anchorOf('resident', new pc.Vec3())).toBe(false);
+    crowd.set(atDestination(minute(2, [[30, 0], [40, 0]], true), false), [0, 0], { nowMs: 60_000, intervalMs: INTERVAL_MS });
+    crowd.update(71_000);
+    expect(crowd.detailOf('resident')).toBe('near');
+    expect(crowd.counts).toMatchObject({ indoors: 0, drawn: 1 });
+    done();
+  });
+
   it('is drawn until the person reaches the door, and not after', () => {
     const { crowd, shown, done } = setup();
     const standing = crowd.set(minute(0, [[0, 0]], false), [0, 0], { nowMs: 0, intervalMs: INTERVAL_MS });

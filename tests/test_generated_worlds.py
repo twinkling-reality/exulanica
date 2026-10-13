@@ -32,6 +32,7 @@ from exulanica.ingest.generated_tiles import MAXIMUM_CLAIMS, GeneratedTileBaker
 from exulanica.ingest.stages import STAGES
 from exulanica.store.namespaces import tile_store
 from exulanica.world import generated_worlds as generated_worlds_module
+from exulanica.world import saved_entries as saved_entries_module
 from exulanica.world import society_authored_ground as ground_builder
 from exulanica.world import society_grounds
 from exulanica.world import society_walking_surfaces as walking_surfaces_module
@@ -583,11 +584,19 @@ def test_a_receipt_is_append_only_and_a_town_s_population_is_checked_by_the_sche
         "where oid='world_generation_receipt'::regclass"
     ).fetchone()
     assert (forced["relrowsecurity"], forced["relforcerowsecurity"]) == (True, True)
-    for statement in (
-        "update world_generation_receipt set created_by=created_by where world_id=%s",
-        "delete from world_generation_receipt where world_id=%s",
+    for statement, error, guard in (
+        (
+            "update world_generation_receipt set created_by=created_by where world_id=%s",
+            psycopg.errors.IntegrityConstraintViolation,
+            "append-only",
+        ),
+        (
+            "delete from world_generation_receipt where world_id=%s",
+            psycopg.errors.CheckViolation,
+            "erased whole",
+        ),
     ):
-        with pytest.raises(psycopg.errors.IntegrityConstraintViolation, match="append-only"):
+        with pytest.raises(error, match=guard):
             connection.execute(statement, (entry["world_id"],))
     definition = connection.execute(
         "select pg_get_constraintdef(oid) as sql from pg_constraint "
@@ -1194,9 +1203,13 @@ def test_a_tile_names_its_current_bake_when_two_tessellators_baked_it(
 def test_a_town_whose_homes_hold_more_than_this_host_runs_is_refused_by_name(made, monkeypatch):
     """A town whose homes hold more people than this host runs a minute of is refused by that name
     where its society is made, and not as a malformed input: an input records a population of any
-    size. The town is made first; what a server can run is no part of making one."""
+    size. The town is made first; what a server can run is no part of making one. It is made
+    under a fixed identity, so it is the same town on every run."""
     api = made
+    town = "world:generated:00000000-0000-4000-8000-000000000003"
+    monkeypatch.setattr(saved_entries_module, "new_world_id", lambda kind: town)
     entry = _town(api, "Crowded")
+    assert entry["world_id"] == town
     make_place = walking_surfaces_module.place_from_city_records
 
     def crowded(**kwargs):

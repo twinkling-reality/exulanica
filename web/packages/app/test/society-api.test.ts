@@ -195,6 +195,51 @@ describe('living society snapshots', () => {
       tick: 2, start_minute_of_day: 1439, minute_of_day: 1, day: 1,
     });
   });
+  const destinations = [
+    { destination_id: 'field', use_class: 'farm', label: 'Field', indoors: false },
+    { destination_id: 'home', use_class: 'home', label: null, indoors: true },
+  ];
+  const places = (livingDestinations: unknown = destinations) => ({
+    input_seq: 1, input_sha256: 'b'.repeat(64), availability: 'available', unavailable_reason: null,
+    walkable_area: null, clearance_mm: 340, targets: [], unavailable_affordances: [],
+    living_destinations: livingDestinations,
+  });
+  it('carries physical enclosure only from the reached destination in the consumed input', () => {
+    const snapshot = parseSociety({ ...row([
+      person(0, { location: { destination_id: 'field', indoors: true } }),
+      person(1, { location: { destination_id: 'home', indoors: false } }),
+    ]), places: places() });
+    expect(snapshot.state.inhabitants.map(p => [p.indoors, p.location_destination])).toEqual([
+      [true, { id: 'field', indoors: false }], [false, { id: 'home', indoors: true }],
+    ]);
+    expect(snapshot.places?.livingDestinations?.get('field')?.indoors).toBe(false);
+    expect(() => parseSociety({ ...row([person(0), person(1)]), places: { ...places(), input_sha256: 'c'.repeat(64) } })).toThrow(/society places/);
+  });
+  it('preserves the legacy flag when destination facts are absent and ignores intended destinations', () => {
+    const atField = person(1, { location: { destination_id: 'field', indoors: true } });
+    const { living_destinations: _destinations, ...olderPlaces } = places();
+    for (const heldPlaces of [undefined, olderPlaces, places([]), places([
+      { destination_id: 'field', use_class: 'farm', label: 'Field' },
+    ])]) {
+      const parsed = parseSociety({ ...row([person(0), atField]), ...(heldPlaces ? { places: heldPlaces } : {}) });
+      expect(parsed.state.inhabitants[1]).toMatchObject({ indoors: true });
+      expect(parsed.state.inhabitants[1]!.location_destination).toBeUndefined();
+    }
+    for (const location of [{ destination_id: null, indoors: false }, { indoors: false }]) {
+      const traveling = person(0, {
+        location,
+        action: { kind: 'move', status: 'active', destination_id: 'home', reason: 'walking' },
+        goal: { activity: 'rest', destination_id: 'home', because: 'tired', reason: 'need' },
+      });
+      expect(parseSociety({ ...row([traveling, person(1)]), places: places() }).state.inhabitants[0]!.location_destination).toBeUndefined();
+    }
+  });
+  it('refuses ambiguous or malformed destination facts instead of guessing visibility', () => {
+    for (const invalid of [null, {}, [...destinations, destinations[0]], [{ ...destinations[0], indoors: 'false' }]]) {
+      expect(() => parseSociety({ ...row([person(0), person(1)]), places: places(invalid) })).toThrow(/living destination/);
+    }
+    expect(() => parseSociety({ ...row([person(0, { location: { destination_id: 1, indoors: false } }), person(1)]), places: places() })).toThrow(/living society/);
+  });
   it('refuses malformed or inconsistent authoritative routine and clock fields', () => {
     const altered = (change: (document: ReturnType<typeof row>) => void) => {
       const document = row([person(0), person(1)]);

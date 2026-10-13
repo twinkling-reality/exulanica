@@ -1,6 +1,6 @@
 # @exulanica/scene-synth
 
-Synthetic single-photo point maps for the ADR-0003 renderer bake-off.
+Synthetic single-photo point maps for renderer measurements. [ADR-0003](../../../docs/adr/0003-renderer-selection.md) selected PlayCanvas as the shipping renderer. These fixtures serve the retained PlayCanvas harness.
 
 Offline tool. Nothing that ships to a browser may import it, and
 `.dependency-cruiser.cjs` enforces that.
@@ -11,8 +11,7 @@ pnpm synth --out ./fixtures --counts 1000000      # one rung
 pnpm synth --out ./fixtures --seed 7 --ply        # a different world, plus a PLY to look at
 ```
 
-Output is deterministic: same seed, same bytes, on any machine. Two renderer
-bindings measured on two different point clouds have not been compared.
+Output is deterministic: same seed, same bytes, on any machine.
 
 ## What it produces, and why that shape
 

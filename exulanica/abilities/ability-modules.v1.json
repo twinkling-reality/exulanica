@@ -356,6 +356,103 @@
       "status": "built",
       "refusal": null,
       "reason": "A visitor from another program going home, as version 1: by its decider's choice, or when its program stays quiet for as many minutes as its kind waits, taking what it holds. Every summary the society's events and its people's explanations give of a visitor names it by what it is, from outside and decided by its own program or by this world, never as simulated, and a crossing refused before anybody arrived as from outside. A society of things records it in its first input once it is built; one that recorded version 1 names its visitors as version 1 did."
+    },
+    {
+      "module": "exulanica-ability/day/v1",
+      "abilities": [],
+      "parameters": [],
+      "events": [
+        "goal_selected",
+        "route_progressed",
+        "action_completed"
+      ],
+      "status": "built",
+      "refusal": null,
+      "reason": "The resident day: pinned needs, homes, shifts and premises in the first input, with movement through the shared planner and physical interior occupancy. Explicit composition only; excluded from automatic modules until rendering and the complete flow are enabled."
+    },
+    {
+      "module": "exulanica-ability/say/v2",
+      "abilities": [
+        "say"
+      ],
+      "parameters": [
+        {
+          "name": "hearing_reach_mm",
+          "value": 8000,
+          "minimum": 1000,
+          "maximum": 50000,
+          "unit": "mm",
+          "reason": "How far a line carries: every being within it whose kind offers hearing hears it, the routine's own reach for two people stopping to talk."
+        },
+        {
+          "name": "lines_heard_maximum",
+          "value": 8,
+          "minimum": 1,
+          "maximum": 64,
+          "unit": "lines",
+          "reason": "How many lines each being keeps, the oldest dropped first, so what it is shown of a conversation stays bounded however long the world talks."
+        },
+        {
+          "name": "line_characters_maximum",
+          "value": 200,
+          "minimum": 1,
+          "maximum": 1000,
+          "unit": "characters",
+          "reason": "The most characters of one line, as the line rule counts them, at which a decider's line is checked before it is said."
+        }
+      ],
+      "events": [
+        "said"
+      ],
+      "status": "built",
+      "refusal": null,
+      "reason": "A decider-chosen line whose hearing read retains the prior state's workspace kind run forms. Existing heard offers, range and room rules remain authoritative; departed beings do not hear. The first version preserves its shipped-only hearing read for exact historical replay."
+    },
+    {
+      "module": "exulanica-ability/follow/v3",
+      "abilities": [
+        "follow"
+      ],
+      "parameters": [
+        {
+          "name": "follow_distance_mm",
+          "value": 2000,
+          "minimum": 500,
+          "maximum": 20000,
+          "unit": "mm",
+          "reason": "How near a follower keeps to the one it follows."
+        },
+        {
+          "name": "lost_after_minutes",
+          "value": 3,
+          "minimum": 1,
+          "maximum": 60,
+          "unit": "minutes",
+          "reason": "How many minutes in a row the follower may end farther off than the follow distance with no open node within it before it stops following, so one it can no longer come near is let go."
+        }
+      ],
+      "events": [
+        "followed",
+        "stopped_following"
+      ],
+      "status": "built",
+      "refusal": null,
+      "reason": "A recorded pursuit persists between decider choice points without a new answer each minute. Explicit stop or another chosen activity ends it, as do target departure, indoor separation and the existing bounded lost-target rule. A missing or refused model answer creates no pursuit and does not cancel one already recorded. Version 2 retains its per-minute keepalive requirement for exact replay; only new societies record this version."
+    },
+    {
+      "module": "exulanica-ability/purposeful/v3",
+      "abilities": [
+        "wait",
+        "stand",
+        "talk",
+        "rest",
+        "visit"
+      ],
+      "parameters": [],
+      "events": [],
+      "status": "built",
+      "refusal": null,
+      "reason": "The purposeful planner retains version 2's capability gates and reads each kind's wait, stand, talk, rest and visit weights for its autonomous choices. Missing weights are zero, and no weighted activity available means waiting. Both beings must prefer talk for a routine pairing. Tiredness still prefers reachable rest where the kind can rest; waiting still yields occupied places. Explicit owner and decider choices are not restricted by preference, and other abilities' weights remain unexecuted. Earlier module versions retain their recorded choices."
     }
   ]
 }

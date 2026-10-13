@@ -1,0 +1,14 @@
+/* Product and Use Cases share one hierarchy, alignment and capture treatment. */
+.feature-pane { --page-top: 110px; --feature-offset: clamp(24px,4vh,48px); isolation: isolate; }
+.feature-pane > .feature-sheet { position: relative; z-index: 1; min-height: calc(100dvh - var(--page-top)); justify-content: flex-start; padding-block: var(--feature-offset) 24px; }
+.feature-column { width: 46%; max-width: 520px; margin-left: 52%; }
+.feature-sheet h1 { font-size: var(--reading-title); line-height: var(--reading-title-leading); letter-spacing: var(--reading-title-tracking); }
+.feature-sheet p { font-size: var(--reading-body-size); line-height: 1.55; }
+.feature-sheet .feature-lead { font-size: 21px; line-height: 1.45; }
+.feature-capture { position: absolute; width: 42%; top: var(--feature-offset); left: 0; }
+.feature-capture img { display: block; width: 100%; height: auto; border-radius: var(--reading-radius); }
+@media(max-width:760px) {
+  .feature-pane { --page-top: 154px; --feature-offset: 40px; }
+  .feature-column { width: 100%; max-width: 520px; margin-inline: auto; }
+  .feature-capture { position: static; width: 100%; max-width: 520px; margin: 28px auto 0 !important; }
+}

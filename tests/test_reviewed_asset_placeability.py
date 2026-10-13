@@ -324,8 +324,8 @@ def test_a_version_that_already_holds_a_component_keeps_it_and_keeps_editing(
     finally:
         with connection.transaction():
             connection.execute(
-                "delete from world_alternate_object where asset_sha256 = %s",
-                (manifest.content_sha256,),
+                "select world_erase_rows(%s, %s)",
+                (repository.workspace_id, objects_api.world_id),
             )
             connection.execute(
                 "delete from world_reviewed_asset where asset_key = %s", (manifest.asset_key,)

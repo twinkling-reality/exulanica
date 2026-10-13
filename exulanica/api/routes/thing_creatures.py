@@ -60,6 +60,8 @@ class CreatureBody(BaseModel):
 
     #: The person's words for one creature, as they typed them.
     words: str
+    #: A finished reference request of this requester, made for things; web notes only.
+    reference_id: uuid.UUID | None = None
 
 
 def _refusal(status: int, code: str, detail: str) -> JSONResponse:
@@ -83,7 +85,7 @@ def _view(connection: Any, workspace_id: uuid.UUID, draft: drafts.CreatureDraft)
     model = None
     if draft.model_id is not None:
         model = {"model_id": draft.model_id, "name": load_manifest().model_name(draft.model_id)}
-    return {
+    view = {
         "profile": DRAFT_PROFILE,
         "draft_id": str(draft.draft_id),
         "status": status,
@@ -104,6 +106,16 @@ def _view(connection: Any, workspace_id: uuid.UUID, draft: drafts.CreatureDraft)
         "started_at": None if draft.started_at is None else draft.started_at.isoformat(),
         "finished_at": None if draft.finished_at is None else draft.finished_at.isoformat(),
     }
+    if draft.reference_id is not None:
+        view["references"] = {
+            "reference_id": str(draft.reference_id),
+            **(
+                draft.reference_usage
+                if draft.reference_usage is not None
+                else {"state": "not_attempted" if draft.finished else "pending"}
+            ),
+        }
+    return view
 
 
 @router.get("/creatures/offered")
@@ -184,6 +196,7 @@ def draft_creature(
             words=body.words,
             sent=sent.text,
             placeholders=sent.placeholders,
+            reference_id=body.reference_id,
         )
     except drafts.DraftNotOffered:
         return _refusal(409, "creatures_not_run_here", "creatures are not drafted here")

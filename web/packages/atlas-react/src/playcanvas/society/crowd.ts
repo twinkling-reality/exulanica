@@ -366,7 +366,7 @@ function placeOf(
 ): SeatingResult | null {
   if (layout === null) return null;
   const atObject = target === null ? null : placeDrawing(layout, target, positionMm);
-  if (atObject?.kind === 'place' || layout.streetFurniture === undefined) return atObject;
+  if (atObject?.kind === 'place' || (target !== null && layout.fixtureSeats?.some(seat => seat.objectId === layout.targets.get(target))) || layout.streetFurniture === undefined) return atObject;
   const onStreet = streetSeatDrawing(layout.streetFurniture, positionMm);
   return onStreet === null ? atObject : { kind: 'place', drawing: onStreet };
 }
@@ -584,6 +584,7 @@ export class SocietyCrowd {
         misses.push({ inhabitantId: person.id, reason: 'activity-has-no-facing' });
       }
       const position = sampleMotionPath(route, total === 0 ? 1 : walked / total);
+      const endsIndoors = person.location_destination?.indoors ?? person.indoors === true;
       const walker: Walker = {
         id: person.id,
         route,
@@ -603,8 +604,8 @@ export class SocietyCrowd {
           )
           : null,
         startsAtMs,
-        endsIndoors: person.indoors === true,
-        indoors: person.indoors === true && walked >= total,
+        endsIndoors,
+        indoors: endsIndoors && walked >= total,
         activity,
         position,
         facing: previous?.facing ?? this.figures?.standingFacingOf?.(person) ?? 0,

@@ -229,3 +229,26 @@ def test_a_share_alike_look_is_read_only_with_its_credit(missing):
         # A verdict that asks no attribution, so the origin's reader takes the look.
         origin["licence"]["verdict"] = "SHIP"
     assert _refused(document, container_of("blocky-traveller")).code == "look_credit_missing"
+
+
+def _unsupported_skinned_map() -> tuple[dict[str, Any], bytes]:
+    """An otherwise valid shipped skin with the audit's dangling unsupported material map."""
+    import struct
+
+    from exulanica_pieces.canonical import sha256_hex
+
+    from test_skinned_glb import _pack
+
+    look, original = _sculpted()
+    length = struct.unpack_from("<I", original, 12)[0]
+    document = json.loads(original[20 : 20 + length])
+    binary = original[20 + length + 8 :]
+    document["materials"][0]["normalTexture"] = {"index": 999}
+    payload = _pack(document, binary)
+    look["container"] = {**look["container"], "sha256": sha256_hex(payload), "bytes": len(payload)}
+    return look, payload
+
+
+def test_admission_refuses_unsupported_skinned_map_after_matching_container_identity():
+    document, container = _unsupported_skinned_map()
+    assert _refused(document, container).code == "look_container_refused"

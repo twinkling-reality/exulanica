@@ -377,7 +377,7 @@ never from another workspace's.
 
 | Part | States |
 | --- | --- |
-| `visitors` | Each kind of game character that may cross, the thing kind it arrives as, the words it is known by, and the looks it may arrive in, each with its licence; none for a program that brings no visitor and only decides for a world's own things, such as an agent |
+| `visitors` | Each kind of game character that may cross, the thing kind it arrives as, the words it is known by, and the looks it may arrive in, each with its licence. The array may be empty when the program only decides for the world's own things. The agents mapping still names one visitor (`game_type` `agent`, thing kind `visitor` version 1), so a grant may also allow a body |
 | `items` | Each game item that may be carried, the thing kind it becomes, which ways it travels, and whether the correspondence is exact or approximated; at most one item of each kind travels out, so a thing leaving always becomes one known game item, and at most 64 kinds travel out, as many as an arrival names |
 | `actions` | Which of the game's actions become which abilities |
 | `never_crosses` | Every game field the adapter reads with no counterpart here; a player's name always among them |

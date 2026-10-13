@@ -4,7 +4,7 @@
 
 <h1 align="center">Exulanica</h1>
 
-<p align="center"><strong>Exulanica: Worlds for AI Agents.</strong></p>
+<p align="center"><strong>Worlds for AI Agents.</strong></p>
 
 <p align="center">
   <a href="https://exulanica.com">Website</a> ·
@@ -20,18 +20,17 @@
   <a href="web/package.json"><img src="https://img.shields.io/badge/Node.js-22%2B-5f7846" alt="Node.js 22 or newer"></a>
 </p>
 
-There are about 3 million open AI models, and 85.6% of them have been downloaded fewer than 200
-times. Most never get seen, let alone used.
+Exulanica is Worlds for AI Agents. People create places and inhabitants, shape their
+interactions, and develop worlds into projects they can explore and build on. Open models can
+take the roles the engine registers. Comparing two models on the same saved world is one
+capability.
+[Product direction](docs/product-direction.md) owns scope, the first milestone, and the
+hypothesis about discovering models through a world.
 
-Exulanica gives them a place to work. Create your own world, exactly how you want it, and power it
-with open models, each doing what it's good at, all in one place you control. You get hands-on
-exposure to models you'd never have tried. Model makers get their work used.
-
-Built on NVIDIA Nemotron and Nebius Token Factory's open models.
-
-<sub>Figures: Hugging Face, ["State of Open Models: Summer 2026"](https://huggingface.co/blog/state-of-open-models-summer-2026), published 2026-08-14 (about 2.96
-million public model repositories; roughly 85.6% of models with fewer than 200 lifetime
-downloads).</sub>
+Hosted model calls go to Nebius Token Factory. The
+[model manifest](exulanica/models/models.manifest.json) names the models, including NVIDIA
+Nemotron, Qwen, and DeepSeek. Exulanica does not generate a world's appearance with a learned
+model.
 
 <p align="center">
   <img src="assets/brand/exulanica/readme-worlds-for-ai-agents.svg" width="100%" alt="Product direction: a world you build sits at the centre, and open models run the agents in it, each model in its own role. Swap the model behind a role and compare the two runs. Hand building, photographs and imported content are ways to build the world.">
@@ -40,33 +39,28 @@ downloads).</sub>
 
 ## Models inside the world
 
-A person builds a world, and open models run what happens inside it. The things in a world that
-act are its agents: the people in your world, animals, vehicles and decision-makers such as a
-shopkeeper. Each model does what it is good at, in its own role, and the person can swap the model
-behind a role and see the difference. World models generate how a world looks; Exulanica is the
-world AI models live in.
+A person builds a world. The things in it that act are its agents: people, animals, vehicles,
+and decision-makers such as a shopkeeper. Open models can take the roles the engine registers.
+Comparing two models on the same saved world is one capability. Exulanica does not generate a
+world's appearance with a learned model.
 
-A model is a proposer, not an authority. A person in a world is the one role a model decides for:
-its decision contract declares what the model is shown and which actions it may choose, the engine
-validates every choice before it takes effect, and every accepted decision is stored, so a run
-replays without calling a model and two runs from the same saved world compare fairly. Traffic,
-animals and shopkeepers are not model roles. Every hosted model call passes one policy boundary
-that enforces the egress allowlist, the budget and the person's rights.
+A model is a proposer, not an authority. Two decision roles are registered: a person, and a
+generated town's junction signal. Each role's contract declares what the model is shown and which
+actions it may choose. The engine validates every choice before it takes effect, and every accepted
+decision is stored, so a run replays without calling the model again and two runs from the same
+saved world compare fairly. A junction signal may keep a green light one second longer or switch
+to amber within its plan. No evaluation record measures whether that improves traffic, and no
+improvement is claimed. Vehicles, animals, weather, and shopkeepers are not model roles. Every
+hosted model call passes one policy boundary that enforces the egress allowlist, the budget, and
+the person's rights.
 
-Built: several open models serve hosted roles through that boundary (the
-[model manifest](exulanica/models/models.manifest.json)). The people in a saved world, whether it
-started from the empty starter or was made from photographs, follow a deterministic planner, and
-the world's owner can choose an open model to decide for one person or a group; each choice is
-validated, stored and replayed without calling the model again
-([people and models in a world](docs/capabilities/simulation.md)). A comparison runs the same
-simulated hour once per model for one group of people, scores how they fared against a control
-run, and the application shows the runs side by side; the world's owner starts one from the
-application's Compare view, within a spending bound they state, on a server that holds development
-seeds, and judged comparisons are recorded
-([comparisons of models](docs/society-experiments.md#comparisons-of-models)). Not built: model
-roles other than a person, traffic, weather or an economy run by models, and a retraining loop. The
-[first milestone](docs/product-direction.md#first-milestone) is two open models running one town,
-shown side by side; the implementation runs one simulated hour of a small square's eight people.
+Several open models serve hosted roles through that boundary (the
+[model manifest](exulanica/models/models.manifest.json)). People in a starter or a world made
+from photographs follow a deterministic planner until the owner chooses a model. A generated town
+is a separate saved world. What the first milestone accepts, including generated towns and what
+the Compare view runs, is the status table in
+[product direction](docs/product-direction.md#first-milestone). Not built: roles beyond a person
+and a junction signal; vehicles, weather, or an economy run by models; and a retraining loop.
 
 ## The world
 
@@ -89,12 +83,12 @@ order they are delivered in:
   <tr>
     <td valign="top">
       <h3>Build your world</h3>
-      Place pieces from the catalogs by hand, make a world from photographs of a real place, or import content with its origin labelled, and your edits persist as versions. A world started from the empty starter and a world made from photographs each host eight people on their ground, and the world's owner chooses the model that decides for them.
+      Place pieces from the catalogs, make a town from a served recipe, make a world from photographs, or import content with its origin labelled. Edits persist as versions. A starter and a world made from photographs each start with eight people. A generated town's people come from its homes.
       <p><a href="docs/capabilities/world-creation.md">World creation</a> · <a href="docs/capabilities/scene-reconstruction.md">Reconstruction</a></p>
     </td>
     <td valign="top">
       <h3>Give the world life</h3>
-      The people in your world follow routines, walk to the places they use and respond to what you change. Small birds fly and perch on the trees that host them, on a clock everyone watching shares. How the world and its time behave is its engine's; a person does not configure those rules.
+      The people in your world follow routines, walk to the places they use, and respond to what you change. Small birds fly and perch on the trees that host them, on a clock everyone watching shares. Pause and playback speed are clock controls. The <a href="docs/world-clock-contract.md">world clock contract</a> owns the rest of the clock. Calendar, weather, and fictional physics are not configurable.
       <p><a href="docs/synthetic-society-contract.md">Society contract</a> · <a href="docs/movement-modules-contract.md">Movement modules</a> · <a href="docs/product-direction.md#configurable-world-rules">World rules</a></p>
     </td>
   </tr>
@@ -132,11 +126,11 @@ supported operations; the full product direction is broader than those component
 
 | Area | Implemented foundation | Delivery target |
 | --- | --- | --- |
-| Models in the world | Open models in hosted roles through one policy boundary; a model chosen per person or group of a saved world's people, validated, stored and replayed; comparisons of models started from the application within a stated bound, scored against a control and shown side by side | Model roles other than a person, and a retraining loop |
+| Models in the world | Open models in hosted roles through one policy boundary; a model chosen for a person or a group, or for a generated town's junction signal, validated, stored and replayed; comparisons of models started from the application within a stated bound, scored against a control and shown side by side | Roles beyond a person and a junction signal, and a retraining loop |
 | Persistent worlds | Authored starter worlds, worlds made from reviewed photographs, saved versions, object edits and undo, appearance state, reference photographs | A complete personal-media-to-editable-world journey |
 | Inspectable data | Supported point and surface representations, subject selection, structured records and source references | Complete reusable object extraction and consistent semantic coverage across sources |
 | Companion | Grounded answers, including about a world's simulated people; conversation memory kept across reloads; reviewed appearance proposals | Shared activity, durable personal continuity and broader creation tools |
-| Life and experiments | Societies of eight people on a saved world's ground, with routines as data (rest, visit, stand, talk); small birds on a shared clock; recorded paired experiments with specific interventions | Richer social behavior, traffic in a world, customizable world rules and validated model-driven scenarios |
+| Life and experiments | A starter or photograph world begins with eight people. A generated town's people come from its homes and are admitted by minute cost. Small birds and a generated town's vehicles share a clock. Paired experiments record specific interventions | Richer social behavior, configurable calendar and physics, and validated model-driven scenarios |
 | Developer access | Authenticated world APIs, an independent Python client and signed partial world packages | General model adapters, dataset workflows and runnable interchange |
 
 General model adapters, user-defined world rules and dataset generation are delivery targets.

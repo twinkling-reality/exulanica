@@ -118,7 +118,10 @@ class StyleScopeBody(BaseModel):
 
 
 class StylePackBody(BaseModel):
-    """A style pack of the host's library, named exactly: id, version and manifest digest."""
+    """A style pack named exactly: id, version and manifest digest.
+
+    Appearance previews resolve the library and current workspace; world creation uses the library.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -515,7 +518,7 @@ def preview(body: PreviewBody, repository: WriteWorld, session: CurrentSession) 
         refines_proposal_id=body.refines_proposal_id,
         appearance_basis=body.appearance_basis,
         style_pack_stated="style_pack" in body.model_fields_set,
-        style_pack=_style_pack(body.style_pack),
+        style_pack=_style_pack(body.style_pack, repository),
     )
     created = repository.preview(proposal)
     return PreviewView(
@@ -804,21 +807,32 @@ def _version_view(version: StyleVersion) -> StyleVersionView:
     )
 
 
-def _style_pack(body: StylePackBody | None) -> StylePackBinding | None:
-    return None if body is None else stated_style_pack(body)
+def _style_pack(
+    body: StylePackBody | None, repository: WorldStyleRepository
+) -> StylePackBinding | None:
+    return None if body is None else stated_style_pack(body, repository=repository)
 
 
-def stated_style_pack(body: StylePackBody) -> StylePackBinding:
-    """The library pack a request names, with the setting it states or the one its parts compose
+def stated_style_pack(
+    body: StylePackBody, *, repository: WorldStyleRepository | None = None
+) -> StylePackBinding:
+    """The pack a request names, with the setting it states or the one its parts compose
     for that pack (:func:`~exulanica.world.world_settings.bound_setting`). A setting the pack
-    cannot be drawn in is refused by reason and path; a pack the library does not hold is named as
-    asked and refused where every pack is, when the appearance is written.
+    cannot be drawn in is refused by reason and path. A scoped appearance repository resolves the
+    library or its own workspace's wearable pack. Without that repository this remains the
+    library-only creation helper; an unknown identity is refused by that caller before writing.
 
     A request states only an authored setting. A drafted one says which call drafted it, and only
     the host's own drafting step can say that truthfully, so one a caller states is refused."""
     if isinstance(body.setting, dict) and body.setting.get("origin", "authored") != "authored":
         raise InvalidStyleData(
             "the world's setting is refused: origin: a request states only an authored setting"
+        )
+    if repository is not None:
+        return repository.requested_pack(
+            StylePackBinding(body.pack_id, body.version, body.manifest_sha256),
+            setting=body.setting,
+            setting_parts=body.setting_parts,
         )
     library = style_pack_library()
     chain = library.chain(body.manifest_sha256)

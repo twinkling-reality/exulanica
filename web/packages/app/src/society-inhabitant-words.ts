@@ -1,6 +1,6 @@
 /**
  * Who a simulated person is and what they are doing, in words, read from the one data file the
- * server's Companion reads too: `assets/catalogs/society-words/society-inhabitant-words.v1.json`.
+ * server's Companion reads too: `assets/catalogs/society-words/society-inhabitant-words.v3.json`.
  *
  * The choice of sentence for a state is code here and in `exulanica/selection/inhabitant_words.py`,
  * and both run the same cases (`tests/fixtures/society-inhabitant-words/cases.json`), so the
@@ -8,7 +8,7 @@
  * sentence here says what anybody talked about.
  */
 
-import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v1.json?raw';
+import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v3.json?raw';
 import livingNeedsText from '../../../../assets/catalogs/society/society-need.v1.json?raw';
 import { ACTIVITY_KINDS } from './society-activity-words.js';
 import { societyEngine } from './society-engines.js';
@@ -226,7 +226,8 @@ export function inhabitantWordsFrom(
   // the server's words read it; making room, waiting and deciding are the planner's own.
   const heading = goal?.kind === undefined ? undefined : ACTIVITY_KINDS.get(goal.kind);
   const under = ACTIVITY_KINDS.get(action.kind);
-  if (action.status === 'blocked') chosen = 'waiting';
+  if (action.status === 'blocked' || (action.kind === 'idle'
+    && (action.reason === 'routine_wait' || action.reason === 'no_weighted_activity'))) chosen = 'waiting';
   else if (action.kind === 'move') {
     chosen = heading !== undefined && heading.setting !== 'object'
       ? heading.headingDoing

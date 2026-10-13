@@ -1,0 +1,2947 @@
+{
+  "recipe": {
+    "profile": "exulanica.body-recipe/v1",
+    "posture": "horizontal",
+    "spine": 3,
+    "upper_body": "none",
+    "heads": [
+      {
+        "neck": 4,
+        "jaw": false
+      }
+    ],
+    "limbs": [
+      {
+        "role": "leg",
+        "count": 8,
+        "segments": 3
+      },
+      {
+        "role": "fin",
+        "count": 4,
+        "segments": 2
+      }
+    ],
+    "tail": 3,
+    "extent_mm": {
+      "length": 16000,
+      "width": 12000,
+      "height": 8000,
+      "span": 0
+    },
+    "holds_with": "none",
+    "colours": [
+      "ivory",
+      "teal",
+      "amber"
+    ],
+    "appearance": "An original shore animal carrying a broad pale ribbed canopy on eight ivory jointed legs, a slender sensory neck and dark jade underside."
+  },
+  "body": {
+    "key": "canopy_strider",
+    "version": 3,
+    "title": "Canopy strider body"
+  },
+  "surface": {
+    "profile": "exulanica.body-surfaces/v1",
+    "plan_sha256": "56f1831881bf7347db3e31a26ba63e8885f77726850542d929d25d840081d732",
+    "recipe_sha256": "b7785c5618e99d27d4251ecc7030d988abfdea898c9b896b09b6dd0eb5a3a38b",
+    "parts": [
+      {
+        "bone": "spine2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            120
+          ],
+          "radii_mm": [
+            3500,
+            4900,
+            1000
+          ],
+          "segments": 32,
+          "rings": 12,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#226b60",
+        "roughness_permille": 420,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            600
+          ],
+          "radii_mm": [
+            4100,
+            5400,
+            1600
+          ],
+          "segments": 48,
+          "rings": 18,
+          "ridges": 12,
+          "ridge_permille": 100
+        },
+        "colour": "#6ea88e",
+        "roughness_permille": 540,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                -1200,
+                300,
+                1150
+              ],
+              "radii_mm": [
+                110,
+                100
+              ]
+            },
+            {
+              "centre_mm": [
+                -2300,
+                0,
+                2550
+              ],
+              "radii_mm": [
+                150,
+                750
+              ]
+            },
+            {
+              "centre_mm": [
+                -3500,
+                -900,
+                2450
+              ],
+              "radii_mm": [
+                130,
+                750
+              ]
+            },
+            {
+              "centre_mm": [
+                -3950,
+                -1600,
+                1100
+              ],
+              "radii_mm": [
+                40,
+                45
+              ]
+            }
+          ],
+          "segments": 16,
+          "subdivisions": 3
+        },
+        "colour": "#f4ecd6",
+        "roughness_permille": 390,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                -1200,
+                300,
+                1320
+              ],
+              "radii_mm": [
+                20,
+                20
+              ]
+            },
+            {
+              "centre_mm": [
+                -2300,
+                0,
+                2740
+              ],
+              "radii_mm": [
+                25,
+                25
+              ]
+            },
+            {
+              "centre_mm": [
+                -3500,
+                -900,
+                2630
+              ],
+              "radii_mm": [
+                20,
+                20
+              ]
+            },
+            {
+              "centre_mm": [
+                -3950,
+                -1600,
+                1170
+              ],
+              "radii_mm": [
+                8,
+                8
+              ]
+            }
+          ],
+          "segments": 12,
+          "subdivisions": 3
+        },
+        "colour": "#a4b79f",
+        "roughness_permille": 600,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                1200,
+                300,
+                1150
+              ],
+              "radii_mm": [
+                110,
+                100
+              ]
+            },
+            {
+              "centre_mm": [
+                2300,
+                0,
+                2550
+              ],
+              "radii_mm": [
+                150,
+                750
+              ]
+            },
+            {
+              "centre_mm": [
+                3500,
+                -900,
+                2450
+              ],
+              "radii_mm": [
+                130,
+                750
+              ]
+            },
+            {
+              "centre_mm": [
+                3950,
+                -1600,
+                1100
+              ],
+              "radii_mm": [
+                40,
+                45
+              ]
+            }
+          ],
+          "segments": 16,
+          "subdivisions": 3
+        },
+        "colour": "#f4ecd6",
+        "roughness_permille": 390,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                1200,
+                300,
+                1320
+              ],
+              "radii_mm": [
+                20,
+                20
+              ]
+            },
+            {
+              "centre_mm": [
+                2300,
+                0,
+                2740
+              ],
+              "radii_mm": [
+                25,
+                25
+              ]
+            },
+            {
+              "centre_mm": [
+                3500,
+                -900,
+                2630
+              ],
+              "radii_mm": [
+                20,
+                20
+              ]
+            },
+            {
+              "centre_mm": [
+                3950,
+                -1600,
+                1170
+              ],
+              "radii_mm": [
+                8,
+                8
+              ]
+            }
+          ],
+          "segments": 12,
+          "subdivisions": 3
+        },
+        "colour": "#a4b79f",
+        "roughness_permille": 600,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                -1200,
+                300,
+                1150
+              ],
+              "radii_mm": [
+                110,
+                100
+              ]
+            },
+            {
+              "centre_mm": [
+                -2300,
+                0,
+                2550
+              ],
+              "radii_mm": [
+                150,
+                750
+              ]
+            },
+            {
+              "centre_mm": [
+                -3500,
+                -900,
+                2450
+              ],
+              "radii_mm": [
+                130,
+                750
+              ]
+            },
+            {
+              "centre_mm": [
+                -3950,
+                -1600,
+                1100
+              ],
+              "radii_mm": [
+                40,
+                45
+              ]
+            }
+          ],
+          "segments": 16,
+          "subdivisions": 3
+        },
+        "colour": "#f4ecd6",
+        "roughness_permille": 390,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                -1200,
+                300,
+                1320
+              ],
+              "radii_mm": [
+                20,
+                20
+              ]
+            },
+            {
+              "centre_mm": [
+                -2300,
+                0,
+                2740
+              ],
+              "radii_mm": [
+                25,
+                25
+              ]
+            },
+            {
+              "centre_mm": [
+                -3500,
+                -900,
+                2630
+              ],
+              "radii_mm": [
+                20,
+                20
+              ]
+            },
+            {
+              "centre_mm": [
+                -3950,
+                -1600,
+                1170
+              ],
+              "radii_mm": [
+                8,
+                8
+              ]
+            }
+          ],
+          "segments": 12,
+          "subdivisions": 3
+        },
+        "colour": "#a4b79f",
+        "roughness_permille": 600,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                1200,
+                300,
+                1150
+              ],
+              "radii_mm": [
+                110,
+                100
+              ]
+            },
+            {
+              "centre_mm": [
+                2300,
+                0,
+                2550
+              ],
+              "radii_mm": [
+                150,
+                750
+              ]
+            },
+            {
+              "centre_mm": [
+                3500,
+                -900,
+                2450
+              ],
+              "radii_mm": [
+                130,
+                750
+              ]
+            },
+            {
+              "centre_mm": [
+                3950,
+                -1600,
+                1100
+              ],
+              "radii_mm": [
+                40,
+                45
+              ]
+            }
+          ],
+          "segments": 16,
+          "subdivisions": 3
+        },
+        "colour": "#f4ecd6",
+        "roughness_permille": 390,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                1200,
+                300,
+                1320
+              ],
+              "radii_mm": [
+                20,
+                20
+              ]
+            },
+            {
+              "centre_mm": [
+                2300,
+                0,
+                2740
+              ],
+              "radii_mm": [
+                25,
+                25
+              ]
+            },
+            {
+              "centre_mm": [
+                3500,
+                -900,
+                2630
+              ],
+              "radii_mm": [
+                20,
+                20
+              ]
+            },
+            {
+              "centre_mm": [
+                3950,
+                -1600,
+                1170
+              ],
+              "radii_mm": [
+                8,
+                8
+              ]
+            }
+          ],
+          "segments": 12,
+          "subdivisions": 3
+        },
+        "colour": "#a4b79f",
+        "roughness_permille": 600,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                -1200,
+                300,
+                1150
+              ],
+              "radii_mm": [
+                110,
+                100
+              ]
+            },
+            {
+              "centre_mm": [
+                -2300,
+                0,
+                2550
+              ],
+              "radii_mm": [
+                150,
+                750
+              ]
+            },
+            {
+              "centre_mm": [
+                -3500,
+                -900,
+                2450
+              ],
+              "radii_mm": [
+                130,
+                750
+              ]
+            },
+            {
+              "centre_mm": [
+                -3950,
+                -1600,
+                1100
+              ],
+              "radii_mm": [
+                40,
+                45
+              ]
+            }
+          ],
+          "segments": 16,
+          "subdivisions": 3
+        },
+        "colour": "#f4ecd6",
+        "roughness_permille": 390,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                -1200,
+                300,
+                1320
+              ],
+              "radii_mm": [
+                20,
+                20
+              ]
+            },
+            {
+              "centre_mm": [
+                -2300,
+                0,
+                2740
+              ],
+              "radii_mm": [
+                25,
+                25
+              ]
+            },
+            {
+              "centre_mm": [
+                -3500,
+                -900,
+                2630
+              ],
+              "radii_mm": [
+                20,
+                20
+              ]
+            },
+            {
+              "centre_mm": [
+                -3950,
+                -1600,
+                1170
+              ],
+              "radii_mm": [
+                8,
+                8
+              ]
+            }
+          ],
+          "segments": 12,
+          "subdivisions": 3
+        },
+        "colour": "#a4b79f",
+        "roughness_permille": 600,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                1200,
+                300,
+                1150
+              ],
+              "radii_mm": [
+                110,
+                100
+              ]
+            },
+            {
+              "centre_mm": [
+                2300,
+                0,
+                2550
+              ],
+              "radii_mm": [
+                150,
+                750
+              ]
+            },
+            {
+              "centre_mm": [
+                3500,
+                -900,
+                2450
+              ],
+              "radii_mm": [
+                130,
+                750
+              ]
+            },
+            {
+              "centre_mm": [
+                3950,
+                -1600,
+                1100
+              ],
+              "radii_mm": [
+                40,
+                45
+              ]
+            }
+          ],
+          "segments": 16,
+          "subdivisions": 3
+        },
+        "colour": "#f4ecd6",
+        "roughness_permille": 390,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "spine3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                1200,
+                300,
+                1320
+              ],
+              "radii_mm": [
+                20,
+                20
+              ]
+            },
+            {
+              "centre_mm": [
+                2300,
+                0,
+                2740
+              ],
+              "radii_mm": [
+                25,
+                25
+              ]
+            },
+            {
+              "centre_mm": [
+                3500,
+                -900,
+                2630
+              ],
+              "radii_mm": [
+                20,
+                20
+              ]
+            },
+            {
+              "centre_mm": [
+                3950,
+                -1600,
+                1170
+              ],
+              "radii_mm": [
+                8,
+                8
+              ]
+            }
+          ],
+          "segments": 12,
+          "subdivisions": 3
+        },
+        "colour": "#a4b79f",
+        "roughness_permille": 600,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1Neck1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                300,
+                300
+              ]
+            },
+            {
+              "centre_mm": [
+                0,
+                804,
+                417
+              ],
+              "radii_mm": [
+                200,
+                200
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e9e5cd",
+        "roughness_permille": 360,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1Neck2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                300,
+                300
+              ]
+            },
+            {
+              "centre_mm": [
+                0,
+                805,
+                417
+              ],
+              "radii_mm": [
+                200,
+                200
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e9e5cd",
+        "roughness_permille": 360,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1Neck3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                300,
+                300
+              ]
+            },
+            {
+              "centre_mm": [
+                0,
+                805,
+                418
+              ],
+              "radii_mm": [
+                200,
+                200
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e9e5cd",
+        "roughness_permille": 360,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1Neck4",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                300,
+                300
+              ]
+            },
+            {
+              "centre_mm": [
+                0,
+                806,
+                418
+              ],
+              "radii_mm": [
+                200,
+                200
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e9e5cd",
+        "roughness_permille": 360,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "tail1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                300,
+                300
+              ]
+            },
+            {
+              "centre_mm": [
+                0,
+                -906,
+                -373
+              ],
+              "radii_mm": [
+                200,
+                200
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e9e5cd",
+        "roughness_permille": 360,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "tail2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                300,
+                300
+              ]
+            },
+            {
+              "centre_mm": [
+                0,
+                -906,
+                -1120
+              ],
+              "radii_mm": [
+                200,
+                200
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e9e5cd",
+        "roughness_permille": 360,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "tail3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                300,
+                300
+              ]
+            },
+            {
+              "centre_mm": [
+                0,
+                -706,
+                -1867
+              ],
+              "radii_mm": [
+                162,
+                162
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e9e5cd",
+        "roughness_permille": 360,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Left1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                350,
+                350
+              ]
+            },
+            {
+              "centre_mm": [
+                -2577,
+                0,
+                1546
+              ],
+              "radii_mm": [
+                240,
+                240
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Left1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            420,
+            420,
+            420
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Left2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                317,
+                317
+              ]
+            },
+            {
+              "centre_mm": [
+                -1250,
+                0,
+                -2557
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Left2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            380,
+            380,
+            380
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Left3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -613,
+            0,
+            -2759
+          ],
+          "radii_mm": [
+            210,
+            300,
+            130
+          ],
+          "segments": 16,
+          "rings": 8,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#c5d6bf",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Left3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            },
+            {
+              "centre_mm": [
+                -793,
+                0,
+                -2689
+              ],
+              "radii_mm": [
+                110,
+                110
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Left3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            285,
+            285,
+            285
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Right1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                350,
+                350
+              ]
+            },
+            {
+              "centre_mm": [
+                2577,
+                0,
+                1546
+              ],
+              "radii_mm": [
+                240,
+                240
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Right1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            420,
+            420,
+            420
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Right2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                317,
+                317
+              ]
+            },
+            {
+              "centre_mm": [
+                1250,
+                0,
+                -2557
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Right2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            380,
+            380,
+            380
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Right3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            613,
+            0,
+            -2759
+          ],
+          "radii_mm": [
+            210,
+            300,
+            130
+          ],
+          "segments": 16,
+          "rings": 8,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#c5d6bf",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Right3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            },
+            {
+              "centre_mm": [
+                793,
+                0,
+                -2689
+              ],
+              "radii_mm": [
+                110,
+                110
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Right3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            285,
+            285,
+            285
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Left1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                350,
+                350
+              ]
+            },
+            {
+              "centre_mm": [
+                -2577,
+                0,
+                1546
+              ],
+              "radii_mm": [
+                240,
+                240
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Left1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            420,
+            420,
+            420
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Left2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                317,
+                317
+              ]
+            },
+            {
+              "centre_mm": [
+                -1250,
+                0,
+                -2557
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Left2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            380,
+            380,
+            380
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Left3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -613,
+            0,
+            -2759
+          ],
+          "radii_mm": [
+            210,
+            300,
+            130
+          ],
+          "segments": 16,
+          "rings": 8,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#c5d6bf",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Left3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            },
+            {
+              "centre_mm": [
+                -793,
+                0,
+                -2689
+              ],
+              "radii_mm": [
+                110,
+                110
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Left3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            285,
+            285,
+            285
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Right1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                350,
+                350
+              ]
+            },
+            {
+              "centre_mm": [
+                2577,
+                0,
+                1546
+              ],
+              "radii_mm": [
+                240,
+                240
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Right1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            420,
+            420,
+            420
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Right2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                317,
+                317
+              ]
+            },
+            {
+              "centre_mm": [
+                1250,
+                0,
+                -2557
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Right2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            380,
+            380,
+            380
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Right3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            613,
+            0,
+            -2759
+          ],
+          "radii_mm": [
+            210,
+            300,
+            130
+          ],
+          "segments": 16,
+          "rings": 8,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#c5d6bf",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Right3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            },
+            {
+              "centre_mm": [
+                793,
+                0,
+                -2689
+              ],
+              "radii_mm": [
+                110,
+                110
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg2Right3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            285,
+            285,
+            285
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Left1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                350,
+                350
+              ]
+            },
+            {
+              "centre_mm": [
+                -2577,
+                0,
+                1546
+              ],
+              "radii_mm": [
+                240,
+                240
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Left1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            420,
+            420,
+            420
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Left2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                317,
+                317
+              ]
+            },
+            {
+              "centre_mm": [
+                -1250,
+                0,
+                -2557
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Left2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            380,
+            380,
+            380
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Left3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -613,
+            0,
+            -2759
+          ],
+          "radii_mm": [
+            210,
+            300,
+            130
+          ],
+          "segments": 16,
+          "rings": 8,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#c5d6bf",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Left3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            },
+            {
+              "centre_mm": [
+                -793,
+                0,
+                -2689
+              ],
+              "radii_mm": [
+                110,
+                110
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Left3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            285,
+            285,
+            285
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Right1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                350,
+                350
+              ]
+            },
+            {
+              "centre_mm": [
+                2577,
+                0,
+                1546
+              ],
+              "radii_mm": [
+                240,
+                240
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Right1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            420,
+            420,
+            420
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Right2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                317,
+                317
+              ]
+            },
+            {
+              "centre_mm": [
+                1250,
+                0,
+                -2557
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Right2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            380,
+            380,
+            380
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Right3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            613,
+            0,
+            -2759
+          ],
+          "radii_mm": [
+            210,
+            300,
+            130
+          ],
+          "segments": 16,
+          "rings": 8,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#c5d6bf",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Right3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            },
+            {
+              "centre_mm": [
+                793,
+                0,
+                -2689
+              ],
+              "radii_mm": [
+                110,
+                110
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg3Right3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            285,
+            285,
+            285
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Left1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                350,
+                350
+              ]
+            },
+            {
+              "centre_mm": [
+                -2577,
+                0,
+                1546
+              ],
+              "radii_mm": [
+                240,
+                240
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Left1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            420,
+            420,
+            420
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Left2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                317,
+                317
+              ]
+            },
+            {
+              "centre_mm": [
+                -1250,
+                0,
+                -2557
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Left2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            380,
+            380,
+            380
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Left3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -613,
+            0,
+            -2759
+          ],
+          "radii_mm": [
+            210,
+            300,
+            130
+          ],
+          "segments": 16,
+          "rings": 8,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#c5d6bf",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Left3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            },
+            {
+              "centre_mm": [
+                -793,
+                0,
+                -2689
+              ],
+              "radii_mm": [
+                110,
+                110
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Left3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            285,
+            285,
+            285
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Right1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                350,
+                350
+              ]
+            },
+            {
+              "centre_mm": [
+                2577,
+                0,
+                1546
+              ],
+              "radii_mm": [
+                240,
+                240
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Right1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            420,
+            420,
+            420
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Right2",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                317,
+                317
+              ]
+            },
+            {
+              "centre_mm": [
+                1250,
+                0,
+                -2557
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Right2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            380,
+            380,
+            380
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Right3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            613,
+            0,
+            -2759
+          ],
+          "radii_mm": [
+            210,
+            300,
+            130
+          ],
+          "segments": 16,
+          "rings": 8,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#c5d6bf",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Right3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                0,
+                0
+              ],
+              "radii_mm": [
+                238,
+                238
+              ]
+            },
+            {
+              "centre_mm": [
+                793,
+                0,
+                -2689
+              ],
+              "radii_mm": [
+                110,
+                110
+              ]
+            }
+          ],
+          "segments": 20
+        },
+        "colour": "#e5e5cf",
+        "roughness_permille": 400,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg4Right3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            0
+          ],
+          "radii_mm": [
+            285,
+            285,
+            285
+          ],
+          "segments": 16,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#83a89b",
+        "roughness_permille": 440,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            650,
+            200
+          ],
+          "radii_mm": [
+            740,
+            920,
+            450
+          ],
+          "segments": 40,
+          "rings": 16,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#e7e8d6",
+        "roughness_permille": 300,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -560,
+            950,
+            350
+          ],
+          "radii_mm": [
+            210,
+            260,
+            140
+          ],
+          "segments": 24,
+          "rings": 10,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#173e37",
+        "roughness_permille": 180,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -590,
+            1080,
+            410
+          ],
+          "radii_mm": [
+            60,
+            75,
+            42
+          ],
+          "segments": 16,
+          "rings": 8,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#ffbe60",
+        "roughness_permille": 200,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            560,
+            950,
+            350
+          ],
+          "radii_mm": [
+            210,
+            260,
+            140
+          ],
+          "segments": 24,
+          "rings": 10,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#173e37",
+        "roughness_permille": 180,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            590,
+            1080,
+            410
+          ],
+          "radii_mm": [
+            60,
+            75,
+            42
+          ],
+          "segments": 16,
+          "rings": 8,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#ffbe60",
+        "roughness_permille": 200,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "fin1Left1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -675,
+            -302,
+            -202
+          ],
+          "radii_mm": [
+            650,
+            1100,
+            160
+          ],
+          "segments": 24,
+          "rings": 8,
+          "ridges": 4,
+          "ridge_permille": 60
+        },
+        "colour": "#488d74",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "fin1Left2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -675,
+            -302,
+            -203
+          ],
+          "radii_mm": [
+            650,
+            1100,
+            160
+          ],
+          "segments": 24,
+          "rings": 8,
+          "ridges": 4,
+          "ridge_permille": 60
+        },
+        "colour": "#71a482",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "fin1Right1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            675,
+            -302,
+            -202
+          ],
+          "radii_mm": [
+            650,
+            1100,
+            160
+          ],
+          "segments": 24,
+          "rings": 8,
+          "ridges": 4,
+          "ridge_permille": 60
+        },
+        "colour": "#488d74",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "fin1Right2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            675,
+            -302,
+            -203
+          ],
+          "radii_mm": [
+            650,
+            1100,
+            160
+          ],
+          "segments": 24,
+          "rings": 8,
+          "ridges": 4,
+          "ridge_permille": 60
+        },
+        "colour": "#71a482",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "fin2Left1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -675,
+            -302,
+            -202
+          ],
+          "radii_mm": [
+            650,
+            1100,
+            160
+          ],
+          "segments": 24,
+          "rings": 8,
+          "ridges": 4,
+          "ridge_permille": 60
+        },
+        "colour": "#488d74",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "fin2Left2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -675,
+            -302,
+            -203
+          ],
+          "radii_mm": [
+            650,
+            1100,
+            160
+          ],
+          "segments": 24,
+          "rings": 8,
+          "ridges": 4,
+          "ridge_permille": 60
+        },
+        "colour": "#71a482",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "fin2Right1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            675,
+            -302,
+            -202
+          ],
+          "radii_mm": [
+            650,
+            1100,
+            160
+          ],
+          "segments": 24,
+          "rings": 8,
+          "ridges": 4,
+          "ridge_permille": 60
+        },
+        "colour": "#488d74",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "fin2Right2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            675,
+            -302,
+            -203
+          ],
+          "radii_mm": [
+            650,
+            1100,
+            160
+          ],
+          "segments": 24,
+          "rings": 8,
+          "ridges": 4,
+          "ridge_permille": 60
+        },
+        "colour": "#71a482",
+        "roughness_permille": 500,
+        "metallic_permille": 0
+      }
+    ]
+  },
+  "look": {
+    "look": "canopy-strider-jade",
+    "version": 1,
+    "label": "jade canopy and pale folds"
+  },
+  "kind": {
+    "kind": "canopy_strider",
+    "version": 3,
+    "label": "canopy strider",
+    "summary": "A stationary eight-legged shore inhabitant with a pale botanical mantle. It can speak to nearby beings; idle deformation is cosmetic.",
+    "class": "being",
+    "moves": [],
+    "abilities": [
+      {
+        "key": "wait",
+        "parameters": {}
+      },
+      {
+        "key": "say",
+        "parameters": {}
+      }
+    ],
+    "offers": [
+      {
+        "key": "talk_to",
+        "parameters": {}
+      },
+      {
+        "key": "hear",
+        "parameters": {}
+      },
+      {
+        "key": "be_followed",
+        "parameters": {}
+      }
+    ],
+    "routine": {
+      "weights": {
+        "wait": 1000
+      },
+      "follow_holders_of": [],
+      "reason": "Authored waiting routine; supported responses are chosen through recorded actions."
+    },
+    "deciders": {
+      "default": "routine",
+      "allowed": [
+        "routine",
+        "person",
+        "model"
+      ]
+    },
+    "ext": {}
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

@@ -21,6 +21,7 @@ const read = (relative: string): string =>
 
 const PAGE = read('../src/style.css');
 const ARTWORK = read('../src/ui/gradient-forms/style.css');
+const FIELD = read('../src/hero.css');
 
 interface Keyframes {
   readonly name: string;
@@ -89,33 +90,40 @@ function looping(source: string): ReadonlySet<string> {
 describe('landing motion', () => {
   it('finds the loops it is meant to be checking', () => {
     expect(looping(PAGE)).toEqual(
-      new Set(['wordmark-sheen', 'companion-breathe', 'companion-blink-track']),
+      new Set(['nav-edge-color', 'companion-breathe', 'menu-companion-blink']),
     );
     expect(looping(ARTWORK)).toEqual(new Set(['gradient-forms-color']));
+    expect(looping(FIELD)).toEqual(new Set(['orbit-travel', 'world-ring-sweep']));
   });
 
   it('starts and ends every looping animation on the resting composition', () => {
-    for (const source of [PAGE, ARTWORK]) {
+    for (const source of [PAGE, ARTWORK, FIELD]) {
       const loops = looping(source);
       const blocks = keyframes(source).filter((block) => loops.has(block.name));
       for (const block of blocks) {
         expect(block.steps.get('0%'), `${block.name} has no 0% step`).toBeDefined();
         expect(block.steps.get('100%'), `${block.name} has no 100% step`).toBeDefined();
-        expect(block.steps.get('0%'), `${block.name} does not end where it starts`).toBe(
-          block.steps.get('100%'),
-        );
+        if (block.name === 'orbit-travel') {
+          expect(block.steps.get('0%')).toBe('offset-distance: 0%');
+          expect(block.steps.get('100%')).toBe('offset-distance: 100%');
+        } else if (block.name === 'world-ring-sweep') {
+          // One complete rotation is the same painted composition at both endpoints.
+          expect(block.steps.get('0%')).toBe('--world-ring-angle: 0deg');
+          expect(block.steps.get('100%')).toBe('--world-ring-angle: 360deg');
+        } else {
+          expect(block.steps.get('0%'), `${block.name} does not end where it starts`).toBe(block.steps.get('100%'));
+        }
       }
-      expect(blocks.length).toBeGreaterThan(0);
+      expect(blocks.length).toBe(loops.size);
     }
   });
 
   it('stops every loop under reduced motion', () => {
     const block = PAGE.slice(PAGE.indexOf('@media (prefers-reduced-motion: reduce)'));
-    expect(block).toContain('animation-duration: 0.01ms !important');
+    expect(block).toContain('animation-duration: 0ms !important');
     expect(block).toContain('animation-iteration-count: 1 !important');
-    for (const selector of ['.companion-menu-life', '.companion-menu-blink', '.companion-menu-face', '.wordmark']) {
-      expect(block).toContain(selector);
-    }
+    expect(block).toContain('.hero-content, .menu-panel { animation: none !important; opacity: 1; }');
+    expect(FIELD.slice(FIELD.indexOf('@media (prefers-reduced-motion: reduce)'))).toContain('animation-play-state: paused !important');
     expect(ARTWORK).toMatch(
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*gradient-forms-shift[\s\S]*animation: none !important/,
     );

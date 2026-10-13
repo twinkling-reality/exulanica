@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { ThingLibrary, readThingLibrary, type PlacedThingRecord, type ThingLayerOptions, type ThingPick } from '@exulanica/atlas-react/things';
 import { BODY_MOTION } from '../src/body-motion.js';
-import { THING_PICK_EVENT, mountThings, signalColour, worldMarkPersonColour, type ThingPickDetail } from '../src/composition/things.js';
+import { THING_PICK_EVENT, mountThings, placedThingRecord, signalColour, worldMarkPersonColour, type ThingPickDetail } from '../src/composition/things.js';
 
 // The layer draws and picks in the renderer, tested beside it (atlas-react things-layer.test.ts);
 // here it stands in, recording what the page hands it, so the page's own part is what is tested.
@@ -77,6 +77,15 @@ const placedRow = (thingId: string, kind: { kind: string; version: number; sha25
 });
 
 describe('the version document\'s placed things', () => {
+  it('carries the complete saved support claim into the renderer record', () => {
+    const document = JSON.parse(readFileSync(join(dirname(fileURLToPath(String(import.meta.url))), 'fixtures/world-version-supported.v6.json'), 'utf8'));
+    const bound = parseVersion(document).things![0]!;
+    const record = placedThingRecord(bound);
+    expect(record.support).toEqual(bound.support);
+    expect(record.support?.surfaceId).toBe('deck');
+    expect(record.transform.yMm).toBe(150);
+    expect(placedThingRecord({ ...bound, removed: true }).support).toEqual(bound.support);
+  });
   it('reads a thing of its workspace\'s own kind by the digest alone, and one whose kind is gone as gone', () => {
     const creature = { source: 'workspace', sha256: 'c'.repeat(64) };
     const version = parseVersion({

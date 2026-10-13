@@ -2,7 +2,7 @@
 
 The inspector (``web/packages/app/src/society-inhabitant-words.ts``) and the Companion
 (``exulanica/selection/inhabitant_words.py``) read
-``assets/catalogs/society-words/society-inhabitant-words.v1.json`` and choose among its words by
+``assets/catalogs/society-words/society-inhabitant-words.v3.json`` and choose among its words by
 the same rule. Both run ``tests/fixtures/society-inhabitant-words/cases.json``; this file runs it
 for the server, and ``web/packages/app/test/society-inhabitant-words.test.ts`` for the page. A
 change to either side's choice, or to the words, fails one of them.

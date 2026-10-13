@@ -1,0 +1,76 @@
+{
+  "profile": "exulanica.model-right-uses/v2",
+  "note": "Declared hosted uses and the exact notices the authenticated personal admission validates before granting rights. Creature picture notes additionally bind a fresh right to the server-derived notice, full model chain and destination. Legacy grants carry no such binding and do not authorize this use.",
+  "notice": "{what} will be sent to an AI service outside Exulanica, at {host}, where a model will {purpose}.{detail} The model is {models}. You can stop this at any time: nothing more is sent from then on, and {kept}.",
+  "fallback_joiner": ", or when that one is unavailable, ",
+  "uses": [
+    {
+      "role": "vision",
+      "offered_with": "detect",
+      "label": "Let an outside AI model describe these photos and read any text in them",
+      "short": "Photo descriptions",
+      "what": "A copy of each selected photo, reduced in size if it is large and without its location or camera details,",
+      "purpose": "describe what it shows and read any text in it",
+      "detail": "The people in the photo are not hidden from this model: it is the model that finds them, so that Exulanica can hide them in what it builds.",
+      "kept": "descriptions already made stay in your library",
+      "stop": "Stop sending this photo to the description model? Nothing more is sent from now on. Descriptions already made from it stay in your library.",
+      "stop_action": "Stop sending this photo for descriptions",
+      "stop_confirm": "Stop sending it"
+    },
+    {
+      "role": "embedding",
+      "offered_with": "detect",
+      "label": "Let an outside AI model index these photos' descriptions so your questions can find them",
+      "short": "Search index",
+      "what": "The descriptions made from each selected photo",
+      "purpose": "index them so your questions can find the photo",
+      "detail": "Names you gave people are replaced before anything is sent, and a place's name is sent only where you allowed it for that place.",
+      "kept": "the search entries already made from a photo are deleted, though it can still be found by the words of its own description",
+      "stop": "Stop sending this photo's descriptions to the search model? Nothing more is sent from now on, and the search entries already made from it are deleted. It can still be found by the words of its own description.",
+      "stop_action": "Stop sending its descriptions for search",
+      "stop_confirm": "Stop sending them"
+    },
+    {
+      "role": "reasoning_cheap",
+      "offered_with": "detect",
+      "label": "Let an outside AI model write Companion answers from these photos",
+      "short": "Companion answers",
+      "what": "The descriptions and dates of the selected photos, whenever a Companion question finds them,",
+      "purpose": "write the answer to your question",
+      "detail": "Names you gave people are replaced before anything is sent, and a place's name is sent only where you allowed it for that place.",
+      "kept": "answers already given stay",
+      "stop": "Stop sending this photo's descriptions to the answer model? From your next question, any answer that draws on it is put together by Exulanica without that model. Answers already given stay.",
+      "stop_action": "Stop sending its descriptions for answers",
+      "stop_confirm": "Stop sending them"
+    },
+    {
+      "role": "reference_vision",
+      "offered_with": "detect",
+      "offered_on": "reference_pictures",
+      "label": "Let an outside AI model read these pictures for your world's reference notes",
+      "short": "Picture notes",
+      "what": "A copy of each selected picture, reduced in size and without its location or camera details,",
+      "purpose": "write short notes about the places and things it shows, for drafting your world",
+      "detail": "The model is told to describe no person and to read no writing, and to refuse a picture that shows either.",
+      "kept": "the reference notes already made with it are withdrawn, though a world already drafted from them keeps what it drafted",
+      "stop": "Stop sending this picture to the reference notes model? Nothing more is sent from now on, and the reference notes already made with it are withdrawn. A world already drafted from them keeps what it drafted.",
+      "stop_action": "Stop sending this picture for notes",
+      "stop_confirm": "Stop sending it"
+    },
+    {
+      "role": "creature_drafter",
+      "offered_with": "detect",
+      "offered_on": "reference_pictures",
+      "consent_use": "creature_picture_notes/v1",
+      "label": "Let an outside AI model draft invented creatures from these picture notes",
+      "short": "Creature picture notes",
+      "what": "Short screened descriptions made from each selected picture",
+      "purpose": "draft an invented creature body and its supported actions, following your explicit changes",
+      "detail": "The creature model receives descriptions, not the picture itself. These notes do not recover geometry or guarantee visual resemblance.",
+      "kept": "pending creature drafts stop using these notes, though invented creature definitions already kept stay until you erase them",
+      "stop": "Stop using this picture’s notes to draft creatures? No further creature requests use them. Pending drafts cannot be kept from them. Invented creature definitions already kept stay until you erase them.",
+      "stop_action": "Stop creature drafting from its notes",
+      "stop_confirm": "Stop using them"
+    }
+  ]
+}

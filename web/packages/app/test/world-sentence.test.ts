@@ -44,6 +44,7 @@ const entry = {
 };
 
 const wire = (state: string, extra: Record<string, unknown> = {}) => ({
+  request_id: null, operation: null, recovered: false, accounting: null,
   draft_id: DRAFT, state, description: state === 'ready' || state === 'refused' ? '' : WORDS,
   started_at: '2026-10-10T12:00:00Z', elapsed_seconds: 4,
   poll_after_seconds: state === 'ready' || state === 'refused' ? null : 3, deadline_seconds: 240,
@@ -64,14 +65,14 @@ const ready = wire('ready', {
 });
 
 const offerWire = (extra: Record<string, unknown> = {}) => ({
-  offered: true, code: null, detail: null, calls_at_most: 5,
+  operation: null, offered: true, code: null, detail: null, calls_at_most: 5,
   starts: { an_hour: 12, left: 12, retry_after_seconds: null },
   description_characters: 1000, running_draft_id: null,
   refusals: [...REFUSALS, { code: 'world_limit_reached', meaning: 'The workspace already holds as many worlds as it may.' }],
   ...extra,
 });
 const OFFER = parseWorldDraftOffer(offerWire());
-const SPEND = 'Making a world asks an AI model up to 5 times. Once started it runs to its end, one world at a time. '
+const SPEND = 'This server does not provide a USD reservation limit. Making a world asks an AI model up to 5 times. Once started it runs to its end, one world at a time. '
   + 'You have 12 of 12 starts left this hour.';
 
 const settle = async (): Promise<void> => {
@@ -144,7 +145,11 @@ describe('what the server\u2019s draft routes answer', () => {
     const mine = parseWorldDraftOffer(SERVED.offer_while_mine_runs);
     const started = parseWorldMakingDraft(SERVED.started);
     expect([mine.offered, mine.code, mine.runningDraftId]).toEqual([false, 'kind_draft_busy', started.draftId]);
-    expect([started.state, started.pollAfterSeconds === null, started.description !== '']).toEqual(['choosing', false, true]);
+    expect([started.state, started.pollAfterSeconds === null, started.description !== '']).toEqual(['queued', false, true]);
+    expect(started.requestId).toBe(SERVED.started['request_id']);
+    expect(started.recovered).toBe(false);
+    expect(offer.operation?.document).toEqual(SERVED.offer['operation']);
+    expect(started.operation?.document).toEqual(SERVED.started['operation']);
     const place = parseWorldMakingDraft(SERVED.ready_place);
     expect([place.state, place.tool?.key, place.entry?.generatedSite === null]).toEqual(['ready', 'place', false]);
     expect(place.made.length).toBeGreaterThan(0);
@@ -544,10 +549,11 @@ describe('the one box', () => {
     await h.tick();
     expect(h.status.textContent).toBe(say('worldSentence.lost'));
     expect(h.waiting).toHaveLength(0);
-    expect(h.make.disabled).toBe(false);
+    expect(h.make.disabled).toBe(true);
+    expect(h.follow.hidden).toBe(false);
   });
 
-  it('asks again after a failed read, and stops after three in a row', async () => {
+  it('offers recovery of the same draft after three failed reads', async () => {
     const lost = (): Error => new TypeError('Failed to fetch');
     const h = box([lost(), parseWorldMakingDraft(wire('drafting')), lost(), lost(), lost()]);
     h.type(WORDS);
@@ -564,7 +570,8 @@ describe('the one box', () => {
     await h.tick();
     expect(h.waiting).toHaveLength(0);
     expect(h.status.textContent).not.toBe(fill('worldSentence.drafting', { elapsed: '4 seconds' }));
-    expect(h.make.disabled).toBe(false);
+    expect(h.make.disabled).toBe(true);
+    expect(h.built.root.querySelector<HTMLButtonElement>('.world-sentence-follow')!.hidden).toBe(false);
   });
 
   it('stops following when the sheet is closed', async () => {
@@ -644,5 +651,165 @@ describe('the sheet with the one box', () => {
     }
     // A server that makes nothing from words, or a person who may ask no model, keeps the recipes.
     for (const never of NEVER_DRAFTS) expect(sentenceOffered(refusedBy(never)), never).toBe(false);
+  });
+});
+
+it('resumes the same draft after interrupted progress without starting another', async () => {
+  const h = box([new TypeError('Failed to fetch'), new TypeError('Failed to fetch'), new TypeError('Failed to fetch'), parseWorldMakingDraft(ready)]);
+  h.type(WORDS); h.make.click(); await settle();
+  await h.tick(); await h.tick(); await h.tick();
+  expect(h.status.textContent).toContain('may still be running');
+  expect(h.make.disabled).toBe(true);
+  expect(h.field.value).toBe(WORDS);
+  h.field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await settle();
+  expect(h.start).toHaveBeenCalledOnce();
+  const follow = h.built.root.querySelector<HTMLButtonElement>('.world-sentence-follow')!;
+  expect(follow.hidden).toBe(false);
+  follow.click(); await settle();
+  expect(h.start).toHaveBeenCalledOnce();
+  expect(h.read).toHaveBeenLastCalledWith(DRAFT);
+  expect(h.openButton.hidden).toBe(false);
+});
+
+it('keeps a known running draft recoverable when its first read fails', async () => {
+  const h = box([new TypeError('Failed to fetch'), parseWorldMakingDraft(ready)], undefined,
+    { ...OFFER, runningDraftId: DRAFT });
+  await settle();
+  h.type(WORDS);
+  expect(h.make.disabled).toBe(true);
+  const follow = h.built.root.querySelector<HTMLButtonElement>('.world-sentence-follow')!;
+  expect(follow.hidden).toBe(false);
+  follow.click(); await settle();
+  expect(h.start).not.toHaveBeenCalled();
+  expect(h.read).toHaveBeenLastCalledWith(DRAFT);
+  expect(h.openButton.hidden).toBe(false);
+});
+
+/** The server recomputes quote terms; these fixtures test exact forwarding. */
+function operationWire(maximum = '0.73123456', at = Date.now()) {
+  return {
+    profile: 'exulanica.world-draft-operation/v1', basis: 'full_context_reservation_ceiling',
+    estimate_is_expected_spend: false, maximum_usd: maximum,
+    read_at: new Date(at).toISOString(), expires_at: new Date(at + 60_000).toISOString(),
+    document_sha256: 'a'.repeat(64), providers: [{ provider: 'example', ceiling_usd: maximum }],
+  };
+}
+
+function quotedPanel(options: Partial<Parameters<typeof buildWorldSentence>[0]> = {}) {
+  const offer = parseWorldDraftOffer(offerWire({ operation: operationWire() }));
+  const start = vi.fn(async (_words: string, submission?: import('../src/world-making-api.js').WorldMakingStart) =>
+    parseWorldMakingDraft(wire('queued', { request_id: submission?.idempotencyKey })));
+  const memory: import('../src/world-making-api.js').WorldMakingMemory = { pending: null };
+  const settings = { offer, start, memory, readOffer: async () => offer, read: vi.fn(), open: vi.fn(), schedule: () => () => {}, ...options };
+  const built = buildWorldSentence(settings);
+  document.body.replaceChildren(built.root);
+  const field = built.root.querySelector<HTMLTextAreaElement>('textarea')!;
+  const make = built.root.querySelector<HTMLButtonElement>('.world-sentence-make')!;
+  const follow = built.root.querySelector<HTMLButtonElement>('.world-sentence-follow')!;
+  const type = (words = WORDS) => { field.value = words; field.dispatchEvent(new Event('input')); };
+  return { ...settings, built, field, make, follow, type };
+}
+
+describe('durable world creation consent and recovery', () => {
+  it('reads queued and recovered, validates the economic basis, and forwards the exact sealed quote', async () => {
+    const quote = operationWire();
+    const operation = parseWorldDraftOffer(offerWire({ operation: quote })).operation!;
+    const id = '11111111-1111-4111-8111-111111111111';
+    let body: unknown;
+    const client = new WorldMakingClient({ baseUrl: 'https://exulanica.test', token: 'private',
+      fetch: vi.fn(async (_input, init) => {
+        body = JSON.parse(String(init?.body));
+        return Response.json(wire('queued', { request_id: id, recovered: true, operation: quote }));
+      }),
+    });
+    const result = await client.start(WORDS, { idempotencyKey: id, operation, maximumUsd: operation.maximumUsd });
+    expect(body).toEqual({ description: WORDS, idempotency_key: id, maximum_usd: quote.maximum_usd, operation: quote });
+    expect(result).toMatchObject({ state: 'queued', requestId: id, recovered: true });
+    expect(() => parseWorldDraftOffer(offerWire({ operation: { ...quote, estimate_is_expected_spend: true } }))).toThrow();
+    expect(() => parseWorldDraftOffer(offerWire({ operation: { ...quote, profile: 'unknown' } }))).toThrow();
+    expect(() => parseWorldDraftOffer(offerWire({ operation: { ...quote, expires_at: quote.read_at } }))).toThrow();
+    expect(() => parseWorldDraftOffer(offerWire({ operation: operationWire('0') }))).toThrow();
+    await expect(client.start(WORDS, { idempotencyKey: DRAFT, operation, maximumUsd: operation.maximumUsd })).rejects.toThrow('identity');
+  });
+
+  it('shows the exact ceiling outside collapsed details and refreshes expired consent without submitting', async () => {
+    const old = parseWorldDraftOffer(offerWire({ operation: operationWire('0.1', Date.now() - 61_000) }));
+    const updated = parseWorldDraftOffer(offerWire({ operation: operationWire('0.76543210') }));
+    const h = quotedPanel({ offer: old, readOffer: async () => updated, workshop: { onReturn: vi.fn(), configure: vi.fn() } });
+    const spend = h.built.root.querySelector('.world-sentence-spend')!;
+    expect(spend.closest('details')).toBeNull();
+    expect(spend.textContent).toContain('US$0.1');
+    expect(spend.textContent).toContain('not expected spending');
+    h.type(); h.make.click(); await settle();
+    expect(h.start).not.toHaveBeenCalled();
+    expect(spend.textContent).toContain('US$0.76543210');
+    h.make.click(); await settle();
+    expect(h.start).toHaveBeenCalledOnce();
+    expect(h.start).toHaveBeenCalledWith(WORDS, expect.objectContaining({ maximumUsd: '0.76543210', operation: updated.operation }));
+    expect(h.built.root.textContent).toContain('Waiting to start');
+  });
+
+  it('replays the same words, ceiling and key after an ambiguous failure, even after quote expiry', async () => {
+    const quote = parseWorldDraftOffer(offerWire({ operation: operationWire() }));
+    const start = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockImplementation(async (_words, submission) => parseWorldMakingDraft(wire('queued', { request_id: submission.idempotencyKey, recovered: true })));
+    const h = quotedPanel({ offer: quote, start });
+    h.type(); h.make.click(); await settle();
+    const first = start.mock.calls[0];
+    expect(h.field.readOnly).toBe(true);
+    expect(h.make.disabled).toBe(true);
+    h.field.value = 'changed without an input event';
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 120_000);
+    h.follow.click(); await settle(); clock.mockRestore();
+    expect(start.mock.calls[1]).toEqual(first);
+    expect(h.memory.pending?.kind).toBe('following');
+    expect(h.built.root.textContent).toContain('Resuming the saved request');
+  });
+
+  it('uses a fresh key for a new intentional request with identical words', async () => {
+    const start = vi.fn(async (_words, submission) => parseWorldMakingDraft({ ...ready, request_id: submission.idempotencyKey }));
+    const h = quotedPanel({ start });
+    h.type(); h.make.click(); await settle();
+    h.type(); h.make.click(); await settle();
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(start.mock.calls[0]![1].idempotencyKey).not.toBe(start.mock.calls[1]![1].idempotencyKey);
+  });
+
+  it('retains pending identity across client and panel recreation while isolating a different account', async () => {
+    const requests: Record<string, unknown>[] = [];
+    const credentials = { baseUrl: 'https://exulanica.test', token: 'account-one',
+      fetch: vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)); requests.push(body);
+        if (requests.length === 1) throw new TypeError('Disconnected');
+        return Response.json(wire('queued', { request_id: body.idempotency_key }));
+      }),
+    };
+    const firstClient = new WorldMakingClient(credentials);
+    const first = quotedPanel({ memory: firstClient.memory, start: (words, submission) => firstClient.start(words, submission) });
+    first.type(); first.make.click(); await settle(); first.built.root.remove();
+    const secondClient = new WorldMakingClient(credentials);
+    expect(secondClient.memory).toBe(firstClient.memory);
+    const second = quotedPanel({ memory: secondClient.memory, start: (words, submission) => secondClient.start(words, submission) });
+    expect(second.field.value).toBe(WORDS);
+    expect(second.make.disabled).toBe(true);
+    expect(requests).toHaveLength(1);
+    second.follow.click(); await settle();
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toEqual(requests[0]);
+    const other = new WorldMakingClient({ ...credentials, token: 'account-two' });
+    expect(other.memory.pending).toBeNull();
+    expect(other.memory).not.toBe(secondClient.memory);
+  });
+
+  it('does not repeat an ambiguous legacy POST or adopt an unrelated response', async () => {
+    const legacy = quotedPanel({ offer: OFFER, start: vi.fn().mockRejectedValue(new TypeError('Disconnected')) });
+    legacy.type(); legacy.make.click(); await settle(); legacy.follow.click(); await settle();
+    expect(legacy.start).toHaveBeenCalledOnce();
+    expect(legacy.built.root.textContent).toContain('cannot safely repeat');
+    const wrong = quotedPanel({ start: vi.fn(async () => parseWorldMakingDraft(wire('queued', { request_id: DRAFT }))) });
+    wrong.type(); wrong.make.click(); await settle();
+    expect(wrong.memory.pending?.kind).toBe('sending');
+    expect(wrong.make.disabled).toBe(true);
   });
 });

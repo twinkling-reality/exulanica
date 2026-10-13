@@ -55,6 +55,7 @@ import random
 import re
 import string
 from collections.abc import Container, Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -361,6 +362,8 @@ def at_choice_point(person: Mapping[str, Any]) -> bool:
     The planner's own choice point: no goal, or the action it completed. A person blocked on the
     way to a goal keeps the goal, as the planner keeps it for them, and is not asked.
     """
+    if person.get("day") is not None and person["action"]["status"] == "active":
+        return person["action"]["remaining_ticks"] <= 1
     return person["goal"] is None or person["action"]["status"] == "completed"
 
 
@@ -410,10 +413,16 @@ def hearers(
     """Who would hear ``speaker`` say a line where they stand: every other person of the society
     whose kind offers hearing, within ``reach_mm`` in the plan, as ``(distance in mm, person)``,
     nearest first and then by the number their name ends with."""
+    from exulanica.world.society_resident_day import same_space
+
     x, y = speaker["position_mm"]
     found = []
     for other in state["inhabitants"]:
-        if other["id"] == speaker["id"] or not _hears(kind_of(other, state)):
+        if (
+            other["id"] == speaker["id"]
+            or not _hears(kind_of(other, state))
+            or not same_space(speaker, other)
+        ):
             continue
         distance = math.isqrt(
             (other["position_mm"][0] - x) ** 2 + (other["position_mm"][1] - y) ** 2
@@ -493,13 +502,17 @@ def follow_options(
     Empty for anybody else."""
     from exulanica.abilities.registry import recorded_row
 
-    if (
-        recorded_row(state.get("modules", ()), "follow") is None
-        or not set(contract.words) >= FOLLOW_KINDS
-    ):
+    row = recorded_row(state.get("modules", ()), "follow")
+    if row is None or not set(contract.words) >= FOLLOW_KINDS:
+        return []
+    # Model terms need a pursuit that survives between choice points. The older player
+    # contract retains follow/v2 with its own per-minute answers, including no-answer carry on.
+    if contract.versions["society-decision-action"] >= 8 and row.version < 3:
         return []
     kind = kind_of(person, state)
-    if kind is None or "follow" not in _abilities(kind):
+    from exulanica.world.society_resident_day import inside
+
+    if inside(person) or kind is None or "follow" not in _abilities(kind):
         return []
     people = {other["id"]: other for other in state["inhabitants"]}
     following = (person.get("following") or {}).get("being")
@@ -524,8 +537,10 @@ def follow_options(
     reach = contract.value("hearing_reach_mm")
     near = []
     for other in state["inhabitants"]:
-        if other["id"] in (person["id"], following) or not _offers(
-            kind_of(other, state), "be_followed"
+        if (
+            inside(other)
+            or other["id"] in (person["id"], following)
+            or not _offers(kind_of(other, state), "be_followed")
         ):
             continue
         distance = math.isqrt(
@@ -909,6 +924,15 @@ def observed_context(
         "last_activity": None if last is None else _activity_label(routine, last)[1],
         "options": [option.as_record() for option in options],
         **_things_context(state, person, document),
+        **(
+            {
+                "clock": dict(state["clock"]),
+                "day": deepcopy(person.get("day")),
+                "indoors": person["location"].get("indoors", False),
+            }
+            if "day_context" in state
+            else {}
+        ),
     }
 
 

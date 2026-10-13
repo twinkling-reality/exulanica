@@ -533,12 +533,20 @@ class ThingStore:
                 raise _refuse("workspace_erased") from exc
             raise
 
-    def keep_creature(self, creature: Creature, *, created_by: uuid.UUID) -> None:
+    def keep_creature(
+        self,
+        creature: Creature,
+        *,
+        created_by: uuid.UUID,
+        guard: Callable[[], None] | None = None,
+    ) -> None:
         """Keep a creature's recipe, plan, sketch and kind, each as assembled and read, the four
         rows in one transaction after the sketch's container is recorded and written. Refused by
         name before anything is written: a shipped key, a sketch container that is not the one the
         sketch names or that the static reader refuses, a reached cap, or a version or document
-        this workspace holds."""
+        this workspace holds. An optional ``guard`` checks the caller's current authority inside
+        each checked transaction, before recording bytes and before writing the creature rows;
+        it must perform no network work and may refuse by raising."""
         if (
             creature.kind.kind
             in {key for key, _version in shipped_thing_kinds(catalogs=self.catalogs)}
@@ -550,6 +558,8 @@ class ThingStore:
         admission = _static_admission(creature.sketch_container)
 
         def check() -> None:
+            if guard is not None:
+                guard()
             if self._count("thing_kind_version") >= KINDS_PER_WORKSPACE or (
                 self._count("look_version") >= LOOKS_PER_WORKSPACE
             ):

@@ -25,7 +25,7 @@ from exulanica.world.starter import AUTHORED_STARTER_REGION_ID, create_starter_a
 from static_glb_builder import cube, png
 from workspace_asset_support import AssetsApi, assets_api, declaration
 from world_structure_fixtures import structural_candidate
-from world_support import registered_world
+from world_support import fixture_workspace, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -406,17 +406,18 @@ def test_a_withdrawn_asset_stays_placed_undrawn_and_is_never_placed_again(api: A
 
 def _stranger_world(api: AssetsApi, repository) -> tuple[str, str]:
     admin = repository.connection
-    world_id = registered_world(admin, api.stranger)
-    structures = WorldStructureRepository(admin, api.stranger, world_id=world_id)
-    candidate = structures.preview(structural_candidate(), proposed_by=api.actor)
-    snapshot = structures.apply(
-        candidate.preview_id,
-        base_snapshot_id=candidate.base_snapshot_id,
-        base_graph_sha256=candidate.base_graph_sha256,
-        base_reconstruction_sha256=candidate.base_reconstruction_sha256,
-        committed_by=api.actor,
-    )
-    admin.commit()
+    with fixture_workspace(admin, api.stranger):
+        world_id = registered_world(admin, api.stranger)
+        structures = WorldStructureRepository(admin, api.stranger, world_id=world_id)
+        candidate = structures.preview(structural_candidate(), proposed_by=api.actor)
+        snapshot = structures.apply(
+            candidate.preview_id,
+            base_snapshot_id=candidate.base_snapshot_id,
+            base_graph_sha256=candidate.base_graph_sha256,
+            base_reconstruction_sha256=candidate.base_reconstruction_sha256,
+            committed_by=api.actor,
+        )
+        admin.commit()
     return world_id, str(snapshot.snapshot_id)
 
 

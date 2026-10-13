@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 import test_society_runtime as helpers
 from tests_support_api import EVERY_PERMISSION, scratch_database
+from world_structure_fixtures import invalidate_snapshot_source
 
 runtime_world = helpers.runtime_world
 pytestmark = pytest.mark.postgres
@@ -155,12 +156,10 @@ def test_unavailable_dependencies_do_not_return_district_json(district_app, repo
             store=w["store"], bindings=[changed], reviewed_affordances=w["registry"]
         )
     else:
-        repository.insert_tombstone(
-            scope="workspace",
-            requested_by=w["session"].actor,
-            reason="isolated test source invalidation",
+        invalidate_snapshot_source(
+            repository, b.world_id, w["objects"].version(b.version_id).source_snapshot_id,
+            w["session"].actor,
         )
-        w["connection"].commit()
         assert w["objects"].version(b.version_id).source_invalidated
     with TestClient(app) as client:
         response = client.get(

@@ -1,8 +1,10 @@
 # Exulanica documentation
 
-Exulanica: Worlds for AI Agents. A person builds a world, and open models run what happens inside
-it, each doing what it is good at; the person can swap one model for another and see the
-difference. World models generate how a world looks; Exulanica is the world AI models live in. The
+Exulanica: Worlds for AI Agents. This hub routes a task to the document that owns it.
+[Product direction](product-direction.md) owns the public name, scope and delivery order.
+Exulanica does not generate a world's appearance with a learned model. Comparing models on one
+saved world is one capability. The
+[people and models guide](capabilities/simulation.md) explains it. The
 [root README](../README.md) introduces the product.
 
 ## Start here
@@ -28,14 +30,12 @@ difference. World models generate how a world looks; Exulanica is the world AI m
 [Developer client](capabilities/developer-client.md) ·
 [Outside AI agents](capabilities/outside-agents.md)
 
-**Models inside the world** are the product's core. The
-[people and models guide](capabilities/simulation.md) explains how a world's people live, how its
-owner hands their choices to open models and how two models are compared; the
+[People and models](capabilities/simulation.md) explains how a world's people live, how its
+owner hands supported roles to open models, and how two models are compared. The
 [decision roles contract](decision-roles-contract.md) and the
-[society contract](synthetic-society-contract.md) specify how a model's decision is validated,
-stored and replayed. The **Companion**, personal photographs and reconstruction from photographs
-are features and ways to build a world; the Companion's guide separates what it does from what it
-is meant to become.
+[society contract](synthetic-society-contract.md) own validation, storage, and replay. The
+Companion, photographs, and reconstruction are other ways to build and use a world. Their guides
+separate supported behavior from later requirements.
 
 ## Contracts
 

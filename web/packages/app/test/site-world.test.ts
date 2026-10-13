@@ -254,7 +254,7 @@ describe('the look a site world is drawn in', () => {
     const world = await loadSiteWorld(access, entry, () => {}, async () => {}, '', null);
     expect(world?.look).toEqual({ pack: 'exulanica.cozy-town', source: 'default', drawn: false, reason: 'The style pack list unavailable: HTTP 503' });
     // With no pack the engine's own colours are still read from the catalog, leaf by leaf.
-    expect(mounts.asked.at(-1)).toEqual({ servedBytes: new TextEncoder().encode(DRAWING).byteLength, materials: SURFACE_MATERIALS, roofForms: ROOF_FORMS, scenery: SITE_SCENERY, interior: SITE_INTERIOR });
+    expect(mounts.asked.at(-1)).toEqual({ seated: expect.any(Function), servedBytes: new TextEncoder().encode(DRAWING).byteLength, materials: SURFACE_MATERIALS, roofForms: ROOF_FORMS, scenery: SITE_SCENERY, interior: SITE_INTERIOR });
   });
 
   it('is the tile look, with no pack read, when the address asks for today\'s look', async () => {

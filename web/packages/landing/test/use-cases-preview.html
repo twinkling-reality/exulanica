@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Use Cases reduced-motion check</title>
+</head>
+<body>
+  <main id="overlay"></main>
+  <script type="module">
+    // Development-only fixture. The real composition reads a simulated OS preference.
+    const query = new URLSearchParams(location.search);
+    const paths = ['worldbuilding', 'model-comparison', 'agent-development'];
+    const selected = paths.includes(query.get('page')) ? query.get('page') : 'worldbuilding';
+    const nativeMedia = window.matchMedia.bind(window);
+    window.matchMedia = value => {
+      const result = nativeMedia(value);
+      if (value === '(prefers-reduced-motion: reduce)') Object.defineProperty(result, 'matches', { value: true });
+      return result;
+    };
+    document.documentElement.dataset.motion = 'reduced';
+    history.replaceState(null, '', `/use-cases/${selected}`);
+    await import('../src/main.ts');
+  </script>
+</body>
+</html>

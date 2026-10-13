@@ -1,3 +1,8 @@
+import { observeSupportVersions } from './composition/thing-support.js';
+import { holdTerrainVersion } from './composition/terrain-occupancy.js';
+import { buildWorldCreation } from './composition/world-creation.js';
+import { WorldMakingClient } from './world-making-api.js';
+import { replaceSurface } from './ui/surface-motion.js';
 /**
  * Boot: one session, one snapshot, one scene, and one write path.
  *
@@ -32,6 +37,7 @@
  * interface would be confidently wrong. Re-reading costs one request and cannot drift.
  */
 
+import { worldEntryIntent, matchingRecipeEntry } from './world-entry-intent.js';
 import { enterAsGuest, readBrowserAccount, type BrowserAccountState } from './account-session.js';
 import {
   anchorId as toAnchorId,
@@ -69,12 +75,12 @@ import {
   worldOpeningCanRetry,
   worldOpeningReason,
 } from './ui/startup-state.js';
-import { el, replace } from './ui/dom.js';
+import { el } from './ui/dom.js';
 import { button, errorState } from './ui/system/components.js';
 import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system/layout.js';
 import { mountActions, type MountedActions } from './composition/actions.js';
 import { redrawWorldLook } from './composition/world-look-redraw.js';
-import { buildLookSheet, type LookSettingNow } from './ui/look-sheet.js';
+import { buildLookSheet, lookChoiceId, type LookSettingNow } from './ui/look-sheet.js';
 import type { WorldStylePackBinding } from './world-style-api.js';
 import { readLookLibrary, type LookLibrary } from './composition/look-library.js';
 import { lookToUse } from './composition/look-use.js';
@@ -139,6 +145,7 @@ import { EnvironmentSelectionClient } from './environment-selection-api.js';
 import {
   parseVersion,
   WorldObjectsClient,
+  versionAuthorityLost,
   type AlternateVersion,
   type SavedEntryWriteBinding,
 } from './world-objects-api.js';
@@ -180,11 +187,11 @@ void boot().catch((error: unknown) => {
   canvas.hidden = true;
   shell.setAttribute('data-world-state', 'error');
   shell.removeAttribute('aria-busy');
-  replace(shell, [buildStartupState(error)]);
+  replaceSurface(shell, [buildStartupState(error)]);
 });
 
 async function boot(): Promise<void> {
-  if (shell.querySelector('.startup-thinking') === null) replace(shell, [buildStartupState()]);
+  if (shell.querySelector('.startup-thinking') === null) replaceSurface(shell, [buildStartupState()]);
   if (preview) {
     await start('');
     return;
@@ -212,7 +219,7 @@ async function boot(): Promise<void> {
  * retains its previous no-storage behavior.
  */
 function askForAccess(account: Exclude<BrowserAccountState, { readonly kind: 'authenticated' }>): void {
-  replace(shell, [buildCredentialGate({
+  replaceSurface(shell, [buildCredentialGate({
     accounts: account.kind,
     modes: account.signIn ?? null,
     signIn: () => window.location.assign('/api/auth/google/start'),
@@ -282,7 +289,7 @@ function showWorldOpeningFailure(
 ): void {
   canvas.hidden = true;
   shell.setAttribute('data-world-state', 'entry');
-  replace(shell, [buildWorldOpeningFailure({ reason, retry })]);
+  replaceSurface(shell, [buildWorldOpeningFailure({ reason, retry })]);
   shell.removeAttribute('aria-busy');
   shell.removeAttribute('data-booting');
 }
@@ -336,6 +343,34 @@ interface MakeWorldSurface {
   remove(): void;
 }
 
+const worldDescriptionMemory = { value: '' };
+
+/** All creation entry points use the same offer, setup and draft lifecycle. */
+function showWorldCreation(onClose: () => void): MakeWorldSurface | null {
+  const credentials = state.credentials;
+  const entries = state.worldEntries;
+  if (credentials === null || entries === null) return null;
+  const client = new WorldMakingClient(credentials);
+  const setupURL = import.meta.env['VITE_EXULANICA_SETUP_URL'];
+  const creation = buildWorldCreation({
+    descriptionMemory: worldDescriptionMemory,
+    memory: client.memory,
+    readOffer: () => client.offer(), start: (words, submission) => client.start(words, submission), read: id => client.read(id),
+    onClose,
+    ...(typeof setupURL === 'string' && setupURL !== '' ? { setupURL } : {}),
+    open: async entry => {
+      state.savedWorldEntries = await entries.entries();
+      await openWorldEntryContext(state, entry);
+      state.worldEntryError = null;
+      shell.removeAttribute('data-world-state');
+      creation.remove();
+      await mount();
+    },
+  });
+  creation.show();
+  return creation;
+}
+
 /**
  * The presets a new world can be generated from, and the values a person may change. A world made
  * from one is opened the way a chosen saved world is: its entry becomes the active one and the
@@ -347,7 +382,7 @@ interface MakeWorldSurface {
  */
 function showWorldRecipes(
   onClose: () => void,
-  start: { readonly recipeKey: string; readonly values: Readonly<Record<string, number | string>>; readonly origin: string } | null = null,
+  start: { readonly recipeKey: string; readonly values: Readonly<Record<string, number | string>>; readonly origin: string | null; readonly stylePack?: WorldStylePackBinding } | null = null,
 ): MakeWorldSurface | null {
   const client = state.worldEntries;
   const credentials = state.credentials;
@@ -374,7 +409,7 @@ function showWorldRecipes(
       // (`style_pack` on POST /worlds/generated). Its setting is its look's own until the person
       // takes the parts a draft of their words offers, sent with the look for the host to compose.
       const looks = readLookLibrary(credentials);
-      const look = buildTownLook({ library: looks, host: shell });
+      const look = buildTownLook({ library: looks, host: shell, ...(start?.stylePack === undefined ? {} : { initial: start.stylePack }) });
       const setting = buildTownSetting({ library: looks });
       // A world that was made, by a recipe, a kind or a sentence, opens the same way.
       const openMade = async (entry: SavedWorldEntry): Promise<void> => {
@@ -387,7 +422,10 @@ function showWorldRecipes(
       };
       const panel = buildWorldRecipes({
         specification: () => specification.specification(),
-        make: (preset, values) => client.makeGenerated(preset.key, preset.label, values, setting.madeIn(look.binding())),
+        make: async (preset, values) => {
+          await look.ready;
+          return client.makeGenerated(preset.key, preset.label, values, setting.madeIn(look.binding()));
+        },
         open: (entry) => openMade(entry),
         onClose,
         // A world of a kind of place is titled by the kind, as a town is by its recipe.
@@ -466,8 +504,20 @@ function showWorldRecipes(
   };
 }
 
+/** Read the entry intent once; internal returns do not reopen a dismissed creation panel. */
+let pendingEntryIntent = worldEntryIntent(window.location.search);
+let pendingEntryProblem = new URLSearchParams(window.location.search).has('style_pack') && pendingEntryIntent === null
+  ? 'This world link has an invalid look request. No world was selected or created. Return to the website for another link, or choose a world here.' : null;
+
 /** Show Your worlds. Only `mountNoWorld` calls this. */
 async function mountWorldEntry(failed?: string): Promise<void> {
+  const requested = pendingEntryIntent;
+  pendingEntryIntent = null;
+  const requestedProblem = pendingEntryProblem;
+  pendingEntryProblem = null;
+  const requestedRecipe = requested?.recipe ?? null;
+  const requestedValues = requested?.values ?? {};
+  const requestedEntry = matchingRecipeEntry(state.savedWorldEntries, requestedRecipe, requestedValues, requested?.stylePack);
   const entries = state.worldEntries;
   canvas.hidden = true;
   shell.setAttribute('data-world-state', 'entry');
@@ -486,12 +536,13 @@ async function mountWorldEntry(failed?: string): Promise<void> {
   };
   const yourWorlds = buildYourWorlds({
     entries: state.savedWorldEntries,
+    ...(requestedEntry === null ? {} : { initialEntryId: requestedEntry.entryId }),
     open,
     picture: worldPicture,
     ...(entries === null ? {} : {
       create: () => {
         if (creating?.isConnected === true) return;
-        creating = showWorldRecipes(closeCreate);
+        creating = showWorldCreation(closeCreate);
       },
       viewValues: (entry) => {
         const ground = entry.generatedGround;
@@ -503,7 +554,7 @@ async function mountWorldEntry(failed?: string): Promise<void> {
         });
       },
     }),
-    arrivalFailure: failed ?? worldOpeningReason(state.worldEntryError),
+    arrivalFailure: failed ?? requestedProblem ?? worldOpeningReason(state.worldEntryError),
     ...(() => {
       const personalWorld = personalWorldControl();
       return personalWorld === undefined ? {} : { personalWorld };
@@ -516,7 +567,7 @@ async function mountWorldEntry(failed?: string): Promise<void> {
       await open(adopted);
     },
   });
-  replace(shell, [yourWorlds.root]);
+  replaceSurface(shell, [yourWorlds.root]);
   shell.removeAttribute('aria-busy');
   shell.removeAttribute('data-booting');
   // Create a world's availability, read the way a mounted world's registry reads it.
@@ -524,10 +575,19 @@ async function mountWorldEntry(failed?: string): Promise<void> {
     const spec = actionSpec('world.make');
     const client = new CapabilitiesClient({ ...state.credentials, worldId: null });
     void client.creation()
-      .then((creation) => yourWorlds.setCreate(availability(spec, creation)))
+      .then((creation) => {
+        const available = availability(spec, creation);
+        yourWorlds.setCreate(available);
+        if (requestedRecipe !== null && requestedEntry === null && available.state === 'available'
+          && yourWorlds.root.isConnected && creating?.isConnected !== true) {
+          creating = showWorldRecipes(closeCreate, { recipeKey: requestedRecipe, values: requestedValues, origin: null,
+            ...(requested?.stylePack === undefined ? {} : { stylePack: requested.stylePack }),
+          });
+        }
+      })
       .catch(() => yourWorlds.setCreate(availability(spec, null)));
   }
-  (yourWorlds.root.querySelector('.your-worlds-card') as HTMLElement | null)?.focus({ preventScroll: true });
+  (yourWorlds.root.querySelector('[aria-current="true"]') as HTMLElement | null)?.focus({ preventScroll: true });
 }
 
 function activeEntryWriteBinding(): SavedEntryWriteBinding {
@@ -608,7 +668,7 @@ async function mountWorld(): Promise<void> {
   shell.setAttribute('data-booting', '');
   shell.setAttribute('aria-busy', 'true');
   const retainedLoading = shell.querySelector<HTMLElement>('.startup-thinking') ?? buildStartupState();
-  replace(shell, [retainedLoading]);
+  replaceSurface(shell, [retainedLoading]);
   disposeMountListeners(state);
   state.atlas?.binding.setControlsEnabled(false);
   state.disposeCharacter?.();
@@ -776,7 +836,7 @@ async function mountWorld(): Promise<void> {
       const entry = state.activeWorldEntry;
       return entry !== null &&
         (entry.currentAuthoredEditSeq > 0 || entry.sourceAttachments.length > 0 ||
-          built.scene.islands.length > 0 || entry.generatedGround != null || entry.generatedSite != null);
+          built.scene.islands.length > 0 || entry.generatedGround != null || entry.generatedSite != null || entry.generatedTerrain != null);
     },
     smallSquareOffered: () => objects.smallSquareOffered(),
   });
@@ -912,6 +972,12 @@ async function mountWorld(): Promise<void> {
   // Authored objects. Mounted after the write path because it hides that panel before showing
   // its own confirmation, and before the renderer because its root enters the document below;
   // it reads `state.atlas` late for the same reason every pre-renderer surface does.
+  const terrainVersion = holdTerrainVersion(state.activeWorldEntry);
+  const supportVersions = observeSupportVersions();
+  const observeAuthoredVersion = (version: AlternateVersion | null): void => {
+    terrainVersion.observe(version);
+    supportVersions.observe(version);
+  };
   const objects = mountObjects({
     env,
     state,
@@ -923,6 +989,7 @@ async function mountWorld(): Promise<void> {
         defaultVersionId: state.activeWorldEntry.authoredVersionId,
         savedEntry: activeEntryWriteBinding,
         onSavedEntryAdvanced: recordAuthoredEntryAdvance,
+        onVersionObserved: observeAuthoredVersion,
       }),
     }),
     scene: built.scene,
@@ -935,6 +1002,14 @@ async function mountWorld(): Promise<void> {
             ...state.activeWorldEntry.authoredScene.region.ground,
           },
         }),
+    generatedGround: () => {
+      const active = state.activeWorldEntry;
+      const binding = state.atlas?.binding;
+      const generated = active?.generatedTerrain ?? active?.generatedSite ?? active?.generatedGround;
+      if (active == null || active.availability !== 'available' || binding?.generatedTile == null
+          || generated == null || !binding.regionRoots.has(toIslandId(generated.regionId))) return null;
+      return { worldId: active.worldId, versionId: active.authoredVersionId, regionId: generated.regionId, navigation: binding.navigationWorld };
+    },
     ...(state.activeWorldEntry?.declaredFloor == null
       ? {}
       : { declaredFloor: state.activeWorldEntry.declaredFloor }),
@@ -947,6 +1022,7 @@ async function mountWorld(): Promise<void> {
   });
   state.disposeObjects = () => objects.dispose();
   const environmentSelection = mountEnvironmentSelection({
+    supportVersions,
     env,
     state,
     credentials: currentCredentials,
@@ -957,6 +1033,7 @@ async function mountWorld(): Promise<void> {
         defaultVersionId: state.activeWorldEntry.authoredVersionId,
         savedEntry: activeEntryWriteBinding,
         onSavedEntryAdvanced: recordAuthoredEntryAdvance,
+        onVersionObserved: observeAuthoredVersion,
       }),
       // Placements go to the open world's versions, which is the world the version names.
       environmentClient: new EnvironmentSelectionClient({
@@ -975,6 +1052,7 @@ async function mountWorld(): Promise<void> {
     ),
     onPanelOpen: () => { companion.dismiss(); objects.close(); character.reach(); },
     onObjects: () => objects.toggle(),
+    onAuthoredObject: (objectId) => objects.inspect(objectId),
     // Somebody crossing in, leaving or turned away: one sentence where every notice appears.
     onVisitorNotice: (notice) => {
       const seeWho = notice.seeWho;
@@ -1283,6 +1361,8 @@ async function mountWorld(): Promise<void> {
     mapReturn,
   ]);
   mapCaption.hidden = true;
+  const returnToWorlds = el('button', { type: 'button', text: 'Your worlds' });
+  returnToWorlds.addEventListener('click', () => window.location.reload());
   const viewportBoundary = el('aside', {
     class: 'viewport-boundary',
     'aria-labelledby': 'viewport-boundary-title',
@@ -1296,13 +1376,14 @@ async function mountWorld(): Promise<void> {
         'Exulanica is designed for laptop and desktop windows. '
         + 'Widen this window to continue.',
     }),
+    returnToWorlds,
   ]);
   let status: MountedStatusAndInspector;
   // Look: the style pack a generated town, or a site made from a world kind, is drawn in, chosen in
   // the Look sheet (ui/look-sheet.ts) and saved as an appearance version (`useStylePack`). Only those
   // two are drawn in packs.
   const lookAccess = state.credentials;
-  const drawnInPacks = state.activeWorldEntry?.generatedGround != null || state.activeWorldEntry?.generatedSite != null;
+  const drawnInPacks = state.activeWorldEntry?.generatedGround != null || state.activeWorldEntry?.generatedSite != null || state.activeWorldEntry?.generatedTerrain != null;
   const lookOffered = drawnInPacks && lookAccess !== null && state.worldStyles !== null;
   let openLook: () => Promise<void> = async () => undefined;
   const appearance = mountAppearance({
@@ -1325,7 +1406,7 @@ async function mountWorld(): Promise<void> {
     void lookLibrary().then(
       async (looks) => {
         const now = await looks.now(boundLook());
-        const title = looks.options.find((option) => option.packId === now.packId)?.title ?? null;
+        const title = looks.options.find((option) => lookChoiceId(option) === now.packId)?.title ?? null;
         const earlier = now.how.earlier ?? null;
         appearance.options.setLook(title === null || earlier === null ? title : `${title}, version ${earlier.version}`);
       },
@@ -1361,7 +1442,7 @@ async function mountWorld(): Promise<void> {
         browsedAway = !isNow;
         // The look drawn now is drawn exactly as the world names it, an earlier version included;
         // any other at the version the host offers now.
-        void redrawWorldLook(isNow ? boundLook() : bindingOf(option.packId)).then((done) => {
+        void redrawWorldLook(isNow ? boundLook() : bindingOf(lookChoiceId(option))).then((done) => {
           // A world that cannot be drawn in another look while open is shown by its pictures.
           if (!done.drawn) sheet.setLive(false);
         });
@@ -1370,7 +1451,7 @@ async function mountWorld(): Promise<void> {
         // Which card was pressed decides: the Now card keeps the version the world names and takes
         // a changed setting; any other asks for the pack as the host lists it (look-use.ts).
         const { binding, named } = lookToUse({
-          option, isNow: isNow === true, setting, worn: boundLook(), listed: bindingOf(option.packId)!,
+          option, isNow: isNow === true, setting, worn: boundLook(), listed: bindingOf(lookChoiceId(option))!,
           earlierPackId: now.how.earlier?.packId ?? null,
         });
         const result = await appearance.useStylePack(binding);
@@ -1412,7 +1493,7 @@ async function mountWorld(): Promise<void> {
   // until they move onto the system (ui/system/layout.ts).
   layout?.dispose();
   layout = createLayout(shell);
-  replace(shell, [
+  replaceSurface(shell, [
     stage,
     chrome.reticle,
     ...(worldIdentity === null ? [] : [worldIdentity.photosDrawer]),
@@ -1480,10 +1561,14 @@ async function mountWorld(): Promise<void> {
       method: request.method,
       path: openWorldPath(request.path, active.worldId, 'a planned change'),
       body: request.body,
+    }).catch(error => {
+      if (versionAuthorityLost(error)) observeAuthoredVersion(null);
+      throw error;
     });
     const body = sent.body;
     if (binding !== null) {
       const version = parseVersion(request.actionId === 'arrangements.place' ? (body as { version: unknown }).version : body);
+      observeAuthoredVersion(version);
       await recordAuthoredEntryAdvance(version, binding);
       await objects.begin(version.versionId);
       await environmentSelection.afterAuthoredEdit(version.versionId);
@@ -1762,7 +1847,7 @@ async function mountWorld(): Promise<void> {
     worldIdentity?.setPhotosVisible(shellState.primary === 'photos');
     if (shellState.primary === 'make') {
       if (makeWorld === null || !makeWorld.isConnected) {
-        makeWorld = showWorldRecipes(() => dispatchShell({ type: 'step-back' }));
+        makeWorld = showWorldCreation(() => dispatchShell({ type: 'step-back' }));
       }
     } else if (makeWorld !== null) {
       makeWorld.remove();
@@ -1830,6 +1915,7 @@ async function mountWorld(): Promise<void> {
   formation.begin();
 
   const renderer = await mountRenderer({
+    terrainVersionCurrent: terrainVersion.current,
     env,
     state,
     snapshot: current,

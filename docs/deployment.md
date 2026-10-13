@@ -567,7 +567,7 @@ stops startup on a malformed value, with a named code from `SOCIETY_SETTING_REFU
 | Variable | Purpose |
 | --- | --- |
 | `EXULANICA_SOCIETY_CONTROL_WORKSPACES` | A JSON array of workspace ids whose playing societies this instance advances, with no accounts needed. Absent or `[]` plays none; a malformed or repeated id is refused |
-| `EXULANICA_SOCIETY_TICK_INTERVAL_MS` | The base wait between simulated minutes, in whole milliseconds: 1,000 to 60,000 and divisible by 4, so every speed divides it exactly. Absent means the declared default, 8,000 |
+| `EXULANICA_SOCIETY_TICK_INTERVAL_MS` | The base wait between simulated minutes, in whole milliseconds: 1,000 to 60,000 and divisible by 4, so every speed divides it exactly. Absent means the declared default, 8,000. For a town, this wait is also the host's slowest minute, because the slowest playback speed is 1. The town ground allows a society a tenth of that minute (`minute_share_milli` 100 in `society-ground.v6.json`). `EXULANICA_MINUTE_COST_SCALE` scales the measured minute before that comparison. A shorter wait admits fewer people. When one person's estimated minute exceeds that budget, the town admits nobody for that engine |
 | `EXULANICA_MINUTE_COST_SCALE` | How this machine compares with the machines a society's minute was measured on: a positive decimal with at most three places, such as `2` for a machine twice as slow or `0.5` for one twice as fast, taken from a measurement on this machine. Absent means 1. Making a society admits a town's people by the measured cost of their minute times this figure, against a tenth of the base wait at the slowest speed; a society already made is not asked again. Anything else is refused at startup (`minute_cost_scale_not_decimal`) |
 | `EXULANICA_SOCIETY_OPENING` | How a society that is made opens: absent, as the opening policy states (on: a town is advanced until 15 percent of its people are outdoors, and a society of things until half its beings are doing something, for at least 10 minutes where the share is not reached sooner, at most 60 minutes, and past the least for at most 5 seconds, so people are on its streets when it is first shown); `off`, at its first minute with everyone at home or idle; or `share:minutes:seconds` in thousandths, minutes and seconds, such as `200:30:2`, which states the seconds as the whole wait (a least of 0 minutes) and may go on `:least-minutes` and `:active-share`, such as `200:30:2:10:500`. It applies to societies made after it is set and changes none that exists |
 | `EXULANICA_SOCIETY_CONTROL_WORKER` | Account-wide discovery. Absent or `off` disables it; `true`, `yes`, `on` or `1` also plays every current account owner's workspace and, where guests enter (5.1.4), each guest's while the guest is there (below), and needs accounts configured |
@@ -907,14 +907,20 @@ its own role. The [local database](local-database.md) guide owns its steps.
 
 One API process runs out of request threads, database connections, decode memory and open streams,
 and each is taken by work the process has already accepted. `exulanica/api/admission.py` therefore
-decides, before any of it is taken, whether the process accepts a request now. **Every number in
-this section bounds one API process.** Several API processes behind one database hold several
-times each limit, and a workspace can hold its share in each of them; the database's
-`max_connections` must cover the sum (5.4.3).
-One thing is not shared between API processes: a kind of place being drafted
-([world kinds contract](world-kinds-contract.md)) lives in the process that started it, so behind
-several processes drafting needs routing that sends each person to the same process, or a poll
-another process answers reads the draft as unknown while it still runs.
+decides, before any of it is taken, whether the process accepts a request now. **Every
+request-capacity limit in this section bounds one API process.** Several API processes behind
+one database hold several times each such limit, and a workspace can hold its request-capacity
+share in each of them; the database's `max_connections` must cover the sum (5.4.3). Draft admission
+has the shared limits described below.
+
+Native kind and whole-world draft identities, outcomes, workspace concurrency and actor hourly
+starts are shared in PostgreSQL ([world kinds contract](world-kinds-contract.md)). Polling does
+not require sticky routing. Each API process retains its own execution-capacity limit; worker
+discovery covers configured token workspaces, watched account workspaces and starts received by
+that process. A worker without a serving model leaves another worker's live claim alone and
+terminalizes overdue work without inference. Expired running claims are not automatically sent
+to a model again. Durable job storage does not change the configured spending mode: process-only
+spending still resets its monetary fuse on restart.
 
 #### 5.4.1 Admission
 
@@ -1101,8 +1107,8 @@ towns played by the API process and then by the playback process
   between 8 and 16 concurrent requests (p95 15 to 28 ms), and at the requests limit of 24 the p95 is
   about 66 ms while the excess is refused in a few milliseconds. The limit sits above that knee
   because many requests wait on a model, a traffic worker or a lock rather than on the core. More
-  API processes behind one database is the boundary that expands it (5.4.3), with each person
-  routed to one process while drafting a kind of place (5.4).
+  API processes behind one database is the boundary that expands it (5.4.3). Draft polling
+  uses shared durable identities (5.4).
 - **Faults:** a client killed while holding streams, a request cancelled mid-body, stalled upload
   bodies, a table lock held for twenty seconds, the derivative worker killed or paused past its
   lease, and the API killed mid-stream each gave every slot back. Every watched upload reached one
@@ -1296,8 +1302,12 @@ Its API connects as `exulanica_judge`, which may read every table, may insert an
 allowlist of tables, and may delete nothing, so "may read, may not write a source or a deletion" is
 enforced by the database rather than intended. The reviewer's bearer token holds the permissions
 `JUDGE_PERMISSIONS` names in `exulanica/orchestration/judge_seed.py`: reads, the authored world and
-its appearance, the Companion, deleting a memory the reviewer made, and the model calls those need;
-intake, admission, consent writes, operations writes and tile materialisation are absent.
+its appearance, the Companion, deleting a memory the reviewer made, acting as a being (`being.act`)
+and the model calls those need; intake, admission, consent writes, operations writes and tile
+materialisation are absent. On this stack no being is played whatever the token holds:
+`exulanica_judge` writes no society table, and playing a being records a choice and an answer there.
+A minted reviewer plays a being on the public server (8.2), whose API connects as the application
+role.
 
 1. On the source database, `exulanica-seed export --workspace <uuid> --into <new directory>` writes
    the workspace's rows and bytes; `exulanica-seed verify --archive <directory>` re-hashes an archive
@@ -1326,7 +1336,7 @@ when the connection arrives from a private container range.
 ### 8.1 Serving it over HTTPS from one host
 
 A browser gives `crypto.subtle` only to a secure context, and the client refuses every region
-without it, so a judge on another machine needs HTTPS rather than a wider bind.
+without it, so a reviewer on another machine needs HTTPS rather than a wider bind.
 `deploy/judge/edge.yaml` is an overlay on the reviewer stack that adds one service, a Caddy
 reverse proxy (`caddy:2.11.4-alpine`) that terminates TLS and forwards to `web`, never to `api`,
 so the `/api` prefix strip and the write limit stay in the path. Its `Caddyfile` takes the host
@@ -1338,7 +1348,7 @@ address has no default. Caddy redacts `Authorization` and `Cookie` values in its
 
 `deploy/judge/stack.sh` runs every step. It writes the stack's secrets into a directory it
 creates mode 0700 (`EXULANICA_DEPLOY_DIR`), with the database passwords generated into a
-`judge.env` created mode 0600 and each judge's token minted by `exulanica-seed token` into a file
+`judge.env` created mode 0600 and each reviewer's token minted by `exulanica-seed token` into a file
 of its own, merged into the one directory the API loads. It never writes the model credential:
 `up` passes `NEBIUS_API_KEY` through from the calling shell, and without it the model routes answer
 that no credential is configured. It never builds on the host, and it starts `migrate` and `seed`
@@ -1349,7 +1359,7 @@ only on the first `up`, because the restore refuses a database that already hold
 | `build` | On the build host: builds `exulanica-judge-backend` and `exulanica-judge-web` for `linux/amd64` from the checkout, as `compose.yaml` declares them, and prints their image IDs |
 | `images` | Prints the two image IDs, to compare the host with the build host |
 | `init` | Writes `judge.env` from `EXULANICA_PUBLIC_HOST`, `EXULANICA_TLS`, `EXULANICA_SEED_ARCHIVE` and `EXULANICA_EDGE_ADDRESS`, leaving `EXULANICA_BUDGET_USD` and `EXULANICA_BUDGET_MAX_CALLS` empty; the stack refuses to start until both are filled in |
-| `mint <label>`, `revoke <label>` | Adds or removes one judge's token; the next `up` serves the change |
+| `mint <label>`, `revoke <label>` | Adds or removes one reviewer's token; the next `up` serves the change |
 | `up` | Starts the stack from loaded images; the first run migrates, seeds and verifies |
 | `reset` | Returns the world to the archive (section 8, step 4) |
 | `status`, `logs [service]` | The containers and the API's readiness from inside the stack; the logs |
@@ -1381,22 +1391,22 @@ value:
    EXULANICA_TLS=<contact email> EXULANICA_SEED_ARCHIVE=<archive directory>
    EXULANICA_EDGE_ADDRESS=0.0.0.0 deploy/judge/stack.sh init`, then set `EXULANICA_BUDGET_USD`
    (for example `10.00`) and `EXULANICA_BUDGET_MAX_CALLS` in `<secrets directory>/judge.env`.
-6. `deploy/judge/stack.sh mint <label>` once per judge.
+6. `deploy/judge/stack.sh mint <label>` once per reviewer.
 7. `read -rs NEBIUS_API_KEY && export NEBIUS_API_KEY`, then `deploy/judge/stack.sh up`. Leaving
    the key unset serves everything except the model routes.
 8. From any machine, `uv run python scripts/judge_smoke.py --origin https://<host name>
-   --token-file <one judge's token file> --http-origin http://<host name> --rate-limit`; it checks
+   --token-file <one reviewer's token file> --http-origin http://<host name> --rate-limit`; it checks
    the client, liveness, readiness, a refused and an accepted read, the world list, the redirect
    and the write limit through the public origin, and exits 0 when all pass. `--ask "<question>"`
    adds one Companion question, which calls a hosted model.
-9. Give each judge the address and their own token, which the client asks for once. The token
+9. Give each reviewer the address and their own token, which the client asks for once. The token
    is the key of the one entry in `<secrets directory>/judge-tokens/<label>.json`.
-10. When judging ends: `deploy/judge/stack.sh destroy --yes-delete-volumes`, then delete the
+10. When the review ends: `deploy/judge/stack.sh destroy --yes-delete-volumes`, then delete the
     virtual machine, its disk and its public address in the console.
 
 `EXULANICA_BUDGET_USD` is a ceiling for one API process life: a restart of `api`, or of the host,
 starts a fresh one, so the model provider's own balance is what bounds spend across restarts. The
-stack has no per-judge spend limit, no backup of its volumes (D-3) and no monitoring beyond the
+stack has no per-reviewer spend limit, no backup of its volumes (D-3) and no monitoring beyond the
 health status Docker records, which nothing acts on, and `status`; a revoked token stays valid
 until the next `up`.
 
@@ -1502,6 +1512,31 @@ changes. A public host also states its own `EXULANICA_MINUTE_COST_SCALE` there, 
 of a society's minute on that host (5.1.5): the composition hands it to the API, the one process
 that makes a society, and a host that leaves it out admits a town's people by the measured
 machines' figures, not its own.
+
+**A token minted before `being.act` was a permission.** Playing a being asks for `being.act`
+beside `world.read` ([security floor](security-floor.md#1-route-permissions)), and a token's grant
+is the list it was minted with: `mint` writes `tokens/<label>.json` under `EXULANICA_DEPLOY_DIR`
+with the permissions the image named that day, and no later image changes that file. A token minted
+by an image without `being.act` keeps everything else it could do, and is answered 404
+`unknown_reference` on the three routes that start a play, answer for the being and give it back;
+the actions read shows `beings.play` as not permitted. To let such a token go on playing:
+1. Add `"being.act"` to the `permissions` array in its part file, `tokens/<label>.json`.
+2. Add it to the same token's entry in the merged file the API loads, `tokens.json`. `up` serves
+   the merged file as it stands; only `init`, `mint` and `revoke` write it again from the parts. So
+   a change to the part alone is not served, and a change to the merged file alone is lost at the
+   next `mint` or `revoke`.
+3. `up`.
+
+`mint` refuses a label that already has a token, and `revoke` then `mint` is not the way: it issues
+a new secret and a new workspace, and the visitor's worlds and the workspace's spending grant stay
+with the old one. A token that should not play needs nothing, and neither does a browser session:
+a guest's and an owner's hold `being.act` by their role. On the reviewer stack
+(`deploy/judge/stack.sh`, whose `mint` writes `judge-tokens/<label>.json` and merges
+`judge-tokens.json`) no being was ever played, since its database role writes no society table, so
+its tokens need no change. Migration 0194, which lets a refusal name `being.act`, is applied before
+the API that knows the permission starts, as `up` does by running `migrate` to completion first:
+that API on a schema without it answers 500 in place of 404 to a token that edits the world and may
+not act as a being.
 
 **On one host.** The machine is section 8.1's: a `cpu-d3` virtual machine with Ubuntu 24.04, a
 public address, and inbound TCP 80 and 443, with 22 limited to the operator's address. It also has

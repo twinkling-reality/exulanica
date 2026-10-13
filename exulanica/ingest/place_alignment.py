@@ -8,8 +8,8 @@ correspondences come from a **reconstruction over the union of both capture sets
 recovers every camera a second time in one shared frame. What is fitted, twice, is the
 similarity between each scene's own recovered frame and that joint frame.
 
-**This is a callable build and not a leased queue, deliberately.** The design note gives the
-reason: no joint reconstruction has ever run here, so a fourth copy of the claim, lease,
+**This is a callable build and not a leased queue, deliberately.** No joint reconstruction
+has ever run here, so a fourth copy of the claim, lease,
 heartbeat and reclaim machinery would be scheduling logic with no executed instance to validate
 it, and the failure modes it exists to survive, a worker dying mid-COLMAP and a lease expiring
 during a forty-five minute job, are exactly the ones a stub cannot exercise. What is given up is

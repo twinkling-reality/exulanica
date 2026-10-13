@@ -237,7 +237,10 @@ def test_every_world_table_names_a_registered_world(repository):
         for table in tables
         if (table, ("workspace_id", KEYED_THROUGH.get(table, ("world_id",))[0])) not in keys
     ]
-    assert unkeyed == []
+    # Immutable erasure records survive the registration they permanently remove. A draft
+    # reserves its deterministic generated identity before a world exists, and its anchor
+    # survives removal; only a ready outcome must bind to a registered saved world.
+    assert unkeyed == ["society_erasure", "world_draft_start", "world_erasure"]
     generated = {
         # The catalog's layout of the expression is PostgreSQL's; its words are the migration's.
         row["table_name"]: (row["column_name"], " ".join(row["expression"].split()))
@@ -257,8 +260,10 @@ def test_every_world_table_names_a_registered_world(repository):
 
 def test_no_world_column_has_a_default_and_none_is_nullable(repository):
     rows = repository.connection.execute(
-        "select table_name, column_default, is_nullable from information_schema.columns "
-        "where table_schema=current_schema() and column_name='world_id'"
+        "select c.table_name, c.column_default, c.is_nullable from information_schema.columns c "
+        "join information_schema.tables t using(table_catalog,table_schema,table_name) "
+        "where c.table_schema=current_schema() and c.column_name='world_id' "
+        "and t.table_type='BASE TABLE'"
     ).fetchall()
     assert rows
     assert [r["table_name"] for r in rows if r["column_default"] is not None] == []
@@ -293,7 +298,10 @@ def test_the_registry_is_forced_row_secure_and_refuses_every_update_and_delete(r
         "update world_identity set kind='authored-starter' where world_id=%s",
         "delete from world_identity where world_id=%s",
     ):
-        with pytest.raises(psycopg.errors.IntegrityConstraintViolation, match="append-only"):
+        with pytest.raises(
+            psycopg.IntegrityError,
+            match=r"append-only|erased whole",
+        ):
             connection.execute(statement, (world_id,))
 
 
@@ -507,6 +515,10 @@ def test_two_callers_on_an_empty_workspace_create_one_personal_source_world(spin
     connections = [open_scratch_connection(psycopg_module, scratch) for _ in range(2)]
     for connection in connections:
         connection.row_factory = psycopg.rows.dict_row
+        connection.execute(
+            "select set_config('exulanica.workspace_id', %s, false)", (str(workspace),)
+        )
+        connection.commit()
     barrier = threading.Barrier(2)
     results: list[str] = []
     failures: list[BaseException] = []

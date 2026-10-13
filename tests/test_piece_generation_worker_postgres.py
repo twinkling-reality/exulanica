@@ -18,6 +18,7 @@ import uuid
 from decimal import Decimal
 from pathlib import Path
 
+import psycopg
 import pytest
 from exulanica.evidence.blob import BlobId
 from exulanica.generation import batches, store
@@ -720,10 +721,10 @@ def test_a_queued_request_its_workspace_s_deletion_cancelled_is_settled_unknown(
         entry,
         "exulanica.generated-asset-queue-withdrawn/v1",
     )
-    [row] = p.rows("select state, failure from piece_request")
-    assert (row["state"], row["failure"]) == ("cancelled", "workspace_deleted")
-    [settlement] = p.rows("select basis, settled_at from piece_settlement")
-    assert settlement["basis"] == "unknown" and settlement["settled_at"] is not None
+    assert p.rows("select state from piece_request") == []
+    [settlement] = p.rows("select basis from piece_erasure_settlement_event where kind = 'decided'")
+    assert settlement["basis"] == "unknown"
+    assert p.rows("select 1 from piece_erasure_settlement_event where kind = 'settled'")
     [reservation] = p.reservations()
     assert reservation["state"] == "unknown"
 
@@ -747,7 +748,7 @@ def test_a_deletion_committed_between_the_listing_and_the_decision_is_withdrawn_
     p.worker.run_once()
     withdrawn = json.loads(p.bucket.get(f"withdrawn/{entry}.json"))
     assert withdrawn["entry_id"] == entry
-    [settlement] = p.rows("select basis from piece_settlement")
+    [settlement] = p.rows("select basis from piece_erasure_settlement_event where kind = 'decided'")
     assert settlement["basis"] == "unknown"
 
 
@@ -817,7 +818,7 @@ def test_a_deletion_between_a_batch_s_record_and_its_offer_sends_nothing(
     # The batch was erased before its ready.json: no session can take what was never offered.
     assert p.entries() == []
     p.worker.run_once()
-    [settlement] = p.rows("select basis from piece_settlement")
+    [settlement] = p.rows("select basis from piece_erasure_settlement_event where kind = 'decided'")
     assert settlement["basis"] == "not_sent"
     [reservation] = p.reservations()
     assert reservation["state"] == "released"
@@ -840,7 +841,9 @@ def test_a_deleted_request_whose_reservation_was_only_admitted_is_released(
     p.worker.run_once()
     monkeypatch.undo()
     p.worker.run_once()
-    [settlement] = p.rows("select basis, usd from piece_settlement")
+    [settlement] = p.rows(
+        "select basis, usd from piece_erasure_settlement_event where kind = 'decided'"
+    )
     assert (settlement["basis"], settlement["usd"]) == ("not_sent", Decimal(0))
     [reservation] = p.reservations()
     assert reservation["state"] == "released"
@@ -868,3 +871,120 @@ def test_a_gpu_the_compute_catalog_no_longer_prices_is_given_nothing_and_settled
     [reservation] = p.reservations()
     assert reservation["state"] == "unknown"
     assert Decimal(reservation["settled_usd"]) == Decimal("0.06")
+
+
+def test_erasure_recovery_retries_withdrawal_before_deciding_spend(played, monkeypatch):
+    p = played()
+    entry = _queued(p)
+    p.tombstone()
+    put = p.bucket.put
+
+    def refuse_withdrawal(key, body):
+        if key.startswith("withdrawn/"):
+            raise OSError("withdrawal storage unavailable")
+        return put(key, body)
+
+    monkeypatch.setattr(p.bucket, "put", refuse_withdrawal)
+    p.worker.run_once()
+    assert p.rows("select 1 from piece_request") == []
+    assert p.rows("select 1 from piece_erasure_settlement_event") == []
+    assert p.reservations()[0]["state"] == "dispatched"
+    monkeypatch.setattr(p.bucket, "put", put)
+    p.worker.run_once()
+    assert json.loads(p.bucket.get(f"withdrawn/{entry}.json"))["entry_id"] == entry
+    assert p.reservations()[0]["state"] == "unknown"
+    assert {r["kind"] for r in p.rows("select kind from piece_erasure_settlement_event")} == {
+        "withdrawn",
+        "decided",
+        "settled",
+    }
+
+
+def test_erasure_recovery_preserves_measured_spend_across_receipt_failure(played, monkeypatch):
+    p = played()
+    _queued(p)
+    with p.bench.runtime.session(p.workspace_id) as connection:
+        [batch] = batches.batches_in_flight(connection, p.workspace_id)
+        batches.end_batch(
+            connection,
+            p.workspace_id,
+            batch,
+            state="expired",
+            ended_at=p.now,
+            settlements={
+                r.piece_request_id: ("reported", Decimal("0.012345")) for r in batch.requests
+            },
+        )
+    p.tombstone()
+    [obligation] = p.rows("select basis, usd from piece_erasure_settlement")
+    assert obligation == {"basis": "reported", "usd": Decimal("0.012345")}
+    mark = batches.mark_settled
+
+    def fail_receipt(*args, **kwargs):
+        raise OSError("receipt unavailable after durable ledger settlement")
+
+    monkeypatch.setattr(batches, "mark_settled", fail_receipt)
+    p.worker.run_once()
+    [reservation] = p.reservations()
+    assert reservation["state"] == "settled"
+    assert Decimal(reservation["settled_usd"]) == Decimal("0.012345")
+    assert not p.rows("select 1 from piece_erasure_settlement_event where kind='settled'")
+    monkeypatch.setattr(batches, "mark_settled", mark)
+    p.worker.run_once()
+    assert p.reservations() == [reservation]
+    assert p.rows("select 1 from piece_erasure_settlement_event where kind='settled'")
+
+
+def test_erasure_recovery_does_not_finish_without_its_durable_reservation(played):
+    from test_piece_batch_tombstone_order_postgres import _queued as queued_without_ledger
+
+    p = played()
+    queued_without_ledger(p.repository.connection, p.workspace_id)
+    p.repository.connection.commit()
+    p.tombstone()
+    p.worker.run_once()
+    assert p.reservations() == []
+    assert p.rows("select 1 from piece_erasure_settlement_event where kind='decided'")
+    assert not p.rows("select 1 from piece_erasure_settlement_event where kind='settled'")
+
+
+def test_erasure_recovery_progress_is_ordered_immutable_and_cannot_invent_obligations(played):
+    p = played()
+    _queued(p)
+    p.tombstone()
+    [obligation] = p.rows("select * from piece_erasure_settlement")
+    request = obligation["piece_request_id"]
+    attempts = (
+        ("insert into piece_erasure_settlement select * from piece_erasure_settlement", ()),
+        ("update piece_erasure_settlement set basis='not_sent',usd=0", ()),
+        ("delete from piece_erasure_settlement", ()),
+        (
+            "insert into piece_erasure_settlement_event(workspace_id,piece_request_id,kind) "
+            "values (%s,%s,'settled')",
+            (p.workspace_id, request),
+        ),
+        (
+            "insert into piece_erasure_settlement_event"
+            "(workspace_id,piece_request_id,kind,basis,usd) "
+            "values (%s,%s,'decided','unknown',0.06)",
+            (p.workspace_id, request),
+        ),
+    )
+    for query, values in attempts:
+        with pytest.raises(psycopg.Error), p.bench.runtime.session(p.workspace_id) as connection:
+            connection.execute(query, values)
+    with p.bench.runtime.session(p.workspace_id) as connection:
+        batches.mark_erasure_withdrawn(
+            connection, p.workspace_id, obligation["piece_batch_id"], p.now
+        )
+    for query in (
+        "update piece_erasure_settlement_event set kind='settled'",
+        "delete from piece_erasure_settlement_event",
+        "insert into piece_erasure_settlement_event"
+        "(workspace_id,piece_request_id,kind,basis,usd) "
+        "select workspace_id,piece_request_id,'decided','unknown',1 from piece_erasure_settlement",
+    ):
+        with pytest.raises(psycopg.Error), p.bench.runtime.session(p.workspace_id) as connection:
+            connection.execute(query)
+    p.worker.run_once()
+    assert p.rows("select 1 from piece_erasure_settlement_event where kind='settled'")

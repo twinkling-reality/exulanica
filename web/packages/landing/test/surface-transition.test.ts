@@ -15,8 +15,13 @@ function fixture(reduced = false, withLandscape = false) {
     purpose: document.createElement('section'),
     capabilities: document.createElement('section'),
     research: document.createElement('section'),
+    roadmap: document.createElement('section'),
     waitlist: document.createElement('section'),
     developers: document.createElement('section'),
+    docs: document.createElement('section'),
+    'docs-world-api': document.createElement('section'),
+    'docs-agents': document.createElement('section'),
+    'not-found': document.createElement('section'),
   };
   const landscape = document.createElement('div');
   const wordmark = document.createElement('h1');
@@ -45,24 +50,33 @@ function fixture(reduced = false, withLandscape = false) {
 }
 
 describe('landing surface transitions', () => {
-  it('moves the artwork through exactly the title camera and returns both to rest', async () => {
+  it('moves only the landscape and keeps all text transitions opacity-only', async () => {
     const { pending, landscape, transition } = fixture(false, true);
     transition.show('title');
     const rest = landscape.style.transform;
     transition.show('purpose');
-    expect(pending[2]?.frames[0]?.transform).toBe(pending[0]?.frames[0]?.transform);
-    expect(pending[2]?.frames.at(-1)?.transform).toBe(pending[0]?.frames.at(-1)?.transform);
-    expect(pending[2]?.options).toEqual(pending[0]?.options);
+    expect(pending.slice(0, 2).flatMap((animation) => animation.frames)
+      .every((frame) => frame.transform === undefined)).toBe(true);
+    expect(pending[2]?.frames[0]?.transform).toBe(rest);
     const purpose = landscape.style.transform;
+    expect(pending[2]?.frames.at(-1)?.transform).toBe(purpose);
     pending.forEach((animation) => animation.complete());
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(landscape.style.transform).toBe(purpose);
     transition.show('title');
-    expect(pending[5]?.frames[0]?.transform).toBe(pending[4]?.frames[0]?.transform);
-    expect(pending[5]?.frames.at(-1)?.transform).toBe(pending[4]?.frames.at(-1)?.transform);
+    expect(pending[5]?.frames[0]?.transform).toBe(purpose);
+    expect(pending[5]?.frames.at(-1)?.transform).toBe(rest);
     transition.finish();
     expect(landscape.style.transform).toBe(rest);
     expect(landscape.style.willChange).toBe('');
+  });
+
+  it('gives documentation and missing pages a neutral landscape', () => {
+    const { landscape, transition } = fixture(false, true);
+    for (const surface of ['docs', 'docs-world-api', 'docs-agents', 'roadmap', 'not-found'] as const) {
+      transition.show(surface);
+      expect(landscape.style.transform).toBe('translate3d(0, 0, 0) scale(1)');
+      transition.finish();
+    }
   });
 
   it('places direct routes at their measured camera and moves between measured destinations', () => {
@@ -78,6 +92,25 @@ describe('landing surface transitions', () => {
     expect(pending[2]?.frames.at(-1)?.transform).toBe(landscape.style.transform);
     expect(landscape.style.transform).not.toBe(expectedPurpose);
     transition.finish();
+  });
+
+  it('uses the resting homepage composition after scrolling and preserves its reading position', () => {
+    const { panes, landscape, transition } = fixture(true, true);
+    const heading = panes.title.querySelector('h1')!;
+    heading.getBoundingClientRect = () => new DOMRect(240, 300 - panes.title.scrollTop, 720, 110);
+    const expected = titleCamera('purpose', new DOMRect(240, 300, 720, 110),
+      panes.title.getBoundingClientRect(), { width: window.innerWidth, height: window.innerHeight }).transform;
+    transition.show('title');
+    panes.title.scrollTop = 700;
+    transition.show('purpose');
+    expect(landscape.style.transform).toBe(expected);
+    expect(panes.title.scrollTop).toBe(700);
+    expect(panes.title.hidden).toBe(false); // It remains visible only until its crossfade settles.
+    transition.finish();
+    transition.refresh();
+    expect(panes.title.hidden).toBe(true);
+    expect(panes.title.scrollTop).toBe(700);
+    expect(landscape.style.transform).toBe(expected);
   });
 
   it('refreshes a resized camera without animation and snaps artwork for reduced motion', () => {
@@ -126,19 +159,6 @@ describe('landing surface transitions', () => {
     expect(research.transform).not.toBe(capabilities.transform);
   });
 
-  it('returns through the same destination-specific camera position', async () => {
-    for (const destination of ['purpose', 'capabilities', 'research'] as const) {
-      const { pending, transition } = fixture();
-      transition.show('title');
-      transition.show(destination);
-      const departure = pending[0]?.frames.at(-1)?.transform;
-      pending.forEach((animation) => animation.complete());
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      transition.show('title');
-      expect(pending[3]?.frames[0]?.transform).toBe(departure);
-    }
-  });
-
   it('opens a direct information route immediately with one accessible surface', () => {
     const { panes, pending, transition } = fixture();
     transition.show('purpose');
@@ -149,14 +169,13 @@ describe('landing surface transitions', () => {
     expect(panes.purpose.getAttribute('aria-hidden')).toBe('false');
   });
 
-  it('starts text with the camera and releases temporary compositor hints on completion', async () => {
+  it('crossfades text briefly and releases temporary compositor hints on completion', async () => {
     const { panes, pending, transition } = fixture();
     panes.title.style.willChange = 'contents';
     transition.show('title');
     transition.show('purpose');
-    expect((pending[1]?.options as KeyframeAnimationOptions).delay).toBe(0);
-    expect((pending[0]?.options as KeyframeAnimationOptions).duration).toBeLessThanOrEqual(600);
-    expect(panes.title.style.willChange).toBe('transform, opacity');
+    expect((pending[0]?.options as KeyframeAnimationOptions).duration).toBeLessThanOrEqual(200);
+    expect(panes.title.style.willChange).toBe('opacity');
     pending.forEach((animation) => animation.complete());
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(panes.title.style.willChange).toBe('contents');

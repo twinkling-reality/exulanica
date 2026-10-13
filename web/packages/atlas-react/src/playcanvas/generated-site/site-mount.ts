@@ -1,13 +1,21 @@
-import { materialOfLeaf, unknownSurfaceLeaf, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type SurfaceMaterials } from '@exulanica/atlas-core';
-import type * as pc from 'playcanvas';
+import {attachTerrainDressing, terrainDressingFrameAvailable, createDressingReadiness, type PreparedDressing, type TerrainDressingAttachment} from './terrain-dressing.js';
+import { materialOfLeaf, unknownSurfaceLeaf, type RoofForms, type SiteInteriorCatalog, type SiteSceneryCatalog, type TerrainOccupancyProof, type SurfaceMaterials } from '@exulanica/atlas-core';
+import * as pc from 'playcanvas';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMount } from '../generated-tile/binding-contract.js';
+import type { SiteTextureMetrics } from '../style-pack/site-textures.js';
+import type { TileEnvironment } from '../generated-tile/environment.js';
 import { applyTileEnvironment } from '../generated-tile/environment.js';
 import { TILE_LOOK_V1, type TileLook } from '../generated-tile/look.js';
-import type { SiteDrawing, SiteSlot } from './site-drawing.js';
+import { isTerrainSiteDrawing, type SiteDrawing, type StructuredSiteDrawing, type TerrainSiteDrawing, type SiteSlot } from './site-drawing.js';
 import { siteNavigationWorld, siteStart } from './site-navigation.js';
 import { drawSiteSlots, type DrawnSiteSlots } from './site-primitives.js';
 import { SITE_CEILING, ceilingRests, drawSiteCeiling, lightFromAbove } from './site-interior.js';
 import { drawSiteScenery, sceneryOf, type DrawnScenery } from './site-scenery.js';
+import { measureSite } from './site-measurements.js';
+import { createHeightfieldMesh } from './heightfield-mesh.js';
+import { drawnSiteSeats } from './site-seating.js';
+import type { SeatGeometry } from './site-seating.js';
+import type { FixtureSeat } from '../society/seating.js';
 
 /**
  * A world made from a world kind, ready for the binding: where a person walks, where they open and
@@ -28,6 +36,7 @@ import { drawSiteScenery, sceneryOf, type DrawnScenery } from './site-scenery.js
  * whole extent, keep the look's own.
  */
 export interface GeneratedSiteMount extends GeneratedTileMount {
+  readonly dressingReadiness?: ReturnType<typeof createDressingReadiness>;
   /** The kind the world was made from, in its own words, which the About panel says. */
   readonly kindLabel: string;
   readonly drawing: SiteDrawing;
@@ -38,11 +47,20 @@ export interface GeneratedSiteMount extends GeneratedTileMount {
  * disposer, which runs before the slots are taken away and puts back everything it changed. It
  * never changes a slot, the walk or the seats; the mount stays the one owner of its entities.
  */
-export type SiteDresser = (host: GeneratedTileHost, drawn: DrawnSiteSlots, drawing: SiteDrawing, scenery?: DrawnScenery | null) => () => void;
+export type SiteUndress = (() => void) & { readonly seatTriangles?: ReadonlyMap<string, SeatGeometry>; readonly textureMetrics?: SiteTextureMetrics; readonly animating?: boolean; readonly dressBeyond?: (instance: pc.MeshInstance, slot: SiteSlot) => void };
+export type SiteDresser = (host: GeneratedTileHost, drawn: DrawnSiteSlots, drawing: StructuredSiteDrawing, scenery?: DrawnScenery | null, environment?: TileEnvironment) => SiteUndress;
 
 export interface SiteMountOptions {
+  readonly preparedDressing?: PreparedDressing;
+  readonly dressingReadiness?: ReturnType<typeof createDressingReadiness>;
+  /** Current authoritative occupancy binding; a source drawing alone cannot establish this. */
+  readonly terrainOccupancy?: TerrainOccupancyProof | (() => TerrainOccupancyProof);
   /** The bytes the drawing was served as, which the attachment reports as transferred. */
   readonly servedBytes: number;
+  /** Record bounded frame intervals and accounted graphics bytes on the canvas for a review. */
+  readonly measure?: boolean;
+  /** Publish contact for this attachment; the returned withdrawal runs before geometry is removed. */
+  readonly seated?: (seats: readonly FixtureSeat[]) => () => void;
   readonly look?: TileLook;
   readonly dress?: SiteDresser;
   /**
@@ -80,7 +98,7 @@ export const SITE_BEYOND_DROP_M = 0.018;
  * The slot a site's base ground is drawn by: the ground plane its drawing lays over its whole
  * extent, at the level of the site's origin. Null where the drawing lays none.
  */
-export function baseGroundSlot(drawing: SiteDrawing): SiteSlot | null {
+export function baseGroundSlot(drawing: StructuredSiteDrawing): SiteSlot | null {
   const { widthMm, depthMm } = drawing.extent;
   return drawing.slots.find((slot) => slot.family === 'ground' && slot.primitive === 'plane'
     && slot.boxMm[0] === widthMm && slot.boxMm[1] === depthMm
@@ -89,6 +107,7 @@ export function baseGroundSlot(drawing: SiteDrawing): SiteSlot | null {
 
 /** The mount for a checked site drawing. */
 export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): GeneratedSiteMount {
+  if (isTerrainSiteDrawing(drawing)) return terrainMount(drawing, options);
   const look = options.look ?? TILE_LOOK_V1;
   const navigationWorld = siteNavigationWorld(drawing);
   return Object.freeze({
@@ -110,7 +129,8 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         ? null : sceneryOf(drawing, base, options.scenery, materials);
       const scenery = standing === null || standing.pieces.length === 0 ? null : drawSiteScenery(host.app.graphicsDevice, standing, materials);
       if (scenery !== null) host.environmentRoot.addChild(scenery.root);
-      const undress = options.dress?.(host, slots, drawing, scenery) ?? null;
+      const undress = options.dress?.(host, slots, drawing, scenery, environment) ?? null;
+      const withdrawSeats = options.seated === undefined ? undefined : options.seated(drawnSiteSeats(drawing, slots, undress?.seatTriangles));
       // An indoor place: a ceiling on the top of the tallest thing it draws, in what that is drawn
       // in once dressed, and the look's sun turned into the light under it.
       const rests = drawing.extent.enclosure === 'indoor' && options.interior !== undefined ? ceilingRests(drawing) : null;
@@ -129,6 +149,8 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       const edged = beyond !== null && worn !== null && environment.ground !== null;
       if (edged) {
         beyond.material = worn;
+        // A texture needs the beyond plane’s physical UVs, rather than its unit primitive UVs.
+        undress?.dressBeyond?.(beyond, base!);
         const at = environment.ground!.getPosition();
         environment.ground!.setPosition(at.x, -SITE_BEYOND_DROP_M, at.z);
       }
@@ -146,15 +168,21 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         canvas.dataset['siteMaterials'] = String(drawn.filter((slot) => slot.leaf !== 'default' && materialOfLeaf(materials, slot.family, slot.leaf) !== null).length);
         canvas.dataset['siteUnknownLooks'] = JSON.stringify([...new Set(drawn.filter((slot) => unknownSurfaceLeaf(materials, slot.lookRole)).map((slot) => slot.lookRole))].sort());
       }
+      const stopMeasure = options.measure ? measureSite(host.app, undress?.textureMetrics, environment.residentBytes, () => {
+        const position = host.camera.getPosition().clone().sub(host.environmentRoot.getPosition());
+        const forward = host.camera.forward;
+        return { positionM: [position.x, position.y, position.z], forward: [forward.x, forward.y, forward.z] };
+      }) : null;
       let disposed = false;
       return {
+        animating: undress?.animating ?? false,
         metrics: Object.freeze({
           tileName: `site:${drawing.worldId}`,
           triangles: slots.triangles,
           drawBatches: slots.drawn,
-          transferredBytes: options.servedBytes,
-          decodedTextureBytes: 0,
-          unavailableSurfaces: 0,
+          transferredBytes: options.servedBytes + (undress?.textureMetrics?.transferredBytes ?? 0),
+          decodedTextureBytes: undress?.textureMetrics?.decodedTextureBytes ?? 0,
+          unavailableSurfaces: undress?.textureMetrics?.unavailableSurfaces ?? 0,
           neighbours: Object.freeze([]),
           lookId: look.id,
           lookVersion: look.version,
@@ -162,6 +190,8 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         dispose(): void {
           if (disposed) return;
           disposed = true;
+          withdrawSeats?.();
+          stopMeasure?.();
           // The look's plane goes with the environment below; only what the canvas said is taken back here.
           if (edged && canvas?.dataset !== undefined) delete canvas.dataset['siteGroundBeyond'];
           if (said) {
@@ -180,4 +210,60 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       };
     },
   });
+}
+
+/** Draw the original admitted triangles; scene dressing never supplies navigation authority. */
+function terrainMount(drawing: TerrainSiteDrawing, options: SiteMountOptions): GeneratedSiteMount {
+  const look = options.look ?? TILE_LOOK_V1;
+  const dressed = drawing.profile === 'exulanica.site-drawing/v4';
+  const prepared = options.preparedDressing;
+  if (dressed && (prepared === undefined || prepared.dressing !== drawing.dressing)) throw new TypeError('The exact terrain dressing must be prepared before mounting.');
+  const readiness = options.dressingReadiness ?? createDressingReadiness();
+  const proof = (): TerrainOccupancyProof => typeof options.terrainOccupancy === 'function' ? options.terrainOccupancy() : options.terrainOccupancy ?? {status: 'unavailable'};
+  const navigationWorld = siteNavigationWorld(drawing, () => dressed && !readiness.read() ? {status: 'unavailable'} : proof());
+  return Object.freeze({drawing, dressingReadiness: readiness, kindLabel: 'Terrain', navigationWorld, start: siteStart(drawing, navigationWorld),
+    attach(host: GeneratedTileHost): GeneratedTileAttachment {
+      const environment = applyTileEnvironment(host.app, host.camera, look);
+      // An infinite presentation floor would obscure the bounded admitted surface.
+      if (environment.ground !== null) environment.ground.enabled = false;
+      const mesh = createHeightfieldMesh(host.app.graphicsDevice, drawing.terrain.geometry);
+      const material = new pc.StandardMaterial();
+      material.name = 'admitted-terrain'; material.diffuse.set(0.36, 0.43, 0.28); material.gloss = 0.15; material.update();
+      const entity = new pc.Entity(`terrain:${drawing.terrain.geometry.data.component_id}`);
+      entity.addComponent('render', {meshInstances: [new pc.MeshInstance(mesh, material)], castShadows: true, receiveShadows: true});
+      host.environmentRoot.addChild(entity);
+      const canvas = host.app.graphicsDevice.canvas as HTMLCanvasElement | undefined;
+      if (canvas?.dataset !== undefined) {
+        canvas.dataset['terrainGeometry'] = drawing.terrain.geometry.sha256;
+        canvas.dataset['terrainContact'] = drawing.terrain.sha256;
+      }
+      let disposed = false;
+      const frameCurrent = (): boolean => !disposed && terrainDressingFrameAvailable(host.environmentRoot) && proof().status === 'verified';
+      let dressing: TerrainDressingAttachment | null = null;
+      const generation = dressed ? readiness.begin(() => frameCurrent() && dressing?.current() === true) : null;
+      if (dressed) {
+        entity.enabled = false;
+        dressing = attachTerrainDressing(host.app, host.environmentRoot, prepared!, () => frameCurrent() && generation!.current());
+        void dressing.ready.then(() => {if (!disposed && generation!.current() && proof().status === 'verified') {generation!.ready(); entity.enabled = true;}}).catch(() => {generation!.dispose();});
+      }
+      const update = (): void => {
+        if (!dressed) return;
+        if (!frameCurrent() || !generation!.current() || dressing?.current() !== true) {generation!.dispose(); dressing?.dispose(); entity.enabled = false;}
+        if (canvas?.dataset !== undefined) canvas.dataset['terrainDressing'] = readiness.read() ? 'ready' : 'unavailable';
+      };
+      host.app.on('update', update);
+      const stopMeasure = options.measure ? measureSite(host.app, undefined, environment.residentBytes) : null;
+      return {get metrics() {return Object.freeze({tileName: `terrain:${drawing.worldId}`,
+        triangles: (drawing.terrain.geometry.data.east_mm.length - 1) * (drawing.terrain.geometry.data.south_mm.length - 1) * 2 + (prepared?.triangles ?? 0),
+        drawBatches: 1 + (prepared?.draws ?? 0), transferredBytes: options.servedBytes + (prepared?.transferredBytes ?? 0), decodedTextureBytes: dressing?.decodedTextureBytes ?? 0, unavailableSurfaces: dressed && !readiness.read() ? (prepared?.draws ?? 0) : 0,
+        neighbours: Object.freeze([]), lookId: look.id, lookVersion: look.version});},
+        sourceCurrent() {return dressed && !disposed && readiness.read() && generation?.current() === true;},
+        pickSource(origin: readonly [number, number, number], direction: readonly [number, number, number]) {
+          if (!dressed || disposed || !readiness.read() || !generation?.current()) return null;
+          return dressing?.pick(origin, direction) ?? null;
+        },
+        dispose() { if (disposed) return; disposed = true; generation?.dispose(); dressing?.dispose(); host.app.off('update', update); stopMeasure?.(); entity.destroy(); mesh.destroy(); material.destroy(); environment.dispose();
+          if (canvas?.dataset !== undefined) {delete canvas.dataset['terrainGeometry']; delete canvas.dataset['terrainContact']; delete canvas.dataset['terrainDressing'];}
+        }};
+    }});
 }

@@ -37,6 +37,7 @@ import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
 import { accessHeaders, type Credentials } from './config.js';
 import type { WorldStylePackBinding } from './world-style-api.js';
 import lookFamilyText from '../../../../assets/catalogs/world-kinds/look-family.v1.json?raw';
+import lookFamilyV2Text from '../../../../assets/catalogs/world-kinds/look-family.v2.json?raw';
 import townRolesText from '../../../../assets/style-packs/town-look-roles.v1.json?raw';
 import colourTableText from '../../../../assets/colour/srgb8-linear16.v1.json?raw';
 import settingRulesText from '../../../../assets/style-packs/settings/setting-rules.v1.json?raw';
@@ -78,6 +79,8 @@ export interface WorldLookChoice {
   readonly source: 'address' | 'world' | 'default' | 'redraw';
   /** For the workspace's own look: the library pack it is drawn on. */
   readonly ownBase?: OwnLookBase;
+  /** Read the manifest and its files through workspace authorization, including standalone packs. */
+  readonly own?: boolean;
   /** The world's own setting drawn over the pack (`exulanica.world-setting/v1`), as its appearance states it. */
   readonly setting?: unknown;
 }
@@ -98,8 +101,8 @@ export function worldLookChoice(search: string, bound: WorldStylePackBinding | n
   const setting = bound?.setting === undefined ? {} : { setting: bound.setting.document };
   if (bound !== null && bound.own !== undefined) {
     const base = bound.own.base;
-    if (bound.own.wearable && base !== null) {
-      return { packId: bound.packId, manifestSha256: bound.manifestSha256, source: 'world', ownBase: base, ...setting };
+    if (bound.own.wearable) {
+      return { packId: bound.packId, manifestSha256: bound.manifestSha256, source: 'world', own: true, ...(base === null ? {} : { ownBase: base }), ...setting };
     }
     if (base !== null) return { packId: base.packId, manifestSha256: base.manifestSha256, source: 'world', ...setting };
     return { packId: DEFAULT_WORLD_LOOK, manifestSha256: null, source: 'default' };
@@ -118,6 +121,8 @@ export interface EarlierStylePackVersion {
 
 /** One pack as the host lists it, at its current version. */
 export interface ListedStylePack {
+  readonly source?: 'library' | 'workspace';
+  readonly ownBase?: OwnLookBase | null;
   readonly pack_id: string;
   readonly version: number;
   readonly manifest_sha256: string;
@@ -182,8 +187,8 @@ export interface PreparedWorldLook {
   readonly setting: { readonly drawn: boolean; readonly reason: string | null } | null;
 }
 
-function lookFamilies(): ReadonlyMap<string, LookFamily> {
-  const catalog = JSON.parse(lookFamilyText) as {
+function lookFamilies(text: string = lookFamilyText): ReadonlyMap<string, LookFamily> {
+  const catalog = JSON.parse(text) as {
     entries: { key: string; fit: LookFamily['fit']; dressing: LookFamily['dressing']; fill_minimum_permille: number; fill_maximum_permille: number }[];
   };
   return new Map(catalog.entries.map((entry) => [entry.key, {
@@ -243,6 +248,53 @@ export async function listedStylePacks(access: Credentials): Promise<readonly Li
   return list.packs as readonly ListedStylePack[];
 }
 
+/** Wearable workspace versions, whose exact admitted manifests supply their presentation. */
+export async function listedWorkspaceStylePacks(access: Credentials): Promise<readonly ListedStylePack[]> {
+  const list = await (await hostGet(access, '/world/style-packs', 'The workspace look list')).json() as {
+    profile?: unknown; workspace_packs?: readonly {
+      source?: string; ready?: boolean; withdrawn?: boolean; pack_id: string; version: number;
+      manifest_sha256: string; base?: { source: string; pack_id: string; version: number; manifest_sha256: string } | null;
+    }[];
+  };
+  if (list.profile !== STYLE_PACK_LIST_PROFILE) throw new Error('The workspace look list has an unknown profile');
+  if (list.workspace_packs === undefined) return [];
+  if (!Array.isArray(list.workspace_packs)) throw new Error('The workspace look list is not a list');
+  const { canonicalJson } = await import('@exulanica/atlas-core');
+  const versions = await Promise.all(list.workspace_packs.filter(entry => entry.source === 'workspace'
+    && entry.ready === true && entry.withdrawn === false
+    && (entry.base == null || entry.base.source === 'library')).map(async entry => {
+    try {
+      const manifest = await ownLookManifest(access, entry.manifest_sha256, entry.pack_id) as {
+        pack_id: string; version: number; title: string; description: string; authors: readonly string[];
+        licence: ListedStylePack['licence']; preview?: { file: string } | null;
+        files: readonly { path: string; sha256: string; media_type: string }[];
+      };
+      if (manifest.pack_id !== entry.pack_id || manifest.version !== entry.version
+        || hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalJson(manifest)))) !== entry.manifest_sha256) return null;
+      const preview = manifest.preview == null ? undefined : manifest.files.find(file => file.path === manifest.preview!.file);
+      return {
+        source: 'workspace', pack_id: entry.pack_id, version: entry.version, manifest_sha256: entry.manifest_sha256,
+        title: manifest.title, description: manifest.description, authors: manifest.authors, licence: manifest.licence,
+        preview_sha256: preview?.sha256 ?? null, preview_media_type: preview?.media_type ?? null,
+        ownBase: entry.base == null ? null : { packId: entry.base.pack_id, version: entry.base.version, manifestSha256: entry.base.manifest_sha256 },
+      } satisfies ListedStylePack;
+    } catch { return null; } // A stale or withdrawn version cannot become a selectable fallback.
+  }));
+  const grouped = new Map<string, ListedStylePack[]>();
+  for (const version of versions) {
+    if (version === null) continue;
+    const held = grouped.get(version.pack_id) ?? [];
+    held.push(version); grouped.set(version.pack_id, held);
+  }
+  return [...grouped.values()].map(held => {
+    held.sort((a, b) => b.version - a.version || a.manifest_sha256.localeCompare(b.manifest_sha256));
+    return { ...held[0]!, earlier_versions: held.slice(1).reverse().map(version => ({
+      version: version.version, manifest_sha256: version.manifest_sha256,
+      preview_sha256: version.preview_sha256 ?? null, preview_media_type: version.preview_media_type ?? null,
+    })) };
+  });
+}
+
 /** The bytes the host serves for `sha256`, held to that digest. */
 export async function stylePackContent(access: Credentials, sha256: string, what: string): Promise<Uint8Array<ArrayBuffer>> {
   if (!/^[0-9a-f]{64}$/.test(sha256)) throw new Error(`${what} is not named by a SHA-256`);
@@ -296,27 +348,29 @@ export async function prepareWorldLook(
   manifestSha256: string | null = null,
   ownBase: OwnLookBase | null = null,
   setting: unknown = null,
+  ownPack: boolean = false,
 ): Promise<PreparedWorldLook> {
+  const isOwn = ownPack || ownBase !== null;
   let digest = manifestSha256;
   if (digest === null) {
-    if (ownBase !== null) throw new Error(`${packId} is the workspace's own and is named by its digest`);
+    if (isOwn) throw new Error(`${packId} is the workspace's own and is named by its digest`);
     const listed = (await listedStylePacks(access)).find((entry) => entry.pack_id === packId);
     if (listed === undefined) throw new Error(`The host serves no style pack ${packId}`);
     digest = listed.manifest_sha256;
   }
-  const [manifest, baseManifest] = await Promise.all(ownBase === null
-    ? [stylePackContent(access, digest, `${packId} manifest`).then((bytes) => JSON.parse(new TextDecoder().decode(bytes)) as unknown), Promise.resolve(null)]
-    : [ownLookManifest(access, digest, packId), stylePackContent(access, ownBase.manifestSha256, `${ownBase.packId} manifest`)
-      .then((bytes) => JSON.parse(new TextDecoder().decode(bytes)) as unknown)]);
+  const [manifest, baseManifest] = await Promise.all([
+    isOwn ? ownLookManifest(access, digest, packId) : stylePackContent(access, digest, `${packId} manifest`).then(bytes => JSON.parse(new TextDecoder().decode(bytes)) as unknown),
+    ownBase === null ? Promise.resolve(null) : stylePackContent(access, ownBase.manifestSha256, `${ownBase.packId} manifest`).then(bytes => JSON.parse(new TextDecoder().decode(bytes)) as unknown),
+  ]);
   const [style, { attachTileInk }, {
-    canonicalJson, parseTextureSetManifest, readStylePackManifest, resolveStylePack, applyWorldSetting, readWorldSetting, readWorldSettingRules,
+    canonicalJson, parseTextureSetManifest, readStylePackManifest, resolveStylePack, stylePackFamilies, applyWorldSetting, readWorldSetting, readWorldSettingRules,
   }] = await Promise.all([
     import('@exulanica/atlas-react/style-pack'),
     import('@exulanica/atlas-react/generated-tile'),
     import('@exulanica/atlas-core'),
   ]);
   const { fetchPackPieces, renderLookOfPreset } = style;
-  if (ownBase !== null) {
+  if (isOwn) {
     // The workspace states its own manifest as JSON; its canonical bytes are held to the digest the
     // appearance names, as the library's manifest bytes are.
     const bytes = new TextEncoder().encode(canonicalJson(manifest));
@@ -324,13 +378,16 @@ export async function prepareWorldLook(
       throw new Error(`${packId}'s manifest is not the one its digest names`);
     }
   }
-  const families = lookFamilies();
+  const legacyFamilies = lookFamilies();
+  const familyCatalogs = new Map(await Promise.all(([ [1, lookFamilyText], [2, lookFamilyV2Text] ] as const).map(async ([version, text]) => [version, { sha256: hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))), families: lookFamilies(text) }] as const)));
   const textureSets = new Set(parseTextureSetManifest(textureManifest).byId.keys());
-  const read = readStylePackManifest(manifest as Parameters<typeof readStylePackManifest>[0], { families, textureSets });
+  const context = { families: legacyFamilies, textureSets, familyCatalogs };
+  const read = readStylePackManifest(manifest as Parameters<typeof readStylePackManifest>[0], context);
+  const families = stylePackFamilies(read, context);
   if (read.pack_id !== packId) throw new Error(`The manifest served for ${packId} names ${read.pack_id}`);
   const chain = [read];
   if (ownBase !== null) {
-    const base = readStylePackManifest(baseManifest as Parameters<typeof readStylePackManifest>[0], { families, textureSets });
+    const base = readStylePackManifest(baseManifest as Parameters<typeof readStylePackManifest>[0], context);
     if (base.pack_id !== ownBase.packId || read.base?.manifest_sha256 !== ownBase.manifestSha256) {
       throw new Error(`${packId} is not drawn on ${ownBase.packId} version ${String(ownBase.version)}`);
     }
@@ -342,7 +399,7 @@ export async function prepareWorldLook(
   for (let above = chain[chain.length - 1]!; above.base !== null; above = chain[chain.length - 1]!) {
     if (chain.length === 4) throw new Error(`${packId} is drawn on more packs than a look resolves through`);
     const bytes = await stylePackContent(access, above.base.manifest_sha256, `${above.base.pack_id} manifest`);
-    chain.push(readStylePackManifest(JSON.parse(new TextDecoder().decode(bytes)) as Parameters<typeof readStylePackManifest>[0], { families, textureSets }));
+    chain.push(readStylePackManifest(JSON.parse(new TextDecoder().decode(bytes)) as Parameters<typeof readStylePackManifest>[0], context));
   }
   let pack = resolveStylePack(chain);
   let drawnSetting: PreparedWorldLook['setting'] = null;
@@ -357,7 +414,7 @@ export async function prepareWorldLook(
   }
   const look = renderLookOfPreset(pack.light.presets[pack.light.default_preset]!, pack.shading, pack.edge);
   const table = (JSON.parse(colourTableText) as { values: number[] }).values;
-  const own = new Set(ownBase === null ? [] : read.files.map((file) => file.sha256));
+  const own = new Set(isOwn ? read.files.map((file) => file.sha256) : []);
   const pieces = await fetchPackPieces(pack, Object.keys(pack.modules), table, (file) => (
     own.has(file.sha256)
       ? ownLookContent(access, digest, file.sha256, `${packId} ${file.path}`)

@@ -50,7 +50,7 @@ export { BODY_MOTION_PROFILE, readBodyMotion } from './body-motion.js';
 export type { JointPose, MotionInput, Pose, Quat } from './motion.js';
 export { DUTY, bodyTravel, gaitOf, solvePose } from './motion.js';
 export { PickRing, rayMeets, ringRadius } from './ring.js';
-export type { DrawnSociety, DrawnThing, PlacedKind, PlacedThingRecord, SocietyPoint, ThingLayerOptions, ThingMiss, ThingPick } from './thing-layer.js';
+export type { DrawnSociety, DrawnThing, PlacedKind, PlacedThingRecord, PlacedThingSupportReference, SocietyPoint, ThingLayerOptions, ThingMiss, ThingPick } from './thing-layer.js';
 export { DESTINATION_RING_RADIUS, PLAYED_RING_RADIUS, ThingLayer } from './thing-layer.js';
 export type { FigureMade, FigureMakerOptions } from './figure-maker.js';
 export { ThingFigureMaker } from './figure-maker.js';

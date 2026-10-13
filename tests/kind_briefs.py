@@ -204,3 +204,43 @@ def held_to_form(brief: Mapping[str, Any]) -> dict[str, Any]:
     from exulanica.selection.kind_brief import brief_form
 
     return brief_form().model_validate(brief).model_dump(mode="json")  # type: ignore[no-any-return]
+
+
+def current_farm_form(*required_parts: str) -> dict[str, Any]:
+    """A current drafter reply binding explicit description phrases to the farm fixture's parts.
+
+    Older schema tests keep ``held_to_form``. Callers name phrases present in their description;
+    this helper does not invent requirements from arbitrary prose or from saved personal names.
+    """
+    from exulanica.selection.kind_brief import brief_form
+    from exulanica.selection.kind_drafting import kind_drafting_prompt
+    from exulanica.world.kinds.catalogs import load_kind_catalogs
+
+    document = fixture_kind("farm")
+    parts = {part["label"]: part for part in document["parts"]}
+    brief = brief_of(document)
+    brief["requirements"] = [
+        {
+            "words": label,
+            "status": "fulfilled",
+            "omission": "",
+            "form": parts[label]["form"],
+            "look": "",
+            "shape_class": "",
+            "roof_form": "",
+            "minimum_count": 1,
+            "roles": [],
+            "part_labels": [label],
+        }
+        for label in required_parts
+    ]
+    prompt = kind_drafting_prompt()
+    return (
+        brief_form(
+            load_kind_catalogs(bounds_version=2 if prompt.version >= 7 else 1),
+            fixture_vocabulary=prompt.version >= 6,
+            requirement_contract=prompt.version >= 7,
+        )
+        .model_validate(brief)
+        .model_dump(mode="json")
+    )  # type: ignore[no-any-return]

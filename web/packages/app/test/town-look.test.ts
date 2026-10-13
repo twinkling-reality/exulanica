@@ -20,6 +20,7 @@ const listed = vi.hoisted(() => ({ packs: [] as ListedStylePack[] }));
 vi.mock('../src/world-look.js', async (original) => ({
   ...await original<typeof import('../src/world-look.js')>(),
   listedStylePacks: async () => listed.packs,
+  listedWorkspaceStylePacks: async () => [],
   // The library also reads the host's named setting parts; this file is about the look, so the
   // host lists none. Left unstubbed, that read went to the real network for exulanica.test.
   listedSettings: async () => null,
@@ -470,5 +471,56 @@ describe('the look of a town drafted from words', () => {
     expect(page.row().title).toBe(TOON.title);
     expect(page.host.querySelector<HTMLInputElement>('[data-parameter="block_length_mm"]')!.value).toBe('100000');
     expect(page.host.querySelector<HTMLButtonElement>('.world-recipes-make')!.disabled).toBe(false);
+  });
+});
+
+describe('a look requested by a public world link', () => {
+  const access: Credentials = { baseUrl: 'https://exulanica.test', token: 'look-token' };
+  const initial = { packId: TOON.pack_id, version: TOON.version, manifestSha256: TOON.manifest_sha256 };
+  const host = (): HTMLElement => {
+    const node = document.createElement('div');
+    document.body.replaceChildren(node);
+    return node;
+  };
+
+  it('retains an earlier served version through creation and later word drafts', async () => {
+    listed.packs = listed.packs.map(p => p.pack_id === TOON.pack_id ? {
+      ...p, version: p.version + 1, manifest_sha256: 'f'.repeat(64),
+      earlier_versions: [{ version: initial.version, manifest_sha256: initial.manifestSha256, preview_sha256: null, preview_media_type: null }],
+    } : p);
+    const container = host();
+    const library = await readLookLibrary(access);
+    const look = buildTownLook({ library: Promise.resolve(library), host: container, initial });
+    container.append(look.row);
+    await look.ready;
+    expect(look.binding()).toEqual(initial);
+    expect(look.row.textContent).toContain(`Requested version ${initial.version}`);
+    expect(look.drafted.take({ state: 'none' } as Parameters<typeof look.drafted.take>[0])).toBe(false);
+    expect(look.binding()).toEqual(initial);
+  });
+
+  it('refuses an unavailable requested digest until a person explicitly chooses a replacement', async () => {
+    const container = host();
+    const library = await readLookLibrary(access);
+    const look = buildTownLook({ library: Promise.resolve(library), host: container,
+      initial: { ...initial, manifestSha256: 'f'.repeat(64) } });
+    container.append(look.row);
+    await look.ready;
+    expect(() => look.binding()).toThrow('not available on this installation');
+    container.querySelector<HTMLButtonElement>('[data-action="look.change"]')!.click();
+    container.querySelector<HTMLButtonElement>(`.look-sheet-card[data-pack-id="${FINISHED.pack_id}"]`)!.click();
+    container.querySelector<HTMLButtonElement>('[data-action="look.use"]')!.click();
+    await vi.waitFor(() => expect(container.querySelector('section.look-sheet')).toBeNull());
+    expect(look.binding()).toEqual(library.binding(FINISHED.pack_id));
+  });
+
+  it('blocks creation while the requested version is unverified or its library cannot be read', async () => {
+    let reject!: (error: Error) => void;
+    const library = new Promise<Awaited<ReturnType<typeof readLookLibrary>>>((_resolve, fail) => { reject = fail; });
+    const look = buildTownLook({ library, host: host(), initial });
+    expect(() => look.binding()).toThrow('Checking');
+    reject(new Error('offline'));
+    await look.ready;
+    expect(() => look.binding()).toThrow('could not be checked');
   });
 });

@@ -442,6 +442,8 @@ class DecisionRole:
     #: The terms an engine hosting the role states for its own requests, by engine; an engine
     #: stating none is asked under the role's own terms.
     engine_terms: Mapping[str, RoleTerms] = field(default_factory=dict)
+    #: Earlier published prompts remain authoritative for already reserved requests.
+    historical_terms: Mapping[str, RoleTerms] = field(default_factory=dict, repr=False)
     _contracts: dict[tuple[tuple[str, int], ...], DecisionContract] = field(
         default_factory=dict, compare=False, hash=False, repr=False
     )
@@ -474,11 +476,14 @@ class DecisionRole:
         return (self.own_terms, *(self.engine_terms[e] for e in sorted(self.engine_terms)))
 
     def terms_with_prompt(self, prompt_version: object) -> RoleTerms | None:
-        """The terms of this registry whose prompt is ``prompt_version``, the one a request
-        records; None for a prompt no terms of it state now, one a request was asked under
-        before."""
+        """The recorded prompt's terms, including published predecessors of this role.
+
+        A pending request keeps its original line rules when a newer registry becomes current.
+        Unknown prompts still return None; no current rule is inferred for an older request.
+        """
         return next(
-            (terms for terms in self.every_terms() if terms.prompt_version == prompt_version), None
+            (terms for terms in self.every_terms() if terms.prompt_version == prompt_version),
+            self.historical_terms.get(prompt_version) if isinstance(prompt_version, str) else None,
         )
 
     @property
@@ -854,6 +859,38 @@ def _adapter(entry_key: str, name: str, package: str) -> ModuleType:
     return module
 
 
+def _historical_terms(directory: Path, before_version: int) -> dict[str, dict[str, RoleTerms]]:
+    """Read old prompt declarations without importing old adapters or activating old roles."""
+    found: dict[str, dict[str, RoleTerms]] = {}
+    paths = sorted(
+        directory.glob(f"{REGISTRY_CATALOG}.v*.json"),
+        key=lambda path: split_versioned_name(path)[1],
+    )
+    for path in paths:
+        _stem, version = split_versioned_name(path)
+        if version >= before_version:
+            continue
+        catalog = load_catalog(path, _registry_schema(version))
+        for entry in catalog.entries:
+            values: dict[str, Any] = dict(entry.values)
+            prompts = found.setdefault(entry.key, {})
+            for stated in (values, *values.get("engine_terms", ())):
+                terms = dict(stated)
+                prompt = str(terms["prompt_version"])
+                prompts[prompt] = RoleTerms(
+                    versions={
+                        str(values["action_catalog"]): int(terms["action_version"]),
+                        str(values["policy_catalog"]): int(terms["policy_version"]),
+                    },
+                    prompt_version=prompt,
+                    instruction=str(terms["instruction"]),
+                    choice_description=str(terms["choice_description"]),
+                    not_offered=str(terms["not_offered"]),
+                    line_rules=frozenset(terms.get("line_rules", ())),
+                )
+    return found
+
+
 def load_decision_roles(
     directory: Path = REGISTRY_DIRECTORY, *, adapters: str = ADAPTER_PACKAGE
 ) -> RoleRegistry:
@@ -865,6 +902,7 @@ def load_decision_roles(
     path = _newest(directory)
     _stem, version = split_versioned_name(path)
     catalog: Catalog = load_catalog(path, _registry_schema(version))
+    historical = _historical_terms(directory, version)
     roles: dict[str, DecisionRole] = {}
     for entry in catalog.entries:
         values = dict(entry.values)
@@ -921,6 +959,7 @@ def load_decision_roles(
             not_offered=str(values["not_offered"]),
             adapter=adapter,  # type: ignore[arg-type]
             engine_terms=engine_terms,
+            historical_terms=historical.get(entry.key, {}),
         )
     for name in PROFILE_PATTERNS:
         stated = [getattr(role, name) for role in roles.values()]

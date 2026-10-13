@@ -7,10 +7,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import type { ThingLibrary } from '@exulanica/atlas-react/things';
-import { mountThingCard } from '../src/composition/thing-card-mount.js';
+import { mountThingCard, placedThingCard } from '../src/composition/thing-card-mount.js';
 import { creditOf, kindCameWords } from '../src/composition/thing-origin-words.js';
 import { THING_PICK_EVENT, type ThingPickDetail } from '../src/composition/things.js';
-import { readOrigin, readThingLooks, type LookReference } from '../src/thing-card-api.js';
+import { readKindFacts, readOrigin, readThingLooks, type LookReference } from '../src/thing-card-api.js';
 import type { SelectedThing } from '../src/composition/environment-selection.js';
 
 /** The repository, from the web workspace the suite runs in. */
@@ -69,6 +69,11 @@ const rowText = (root: HTMLElement, heading: string) =>
   [...root.querySelectorAll('.thing-card-row')].find((row) => row.querySelector('h4')?.textContent === heading)?.textContent ?? null;
 
 describe('the thing card for a placed thing', () => {
+  it('does not call an authored workspace kind shipped, even when its author is the project', () => {
+    const selected = placed(WELL, 'workspace-well');
+    const card = placedThingCard({ ...selected, placed: { ...selected.placed, kind: { source: 'workspace', sha256: 'a'.repeat(64) } } }, readKindFacts(WELL), null);
+    expect(card.cameFrom).toBe('You placed it here. A well is an authored kind available in this workspace.');
+  });
   it('says what it is, that it decides nothing, how it looks and where it came from', async () => {
     const { card, root } = mount();
     expect(card.view.showThing!(placed(WELL, 'well-1'))).toBe(true);
@@ -176,7 +181,10 @@ describe('origin words', () => {
     lineage: {}, distribution: 'public', ...fields,
   });
   it('say where a kind came from by its origin class alone', () => {
-    expect(kindCameWords('lantern', origin({}))).toBe('A lantern is one of Exulanica\'s own kinds.');
+    expect(kindCameWords('lantern', origin({}))).toBe('A lantern is an authored kind.');
+    expect(kindCameWords('lantern', origin({}), null, 'shipped')).toBe('A lantern is one of Exulanica\'s own kinds.');
+    expect(kindCameWords('lantern', origin({}), null, 'workspace')).toBe('A lantern is an authored kind available in this workspace.');
+    expect(kindCameWords('lantern', origin({ by: { kind: 'account' } }), null, 'workspace')).toBe('A lantern is an authored kind available in this workspace.');
     expect(kindCameWords('dragon', origin({ class: 'drafted', by: { kind: 'model' } }))).toBe('A dragon is a kind a model drafted from words.');
     // A drafted kind's origin names the model that drafted it (the creature drafter's provenance):
     // the card says which open model, by the name the server reads for it where it gave one.

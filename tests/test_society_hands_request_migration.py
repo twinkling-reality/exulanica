@@ -20,6 +20,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import uuid
+from contextlib import ExitStack
 
 import pytest
 from exulanica.api.app import create_app
@@ -39,6 +40,7 @@ from psycopg.conninfo import make_conninfo
 import pg_harness
 from society_seed_support import choose_society_seed
 from tests_support_api import EVERY_PERMISSION, scratch_database
+from world_support import historical_world_fixture_schema
 
 pytestmark = pytest.mark.postgres
 
@@ -167,7 +169,7 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
             "migrations",
             lambda: iter(m for m in everything if m.version < hands.version),
         )
-        with pg_harness.migrated_schema() as (_psycopg, admin):
+        with pg_harness.migrated_schema() as (_psycopg, admin), ExitStack() as fixture_schema:
             scratch = admin.execute("select current_schema()").fetchone()[0]
             # Whether a placed thing names a shipped kind or its workspace's own (0188), and the
             # kind erasures (0172), which the current version read names when it asks whether a
@@ -186,6 +188,7 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
             base = env_get("TEST_DATABASE_URL")
             assert base is not None
             database = Database(url=make_conninfo(base, options=f"-csearch_path={scratch},public"))
+            fixture_schema.enter_context(historical_world_fixture_schema(admin, support=True))
             with database.session(workspace) as connection:
                 _snapshot, _authority, version_id = create_starter_authorities(
                     connection,
@@ -263,6 +266,7 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
                 assert _checks(admin) >= OLD_CHECKS and not _checks(admin) & NEW_CHECKS
                 assert world.replayed() is True
 
+                fixture_schema.close()
                 admin.execute(hands.sql)
                 admin.commit()
 
@@ -272,7 +276,8 @@ def test_the_hands_request_migration_holds_every_stored_request_and_binds_both_p
                     "select bool_and(convalidated) from pg_constraint where conname = any(%s)",
                     (sorted(NEW_CHECKS),),
                 ).fetchone() == (True,)
-                assert world.replayed() is True
+                with historical_world_fixture_schema(admin, support=True):
+                    assert world.replayed() is True
                 admin.execute("drop view thing_erasure")
                 admin.execute("alter table world_alternate_thing drop column kind_source")
                 for later in everything:

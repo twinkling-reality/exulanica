@@ -722,14 +722,17 @@ def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
     own, things = person.terms(), person.terms(THINGS)
     assert own == person.terms("exulanica-society/v2") == person.terms("exulanica-society/v5")
     assert own.versions == {"society-decision-action": 2, "society-decision-policy": 2}
-    assert things.versions == {"society-decision-action": 5, "society-decision-policy": 5}
+    assert things.versions == {"society-decision-action": 8, "society-decision-policy": 8}
     assert (own.prompt_version, things.prompt_version) == (
         "society-person-choice/v1",
-        "society-person-choice/v5",
+        "society-person-choice/v6",
     )
     contract = person.contract(things.versions)
     assert {"carry_on", "say_to", "say_all", "leave"} <= set(contract.words)
     assert {"pick_up", "put_down", "give", "take"} <= set(contract.words)
+    assert {"follow", "stop_following"} <= set(contract.words)
+    assert "point" not in contract.words
+    assert {"point", "follow", "stop_following"} <= set(play_contract(person, THINGS).words)
     assert contract.value("line_characters_maximum") == 200
     # The role's own contract keeps exactly its keys: the line bounds are the third policy's and
     # the bound on hands options the fourth's.

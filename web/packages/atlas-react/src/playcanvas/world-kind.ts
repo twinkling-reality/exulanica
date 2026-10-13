@@ -60,8 +60,11 @@ export interface WorldKind {
 
 /** The options the kind is decided from: which ground. */
 export interface WorldKindOptions {
+  /** Source-independent authored ground. It is a region, never a capture-backed Atlas island. */
   readonly authoredRegion?: AuthoredRegion;
+  /** Admitted owned geography. One semantic document drives rendering and collision. */
   readonly ownedDistrict?: OwnedDistrictGround;
+  /** A generated tile supplies its ground, collision, opening stance and environment drawing. */
   readonly generatedTile?: GeneratedTileMount;
   /**
    * A world made from a world kind: the site supplies the ground, the collision and the opening
@@ -110,6 +113,18 @@ export function describeWorldKind(options: WorldKindOptions): WorldKind {
 export function groundMount(kind: WorldKind): GeneratedTileMount | null {
   return kind.ground.form === 'generated-tile' ? kind.ground.tile
     : kind.ground.form === 'generated-site' ? kind.ground.site : null;
+}
+
+/** A saved generated region needs a mounted ground and a frame distinct from scene regions. */
+export function validateGeneratedObjectRegion(
+  kind: WorldKind,
+  scene: AtlasScene,
+  regionId: IslandId | undefined,
+): void {
+  if (regionId !== undefined && (groundMount(kind) === null
+    || scene.islands.some(island => island.islandId === regionId))) {
+    throw new TypeError('A generated object region requires its own mounted ground and an unambiguous frame');
+  }
 }
 
 /** The authored starter region a world stands on, or null when it stands on anything else. */

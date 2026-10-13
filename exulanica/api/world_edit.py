@@ -173,7 +173,25 @@ def object_write_repository(
     world_id: WorldId,
 ) -> WorldObjectRepository:
     observer = getattr(request.app.state, "society_authored_edit", None)
+    _prepare_society(connection, session, services, world_id, request.path_params.get("version_id"))
     return writing_repository(connection, session, services, observer, world_id)
+
+
+def _prepare_society(
+    connection: Any, session: Any, services: Services, world_id: str, version_id: object
+) -> None:
+    """Before an authored edit's transaction: what the version's society needs made ahead to
+    compose its next input, where it needs anything (a site world's place, for a society of
+    things: :meth:`~exulanica.api.society_runtime.SocietyRuntime.prepare_authored_edit`). An edit
+    of a route that names no version, or a version that is no identity, prepares nothing."""
+    runtime = services.society_runtime
+    if runtime is None or not isinstance(version_id, str):
+        return
+    try:
+        version = uuid.UUID(version_id)
+    except ValueError:
+        return
+    runtime.prepare_authored_edit(connection, session, world_id, version)
 
 
 def writing_repository(

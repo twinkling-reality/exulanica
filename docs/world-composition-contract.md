@@ -22,6 +22,7 @@ import, personal media and a fantasy variation; it is not a prerequisite for mak
 - [Existing implementation](#existing-implementation)
 - [Acceptance for a complete composition journey](#acceptance-for-a-complete-composition-journey)
 - [Composition preview and apply](#composition-preview-and-apply)
+- [Canonical support and connectivity](#canonical-support-and-connectivity)
 
 ## Purpose and authority
 
@@ -149,6 +150,10 @@ works.
 
 ## Unified queries and filters
 
+[Declared-colour queries](world-objects-contract.md#declared-colour-queries) inspect authorized
+current thing appearances through typed world inventory identities. These authored rendering facts
+are separate from CONTENT selection and do not expand its factual evidence or citation scope.
+
 `Intent.CONTENT` is the typed Selection for place-related content. It uses the
 existing Selection mechanism, authorized read projections and Companion planning
 path. It does not add a parallel Earth-only search or let a model write SQL.
@@ -177,7 +182,7 @@ the named place entity and does not traverse the canonical place.
 
 Those kinds are the literals [executor.py](../exulanica/selection/executor.py)
 selects. Inhabitant and event rows appear for a society whose engine takes no input
-(`takes_inputs: false` in `exulanica/world/society-engines.v4.json`), or whose input history
+(`takes_inputs: false` in `exulanica/world/society-engines.v5.json`), or whose input history
 the host authorizes for the named world. That projection is not a living-world loop.
 
 An undone environment addition is absent. A revoked or never-confirmed bridge
@@ -463,3 +468,165 @@ instance is region-local to that snapshot; neither reads the appearance plane. A
 `style_version_id` is no longer the live style composes exactly as `POST .../objects` accepts it.
 Attachment refusal is the `CompatibilityIntent.COMPOSE` classification of the typed attachment
 reference.
+
+## Canonical support and connectivity
+
+The support-surface reader reads
+`exulanica.support-network/v1`: bounded horizontal support rectangles and solid volumes in integer
+millimetres, nodes qualified by surface identity, explicit walking or small-step connections,
+an actor's radius/height/step limits, a source binding and a canonical digest. A node's whole
+footprint and headroom must fit; every connection's swept footprint must have continuous support
+and avoid declared solids. The circular actor footprint is conservatively checked through its
+enclosing square. Walking edges stay on one surface. A step explicitly joins two surfaces and
+cannot exceed the actor's limit or the existing society-place limit of 180 mm. Axis-aligned
+connections, horizontal decks and small steps are supported; ramps, lifts and transit are not.
+
+Queries require a surface identity. Overlapping plan positions at different heights do not create
+adjacency or select a floor. `support_at` checks a pose on one surface; `motion_on_surface` checks
+its swept clearance; `connection_at` resolves a pose within a declared connection, including a
+footprint straddling a small step. Its transverse portal is bounded by the supports' shared width.
+The consumer retains its active surface and connection rather than snapping to a highest or
+nearest visual mesh.
+
+The support-place projection maps the same admitted network to
+the existing `exulanica.society-place/v2` and `exulanica.support-adapter/v1`. The society receives
+actual support heights and explicit edges; the adapter retains node-to-surface bindings that the
+place profile cannot carry. Destinations and standing spots use the existing routine/place
+schemas and must be reachable from the declared entry. No destination, activity or connection is
+inferred from a rendered crowd or an asset name.
+
+Site-kind creation accepts an optional `support` declaration with profile
+`exulanica.support-authoring/v1`: network identity, actor limits, additional surfaces, nodes,
+connections, normalized destinations and standing spots. The site support compiler
+adds the actual ground and source entry, derives wall-opening, lintel, roof, fixture and exclusion
+volumes from the generated records and drawing, and binds their canonical geometry digest. The
+caller cannot supply source geometry or omit its solids. The combined place preserves source
+activities and refuses a declaration that removes their support or reachability. Existing source
+bench seats retain their admitted human posture semantics while every other solid and added
+support ceiling remains authoritative; this does not validate arbitrary seated body contact.
+
+Explicit support selects site-plan composer version 2 and `exulanica.site-drawing/v2`. The ordinary
+saved-world path persists its declaration, network and place digest; replay regenerates source
+geometry and requires the entire binding to match. The drawing carries the same support adapter,
+the combined node-to-surface bindings and its entry node/surface. Calls without support retain
+composer version 1 and drawing version 1. Published historical receipts keep their interpretation.
+No support declaration is accepted for a town kind.
+
+The attachment supports horizontal decks and bounded small steps. Water and closed-zone exclusions
+remain blocking volumes; bridges over them, arbitrary ramps, lifts, transit and a full vertical
+city are unsupported. A declared actor envelope must match the actual consumer before traversal.
+The source binding covers generated site records. Explicit passive rigid thing placement uses
+the [support-bound placement authority](world-objects-contract.md#explicit-support-bound-placement)
+to pin a surface and check current declared-volume clearance. General authored mesh transforms
+retain their separate contract; placement does not add an elevated activity or traversal host.
+The browser person consumer reads drawing version 2 through
+the support navigation reader, using the same
+sealed network, explicit connections and conservative footprint/headroom checks. It binds only
+the 340 mm radius, 1800 mm height person actor; a different declared envelope is refused. Added
+horizontal supports are drawn at their exact top height and rectangle in the existing site dresser,
+without cosmetic border expansion. Version 1 retains its level floor and polygon blockers.
+
+Camera movement carries the network digest, active surface and straddling connection. Sampling is
+pure; only an accepted complete swept move commits a new pose and support state. A collision-clipped
+move is checked again from the original state. Last-safe recovery retains its matching surface and
+connection. A ground-view reset uses an explicit admitted state or the declared entry, requires the
+matching height, and refuses stale or unsupported poses. Reopening uses the saved arrival and entry
+surface; runtime camera state is not a newly persisted world edit.
+
+Unqualified path and placement queries use the declared entry surface rather than selecting a
+higher floor. Explicit support-bound placement uses its named source surface. Inhabitant rendering
+and movement at projected support heights still require separate end-to-end verification; this
+person consumer does not connect a creature's locomotion host or establish a vertical city, ramps,
+lifts or transit.
+
+## Heightfield geometry and contact
+
+The pure `exulanica.heightfield-geometry/v1` reader admits a bounded rectangular sheet in
+region-local east/up/south integer millimetres, with strictly increasing east/south axes,
+row-major heights and a fixed triangle diagonal. Its digest binds the coordinates, component
+identity and stated provenance. Point queries return an exact rational elevation and integer
+normal, with numeric triangle ordering resolving shared-edge ties. Provenance fields describe
+the submitted source; their presence does not grant access to another source or establish rights
+to an imported asset.
+
+`exulanica.heightfield-contact/v1` binds that geometry and declares conservative obstruction
+boxes or explicitly unknown obstructions. Its person policy covers a 680 mm square footprint
+and 1800 mm height, dry terrain at or above 350 mm and a bounded slope. Movement clips the entire
+convex hull of both endpoint footprints against every touching terrain triangle. Exact rational
+predicates check coverage, dry height and slope; clearance uses the global swept floor minimum
+through global maximum plus actor height wherever an obstruction overlaps horizontally.
+Closed tangency blocks. This can reject usable space, but a low adjacent triangle cannot shorten
+the moving body's headroom envelope. Unknown obstruction geometry and excessive work return
+unavailable, never clear. A passive-patch query additionally requires one exact integer elevation
+over its complete square footprint.
+
+Python and browser BigInt consumers share these predicates and wire identities. The mesh bridge
+converts admitted millimetres to floating-point renderer metres, retains the fixed topology and
+maps original triangle ordinals back to component/source identity. Rendering precision does not
+replace exact contact predicates. These pure contracts do not establish complete current-world
+occupancy, a society activity projection, articulated body support or permission to edit a
+source. Those responsibilities require explicit integration with their existing authorities.
+
+Terrain authoring uses `POST /worlds/generated/terrain` with `world.write`. The closed request
+contains a title, an `exulanica.terrain-authoring/v1` or `/v2` document and an optional admitted
+style pack. Version 1 contains bare terrain; version 2 adds immutable reviewed-component dressing.
+The authoring document binds geometry/contact digests, an entry with clear stationary contact,
+its facing, bounds and explicit capabilities. This creator uses east `0..width` and south
+`-depth..0`; it refuses incompatible coordinates rather than translating them. It stores the
+exact source and rational arrival in a site-plan version 3 (authoring 1) or version 4 (authoring 2)
+receipt through the ordinary atomic
+generated-world registration, snapshot, authored version and saved-entry path. Only the snapshot's
+integer arrival height uses the shared ties-toward-zero quantizer. Drawing versions 3 and 4 preserve
+the corresponding exact source; old receipt and drawing bytes remain reproducible. The saved entry carries `generated_terrain`, with no synthetic world kind, declared
+flat floor or society engine. Society projection is explicitly unavailable.
+
+Dressed authoring binds a canonical `exulanica.terrain-dressing/v1` document and its digest.
+Each sorted, unique instance names a currently reviewed `component` asset key and exact GLB digest,
+an integer millimetre position, an axis-aligned quarter turn and positive uniform scale from
+100 through 4000 per mille. The complete active GLB scene is included. External resources,
+animated/deformed geometry and active matrix nodes are refused; source nodes use translation,
+quaternion rotation and scale. Every rendered mesh instance contributes a conservative obstruction,
+including transparent foliage. Caller-supplied contact must equal that complete derived coverage.
+
+The aggregate bounds are eight instances/files, 32 MiB of distinct content, 512 mesh proxies and
+draw primitives, 1,048,576 rendered vertices/triangles, and 16,777,216 decoded texels. Binary32
+transform and shader arithmetic receive a conservative error envelope of at most one millimetre
+per axis before outward rounding. Unsupported arithmetic domains refuse. The renderer enforces
+an unchanged source hierarchy and a translated root within ±1024 metres, with identity linear
+transform; changing either revokes the attachment and ground navigation. These limits do not
+establish hardware pixel identity or device frame-rate performance.
+
+Exact component bytes are bounded-read and hashed outside the database asset barrier. Expensive
+geometry/image validation uses the existing bounded kind worker; its cache holds pure coverage,
+never continuing authorization. Creation checks current registry rows under the workspace and asset
+locks before commit. Drawing and contact proof repeat current world/version/source/state and
+component-row checks under the final read barrier after byte and worker work. Withdrawal, rebinding,
+wrong component kind or unavailable bytes refuses the scene; it does not yield a walkable bare plane.
+Library availability is a cheap current-source check, while opening obtains complete validation.
+All components must decode and attach before ground navigation becomes ready. Embedded PBR maps
+retain the exact container's material data; a successful load is not visual-quality acceptance.
+Source dressing has no authored object identity, editing authority, society projection or upper-floor
+support. Terrain placement and inhabitation remain separate capabilities.
+
+`GET /world/versions/{version_id}/terrain-contact` requires `world.read` and the world scope. It
+returns a no-store `exulanica.terrain-source-proof/v1` binding the world, version, source snapshot,
+receipt, geometry, contact and authored-state digest. Dressed sources return `/v2`, adding the exact
+dressing digest; the existing saved-entry shape remains unchanged. An optional `expected_state_sha256` rejects
+a stale read. Verification requires every authored delta section to be empty, including retained
+undone rows; any object, environment, point-map, thing or element override returns
+`authored_occupancy_unreconciled`. This is a conservative source-only gate, not a complete proxy
+adapter for edited terrain. Consumers must revoke the proof when they observe a changed version,
+source or authored state and obtain a fresh proof before accepting movement again. Replaying a
+source or restoring an old camera pose does not establish current clearance. Terrain-bound
+placement and inhabited terrain remain separate capabilities.
+
+The browser binds person movement to this proof and the saved entry's source, state and edit
+sequence. Observed edits, including an add followed by undo, and source/scope refusals revoke the
+mount before asynchronous display updates. A mounted proof refreshes every two seconds with a
+1.5-second request deadline and expires five seconds after its last successful observation.
+Movement checks expiry synchronously, including when background browser timers are delayed.
+Failed, changed, timed-out or expired proof permanently stops ground movement for that mount;
+reopening obtains a new proof. Disposal aborts outstanding refreshes. This bounds stale contact
+authority but does not provide instantaneous detection of another client's edit. Refusal preserves
+the accepted pose rather than substituting a flat floor or moving the person through unknown
+occupancy. Overview camera movement does not establish walking clearance.

@@ -37,7 +37,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
 from itertools import pairwise
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from exulanica.canonical import sha256_of_canonical
 from exulanica.grammar.grammars.site.layout import SPACING
@@ -55,6 +55,9 @@ from exulanica.grammar.records import canonical_record
 from exulanica.world.society_catalogs import RoutineModel
 from exulanica.world.society_place import PLACE_PROFILE_V2, ceil_distance, seal_place
 
+if TYPE_CHECKING:
+    from exulanica.world.society_city_place import CityObstructions
+
 __all__ = [
     "CAPSULE_RADIUS_MM",
     "INDOOR_LATTICE_MM",
@@ -65,6 +68,8 @@ __all__ = [
     "SiteSociety",
     "place_from_site_records",
     "place_residents",
+    "site_blocked_boxes",
+    "site_obstructions",
 ]
 
 SITE_RECORDS_PROFILE: Final = "exulanica.site-records/v1"
@@ -440,6 +445,62 @@ def place_residents(place: Mapping[str, Any]) -> int:
     return sum(int(dest["resident_capacity"]) for dest in place["destinations"])
 
 
+def _blocked(records: Sequence[object]) -> list[_Box]:
+    """What a walker keeps out of on a site, from its records: every structure, every area, every
+    fixture that blocks inside a zone, every closed zone and every wall's pieces."""
+    zones = [r for r in records if isinstance(r, SiteZoneRecord)]
+    zone_ids = {zone.identity for zone in zones}
+    blocked = [
+        _Box(s.min_x_mm, s.min_y_mm, s.max_x_mm, s.max_y_mm)
+        for s in records
+        if isinstance(s, SiteStructureRecord)
+    ]
+    blocked += [
+        _Box(a.min_x_mm, a.min_y_mm, a.max_x_mm, a.max_y_mm)
+        for a in records
+        if isinstance(a, SiteAreaRecord)
+    ]
+    blocked += [
+        _fixture_box(f)
+        for f in records
+        if isinstance(f, SiteFixtureRecord) and f.blocks and f.owner_identity in zone_ids
+    ]
+    blocked += [
+        _Box(z.min_x_mm, z.min_y_mm, z.max_x_mm, z.max_y_mm) for z in zones if z.access == "closed"
+    ]
+    for wall in records:
+        if isinstance(wall, SiteWallRecord):
+            blocked += _wall_boxes(wall)
+    return blocked
+
+
+def site_blocked_boxes(records: Sequence[object]) -> list[list[int]]:
+    """A site's blocked boxes as plain figures, ``[x0, y0, x1, y1]`` in the site's own frame (east
+    and north, millimetres): the list the place's walking graph is laid clear of, in the order the
+    place builder reads them. What a society of things keeps a placed thing's standing places
+    clear of on a site (:func:`site_obstructions`), handed over with the place by whoever holds
+    the records."""
+    return [[box.x0, box.y0, box.x1, box.y1] for box in _blocked(records)]
+
+
+def site_obstructions(boxes: Iterable[Sequence[int]]) -> CityObstructions:
+    """The obstructions a site's blocked boxes make, in the shape a town's have and in the site's
+    frame (east, north), by the tests the site's own walking graph is laid with: each box grown by
+    the walking capsule's radius, a point free where no box holds it and a step clear where it
+    passes through none."""
+    from exulanica.world.society_city_place import CityObstructions
+
+    cells = _Cells([_Box(*(int(v) for v in box)).inflated(CAPSULE_RADIUS_MM) for box in boxes])
+
+    def stands(point: Point) -> bool:
+        return not any(box.contains(point) for box in cells.holding(point))
+
+    def steps(a: Point, b: Point) -> bool:
+        return not any(_blocks(box, a, b) for box in cells.near(a, b))
+
+    return CityObstructions(stands=stands, steps=steps)
+
+
 def place_from_site_records(
     *,
     place_id: str,
@@ -458,7 +519,6 @@ def place_from_site_records(
     zones = [r for r in records if isinstance(r, SiteZoneRecord)]
     structures = [r for r in records if isinstance(r, SiteStructureRecord)]
     areas = [r for r in records if isinstance(r, SiteAreaRecord)]
-    walls = [r for r in records if isinstance(r, SiteWallRecord)]
     fixtures = [r for r in records if isinstance(r, SiteFixtureRecord)]
     rooms = [r for r in records if isinstance(r, SiteRoomRecord)]
     zone_ids = {zone.identity for zone in zones}
@@ -469,15 +529,7 @@ def place_from_site_records(
     # which only adds places to stand and ways round, at twice it outdoors.
     corridor_step = station if extent.enclosure == "open" else INDOOR_LATTICE_MM
     lattice = 2 * station if extent.enclosure == "open" else INDOOR_LATTICE_MM
-    blocked: list[_Box] = [_Box(s.min_x_mm, s.min_y_mm, s.max_x_mm, s.max_y_mm) for s in structures]
-    blocked += [_Box(a.min_x_mm, a.min_y_mm, a.max_x_mm, a.max_y_mm) for a in areas]
-    blocked += [_fixture_box(f) for f in fixtures if f.blocks and f.owner_identity in zone_ids]
-    blocked += [
-        _Box(z.min_x_mm, z.min_y_mm, z.max_x_mm, z.max_y_mm) for z in zones if z.access == "closed"
-    ]
-    for wall in walls:
-        blocked += _wall_boxes(wall)
-    graph = _Graph(blocked, node_limit)
+    graph = _Graph(_blocked(records), node_limit)
     walkable: list[str] = []
     spots: dict[str, dict[str, Any]] = {}
     destinations: list[dict[str, Any]] = []

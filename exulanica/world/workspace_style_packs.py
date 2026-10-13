@@ -48,6 +48,7 @@ from exulanica.world.style_packs import (
     canonical_json,
     load_context,
     read_manifest,
+    require_chain_catalog,
 )
 from exulanica.world.workspace_preparations import (
     DEFAULT_RETAINED_BYTES,
@@ -747,6 +748,13 @@ class WorkspaceStylePackRepository:
             raise GeneratedStylePackRefused(
                 "base_not_library", "a generated look is drawn on a version the library holds"
             )
+        base_chain = style_pack_library().chain(named["manifest_sha256"])
+        if base_chain is None:
+            raise GeneratedStylePackRefused("base_not_library", "the base manifest is unavailable")
+        try:
+            require_chain_catalog((manifest, *base_chain))
+        except StylePackRefused as refused:
+            raise GeneratedStylePackRefused("manifest_refused", str(refused)) from refused
         files = tuple(
             PackFile(
                 file["path"], file["sha256"], file["bytes"], file["media_type"], "generated_piece"

@@ -57,6 +57,7 @@ from exulanica.world.style_packs import (
     canonical_json,
     load_context,
     read_manifest,
+    require_chain_catalog,
 )
 
 __all__ = [
@@ -208,6 +209,7 @@ class StylePackLibrary:
             manifest = json.loads(item.data)
             found.append(manifest)
             digest = None if manifest["base"] is None else manifest["base"]["manifest_sha256"]
+        require_chain_catalog(found)
         return tuple(found)
 
     @property
@@ -454,6 +456,7 @@ def load_style_pack_library(
         (read.manifest["pack_id"], read.manifest["version"]): read.digest
         for read in (*packs.values(), *published)
     }
+    by_digest = {read.digest: read.manifest for read in (*packs.values(), *published)}
     for read in (*packs.values(), *published):
         base = read.manifest["base"]
         if base is None:
@@ -462,6 +465,10 @@ def load_style_pack_library(
             raise _refuse(
                 read.manifest["pack_id"], f"its base {base['pack_id']} is not a pack of the library"
             )
+        try:
+            require_chain_catalog((read.manifest, by_digest[base["manifest_sha256"]]))
+        except StylePackRefused as refused:
+            raise _refuse(read.manifest["pack_id"], str(refused)) from refused
     default, chooser_offers = _library_file(library_file, packs)
     notes = _notes(directory, set(held))
     return StylePackLibrary(

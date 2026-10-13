@@ -11,6 +11,7 @@ import {
   objectWriteFailure,
   parseAsset,
   parseObject,
+  parsePlacedThing,
   parseVersion,
   type AlternateVersion,
 } from '../src/world-objects-api.js';
@@ -38,6 +39,85 @@ const FIXTURE = JSON.parse(readFileSync(
 )) as Record<string, unknown>;
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+// Exact owner201 response retained from the private runtime-role support-placement API probe.
+const SUPPORTED = JSON.parse(readFileSync(
+  new URL('./fixtures/world-version-supported.v6.json', import.meta.url), 'utf8',
+)) as Record<string, unknown> & { things: Record<string, unknown>[] };
+
+describe('saved support affinity reader boundary', () => {
+  it.each([1, 2, 3, 4, 5])('retains supported historical view version %i', (schemaVersion) => {
+    expect(parseVersion({ ...clone(FIXTURE), schema_version: schemaVersion }).schemaVersion)
+      .toBe(schemaVersion);
+  });
+
+  it('retains a real supported version, ordinary objects and edit authority without flattening affinity', () => {
+    const document = { ...clone(SUPPORTED), objects: clone(FIXTURE['objects']) };
+    const parsed = parseVersion(document);
+    const bound = parsed.things![0]!;
+    const support = SUPPORTED.things[0]!['support'] as Record<string, unknown>;
+    expect(parsed.schemaVersion).toBe(6);
+    expect(parsed.objects).toEqual(parseVersion(FIXTURE).objects);
+    expect(parsed.stateSha256).toBe(SUPPORTED['state_sha256']);
+    expect(parsed.editSeq).toBe(SUPPORTED['edit_seq']);
+    expect(parsed.edits).toHaveLength((SUPPORTED['edits'] as unknown[]).length);
+    expect(bound.profile).toBe('exulanica.placed-thing/v2');
+    expect(bound.transform.yMm).toBe(150);
+    expect(bound.support).toEqual({
+      profile: support['profile'], worldId: support['world_id'], sourceSnapshotId: support['source_snapshot_id'],
+      receiptSha256: support['receipt_sha256'], networkSha256: support['network_sha256'],
+      regionId: support['region_id'], surfaceId: support['surface_id'],
+    });
+    expect(Object.isFrozen(bound.support)).toBe(true);
+    document.things[0]!['removed'] = true;
+    expect(parseVersion(document).things![0]).toEqual({ ...bound, removed: true });
+  });
+
+  it('connects the actual supported snapshot as the client current editable version', async () => {
+    const { fetchImpl } = transport({
+      'GET /world/assets': [],
+      [`GET /world/versions/${String(SUPPORTED['version_id'])}`]: SUPPORTED,
+    });
+    const subject = new WorldObjectsClient({
+      worldId: String(SUPPORTED['world_id']), baseUrl: 'https://exulanica.test', token: 'token', fetch: fetchImpl,
+    });
+    const connected = await subject.connect(String(SUPPORTED['version_id']));
+    expect(connected.version).toEqual(parseVersion(SUPPORTED));
+    expect(subject.version()).toBe(connected.version);
+    expect(subject.version()?.things?.[0]?.support?.surfaceId).toBe('deck');
+  });
+
+  it.each([1, 2, 3, 4, 5])('refuses binding hidden beneath historical version %i', (schemaVersion) => {
+    expect(() => parseVersion({ ...clone(SUPPORTED), schema_version: schemaVersion }))
+      .toThrow(/support binding requires version schema 6/);
+  });
+
+  it.each(['world_id', 'source_snapshot_id'])('refuses support from another owning %s', (field) => {
+    const document = clone(SUPPORTED);
+    document[field] = field === 'world_id' ? 'world:another' : '00000000-0000-0000-0000-000000000001';
+    expect(() => parseVersion(document)).toThrow(/support belongs to another version source/);
+  });
+
+  it.each([
+    ['profile', 'exulanica.support-reference/v2'], ['network_sha256', 'not-a-digest'],
+    ['source_snapshot_id', 'not-a-uuid'], ['region_id', 'region:another'], ['surface_id', ''],
+    ['undeclared', 'ignored?'],
+  ])('refuses invalid or unknown support field %s', (field, value) => {
+    const document = clone(SUPPORTED);
+    (document.things[0]!['support'] as Record<string, unknown>)[field!] = value;
+    expect(() => parseVersion(document)).toThrow(WorldObjectsContractError);
+  });
+
+  it('refuses unknown placed profiles, missing binding halves and unclosed documents', () => {
+    for (const changed of [
+      { ...clone(SUPPORTED.things[0]!), profile: 'exulanica.placed-thing/v3' },
+      { ...clone(SUPPORTED.things[0]!), support: undefined },
+      { ...clone(SUPPORTED.things[0]!), profile: undefined },
+      { ...clone(SUPPORTED.things[0]!), another: true },
+    ]) expect(() => parsePlacedThing(changed)).toThrow(WorldObjectsContractError);
+    expect(() => parseVersion({ ...clone(FIXTURE), schema_version: 7 }))
+      .toThrow(/unsupported version schema/);
+  });
+});
 
 function transport(responses: Readonly<Record<string, unknown>>) {
   const calls: { method: string; path: string; body: unknown }[] = [];
@@ -839,4 +919,19 @@ describe('an object placed from a workspace asset', () => {
     delete (row['workspace_asset'] as Row)['availability'];
     expect(() => parseVersion(holding(row))).toThrow(/workspace asset availability/);
   });
+});
+
+it('observes accepted object writes synchronously before asynchronous painting and saved-entry advancement', async () => {
+  const moved = {...clone(FIXTURE),edit_seq:6,state_sha256:'c'.repeat(64)};
+  const {fetchImpl} = transport({[ADD]:moved});
+  const order:string[]=[];let release!:()=>void;let entered!:()=>void;
+  const painting = new Promise<void>(r=>{entered=r;}), pending = new Promise<void>(r=>{release=r;});
+  const subject = new WorldObjectsClient({worldId:TEST_WORLD,baseUrl:'https://exulanica.test',token:'token',fetch:fetchImpl,
+    savedEntry:()=>({entryId:'entry:test',revision:1,authoredVersionId:VERSION_ID,authoredStateSha256:String(FIXTURE['state_sha256']),authoredEditSeq:Number(FIXTURE['edit_seq'])}),
+    onVersionObserved:version=>{expect(version?.stateSha256).toBe('c'.repeat(64));order.push('observed');},
+    onVersionChange:async()=>{order.push('painting');entered();await pending;},
+    onSavedEntryAdvanced:async()=>{order.push('advanced');},
+  });
+  const write=subject.place(parseVersion(FIXTURE),{objectId:'object:new',assetSha256:'b'.repeat(64),regionId:'region-a',transform:transform(),originRole:'fictional',behaviour:null});
+  await painting;expect(order).toEqual(['observed','painting']);release();await write;expect(order).toEqual(['observed','painting','advanced']);
 });

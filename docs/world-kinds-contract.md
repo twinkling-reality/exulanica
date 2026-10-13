@@ -9,6 +9,7 @@ its own generator; the [grammar contract](grammar-package.md) owns the city stag
 data that one grammar realises rather than code per kind.
 
 Contents: [the document](#the-kind-document), [roles](#engine-roles-and-look-roles),
+[declared requirements](#declared-requirements-and-structural-classes),
 [checks](#checks), [the site grammar](#the-site-grammar), [people](#people-in-a-site-world),
 [the receipt](#a-world-made-from-a-kind), [the drawing](#the-drawing),
 [storage and routes](#storage-and-routes),
@@ -17,7 +18,7 @@ Contents: [the document](#the-kind-document), [roles](#engine-roles-and-look-rol
 
 ## The kind document
 
-Profile `exulanica.world-kind/v1`, read by `read_kind` in
+Profiles `exulanica.world-kind/v1` and `exulanica.world-kind/v2`, read by `read_kind` in
 [`exulanica/world/kinds/document.py`](../exulanica/world/kinds/document.py). Every key is closed:
 a key the profile does not state is refused. Every figure is an integer; a float is refused
 wherever it appears. A kind is identified by its key (`[a-z][a-z0-9_]{0,31}`), its version (1 to
@@ -63,6 +64,50 @@ its parameter's range and step and refuses by name with the specification's code
 (`specification_value_unknown`, `specification_value_out_of_range`); it never clamps. An unknown
 preset is `unknown_world_recipe`.
 
+## Declared requirements and structural classes
+
+Version 2 adds `requirement_source` (`sha256` of the sent description and its character count)
+and one to 48 `requirements`. Each requirement has a minted `key`, integer `source_span`
+(`[start, end]` in that description), `status` (`fulfilled` or `omitted`), `omission`, expected
+`form`, `roles`, `look`, `shape_class`, `roof_form`, `minimum_count` and target `parts` keys.
+These fields retain no copied source text. For a drafted kind the source digest must match
+`provenance.words_sha256`; an uploaded kind's unavailable original text cannot be verified.
+
+A fulfilled claim has targets and no omission reason, and declares at least one constraint.
+Every target must exist, be placed and meet every declared constraint. Its guaranteed total
+quantity includes nested rooms and fixtures and uses each count span or parameter's minimum,
+across all allowed worlds. An unplaced water part or a shed labelled harbour cannot satisfy a
+claim expecting an area with the `water` role. A campfire claim expecting `fixture` and
+`fixture.campfire` cannot be satisfied by a building. An omitted claim has no targets and one
+reason: `unsupported_geometry`, `unsupported_layout`, `unsupported_behavior`, `unavailable_asset`
+or `outside_bounds`. The checks validate declared claims, not whether a model extracted every
+requested requirement or chose sufficiently specific constraints.
+
+A version 2 structure or boundary may declare `shape_class`: a reference with `key`, catalog
+`version` and exact `sha256`. The structural catalog and its checker apply numeric constraints to
+all parameter and span endpoints. A class is independent of a part's label. Its defaults are
+resolved while compiling a brief; saved parts retain their resolved figures and pinned class.
+Both flat and gabled roofs remain supported; an explicitly declared roof requirement is checked.
+
+| Class | Authored default | Supported operating range |
+| --- | --- | --- |
+| `fortified_residence` | 20 x 20 m, five 3 m storeys, flat roof | Each side 8 to 40 m; total height 12 to 36 m; height divided by shorter side 0.5 to 4 |
+| `defensive_wall` | 5 m high, 1.5 m thick | Height 3 to 10 m; thickness 1 to 3 m; no battlements or wall walk |
+
+These are authored operating ranges, not universal definitions. English Heritage describes
+[Middleham's keep](https://www.english-heritage.org.uk/visit/places/middleham-castle/history/description/)
+as about 15 m high, 24 m wide and 32 m deep, and
+[Dunstanburgh's mantlet](https://www.english-heritage.org.uk/visit/places/dunstanburgh-castle/history/)
+as 6.5 m high and 1.3 m thick. Those examples support representative proportions without making
+every keep taller than its footprint. A 6 m building cannot declare this fortified residence class.
+
+Version 2 uses the second bound catalog: boundary
+height extends to 10 m and thickness to 3 m; fixture height is independently 20 mm to 12 m,
+while width and depth retain their 200 mm minimum. The
+fixture vocabulary adds a 50 mm sleeping
+mat. Version 1 keeps its original bounds and vocabulary. The site grammar and composer versions
+remain unchanged; these fields establish structure and admissibility, not recognizable meshes.
+
 ## Engine roles and look roles
 
 A part's **engine roles** say what the engine does with it. The sixteen roles, the forms that may
@@ -93,7 +138,7 @@ generating the kind can cost, each figure at its most:
 a site's grid (its width by its depth in modules) is at most 512 by 512 points (`grid_points`), and
 everything the kind places, a structure's rooms and their fixtures included, at most 512 things
 (`placed_things`). Codes: `kind_document_invalid`, `kind_role_unknown`, `kind_reference_unknown`,
-`kind_out_of_bounds`, `kind_role_unmet`.
+`kind_out_of_bounds`, `kind_role_unmet`, `kind_requirement_unmet`, `kind_shape_unmet`.
 
 **Stage B, sample worlds** ([`samples.py`](../exulanica/world/kinds/samples.py)): every preset
 with two seeds, and each parameter's least and greatest with one, at most 48 samples. Each sample
@@ -190,7 +235,10 @@ sample world's place and hold it to the society's place check under that routine
 A site world's society uses the walking-surfaces input profile
 (`exulanica.society-input/walking-surfaces-v2`) with the navigation profile
 `site-walking-surfaces/v1`, site record subjects and a `site_place` dependency in place of a
-city's `city_place`. The living engine is `exulanica-society/v5`, unchanged; the
+city's `city_place`. The living engine is `exulanica-society/v5`, unchanged. A site world holding a
+thing its author placed when its people are brought in is a society of things,
+`exulanica-society/v7`, over `exulanica.society-input/walking-surfaces-v3` with the same navigation
+profile and place dependency; that input carries no place. The
 [society contract](synthetic-society-contract.md) owns inputs and engines. A site world's society
 ground is the society ground catalog's `generated_site` entry. The page hosts
 a site world's people in the site's frame, as it hosts a town's. The place a site world's society
@@ -201,9 +249,22 @@ is made. Nothing waits for the worker inside a transaction:
 - **Bringing people in** asks the worker for the place before its transaction begins, holding no
   lock, and waits for it at most 15 s; inside the transaction the place is only read from what the
   worker keeps.
-- **Each later input**, such as one an edit composes, is composed from the place the society's last
-  input carries (held to its `site_place` digest, the world's snapshot, which names the receipt,
-  and the routine the receipt names), so an edit never asks the worker.
+- **Each later input of a living society**, such as one an edit composes, is composed from the
+  place the society's last input carries (held to its `site_place` digest, the world's snapshot,
+  which names the receipt, and the routine the receipt names), so such an edit never asks the
+  worker.
+- **Each later input of a society of things** is composed over the place the worker keeps, since
+  its inputs carry none. An authored edit asks the worker for it before the edit's transaction
+  begins, holding no lock, and waits at most 15 s, as bringing people in does; a server that
+  started again, or whose kept places turned over, makes the place then and the edit is made in
+  the one ask.
+- **An erased creature's telling** composes such an input too
+  ([things](things-contract.md)). The erasing request asks for the place before each telling,
+  within what is left of the telling's budget. A minute that tells a society nobody reached (a
+  step, a manual step, a playback round) asks for it only once it has met the missing place, waits
+  at most 15 s, and tries once more: a step is answered in the one ask, and a playback round goes
+  on playing. A place still not made is answered 503 with a `Retry-After` by both step routes and
+  pauses a playback round as any input that cannot be composed does.
 - A place neither holds is asked of the worker without waiting, and the request is answered 503
   `kind_work_overran`, `kind_work_busy` or `kind_work_unavailable` with a `Retry-After`, nothing
   written; asking again reads the finished place.
@@ -253,8 +314,8 @@ states its kind and no tiles, while a town's receipt is held to the rule 0118 st
 
 ## The drawing
 
-A site world serves one document, `exulanica.site-drawing/v1`, made from the records its receipt
-generates again ([`site_drawing.py`](../exulanica/world/site_drawing.py)):
+A site world without an explicit support attachment serves `exulanica.site-drawing/v1`, made from
+the records its receipt generates again ([`site_drawing.py`](../exulanica/world/site_drawing.py)):
 
 - **slots**, one per drawn piece: a stable identity (the record's subject identity, with the piece
   it names for walls, lintels, doors and roofs), the look role, the base centre of its box, its
@@ -269,6 +330,15 @@ generates again ([`site_drawing.py`](../exulanica/world/site_drawing.py)):
   blocking fixtures and water);
 - **seats**: each seat's height;
 - the kind, the extent and enclosure, and the arrival.
+
+A site created with admitted support authoring serves `exulanica.site-drawing/v2`. It carries the
+same slots and a source-bound support adapter: the sealed network, place digest, node-to-surface
+bindings and declared entry surface. The browser reads both versions. Its version 2 person consumer
+binds the recorded 340 mm radius and 1800 mm height, draws additional horizontal support tops at
+exact dimensions, and carries explicit surface/connection state through accepted swept movement
+and recovery. It does not select a floor from overlapping meshes. Reopening starts at the declared
+entry. [Canonical support and connectivity](world-composition-contract.md#canonical-support-and-connectivity)
+owns the geometry, state rules and outstanding inhabitant, elevated-object and transit limits.
 
 A style pack dresses a slot by its look role and never changes it. Nothing in the drawing decides a
 look.
@@ -285,9 +355,11 @@ path or road, of a material its leaf names). The site is drawn in the look the p
 world, the address's, else the pack its appearance names, else the host's default: the pack's
 light lights it and the pack dresses its slots by their look roles, its swatches on the primitives
 and its pieces in their slots ([drawing a site in a pack](style-pack-contract.md#71-drawing-a-site-in-a-pack));
-a slot the pack does not dress keeps its primitive and fallback colour. A person exploring stands on the floor and nowhere beyond it, and every
-blocker and keep-out box is an obstacle the movement resolver collides against with the society's
-340 mm walking radius, so a person comes into a building through its door. The About panel says
+a slot the pack does not dress keeps its primitive and fallback colour. On version 1, a person
+exploring stands on the floor and nowhere beyond it; blocker and keep-out boxes are obstacles
+checked with the society's 340 mm walking radius, so a person comes into a building through its
+door. On version 2, the canonical support network supplies the surfaces, solid clearance and
+explicit small-step connections. The About panel says
 the world was made from its kind. The person's view stays first person, as on a generated tile,
 because the follow camera does not keep out of a site's walls.
 
@@ -328,7 +400,8 @@ creator or an agent uses.
 The kind drafter ([`kind_drafting.py`](../exulanica/selection/kind_drafting.py)) asks a model to
 fill a **brief** ([`kind_brief.py`](../exulanica/selection/kind_brief.py)) for a person's
 description: zones holding their structures, rooms, areas and fixtures, each part's use stated
-where it stands, with no key and no reference, and every closed word a list the form offers. Code
+where it stands, with no key, and every closed word a list the form offers. Version 7 of the
+drafting prompt adds copied requirements and exact part labels as their targets. Code
 compiles the brief into a kind document: the keys and references, a use class for each use, the
 spine and the boundary, seat and standing places trimmed to the society's spacing, a bed's
 sleepers, and who comes in where nobody lives there.
@@ -344,6 +417,30 @@ Both stages of the checks stay the one authority: a kind they refuse is refused 
 drafter sends one brief and at most two repairs, each naming the check's code, the place in the
 brief and the check's own sentence, never the reply's words; there is no fallback model.
 
+Fixtures may use the authored dimensions of a named leaf in the
+fixture vocabulary. The transient brief's `size_source`
+is `catalog` to use that leaf's box, or `stated` to keep its own dimensions. A request for catalog
+sizing with an unlisted look is refused and repaired; an unlisted leaf with stated dimensions
+remains valid. The compilation trail counts defaulted and unlisted fixture parts. These are
+authored placement defaults, not measured assets or evidence of visual resemblance. Roles and
+uses still govern behavior. The catalog grants no boat movement or crane operation.
+
+The drafting instructions include the vocabulary's exact file digest and dimensions; the existing
+`prompt_version` and `prompt_sha256` provenance bind those inputs. The saved kind contains resolved
+figures. Replay reads those figures without consulting the fixture
+vocabulary, so changing it cannot resize an existing world.
+
+The compiler resolves each requirement's `part_labels` uniquely to part keys; missing or ambiguous
+labels are refused. A phrase absent from the sent description, or cutting a replaced saved name,
+is refused and repaired. Version 7 compiles world-kind/v2, with the text-free requirement records
+above. `shape_source` chooses stated or catalog structural dimensions; `roof_form: catalog`
+resolves a class default only when no explicit roof is chosen. Sizing must still meet the class
+and requirement checks. The sentence answer reports omitted source phrases through `left_out`;
+an overlapping appearance or setting phrase cannot hide a content omission. Published prompts
+5 and 6 keep their forms and instructions: v5 has no fixture defaults, v6 uses vocabulary v1 and
+transient `not_supported` phrases, and both compile world-kind/v1. Version 7 has deterministic
+contract coverage, without live-model or visual acceptance evidence.
+
 The page calls a world kind a **kind of place**. Before anything is typed, `GET /worlds/kinds`
 says whether this caller may draft one here (`drafting`: `offered`, and otherwise `code`:
 `not_authorised` without world write and model invoke, `provider_credential_absent` without a
@@ -357,7 +454,7 @@ capacity changes from moment to moment, so an offered start may still be refused
 `kind_draft_capacity`, which says when to try again; an allowance just above that least amount may
 still meet its ceiling at a repair, and the draft then ends `budget_exceeded`. A person asks for a
 draft with `POST /worlds/kinds/drafts` and the words they typed. The route answers at once, 202
-with the draft's id, and never waits on the model: a job in the API process drafts on the
+with the draft's id, and never waits on the model: a durable job claimed by an API worker drafts on the
 `kind_drafter` role, holds each drafted kind to both stages in the kind worker as an
 upload is held, and keeps a passing kind in the workspace, origin `drafted`, under the key its
 brief states or, where the workspace already keeps that key, the key with the first number free
@@ -373,7 +470,7 @@ states, which the page says in these words:
 | --- | --- |
 | `drafting` | "Drafting your kind of place, {elapsed} so far. It can take a few minutes. You can leave: it keeps going, and it will be among your kinds when it is ready." ({elapsed} from the answer's `elapsed_seconds`) |
 | `ready` | "{label}: {summary}" and "Drafted from your words by {model name}" (the answer's `model_name`), then its presets and values |
-| `refused` | "These words did not draft a kind of place people can live, walk and work in: {sentence} Try describing it another way." ({sentence} the refusal's `detail`, the last check's own sentence; where no check refused, the refusal's `check` is null and the page says the two sentences without it, since the drafter's own sentence would repeat the first) |
+| `refused` | "These words did not draft a kind of place people can live, walk and work in: {sentence} Try describing it another way." ({sentence} the refusal's `detail`, a fixed sentence from the refusal catalog; where no check refused, the refusal's `check` is null and the page says the two sentences without it, since the drafter's own sentence would repeat the first) |
 
 A refusal that is not the drafted kind's (`budget_exceeded`, `kind_draft_unanswered`,
 `kind_draft_model_failed`, `kind_work_unavailable`, `kind_draft_failed`, `kind_cap_reached`,
@@ -382,7 +479,7 @@ role's timeout is `kind_draft_unanswered`; a provider's error status, a connecti
 call refused before it was sent is `kind_draft_model_failed`, never said as the model's silence.
 Ready and refused carry what the drafting cost, every call made included, except a draft ended for
 running past its deadline, whose calls the server no longer reads. Saved names are replaced in the
-words before the job starts, and the workspace's rules, releasing no place's name, are applied again
+words when the claimed job prepares its request, and the workspace's rules, releasing no place's name, are applied again
 as each request leaves. A draft takes at most the longest its client takes for one call of the role
 and the checks' bound, for each of its three attempts. Making a world of the kept kind is
 `POST /worlds/kinds/{kind}/worlds`.
@@ -391,12 +488,14 @@ and the checks' bound, for each of its three attempts. Making a world of the kep
 
 A person says the world they want and it is made, with no kind, preset or value met on the way.
 `POST /worlds/drafts` (world write and model invoke) takes the words (1 to 1,000 characters; a body
-over 16,384 bytes is refused 413 before it is read) and answers 202 with a draft's id at once;
+over 131,072 bytes, including operation metadata, is refused 413 before it is read) and answers
+202 with a durable draft and request id at once;
 `GET /worlds/drafts/{draft_id}` (world read) is polled. A job in the API process
 ([`world_making.py`](../exulanica/api/world_making.py)) does three things and says which it is at:
 
 | State | What the job is doing |
 | --- | --- |
+| `queued` | The accepted durable job waits for a native drafting slot |
 | `choosing` | Asks which tool should make the place: a forced choice among the entries of the [world tool catalog](../assets/catalogs/world-tools/world-tool.v1.json), each a composer with its drafter and its own words for what it can make and what it cannot, which is all the chooser is shown ([`tool_choosing.py`](../exulanica/selection/tool_choosing.py), role `world_tool_chooser`). Where the chooser answers none, is refused twice or fails, the catalog's tool for an unsure choice is taken, the site grammar's, and the answer says so (`tool.chosen_by` `unsure`) |
 | `drafting` | That tool's drafter writes what its composer takes: the kind drafter a whole kind document, held to both stages of the checks as above, or the specification drafter a town's preset and values, held to the gate every town passes. Then two short steps ask what the same words say of how the world is drawn and where it stands: the look chooser among the library's looks and the setting chooser among the named parts of a setting ([the setting offer](style-pack-contract.md#121-a-setting-offered-from-a-description)). Neither can fail the draft |
 | `making` | The world is composed and its entry saved, as `POST /worlds/kinds/{kind}/worlds` and `POST /worlds/generated` make one |
@@ -410,9 +509,12 @@ generator is one more entry of the tool catalog and no change to the choosing.
 **Before a word is typed.** `GET /worlds/drafts` (world read) says what a start would meet, for
 this person in this workspace: `offered`, or the first refusal a start would give by `code` and
 `detail`, in the order the start asks them; `calls_at_most`, the most times one draft asks a model,
-counted from the steps' own bounds (the chooser's call and its repair, the attempts of whichever
-tool's drafter makes the most, then the look chooser's and the setting chooser's call and repair); `starts`, how many drafts this person may start in an
-hour, how many are left and when the next frees; `description_characters`; and
+including schema repairs, transport retries, declared fallbacks and both native tool paths;
+`operation`, a sealed monetary reservation ceiling derived from fresh provider metadata, with
+per-provider bounds, individual model rates, response digests and expiry; `starts`, the hourly
+allowance and starts left for this actor across workspaces and API processes, counting both native
+kind and whole-world starts;
+`description_characters`; and
 `running_draft_id`, this person's own draft of a world still running here. A page shows the calls
 and the starts before the words are sent. Another person's running draft is `kind_draft_busy`
 with no id. Every refusal that is known before a model is asked is answered by the start before
@@ -463,9 +565,36 @@ workspace keeps are the ones a person chose to keep. The draft runs under the sa
 same three budgets as a kind's draft; while one runs in a workspace the other is answered 409
 `kind_draft_busy`. Only the person who started a draft reads it, and only through this route.
 
-**What is kept of the words.** The whole sentence is held in the API process while the draft runs
-and dropped when it ends; the job writes it to no table, and a refused draft's sentence is kept
-nowhere on the server. The phrases the table's last row names stay for an hour. They are sent to the hosted models that choose and draft,
+**Durable confirmation and readback.** Workspace Companion preparation
+(`POST /selection/world-drafts/prepare`, world read) returns a digest-bound proposal with one
+explicit native `POST /worlds/drafts` step and the operation ceiling. Preparation creates no job
+and asks no model. The native POST requires world write and model invoke, rechecks the quote,
+opens durable provider bounds whose ceilings sum to its accepted total, and enqueues the existing
+world maker. Missing prices, changed configuration or an inactive worker are named refusals.
+The ceiling reserves full input contexts and actual output bounds; it is not expected spend or an
+invoice. `accounting` reads actual reservations, reported charges and unknown liability separately.
+`execution` names served models only where a response supplied that identity.
+
+An explicit `idempotency_key` binds the actor, workspace, description and accepted quote terms.
+The same key and terms read the same request without inference; changed terms are refused.
+Description-only callers receive a fresh server key for every accepted POST and cannot use
+same-key replay without preserving that identity. Native kind and whole-world starts share durable
+workspace concurrency and actor hourly limits across API processes. The offer is advisory; the
+start checks both limits atomically. Minimal start identities and timing remain after draft content
+is erased, so deletion does not replenish the hourly allowance.
+
+A worker reclaims an interrupted job without asking it again. If its fixed world identity already
+has a saved entry, readback recovers that entry; otherwise it records `world_draft_interrupted`.
+The native generation receipt remains the deterministic world replay source. Spending already
+sent remains recorded. `POST /selection/world-drafts/outcome` reads the authoritative native
+result matching the prepared request; a client-supplied success grants nothing.
+
+**What is kept of the words.** The full sentence is stored in `world_draft_input` while work is
+pending and removed when an outcome is recorded. Progress and result records retain selected
+omission/look/setting phrases for readback until world or workspace erasure. Those erasures
+cancel work, delete draft content and clear its job payload; start timing and financial identifiers
+remain without a content fingerprint. A backup restore reapplies those erasures and grants no
+content recovery. The words are sent to the hosted models that choose and draft,
 every saved name replaced first; a request already sent is beyond any deletion here. What a made
 world keeps that was written from the words:
 
@@ -477,12 +606,12 @@ world keeps that was written from the words:
 | A town's tile bake jobs (`job`) | Ids, a digest and a tile in each payload, and nothing of the words |
 | The world's appearance (`world_style_version`) | The look's id and the keys of the setting's named parts: catalog keys, none of the person's words |
 | The API process, until it restarts or the entry is the least recently read | A made place's drawing and its society's place, and the checks of a drafted document, a refused one's included: built from the document, never written to storage or to a file |
-| The API process, for an hour after the draft ends | A town's `left_out` phrases and the phrases that chose a look or a setting, as they were typed, saved names included, read by the person who started the draft and nobody else |
+| Durable draft progress/outcome, until world or workspace erasure | A town's or site's `left_out` phrases and the phrases that chose a look or a setting, as they were typed, saved names included, read by the person who started the draft and nobody else |
 
-The world's registration (`world_identity`), which outlives a removal, states that the world was
-generated from a world kind and names no kind. Spending rows hold amounts, models and times, and
-no text. No erasure rewrites a receipt and no removal reaches the rows above, which is why
-taking a kind from a person is a deployment's stated choice.
+World registration states that a world was generated from a world kind without repeating its
+key. World removal erases its receipt, saved entry and structural rows; independently kept
+library kinds remain until separately erased. Spending records retain accounting facts.
+A request already sent to an outside provider is not recalled.
 
 ## The town as a kind
 
@@ -507,26 +636,37 @@ town's receipt or digest depends on the adapter.
   (thatch steep and overhanging, a canvas roof a tent's, an earth roof a slab with a parapet); the
   walls under it are not: every structure but a tent is a box of walls, and a tall thing standing
   near a tent's side shows through its canvas.
-- Beyond an open site its own base ground runs out to the pack's reach, flat. What surrounds a
-  place is not read from its words: an island has no sea round it and a forest camp no tree.
-- A draft's state lives in the API process that started it, so drafting needs one API process or
-  routing that sends each person to the same one ([deployment guide](deployment.md), 5.4): a poll
-  another process answers reads `kind_draft_unknown` while the draft still runs. A draft still
-  running when its process stops is lost, what it had spent stands, and its page reads
-  `kind_draft_unknown` and offers to start again. A ready draft's kind is kept in the workspace and
-  outlives the process; an ended draft's state is answered for an hour after it ended, and one
-  still drafting past its deadline and two minutes ends as `kind_draft_failed`. How many
-  drafts one workspace and the process run at once and how many one person starts in an hour
-  are the [world draft policy](../exulanica/world/world-draft-policy.v1.json)'s chosen budgets
-  (one, two and twelve), each with its reason and a deployment's own figure in the variable it
-  names. Running drafts on the durable job queue is planned work, not delivered.
-- A world made from a sentence is drawn in the host's default look: the look and the setting a
-  description asks for are offered by the town's own draft route and not yet taken by this job. A
-  place's draft names nothing it left out. A draft a process restart lost is answered 404
-  `world_draft_unknown`; what it had spent stands, and a world it had already made is among the
-  person's worlds.
+- Beyond an open site its ground runs out to the pack's reach, flat, with the setting it wears.
+  A sea setting changes that ground beyond the site; it supplies no water area inside it, shore
+  layout or boats. Settings supply no individual trees.
+- Native kind drafts keep their identity, requester, input, bounded execution metadata and outcome
+  in PostgreSQL. Any API process can answer the original requester's poll; no sticky routing is
+  required. Never-claimed queued work can resume within its admitted deadline plus the two-minute stale
+  margin. An expired running claim
+  is not sent to a model again: an atomic committed result remains readable, and unfinished work
+  ends `kind_draft_failed`. Changed prompt or model-manifest pins also refuse before inference.
+  The checked kind, outcome and terminal job state commit together under the live claim; a late
+  worker cannot publish after cancellation or claim replacement. A provider-reported model
+  identity absent from the response or outside the answering provider's admitted manifest refuses
+  publication; it is retained as unavailable,
+  rather than storing arbitrary provider text or attributing the result to a different model.
+  The description is removed at termination. Ended views remain available for one hour; subsequent cleanup removes their
+  outcome and attempt content while retaining minimal admission anchors. Workspace erasure
+  cancels work and scrubs content; erasing a completed kind removes its associated draft content.
+  A minimal draft identity on the kept kind survives outcome cleanup and is carried by its
+  erasure record, so replay can also scrub a backup taken before the draft produced its kind.
+  The [world draft policy](../exulanica/world/world-draft-policy.v1.json) owns workspace, process
+  and actor budgets (one, two and twelve), with deployment overrides. Workspace concurrency and
+  hourly actor starts are shared across native-kind and whole-world jobs; execution capacity
+  remains a separate limit in each API process. A native-kind POST still creates a new server
+  identity each time; retrying the HTTP request is not an idempotent replay.
+- A world made from a sentence takes the look and setting validated from its words, or the
+  host's default where none is taken. A site's draft reports only the content requirements its
+  model identified as omitted; it can still miss others. An interrupted whole-world draft is
+  recovered or refused without another model ask; its spending remains recorded.
 - A drafted kind is kept once it passes, without a separate accept, and takes one of the
-  workspace's kind versions; no kind is removed. Hiding a kind no world uses is planned work.
+  workspace's kind versions. Its creator or workspace owner can erase an unused version through
+  the erasure routes below; a retained world receipt prevents erasure.
 - The library ships the town's adapter and no site-grammar kind. The three kinds under
   `tests/fixtures/world-kinds` are hand-written test fixtures.
 - Only the ground storey of a structure is walked inside.
@@ -545,4 +685,47 @@ town's receipt or digest depends on the adapter.
 - A kept kind is read again with the catalogs this server holds; a world of a kind regenerates
   from the kind document its receipt carries, read with those catalogs too and laid out again
   within the layout budget, so a later bound that refuses the document, or a lower budget than its
-  layout needs, makes the world unreadable by name. Withdrawing a kept kind is not offered.
+  layout needs, makes the world unreadable by name. An unreadable kept version remains erasable.
+
+
+## Erasing a kept version
+
+`GET /worlds/kinds/versions/{document_sha256}/removal` previews a kept version and its retained
+world-receipt count. `DELETE /worlds/kinds/versions/{document_sha256}` permanently erases that
+version's document and validation report. The preview requires `world.read`; deletion requires
+both `world.write` and `deletion.write`. Both require the version's creator or the browser
+account's current ownership of its workspace. A program's bearer grant gives no owner override.
+Shipped kinds are not workspace rows and cannot be erased here. Disabling new kinds from people
+does not disable erasure of an already kept version.
+
+Every retained world receipt copying that version blocks deletion with `409 world_kind_in_use`;
+remove those worlds first. Erasure never cascades to a world, another kind version or another
+workspace. An unknown digest returns `404 unknown_world_kind`, a different creator without
+ownership `403 world_kind_not_yours`, an erased version `410 world_kind_erased`, and a sealed
+restore checkpoint `409 restore_sealed`. Successful deletion returns 204. No document parsing is
+required for deletion, so a version that current catalogs no longer read is still removable.
+
+The document digest and SHA-256 of its UTF-8 kind key, together with its version, permanently
+retire both the original bytes and the original version identity in that workspace. A later
+version may be kept. These retained values are fingerprints, not anonymization. The immutable
+record also retains workspace, erasure, tombstone and actor identities and the erasure time;
+it retains no label, summary, document, validation report or original key. Spending records
+remain. Library appends cannot reuse the retired key/version or document digest. Receipt checks
+match only the erased document digest: an independent inline world can use the same key/version
+with different bytes, since it has no library binding. Database guards refuse a late receipt
+from a composition of the erased document already in flight.
+
+A backup restore carries this record even if the backup predates the kind. World erasures replay
+first, removing any receipts that the older backup still holds, then the kind is erased again.
+A surviving receipt blocks replay rather than silently deleting its world. The erased bytes and
+version identity cannot be reintroduced after restore.
+
+After commit, the serving process drops the parsed document and sample-check cache, discards
+its owned kind-worker child and prevents late callbacks from refilling those caches. Other
+finished worlds remain cached; other in-flight work on that shared child may retry. Associated durable kind-draft content is scrubbed in the erasure transaction. Kind publication
+and draft completion share one transaction, so no intermediate kept-but-unrecorded result remains.
+Other API processes retain no authoritative draft cache. In-flight publication checks the live
+claim and durable retirement record; an unrelated draft whose kind has not been saved is not
+mistaken for an erased one. Immediate memory erasure
+across processes and recall of responses already sent are not provided. This backend API does
+not add a library-removal page or enable public deployment.

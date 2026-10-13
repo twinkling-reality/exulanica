@@ -1,6 +1,7 @@
 """The society engines and what each can do, stated once, as data.
 
-``society-engines.v4.json`` beside this module is the one statement of which engine profiles
+The newest ``society-engines.v<N>.json`` beside this module is the one statement of which engine
+profiles
 exist and which capabilities each has: whether a society may still be created with it, whether it
 consumes authorised inputs, whether the playback worker may play it, whether it takes directed
 actions, model decisions or experiments, whether the world's owner may choose a model for one of
@@ -19,10 +20,12 @@ body is fixed SQL, a test reads the live schema and compares it with this table.
 asks what an engine can do asks the table; ``tests/test_society_engine_capabilities.py`` fails a
 module that compares an engine's identity where a capability decides.
 
-``society-engines.v1.json``, the table's first shape, ``society-engines.v2.json``, its second,
-and ``society-engines.v3.json``, its third, stay beside it because evaluation records and the
-comparison drawing of their day name them; tests hold each to this one's rows, and
-:func:`load_engine_table` reads the second and the third as it reads this one.
+Every earlier version stays beside it, because evaluation records, the comparison drawing of
+their day and the societies made under them name them; tests hold each to this one's rows.
+:func:`load_engine_table` reads every version from the second on by its number: what a table may
+state is what its version had come to state (an engine for a world holding things from the third,
+no maximum population from the fourth), so a new version is a new file and nothing here changes
+unless it states something new.
 
 An engine that is not in the table is refused by name everywhere it is looked up, never guessed
 to behave like one that is.
@@ -65,12 +68,39 @@ __all__ = [
     "society_engine",
 ]
 
-ENGINES_PATH: Final = Path(__file__).with_name("society-engines.v4.json")
-TABLE_PROFILE: Final = "exulanica.society-engines/v4"
-#: The profiles this module reads: the second, which states no ``creates_holding_things``, the
-#: third, whose every engine states a maximum population, and this.
-_HOLDING_PROFILES: Final = ("exulanica.society-engines/v3", TABLE_PROFILE)
-_PROFILES: Final = ("exulanica.society-engines/v2", *_HOLDING_PROFILES)
+_TABLE_FILE: Final = re.compile(r"society-engines\.v([1-9][0-9]*)\.json")
+_TABLE_PROFILE: Final = re.compile(r"exulanica\.society-engines/v([1-9][0-9]*)")
+#: The first version this module reads (the first table's shape is held to this one by a test),
+#: the first that may state an engine for a world holding things, and the first in which an
+#: engine may state no maximum population.
+_READ_SINCE: Final = 2
+_HOLDING_SINCE: Final = 3
+_NO_MAXIMUM_SINCE: Final = 4
+
+
+def _newest_table() -> tuple[int, Path]:
+    """The table this host reads: the highest version among the files beside this module."""
+    found = {
+        int(match[1]): path
+        for path in Path(__file__).parent.glob("society-engines.v*.json")
+        if (match := _TABLE_FILE.fullmatch(path.name)) is not None
+    }
+    version = max(found)
+    return version, found[version]
+
+
+TABLE_VERSION, ENGINES_PATH = _newest_table()
+TABLE_PROFILE: Final = f"exulanica.society-engines/v{TABLE_VERSION}"
+
+
+def _profile_version(profile: object) -> int | None:
+    """The version a table's profile names, where this module reads it: from the second up to
+    the table this host reads."""
+    match = _TABLE_PROFILE.fullmatch(profile) if isinstance(profile, str) else None
+    version = None if match is None else int(match[1])
+    return version if version is not None and _READ_SINCE <= version <= TABLE_VERSION else None
+
+
 StateFamily = Literal["legacy", "purposeful", "living", "things"]
 _STATE_FAMILIES: Final = ("legacy", "purposeful", "living", "things")
 #: The kinds of ground a new society is created over, each with the engine the table names for it:
@@ -149,8 +179,8 @@ class SocietyEngine:
 
 
 def _engine(row: Any, *, unbounded: bool = False) -> SocietyEngine:
-    """One row, checked. ``unbounded`` says the table's profile lets an engine state no maximum
-    population (the fourth does); absent, the maximum is none."""
+    """One row, checked. ``unbounded`` says the table's version lets an engine state no maximum
+    population (from the fourth); absent, the maximum is none."""
     fields = {"engine", "population", "playback_refusal", "reason", "state_family", *_CAPABILITIES}
     if not isinstance(row, dict) or set(row) != fields:
         raise ValueError("a society engine row states exactly its capabilities and a reason")
@@ -274,17 +304,20 @@ def load_engine_table(
     takes."""
     document = json.loads(path.read_text(encoding="utf-8"))
     keys = {"profile", "creates", "default_engine", "engines"}
+    version = _profile_version(document.get("profile")) if isinstance(document, dict) else None
     if (
-        not isinstance(document, dict)
-        or document.get("profile") not in _PROFILES
+        version is None
         or not keys <= set(document)
         or not set(document) - keys
-        <= ({"creates_holding_things"} if document["profile"] in _HOLDING_PROFILES else set())
+        <= ({"creates_holding_things"} if version >= _HOLDING_SINCE else set())
         or not isinstance(document["engines"], list)
         or not document["engines"]
     ):
-        raise ValueError(f"{path.name} is not a society engine table of {_PROFILES}")
-    unbounded = document["profile"] == TABLE_PROFILE
+        raise ValueError(
+            f"{path.name} is not a society engine table of versions {_READ_SINCE} to "
+            f"{TABLE_VERSION}"
+        )
+    unbounded = version >= _NO_MAXIMUM_SINCE
     engines = tuple(_engine(row, unbounded=unbounded) for row in document["engines"])
     names = [engine.engine for engine in engines]
     if names != sorted(set(names)):

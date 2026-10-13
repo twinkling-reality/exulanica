@@ -28,7 +28,16 @@ before a database connection is opened for the route.
 - Declared in `exulanica/api/permissions.py`, `ROUTE_RULES`. The vocabulary is the closed enum
   `Permission`: `library.read`, `library.write`, `model.invoke`, `intake.write`, `deletion.write`,
   `consent.read`, `consent.write`, `admission.read`, `admission.write`, `world.read`,
-  `world.write`, `operations.read`, `operations.write`, `tiles.materialise`. There is no wildcard.
+  `world.write`, `being.act`, `operations.read`, `operations.write`, `tiles.materialise`,
+  `references.request`, `door.grant`, `world.enter`. There is no wildcard.
+- `being.act` is acting as one being of a world's society: starting to play it, answering for it
+  in its minute and giving it back, the three routes under
+  `/world/versions/{version_id}/society/play` that write. They require it beside `world.read` and
+  do not require `world.write`, so a credential may be let act as a being without being let edit
+  the world, and one that edits the world acts as a being only where its grant names `being.act`
+  too. It is a permission, checked by the floor; the actions a page names (`beings.play`,
+  `beings.answer`, `beings.give-back`) are ids of what a person does, each carried out by a route
+  that requires it.
 - Enforced in `exulanica/api/dependencies.py`, `authorise_route`, installed on the application by
   `exulanica/api/app.py` as an application-level dependency, so no route can leave it out.
   `current_session`, which every authenticated route depends on, applies the same check again for
@@ -52,14 +61,15 @@ before a database connection is opened for the route.
 
 **Who holds what.** DECISION. A bearer token holds exactly the permissions its grant names. A
 browser session holds `ACCOUNT_OWNER_PERMISSIONS`: `admission.read`, `admission.write`,
-`consent.read`, `consent.write`, `deletion.write`, `intake.write`, `library.read`,
-`library.write`, `model.invoke`, `operations.read`, `operations.write`, `world.read` and
-`world.write`, which is every permission except `tiles.materialise`. A guest's browser session
+`being.act`, `consent.read`, `consent.write`, `deletion.write`, `door.grant`, `intake.write`,
+`library.read`, `library.write`, `model.invoke`, `operations.read`, `operations.write`,
+`references.request`, `world.enter`, `world.read` and `world.write`, which is every permission except
+`tiles.materialise`. A guest's browser session
 (migration 0139, [deployment](deployment.md#514-browser-accounts)) holds `GUEST_PERMISSIONS`:
-`world.read`, `world.write`, `model.invoke`, `library.read`, `library.write` and
-`deletion.write`, the journey of making a world, choosing its models, comparing, asking the
-Companion and deleting what one made, and nothing else: no intake, consent, admission, operations
-or tiles. That grant is keyed on the membership role, not assumed: a browser session exists only
+`world.enter`, `world.read`, `world.write`, `being.act`, `model.invoke`, `library.read`, `library.write` and
+`deletion.write`, the journey of making a world, choosing its models, playing one of its beings,
+comparing, asking the Companion and deleting what one made, and nothing else: no intake, consent,
+admission, operations or tiles. That grant is keyed on the membership role, not assumed: a browser session exists only
 for an account membership, the migrations allow the roles `owner` and `guest`, and
 `AccountRepository.session` requires one of them. `tests/test_route_permissions.py` reads the
 latest check and fails when a role appears without a grant of its own. Withholding `tiles.materialise` from a browser session is an
@@ -67,6 +77,35 @@ open decision: three routes require it (section 2), so a browser session cannot 
 world or read a tile's bytes until somebody grants it here deliberately. An explicit Authorization
 header never falls back to the cookie. Rejected alternative: letting a browser session inherit whatever a bearer token would hold,
 which has no source to inherit from.
+
+**Human observation invitations.** IMPLEMENTED, backend only and disabled by default. Supplying
+`ParticipationRuntime` to the application enables owner-browser issue, list and revoke routes at
+`/world/invitations`, and browser redemption and reads at `/participation`. Ordinary sign-in and
+admission still apply. `world.enter` alone opens no world: a `Granted` route also requires a
+current, unexpired invitation bound to that account, an active host workspace and currently
+available sources. Explicit bearer credentials cannot redeem or use these human invitations.
+Request capacity and refusal accounting belong to the visitor's workspace, never the host's.
+
+An invitation names one version of a source-independent world with a supported society of things.
+Personal placements, environment instances and point maps make the version ineligible. The
+observer sees explicitly projected placement and motion records and model identities, without
+saved names, private intentions, memories, conversation text or account identities. Trusted
+source authorization checks the consumed, queued and remembered society inputs before serving;
+participant data reads then use a separate loginless, read-only database role with six closed
+projection views and no base-table grants. This role contains accidental queries, not malicious
+application code that can reset its role. Referenced binary data is read outside authorization
+transactions and checked against current authority again before release.
+
+The invitation secret is disclosed only at issue and stored as a digest. Redemption is single-use;
+an exact issue retry returns the existing grant without redisclosing its secret. Owners may revoke,
+and participants may permanently leave even when the world's sources have become unavailable.
+Leaving deletes the principal binding and entry immediately. Ended bindings are eligible for
+bounded cleanup after one day; access ends at expiry or revocation without waiting for cleanup.
+World and workspace erasure delete the grant's children before its parent. Production backup sets
+omit entry rows, while restore carries revocations and departures, so an older backup cannot
+reopen access. Focused real-database lifecycle, isolation and restore checks cover participation. Participant UI,
+actions, speech, presence, event feeds and complete scene rendering are not implemented by this
+observation increment; it cannot spend the host's model budget.
 
 **A creator's upload needs the operator's grant.** DECISION. Every account that signs in owns a
 workspace and so holds `admission.write`. The two routes that admit a creator's bytes into a

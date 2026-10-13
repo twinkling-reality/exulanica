@@ -241,6 +241,14 @@ nothing it stores may be read as evidence.
 A removal is stored, not executed. The row survives with `removed = true`, so the object id stays
 stable and undo restores it rather than resurrecting a new identity.
 
+An enabled, resident authored object can be selected by clicking its rendered geometry or
+pressing E while looking at it. Both gestures open the same object controls and select its served
+object id without writing an edit. Picking uses static mesh triangles rather than bounding boxes;
+hidden objects and animated skin or morph meshes are excluded. The nearest surface limits the
+pick, so an object behind ground, a placed thing or a nearer inhabitant is not selected through it.
+Removed objects, disposed mounts and a different active authored version cannot open stale controls.
+Moving a selected object remains a preview until the person reviews and confirms the edit.
+
 ### Behaviours
 
 A behaviour is `behaviour_key` plus `behaviour_version` plus parameters, all validated against
@@ -543,6 +551,8 @@ client recipe; this surface has no such prior client, so it does not invent a se
 | `GET` | `/world/versions` | Every alternate version of this world, newest first |
 | `POST` | `/world/versions` | Create an alternate from a source snapshot or another version, with the parent's rows it left out |
 | `GET` | `/world/versions/{version_id}` | One version with its objects, overrides and edit history |
+| `GET` | `/world/versions/{version_id}/inventory` | Covered semantic entities, their native model roles, source availability and explicit enumeration coverage |
+| `POST` | `/world/versions/{version_id}/inventory/query` | Read-only declared-colour matching over authorized current thing appearances, with typed identities and unknown coverage |
 | `POST` | `/world/versions/{version_id}/objects` | Add one authored object |
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/move` | Replace one object's transform |
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/remove` | Store a removal |
@@ -613,6 +623,57 @@ handlers. The edit codes are mapped once, in `OBJECT_PROBLEMS` in `exulanica/api
 which every authored-edit route shares, so this surface adds no global exception handler. When the
 running application has no society input adapter for a purposeful society on the version, an edit
 answers `409 invalid_object_state` and writes nothing.
+
+### Semantic inventory
+
+`GET /world/versions/{version_id}/inventory` requires `world.read` and returns
+`exulanica.world-inventory/v1` with `Cache-Control: private, no-store`. It enumerates unremoved
+authored objects, placed things and environment instances, authorized society inhabitants and
+non-being things, and the signal identities the native model-role reader supplies. Identities
+are typed by source. An authoritative `placed_id` links a society entity to its authored thing;
+matching strings alone do not merge entities. Each entity retains its source records, current
+availability, aliases and native role-instance references. Point-map placements are listed
+separately as representations. Source element overrides and generated drawing slots do not become
+independent semantic entities.
+
+The `roles` field retains the native [decision-role read](decision-roles-contract.md), including
+choices, refusal, capability and bounded execution evidence. Role membership is not model
+assignability or proof of execution. Things-family society entities link to their selected-subject
+detail for eligibility and supported actions. Missing evidence in the role's bounded decision
+window does not mean that the subject has never run. Refused society inputs suppress population
+and its model view while readable authored records remain available.
+
+`coverage` states completeness for each covered collection. Unavailable signal enumeration is
+reported as unavailable, not an empty set of systems. Generated semantics, structural source
+semantics, reconstructed scene layers and vehicles are explicitly `not_enumerated`. The response
+is `component-pinned`: authored state/edit sequence, society state/tick and the model-role clock
+are separate read identities, not an atomic simulation frame. Reading creates no jobs or model
+calls and performs no site drawing compilation; existing current-source authorization and society
+read locks remain authoritative.
+
+### Declared-colour queries
+
+`POST /world/versions/{version_id}/inventory/query` requires `world.read` and returns
+`exulanica.world-entity-query/v1` with `Cache-Control: private, no-store`. Its closed predicate
+names `declared_base_colour`, the quantifier `any_constant_primitive`, and either an exact RGB8
+swatch or inclusive RGB8 channel intervals. It does not interpret colour names, recipe prose,
+material names, dominant colour or perceived pixels.
+
+The reader resolves the effective admitted appearance of covered things-family society subjects,
+using the same selection and fallback rules as their native cards. It examines the pinned static
+container and rechecks appearance authority after reading bytes. A result retains the inventory's
+existing typed reference and aliases; primitive and material indices explain the match without
+creating another entity. Selected-look and container digests distinguish different appearances
+of the same kind. Authored appearance facts are not evidence of a photographed source world.
+
+A known matching primitive establishes `match`. `no_match` requires complete supported primitive
+coverage; otherwise the result is `unknown`. Texture, vertex colour, unsupported material effects,
+unavailable authority and bounded-work exhaustion remain explicit unknowns. Unsupported inventory
+sources and unenumerated collections remain visible in coverage. A partial positive match remains
+partial. The query inherits component-pinned inventory reads and does not promise an atomic world
+frame. It changes no geometry, transforms, selection, model choices or society state and starts no
+model or drawing work. Focusing or arranging results requires a separate client operation; it is
+not a canonical edit performed by the query.
 
 ## 7. Wire shape
 
@@ -960,11 +1021,13 @@ the program that sends it decides for; an id already placed in the version is
 holds at most 256 placed things, removed ones included, since its delta keeps them; one more is
 refused as `409 thing_limit_reached`, and undoing a placement makes room again. What a placed
 thing is never changes after it is placed: the table's trigger refuses a change to its kind or
-origin, and a move keeps its region, so a move changes its pose alone. `add_thing`, `move_thing`
+origin, and a move keeps its region. An unbound move changes its pose; a freeform move of a
+support-bound thing also clears its support affinity. `add_thing`, `move_thing`
 and `remove_thing` append to the version's edit log under the same compare-and-swap as every edit,
 naming the thing in the log's `thing_id`, and undo restores the stored document; an undone addition
-is a retained, removed row, and the same id may be placed again. A branched or carried version keeps
-its placed things as they are: a shipped kind's version never changes, and a copied thing keeps its
+is a retained, removed row, and the same id may be placed again. A same-source branch keeps
+its placed things as they are; a support-bound thing cannot carry to a different source without
+explicit revalidation. A shipped kind's version never changes, and a copied thing keeps its
 placing edit's time, so a workspace kind erased after that leaves the copy gone as well.
 
 A thing may instead name a kind its workspace keeps ([a workspace's own
@@ -1002,10 +1065,85 @@ package format admits the thing edits yet. An export reads the edit kinds of a v
 lineage, so a version is withheld from a package export by name (`edit_kind_not_admitted`, naming the
 edit) once it or any version it descends from holds a thing edit, even after the thing is removed:
 every later version of such a saved world is withheld too, each one carried when photographs are
-added included. Nothing in the browser draws a placed thing. A society of things reads the
+added included. Unbound things use the existing thing/look renderer through their society;
+support-bound documents require a compatible authored-version reader. A society of things reads the
 version's placed things ([society contract](synthetic-society-contract.md#the-society-of-things-v7)):
 its placed beings live there, and its placed objects block walking and offer rests and visits as
 their kinds say.
+
+### Explicit support-bound placement
+
+`POST /world/versions/{version_id}/things/on-support` places a passive rigid object-class thing
+on an explicitly named horizontal surface of an admitted site-plan version 2 source. Its preview
+at `/things/on-support/preview` uses the same resolver and writes no state or history. The request
+states the existing kind reference, thing identity, origin role, region, east/south millimetre
+point and yaw, plus `exulanica.support-reference/v1`: world, source snapshot, generation receipt
+digest, support network digest, region and surface identity. The server resolves the height from
+that surface, uses the kind's own fixed box and keeps its scale unchanged. It never selects a
+highest mesh or a nearby floor.
+
+Support-bound placement requires the entire conservative
+all-yaw footprint and body height to fit. Actual source solids, other supported planes and current
+authored volume proxies must remain clear. It also protects the declared actor's node and swept
+connection envelopes, including the combined source place. This proves declared-envelope
+clearance, not arbitrary body, mesh-contact or locomotion compatibility. Source fixture envelopes
+count even when they do not block walking. This operation has no complete volume proxy for
+authored meshes, environments, point maps, source overrides or incompatible placed kinds; such
+current content in the region causes an explicit refusal. Their existing authored edit contracts
+remain unchanged.
+
+Migration 0206 stores nullable support fields on the existing thing row and binds the support
+snapshot to the same owning version's source. A bound thing has the explicit closed
+`exulanica.placed-thing/v2` document; its canonical delta selects schema version 5 and its API
+version view selects version 6. Unbound thing documents and their delta/view versions retain
+their original bytes. Kind/origin guards, workspace isolation, compare-and-swap, saved-entry
+advancement and edit history remain authoritative. A successful freeform thing move clears its
+own affinity; a failed edit changes nothing. Removal retains the reference, undo restores the
+stored binding exactly, and same-source branching preserves it. A different-source carry refuses
+the bound placement. Existing package formats withhold the things section and its lineage; they
+do not export a transform while discarding support. The browser reads view version 6 and preserves
+its closed support bindings. It draws a passive supported thing only after an authorized support
+availability read matches its version, state and binding, including the source snapshot. The
+mounted site-plan version 2 drawing must match the world, receipt, network, region and surface.
+The saved unscaled transform must name that surface's height. The existing look stands at that exact
+region-local pose under the source region root, without adding the society's arrival height.
+Picking uses the figure at its elevated pose.
+
+Display availability expires five seconds from the start of each support read. A request times out
+after 1.5 seconds; individual items expire independently during bounded refresh rounds. Failed,
+unavailable, expired or mismatched reads hide the affected figure and its pick volume, with no
+ground fallback. An observed version change, erased kind or source invalidation revokes availability
+before asynchronous repaint, and stale reads or pending figure loads cannot restore it. Undo and
+reopening require fresh validation. This is a bounded observation of source and placement
+availability, not instantaneous detection of changes made elsewhere. Other authored objects,
+unbound things and their editing retain their existing behavior.
+
+`GET /world/versions/{version_id}/things/{thing_id}/support` reads affinity and current clearance
+separately from canonical state. The queried thing is excluded from its own obstruction set;
+unknown or newly overlapping content becomes unavailable. No read moves it or guesses a surface.
+Its `society` result distinguishes a bounded omission from an unavailable projection. The existing
+closed society input can omit a freshly revalidated passive object only where its entire rigid
+volume is disjoint from all declared actor envelopes and a real rest/visit offer can be recorded
+as unavailable with a truthful existing reason. A bound thing resting on the ground plane is not
+off-ground; without a supported ground-affinity projection it is explicitly unavailable rather
+than given that reason. Full v2 document digests remain dependencies. It does not infer elevated activities
+or inhabitants. Missing source, unknown occupancy, overlap or lack of a truthful existing activity
+record makes the society projection unavailable. Later edits and undo recheck this condition;
+the society observer may reject an edit or record an unavailable input according to its existing
+engine policy. Initialization from an unavailable input can return `422 invalid_society_state`.
+
+Rendering and society projection remain separate: a supported object with available placement
+clearance can be visible and selectable while the ground-level society deliberately omits it.
+Its saved pose is not replaced by a society ground position or holder. Display availability does
+not grant an elevated rest or visit, extend inhabitant navigation, or establish clearance for
+editable terrain.
+
+General authored mesh movement continues to accept its existing finite transforms. Supported
+placement adds no universal ground check to that operation. The existing removal/erasure paths
+delete the thing's support columns and edit history with their owning world; restored tombstones
+prevent the removed world from serving again. Shared inhabitant path heights, seated-body
+clearance, giant movement, ramps, lifts and city transit are not established by this placement
+operation.
 
 ## Bounded scene-extraction preparation
 

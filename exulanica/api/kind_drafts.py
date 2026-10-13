@@ -9,12 +9,12 @@ drafted kind to both stages of the kind checks in the kind worker as a creator's
 and keeps a passing kind in the workspace, origin ``drafted``, with its provenance and never the
 words.
 
-The words are held only while the draft runs: a draft that ends forgets them, as a reference
-request does. The state lives in this API process, which a deployment runs one of for drafting, or
-routes each person to one of (``docs/deployment.md`` section 5.4). A ready draft's result is the
-kept kind itself, which outlives the process; a draft's ended state is answered for
-:data:`KEEP_SECONDS`. A draft still running when the process stops is lost, and what it had spent
-stands: the page then reads ``kind_draft_unknown`` and offers to start again.
+The words are held only while the draft runs. Native kind routes use the durable repository and
+worker; this holder supplies bounded local execution capacity and remains a transient runner for
+pure callers. Kind and whole-world workers enter it after shared database admission. Their jobs
+retain identity and outcomes across process replacement without automatically repeating uncertain
+paid work. Ended native-kind views are retained for :data:`KEEP_SECONDS`.
+
 """
 
 from __future__ import annotations
@@ -26,12 +26,12 @@ import math
 import threading
 import time
 import uuid
-from collections.abc import Callable, Mapping
-from contextlib import AbstractContextManager
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, Protocol
 
 import psycopg
 
@@ -160,7 +160,9 @@ def draft_deadline_seconds(client: ModelClient | None = None) -> float:
 def _instructions_characters() -> int:
     from exulanica.world.society_living import town_routine
 
-    return len(render_instructions(kind_drafting_prompt(), load_kind_catalogs(), town_routine()))
+    prompt = kind_drafting_prompt()
+    catalogs = load_kind_catalogs(bounds_version=2 if prompt.version >= 7 else 1)
+    return len(render_instructions(prompt, catalogs, town_routine()))
 
 
 def attempt_floor_usd(client: ModelClient) -> dict[str, Decimal]:
@@ -265,6 +267,8 @@ class KindDraft:
     #: each with the person's own words that chose it; None where none was taken.
     look: Mapping[str, Any] | None = None
     setting: Mapping[str, Any] | None = None
+    #: Content erased with the resulting world; timing remains for the starts-per-hour budget.
+    erased: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -295,6 +299,9 @@ class KindDrafts:
     _drafts: dict[uuid.UUID, KindDraft] = field(default_factory=dict, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _closing: threading.Event = field(default_factory=threading.Event, repr=False)
+    _reserved: int = field(default=0, repr=False)
+    _erased_entries: set[tuple[uuid.UUID, uuid.UUID]] = field(default_factory=set, repr=False)
+    _active_worlds: dict[uuid.UUID, uuid.UUID] = field(default_factory=dict, repr=False)
 
     @property
     def closing(self) -> bool:
@@ -307,6 +314,24 @@ class KindDrafts:
 
     def _budget(self, told: int | None, budget: str, *, guest: bool = False) -> int:
         return current_world_draft_policy().figure(budget, guest=guest) if told is None else told
+
+    @contextmanager
+    def kind_start_count(self, actor: uuid.UUID) -> Iterator[int]:
+        """Actor-wide native kind starts in the window, including erased timing.
+
+        Hold the native admission lock until durable world admission finishes, so another kind
+        start in this process cannot change the sampled count. Kind start timing remains local
+        to this holder; durable world starts are counted by the database, never counted here.
+        """
+        with self._lock:
+            now = self.clock()
+            self._forget(now)
+            yield sum(
+                draft.actor == actor
+                and draft.purpose == "kind"
+                and now - draft.started < self.keep_seconds
+                for draft in self._drafts.values()
+            )
 
     def refusal(
         self, workspace_id: uuid.UUID, actor: uuid.UUID, *, guest: bool = False
@@ -345,6 +370,23 @@ class KindDrafts:
                 retry_seconds=self._retry(actor, now, guest),
             )
 
+    @contextmanager
+    def execution_slot(self) -> Iterator[None]:
+        """Reserve only this process's capacity before claiming durable work."""
+        with self._lock:
+            self._forget(self.clock())
+            active = sum(d.state == "drafting" for d in self._drafts.values())
+            if self.closing or active + self._reserved >= self._budget(
+                self.per_server, "drafts_at_once"
+            ):
+                raise KindDraftCapacity()
+            self._reserved += 1
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._reserved -= 1
+
     def start(
         self,
         workspace_id: uuid.UUID,
@@ -355,24 +397,34 @@ class KindDrafts:
         deadline: float | None = None,
         guest: bool = False,
         purpose: Purpose = "kind",
+        identity: uuid.UUID | None = None,
+        admitted: bool = False,
+        reserved: bool = False,
     ) -> KindDraft:
         """Start ``job`` on a thread of its own for a new draft, or refuse while the workspace,
         the person (a guest by a guest's figure) or the process already runs or started as many
         as it may."""
+        if identity is not None and purpose != "world" and not admitted:
+            raise ValueError("only a durably admitted draft supplies its identity")
         with self._lock:
             now = self.clock()
             self._forget(now)
-            busy = self._busy(workspace_id)
+            busy = None if admitted else self._busy(workspace_id)
             if busy is not None:
                 raise KindDraftBusy(busy.draft_id, busy.actor, busy.purpose)
-            retry = self._retry(actor, now, guest)
+            retry = None if admitted else self._retry(actor, now, guest)
             if retry is not None:
                 raise KindDraftLimit(retry)
             at_once = self._budget(self.per_server, "drafts_at_once")
-            if sum(draft.state == "drafting" for draft in self._drafts.values()) >= at_once:
+            if (
+                not reserved
+                and sum(draft.state == "drafting" for draft in self._drafts.values())
+                + self._reserved
+                >= at_once
+            ):
                 raise KindDraftCapacity()
             draft = KindDraft(
-                draft_id=uuid.uuid4(),
+                draft_id=identity or uuid.uuid4(),
                 workspace_id=workspace_id,
                 actor=actor,
                 description=description,
@@ -383,8 +435,11 @@ class KindDrafts:
                 purpose=purpose,
             )
             self._drafts[draft.draft_id] = draft
+            if purpose == "world":
+                self._active_worlds[draft.draft_id] = workspace_id
             snapshot = dataclasses.replace(draft)
-        # A daemon: a draft still running when the process stops is lost, never waited for.
+        # A daemon holds only local execution state. Durable jobs retain identity and recover
+        # under their recorded lease; transient callers retain only this process record.
         thread = threading.Thread(
             target=self._run, args=(draft, job), name=f"kind-draft-{draft.draft_id}", daemon=True
         )
@@ -394,6 +449,8 @@ class KindDrafts:
             # No thread to run it on: the draft never started and holds no place.
             with self._lock:
                 self._drafts.pop(draft.draft_id, None)
+                self._active_worlds.pop(draft.draft_id, None)
+                self._trim_erased_entries()
             raise KindDraftCapacity() from failed
         return snapshot
 
@@ -412,6 +469,7 @@ class KindDrafts:
             draft = self._drafts.get(draft_id)
             if (
                 draft is None
+                or draft.erased
                 or draft.workspace_id != workspace_id
                 or draft.actor != actor
                 or draft.purpose != purpose
@@ -430,6 +488,7 @@ class KindDrafts:
                 dataclasses.replace(draft)
                 for draft in self._drafts.values()
                 if draft.workspace_id == workspace_id
+                and not draft.erased
                 and draft.actor == actor
                 and draft.purpose == purpose
             ]
@@ -439,7 +498,7 @@ class KindDrafts:
         """Say where a draft still running has got to (its stage, the tool taken): read by its
         polls, and never a way to end it or to change one that has ended."""
         with self._lock:
-            if draft.state != "drafting":
+            if draft.erased or draft.state != "drafting":
                 return
             for name, value in fields.items():
                 setattr(draft, name, value)
@@ -449,7 +508,7 @@ class KindDrafts:
         """Set what the job found, once, and forget the words: a draft that ended stays as it
         ended and keeps nothing a person typed."""
         with self._lock:
-            if draft.state != "drafting":
+            if draft.erased or draft.state != "drafting":
                 return
             for name, value in fields.items():
                 setattr(draft, name, value)
@@ -462,6 +521,10 @@ class KindDrafts:
         be meanwhile: a job that outlived the bound it is ended as failed by has still made its
         world, and a person is never told to say again what is already theirs."""
         with self._lock:
+            entry_id = fields.get("entry_id", draft.entry_id)
+            if draft.erased or (draft.workspace_id, entry_id) in self._erased_entries:
+                self._erase_content(draft)
+                return
             if draft.state == "ready":
                 return
             for name, value in fields.items():
@@ -470,6 +533,51 @@ class KindDrafts:
             draft.description = ""
             draft.changed = self.clock()
             self._forget(draft.changed)
+
+    @staticmethod
+    def _erase_content(draft: KindDraft) -> None:
+        """Discard content in place, including a job's reference to this same draft object."""
+        draft.erased = True
+        draft.state = "refused"
+        draft.description = ""
+        draft.kind = draft.version = draft.entry_id = None
+        draft.refusal = draft.model_id = None
+        draft.stage = draft.tool = draft.tool_chosen = None
+        draft.calls = draft.made = draft.left_out = ()
+        draft.look = draft.setting = None
+
+    def erase_kind(self, workspace_id: uuid.UUID, kind: str, version: int) -> None:
+        """Scrub a removed kind's drafts, including the gap between commit and finish."""
+        with self._lock:
+            for draft in self._drafts.values():
+                if (
+                    draft.workspace_id == workspace_id
+                    and draft.purpose == "kind"
+                    and draft.kind == kind
+                    and draft.version == version
+                ):
+                    self._erase_content(draft)
+
+    def erase_entries(self, workspace_id: uuid.UUID, entry_ids: set[uuid.UUID]) -> None:
+        """Forget removed worlds' draft content without refunding their start allowance.
+
+        Entry identities remain only while an in-flight world draft could report a result.
+        This also covers a world removed after its database commit but before ``made`` runs.
+        Other processes must check saved-entry existence before serving their local draft.
+        """
+        with self._lock:
+            self._erased_entries.update((workspace_id, entry_id) for entry_id in entry_ids)
+            for draft in self._drafts.values():
+                if draft.workspace_id == workspace_id and draft.entry_id in entry_ids:
+                    self._erase_content(draft)
+            self._trim_erased_entries()
+            self._forget(self.clock())
+
+    def _trim_erased_entries(self) -> None:
+        active = set(self._active_worlds.values())
+        self._erased_entries.intersection_update(
+            item for item in self._erased_entries if item[0] in active
+        )
 
     def _run(self, draft: KindDraft, job: Callable[[KindDraft, KindDrafts], None]) -> None:
         try:
@@ -480,6 +588,9 @@ class KindDrafts:
         finally:
             # A job that returned without saying how it ended has refused nothing it could name.
             self.finish(draft, state="refused", refusal=dict(_FAILED))
+            with self._lock:
+                self._active_worlds.pop(draft.draft_id, None)
+                self._trim_erased_entries()
 
     def _busy(self, workspace_id: uuid.UUID) -> KindDraft | None:
         running = [
@@ -545,8 +656,15 @@ class _ChecksUnavailable(Exception):
     """The kind worker could not check a drafted kind: the server's state, never the model's."""
 
 
+class DraftRecorder(Protocol):
+    @property
+    def closing(self) -> bool: ...
+
+    def finish(self, draft: KindDraft, **fields: Any) -> None: ...
+
+
 def _checked(
-    workspace_id: uuid.UUID, drafts: KindDrafts
+    workspace_id: uuid.UUID, drafts: DraftRecorder
 ) -> Callable[[dict[str, Any]], KindVerdict]:
     """Both stages of the kind checks, stage B in the kind worker, as an upload is checked."""
 
@@ -584,7 +702,7 @@ def _checked(
 
 def drafted_kind(
     draft: KindDraft,
-    drafts: KindDrafts,
+    drafts: DraftRecorder,
     *,
     client: ModelClient,
     text: str,
@@ -711,6 +829,8 @@ def run_draft(
     )
     if outcome is None or outcome.kind is None or outcome.report is None:
         return
+    # Publish identity before commit so erasure can scrub even before finish records ready.
+    drafts.advance(draft, kind=outcome.kind.kind, version=outcome.kind.version)
     try:
         with opened() as connection:
             kept = WorkspaceKinds(connection, workspace_id).append(

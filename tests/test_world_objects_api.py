@@ -23,8 +23,8 @@ from exulanica.world import GLB_MEDIA_TYPE, WorldStructureRepository, reviewed_a
 from fastapi.testclient import TestClient
 
 from tests_support_api import EVERY_PERMISSION
-from world_structure_fixtures import structural_candidate
-from world_support import FIXTURE_WORLD_ID, registered_world
+from world_structure_fixtures import invalidate_snapshot_source, structural_candidate
+from world_support import FIXTURE_WORLD_ID, fixture_workspace, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -565,10 +565,9 @@ def test_a_known_style_version_is_accepted_as_the_appearance_reference(objects_a
 def test_a_deleted_source_refuses_further_edits_over_http(objects_api, repository):
     """The sixth problem code, which had no HTTP test."""
     version = objects_api.add(objects_api.version()).json()
-    repository.insert_tombstone(
-        scope="workspace", requested_by=uuid.uuid4(), reason="the person deleted their world"
+    invalidate_snapshot_source(
+        repository, objects_api.world_id, objects_api.snapshot_id, objects_api.actor
     )
-    repository.connection.commit()
 
     read = objects_api.get(objects_api.in_world(f"/world/versions/{version['version_id']}"))
     assert read.status_code == 200
@@ -618,7 +617,8 @@ def test_another_workspace_cannot_see_or_edit_a_version(objects_api, repository)
     assert objects_api.stranger_get(nobody).json() == listed.json()
 
     # A world of the same id in the stranger's own workspace holds none of the owner's versions.
-    registered_world(repository.connection, objects_api.stranger_workspace_id)
+    with fixture_workspace(repository.connection, objects_api.stranger_workspace_id):
+        registered_world(repository.connection, objects_api.stranger_workspace_id)
     assert objects_api.stranger_get(objects_api.in_world("/world/versions")).json() == []
     read = objects_api.stranger_get(at)
     assert read.status_code == 404

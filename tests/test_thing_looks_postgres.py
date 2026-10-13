@@ -158,11 +158,11 @@ def test_the_table_holds_its_shape_and_refuses_every_change(world, repository):
                 ),
             )
         connection.rollback()
-    for change in (
-        "update world_thing_look set look='blocky-knight'",
-        "delete from world_thing_look",
+    for change, guard in (
+        ("update world_thing_look set look='blocky-knight'", "appended and never changed"),
+        ("delete from world_thing_look", "erased whole"),
     ):
-        with pytest.raises(psycopg.errors.CheckViolation, match="appended and never changed"):
+        with pytest.raises(psycopg.errors.CheckViolation, match=guard):
             connection.execute(change)
         connection.rollback()
 

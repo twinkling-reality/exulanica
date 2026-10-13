@@ -331,11 +331,11 @@ comparison, and the developer client reads it, its runs and their decisions thro
 is reported `not_served`; the model and comparison gates are served in part, for one group under one
 model and one simulated hour of the town.
 
-**The judge seed.** The last session exports the run's workspace with `exulanica-seed export`,
+**Reviewer export.** The last session exports the run's workspace with `exulanica-seed export`,
 verifies the archive, and restores it into a fresh database on the run's own server and an empty
-data directory with the judge deployment's jobs (`exulanica-db`, `exulanica-seed role` and
-`restore`), then reads each town's tiles back from them: every tile must read baked, with its bytes
-in the restored tile store.
+data directory with the reviewer stack's jobs (`exulanica-db`, `exulanica-seed role` and
+`restore`). The stack files live under `deploy/judge/`. It then reads each town's tiles back
+from them: every tile must read baked, with its bytes in the restored tile store.
 
 **The Companion's memory and the made world.** In the world made from the photographs the Companion
 is asked for a change the reviewed design cannot make and must answer once, without offering to

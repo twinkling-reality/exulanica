@@ -61,13 +61,13 @@ def _open_request(purged) -> uuid.UUID:
     return made.piece_request_id
 
 
-def _state(purged, piece_request_id: uuid.UUID) -> tuple[str, str | None]:
-    [row] = purged.rows(
+def _state(purged, piece_request_id: uuid.UUID) -> tuple[str, str | None] | None:
+    rows = purged.rows(
         "select state, failure from piece_request where piece_request_id = %s and world_id = %s",
         piece_request_id,
         FIXTURE_WORLD_ID,
     )
-    return row["state"], row["failure"]
+    return (rows[0]["state"], rows[0]["failure"]) if rows else None
 
 
 def _workspace_tombstone_as_runtime(purged) -> None:
@@ -78,13 +78,13 @@ def _workspace_tombstone_as_runtime(purged) -> None:
         )
 
 
-def test_the_runtime_role_s_workspace_tombstone_cancels_an_open_request(purged) -> None:
+def test_the_runtime_role_s_workspace_tombstone_erases_an_open_request(purged) -> None:
     made = _open_request(purged)
     _workspace_tombstone_as_runtime(purged)
-    assert _state(purged, made) == ("cancelled", "workspace_deleted")
+    assert _state(purged, made) is None
 
 
-def test_the_administrative_role_s_workspace_tombstone_cancels_an_open_request(purged) -> None:
+def test_the_administrative_role_s_workspace_tombstone_erases_an_open_request(purged) -> None:
     made = _open_request(purged)
     with purged.database().session(purged.workspace_id) as connection:
         connection.execute(
@@ -92,7 +92,7 @@ def test_the_administrative_role_s_workspace_tombstone_cancels_an_open_request(p
             "values (%s, 'workspace', %s, 'an operator deleted the workspace')",
             (purged.workspace_id, uuid.uuid4()),
         )
-    assert _state(purged, made) == ("cancelled", "workspace_deleted")
+    assert _state(purged, made) is None
 
 
 def test_a_capture_tombstone_reaches_no_piece_request(purged) -> None:
@@ -108,12 +108,12 @@ def test_a_restore_replays_the_tombstone_onto_the_request_the_backup_held_open(
     made = _open_request(purged)
 
     def current() -> bool:
-        return _state(purged, made)[0] == "requested"
+        return _state(purged, made) == ("requested", None)
 
     assert not _through_a_restore(
         purged, tmp_path, withdraw=lambda: _workspace_tombstone_as_runtime(purged), current=current
     )
-    assert _state(purged, made) == ("cancelled", "workspace_deleted")
+    assert _state(purged, made) is None
 
 
 def _made_batch(purged) -> None:

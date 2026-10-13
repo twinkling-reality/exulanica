@@ -47,7 +47,7 @@ from psycopg.rows import dict_row
 
 import pg_harness
 from test_interaction_policy_postgres import proposal as interaction_proposal
-from world_support import FIXTURE_WORLD_ID, registered_world
+from world_support import FIXTURE_WORLD_ID, historical_world_fixture_schema, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -151,7 +151,8 @@ def _admit(admin, workspace, store, place_id, tmp_path) -> uuid.UUID:
 
 def _styles(admin, workspace, topology) -> WorldStyleRepository:
     _as(admin, workspace)
-    registered_world(admin, workspace)
+    with historical_world_fixture_schema(admin):
+        registered_world(admin, workspace)
     styles = WorldStyleRepository(admin, workspace, world_id=FIXTURE_WORLD_ID)
     if (
         admin.execute(
@@ -185,7 +186,8 @@ def _style_preview(admin, workspace, proposal_id):
 
 def _interaction_preview(admin, workspace, proposal_id):
     _as(admin, workspace)
-    registered_world(admin, workspace)
+    with historical_world_fixture_schema(admin):
+        registered_world(admin, workspace)
     policies = WorldInteractionPolicyRepository(admin, workspace, world_id=FIXTURE_WORLD_ID)
     return policies.preview(interaction_proposal(policies, FIELD_OF_VIEW, proposal_id=proposal_id))
 

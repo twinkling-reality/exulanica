@@ -460,6 +460,17 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"base_state_sha256": _ZERO_DIGEST},
     },
+    "POST /world/versions/{version_id}/inventory/query": {
+        **_IN_WORLD,
+        "json": {
+            "profile": "exulanica.world-entity-query/v1",
+            "predicate": {
+                "kind": "declared_base_colour",
+                "quantifier": "any_constant_primitive",
+                "colour": {"kind": "swatch", "srgb8": [242, 200, 74]},
+            },
+        },
+    },
     "POST /world/versions/{version_id}/models/{role_key}": {
         **_IN_WORLD,
         "json": {
@@ -633,6 +644,8 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "origin_role": "fictional",
         },
     },
+    "POST /world/versions/{version_id}/things/on-support": build.support_placement_probe(),
+    "POST /world/versions/{version_id}/things/on-support/preview": build.support_placement_probe(),
     "POST /world/versions/{version_id}/things/undo": {
         **_IN_WORLD,
         "json": {"base_state_sha256": _ZERO_DIGEST},
@@ -815,6 +828,8 @@ class Owned:
 
     build: Callable[[Any], object]
     invent: Callable[[], str] = _uuid
+    #: Require a successful owner request, beyond a merely different refusal.
+    owner_succeeds: bool = False
 
 
 @dataclass(frozen=True)
@@ -845,8 +860,19 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/formation/{batch_id}": Owned(build.intake_batch),
     "/geometry/{artifact_id}": Owned(build.point_map),
     "/materials/recipes/{recipe_id}": Owned(build.material_recipe),
+    "/models/bindings/{binding_sha256}": Owned(
+        build.model_binding, build.invented_digest, owner_succeeds=True
+    ),
+    "/models/probes/{probe_id}": Owned(build.model_probe, owner_succeeds=True),
     "/operations/derivative-jobs/{job_id}": Owned(build.derivative_job),
     "/operations/reconstruction-scenes/{job_id}": Owned(build.reconstruction_job),
+    "/participation/{grant_id}": Owned(build.invitation, owner_succeeds=True),
+    "/participation/{grant_id}/world/files/{sha256}": Owned(
+        build.participation_file, build.invented_digest, owner_succeeds=True
+    ),
+    "/participation/{grant_id}/world/tiles/{baked_tile_id}": Owned(
+        build.participation_tile, owner_succeeds=True
+    ),
     "/person-regions/{capture_id}": Owned(build.capture),
     "/person-subjects/{subject_id}": Owned(build.person_subject),
     "/personal-admission/model-rights/{right_id}": Owned(build.model_right),
@@ -894,6 +920,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     ),
     "/world/interactions/previews/{preview_id}": Owned(build.interaction_preview),
     "/world/interactions/proposals/{proposal_id}": Owned(build.interaction_proposal),
+    "/world/invitations/{grant_id}": Owned(build.invitation, owner_succeeds=True),
     "/world/piece-requests/{piece_request_id}": Owned(build.piece_request),
     "/world/projects/{project_id}": Owned(build.world_project),
     "/world/projects/{project_id}/items/{item_id}": Owned(build.world_project_item),
@@ -933,6 +960,9 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     ),
     "/world/versions/{version_id}/society/play/{subject_id}": Owned(build.society_thing),
     "/world/versions/{version_id}/society/things/{thing_id}": Owned(build.society_thing),
+    "/world/versions/{version_id}/subjects/{ref}": Owned(
+        build.selected_subject, build.invented_subject
+    ),
     "/world/versions/{version_id}/things/{thing_id}": Owned(
         build.placed_thing, build.invented_thing
     ),
@@ -945,15 +975,29 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     ),
     "/worlds/drafts/{draft_id}": Owned(build.world_draft),
     "/worlds/kinds/drafts/{draft_id}": Owned(build.kind_draft),
+    "/worlds/kinds/versions/{document_sha256}": Owned(build.held_world_kind, build.invented_digest),
     "/worlds/references/{reference_id}": Owned(build.reference_request),
+    "/worlds/{world_id}": Owned(build.removable_world, owner_succeeds=True),
 }
 
 #: Routes that ask about a narrower kind than their address names, each with the builder that makes
 #: it, sorted by path and then method. The district read asks about a version, and only a version
 #: whose district the host registered can be answered for its owner.
 BUILDER_OVERRIDES: Final[Mapping[str, Mapping[str, Owned | Shared]]] = {
+    "GET /world/versions/{version_id}/inventory": {
+        "/world/versions/{version_id}": Owned(build.world_version, owner_succeeds=True)
+    },
+    "POST /world/versions/{version_id}/inventory/query": {
+        "/world/versions/{version_id}": Owned(build.world_version, owner_succeeds=True)
+    },
     "GET /world/versions/{version_id}/society/district": {
         "/world/versions/{version_id}": Owned(build.district_version)
+    },
+    "POST /world/versions/{version_id}/things/on-support": {
+        "/world/versions/{version_id}": Owned(build.supported_version, owner_succeeds=True)
+    },
+    "POST /world/versions/{version_id}/things/on-support/preview": {
+        "/world/versions/{version_id}": Owned(build.supported_version, owner_succeeds=True)
     },
     "GET /world/versions/{version_id}/tiles/{baked_tile_id}/bytes": {
         "/world/versions/{version_id}": Owned(build.generated_tile)
@@ -967,8 +1011,11 @@ EXISTENCE_REQUESTS: Final[Mapping[str, Callable[[Any], dict[str, Any]]]] = {
     "POST /environment-resources/sources/{admission_id}/feature-indexes": (
         build.feature_index_request
     ),
+    "POST /models/probes/{probe_id}/start": build.model_probe_start_request,
     "PUT /world-entries/{entry_id}": build.entry_update_request,
     "POST /world/styles/previews/{preview_id}/apply": build.style_apply_request,
+    "POST /world/versions/{version_id}/things/on-support": build.support_placement_request,
+    "POST /world/versions/{version_id}/things/on-support/preview": build.support_placement_request,
     "GET /world/versions/{version_id}/tiles/{baked_tile_id}/bytes": build.generated_tile_request,
     "GET /world/versions/{version_id}/traffic/comparisons/{comparison_id}": (
         build.signal_comparison_request

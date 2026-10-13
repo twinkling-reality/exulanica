@@ -920,12 +920,11 @@ def test_after_its_own_look_is_withdrawn_a_world_takes_regional_changes_and_fall
     assert world.steps(plant)[0]["kind"] == "applied"
 
 
-def test_a_world_wears_no_creator_s_own_pack_yet(world) -> None:
-    # A creator's ready pack may be worn as far as its own check says, but a world's appearance is
-    # history no erasure rewrites, so for now it names only looks of generated pieces.
+def test_a_world_wears_no_creator_s_upload_before_its_check_passes(world) -> None:
+    # Uploads may be named after admission and preparation, never merely after recording bytes.
     pack = admitted()
-    world.packs.ready(pack)
-    assert world.own().wearable(pack.manifest_sha256)
+    world.own().record(pack)
+    assert not world.own().wearable(pack.manifest_sha256)
     current = world.styles.current()
     with pytest.raises(psycopg.errors.CheckViolation, match="own_pack_not_wearable"):
         world.packs.connection.execute(

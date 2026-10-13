@@ -28,16 +28,15 @@ answers at once with a draft the page polls at ``GET /worlds/kinds/drafts/{draft
 
 from __future__ import annotations
 
-import functools
 import json
 import math
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any, Final, Literal
 
-from fastapi import APIRouter, Depends
+import psycopg
+from fastapi import APIRouter, Depends, Path, Request
 from fastapi.responses import JSONResponse, Response
-from psycopg.rows import dict_row
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from exulanica.api.dependencies import (
@@ -47,32 +46,34 @@ from exulanica.api.dependencies import (
     ScopedConnection,
     get_services,
     holds_as_guest,
+    owns_workspace,
 )
 from exulanica.api.kind_drafts import (
     KIND_DRAFT_CODES,
     KINDS_FROM_PEOPLE_NOT_OFFERED,
     KINDS_FROM_PEOPLE_NOT_OFFERED_DETAIL,
     KindDraft,
-    KindDraftBusy,
     KindDraftCapacity,
-    KindDraftLimit,
+    KindDrafts,
     allowance_refusal,
     draft_deadline_seconds,
-    run_draft,
 )
 from exulanica.api.permissions import Permission
 from exulanica.api.routes.selection import ExecutionView, ModelNotConfigured, _execution
 from exulanica.api.routes.world_entries import SavedWorldEntryView, _view
 from exulanica.api.sayable import sayable
 from exulanica.api.services import Services
+from exulanica.api.world_draft_worker import manifest_sha256
 from exulanica.api.world_scope import WorldId
-from exulanica.epistemics.hosted_requests import no_place_released
 from exulanica.models.manifest import load_manifest
+from exulanica.selection.calls import AttemptOutcome, CallCost, ModelCall
 from exulanica.selection.kind_drafting import kind_drafting_prompt
 from exulanica.selection.world_drafting import sendable
+from exulanica.world import draft_admission
 from exulanica.world.composers import GeneratedWorldRefused, UnknownWorldComposer
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.generated_worlds import generation_receipt, states_site
+from exulanica.world.kind_draft_jobs import KindDraftRepository
 from exulanica.world.kinds.document import (
     KIND_CODES,
     KindDocument,
@@ -80,12 +81,14 @@ from exulanica.world.kinds.document import (
     KindValueRefused,
     read_kind,
 )
+from exulanica.world.kinds.erasure import KindErasureRefused, erase_kind, removal_preview
 from exulanica.world.kinds.library import shipped_kinds, town_adapter
 from exulanica.world.kinds.repository import (
     KindCapReached,
     KindUnreadable,
     KindVersionExists,
     WorkspaceKinds,
+    forget_kind,
 )
 from exulanica.world.kinds.samples import SiteRefused
 from exulanica.world.kinds.worker import (
@@ -101,6 +104,7 @@ from exulanica.world.kinds.worker import (
     kind_worker,
 )
 from exulanica.world.saved_entries import InvalidSavedWorldTitle, SavedWorldEntryRepository
+from exulanica.world.world_draft_jobs import WorldDraftRefused
 from exulanica.world.world_recipes import (
     SpecificationRefused,
     UnknownWorldRecipe,
@@ -264,6 +268,8 @@ class CreateKindWorldBody(BaseModel):
     #: Values for any of the kind's parameters, each held to its range by the kind's gate, which
     #: refuses by name, so they are taken as the JSON sent.
     values: Annotated[dict[str, Any] | None, Field(max_length=64)] = None
+    #: Explicit bounded support authoring; absent retains the historical composer/drawing.
+    support: dict[str, Any] | None = None
 
 
 def _echo(value: object) -> object:
@@ -406,7 +412,15 @@ def _drafting(
         except KindCapReached as exc:
             code = exc.code
         else:
-            code = services.kind_drafts.refusal(workspace_id, actor, guest=guest)
+            holder = services.kind_drafts
+            maximum = holder._budget(holder.starts_per_hour, "starts_an_hour", guest=guest)
+            admitted = draft_admission.allowance(connection, workspace_id, actor, maximum)
+            if admitted["running_count"] >= holder._budget(
+                holder.per_workspace, "workspace_drafts_at_once"
+            ):
+                code = "kind_draft_busy"
+            elif admitted["left"] == 0:
+                code = "kind_draft_limit"
     return KindDraftingView(
         offered=code is None,
         code=code,
@@ -492,7 +506,10 @@ def upload_kind(
     try:
         # Before the worker builds anything; the append asks again under the workspace's lock.
         stored.refuse_before_checks(kind)
-    except (KindVersionExists, KindCapReached) as exc:
+    except (KindVersionExists, KindCapReached, KindErasureRefused) as exc:
+        if isinstance(exc, KindErasureRefused):
+            forget_kind(kind.sha256)
+            kind_worker().forget_kind(str(session.workspace_id), kind.sha256)
         return _problem(409, exc.code, str(exc))
     worker = kind_worker()
     # Kept by the workspace with the document: two workspaces sending one document are told nothing
@@ -516,7 +533,10 @@ def upload_kind(
     report = answer["report"]
     try:
         kept = stored.append(kind, report, created_by=session.actor)
-    except (KindVersionExists, KindCapReached) as exc:
+    except (KindVersionExists, KindCapReached, KindErasureRefused) as exc:
+        if isinstance(exc, KindErasureRefused):
+            forget_kind(kind.sha256)
+            kind_worker().forget_kind(str(session.workspace_id), kind.sha256)
         return _problem(409, exc.code, str(exc))
     return UploadedKindView(kind=_kind_view(kept.kind, "workspace"), validation=dict(report))
 
@@ -563,12 +583,29 @@ class KindDraftView(BaseModel):
 
 
 def _draft_view(
-    draft: KindDraft, connection: Any, workspace_id: uuid.UUID, now: float
+    draft: KindDraft,
+    connection: Any,
+    workspace_id: uuid.UUID,
+    now: float,
+    holder: KindDrafts | None = None,
 ) -> KindDraftView:
     kind = None
-    if draft.state == "ready" and draft.kind is not None and draft.version is not None:
-        stored = WorkspaceKinds(connection, workspace_id).version(draft.kind, draft.version)
-        kind = None if stored is None else _kind_view(stored.kind, "workspace")
+    if draft.kind is not None and draft.version is not None:
+        kinds = WorkspaceKinds(connection, workspace_id)
+        stored = kinds.version(draft.kind, draft.version) if draft.state == "ready" else None
+        # An identified draft may still be between append and finish in another process.
+        # Ordinary absence before append is not erasure; its retirement record is definitive.
+        erased = (
+            stored is None
+            if draft.state == "ready"
+            else kinds.version_erased(draft.kind, draft.version)
+        )
+        if erased:
+            if holder is not None:
+                holder.erase_kind(workspace_id, draft.kind, draft.version)
+            KindDrafts._erase_content(draft)
+        elif stored is not None:
+            kind = _kind_view(stored.kind, "workspace")
     prompt = kind_drafting_prompt()
     ended = draft.state != "drafting"
     return KindDraftView(
@@ -592,6 +629,48 @@ def _draft_view(
     )
 
 
+def _durable_kind_view(row: dict, connection: Any) -> KindDraftView:
+    now = datetime.now(UTC)
+    end = row["completed_at"] or now
+    doc = row["outcome"] or {}
+    draft = KindDraft(
+        draft_id=row["draft_id"],
+        workspace_id=row["workspace_id"],
+        actor=row["actor_id"],
+        description=row["description"] or "",
+        started_at=row["started_at"],
+        started=0,
+        changed=(end - row["started_at"]).total_seconds(),
+        deadline=row["deadline_seconds"],
+        state="drafting" if row["state"] in ("queued", "running") else doc.get("state", "refused"),
+        kind=doc.get("kind"),
+        version=doc.get("version"),
+        refusal=doc.get("refusal"),
+        model_id=doc.get("model_id"),
+        calls=tuple(
+            ModelCall(
+                **dict(
+                    call,
+                    outcome=AttemptOutcome(call["outcome"]),
+                    cost_basis=CallCost(call["cost_basis"]),
+                )
+            )
+            for call in doc.get("calls", ())
+        ),
+    )
+    view = _draft_view(
+        draft, connection, row["workspace_id"], (now - row["started_at"]).total_seconds()
+    )
+    return view.model_copy(
+        update={
+            "prompt_version": row["prompt_version"],
+            "execution": _execution(draft.calls, (), prompt_version=row["prompt_version"])
+            if draft.calls
+            else None,
+        }
+    )
+
+
 @router.post(
     "/drafts",
     response_model=KindDraftView,
@@ -601,6 +680,8 @@ def _draft_view(
 def start_kind_draft(
     body: DraftKindBody,
     connection: ReadOnlyConnection,
+    scoped: ScopedConnection,
+    request: Request,
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
     guest: Annotated[bool, Depends(holds_as_guest)],
@@ -635,47 +716,49 @@ def start_kind_draft(
         WorkspaceKinds(connection, workspace_id).refuse_when_full()
     except KindCapReached as exc:
         return _problem(409, exc.code, str(exc))
-    sent = sendable(connection, workspace_id, body.description)
-
-    def readable() -> Any:
-        return services.readonly_database.session(workspace_id)
-
-    def opened() -> Any:
-        return services.database.session(workspace_id)
-
-    # Describing a world is no use a place-name right offers, so no grant reaches these requests;
-    # the policy opens its own connection for each judgement, since the request's is gone by then.
-    client = services.model_client.with_policy(
-        services.request_policy(workspace_id, readable, released_places=no_place_released)
-    )
+    sendable(connection, workspace_id, body.description)
+    holder = services.kind_drafts
+    repo = KindDraftRepository(scoped, workspace_id)
     try:
-        draft = services.kind_drafts.start(
-            workspace_id,
-            session.actor,
-            body.description,
-            functools.partial(
-                run_draft,
-                client=client,
-                opened=opened,
-                readable=readable,
+        maximum = holder._budget(holder.starts_per_hour, "starts_an_hour", guest=guest)
+        workspace_maximum = holder._budget(holder.per_workspace, "workspace_drafts_at_once")
+        available = draft_admission.allowance(scoped, workspace_id, session.actor, maximum)
+        if available["running_count"] >= workspace_maximum:
+            raise WorldDraftRefused("kind_draft_busy")
+        if available["left"] == 0:
+            raise WorldDraftRefused("kind_draft_limit", available["retry_after_seconds"])
+        with holder.execution_slot():
+            ident = repo.submit(
                 actor=session.actor,
-                text=sent.text,
-                placeholders=sent.placeholders,
-            ),
-            deadline=draft_deadline_seconds(client),
-            guest=guest,
-        )
-    except KindDraftBusy as busy:
-        # The running draft's id is told only to the person who started it, and only where it is
-        # a kind's: a world's draft is read by its own route.
-        return _problem(409, "kind_draft_busy", str(busy), **busy.told_to(session.actor, "kind"))
-    except KindDraftLimit as limit:
-        return _problem(
-            429,
-            "kind_draft_limit",
-            "As many drafts as one person may start in an hour were started. Try again later.",
-            headers={"Retry-After": str(limit.retry_seconds)},
-        )
+                description=body.description,
+                guest=guest,
+                starts_maximum=holder._budget(
+                    holder.starts_per_hour, "starts_an_hour", guest=guest
+                ),
+                workspace_maximum=holder._budget(holder.per_workspace, "workspace_drafts_at_once"),
+                deadline_seconds=math.ceil(draft_deadline_seconds(services.model_client)),
+                manifest_sha256=manifest_sha256(services.model_client),
+                prompt_version=kind_drafting_prompt().prompt_version,
+            )
+    except WorldDraftRefused as failed:
+        if failed.code == "kind_draft_busy":
+            busy = draft_admission.allowance(scoped, workspace_id, session.actor, 1)["running"]
+            extra: dict[str, Any] = (
+                {"draft_id": str(busy["draft_id"])}
+                if busy and busy["actor_id"] == session.actor and busy["purpose"] == "kind"
+                else {}
+            )
+            return _problem(409, failed.code, "A draft is already running here.", **extra)
+        if failed.code == "kind_draft_limit":
+            return _problem(
+                429,
+                failed.code,
+                "As many drafts as one person may start in an hour were started. Try again later.",
+                headers={"Retry-After": str(failed.retry_after_seconds or 60)},
+            )
+        return _problem(409, "kind_draft_failed", "The draft could not be started.")
+    except KindCapReached as failed:
+        return _problem(409, failed.code, str(failed))
     except KindDraftCapacity:
         return _problem(
             503,
@@ -683,7 +766,12 @@ def start_kind_draft(
             "The server is drafting as many kinds as it may. Try again in a moment.",
             headers={"Retry-After": "30"},
         )
-    return _draft_view(draft, connection, workspace_id, services.kind_drafts.clock())
+    worker = getattr(request.app.state, "kind_draft_worker", None)
+    if worker is not None:
+        worker.notify(workspace_id)
+    row = repo.get(session.actor, ident)
+    assert row is not None
+    return _durable_kind_view(row, scoped)
 
 
 class KindDraftListView(BaseModel):
@@ -702,11 +790,10 @@ def list_kind_drafts(
 ) -> KindDraftListView:
     """The caller's drafts this server still holds in this workspace, newest first, so a reload,
     a second tab or a return finds a draft still running without starting another."""
-    now = services.kind_drafts.clock()
     return KindDraftListView(
         drafts=[
-            _draft_view(draft, connection, session.workspace_id, now)
-            for draft in services.kind_drafts.listing(session.workspace_id, session.actor)
+            _durable_kind_view(row, connection)
+            for row in KindDraftRepository(connection, session.workspace_id).listing(session.actor)
         ]
     )
 
@@ -722,17 +809,63 @@ def read_kind_draft(
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
 ) -> KindDraftView | JSONResponse:
-    """The draft's state; 404 ``kind_draft_unknown`` for an id this server does not hold for this
-    caller in this workspace (another person's draft reads so too), which a draft lost when the
-    server restarted reads as too."""
-    draft = services.kind_drafts.read(session.workspace_id, session.actor, draft_id)
-    if draft is None:
-        return _problem(
-            404,
-            "kind_draft_unknown",
-            "You have no draft with this id. If the server restarted while it ran, start it again.",
+    """The requester's retained draft, including after another process takes over."""
+    row = KindDraftRepository(connection, session.workspace_id).get(session.actor, draft_id)
+    if row is None:
+        return _problem(404, "kind_draft_unknown", "You have no draft with this id.")
+    return _durable_kind_view(row, connection)
+
+
+def _erasure_refused(exc: KindErasureRefused) -> JSONResponse:
+    status = {"unknown_world_kind": 404, "world_kind_erased": 410, "world_kind_not_yours": 403}.get(
+        exc.code, 409
+    )
+    return _problem(status, exc.code, exc.detail)
+
+
+@router.get("/versions/{document_sha256}/removal", response_model=None)
+def kind_removal_preview(
+    document_sha256: Annotated[str, Path(pattern="^[0-9a-f]{64}$")],
+    request: Request,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+) -> dict | JSONResponse:
+    try:
+        return removal_preview(
+            connection,
+            session.workspace_id,
+            document_sha256,
+            actor=session.actor,
+            by_owner=owns_workspace(request, session),
         )
-    return _draft_view(draft, connection, session.workspace_id, services.kind_drafts.clock())
+    except KindErasureRefused as exc:
+        return _erasure_refused(exc)
+
+
+@router.delete("/versions/{document_sha256}", status_code=204)
+def remove_kept_kind(
+    document_sha256: Annotated[str, Path(pattern="^[0-9a-f]{64}$")],
+    request: Request,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> Response:
+    try:
+        with connection.transaction():
+            kind, version = erase_kind(
+                connection,
+                session.workspace_id,
+                document_sha256,
+                erased_by=session.actor,
+                by_owner=owns_workspace(request, session),
+            )
+    except KindErasureRefused as exc:
+        return _erasure_refused(exc)
+    forget_kind(document_sha256)
+    kind_worker().forget_kind(str(session.workspace_id), document_sha256)
+    if services.kind_drafts is not None:
+        services.kind_drafts.erase_kind(session.workspace_id, kind, version)
+    return Response(status_code=204)
 
 
 def _kept_kind(
@@ -788,14 +921,21 @@ def create_kind_world(
     and answers 403 ``kinds_from_people_not_offered`` for a kind the workspace keeps.
     """
     try:
+        from exulanica.world.support_surfaces import SupportRefused
+
         require_world_registration(connection)
     except WorldsReadOnly as exc:
         return _problem(403, exc.code, str(exc))
     entries = SavedWorldEntryRepository(
         connection, session.workspace_id, services.store, guest=guest
     )
+    used_kind: KindDocument | None = None
     try:
         if kind == town_adapter().kind and body.version in (None, town_adapter().version):
+            if body.support is not None:
+                return _problem(
+                    422, "support_network_invalid", "Support authoring is served for site worlds."
+                )
             created = entries.create_generated(
                 title=body.title,
                 recipe_key=body.preset,
@@ -815,8 +955,9 @@ def create_kind_world(
             found = _find_kind(connection, session.workspace_id, kind, body.version)
             if found is None:
                 return _problem(404, "unknown_world_kind", f"no world kind is named {kind!r}")
+            used_kind = found
             values = found.values(body.preset, body.values)
-            composer = WorkerComposer(session.workspace_id)
+            composer = WorkerComposer(session.workspace_id, support=body.support)
             created = entries.create_from_kind(
                 title=body.title,
                 kind=found,
@@ -826,6 +967,15 @@ def create_kind_world(
             )
             # The drawing the page reads next and the place its people walk, made with the world.
             composer.keep()
+    except KindErasureRefused as exc:
+        return _erasure_refused(exc)
+    except psycopg.errors.CheckViolation as exc:
+        if exc.diag.constraint_name == "world_kind_erased":
+            if used_kind is not None:
+                forget_kind(used_kind.sha256)
+                kind_worker().forget_kind(str(session.workspace_id), used_kind.sha256)
+            return _erasure_refused(KindErasureRefused("world_kind_erased"))
+        raise
     except UnknownWorldRecipe as exc:
         return _problem(404, exc.code, str(exc))
     except KindValueRefused as exc:
@@ -841,6 +991,8 @@ def create_kind_world(
         return _problem(409, exc.code, str(exc), refusals=list(exc.refusals))
     except KindWorkWaiting as exc:
         return _problem(503, exc.code, str(exc), headers={"Retry-After": str(exc.retry_seconds)})
+    except SupportRefused as exc:
+        return _problem(422, exc.code, exc.detail, where=exc.where)
     except TileBudgetReached as exc:
         return _problem(409, exc.code, str(exc), returns_at=exc.returns_at.isoformat())
     except (GeneratedWorldRefused, UnknownWorldComposer, WorldLimitReached) as exc:
@@ -857,46 +1009,86 @@ def read_site_drawing(
     connection: ReadOnlyConnection,
     session: CurrentSession,
     world_id: WorldId,
+    services: Annotated[Services, Depends(get_services)],
 ) -> Response:
-    """The drawing a site world's records make, generated again from the receipt the version's own
-    snapshot names, in the kind worker, and served with its digest as its entity tag. A drawing the
-    worker does not finish in time, or cannot take, answers 503 ``kind_work_*`` with a
-    ``Retry-After``; a finished one is kept, so asking again reads it."""
-    require_world(connection, session.workspace_id, world_id)
-    with connection.cursor(row_factory=dict_row) as cursor:
-        row = cursor.execute(
-            "select source_snapshot_id from world_alternate_version where workspace_id=%s "
-            "and world_id=%s and version_id=%s",
-            (session.workspace_id, world_id, version_id),
-        ).fetchone()
-    if row is None:
-        return _problem(404, "unknown_reference", "no such world version")
-    snapshot_id = row["source_snapshot_id"]
+    """Serve the version's exact drawing after worker/cache and final current-source checks."""
+    from exulanica.api.world_edit import object_problem
+    from exulanica.db.read_check import final_read_check
+    from exulanica.world.composers.site_plan import receipt_terrain
+    from exulanica.world.errors import StaleObjectBase
+    from exulanica.world.kinds.worker import TerrainDressingWorkerCompiler
+    from exulanica.world.object_repository import WorldObjectRepository
+    from exulanica.world.reviewed_catalog import ReviewedCatalog
+    from exulanica.world.terrain_authoring import TerrainAuthoringRefused
+    from exulanica.world.terrain_dressing_authority import (
+        require_terrain_dressing_current,
+        resolve_terrain_dressing,
+    )
+
     try:
+        require_world(connection, session.workspace_id, world_id)
+        repository = WorldObjectRepository(
+            connection, session.workspace_id, world_id=world_id, store=services.store
+        )
+        initial = repository.edit_base_row(version_id)
+        snapshot_id = initial["source_snapshot_id"]
         if not states_site(connection, session.workspace_id, world_id, snapshot_id):
             return _problem(404, "unknown_reference", "this world is not made from a world kind")
         digest, receipt = generation_receipt(
             connection, session.workspace_id, world_id, snapshot_id
         )
-    except InvalidStructuralData as exc:
+        dressed = receipt["composer"] == {"key": "site-plan", "version": 4}
+        resolved = None
+        if dressed:
+            repository.require_edit_base(initial, initial["state_sha256"])
+            resolved = resolve_terrain_dressing(
+                ReviewedCatalog(connection),
+                services.store,
+                receipt_terrain(receipt),
+                compile_coverage=TerrainDressingWorkerCompiler(session.workspace_id),
+            )
+        worker = kind_worker()
+        outcome = worker.run(
+            drawing_key(str(session.workspace_id), digest),
+            DRAWING_SECONDS,
+            drawing_job,
+            str(session.workspace_id),
+            world_id,
+            dict(receipt),
+            digest,
+            workspace=str(session.workspace_id),
+            kept=worker.drawings,
+        )
+        if outcome.status != "done" or outcome.value is None:
+            return _waiting(outcome, kept=True)
+        answer = outcome.value
+        if answer["status"] == "refused":
+            return _problem(409, "generated_world_unreadable", answer["detail"])
+        if resolved is not None:
+            with final_read_check(connection, not_idle="dressed drawing requires an idle read"):
+                require_world(connection, session.workspace_id, world_id)
+                final = repository.edit_base_row(version_id)
+                repository.require_edit_base(final, initial["state_sha256"])
+                if (
+                    final["source_snapshot_id"] != snapshot_id
+                    or final["edit_seq"] != initial["edit_seq"]
+                ):
+                    raise StaleObjectBase("terrain drawing source changed while it was read")
+                final_digest, _ = generation_receipt(
+                    connection, session.workspace_id, world_id, snapshot_id
+                )
+                if final_digest != digest:
+                    raise StaleObjectBase("terrain drawing receipt changed while it was read")
+                require_terrain_dressing_current(ReviewedCatalog(connection), resolved)
+    except KindWorkWaiting as exc:
+        return _problem(503, exc.code, str(exc), headers={"Retry-After": str(exc.retry_seconds)})
+    except (InvalidStructuralData, TerrainAuthoringRefused) as exc:
         return _problem(409, "generated_world_unreadable", str(exc))
-    worker = kind_worker()
-    outcome = worker.run(
-        drawing_key(str(session.workspace_id), digest),
-        DRAWING_SECONDS,
-        drawing_job,
-        str(session.workspace_id),
-        world_id,
-        dict(receipt),
-        digest,
-        workspace=str(session.workspace_id),
-        kept=worker.drawings,
-    )
-    if outcome.status != "done" or outcome.value is None:
-        return _waiting(outcome, kept=True)
-    answer = outcome.value
-    if answer["status"] == "refused":
-        return _problem(409, "generated_world_unreadable", answer["detail"])
+    except Exception as exc:
+        problem = object_problem(exc)
+        if problem is None:
+            raise
+        return problem
     return Response(
         content=answer["body"],
         media_type="application/json",

@@ -831,17 +831,8 @@ def test_the_quickstart_answers_a_turn_with_its_minds_choice(monkeypatch):
     from exulanica.models.manifest import load_manifest
 
     manifest = load_manifest()
-    source = QUICKSTART.read_text(encoding="utf-8")
-    model = next(line.split('"')[1] for line in source.splitlines() if line.startswith("MODEL = "))
-    nemotron = next(
-        line.split('"')[1] for line in source.splitlines() if line.startswith("# MODEL = ")
-    )
-    # Both minds the quickstart names are ones the product's probe verified to answer this choice
-    # by a tool call, on Nebius Token Factory.
-    for mind in (model, nemotron):
-        spec = manifest.models[mind]
-        assert spec.provider == "nebius_token_factory"
-        assert "tool_call" in {mechanism.value for mechanism in spec.answering}
+    # An operator's provider selection must reach both the request and the declared identity.
+    model = "test-provider/operator-selected-model"
     asked_mind: list[dict] = []
 
     class Reply:
@@ -876,6 +867,7 @@ def test_the_quickstart_answers_a_turn_with_its_minds_choice(monkeypatch):
         monkeypatch.setenv("EXULANICA_URL", url)
         monkeypatch.setenv("EXULANICA_AGENT_KEY", KEY)
         monkeypatch.setenv("NEBIUS_API_KEY", "test-mind-key")
+        monkeypatch.setenv("NEBIUS_MODEL", model)
         monkeypatch.setattr(urllib.request, "urlopen", mind)
         run = threading.Thread(target=runpy.run_path, args=(str(QUICKSTART),), daemon=True)
         run.start()

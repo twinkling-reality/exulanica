@@ -159,6 +159,7 @@ REASON_CODES: Final = AFFORDANCE_REASON_CODES | frozenset(
         "called_away",
         "chosen_by_their_model",
         "current_position_invalidated",
+        "day_arrived",
         "following_reachable_route",
         "input_unavailable",
         "made_room",
@@ -169,11 +170,13 @@ REASON_CODES: Final = AFFORDANCE_REASON_CODES | frozenset(
         "no_room_at_destination",
         "no_room_to_wait",
         "nothing_its_kind_does",
+        "no_weighted_activity",
         "partner_left",
         "place_moved",
         "remembered_target_selected",
         "reviewed_duration_elapsed",
         "route_invalidated",
+        "routine_wait",
         "standing_a_while",
         "standing_node_removed",
         "talking",
@@ -304,6 +307,8 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         # What a town's people are made from: recorded by its first input alone, where it is.
         if "people" in document:
             fields.add("people")
+        if "day" in document:
+            fields.add("day")
         # The run forms of the kinds its workspace keeps that a placed thing is of, and the
         # placed things left out because theirs is gone: each stated only where there is one.
         for made in ("kinds", "things_gone"):
@@ -729,10 +734,11 @@ def _validate_living(document: dict[str, Any]) -> None:
 
 def _admitted_navigation(profile: str) -> tuple[str, ...]:
     """The navigation profiles an input of ``profile`` may record: its own, and for the living
-    walking-surfaces input every ground's that walks its world's own surfaces (a town's, a site's),
-    as the society ground catalog states them, each naming the producer of its surfaces."""
+    walking-surfaces input and the things one every ground's that walks its world's own surfaces
+    (a town's, a site's), as the society ground catalog states them, each naming the producer of
+    its surfaces. The purposeful walking-surfaces input reads a town alone."""
     own = NAVIGATION_PROFILES[profile]
-    if profile != WALKING_SURFACES_INPUT_V2:
+    if profile not in (WALKING_SURFACES_INPUT_V2, WALKING_SURFACES_INPUT_V3):
         return (own,)
     from exulanica.world.society_grounds import society_grounds
 
@@ -829,8 +835,12 @@ def _graph(document: dict[str, Any]) -> tuple[dict, dict, dict]:
 def _spawn_nodes(document: dict[str, Any]) -> tuple[dict[str, Any], list[str], bool]:
     """The nodes a newcomer may be placed at over this input, and whether it is a saved world's.
 
-    Only declared nodes in components containing reviewed targets. This is placement of people
-    who are not yet there, never recovery or teleportation of anybody who is.
+    Only declared nodes in components containing reviewed targets. Where an input offers no
+    target at all but states the people who live there (its ``people`` frame), they start in the
+    parts of the walking graph their own premises' doors are in: a place with homes and nothing
+    to visit is still somewhere its people are. An input with targets is read as it always was,
+    so no society that exists starts anywhere else. This is placement of people who are not yet
+    there, never recovery or teleportation of anybody who is.
     """
     _require(
         document["availability"] == "available"
@@ -838,13 +848,17 @@ def _spawn_nodes(document: dict[str, Any]) -> tuple[dict[str, Any], list[str], b
         "initial district unavailable",
     )
     nodes, adjacent, _ = _graph(document)
-    targets = [t for t in document["targets"] if t["enabled"]]
-    if not (nodes and targets):
+    starts = [t["node_id"] for t in document["targets"] if t["enabled"]]
+    if not starts:
+        frame = document.get("people")
+        premises = frame.get("premises", ()) if isinstance(frame, dict) else ()
+        starts = sorted({row["node_id"] for row in premises if row.get("node_id") in nodes})
+    if not (nodes and starts):
         raise SocietyStartRefused("no_reachable_targets")
     reachable = set()
-    for target in targets:
-        if target["node_id"] not in reachable:
-            reachable.update(_paths(target["node_id"], adjacent))
+    for start in starts:
+        if start not in reachable:
+            reachable.update(_paths(start, adjacent))
     spawn_nodes = sorted(reachable)
     authored = is_authored_ground(document["profile"])
     if authored:
@@ -1120,9 +1134,15 @@ def held_nodes(people: list[dict], me: dict, *, graph: tuple[dict, dict] | None 
     for other in people:
         if other is me:
             continue
+        if other.get("location", {}).get("indoors") is True and "day" in other:
+            continue
         if graph is not None and not _location_valid(other, *graph):
             continue
-        if other["goal"] is not None and other["route"] is not None:
+        if (
+            other["goal"] is not None
+            and other["route"] is not None
+            and not other["goal"].get("day", {}).get("indoors")
+        ):
             held.add(other["route"]["destination_node_id"])
         if other["location"]["edge"] is None:
             held.add(other["location"]["node_id"])
@@ -1258,8 +1278,9 @@ def _asked_stand(policy: dict | None, stand: PurposefulActivity | None) -> bool:
     return (
         policy is not None
         and stand is not None
-        and policy.get("chosen_by") == "person"
-        and policy.get("activity") == stand.key
+        and "place_node_id" in policy
+        and policy.get("chosen_by") in ("person", "day")
+        and (policy.get("activity") == stand.key or policy.get("chosen_by") == "day")
     )
 
 
@@ -1503,9 +1524,10 @@ def routine_withheld(state: Mapping[str, Any], person: Mapping[str, Any]) -> fro
     none where the society records the first version, or its people state no kind, whose routine
     plans every activity for everybody, as it always did. The planner and the options a decider
     is offered both leave them out, and a request for one is refused."""
-    from exulanica.abilities.registry import PURPOSEFUL_BY_KIND
+    from exulanica.abilities.registry import recorded_row
 
-    if PURPOSEFUL_BY_KIND not in state.get("modules", ()) or "kind" not in person:
+    row = recorded_row(state.get("modules", ()), "purposeful")
+    if row is None or row.version < 2 or "kind" not in person:
         return frozenset()
     from exulanica.world.society_kinds import kind_here
 
@@ -1529,6 +1551,10 @@ def free_to_talk(
     which within the minute has already grown, or by ``need``, the need a check made before the
     minute judges them by (:func:`need_this_minute`).
     """
+    from exulanica.world.society_resident_day import inside
+
+    if inside(person):
+        return False
     nodes, _adjacent, edges = graph
     return (
         person["id"] not in policies
@@ -1547,6 +1573,10 @@ def standing_to_talk(
 ) -> bool:
     """Whether somebody standing a while may be joined there to talk: nobody's policy governs
     them this minute, and they stand on a node the graph still has."""
+    from exulanica.world.society_resident_day import inside
+
+    if inside(person):
+        return False
     nodes, _adjacent, edges = graph
     stand = routine.in_setting("open")
     return (
@@ -1561,7 +1591,13 @@ def standing_to_talk(
 
 def within_talk_reach(person: dict, other: dict, talk: PurposefulActivity) -> bool:
     """Whether two people are near enough to talk: within the talk activity's reach."""
-    return _squared_mm(person["position_mm"], other["position_mm"]) <= talk.reach_mm**2
+    from exulanica.world.society_resident_day import inside
+
+    return (
+        not inside(person)
+        and not inside(other)
+        and _squared_mm(person["position_mm"], other["position_mm"]) <= talk.reach_mm**2
+    )
 
 
 def _held_apart(people: list[dict], person: dict, partner: dict, taken: set[str]) -> set[str]:
@@ -1571,7 +1607,13 @@ def _held_apart(people: list[dict], person: dict, partner: dict, taken: set[str]
     for other in people:
         if other is person or other is partner:
             continue
-        if other["goal"] is not None and other["route"] is not None:
+        if "day" in other and other["location"].get("indoors") is True:
+            continue
+        if (
+            other["goal"] is not None
+            and other["route"] is not None
+            and not other["goal"].get("day", {}).get("indoors")
+        ):
             held.add(other["route"]["destination_node_id"])
         if other["location"]["edge"] is None:
             held.add(other["location"]["node_id"])
@@ -1700,6 +1742,7 @@ def _talk_pairs(
     *,
     chosen: dict[str, dict[str, Any]] | None = None,
     talking: Container[str] | None = None,
+    weights_by_person: Mapping[str, Mapping[str, int]] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Who stops to talk with whom this minute, and where each stands, before anybody chooses.
 
@@ -1727,7 +1770,18 @@ def _talk_pairs(
             continue
         if talking is not None and person["id"] not in talking:
             continue
-        if _weighted(seed, "seek", tick, person["ordinal"], weights) != talk.key:
+        own = (weights_by_person or {}).get(person["id"])
+        seeking = (
+            weights
+            if own is None
+            else [
+                (a.key, own.get(a.affordance if a.setting == "object" else a.key, 0))
+                for a in routine.activities.values()
+                if a.object_kind == ANY_KIND or a.setting != "object"
+            ]
+            + [("wait", own["wait"])]
+        )
+        if _weighted(seed, "seek", tick, person["ordinal"], seeking) != talk.key:
             continue
         near = sorted(
             (_squared_mm(person["position_mm"], other["position_mm"]), other["ordinal"], other)
@@ -1735,6 +1789,11 @@ def _talk_pairs(
             if other is not person
             and other["id"] not in pairs
             and (talking is None or other["id"] in talking)
+            and (
+                weights_by_person is None
+                or other["id"] not in weights_by_person
+                or weights_by_person[other["id"]]["talk"] > 0
+            )
             and (
                 free_to_talk(other, routine, graph, policies)
                 or standing_to_talk(other, routine, graph, policies)
@@ -1928,6 +1987,20 @@ def _advance_purposeful_society(
             emit(person, "blocked", reason, "unable_to_act", doc)
         person["blocked_key"] = key
 
+    def wait_by_routine(person: dict, selected: bool, doc: dict) -> None:
+        reason = "routine_wait" if selected else "no_weighted_activity"
+        action = {
+            "kind": "idle",
+            "status": "active",
+            "target_id": None,
+            "remaining_ticks": 0,
+            "reason": reason,
+        }
+        changed = person["action"] != action
+        person.update(action=action, goal=None, target=None, route=None, blocked_key=None)
+        if changed:
+            emit(person, "goal_selected", reason, "waiting", doc)
+
     for person in result["inhabitants"]:
         person["motion_path_mm"] = [list(person["position_mm"])]
     # Validate every accepted edit, including a move followed by undo before any time passes.
@@ -1959,7 +2032,7 @@ def _advance_purposeful_society(
                 reason = doc["unavailable_reason"] or doc["navigation"]["unavailable_reason"]
             elif not _location_valid(person, nodes, edges):
                 reason = "current_position_invalidated"
-                if places_here:
+                if places_here and not ("day" in person and person["location"].get("indoors")):
                     loc = person["location"]
                     stood = (
                         {loc["node_id"]}
@@ -2034,10 +2107,16 @@ def _advance_purposeful_society(
             elif person["route"]:
                 person["route"]["input_sha256"] = doc["document_sha256"]
     doc = inputs[-1]
+    from exulanica.world.society_resident_day import prepare, stays_inside
+
+    goal_policy = prepare(result, doc, seed, goal_policy, emit)
     # The routine the input this minute is decided under records: how long each stay lasts, what
     # it relieves, and how a person picks where. A routine picked by the nearest place is the one
     # the society was released with, and it runs exactly as it always has.
     routine = routine_of(doc)
+    from exulanica.world.society_routine_weights import routine_weights
+
+    weights_by_person = routine_weights(result)
     drawn = routine.choice == "drawn"
     nodes, adjacent, edges = _input_graph(doc)
     targets = [t for t in doc["targets"] if t["enabled"]]
@@ -2118,6 +2197,7 @@ def _advance_purposeful_society(
                 paths_from,
             ),
             talking=talking,
+            weights_by_person=weights_by_person,
         )
     # Talking goes on while both people were at it when the minute began, and both still mean to.
     before = {person["id"]: person for person in state["inhabitants"]}
@@ -2129,7 +2209,10 @@ def _advance_purposeful_society(
         if not _location_valid(person, nodes, edges):
             block(person, "current_position_invalidated", doc)
             continue
+        if stays_inside(person, (goal_policy or {}).get(person["id"])):
+            continue
         policy = (goal_policy or {}).get(person["id"])
+        own_weights = weights_by_person.get(person["id"])
         pairing = pairs.get(person["id"])
         if (
             talk is not None
@@ -2169,7 +2252,9 @@ def _advance_purposeful_society(
                 # request's own code, never a model's.
                 block(
                     person,
-                    "validated_user_wait"
+                    policy["day_wait"]
+                    if policy.get("chosen_by") == "day" and "day_wait" in policy
+                    else "validated_user_wait"
                     if policy.get("chosen_by") == "person"
                     else "validated_model_wait",
                     doc,
@@ -2200,7 +2285,9 @@ def _advance_purposeful_society(
                     | {
                         other["place_node_id"]
                         for subject, other in (goal_policy or {}).items()
-                        if subject != person["id"] and "place_node_id" in other
+                        if subject != person["id"]
+                        and "place_node_id" in other
+                        and not other.get("day", {}).get("indoors")
                     }
                     | {
                         other["node_id"]
@@ -2218,6 +2305,7 @@ def _advance_purposeful_society(
             target = None
             goal: dict[str, Any] | None = None
             destination = None
+            routine_wait_selected: bool | None = None
             # The policy of a choice a model made for this person, if one did.
             chosen = policy if policy is not None and policy.get("chosen_by") == "model" else None
             if pairing is not None and talk is not None:
@@ -2244,7 +2332,9 @@ def _advance_purposeful_society(
                 # before the minute; a request's walk records the request's own code.
                 stood = chosen if chosen is not None else policy
                 assert stood is not None and stand is not None
-                if stood["place_node_id"] not in paths or stood["place_node_id"] in held:
+                if stood["place_node_id"] not in paths or (
+                    stood["place_node_id"] in held and not stood.get("day", {}).get("indoors")
+                ):
                     block(person, "route_invalidated", doc)
                     continue
                 goal = {
@@ -2254,6 +2344,9 @@ def _advance_purposeful_society(
                     if chosen is not None
                     else "remembered_target_selected",
                 }
+                if stood.get("chosen_by") == "day":
+                    goal["reason"] = stood["day"]["reason"]
+                    goal["day"] = dict(stood["day"])
                 destination = stood["place_node_id"]
             elif drawn and policy is None:
                 # A drawn routine: somebody tired sits if there is room, and anybody else picks,
@@ -2276,13 +2369,28 @@ def _advance_purposeful_society(
                 else:
                     tired = None
                     options = [
-                        (affordance, routine.default(affordance).weight)
+                        (
+                            affordance,
+                            routine.default(affordance).weight
+                            if own_weights is None
+                            else own_weights[affordance],
+                        )
                         for affordance in routine.affordances
                         if by_affordance[affordance]
                     ]
                     if spot is not None and stand is not None:
-                        options.append((stand.key, stand.weight))
+                        options.append(
+                            (
+                                stand.key,
+                                stand.weight if own_weights is None else own_weights[stand.key],
+                            )
+                        )
+                    if own_weights is not None:
+                        options.append(("wait", own_weights["wait"]))
                     kind = _weighted(seed, "choose", tick, person["ordinal"], options)
+                if own_weights is not None and kind in (None, "wait"):
+                    routine_wait_selected = kind == "wait"
+                    kind = None
                 if stand is not None and kind == stand.key:
                     goal = {
                         "kind": stand.key,
@@ -2341,6 +2449,10 @@ def _advance_purposeful_society(
                     if policy and target["target_id"] == policy.get("preferred_target_id")
                     else routine.kind(target["affordance"]).nearest_reason,
                 }
+            if goal is None and own_weights is not None and policy is None and not drawn:
+                # Activity targets with nearest routines are refused at input admission; an
+                # admitted empty-target routine has nothing to do beyond waiting safely.
+                routine_wait_selected = own_weights["wait"] > 0
             if goal is None and standing_at is not None:
                 # Somebody who has finished at a place and has nothing else to do steps away to
                 # the nearest node where nobody stands, is headed or would be in the way.
@@ -2358,6 +2470,9 @@ def _advance_purposeful_society(
                 destination = waiting[1]
                 goal = {"kind": "make_room", "target_id": None, "reason": "making_room"}
             elif goal is None:
+                if routine_wait_selected is not None:
+                    wait_by_routine(person, routine_wait_selected, doc)
+                    continue
                 reason = "no_reachable_affordance" if targets else "no_enabled_affordance"
                 if policy is not None and targets:
                     reason = "no_known_reachable_affordance"
@@ -2375,6 +2490,8 @@ def _advance_purposeful_society(
                 progress = loc["edge"]["progress_mm"]
             person["route_geometry_sha256"] = _navigation_sha256(doc)
             person["goal"] = goal
+            if "day" in person:
+                person["location"].update(indoors=False, destination_id=None)
             person["target"] = deepcopy(target)
             person["route"] = {
                 "node_ids": path,
@@ -2464,7 +2581,9 @@ def _advance_purposeful_society(
                 "reason": "standing_a_while",
                 "relief_milli": stand.relief,
             }
-            emit(person, "route_progressed", "standing_a_while", "action_started", doc)
+            if "day" in person["goal"]:
+                person["action"]["reason"] = "day_arrived"
+            emit(person, "route_progressed", person["action"]["reason"], "action_started", doc)
         elif arrived and target is None and talk is not None and goal_kind == talk.key:
             person["action"] = {
                 "kind": talk.key,

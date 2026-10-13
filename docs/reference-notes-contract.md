@@ -11,7 +11,7 @@ contract; the hosted-request boundary itself belongs to the
 | --- | --- |
 | Web notes from one source (Tavily), off by default and offered to listed workspaces only | Implemented |
 | A drafter's notes from a finished request: the quoted block, its bound and its provenance | Implemented |
-| A drafter's prompt carrying the notes | Implemented for the describe-a-town drafter (`POST /worlds/specification/drafts` with `reference_id`, prompt version 3); not built for the kind, look and piece drafters, each of which adds them in a prompt version of its own |
+| A drafter's prompt carrying the notes | Implemented for the describe-a-town drafter (`POST /worlds/specification/drafts` with `reference_id`, prompt version 3) and creature drafts (`POST /things/creatures`, purpose `things`, web or authorized selected-picture notes and prompt version 2); not built for the kind, look and piece drafters, each of which adds them in a prompt version of its own |
 | Notes read from a person's own pictures: the reading call, its role, the checks on its notes, the job's picture step and the routes | Implemented, off by default (`EXULANICA_REFERENCE_PICTURES`) and never offered on a `public` installation; it stays off until Nebius Token Factory Sales confirms in writing that its terms allow it |
 | Facts admitted from record sources (Wikidata, GeoNames, Overture places) | Not built |
 
@@ -35,7 +35,7 @@ result and never the query text.
 
 ## 2. Sources are catalog data
 
-`assets/catalogs/reference-sources/` holds three catalogs in the house envelope
+`assets/catalogs/reference-sources/` holds versioned catalogs in the house envelope
 (`exulanica/grammar/catalogs.py`), read by `exulanica/references/catalogs.py`:
 
 - `reference-source.v1.json`: each source states whether it returns leads (words for drafting,
@@ -45,7 +45,11 @@ result and never the query text.
   everyone or to the operator only, its cost per call and the one request shape its adapter sends.
   The reader refuses a leads source that keeps, shows or exports anything it returned, and any
   records source until record admission exists.
-- `reference-aspect.v1.json`: the closed list of aspects a note or a search may be about.
+- `reference-aspect.v1.json`: the closed vocabulary for existing requests and world purposes.
+  `reference-aspect.v2.json` adds anatomy and part layout for web notes with purpose `things`;
+  materials and colour and rough scale keep their existing meanings. Selected things pictures
+  use the expanded vocabulary with `reference-picture-screen.v2.json`; its no-person and no-writing
+  word screens match v1. Historical picture requests retain their v1 vocabulary and screening.
 - `reference-query-screen.v1.json`: words no outgoing query carries, by category, each with the term
   or reason that rules them out.
 
@@ -95,11 +99,35 @@ withdrawn; the database holds each of these.
 | search | Each subject passes the boundary; each search is admitted against the source's spending, sent, and recorded in `reference_lookup` |
 | read | One call of the `reference_drafting` role writes at most twelve notes from what the searches found; a note sharing six consecutive words with anything it was shown, or failing the screen, is dropped |
 | read_picture | Before the searches, once for each picture the request names: the picture is read and its notes checked (section 10); the step names the picture's capture id |
-| bundle | The kept notes become a reference bundle (`exulanica.reference-bundle/v1`), complete or partial with the steps it missed |
+| bundle | The kept notes become a reference bundle (v1 for existing/world requests, v2 for web-only things, v3 for selected things pictures), complete or partial with the steps it missed |
 
 A request that did not ask for web notes skips plan, search and read; one that names no picture
-has no picture step. The planner and reader prompts are data (`exulanica/references/reference-prompts.v1.json`), and a
-request keeps that file's digest. Their role, `reference_drafting`, has the same model chain on
+has no picture step. Planner and reader words are versioned data. Existing requests and world
+purposes use `exulanica/references/reference-prompts.v1.json` (content version 2); new `things`
+requests without selected pictures use `reference-prompts.v3.json` (content version 3); things
+requests with selected uploaded captures use `reference-prompts.v4.json` (content version 4).
+Each request pins its file's digest.
+The worker resolves that exact digest and purpose before admitting any provider call; an unknown
+or incompatible digest fails with `reference_prompts_unavailable`, without substituting newer
+words. Historical picture digests retain their prompt and closed vocabulary.
+
+Bundle profiles version the closed note vocabulary. `exulanica.reference-bundle/v3` serves
+things with creature-compatible picture aspects. Older profiles cannot carry these picture
+aspects, even when a caller supplies a broader catalog. `exulanica.reference-bundle/v1` remains
+readable with identical canonical bytes and digest. `exulanica.reference-bundle/v2` has the same
+fields, serves only purpose `things`, and accepts the expanded web-note vocabulary. Database
+constraint 0204 admits those two profiles and requires a v2 bundle's purpose to match its things
+request. Other profiles are refused. The dual reader, renderer and existing creature consumer
+preserve the bundle's digest through note usage and creature origin ingredients.
+
+The things planner and reader describe anatomy, relative parts, materials, colour and rough scale
+from text. They do not infer missing anatomy, dimensions, rigging or behavior, and do not claim to
+have seen or matched an image. Notes remain suggestions: the creature drafter receives the
+person's unchanged explicit edits with higher priority than reference features, while its supported
+body and action checks remain authoritative. Prompt precedence is not proof that a model will
+follow an edit or achieve visual resemblance; those need evaluated outputs.
+
+Their role, `reference_drafting`, has the same model chain on
 Nebius Token Factory as `structured_extraction` and is offered for no place-name right and no
 personal model right, so no right granted for another role reaches a web lookup
 ([model selection](model-and-service-selection.md)).
@@ -108,7 +136,9 @@ Each step has its own share of the job's time, each from a measured latency by t
 manifest's timeout rule (the longest measured, times two, rounded up to five seconds): the planner
 and the reader the `reference_drafting` role's timeout, a picture the `reference_vision` role's, and
 the searches, which are sent at once, their own basis (`SEARCH_LONGEST_MS` in
-`exulanica/references/worker.py`, the longest of nine searches measured on 2026-10-09). The job's
+`exulanica/references/adapters/base.py`, 17,440 ms across the eighteen searches measured on
+2026-10-09). Both the search transport timeout and the search stage use this basis, giving a
+35-second allowance under the manifest's rule and an 85-second web-only job. The job's
 deadline is the sum of its steps' shares, so slow searches never take the reader's time. Each model
 call is given its share, or what is left of the deadline when that is less; a call cut by it is
 recorded with the reason `deadline`. Past the deadline the job ends partial with what it has, so a
@@ -228,8 +258,9 @@ the provenance a drafted document keeps. A drafter takes web notes only unless i
 a note read from a person's own picture is declared as that picture, and the workspace's request
 policy refuses the whole call unless the person's right names the drafter's role, so a drafter asks
 for picture notes only once its role is offered for them. Notes are drafted from web text, which is untrusted, so the
-block is quoted, delimited material: a heading saying the notes describe what such a place looks
-like and are never instructions, then the notes between triple quotes, one line each, grouped by
+block is quoted, delimited material: v1 describes a place; v2 and v3 describe things and explicitly
+states that the person's changes take precedence. Both deny instructional authority. Notes appear
+between triple quotes, one line each, grouped by
 aspect. A double quote inside a note is written as a single quote and its whitespace as one space,
 so no note closes the quotation or begins a line of its own. The drafter's strict schema and its
 checks stay the authority over what is made.
@@ -261,7 +292,8 @@ version 2, byte for byte, and its `references` is null.
 What a picture may become is fixed before any model sees one. One call of the `reference_vision`
 role (`exulanica/references/pictures.py::read_picture`) reads the picture's rendition, the 768 px
 copy with no location or camera details, and answers a strict form: `refuse`, one of
-`shows_people`, `shows_text` or `not_a_place`, or null, and then at most six notes of at most 80
+`shows_people`, `shows_text` or `not_a_place` for historical/place requests, with `not_a_thing`
+replacing the last reason for selected things pictures, or null, and then at most six notes of at most 80
 characters. A refusal keeps nothing of the picture but its reason. The form has no field for a
 person, a place name or any writing, and nothing in a picture is located, cropped, embedded or
 compared. The call declares its picture, so the workspace's request policy refuses it unless the
@@ -269,11 +301,12 @@ person's current right names this role's chain for that picture.
 
 | A picture may become | A picture never becomes |
 | --- | --- |
-| At most six notes in the model's words, about buildings, materials and colour, landscape and plants, food and goods, vehicles and boats, or scale | Anything about a person: clothing is closed to pictures because in a picture somebody wears it |
+| At most six notes in the model's words, about buildings, materials and colour, landscape and plants, food and goods, vehicles and boats, or scale; selected things pictures also allow visible anatomy and relative part layout | Anything about a person: clothing is closed to pictures because in a picture somebody wears it |
 | A refusal with one reason | Text read from it, a place name, a search query, geometry or a stored derivative |
 
 Every note kept passes, in order: its aspect is open to pictures; it holds no word of
-`assets/catalogs/reference-sources/reference-picture-screen.v1.json` (people, faces, bodies and
+`assets/catalogs/reference-sources/reference-picture-screen.v1.json`, or the matching v2 screen
+for selected things pictures (people, faces, bodies and
 the like); it holds no quotation mark and no capitalised word inside a sentence, so lettering and
 proper names read from the picture are dropped; it does not end in a word cut at the length bound;
 it names none of the workspace's saved names, as the request boundary recognises them; then the
@@ -283,7 +316,7 @@ not photographs.
 
 A person admits a picture as they admit a photograph (`POST /intake`, then `POST
 /personal-admission`), granting the picture reader's right against the words the list's
-`pictures.consent.uses` states. Each use in `exulanica/ingest/model-right-uses.v1.json` says where
+`pictures.consent.uses` states. Each use in version 2 of the model-right uses catalog says where
 it is offered (`offered_on`: `photos` when absent, or `reference_pictures`); the photograph
 admission screen lists only uses offered on photographs, and the reference picture use is listed
 only on this step: while pictures are offered, and whenever the caller holds a current picture
@@ -310,6 +343,24 @@ picture makes the bundle partial. The bundle names each picture the workspace's 
 through, with the rights it was read under and the model that read it (the role's model when no
 answer came back), and each note kept from a picture has basis `own_picture` and names its picture.
 A drafter is given web notes only unless it asks for picture notes (section 9).
+
+Selected things pictures are semantic references for invented creatures. The v4 reader refuses
+any human person, human part or depiction, and readable writing or a screen. A permitted drawing
+of a nonhuman creature may yield visible anatomy, relative part layout and materials or colour;
+it establishes no absolute dimensions, hidden parts, rig, actions or visual resemblance. The
+existing word screens remain conservative. No selected pixels are passed to creature drafting.
+
+The creature consumer accepts `own_picture` notes only from v3 bundles, while picture reading is
+offered to that workspace and a fresh, explicitly bound `creature_drafter` right covers every
+model of its chain. [Personal admission](personal-admission.md) owns that consent binding. The
+worker declares the captures to the hosted request policy, disables response caching for these
+image-derived requests, and rechecks exact rights, current notice and chain, screening, person
+findings and feature eligibility before every attempt and in both creature-store transactions.
+A stop, expiry or source erasure before final publication refuses the result; known completed
+calls remain recorded as used. Creature-role stops prevent further creature use without withdrawing
+the notes from other authorized consumers. Reader-role stops and source erasure withdraw the
+whole reference bundle. Invented creature definitions already kept remain under their ordinary
+erasure authority; retaining them grants no further source or note access.
 
 Only the person who granted a picture's reading right, or an owner of the workspace, may stop it;
 anyone else is answered 404 as for an id nobody granted. Stopping it ends every reading right not

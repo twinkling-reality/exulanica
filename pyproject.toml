@@ -341,6 +341,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ANN"]
+# Opt-in prototype fixtures use the same dynamic fake-interface conventions as tests/.
+"tools/prototypes/entity-model-pilot/test_*.py" = ["ANN"]
+"tools/prototypes/entity-model-pilot/conftest.py" = ["ANN"]
 # Standalone PEP 723 verification harnesses, committed before this package existed and left
 # byte-identical so the runtime evidence they produced stays reproducible. Still linted for real
 # errors (pyflakes, bugbear); only cosmetic rules are waived.
@@ -410,7 +413,9 @@ layers = [
   # decision host is given. Only the HTTP surface (and the harness above it) reaches it, and the
   # contracts below keep it from reaching the workflows: it reads worlds, writes its own tables and
   # knows no game. A game is an adapter in `bridges/` plus a mapping file, which is data.
-  "door",
+  # Human participation has its own browser-bound authority. It shares the world's lower
+  # contracts with the door; neither authority may import or silently inherit the other.
+  "door | participation",
   # Environment source admission composes scoped persistence, content-addressed storage and the
   # graph's established read-finalization discipline. Query, placement and rendering remain
   # outside it, and none of the lower workflows imports this admission boundary.

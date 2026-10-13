@@ -164,7 +164,7 @@ def test_a_said_line_is_accepted_beside_its_option_and_bound_by_the_receipt():
         "option": say.as_record(),
         "line": "Good morning.",
     }
-    assert result["provider"]["prompt_version"] == "society-person-choice/v5"
+    assert result["provider"]["prompt_version"] == "society-person-choice/v6"
     validate_decision_receipt(receipt_for(request, 1, result), request)
     # Asked under the engine's own terms: a choice with a line, and its instruction.
     (sent,) = transport.requests
@@ -230,16 +230,24 @@ MESSAGES_SHA256 = {
 }
 
 
-def test_the_fifth_prompt_is_kept_as_bytes():
-    state, document, knight, contract, options = _asked()
-    request = _request(state, document, knight["id"], options, contract, model="example/model")
-    role = person_role()
-    found = {
-        mechanism.value: hashlib.sha256(
-            canonical_json(role.adapter.messages(role, request["context"], mechanism))
-        ).hexdigest()
-        for mechanism in (AnsweringMechanism.TOOL_CALL, AnsweringMechanism.JSON_SCHEMA)
-    }
+def test_the_fifth_prompt_is_kept_as_bytes(tmp_path):
+    from exulanica.world.decision_roles import ADAPTER_PACKAGE, REGISTRY_DIRECTORY
+
+    from decision_role_support import registry_in_use
+
+    # Rebuild the historical prompt under its published terms, not a newer model vocabulary.
+    prior = REGISTRY_DIRECTORY / "decision-roles.v8.json"
+    (tmp_path / prior.name).write_bytes(prior.read_bytes())
+    with registry_in_use(tmp_path, ADAPTER_PACKAGE):
+        state, document, knight, contract, options = _asked()
+        request = _request(state, document, knight["id"], options, contract, model="example/model")
+        role = person_role()
+        found = {
+            mechanism.value: hashlib.sha256(
+                canonical_json(role.adapter.messages(role, request["context"], mechanism))
+            ).hexdigest()
+            for mechanism in (AnsweringMechanism.TOOL_CALL, AnsweringMechanism.JSON_SCHEMA)
+        }
     if os.environ.get("EXULANICA_LINE_GOLDENS") == "print":
         print(json.dumps(found, indent=2))
     assert found == MESSAGES_SHA256

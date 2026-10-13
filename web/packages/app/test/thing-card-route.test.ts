@@ -169,10 +169,13 @@ describe('the served card, read', () => {
     expect(asked[0]!.url).toBe(`https://example.test/world/versions/version-1/society/things/${KNIGHT_ID}?world_id=world%3Aa`);
     await chooseThingLook(access, 'world:a', 'version-1', KNIGHT_ID, { source: 'workspace', sha256: 'd'.repeat(64) }, answer(200, knightCard('blocky-knight')) as typeof fetch);
     expect(asked[1]!.url).toBe(`https://example.test/world/versions/version-1/society/things/${KNIGHT_ID}/look?world_id=world%3Aa`);
+    expect(asked[1]!.init?.method).toBe('POST');
     expect(JSON.parse(String(asked[1]!.init?.body))).toEqual({ look: { source: 'workspace', sha256: 'd'.repeat(64) } });
     const shipped = kindLook(KNIGHT, 'blocky-knight');
     await chooseThingLook(access, 'world:a', 'version-1', KNIGHT_ID, { source: 'shipped', key: 'blocky-knight', version: shipped.version, sha256: shipped.sha256 }, answer(200, knightCard('blocky-knight')) as typeof fetch);
     expect(JSON.parse(String(asked[2]!.init?.body))).toEqual({ look: { look: 'blocky-knight', version: shipped.version, sha256: shipped.sha256 } });
+    await chooseThingLook(access, 'world:a/b', 'version/one', 'thing?one', { source: 'workspace', sha256: 'd'.repeat(64) }, answer(200, knightCard('blocky-knight')) as typeof fetch);
+    expect(asked[3]!.url).toBe('https://example.test/world/versions/version%2Fone/society/things/thing%3Fone/look?world_id=world%3Aa%2Fb');
     const refused = await chooseThingLook(access, 'world:a', 'version-1', KNIGHT_ID, { source: 'workspace', sha256: 'd'.repeat(64) }, answer(422, { code: 'look_unfit', detail: '' }) as typeof fetch);
     expect(refused).toEqual({ chosen: false, code: 'look_unfit' });
   });

@@ -158,7 +158,7 @@ What a role in a world also needs:
   junction signal role is compared by its own records (migration 0132,
   [signal comparisons](traffic-contract.md#signal-comparisons)).
 - **Words.** The page and the Companion have words for the person's reason codes only, the
-  `decision_reason` entries of `assets/catalogs/society-words/society-inhabitant-words.v1.json`,
+  `decision_reason` entries of `assets/catalogs/society-words/society-inhabitant-words.v2.json`,
   held to the person's reasons by `tests/test_companion_decision_model.py` and
   `web/packages/app/test/society-models-words-parity.test.ts`.
 - **One role per subject at a time.** A subject has at most one request a minute, whatever its
@@ -268,7 +268,7 @@ and why not (`host_refusal`: `models_not_run_here`, `provider_credential_absent`
 model is not asked here when it is not (`refusal`, one of `MODEL_REFUSALS`) and where the decider
 comes from (`from`: `choice`, `choice_over_bound`, `travellers` or `travellers_over_bound`); each
 gate's travellers' mind (`travellers`: `{grant_id, choice_seq, decider, model}`); each person's latest
-model decision;
+model decision, including its `request_id`;
 per model the decisions asked, accepted and applied, why the rest were not acted on, latency and
 cost, over the society's latest 2,000 decisions (`DECISIONS_READ`); and every subject an outside
 program decides for under a grant that stands (`outside`), with what the grant view says of its
@@ -279,15 +279,30 @@ among those decisions (`latest`: `{decision_seq, base_tick, consumed_tick, statu
 program left without a usable answer reads as its receipt does, such as `unavailable` with
 `no_answer_in_time`: the turn the routine decided. Neither route asks a model.
 
+A latest model decision's `request_id` addresses
+`GET /world/versions/{version_id}/society/decisions/{request_id}?world_id=W`, which returns the
+recorded request and receipt. The same identity is retained in the person role's `view.latest`
+on the world models and inventory reads. Reading the detail requires `world.read` and current
+authorization for the society and the request's original inputs; a previously returned identity
+does not preserve access after source withdrawal. These reads neither ask a model nor advance
+the society.
+
+The browser models client retains this request identity and reads its detail within the open
+world. It preserves the versioned role documents, checks the returned request identity and
+receipt binding, and propagates absent or withdrawn-source refusals. Older summaries without a
+request identity do not acquire an invented link. The server remains responsible for validating
+the role's request and receipt contracts.
+
 In a saved world the People panel offers the choice for one person or for everyone and shows this
 read (`web/packages/app/src/composition/society-models-mount.ts`). Where the host cannot ask a
 person's model, the page says the person follows their own routine for now, and why.
 
 ## A person playing a being
 
-A person holding `world.write` may play one being of a society of things whose kind lets a person
-decide for it (`/world/versions/{version_id}/society/play?world_id=W`,
-`exulanica/api/routes/society_play.py`). Starting records a choice naming the being with the
+A person holding `being.act` beside `world.read` may play one being of a society of things whose
+kind lets a person decide for it (`/world/versions/{version_id}/society/play?world_id=W`,
+`exulanica/api/routes/society_play.py`); playing needs no `world.write`, since it edits nothing of
+the authored world ([security floor](security-floor.md#1-route-permissions)). Starting records a choice naming the being with the
 decider `{"kind": "person", "account_id"}`, the session's account, through this route only, and
 the minute it began (`since_tick`). It is refused by name: `engine_takes_no_play` for any engine but
 v7's, `being_played` where another account plays the being, `decided_from_outside` for a visitor its
@@ -545,7 +560,12 @@ fourth catalogs, which add the hands actions, and the third prompt; from registr
 same catalogs and the fourth prompt (below); from registry version 8, the fifth catalogs, the
 fourth's actions and bounds with `context_bytes_maximum` 16,000, and the fifth prompt, which also
 shows a being what it notices around it and what it remembers where its society records the notice
-and memory modules ([minds contract](minds-contract.md)). Version 3 keeps version 2's actions and
+and memory modules ([minds contract](minds-contract.md)). Registry version 9 uses action and policy
+catalog version 8 and prompt `society-person-choice/v6`, adding `follow` and `stop_following` for
+capable beings in societies that recorded `exulanica-ability/follow/v3`. These choices use the
+existing body-paced walking and bounded pursuit rules; they do not grant a stationary kind
+movement. Older follow modules are not offered these model choices. The separate player action
+catalog keeps its walk-to-point action, which models are not offered. Version 3 keeps version 2's actions and
 bounds and adds:
 
 | Action | Kind | Words a model reads |
@@ -586,6 +606,13 @@ leaving; a being with none of those is not asked. Going on and waiting change no
 program's idle answer is going on where it is offered, waiting otherwise
 (`DecisionRole.idle_label`).
 
+Following under module version 3 is an accepted persistent intent: no model call is needed merely
+to keep it alive between decision points. A missing answer or change of controller does not undo
+that intent. An applied stop, another chosen action, or an applied direct owner command ends it;
+target departure, interior entry and the module's lost-target bound also end it. The model can
+reconsider at the ordinary choice point or after a directed heard line. The society's recorded
+module version governs these rules, so existing version-2 pursuit and replay remain unchanged.
+
 **What the model reads.** Its terms' instruction, then the situation, which also says when
 something is still under way, and the lines the being heard, oldest first, each quoted and named as
 what others said, never as instructions, by who said it (kind and number), to whom and when.
@@ -594,7 +621,7 @@ what others said, never as instructions, by who said it (kind and number), to wh
 argument, `line`: a string of at most `line_characters_maximum` characters, or null, both arguments
 required (`exulanica/models/choice.py`); `DecisionRole.line_labels` names the labels whose answer
 carries a line, for a door to state. An answer naming a say option with no line, or another option
-with one, is asked once more with its terms' note. Under the fourth and fifth prompts, whose
+with one, is asked once more with its terms' note. Under the fourth, fifth and sixth prompts, whose
 instruction asks the being to speak to the one it addresses without naming or describing them, a
 line said to one being that ends with that being's name or description, as the option's words name
 them (the name,
@@ -603,7 +630,9 @@ its name part, or its kind with or without an article, case and closing punctuat
 that prompt's note, which says so, within the attempts the contract allows; a line that ends with
 the listener's kind while speaking of itself is asked again too. A receipt is held to the rule its
 request's recorded prompt states (`names_its_listener`), so a request asked under an earlier prompt
-reads and replays as it did. A line that breaks the line rule is
+reads and replays as it did. Published historical prompt terms remain available when a newer
+registry becomes current, including while an earlier request awaits its answer; a newer prompt
+does not remove an earlier request's validation rules. A line that breaks the line rule is
 refused `line_out_of_bounds`, and one the workspace's rules would change, as they change a saved
 name, `line_refused_by_rules`; either way the receipt is rejected, nothing is said and the routine
 decides that turn. An accepted receipt's proposal is the label, the option and the line. A model's
@@ -850,6 +879,105 @@ goes on through `resume_minutes`: every minute whose receipts it recorded is ans
 as a replay answers, and only the later minutes are asked, so nothing recorded is asked again; a
 stored request the loop does not rebuild stops it by name.
 
+## Model discovery and admission preflight
+
+`GET /models`, with `world.read`, serves `exulanica.model-discovery/v1`: models ordered by
+provider and identifier, the provider catalog's source, read date and digest, the catalog-owned
+licence class, and the caller's workspace model records. It reads stored facts and makes no
+provider request. It does not establish live model availability or current prices.
+
+`POST /models/preflight`, also with `world.read`, takes `{provider, model_id}` and serves
+`exulanica.model-admission-preflight/v1` for that exact identifier. This is a read operation;
+it writes no admission or verdict, starts no job and asks no model. Invalid identifiers and
+extra fields are refused by body validation. Both responses are private and are not cached.
+
+The two reads distinguish these boundaries:
+
+- **Eligibility:** a served provider, a listed chat model with a registered role's required use
+  cases, and an accepted licence class from the shipped catalog. An unknown provider, unlisted
+  model, unsuitable model or unadmitted licence has its own reason. Conditional and unclassified
+  licences remain unadmitted, even if a workspace record says otherwise.
+- **Workspace evidence:** the caller's appended model facts and recorded verdict. A verified
+  assertion alone grants nothing. `binding_evidence`, where present, identifies the current
+  adding, exact replayed probe, role, engine, prompt and outcome digest.
+- **Execution binding:** shipped manifest bindings and fully replayed workspace bindings have
+  offered roles under their answering contracts. Added candidates are limited to the probe's
+  society role and engine, and require the host's explicit runtime opt-in. Shipped answering
+  records and any spoken-line limitation are served beside their bindings.
+- **Runtime readiness:** the provider's refusal and each offered role's host refusal. The
+  world's models route remains authoritative for its actual inhabitants, choices and world
+  prerequisites. A shipped probe record does not establish that this host can ask the model.
+- **Pricing:** stored manifest or recorded probe rates and context limits, with their source,
+  explicitly not current provider verification. Added candidates require fresh rates before
+  execution. Rates are separate from an operation estimate.
+
+`POST /models` adds an eligible catalog identifier to the workspace, and `POST /models/remove`
+removes it. Both take a caller's request UUID and record one immutable fact; replaying that
+request returns its original state even after later facts. Provider licence words and a stored
+`verified` assertion never grant execution.
+
+`POST /models/probes/prepare` records an immutable definition after reading the configured
+provider's current rates. Preparation asks no model and needs no spending allowance. Its quote
+binds the model's exact adding, the provider response digest, the fixed case book, the actual role
+messages, contract, prompt, token limit and deadline. The operation estimate is separate from a
+stored rate: it prices the full context-window ceiling plus the declared answer limit for every
+case. Prices expire one hour after reading.
+
+`POST /models/probes/{probe_id}/start` requires the prepared definition digest, a caller's request
+UUID and an explicit dollar ceiling covering that estimate. It opens a durable bound under the
+workspace's existing provider allowance, appends the start authorization and makes the existing
+job due. It issues no inference itself. The worker requires `EXULANICA_MODEL_PROBE_WORKER=true`,
+an explicit `EXULANICA_MODEL_PROBE_WORKSPACES` UUID list, a configured client and durable spending.
+Discovery reports whether this host serves starts. Catalog eligibility, the model epoch and the
+allowance are checked again at execution.
+
+The versioned probe exercises the society decision role under `exulanica-society/v7`: six plain
+choices and sixteen speech choices, each by strict JSON schema and forced tool call. Speech
+cases offer real speech actions alone, requiring a line. Each case is asked once, with no model
+fallback, cache or paid retry. A mechanism answers plain choices at five successful cases and
+speech choices at fourteen. Completion and passing are separate. A response from another model,
+a missing served identity, an infrastructure failure, an interrupted job or stale adding produces
+no admission verdict. Model answers pass the role's actual choice and line rules during replay.
+
+`GET /models/probes/{probe_id}` serves the preparation, bounded start, receipts and terminal
+outcome within the caller's workspace. `POST /models/probes/{probe_id}/replay` reconstructs the
+verdict from stored receipts without a client or network. `POST /models/probes/{probe_id}/cancel`
+ends future work and closes its bound. Receipts include actual response identity, reported usage,
+latency and separate accounting for unknown costs. A reclaimed lease uses the same durable
+spending keys; an uncertain prior dispatch cannot silently spend again. Exhausted claims end as
+unfinished. Terminal bound closure is retried from the job until recorded.
+
+Removing or re-adding a model prevents an older probe from verifying its newer state. A workspace
+tombstone serializes with all probe inserts, cancels its unfinished jobs and erases preparations,
+starts, answers and outcomes; the financial ledger follows its existing retention contract.
+These are private capability records, ordered by identity, with no published model comparison.
+
+Workspace candidates may be offered under `EXULANICA_WORKSPACE_MODELS=true`, which defaults to
+false. Admission reconstructs every receipt and terminal outcome of the latest completed probe
+for the current adding, checks current catalog eligibility, and requires the same mechanism to
+pass both plain and speech thresholds. It preserves the role's mechanism order and makes no
+comparative ranking claim. The scope is `society_decision` under `exulanica-society/v7`; signals,
+other engines, comparisons and automatic roles receive no added candidate bindings.
+
+The owner must explicitly choose the candidate for an actual inhabitant through the existing
+world role choice route. Nothing selects it automatically. A probe read's
+`execution_admitted: false` means that probe alone installs no execution authority. Playback also
+requires its existing workspace allowance, host admission and durable spending. Before asking,
+it reads current rates without holding a database session, rechecks the current proof under the
+workspace lock, and stores the complete execution manifest with provider configuration,
+parameters, rate response and proof digests. Each ask rechecks the current adding, licence,
+proof, restore completion and rate freshness; candidate rates expire after sixty seconds.
+Provider failures or another served identity cannot apply a candidate's decision.
+
+The decision request's `provider_config.manifest_sha256` resolves through
+`GET /models/bindings/{binding_sha256}`, with `world.read`, to the caller's immutable source
+snapshot. Removing a candidate stops future asks while leaving past decisions and source
+snapshots inspectable. A snapshot grants no execution permission. Snapshots stay in sealed
+backups; replay of a later workspace tombstone erases them. Pending restore control or an
+external pending restore marker refuses execution. Replay of stored decisions asks no model.
+The `models.add` Companion action remains reserved until its separate action contract maps the
+admission route.
+
 ## Implementation and evidence
 
 | Part | Source | Tests |
@@ -862,4 +990,4 @@ stored request the loop does not rebuild stops it by name.
 | The owner's choice and its read | `exulanica/world/society_model_choice_repository.py`, `exulanica/api/routes/society_models.py`, migrations 0110 and 0117 | `tests/test_society_person_decisions_postgres.py`, `tests/test_decision_roles_postgres.py` |
 | Reservations, receipts and their tables | `exulanica/world/society_decision_repository.py`, migrations 0055, 0110 and 0117 | `tests/test_society_decision_migration.py`, `tests/test_person_role_goldens_postgres.py` |
 | The host's phase and spend | `exulanica/api/decision_host.py`, `exulanica/api/society_control_worker.py` | `tests/test_society_person_decisions_postgres.py`, `tests/test_society_model_actions_postgres.py` |
-| Words for reasons | `assets/catalogs/society-words/society-inhabitant-words.v1.json`, `web/packages/app/src/ui/society-models.ts` | `tests/test_companion_decision_model.py`, `web/packages/app/test/society-models-words-parity.test.ts` |
+| Words for reasons | `assets/catalogs/society-words/society-inhabitant-words.v2.json`, `web/packages/app/src/ui/society-models.ts` | `tests/test_companion_decision_model.py`, `web/packages/app/test/society-models-words-parity.test.ts` |

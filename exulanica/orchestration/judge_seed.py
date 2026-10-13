@@ -359,13 +359,18 @@ JUDGE_INSERT_ONLY_TABLES: Final[tuple[str, ...]] = (
 #:
 #: The same routes as :data:`JUDGE_WRITE_TABLES`, stated at the other boundary: every read, the
 #: authored world and its appearance, the Companion and what it remembers, deleting a memory the
-#: judge made, and the model calls those routes need. Intake, admission, consent writes,
-#: operations writes and tile materialisation are absent, and absence is the grant. Plain strings
-#: rather than the enum, because importing the API package would load the whole application into
-#: the seed job; ``load_token_directory`` refuses any name outside the vocabulary, and
-#: ``tests/test_judge_seed.py`` loads what :func:`mint_judge_token` mints.
+#: judge made, and the model calls those routes need. ``being.act`` is what the three routes that
+#: act as a being ask for, which editing the world does not cover: a token minted with this grant
+#: plays a being where the API connects as the application role, as the public server's minted
+#: reviewers do. On the reviewer stack the judge role writes no society table
+#: (:data:`JUDGE_WRITE_TABLES`), so no being is played there whatever the token holds. Intake,
+#: admission, consent writes, operations writes and tile materialisation are absent, and absence
+#: is the grant. Plain strings rather than the enum, because importing the API package would load
+#: the whole application into the seed job; ``load_token_directory`` refuses any name outside the
+#: vocabulary, and ``tests/test_judge_seed.py`` loads what :func:`mint_judge_token` mints.
 JUDGE_PERMISSIONS: Final[tuple[str, ...]] = (
     "admission.read",
+    "being.act",
     "consent.read",
     "deletion.write",
     "library.read",

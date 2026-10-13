@@ -289,6 +289,238 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
             for name in ("society_experiment_definition", "world_society_decision_request")
         },
     ),
+    # tg_tombstone_erases_models_and_minds_budgets (0193) deletes, on a workspace tombstone, the
+    # facts the workspace holds about the models it added and every budget set for the minds of
+    # its worlds; each table's guard lets this role delete and nobody else.
+    "0193": DefinerGrants(
+        tables={
+            "workspace_model": frozenset(("SELECT", "DELETE")),
+            "world_minds_budget": frozenset(("SELECT", "DELETE")),
+        }
+    ),
+    # world_erase_rows (0195) locks a world's parent rows (UPDATE on workspace_id, which no body
+    # writes, for FOR UPDATE) and deletes every row of one world, its registration last, for a
+    # workspace tombstone's erasure of every world the workspace holds;
+    # tg_world_erases_on_tombstone then deletes the kinds the workspace kept. The society tables
+    # it also deletes from are 0182's grants, piece_output's is 0175's, and a world's budget for
+    # its minds is the grant of the migration that lets the owner delete it. The owner already
+    # updates a project and its items (0127), so their rows are locked under that grant.
+    "0195": DefinerGrants(
+        tables={
+            name: frozenset(("SELECT", "DELETE"))
+            for name in (
+                "companion_answer_simulation_citation",
+                "companion_answer_simulation_label",
+                "door_delivery",
+                "door_grant",
+                "door_grant_revision",
+                "door_grant_revocation",
+                "door_presence",
+                "door_secret",
+                "door_visitor_gone",
+                "piece_look_step",
+                "piece_request",
+                "piece_settlement",
+                "saved_world_entry",
+                "saved_world_source_attachment",
+                "saved_world_source_attachment_operation",
+                "saved_world_source_current_membership",
+                "saved_world_source_detach",
+                "saved_world_source_detach_operation",
+                "signal_comparison",
+                "signal_comparison_decision",
+                "signal_comparison_outcome",
+                "signal_comparison_run",
+                "signal_comparison_start",
+                "world_alternate_element_override",
+                "world_alternate_environment_instance",
+                "world_alternate_object",
+                "world_alternate_point_map_instance",
+                "world_alternate_thing",
+                "world_alternate_version",
+                "world_alternate_version_edit",
+                "world_generation_receipt",
+                "world_identity",
+                "world_interaction_policy_audit_event",
+                "world_interaction_policy_preview",
+                "world_interaction_policy_proposal",
+                "world_interaction_policy_state",
+                "world_interaction_policy_version",
+                "world_kind_version",
+                "world_package_export",
+                "world_project",
+                "world_project_binding",
+                "world_project_item",
+                "world_project_item_revision",
+                "world_project_item_source",
+                "world_project_share",
+                "world_region_style_version",
+                "world_structure_audit_event",
+                "world_structure_dependency",
+                "world_structure_element_identity",
+                "world_structure_invalidation",
+                "world_structure_placement_migration",
+                "world_structure_preview",
+                "world_structure_snapshot",
+                "world_structure_snapshot_element",
+                "world_structure_snapshot_region",
+                "world_structure_state",
+                "world_style_audit_event",
+                "world_style_preview",
+                "world_style_proposal",
+                "world_style_state",
+                "world_style_version",
+                "world_thing_look",
+                "world_topology_contract",
+                "world_topology_region",
+                "world_topology_source",
+                "world_traffic_signal_choice",
+                "world_traffic_signal_decision",
+                "world_traffic_signal_decision_request",
+                "world_traffic_signal_segment",
+            )
+        }
+        | {"piece_erasure_settlement": frozenset(("SELECT", "INSERT"))},
+        columns={
+            name: {"workspace_id": frozenset(("UPDATE",))}
+            for name in (
+                "saved_world_entry",
+                "world_alternate_version",
+                "world_style_state",
+                "world_style_preview",
+                "world_structure_state",
+                "world_structure_preview",
+                "world_interaction_policy_state",
+                "world_interaction_policy_preview",
+                "piece_request",
+                "signal_comparison_start",
+                "signal_comparison_run",
+                "door_grant",
+                "world_identity",
+            )
+        },
+    ),
+    # Probe records are erased and their queued work cancelled with the workspace.
+    "0196": DefinerGrants(
+        tables={
+            **{
+                name: frozenset(("SELECT", "DELETE"))
+                for name in (
+                    "model_probe",
+                    "model_probe_start",
+                    "model_probe_receipt",
+                    "model_probe_outcome",
+                )
+            },
+            "job": frozenset(("SELECT",)),
+        },
+        columns={
+            "job": {
+                name: frozenset(("UPDATE",))
+                for name in (
+                    "state",
+                    "completed_at",
+                    "lease_expires_at",
+                    "claim_token",
+                    "claimed_by",
+                    "last_error",
+                    "failure_class",
+                )
+            }
+        },
+    ),
+    # The world-erasure trigger cancels generated tile work before erasing the world's rows.
+    "0197": DefinerGrants(
+        tables={
+            "world_erasure": frozenset(("SELECT",)),
+            "job": frozenset(("SELECT",)),
+        },
+        columns={
+            "job": {
+                name: frozenset(("UPDATE",))
+                for name in (
+                    "state",
+                    "completed_at",
+                    "lease_expires_at",
+                    "claim_token",
+                    "claimed_by",
+                    "last_error",
+                    "failure_class",
+                )
+            }
+        },
+    ),
+    "0199": DefinerGrants(
+        tables={
+            name: frozenset(("SELECT", "DELETE"))
+            for name in (
+                "world_grant",
+                "world_grant_revision",
+                "world_grant_principal",
+                "world_grant_revocation",
+                "world_grant_departure",
+                "world_grant_entry",
+                "participation_redemption_refusal",
+            )
+        },
+        columns={"world_grant_entry": {"revoked_at": frozenset(("UPDATE",))}},
+    ),
+    # Binding provenance is immutable and erased with its workspace.
+    "0201": DefinerGrants(
+        tables={"workspace_model_binding_snapshot": frozenset(("SELECT", "DELETE"))},
+    ),
+    "0205": DefinerGrants(
+        tables={
+            "capture": frozenset(("SELECT",)),
+            "personal_model_right": frozenset(("INSERT",)),
+            "personal_model_right_use": frozenset(("SELECT", "INSERT")),
+            "capture_reconstruction_authorization": frozenset(("SELECT",)),
+        },
+    ),
+    "0207": DefinerGrants(
+        tables={
+            "world_draft_start": frozenset(("SELECT",)),
+            **{
+                name: frozenset(("SELECT", "DELETE"))
+                for name in (
+                    "world_draft_request",
+                    "world_draft_input",
+                    "world_draft_progress",
+                    "world_draft_attempt",
+                    "world_draft_outcome",
+                )
+            },
+            "job": frozenset(("SELECT",)),
+        },
+        columns={
+            "job": {
+                name: frozenset(("UPDATE",))
+                for name in (
+                    "state",
+                    "payload",
+                    "completed_at",
+                    "claim_token",
+                    "lease_expires_at",
+                    "claimed_by",
+                    "failure_class",
+                    "last_error",
+                )
+            }
+        },
+    ),
+    "0211": DefinerGrants(
+        tables={
+            "kind_draft_start": frozenset(("SELECT",)),
+            **{
+                name: frozenset(("SELECT", "DELETE"))
+                for name in (
+                    "kind_draft_input",
+                    "kind_draft_attempt",
+                    "kind_draft_outcome",
+                )
+            },
+        },
+    ),
 }
 
 

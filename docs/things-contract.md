@@ -150,30 +150,47 @@ served by one ability module, with what it needs of the body and what its target
 | `say` | `exulanica-ability/say/v1` | nothing; takes a line | `hear` | |
 | `leave` | `exulanica-ability/crossing/v1` | a way to move | `leave_through`, or none | `quiet_minutes` 1 to 60 |
 
+A society records the module versions that execute these abilities. For following, version 3
+keeps an accepted pursuit between decision opportunities; version 2 requires a keeping decision
+each minute. Current model terms offer following only with version 3, while the player's existing
+version-2 controls remain available. The [society contract](synthetic-society-contract.md#the-society-of-things-v7)
+defines cancellation and target-loss rules. A follow ability still requires a way to move.
+
 The purposeful abilities are the purposeful routine's actions with exactly its rules, and talking
 stays wordless: words are said. A line is written only by a decider, never by the routine. Under the
-module's second version (`exulanica-ability/purposeful/v2`), which every society of things made
-since records, a being does only those its kind lists: the routine plans only them, its decider is
+module's second and third versions (`exulanica-ability/purposeful/v2` and `/v3`), a being does
+only those its kind lists: the routine plans only them, its decider is
 offered only them, a talk takes two beings whose kinds both list talk, and a request for another is
 refused `activity_not_offered`
 ([society contract](synthetic-society-contract.md#the-society-of-things-v7)). Waiting is
-everybody's, and a being whose kind does not rest is never tired. A society that recorded the first
-version runs it for its whole life, where every being may do all five.
+everybody's, and a being whose kind does not rest is never tired. The third version also reads
+the kind's purposeful activity weights for autonomous choices; the second keeps the world's
+routine weights. A society that recorded the first version runs it for its whole life, where
+every being may do all five. New societies record the third version; stored societies retain
+their recorded version.
 
 [`ability-modules.v1.json`](../exulanica/abilities/ability-modules.v1.json) states each module once,
 by version, read by [`registry.py`](../exulanica/abilities/registry.py): the abilities it serves,
 its bounded parameters (a figure the module uses itself, or a range a kind states within), the
-event kinds its minute records, and whether it is built. Purposeful (versions 1 and 2), say,
+event kinds its minute records, and whether it is built. Purposeful (versions 1, 2 and 3), say,
 crossing (versions 1 and 2, the second naming a visitor in every summary by what it is, from
 outside, never as simulated) and hands (versions 1 and 2: `reach_mm` 1,500, `approach_mm` 8,000,
 `walk_minutes_maximum` 3) are built, and so is follow's second version (`follow_distance_mm` 2,000, `lost_after_minutes`
-3); its first was stated and never built, so no society records it, and it is still refused by name
+3), with persistent accepted pursuit in its third version; its first was stated and never built,
+so no society records it, and it is still refused by name
 (`follow_not_built`). A society of things records
 the modules it runs in its first input and runs exactly those for its whole life
 ([society contract](synthetic-society-contract.md#the-society-of-things-v7)), so a module version
 stays in the table while any stored society names it, and a new version is a new row. A later
 version of a module serves the same abilities, so the abilities catalog names one version of each
 module and an ability is served by whichever version a society runs.
+
+Speech version `exulanica-ability/say/v2` retains the previous state's workspace-kind run forms
+when deciding who hears a line. Shipped and workspace beings must offer `hear`, remain present,
+share the permitted space and be within the recorded hearing reach. The first speech version
+retains its shipped-kind hearing read, including its omission of workspace-kind hearers, for
+exact replay. Societies record the speech version in their first input; adding the second version
+does not reinterpret older events or add a model decision.
 
 [`offers.v1.json`](../assets/catalogs/things/offers.v1.json) states what a thing lets others do to
 it, and the parameters a kind states for each:
@@ -196,10 +213,17 @@ hanging below the hand (`-z`). A gate's arrival point is 1,000 mm in front of it
 from it (`+y`), so a visitor steps out of the gate into the world.
 
 The world object catalog's uses map onto offers: `rest` to `rest_at` with its places and seats,
-`visit` to `visit`, perches to `perch` and hosted flyers to `host`. A kind's routine draws among
-`wait`, `stand`, `talk`, `rest`, `visit`, the hands abilities and `follow`, by the kind's weights.
-No society reads these weights yet: the society of things' routine is the purposeful planner's, and
-only a decider, or the world's owner by a direct request
+`visit` to `visit`, perches to `perch` and hosted flyers to `host`. A kind may state weights for
+its purposeful activities, hands abilities and following. Recorded purposeful/v3 reads only
+`wait`, `stand`, `talk`, `rest` and `visit` for ordinary autonomous choices. Missing keys and
+explicit zero weights both mean no preference; an empty or unavailable distribution waits
+safely. Automatic conversation requires positive talk preference from both participants.
+Durations, need thresholds, relief, reach and capacity remain the world's routine rules.
+Tiredness may select an available rest place despite zero rest preference, and a being that
+finishes at a destination makes room before waiting. Explicit model, player and owner choices
+remain governed by capabilities rather than weights. Earlier purposeful versions ignore kind
+weights, and people with no kind retain world-routine selection. Hands and follow weights and
+`follow_holders_of` are not executed by the routine; only a decider, or the world's owner by a direct request
 ([society contract](synthetic-society-contract.md#typed-user-directed-actions)), uses a being's
 hands.
 
@@ -481,7 +505,7 @@ kind suggesting a look the library does not hold at the kind's digest each stop 
 | --- | --- | --- | --- | --- | --- | --- |
 | `knight` | being | humanoid, 1,700 to 1,900 mm | wait, stand, talk, rest, visit, pick_up, put_down, give, take, follow, say | talk_to, hear, receive, be_followed | the routine by default; a model, the owner or an outside program | version 2: `kaykit-knight`, then `blocky-knight`; version 1: `blocky-knight` |
 | `traveller` | being | humanoid, 1,550 to 1,800 mm | as the knight; version 2 also leave after 5 quiet minutes, offered only once it crossed in | as the knight | as the knight | `blocky-traveller` |
-| `lantern_spirit` | being | bodiless, radius 200 mm | wait, follow, say, pick_up, put_down, give, take | talk_to, hear, receive, be_followed | as the knight; its routine follows whoever carries a lantern | `spirit-light` |
+| `lantern_spirit` | being | bodiless, radius 200 mm | wait, follow, say, pick_up, put_down, give, take | talk_to, hear, receive, be_followed | as the knight; its authored preference to follow a lantern's holder is not executed by the routine | `spirit-light` |
 | `visitor` | being | humanoid, 1,500 to 2,000 mm | wait, stand, talk, say, pick_up, put_down, give, take, follow, leave after 5 quiet minutes | talk_to, hear, receive, be_followed | an outside program only | none: its crossing brings one |
 | `villager` | being | humanoid, 1,500 to 1,950 mm | wait, stand, talk, rest, visit | talk_to, hear | the routine; a model or the owner | `people-catalog` |
 | `sword` | object | versions 2 and 3: 240 x 80 x 1,000 mm, as wide and deep as a sword's guard and pommel; version 1: 120 x 40 x 1,000 mm | | holdable, one hand, 150 mm up its length | | version 3: `kaykit-sword`, then `primitive-sword`; versions 1 and 2: `primitive-sword` |
@@ -639,6 +663,45 @@ oriented parts are triangles in whole millimetres, each lit by its own normal, a
 product's static glTF reader. It is the creature's own body plan made visible, never a picture
 standing in for it.
 
+### Authored body surfaces
+
+The body-surface writer writes a `rigid_on_bones` look from an
+`exulanica.body-surfaces/v1` document. It pins the recipe and body-plan digests, verifies the
+builder's rest joints, and attaches each surface to a named bone of that plan. Rounded ellipsoids
+with optional radial ridges and swept tubes with bounded subdivision are declarative appearance
+inputs. Coordinates and radii are whole slot-frame millimetres. The document admits at most 128
+parts and 20,000 triangles; every generated rest vertex must fit the recipe's width, length and
+height and stay above its support plane. Degenerate geometry, unknown fields or attachments,
+invalid material factors and mismatched pins refuse before a container is written.
+
+The mesh writer accepts optional finite unit normals per vertex and roughness/metalness in whole
+thousandths. A mesh without these additions retains its flat normals and exact container bytes.
+The resulting look uses the existing look and static-container checks. Its origin retains the
+recipe, plan and surface digests; an authoring receipt identifies the writer, output digest, counts
+and rest bounds. Authored geometry carries authored provenance, with no invented model receipt.
+
+The low-level mesh writer also accepts normalized atlas UVs and optional embedded material maps.
+`PngMap` checks complete PNG chunks, checksums and bounded compressed pixel data: eight-bit RGB or
+RGBA, non-interlaced, each side at most 4096 pixels. `MaterialMaps` assigns base colour in sRGB,
+tangent-space normal XYZ, and linear packed roughness/metallic in the green/blue channels. Existing
+colour and material factors multiply the maps. A normal map requires explicit unit tangents
+orthogonal to its normals, handedness of plus or minus one, and nondegenerate triangle UVs after
+float32 conversion. Tangents rotate with geometry from the slot frame to glTF; UVs retain their
+stated orientation. Flat meshes duplicate UVs with their corners; smooth meshes remain indexed.
+Exact image bytes are embedded once per unique image in the existing static container, with no
+external references. The writer enforces the static admission image and texel ceilings and the
+look's 32 MiB container ceiling. Admission, workspace retention, serving and withdrawal use the
+existing look contracts. The declarative body-surface document provides no UV unwrap, texture bake
+or map fields; these inputs are for authored meshes supplied to the lower-level writer. They do
+not extend the skinned-container profile or the sculpting pipeline.
+
+The operator utility that assembles surfaces into an asset bundle assembles a
+declared recipe, body, surface, look, kind and origin into an immutable asset bundle. It provides
+no browser body editor or upload operation. The kind's admitted abilities and movement modules
+remain authoritative. Rest bounds and cosmetic deformation do not establish locomotion clearance;
+the host must provide a compatible graph and supported recorded action. Visible sole contact
+requires checking the posed mesh, including geometry beyond a limb's last joint.
+
 ### Assembling a creature
 
 [`creatures.py`](../exulanica/things/creatures.py) `assemble_creature` turns a drafted form into the
@@ -692,7 +755,7 @@ it goes:
 | `kept` | The kind made and its sketch, each by key, version and digest, its label, and the model that drafted it |
 | `erased` | Nothing: the draft was kept, and the workspace has erased the creature since |
 | `refused` | The refusing check's code, the field of the drafter's form it refused, and the code's fixed sentence, an unbuilt movement's in the grammar's own words ("This world has no flying creatures yet.") |
-| `failed` | Why, by code: `drafter_unavailable`, `spending_refused`, `request_refused`, `expired`, `stranded`, `not_served` |
+| `failed` | Why, by code: `drafter_unavailable`, `spending_refused`, `request_refused`, `reference_withdrawn`, `expired`, `stranded`, `not_served` |
 | `cancelled` | Why, by code: `workspace_deleted`, its workspace erased before the draft ended |
 
 `GET /things/creatures/offered` (`exulanica.creature-offer/v1`) says before anyone types whether
@@ -702,6 +765,41 @@ the closed lists of codes a draft may end with: a refusal outside the list is ca
 `creature_not_drafted`. `GET /things/creatures/drafts` lists the requester's own drafts, newest
 first, so a reload finds one still running; a draft states when it was asked, when a worker first
 took it and when it ended.
+
+An optional `reference_id` names a finished reference request owned by the requester, made with
+purpose `things`. The worker takes web notes through the existing
+[reference authority](reference-notes-contract.md). Selected-picture notes use its v3 bundle and
+a separately declared, current creature-role consent. Unknown, foreign, unfinished or
+wrong-purpose requests retain their visible `not_used` fallback. A selected-picture request whose
+authority ended fails closed, including before its first dispatch. No-reference requests retain their response shape and
+`creature-drafting-1` prompt. Consumed notes select `creature-drafting-2`, are quoted as untrusted
+descriptions after the person's words, and cannot override the body's supported bounds or actions.
+Explicit requested changes take priority in the prompt; the use record does not establish that a
+model followed a particular change or that a reference caused an output field.
+
+Reference-bearing drafts expose `references` with the request ID and a state. `pending` means no
+attempt has been recorded; `not_attempted` means the draft ended before that point. `used` means an
+exact notes-conditioned request returned a model response or matched a cached response. `unknown`
+means a dispatch may have reached the provider without a response, including a worker interrupted
+before recording its result. `not_used` means no eligible notes or known non-delivery. Used and
+unknown records name the bundle digest, note count and the consumed bases (`web_description`,
+`own_picture` or both), never note text. Picture-derived requests bypass response caching.
+The draft queue preserves this record across reclaim without changing the job's spending key.
+The body's and kind's existing origin ingredient lists bind the consumed bundle digest; the user
+words' digest remains separate, and no generation receipt is invented.
+
+The worker checks reference authority before each model attempt and under a reference-row lock
+inside both existing creature-store transactions. For picture notes, privacy currency and the
+source lifecycle lock precede the claim and reference rows; exact right currency is read without
+locking right rows. Feature eligibility, screening, person findings and the explicit consent
+binding are checked again within those guards. No lock spans a provider call. Withdrawal before
+the final store check discards the answer with `reference_withdrawn`; a completed call remains
+recorded as used. A lost claim publishes no stale completion. Bytes written before a second store
+check refuses remain in the existing inventory and are reached by workspace erasure. This path
+uses semantic anatomy, relative part layout, material, colour and rough-scale suggestions. It
+does not recover geometry, match an appearance from pixels, add a reference-selection UI or make
+inhabitant behavior model-driven. Already kept invented definitions remain until ordinary
+creature erasure; a stopped or erased source cannot authorize another attempt.
 
 A draft is a row and a job on the shared job queue, claimed with a lease and a claim token as a
 reference job is. The words live only in the job until the draft ends, and the draft keeps nothing
@@ -1352,10 +1450,12 @@ These are material limits of the boundary above, not partial behaviour:
 - The society of things ([society contract](synthetic-society-contract.md#the-society-of-things-v7))
   reads a placed thing's kind, places its beings, lets visitors cross in and leave, says the lines
   its beings' deciders choose and does the hands acts they choose or the world's owner asks for by
-  a direct request. A being follows another only where a person playing it chooses to: no model or
-  outside program is offered following yet (the engine's terms state no follow action), the
-  routine never follows (so a lantern spirit's `follow_holders_of` is unread), and no direct request
-  asks it. The routine says nothing and uses no hands; only a model chosen for a being, a visitor's
+  a direct request. A person playing a capable being may choose following; current model terms
+  also offer it when the society records follow/v3. Accepted pursuit persists until an explicit
+  stop or superseding choice, an applied owner command, or the recorded target-loss conditions.
+  Older follow/v2 keeps its per-minute rules and is withheld from current model choices. The
+  routine never initiates following (so a lantern spirit's `follow_holders_of` is unread), and no
+  direct owner request starts it. The routine says nothing and uses no hands; only a model chosen for a being, a visitor's
   own program, or the world's owner's direct request does.
   A visitor the world decides for takes no person's direct request yet, and nobody in the app can
   take a being over and play it.
@@ -1369,14 +1469,18 @@ These are material limits of the boundary above, not partial behaviour:
   route is still the shortest by length whoever walks it, a follower slower than the one it
   follows falls behind, and the minutes a hands act may take to reach its thing are the same for
   every body, so a slow one may not reach it in time. Its routine is the purposeful routine held to
-  the abilities its kind lists; the weights drafted with it are read by nothing, so a creature
+  the abilities its kind lists. Recorded purposeful/v3 reads its five purposeful weights; earlier
+  versions retain world-routine selection. A wait preference does not remove movement or rest
+  capability, and tiredness and making room remain exceptions to ordinary waiting. A creature
   whose kind lists none of rest, visit, stand and talk waits where it is. A decider is told its
   body, never a temperament: nothing drafts or carries one. In a society made before paces were
   read, which moves every body at the people's pace, a small body's legs step as often as that
   pace asks of its short stride, and a large body's seldom. A leg of one segment does not lift as it swings forward. A sketch is posed
   in full at any distance within the crowd's far radius; how many the page poses in a frame is not
-  measured. It wears only its sketch: a
-  choice of another look for it is refused (`look_unfit`). A creature placed in a world whose
+  measured. Its owner may choose another admitted workspace look on its exact held body plan.
+  The choice is recorded beside the thing; its identity, society minute, decisions and replay
+  do not change. Withdrawn, erased, foreign-workspace and incompatible looks are refused;
+  a withdrawn chosen look falls back to its admitted first look. A creature placed in a world whose
   society is not a society of things (a living town already made) is taken in by nothing and
   stands where it was placed.
 - A model's line names its model only where its said event records one (a society made since its
@@ -1384,7 +1488,7 @@ These are material limits of the boundary above, not partial behaviour:
   A person in flight wears no pill: the flock draws them, not the crowd.
 - No creature flies, swims, climbs or burrows: the grammar states those movements and refuses them
   in words. A floating body therefore cannot move at all yet.
-- No creature wears a sculpted look: its sketch is its only look. The route that makes one (route C
+- A creature may wear an admitted compatible look. The sculpted-look pipeline (route C
   of [generated appearance](generated-appearance.md)) is built. In its two pre-registered rig
   trials one and then four bodies of eight counted, against the five the rule needed, so the sketch
   stays every creature's default. Nothing in the product asks for a sculpted look yet. A look request is written by

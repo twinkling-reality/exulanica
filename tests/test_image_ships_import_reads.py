@@ -133,16 +133,40 @@ def test_every_image_copies_and_admits_every_package_the_wheel_builds():
             assert image.allowlisted(f"{package}/__init__.py"), (name, package)
 
 
-def test_every_image_that_installs_the_package_is_checked():
-    """A recipe that installs the package non-editably is one whose imports read site-packages."""
-    installing = sorted(
-        path.relative_to(REPOSITORY).as_posix()
-        for path in REPOSITORY.glob("**/Dockerfile")
-        if ".venv" not in path.parts
-        and "node_modules" not in path.parts
+def installing_image_recipes(root: Path) -> list[str]:
+    """Nonignored package installers, including recipes awaiting their first commit."""
+    # Inspect deployable source, including new files awaiting commit. Ignored local scratch
+    # copies are not additional image recipes shipped by this repository.
+    listed = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return sorted(
+        relative
+        for relative in set(filter(None, listed.split("\0")))
+        if (path := root / relative).name == "Dockerfile"
+        and path.is_file()
         and "--no-editable" in path.read_text(encoding="utf-8")
     )
-    assert installing == ["Dockerfile", "deploy/material-bake/Dockerfile"]
+
+
+
+def test_every_image_that_installs_the_package_is_checked():
+    """A recipe that installs the package non-editably is one whose imports read site-packages."""
+    assert installing_image_recipes(REPOSITORY) == ["Dockerfile", "deploy/material-bake/Dockerfile"]
+
+
+def test_image_discovery_includes_new_recipes_and_excludes_ignored_scratch(tmp_path):
+    subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
+    (tmp_path / ".gitignore").write_text("scratch/\n")
+    for relative in ("Dockerfile", "deploy/new/Dockerfile", "scratch/copy/Dockerfile"):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("RUN uv sync --no-editable\n")
+    assert installing_image_recipes(tmp_path) == ["Dockerfile", "deploy/new/Dockerfile"]
 
 
 @pytest.mark.parametrize("name", sorted(IMAGES))

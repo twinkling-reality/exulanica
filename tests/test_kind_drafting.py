@@ -13,22 +13,28 @@ import copy
 import hashlib
 import json
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pytest
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
-from exulanica.models.manifest import Role
+from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.schema import response_format_for
 from exulanica.models.transport import HttpResponse
+from exulanica.selection import kind_drafting
 from exulanica.selection.kind_brief import brief_form, compile_brief
 from exulanica.selection.kind_drafting import (
     DRAFT_ATTEMPTS,
     KindDraftRefusalCode,
     KindVerdict,
-    draft_kind,
-    kind_drafting_prompt,
     render_instructions,
+)
+from exulanica.selection.kind_drafting import (
+    draft_kind as current_draft_kind,
+)
+from exulanica.selection.kind_drafting import (
+    kind_drafting_prompt as current_kind_drafting_prompt,
 )
 from exulanica.world.kinds.catalogs import load_kind_catalogs
 from exulanica.world.kinds.document import KindRefused, read_kind
@@ -41,9 +47,22 @@ from kind_briefs import PROVENANCE, brief_of, fixture_kind, held_to_form
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
 
 #: The scripted transport's model, as every reply names it.
-MODEL = "test/model"
+MODEL = load_manifest()[Role.KIND_DRAFTER].primary.model_id
 ROLE = Role.KIND_DRAFTER
 DESCRIPTION = "A small farm with a farmhouse, a barn, fields and a duck pond."
+
+
+LEGACY_PROMPT = Path(kind_drafting.__file__).with_name("kind-drafting.v6.json")
+
+
+def kind_drafting_prompt(path=LEGACY_PROMPT):
+    """This suite preserves the published version 6 behavior; v7 has its own contract suite."""
+    return current_kind_drafting_prompt(path)
+
+
+def draft_kind(*args, **kwargs):
+    kwargs.setdefault("prompt", kind_drafting_prompt())
+    return current_draft_kind(*args, **kwargs)
 
 
 def _farm() -> dict[str, Any]:
@@ -112,7 +131,7 @@ def test_a_kind_that_passes_is_drafted_once_with_its_provenance():
     provenance = outcome.document["provenance"]
     assert provenance["words_sha256"] == hashlib.sha256(DESCRIPTION.encode()).hexdigest()
     assert provenance["prompt_sha256"] == hashlib.sha256(instructions.encode()).hexdigest()
-    assert provenance["prompt_version"] == "kind-drafting-5"
+    assert provenance["prompt_version"] == "kind-drafting-6"
     assert (outcome.document["origin"], provenance["model"]) == ("drafted", MODEL)
     assert outcome.report["verdict"] == "passed"
     assert [(step["outcome"], step["sizing"]) for step in outcome.trail] == [("passed", [])]
@@ -120,6 +139,58 @@ def test_a_kind_that_passes_is_drafted_once_with_its_provenance():
     # The description is the user message, as sent; the instructions carry the catalogs' words.
     assert DESCRIPTION in transport.requests[0]["payload"]["messages"][1]["content"]
     assert "workplace (structure, area, fixture, room)" in instructions
+
+
+def test_copied_omissions_are_transient_offsets_and_invented_phrases_require_repair():
+    description = "A small farm with a farmhouse and a flying boat."
+    invalid = _farm()
+    invalid["not_supported"] = ["a spaceship"]
+    repaired = _farm()
+    repaired["not_supported"] = ["a flying boat", "a flying boat"]
+    client, transport = _client(_reply(invalid), _reply(repaired))
+    outcome = draft_kind(client, description, role=ROLE, check=_checked)
+    assert outcome.attempts == ("check:kind_document_invalid", "passed")
+    assert [description[a:b] for a, b in outcome.not_supported_at] == ["a flying boat"]
+    assert "a spaceship" not in transport.requests[1]["payload"]["messages"][-1]["content"]
+    assert "not_supported" not in outcome.document
+    assert "a flying boat" not in json.dumps(outcome.document["provenance"])
+
+
+def test_omission_that_cuts_a_saved_name_is_refused():
+    brief = _farm()
+    brief["not_supported"] = ["person A"]
+    client, _transport = _client(*[_reply(brief)] * DRAFT_ATTEMPTS)
+    outcome = draft_kind(client, "A farm for [person A]", role=ROLE, check=_checked)
+    assert outcome.document is None and outcome.refusal is not None
+    assert outcome.not_supported_at == ()
+
+
+def test_unknown_leaf_catalog_sizing_is_repaired_by_the_compiler_before_samples():
+    brief = _farm()
+    thing = brief["zones"][0]["structures"][0]["rooms"][0]["fixtures"][0]
+    thing.update(look="fixture.unknown", size_source="catalog")
+    client, _transport = _client(_reply(brief), _reply(_farm()))
+    outcome = draft_kind(client, DESCRIPTION, role=ROLE, check=_checked)
+    assert outcome.attempts == ("check:kind_document_invalid", "passed")
+    assert outcome.trail[0]["where"].endswith(".size_source")
+
+
+def test_published_v5_drafting_keeps_its_form_and_does_not_read_the_fixture_vocabulary(
+    monkeypatch,
+):
+    prompt = kind_drafting_prompt(Path(kind_drafting.__file__).with_name("kind-drafting.v5.json"))
+
+    def unavailable():
+        raise AssertionError("version 5 read the version 6 vocabulary")
+
+    monkeypatch.setattr(kind_drafting, "load_thing_leaves", unavailable)
+    instructions = render_instructions(prompt, load_kind_catalogs(), town_routine())
+    assert "Named fixture leaves" not in instructions
+    schema = brief_form(fixture_vocabulary=False).model_json_schema()
+    assert "size_source" not in json.dumps(schema) and "not_supported" not in json.dumps(schema)
+    client, _transport = _client(_reply(brief_of(fixture_kind("farm"))))
+    outcome = draft_kind(client, DESCRIPTION, prompt=prompt, role=ROLE, check=_checked)
+    assert outcome.document["provenance"]["prompt_version"] == "kind-drafting-5"
 
 
 def test_a_kind_the_checks_refuse_is_told_the_check_and_place_and_never_its_own_words():

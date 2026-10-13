@@ -124,6 +124,25 @@ function benchSeat() {
 }
 
 describe('a person using an object', () => {
+  it('sits on a canonical fixture at recorded XY, and rises when its contact is withdrawn', () => {
+    const { crowd, poses } = setup(true);
+    const fixtureLayout: SeatingLayout = {
+      uses: new Map(), objects: [], targets: new Map([['fixture-rest', 'bench-a']]),
+      fixtureSeats: [{ objectId: 'bench-a', heightHintM: .225, maximumHeightM: .46, facing: Math.PI / 2,
+        triangles: [1,.45,-3, 3,.45,-3, 1,.45,-1, 3,.45,-3, 3,.45,-1, 1,.45,-1],
+        normals: Array.from({length:6},()=>[0,1,0]).flat() }],
+    };
+    crowd.set({ ...STATE, inhabitants: [person('resting',[1800,-2400],'rest','fixture-rest')] }, [0,0], {nowMs:0,intervalMs:1000}, fixtureLayout);
+    run(crowd,3);
+    const drawn = last(poses,'resting');
+    expect(drawn.position[0]).toBeCloseTo(1.8);
+    expect(drawn.position[2]).toBeCloseTo(-2.4);
+    expect(drawn.position[1] + postureSeatMetres(crowd.farAppearance('resting'),'perched')).toBeCloseTo(.45);
+    expect(crowd.seatingMisses).toEqual([]);
+    crowd.setLayout({...fixtureLayout,fixtureSeats:[]}); run(crowd,3,3000);
+    expect(last(poses,'resting').position[1]).toBe(0);
+    expect(crowd.seatingMisses[0]?.reason).toBe('object-not-drawn');
+  });
   it('walks to stand before the seat, then lowers onto it at its height and facing', () => {
     const { crowd, poses } = setup(true);
     const { seat, lift } = benchSeat();

@@ -149,6 +149,7 @@ def consumed_places(document: dict[str, Any]) -> dict[str, Any]:
                         "destination_id": destination["destination_id"],
                         "use_class": destination["use_class"],
                         "label": destination["label"],
+                        "indoors": destination["indoors"],
                     }
                     for destination in document["living"]["place"]["destinations"]
                     if destination["enabled"]

@@ -15,8 +15,9 @@ pack (section 10) are built, as are a creator's own packs in their workspace: ke
 checked, served, downloaded as an archive, offered for publication and withdrawn (section 11), and
 looks made of generated pieces, recorded, checked, served and worn by the world they were made for
 (sections 10 and 11.2), and a world's own setting, chosen from named parts, checked, stored and
-drawn (section 12) and offered from a description (section 12.1). A person choosing their own workspace pack for a world, publishing one to
-the library, the page's upload control, and drafting a pack with a model are planned and not built.
+drawn (section 12) and offered from a description (section 12.1). The appearance preview/apply API
+accepts ready packs from the world's workspace. The page's workspace-pack choice and upload controls,
+publishing a pack to the library, and drafting a pack with a model are planned and not built.
 
 ## 1. In plain words
 
@@ -48,6 +49,7 @@ is the text as stored, in the order it is stored.
 | `shading` | `pbr`, `toon` with its bands, or `flat`, and an ink colour or none |
 | `edge` | The ground beyond the world: a colour, how far below the tiles it lies, how far it reaches |
 | `palette` | At most 64 swatches, each a distinct sRGB colour with roughness, metalness and emission |
+| `look_family_catalog` | Optional retained appearance catalog pin, `{version, sha256}`; the digest names the exact catalog file bytes. Absence retains version 1 and adds nothing to the manifest's canonical bytes |
 | `surfaces` | A look role of a surface family to a swatch or a texture set, with an optional swatch for upward faces |
 | `modules` | A look role of a module family to one to eight variants, each a piece file, an optional second level of detail, the piece's own size and, for a fill family, where it stretches |
 | `files` | Every file the pack carries, in path order: path, SHA-256, size and the media type its extension states (`model/gltf-binary` for `.glb`, `image/jpeg`, `image/png` or `image/webp` for a picture); every file is a variant's piece or the preview |
@@ -55,6 +57,12 @@ is the text as stored, in the order it is stored.
 A pack with no base states its light and shading. A pack drawn on a base states only what it changes:
 its swatches, surfaces, modules, presets, shading and edge replace the base's, and anything it leaves
 out is the base's. A chain holds at most four manifests.
+
+Catalog selection is explicit rather than inherited: every manifest in a base chain either omits
+`look_family_catalog` or states the same version and digest. A mixed chain is refused after base
+identity checks, before resolving its appearance. A generated derived look preserves its base's
+explicit pin. Readers accept only retained catalog versions with matching file digests, never a
+manifest-supplied path, URL or latest-version lookup.
 
 A profile changes without breaking a manifest written under it. A field added within a profile is
 optional, and its absence keeps the meaning a manifest had before the field existed: `preview` came
@@ -67,6 +75,12 @@ so every published version stays readable.
 A look role is `family.leaf`. The families, how each is fitted and how a pack dresses it are the
 world kinds' look-family catalog, which both readers are given rather than copying; leaves are open. A pack
 dresses look roles only, never a slot, an engine role or a position.
+
+Appearance catalog version 2 retains the version 1 families and changes the optional roof module's
+fit from `surface` to uniform `contain` within the served roof slot. A pack opts into it through
+`look_family_catalog`; a pack without that field keeps version 1. This selection does not change
+the kind catalog, a saved canonical drawing, support or navigation. A roof module still needs to
+respect the roof envelope and usable openings; selecting a catalog is not a clearance proof.
 
 | Dressing | Families | What the pack supplies |
 | --- | --- | --- |
@@ -236,14 +250,26 @@ A world made from a world kind (its site, [world kinds](world-kinds-contract.md#
 drawn in a pack too, chosen the same way as a town's: the address's, else the pack its appearance
 names, else the host's default. `packSiteDresser`
 (`web/packages/atlas-react/src/playcanvas/style-pack/site-dresser.ts`) dresses the site's drawn
-slots; nothing it does changes a slot, the walk or the seats, and taking the site down puts every
+slots; nothing it does changes a slot, the walk or the society's seat places, and taking the site down puts every
 material back and shows every primitive again.
+
+A person resting at a declared site fixture faces its served front and keeps their recorded
+plan position. The renderer finds contact on that fixture's actual transformed triangles,
+captured when it mounts or changes appearance, with at most 100,000 module vertices retained
+across the site; a seat exceeding that budget has unavailable contact. It tests the upper visible intersection before
+accepting a nearly horizontal upward face between the source's height hint and the supported
+human-seat ceiling of 460 mm above the slot base. A missing corner, occluding slope, tall face
+or absent geometry reports `fixture-seat-contact-unavailable`; it does not use a hidden seat
+below it or another object nearby. Contact belongs to the attached saved entry and version,
+and is withdrawn with the appearance. Authored catalog seats and town furniture keep their
+existing paths. This presentation rule grants no walking support and does not establish full
+seated-body clearance or arbitrary seat heights.
 
 | Part | What it does |
 | --- | --- |
 | Light | The pack's default preset is the site's render look, as it is a town's |
 | Resolving | Each slot by its look role (section 3): a slot the engine draws as a primitive takes either a surface or a piece, a surface before a piece at each leaf; a `none` slot, a hole only a pack fills, takes a piece alone |
-| Surfaces | A swatch, with its up swatch, becomes the material of the slot's primitive, in the pack's shading. A site holds no texture set's images, so a leaf the pack dresses with a texture set is resolved as if the pack left it out, and takes its material where its words name one and otherwise its family's `default` |
+| Surfaces | A swatch, with its up swatch, becomes the material of the slot's primitive, in the pack's shading. A texture surface uses the same digest-verified texture library and material classes as a town. Copies of primitive meshes carry UVs in physical millimetres along the slot's served frame, including separate strips around openings; their positions, bounds and canonical walk are unchanged. An unavailable or refused texture draws the unavailable pattern. Glazing requests a scene-colour copy and keeps its transparent draw ordering and shadow rules |
 | Materials | A leaf the pack does not state is drawn in the material its words name (section 3): the pack's own surface for that material, or the surface material catalog's colour in the pack's shading. A leaf that names none takes its family's `default` and is counted on the canvas |
 | Ground beyond | A pack's ground beyond the world is its own colour for a town. Beyond a site that is open to the sky, the pack's plane is drawn in whatever the site's base ground is drawn in (the one ground its drawing lays over its whole extent, once dressed) and lies just under it, so a desert's sand runs to the pack's reach. It reads the base ground only, never a zone or an area at the site's edge; an indoor site keeps the pack's own. The canvas states the base ground's look role (`data-site-ground-beyond`) |
 | Scenery beyond | On the ground beyond a site stands what the site scenery catalog states for the material of the site's base ground ([`site-scenery.v1.json`](../assets/catalogs/world-kinds/site-scenery.v1.json), read by [`site-scenery.ts`](../web/packages/atlas-core/src/site-scenery.ts)): trees beyond a forest's floor, a low stone here and there beyond sand, a tree here and there beyond grass, and nothing beyond any other ground. **It is scenery, like the horizon: not a part of the world, not listed, not walked, not picked, and it hides nobody; a creator's world document states none of it.** The page makes it from the base ground's material and the world's own identity, in whole millimetres, so one world has the same trees every time and on every machine; it is never a slot of the site's drawing, so the walk, a click, what hides a being and everything else that reads the drawing are the same with it as without. It stands only beyond the site's rectangle, from the catalog's margin out to its reach, thinning toward the site where the entry says so, so a wood meets a clearing raggedly and not as a row of trunks. A tree is the pack's own tree piece (its `plant` module) scaled to each tree, baked into the pack's meshes beside the site's and not outlined; where a pack has no plant, a plain trunk and crown in the pack's shading. A stone is a plain low shape in every pack, since no pack holds one. Each entry's count is a rendering budget stated with its reason and no fact of any world: where the ground holds more, the nearest to the site are kept (a wood of 1,200 trees is 216,000 triangles). Limits: a look that draws no ground beyond a site (the tile look) draws no scenery; an indoor site has none; the site's own grounds are still rectangles, their edges broken as Borders below says, so from above a clearing is square; no water is drawn beyond any site, an island's included; and a town has none of this, having no site rectangle |
@@ -260,6 +286,25 @@ look in the engine's colours, and `data-world-look` states the pack asked for, w
 it was not drawn. The Look sheet is offered on a site as on a town, and `redrawWorldLook` mounts the
 site's drawing, already read and checked, again in the new pack's light and dressing on the same
 host.
+
+Texture surfaces retain their served rectangle rather than expanding for a cosmetic broken border.
+The ground beyond uses the base ground's physical texture scale. Water swatches in PBR shading
+carry animated normal ripples; these are cosmetic, with no change to basin geometry, keep-outs,
+movement or simulation. Toon water keeps its static pattern. Glazing samples the drawn scene;
+water reflects the environment, without a separate planar reflection pass.
+
+The optional `?measure=1` review mode records a bounded frame-interval sample, draw calls, canvas
+resolution, graphics backend, camera position and facing, and accounted texture bytes on the canvas. Frame intervals are not
+GPU execution times. Accounted bytes cover uploaded surface textures and the environment maps,
+not total graphics-device or process memory.
+
+The existing Look sheet lists the committed library and the current workspace's admitted, wearable
+looks. Choices retain source, version and manifest digest separately from their displayed names,
+so the same pack id in both namespaces stays unambiguous. An older bound version stays selected
+until a person chooses another. Unready, withdrawn or unreadable workspace versions are not
+offered, and Apply rechecks availability. The browser supports standalone workspace packs and
+workspace packs based on a library pack; workspace-on-workspace base chains are not offered by
+this browser loader.
 
 ## 8. The authored packs
 
@@ -369,7 +414,7 @@ fetches a world's pack by the manifest digest its appearance names, so it draws 
 world was given, and moving to the current version is a choice of its own through the same preview
 and Apply. `listedVersion` (`web/packages/app/src/world-look.ts`) places a digest as a listed pack's
 current version or an earlier one. A pack states no structure, so naming one never moves the world's topology. A world
-package exported from a world does not yet carry the pack its appearance names.
+package exported from a world does not carry the pack its appearance names.
 
 A world may also wear a version of its workspace's own pack (section 11): its style version then
 states `style_pack_source` `workspace` beside the id, version and digest (one migration,
@@ -377,9 +422,18 @@ states `style_pack_source` `workspace` beside the id, version and digest (one mi
 naming a library pack, states `library`, and reads exactly as it did). Such a version is named only
 while `workspace_style_pack_wearable` says it may be worn, asked under the asset read lock as the
 last question of the write, and the schema holds the same at insert, so a rollback to a version
-naming one that was since withdrawn is refused. The appearance routes name library packs only; the
-generation worker names a look made of a world's generated pieces
+naming one that was since withdrawn is refused. An appearance preview resolves the exact id,
+version and manifest digest against the host's library first, then the current workspace's wearable
+packs. It accepts a standalone workspace pack or an admitted base chain, and checks any requested
+setting against that chain. Unknown, unready, withdrawn and other-workspace identities are refused;
+the request cannot choose another workspace. Apply rechecks availability under the write lock.
+The generation worker also names a look made of a world's generated pieces
 ([generated pieces](generated-pieces-contract.md#54-a-worlds-look-taking-its-pieces-in-and-back)).
+Migration `a_world_wears_an_admitted_workspace_pack` extends the original generated-only gate to
+admitted uploads without rewriting existing appearance rows. A pack withdrawal revokes use and
+keeps history; workspace erasure deletes every world's appearance history as well as scrubbing the
+pack's private identifiers and documents and purging its files. Restore carries withdrawals and
+workspace tombstones so an earlier backup cannot restore their use or erased world history.
 A version naming the workspace's own pack is answered with `source` `workspace`, the library version
 it is drawn on (`base`) and whether it may still be worn (`wearable`); a library pack's answer states
 none of the three. The page fetches such a pack's manifest from `GET /workspace-style-packs/{sha256}`

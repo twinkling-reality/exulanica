@@ -7,17 +7,30 @@ from typing import Final, Protocol
 
 from exulanica.errors import ExulanicaError
 from exulanica.models.egress import EgressAllowlist
+from exulanica.models.manifest import TimeoutRule
 from exulanica.models.transport import HttpxTransport
 from exulanica.references.boundary import AdmittedQuery
 from exulanica.references.catalogs import ReferenceSource
 
 __all__ = [
+    "SEARCH_LONGEST_MS",
     "SOURCE_REFUSALS",
     "Leads",
     "ReferenceAdapter",
     "ReferenceSourceUnavailable",
+    "search_timeout_seconds",
     "source_transport",
 ]
+
+#: The longest dispatch-to-settle latency among the eighteen Tavily searches in the two
+#: LOOKUP live checks on 2026-10-09 (main 7eef51d1 and 49d0d00b). Both the transport and the
+#: worker's search stage apply the manifest's timeout rule to this same measured basis.
+SEARCH_LONGEST_MS: Final = 17440
+
+
+def search_timeout_seconds(rule: TimeoutRule) -> float:
+    """The search transport and stage allowance, derived from the measured search latency."""
+    return float(rule.timeout_for(SEARCH_LONGEST_MS))
 
 #: Why a source answered nothing usable, by code, as the capability descriptors will name it.
 SOURCE_REFUSALS: Final = (

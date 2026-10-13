@@ -27,6 +27,8 @@ import './look-sheet.css';
 
 /** One pack the sheet offers, as the host lists it. */
 export interface LookOption {
+  /** Page-local source and manifest identity; older callers may use the pack id alone. */
+  readonly choiceId?: string;
   readonly packId: string;
   readonly title: string;
   readonly description: string;
@@ -38,6 +40,10 @@ export interface LookOption {
   readonly version?: number;
   /** The host's note on what this version changed, for a person; null or absent for none. */
   readonly changes?: string | null;
+}
+
+export function lookChoiceId(option: Pick<LookOption, 'packId' | 'choiceId'>): string {
+  return option.choiceId ?? option.packId;
 }
 
 /** The earlier version of an offered pack a world is drawn in now. */
@@ -194,9 +200,9 @@ export function buildLookSheet(options: {
     && offered.axes.some((axis) => (picked[axis.key] ?? '') !== (stated[axis.key] ?? ''));
 
   /** Whether a card is the look the world is drawn in now. */
-  const isNowCard = (card: Card): boolean => card.option.packId === current && (earlier === null || card.earlier !== null);
+  const isNowCard = (card: Card): boolean => lookChoiceId(card.option) === current && (earlier === null || card.earlier !== null);
   /** The version words a card's look is named by, where the world is in an earlier version of its pack. */
-  const versioned = (card: Card): boolean => earlier !== null && card.option.packId === earlier.packId;
+  const versioned = (card: Card): boolean => earlier !== null && lookChoiceId(card.option) === earlier.packId;
   const nowWords = (): string => {
     const now = entries.find(isNowCard);
     if (now === undefined) return 'Back to the world';
@@ -325,11 +331,11 @@ export function buildLookSheet(options: {
           return el('label', { class: 'look-sheet-setting-axis' }, [el('span', { class: 'look-sheet-setting-title', text: axis.title }), select, about]);
         }),
       ]);
-      earlier = how?.earlier != null && how.earlier.packId === now && next.some((option) => option.packId === now) ? how.earlier : null;
+      earlier = how?.earlier != null && how.earlier.packId === now && next.some((option) => lookChoiceId(option) === now) ? how.earlier : null;
       // The earlier version the world keeps comes just before its pack's current version.
       entries = next.flatMap((option, index): Card[] => {
         const pack: Card = { option, earlier: null, place: index + 1 };
-        return earlier !== null && option.packId === earlier.packId ? [{ option, earlier, place: index + 1 }, pack] : [pack];
+        return earlier !== null && lookChoiceId(option) === earlier.packId ? [{ option, earlier, place: index + 1 }, pack] : [pack];
       });
       cards.length = 0;
       replace(strip, entries.map((card, index) => {
@@ -338,7 +344,7 @@ export function buildLookSheet(options: {
           ? card.earlier !== null ? `Now · version ${card.earlier.version}` : options.choosing?.now ?? 'Now'
           : versioned(card) && card.option.version !== undefined ? `Version ${card.option.version}` : `Look ${card.place}`;
         const button = el('button', {
-          type: 'button', role: 'option', class: 'look-sheet-card', 'data-pack-id': card.option.packId,
+          type: 'button', role: 'option', class: 'look-sheet-card', 'data-pack-id': card.option.packId, 'data-look-choice': lookChoiceId(card.option),
           ...(card.earlier === null ? {} : { 'data-version': String(card.earlier.version) }),
         }, [
           // A pack with no picture has no picture box: never a stand-in.

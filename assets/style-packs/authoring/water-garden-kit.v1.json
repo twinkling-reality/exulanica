@@ -1,0 +1,134 @@
+{
+  "profile": "exulanica.authored-garden-kit/v1",
+  "look_family_catalog_version": 2,
+  "pieces": [
+    {
+      "role": "roof.vault",
+      "recipe": "vault_shell",
+      "file": "pieces/vault.glb",
+      "size_mm": [
+        12000,
+        21000,
+        4200
+      ],
+      "segments": 48,
+      "shell_share_permille": 25
+    },
+    {
+      "role": "fixture.bench",
+      "recipe": "rounded_seat",
+      "file": "pieces/seat.glb",
+      "size_mm": [
+        2000,
+        500,
+        450
+      ],
+      "segments": 8,
+      "corner_radius_mm": 180
+    },
+    {
+      "role": "plant.tree",
+      "recipe": "fan_tree",
+      "file": "pieces/fan-tree.glb",
+      "size_mm": [
+        2000,
+        2000,
+        6000
+      ],
+      "segments": 12,
+      "fronds": 24
+    },
+    {
+      "role": "plant.canopy_tree",
+      "recipe": "fan_tree",
+      "file": "pieces/canopy-tree.glb",
+      "size_mm": [
+        3000,
+        3000,
+        5200
+      ],
+      "segments": 12,
+      "fronds": 24
+    },
+    {
+      "role": "plant.shrub",
+      "recipe": "fan_tree",
+      "file": "pieces/shrub.glb",
+      "size_mm": [
+        1800,
+        1800,
+        1200
+      ],
+      "segments": 12,
+      "fronds": 12
+    },
+    {
+      "role": "plant.flowering_plant",
+      "recipe": "flower_cluster",
+      "file": "pieces/flowers.glb",
+      "size_mm": [
+        1200,
+        1200,
+        650
+      ],
+      "segments": 12,
+      "blooms": 7
+    }
+  ],
+  "variants": [
+    {
+      "pack_id": "original.tide-garden",
+      "title": "Tide porcelain",
+      "description": "Porcelain vaults, cyan seating, glass walls, reflective basin surfaces and original fan trees under clear coastal light.",
+      "accent": [
+        75,
+        200,
+        204
+      ],
+      "leaf": [
+        39,
+        107,
+        70
+      ],
+      "sky_zenith": [
+        44,
+        119,
+        186
+      ],
+      "sky_horizon": [
+        181,
+        221,
+        229
+      ],
+      "sun_elevation_mdeg": 34000,
+      "version": 5
+    },
+    {
+      "pack_id": "original.tide-celadon",
+      "title": "Celadon afternoon",
+      "description": "The same reusable garden kit in celadon, warm afternoon light and a pale violet horizon.",
+      "accent": [
+        171,
+        199,
+        123
+      ],
+      "leaf": [
+        62,
+        118,
+        58
+      ],
+      "sky_zenith": [
+        79,
+        103,
+        157
+      ],
+      "sky_horizon": [
+        237,
+        217,
+        202
+      ],
+      "sun_elevation_mdeg": 19000,
+      "version": 5
+    }
+  ]
+}

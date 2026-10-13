@@ -254,6 +254,7 @@ def _things_on_surfaces(
     routine: PurposefulRoutine,
     segment_blocked: SegmentBlocked,
     town: CityObstructions,
+    omitted_support_ids: frozenset[str] = frozenset(),
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """The town's surfaces with its placed things on them.
 
@@ -268,7 +269,12 @@ def _things_on_surfaces(
     every place the town still offers and every one kept before it; its activity is the
     routine's entry for its kind. A being is neither: it lives in the society."""
     usable, obstacles, records = _things_one_by_one(
-        things, kinds, ground, version.version_id, height_above=height_above
+        things,
+        kinds,
+        ground,
+        version.version_id,
+        height_above=height_above,
+        omitted_support_ids=omitted_support_ids,
     )
     clear = _near_clear(obstacles, supports=area_supports(ground), segment_blocked=segment_blocked)
     nodes, edges = _cut_at_things(nodes, edges, clear)
@@ -743,7 +749,10 @@ def build_walking_surfaces_input(
     segment_blocked: SegmentBlocked | None = None,
     obstructions: CityObstructions | None = None,
     people: Mapping[str, Any] | None = None,
+    day_place: Mapping[str, Any] | None = None,
+    day_routine: RoutineModel | None = None,
     made_kinds: Mapping[str, Mapping[str, Any]] | None = None,
+    support_source: Any = None,
 ) -> dict[str, Any]:
     """Compose a generated world's input over the walking surfaces its records state, from the
     place :func:`walking_surfaces_place` made of them for ``ground``.
@@ -758,6 +767,17 @@ def build_walking_surfaces_input(
     (:func:`~exulanica.world.town_people.people_frame`), where one is given, and whose first input
     also records it;
     without either, the walking-surfaces-v1 input the purposeful society reads."""
+    if (day_place is not None or day_routine is not None) and (
+        not things
+        or input_seq != 1
+        or people is None
+        or day_place is None
+        or day_routine is None
+        or availability != "available"
+    ):
+        raise ValueError(
+            "resident day needs an available first things input, people, place and routine"
+        )
     if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
     validate_reviewed_affordances(reviewed_affordances)
@@ -890,6 +910,16 @@ def build_walking_surfaces_input(
         )
     placed = things_in_region(version, ground, made_kinds) if things else []
     thing_kinds, unknown = _thing_kinds(placed, made_kinds)
+    from exulanica.world.society_authored_ground import supported_things_projection
+
+    omitted, support_records, support_refusal = supported_things_projection(
+        version,
+        ground,
+        thing_kinds,
+        support_source if things else None,
+    )
+    reason = reason or support_refusal
+    records_list.extend(support_records)
     # Only a society of things reads how high a thing stands: v1 and v2 read no height.
     height_above = surface_height_above(place, ground) if things else None
     if things and unknown is not None:
@@ -914,6 +944,7 @@ def build_walking_surfaces_input(
             routine=chosen,
             segment_blocked=segment_blocked,
             town=obstructions,
+            omitted_support_ids=omitted,
         )
         records_list.extend(refused)
     # A world whose homes hold more people than the head count its ground states is refused by
@@ -996,7 +1027,9 @@ def build_walking_surfaces_input(
     }
     if things:
         document["things"] = (
-            _input_things(placed, thing_kinds, ground, height_above) if reason is None else []
+            _input_things(placed, thing_kinds, ground, height_above, omitted_support_ids=omitted)
+            if reason is None
+            else []
         )
         if reason is None:
             state_made_kinds(document, thing_kinds, made_things_gone(version, ground, made_kinds))
@@ -1013,6 +1046,13 @@ def build_walking_surfaces_input(
             # with the society's seed, and replay reads it from this input. A later input
             # is given the frame for its population alone and records none.
             document["people"] = dict(people)
+            if day_place is not None:
+                from exulanica.world.society_resident_day import make_frame
+
+                if day_routine is None:
+                    raise ValueError("resident day requires its place's routine")
+                document["day"] = make_frame(day_place, day_routine, people, document)
+                record_modules(document, day=True)
     if living is not None:
         document["living"] = {
             "routine": living.binding(),

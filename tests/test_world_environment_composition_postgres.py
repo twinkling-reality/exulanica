@@ -79,7 +79,7 @@ from model_fakes import FakeTransport, chat_body
 from pg_harness import open_scratch_connection
 from tests_support_api import EVERY_PERMISSION, scratch_database
 from world_structure_fixtures import structural_candidate
-from world_support import FIXTURE_WORLD_ID, registered_world
+from world_support import FIXTURE_WORLD_ID, fixture_workspace, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -368,10 +368,13 @@ def test_runtime_role_undo_retains_environment_history_without_delete(
             world_id=composed.worlds.world_id,
             store=composed.store,
         )
-        assert connection.execute(
-            "select has_table_privilege(current_user,'world_alternate_environment_instance',"
-            "'DELETE') as allowed"
-        ).fetchone()["allowed"] is False
+        assert (
+            connection.execute(
+                "select has_table_privilege(current_user,'world_alternate_environment_instance',"
+                "'DELETE') as allowed"
+            ).fetchone()["allowed"]
+            is False
+        )
         placed = runtime.add_environment(
             composed.version.version_id,
             composed.placement("environment:reusable"),
@@ -415,11 +418,14 @@ def test_runtime_role_undo_retains_environment_history_without_delete(
             actor=uuid.uuid4(),
         )
         assert len(readded.environment_instances) == 1
-        assert connection.execute(
-            "select count(*) as n from world_alternate_environment_instance "
-            "where workspace_id=%s and world_id=%s and version_id=%s",
-            (repository.workspace_id, runtime.world_id, composed.version.version_id),
-        ).fetchone()["n"] == 1
+        assert (
+            connection.execute(
+                "select count(*) as n from world_alternate_environment_instance "
+                "where workspace_id=%s and world_id=%s and version_id=%s",
+                (repository.workspace_id, runtime.world_id, composed.version.version_id),
+            ).fetchone()["n"]
+            == 1
+        )
         projection = connection.execute(
             "select addition_undone,created_edit_id,last_edit_id "
             "from world_alternate_environment_instance where workspace_id=%s and world_id=%s "
@@ -902,7 +908,8 @@ def test_environment_proposal_is_read_only_exact_and_workspace_scoped(
         assert (unnamed.status_code, unnamed.json()["code"]) == (404, "unknown_reference")
         # A world of the same id in the stranger's own workspace does not reach the owner's
         # version, which answers as a version that does not exist.
-        registered_world(composed.worlds.connection, stranger, composed.worlds.world_id)
+        with fixture_workspace(composed.worlds.connection, stranger):
+            registered_world(composed.worlds.connection, stranger, composed.worlds.world_id)
         foreign = client.post(proposals, headers=stranger_headers, json=body)
         absent = client.post(
             proposals,

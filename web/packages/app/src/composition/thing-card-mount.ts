@@ -13,7 +13,7 @@
 
 import type { ThingLibrary } from '@exulanica/atlas-react/things';
 import { buildThingCard, type CardLine, type CardLookOutcome, type CardLooks, type CardMark, type CardMind, type CardMindChoice, type ThingCardModel } from '../ui/thing-card.js';
-import { cameWords, costWords, modelLine, outsideLatestWords, outsideShort } from '../ui/society-models.js';
+import { cameWords, costWords, modelLine, priceWords, outsideLatestWords, outsideShort } from '../ui/society-models.js';
 import type { ModelRef, SocietyModel } from '../society-models-api.js';
 import type { Credentials } from '../config.js';
 import { openThingLibrary } from '../things-library.js';
@@ -22,7 +22,7 @@ import type { InhabitantView, MountedEnvironmentSelection, SelectedBeing, Select
 import { creditOf, kindCameWords, lookLine, lookOptionLine, sourceLink, withArticle } from './thing-origin-words.js';
 import { chooseThingLook, fetchThingCardRoute, sameLook, type CardLookReference, type LookChoiceOutcome, type ThingCardRoute } from '../thing-card-route-api.js';
 import { lineMarkOf, markLabel, markOf, type ThingMark } from './thing-marks.js';
-import { carriedWords, kindKey, libraryKind, type KindReference } from './visitor-notices.js';
+import { carriedWords, isMadeKind, kindKey, libraryKind, type KindReference } from './visitor-notices.js';
 import type { BeingLine } from './being-lines.js';
 import { fetchCrossingManifest, type CrossingManifest, type CrossingRows } from '../crossing-manifest-api.js';
 import { THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type ThingLookChosenDetail, type ThingPickDetail } from './things.js';
@@ -93,7 +93,7 @@ function beingCameWords(being: SelectedBeing, kind: KindFacts | null, draftedBy:
     case 'crossed':
       return `Came in from ${being.crossing?.entry?.label ?? 'outside this world'}.`;
     case 'placed':
-      return kind === null ? 'You placed it here.' : `You placed it here. ${kindCameWords(kind.label, kind.origin, draftedBy)}`;
+      return kind === null ? 'You placed it here.' : `You placed it here. ${kindCameWords(kind.label, kind.origin, draftedBy, isMadeKind(being.kind) ? 'workspace' : 'shipped')}`;
     case 'populated':
       return 'One of the people who live in this world.';
   }
@@ -140,12 +140,13 @@ export function personCard(
   const mark = being === null ? markOf({ running }) : markOf({ ...being.mark, running });
   const offered = running === null ? undefined : models?.find((model) => modelKey(model) === modelKey(running));
   const choices: CardMindChoice[] = about.mind === null || models === null ? [] : [
-    { key: ROUTINE_KEY, name: ROUTINE_NAME, line: ROUTINE_LINE, badge: null, now: running === null, refused: null },
+    { key: ROUTINE_KEY, name: ROUTINE_NAME, line: ROUTINE_LINE, badge: null, price: 'No model calls. No model cost.', now: running === null, refused: null },
     ...models.map((model) => ({
       key: modelKey(model),
       name: model.name,
       line: modelLine(model),
       badge: costWords(model, models),
+      price: priceWords(model),
       now: running !== null && modelKey(model) === modelKey(running),
       refused: model.refusal === null ? null : 'Not asked on this server.',
     })),
@@ -290,7 +291,7 @@ export function placedThingCard(thing: SelectedThing, kind: KindFacts, look: Loo
     mind,
     looks: routeLooks(route) ?? looksOf(look),
     ...routeWords(route),
-    cameFrom: `${placedByYou ? 'You placed it here. ' : ''}${kindCameWords(kind.label, kind.origin)}`,
+    cameFrom: `${placedByYou ? 'You placed it here. ' : ''}${kindCameWords(kind.label, kind.origin, route?.draftedBy?.name ?? null, thing.placed.kind.source === 'workspace' ? 'workspace' : 'shipped')}`,
   };
 }
 

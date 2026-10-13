@@ -6,8 +6,7 @@ import urllib.request
 from exulanica_agent import Body, Turn
 
 MIND = "https://api.tokenfactory.nebius.com/v1/chat/completions"
-MODEL = "Qwen/Qwen3-235B-A22B-Instruct-2507"
-# MODEL = "nvidia/Nemotron-3_5-Lightning"  # one line for an NVIDIA Nemotron mind
+MODEL = os.environ["NEBIUS_MODEL"]  # a model that supports the offered tool call
 KEY = os.environ["NEBIUS_API_KEY"]
 
 

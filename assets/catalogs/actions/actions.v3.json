@@ -1,0 +1,751 @@
+{
+  "catalog_id": "actions",
+  "catalog_version": 3,
+  "schema_version": 2,
+  "profile": "exulanica.action-catalog/v2",
+  "source_build": "Authored action descriptors. Conditions narrow availability using served subject facts; spend reads describe the confirmation surface for a spending action. Route permissions and write validation remain authoritative.",
+  "fallback": "An id this catalog does not hold is no action: it is neither served nor planned.",
+  "entries": [
+    {
+      "key": "objects.undo",
+      "id": "objects.undo",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Take back",
+        "hint": "Take back the last change to this world"
+      },
+      "route": "POST /world/versions/{version_id}/objects/undo",
+      "bind": {},
+      "plan_word": "undo_last_edit",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [
+        "last_change"
+      ],
+      "protected": false,
+      "reason": "Takes back the last change to a world's placed objects; what it takes back is gone from the world as it stands.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "objects.place",
+      "id": "objects.place",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Place an object",
+        "hint": "Place a reviewed object where you are pointing"
+      },
+      "route": "POST /world/versions/{version_id}/compositions/apply",
+      "bind": {},
+      "plan_word": "place_object",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Places one reviewed object in a world, the first thing a person builds with.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "objects.move",
+      "id": "objects.move",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "object"
+      ],
+      "words": {
+        "label": "Move an object",
+        "hint": "Move an object to where you are pointing"
+      },
+      "route": "POST /world/versions/{version_id}/objects/{object_id}/move",
+      "bind": {},
+      "plan_word": "move_object",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Moves one placed object, so a world can be arranged after it is made.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "objects.remove",
+      "id": "objects.remove",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "object"
+      ],
+      "words": {
+        "label": "Remove an object",
+        "hint": "Take an object out of this world"
+      },
+      "route": "POST /world/versions/{version_id}/objects/{object_id}/remove",
+      "bind": {},
+      "plan_word": "remove_object",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [
+        "placed_object"
+      ],
+      "protected": false,
+      "reason": "Takes one placed object out of a world; the object as placed is what is lost.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "arrangements.place",
+      "id": "arrangements.place",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Place an arrangement",
+        "hint": "Place a published group of objects in one change"
+      },
+      "route": "POST /world/versions/{version_id}/arrangements/apply",
+      "bind": {},
+      "plan_word": "place_arrangement",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Places a published group of objects in one change of a world.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "pieces.request",
+      "id": "pieces.request",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Make new pieces for how things look here",
+        "hint": "Ask the piece maker for new pieces of this world's look, after seeing the time and the cost"
+      },
+      "route": "POST /world/piece-requests",
+      "bind": {},
+      "plan_word": "request_pieces",
+      "cost_class": "generation",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Asks the piece maker for new pieces of a world's look, which costs generation and is shown with its time and cost first.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "things.place",
+      "id": "things.place",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Add a thing",
+        "hint": "Add a thing by its kind, beside something or where you are pointing"
+      },
+      "route": "POST /world/versions/{version_id}/things",
+      "bind": {},
+      "plan_word": "place_thing",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Adds a thing or a being to a world by its kind.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "things.move",
+      "id": "things.move",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "thing"
+      ],
+      "words": {
+        "label": "Move a thing",
+        "hint": "Move a placed thing to where you are pointing"
+      },
+      "route": "POST /world/versions/{version_id}/things/{thing_id}/move",
+      "bind": {},
+      "plan_word": "move_thing",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Moves one placed thing to another place in its world.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "things.remove",
+      "id": "things.remove",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "thing"
+      ],
+      "words": {
+        "label": "Remove a thing",
+        "hint": "Take a placed thing out of this world"
+      },
+      "route": "POST /world/versions/{version_id}/things/{thing_id}/remove",
+      "bind": {},
+      "plan_word": "remove_thing",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [
+        "placed_thing"
+      ],
+      "protected": false,
+      "reason": "Takes one placed thing out of a world; the thing as placed is what is lost.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "people.direct",
+      "id": "people.direct",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "being"
+      ],
+      "words": {
+        "label": "Ask someone",
+        "hint": "Ask one of the beings here to go to a place or use it"
+      },
+      "route": "POST /world/versions/{version_id}/society/actions",
+      "bind": {},
+      "plan_word": "direct_thing",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Asks one being of a world to go to a place or use it, which the being's own decision then takes up.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "minds.choose",
+      "id": "minds.choose",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "being",
+        "world"
+      ],
+      "words": {
+        "label": "Choose who decides",
+        "hint": "Give a being, a kind, a role or everyone an AI model, or their own routine back, after seeing what it comes to"
+      },
+      "route": "POST /world/versions/{version_id}/models/{role_key}",
+      "bind": {
+        "role_key": "society_decision"
+      },
+      "plan_word": "choose_mind",
+      "cost_class": "model_calls",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Chooses who decides for a being or a group of them; a model chosen is asked at the world's cost, shown before the yes.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "beings.play",
+      "id": "beings.play",
+      "status": "offered",
+      "family": "being",
+      "subjects": [
+        "being"
+      ],
+      "words": {
+        "label": "Play this being",
+        "hint": "You choose what one being does, in the world, until you give it back; its mind rests meanwhile"
+      },
+      "route": "POST /world/versions/{version_id}/society/play",
+      "bind": {},
+      "plan_word": "play_being",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "A person starts deciding for one being themselves, which asks no model.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "beings.give-back",
+      "id": "beings.give-back",
+      "status": "offered",
+      "family": "being",
+      "subjects": [
+        "being"
+      ],
+      "words": {
+        "label": "Give it back",
+        "hint": "Give back the being you play; its own mind decides again"
+      },
+      "route": "POST /world/versions/{version_id}/society/play/{subject_id}/give-back",
+      "bind": {},
+      "plan_word": "give_back",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "A person gives back the being they play, which is then decided for as it was before.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "minds.budget",
+      "id": "minds.budget",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Set the budget for AI minds",
+        "hint": "Set what this world may spend on the AI minds of its beings in an hour, after seeing what it comes to"
+      },
+      "route": "POST /world/versions/{version_id}/models/{role_key}/budget",
+      "bind": {
+        "role_key": "society_decision"
+      },
+      "plan_word": "set_minds_budget",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Sets what a world may spend on the model minds of its beings in an hour; setting it asks no model.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "people.take-in",
+      "id": "people.take-in",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Take the newcomers in",
+        "hint": "The people of a town take in what was placed after they came; their day starts again and this cannot be undone"
+      },
+      "route": "POST /world/versions/{version_id}/society/take-in",
+      "bind": {},
+      "plan_word": "take_in",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [
+        "day_so_far",
+        "clock_position",
+        "playing_and_speed",
+        "models_chosen",
+        "looks_saved_for_residents",
+        "comparisons_and_experiments",
+        "companion_answers"
+      ],
+      "protected": false,
+      "reason": "A living town's people take in what was placed after they came; their day so far is erased and nothing undoes it.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "people.send-away",
+      "id": "people.send-away",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Send everyone away",
+        "hint": "Send the people who live here away for now; the world and its history stay"
+      },
+      "route": "POST /world/versions/{version_id}/society/presence",
+      "bind": {},
+      "plan_word": "send_away",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Sends everyone of a world's society away, which bringing them back reverses.",
+      "when": [
+        {
+          "fact": "presence",
+          "value": "here",
+          "code": "nobody_to_send_away"
+        }
+      ],
+      "spend_read": null
+    },
+    {
+      "key": "people.bring-back",
+      "id": "people.bring-back",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Bring them back",
+        "hint": "Bring back the people who were sent away"
+      },
+      "route": "POST /world/versions/{version_id}/society/presence",
+      "bind": {},
+      "plan_word": "bring_back",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Brings back the people of a world's society who were sent away.",
+      "when": [
+        {
+          "fact": "presence",
+          "value": "away",
+          "code": "already_here"
+        }
+      ],
+      "spend_read": null
+    },
+    {
+      "key": "people.bring-in",
+      "id": "people.bring-in",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Bring people in",
+        "hint": "Bring simulated people into this world"
+      },
+      "route": "POST /world/versions/{version_id}/society",
+      "bind": {},
+      "plan_word": "bring_people",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Brings simulated people into a world that holds none.",
+      "when": [
+        {
+          "fact": "society",
+          "value": "absent",
+          "code": "people_already_here"
+        }
+      ],
+      "spend_read": null
+    },
+    {
+      "key": "clock.play",
+      "id": "clock.play",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Play",
+        "hint": "Let the world run on its own"
+      },
+      "route": "PUT /world/versions/{version_id}/society/control",
+      "bind": {},
+      "plan_word": "play",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Lets a world's society run on its own, at a speed.",
+      "when": [
+        {
+          "fact": "mode",
+          "value": "paused",
+          "code": "already_playing"
+        }
+      ],
+      "spend_read": null
+    },
+    {
+      "key": "clock.pause",
+      "id": "clock.pause",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Pause",
+        "hint": "Stop the world where it is"
+      },
+      "route": "PUT /world/versions/{version_id}/society/control",
+      "bind": {},
+      "plan_word": "pause",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Stops a world's society where it is.",
+      "when": [
+        {
+          "fact": "mode",
+          "value": "playing",
+          "code": "already_paused"
+        }
+      ],
+      "spend_read": null
+    },
+    {
+      "key": "clock.speed",
+      "id": "clock.speed",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Change speed",
+        "hint": "Change how fast the world plays"
+      },
+      "route": "PUT /world/versions/{version_id}/society/control",
+      "bind": {},
+      "plan_word": "set_speed",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Changes how fast a world's society runs, and leaves it running or stopped as it was.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "clock.advance",
+      "id": "clock.advance",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Next minute",
+        "hint": "Advance the world by one minute"
+      },
+      "route": "POST /world/versions/{version_id}/society/control/steps",
+      "bind": {},
+      "plan_word": "advance",
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Advances a stopped world's society by one minute.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "world.make",
+      "id": "world.make",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "workspace"
+      ],
+      "words": {
+        "label": "Create a world",
+        "hint": "Describe the world you want to create"
+      },
+      "route": "POST /worlds/generated",
+      "bind": {},
+      "plan_word": null,
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Makes a new generated world in the caller's workspace.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "creatures.make",
+      "id": "creatures.make",
+      "status": "reserved",
+      "family": "workshop",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Make a creature",
+        "hint": "Describe a creature and add it to this world"
+      },
+      "route": null,
+      "bind": {},
+      "plan_word": null,
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "The page names this id today for describing a creature; reserved until one route and one plan word carry it.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "world.draft",
+      "id": "world.draft",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "workspace"
+      ],
+      "words": {
+        "label": "Make a world from a sentence",
+        "hint": "Describe a world and have it drafted, after seeing what a draft may spend"
+      },
+      "route": "POST /worlds/drafts",
+      "bind": {},
+      "plan_word": "draft_world",
+      "cost_class": "model_calls",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "A confirmed workspace proposal starts the native durable world draft and reads its authoritative result.",
+      "when": [],
+      "spend_read": "GET /worlds/drafts"
+    },
+    {
+      "key": "world.observe",
+      "id": "world.observe",
+      "status": "reserved",
+      "family": "visit",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Watch this world",
+        "hint": "Be in this world and see what happens in it"
+      },
+      "route": null,
+      "bind": {},
+      "plan_word": null,
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "A visitor's being in a world and seeing it, which a role may grant; reserved until its route exists.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "beings.answer",
+      "id": "beings.answer",
+      "status": "reserved",
+      "family": "being",
+      "subjects": [
+        "being"
+      ],
+      "words": {
+        "label": "Answer for this being",
+        "hint": "Choose what the being you play does in its minute"
+      },
+      "route": null,
+      "bind": {},
+      "plan_word": null,
+      "cost_class": "none",
+      "world_cost_class": "model_ask_brought_forward",
+      "destroys": [],
+      "protected": false,
+      "reason": "Answering a played being's minute, which may bring another being's model ask forward at the world's cost; reserved until a role's route carries it.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "world.leave",
+      "id": "world.leave",
+      "status": "reserved",
+      "family": "visit",
+      "subjects": [
+        "world"
+      ],
+      "words": {
+        "label": "Leave",
+        "hint": "Leave this world"
+      },
+      "route": null,
+      "bind": {},
+      "plan_word": null,
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": true,
+      "reason": "Leaving a world, which every role holds and no creator's role may leave out; reserved until its route exists.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "world.report",
+      "id": "world.report",
+      "status": "reserved",
+      "family": "visit",
+      "subjects": [
+        "world",
+        "being"
+      ],
+      "words": {
+        "label": "Report",
+        "hint": "Report something in this world to the people who run this server"
+      },
+      "route": null,
+      "bind": {},
+      "plan_word": null,
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": true,
+      "reason": "Reporting a world, a being or a line said in it, which every role holds; reserved until its route exists.",
+      "when": [],
+      "spend_read": null
+    },
+    {
+      "key": "things.look",
+      "id": "things.look",
+      "status": "offered",
+      "family": "workshop",
+      "subjects": [
+        "being",
+        "thing"
+      ],
+      "words": {
+        "label": "Choose a look",
+        "hint": "Choose an available look made for this body"
+      },
+      "route": "POST /world/versions/{version_id}/society/things/{thing_id}/look",
+      "bind": {},
+      "plan_word": null,
+      "cost_class": "none",
+      "world_cost_class": "none",
+      "destroys": [],
+      "protected": false,
+      "reason": "Records a look for an existing body without advancing its society or calling a model.",
+      "when": [],
+      "spend_read": null
+    }
+  ]
+}

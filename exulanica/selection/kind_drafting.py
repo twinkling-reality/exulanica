@@ -2,7 +2,7 @@
 
 A person, or an agent through the API, describes a kind of place ("a fishing harbour with a fish
 market and boats"). When no kind the library holds fits, an open model fills a brief of what the
-place holds, the server compiles the brief into a whole world kind (``exulanica.world-kind/v1``,
+place holds, the server compiles the brief into a whole world kind (``exulanica.world-kind/v2``,
 :mod:`exulanica.world.kinds.document`), and holds that kind to both stages of its checks before
 anything is kept or made:
 
@@ -29,7 +29,7 @@ anything is kept or made:
     words with the vocabulary the catalogs state) and the SHA-256 of the words sent, never the
     words.
 
-The words the model is asked with are data (``kind-drafting.v5.json`` beside this module). Pure
+The words the model is asked with are data (``kind-drafting.v7.json`` beside this module). Pure
 apart from the model client: nothing is read from a connection and nothing is written.
 """
 
@@ -53,7 +53,8 @@ from exulanica.grammar.grammars.site.plan import (
     ROOF_FORMS,
 )
 from exulanica.models.client import ModelClient
-from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
+from exulanica.models.errors import ModelError, StructuredOutputError, TruncatedResponseError
+from exulanica.models.identity import chat_model_identity
 from exulanica.models.manifest import Role
 from exulanica.models.response import Runaway
 from exulanica.selection.calls import CallLog, ModelCall
@@ -67,8 +68,11 @@ from exulanica.selection.kind_brief import (
     brief_where,
     compile_brief,
 )
+from exulanica.selection.world_drafting import verbatim_bounds
 from exulanica.world.kinds.catalogs import KindCatalogs, load_kind_catalogs
-from exulanica.world.kinds.document import KIND_CODES, KindDocument
+from exulanica.world.kinds.document import KIND_CODES, KindDocument, KindRefused
+from exulanica.world.kinds.shape_classes import load_shape_classes
+from exulanica.world.kinds.thing_leaves import load_thing_leaves
 from exulanica.world.society_catalogs import RoutineModel
 
 __all__ = [
@@ -86,7 +90,7 @@ __all__ = [
     "render_instructions",
 ]
 
-PROMPT_PATH: Final = Path(__file__).with_name("kind-drafting.v5.json")
+PROMPT_PATH: Final = Path(__file__).with_name("kind-drafting.v7.json")
 #: The manifest role a kind is drafted under, bound to the model the drafter's pre-registered
 #: measurement chose (docs/evaluation/2026-10-07-kind-drafter-timings.json).
 DRAFTER_ROLE: Final = Role.KIND_DRAFTER
@@ -124,6 +128,9 @@ _STATED_BOUNDS: Final = (
     "structure_width_mm",
     "structure_depth_mm",
     "storeys",
+    "storey_height_mm",
+    "boundary_height_mm",
+    "boundary_thickness_mm",
     "fixture_size_mm",
     "fixture_places",
     "walking_nodes",
@@ -288,10 +295,37 @@ def render_instructions(
         outdoors, indoors = getattr(SPACING["open"], name), getattr(SPACING["indoor"], name)
         lines.append(f"- {meaning}: {outdoors} outdoors, {indoors} indoors")
     lines.append("")
+    if prompt.version >= 6:
+        leaves = load_thing_leaves(version=2 if prompt.version >= 7 else 1)
+        lines.append("Named fixture leaves (authored default width, depth, height in mm):")
+        lines.append(f"Fixture catalog SHA-256: {leaves.sha256}")
+        for leaf in leaves.entries.values():
+            lines.append(f"- {leaf.role}: {leaf.words}; {', '.join(map(str, leaf.box_mm))}")
+        lines.append("")
+    if prompt.version >= 7:
+        shapes = load_shape_classes()
+        lines.append(f"Structural catalog v{shapes.version} SHA-256: {shapes.sha256}")
+        for shape in shapes.entries.values():
+            values = ", ".join(
+                f"{key}={value}"
+                for key, value in shape.values.items()
+                if key not in ("words", "form", "reason", "licence")
+            )
+            lines.append(f"- {shape.key} ({shape.form}): {shape.words}; {values}")
+        lines.append("")
     lines.append("Bounds every kind is held to (least to greatest):")
     for key in _STATED_BOUNDS:
+        if prompt.version < 6 and key in (
+            "storey_height_mm",
+            "boundary_height_mm",
+            "boundary_thickness_mm",
+        ):
+            continue
         low, high = catalogs.bound(key)
         lines.append(f"- {key}: {low} to {high}")
+    if prompt.version >= 7:
+        low, high = catalogs.bound("fixture_height_mm")
+        lines.append(f"- fixture_height_mm: {low} to {high}")
     return "\n".join(lines)
 
 
@@ -331,6 +365,8 @@ class KindDraftOutcome:
     #: Each attempt's outcome: ``passed``, ``form_refused``, ``truncated`` (``truncated:whitespace``
     #: or ``truncated:repetition`` when the reply plainly ran on so) or ``check:<code>``.
     attempts: tuple[str, ...] = ()
+    #: Validated source offsets, transient only, for requirements the draft leaves out.
+    not_supported_at: tuple[tuple[int, int], ...] = ()
     #: Each attempt as it went: its outcome, the brief and what sizing changed, and for a kind the
     #: checks refused the check's code, place and sentence and the document it refused; for a
     #: measurement's record.
@@ -376,7 +412,11 @@ def draft_kind(
     checks, so the kind checked is the kind kept (a workspace already keeping that key).
     """
     prompt = kind_drafting_prompt() if prompt is None else prompt
-    catalogs = load_kind_catalogs() if catalogs is None else catalogs
+    catalogs = (
+        load_kind_catalogs(bounds_version=2 if prompt.version >= 7 else 1)
+        if catalogs is None
+        else catalogs
+    )
     if routine is None:
         from exulanica.world.society_living import town_routine
 
@@ -385,7 +425,12 @@ def draft_kind(
         declared = client.manifest[role].max_tokens
         max_tokens = None if declared is None else declared.value
     instructions = render_instructions(prompt, catalogs, routine)
-    form = brief_form(catalogs, routine)
+    form = brief_form(
+        catalogs,
+        routine,
+        fixture_vocabulary=prompt.version >= 6,
+        requirement_contract=prompt.version >= 7,
+    )
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": instructions},
         {"role": "user", "content": f'The description:\n"""{description}"""'},
@@ -407,40 +452,79 @@ def draft_kind(
                 max_tokens=max_tokens,
                 arrays_last=True,
             )
-            log.record(drafted.call)
+            log.record(drafted.call, manifest=client.manifest)
+            identity = chat_model_identity(drafted.call, client.manifest)
+            if identity.model_id is None:
+                failure = ModelError("The response did not identify an admitted model.")
+                log.on_failure(prompt.prompt_version).note(failure)
+                raise failure
             provenance = {
                 "role": str(role.value),
-                "model": drafted.call.served_model_id,
+                "model": identity.model_id,
                 "prompt_version": prompt.prompt_version,
                 "prompt_sha256": _digest(instructions),
                 "words_sha256": _digest(description),
             }
             brief = drafted.value.model_dump(mode="json")
-            compiled = compile_brief(
-                brief,
-                version=version,
-                provenance=provenance,
-                licence=prompt.drafted_licence,
-                catalogs=catalogs,
-                routine=routine,
-            )
-            if key_for is not None:
-                compiled.document["kind"] = key_for(str(compiled.document["kind"]))
-            verdict = check(compiled.document)
+            copied = []
+            invalid = False
+            for phrase in brief.get("not_supported", ()):
+                span = verbatim_bounds(phrase, description)
+                if span is None:
+                    invalid = True
+                elif span not in copied:
+                    copied.append(span)
+            compiled = None
+            if invalid:
+                verdict = KindVerdict(
+                    False,
+                    code="kind_document_invalid",
+                    where="not_supported",
+                    detail="Every omitted requirement must be copied from the description "
+                    "without cutting a replaced name.",
+                )
+            else:
+                try:
+                    compiled = compile_brief(
+                        brief,
+                        version=version,
+                        provenance=provenance,
+                        licence=prompt.drafted_licence,
+                        catalogs=catalogs,
+                        routine=routine,
+                        description=description if prompt.version >= 7 else None,
+                    )
+                except KindRefused as refused:
+                    verdict = KindVerdict(
+                        False, code=refused.code, where=refused.where, detail=refused.detail
+                    )
+                else:
+                    if key_for is not None:
+                        compiled.document["kind"] = key_for(str(compiled.document["kind"]))
+                    verdict = check(compiled.document)
             if verdict.passed:
+                assert compiled is not None
                 attempts.append("passed")
-                trail.append({"outcome": "passed", "sizing": list(compiled.sizing), "brief": brief})
+                trail.append(
+                    {
+                        "outcome": "passed",
+                        "sizing": list(compiled.sizing),
+                        "brief": brief,
+                        "fixture_vocabulary": dict(compiled.fixture_vocabulary),
+                    }
+                )
                 return KindDraftOutcome(
                     document=compiled.document,
                     kind=verdict.kind,
                     report=verdict.report,
                     refusal=None,
-                    model_id=drafted.call.served_model_id,
+                    model_id=identity.model_id,
                     calls=log.calls,
                     attempts=tuple(attempts),
+                    not_supported_at=tuple(dict.fromkeys((*copied, *compiled.not_supported_at))),
                     trail=tuple(trail),
                 )
-            where = brief_where(verdict.where, compiled)
+            where = verdict.where if compiled is None else brief_where(verdict.where, compiled)
             # The check's own sentence, on one line: the server's words about the kind, which
             # quote at most a key, a label or a figure the brief held to its pattern and bounds.
             detail = " ".join(verdict.detail.split())[:400]
@@ -453,9 +537,9 @@ def draft_kind(
                     "code": verdict.code,
                     "where": where,
                     "detail": detail,
-                    "sizing": list(compiled.sizing),
+                    "sizing": [] if compiled is None else list(compiled.sizing),
                     "brief": brief,
-                    "document": compiled.document,
+                    "document": None if compiled is None else compiled.document,
                 }
             )
             log.rejected((f"refused by check {verdict.code} at {where}",))

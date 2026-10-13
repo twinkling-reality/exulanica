@@ -26,7 +26,7 @@ from psycopg.rows import dict_row
 
 import pg_harness
 from test_world_style_postgres import proposal, topology
-from world_support import registered_world
+from world_support import historical_world_fixture_schema, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -46,7 +46,8 @@ def test_existing_style_rows_are_unaffected_and_a_design_choice_is_taken_after(m
         connection.execute(
             "select set_config('exulanica.workspace_id', %s, false)", (str(workspace),)
         )
-        world_id = registered_world(connection, workspace)
+        with historical_world_fixture_schema(connection):
+            world_id = registered_world(connection, workspace)
         styles = WorldStyleRepository(connection, workspace, world_id=world_id)
         initial = styles.register_topology(topology(world_id=world_id))
         drawn = styles.preview(

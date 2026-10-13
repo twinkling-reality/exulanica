@@ -69,6 +69,7 @@ from exulanica.api.installation import (
     installation_facts,
     load_installation,
 )
+from exulanica.api.kind_draft_worker import KindDraftWorker
 from exulanica.api.kind_drafts import KindDrafts
 from exulanica.api.reference_pictures import reference_picture_source
 from exulanica.api.signal_comparison_runner import SignalComparisonRunner
@@ -104,7 +105,8 @@ from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import PROVIDER_CREDENTIAL_ABSENT, ModelClient
 from exulanica.models.egress import EGRESS_ALLOWLIST_ENV
-from exulanica.models.manifest import MANIFEST_PATH, Role, load_manifest
+from exulanica.models.errors import ModelError
+from exulanica.models.manifest import MANIFEST_PATH, Manifest, Role, load_manifest
 from exulanica.models.spending import SpendingRefused
 from exulanica.references import store as reference_store
 from exulanica.references.adapters import ReferenceAdapter
@@ -140,6 +142,7 @@ from exulanica.store.namespaces import WorkspaceStores
 from exulanica.world.decision_roles import DecisionContract, DecisionRole, decision_roles
 from exulanica.world.draft_policy import current_world_draft_policy
 from exulanica.world.material_recipes import MaterialRuntime
+from exulanica.world.model_probe_worker import ModelProbeWorker
 from exulanica.world.society import world_society_seed
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
 from exulanica.world.society_composition import REVIEWED_REACH_MM, reviewed_affordance_registry
@@ -159,6 +162,7 @@ from exulanica.world.workspace_style_packs import WorkspaceStylePackRuntime
 
 if TYPE_CHECKING:
     from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
+    from exulanica.api.world_draft_worker import WorldDraftWorker
 
 __all__ = [
     "DATA_DIR_ENV",
@@ -454,6 +458,9 @@ class Services:
     #: Whether this process plays creature drafts (``EXULANICA_CREATURE_WORKER``), and for which
     #: workspaces (``EXULANICA_CREATURE_WORKSPACES``): none when absent, as each draft spends model
     #: calls.
+    admits_workspace_models: bool = False
+    runs_model_probe_worker: bool = False
+    model_probe_workspaces: tuple[uuid.UUID, ...] = ()
     runs_creature_worker: bool = False
     creature_workspaces: tuple[uuid.UUID, ...] = ()
     #: The workspaces that may ask for web notes (``EXULANICA_REFERENCE_WORKSPACES``); none when
@@ -596,7 +603,109 @@ class Services:
             external=None if self.door is None else self.door.asker(),
             discovered=self.watched_workspaces if self.discovers_model_workspaces else None,
             spending_refusals=self.spending_refusals if self.spending is not None else None,
+            binding_source=self.workspace_execution_source
+            if self.admits_workspace_models
+            else None,
         )
+
+    def workspace_choice_manifest(
+        self, connection: psycopg.Connection, workspace_id: uuid.UUID, engine: str | None
+    ) -> Manifest:
+        """A read-only offered catalog from replayed evidence, with recorded probe rates."""
+        from exulanica.world.workspace_model_bindings import proven_bindings, with_bindings
+
+        manifest = load_manifest()
+        if not self.admits_workspace_models or engine is None:
+            return manifest
+        return with_bindings(manifest, proven_bindings(connection, workspace_id, engine, manifest))
+
+    def workspace_execution_source(
+        self, workspace_id: uuid.UUID, engine: str, selected: frozenset[str]
+    ) -> tuple[ModelClient, Manifest, str] | None:
+        """Fresh prices and a stored source for explicitly chosen, currently proven candidates.
+
+        Provider reads enclose no database session. Final epoch validation and snapshot append
+        share the workspace lock; every subsequent candidate ask checks the epoch again.
+        """
+        import datetime as dt
+
+        from exulanica.world.workspace_lock import lock_workspace
+        from exulanica.world.workspace_model_bindings import (
+            BindingSnapshotRepository,
+            priced_snapshot,
+            proven_bindings,
+        )
+
+        client = self.model_client
+        manifest = load_manifest()
+        if not self.admits_workspace_models or client is None or self.spending is None:
+            return None
+        from exulanica.deletion.restore import RestoreRefused, verify_restore
+
+        try:
+            verify_restore(self.readonly_database, self.restore_state_path)
+        except RestoreRefused:
+            return None
+        selected = selected - manifest.models.keys()
+        if not selected:
+            return None
+        with self.readonly_database.session(workspace_id) as connection:
+            if connection.execute(
+                "select 1 from restore_control where state<>'complete'"
+            ).fetchone():
+                return None
+            bindings = tuple(
+                b
+                for b in proven_bindings(connection, workspace_id, engine, manifest)
+                if b.spec.model_id in selected
+            )
+        if not bindings:
+            return None
+        try:
+            prices = {}
+            for provider in sorted({b.spec.provider for b in bindings}):
+                prices.update(client.provider_prices(provider))
+            read_at = dt.datetime.now(dt.UTC)
+            with self.database.session(workspace_id) as connection, connection.transaction():
+                lock_workspace(connection, workspace_id)
+                current = tuple(
+                    b
+                    for b in proven_bindings(connection, workspace_id, engine, manifest)
+                    if b.spec.model_id in selected
+                )
+                if current != bindings:
+                    return None
+                scoped, document = priced_snapshot(manifest, bindings, prices, read_at=read_at)
+                digest = BindingSnapshotRepository(connection, workspace_id).record(document)
+        except (ValueError, ModelError, KeyError):
+            return None
+
+        def guard() -> bool:
+            try:
+                verify_restore(self.readonly_database, self.restore_state_path)
+            except RestoreRefused:
+                return False
+            if dt.datetime.now(dt.UTC) - read_at > dt.timedelta(seconds=60):
+                return False
+            with self.readonly_database.session(workspace_id) as connection:
+                if connection.execute(
+                    "select 1 from restore_control where state<>'complete'"
+                ).fetchone():
+                    return False
+                current = tuple(
+                    b
+                    for b in proven_bindings(connection, workspace_id, engine, manifest)
+                    if b.spec.model_id in selected
+                )
+                return current == bindings
+
+        try:
+            bound = client.with_chosen_manifest(
+                scoped, {b.spec.model_id: (b.role, b.prompt_version) for b in bindings}, guard=guard
+            )
+        except ValueError:
+            return None
+        return bound, scoped, digest
 
     def person_decision_policy(self, workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
         """The rules any role's decision is asked under, by the host and by a comparison alike:
@@ -842,6 +951,79 @@ class Services:
                     ended += creature_drafts.end_unserved(connection, workspace_id)
         return ended
 
+    def model_probes_served(self, workspace_id: uuid.UUID) -> bool:
+        return (
+            self.runs_model_probe_worker
+            and workspace_id in self.model_probe_workspaces
+            and self.model_client is not None
+            and self.spending is not None
+        )
+
+    def build_kind_draft_worker(self) -> KindDraftWorker:
+        """Native kind jobs remain readable without a provider; overdue work is scrubbed."""
+        return KindDraftWorker(
+            self.database,
+            client=self.model_client if self.kinds_from_people else None,
+            spending=self.spending,
+            holder=self.kind_drafts,
+            policy_for=lambda workspace: self.request_policy(
+                workspace,
+                lambda: self.readonly_database.session(workspace),
+                released_places=no_place_released,
+            ),
+            workspaces=lambda: (
+                (frozenset() if self.tokens is None else self.tokens.workspaces)
+                | self.watched_workspaces()
+            ),
+        )
+
+    def build_world_draft_worker(self) -> WorldDraftWorker | None:
+        """The native world maker under durable job and spending authority."""
+        if not self.kinds_from_people or self.model_client is None or self.spending is None:
+            return None
+        from exulanica.api.world_draft_worker import WorldDraftWorker
+
+        return WorldDraftWorker(
+            self.database,
+            client=self.model_client,
+            spending=self.spending,
+            holder=self.kind_drafts,
+            store=self.store,
+            policy_for=lambda workspace: self.request_policy(
+                workspace,
+                lambda: self.readonly_database.session(workspace),
+                released_places=no_place_released,
+            ),
+            workspaces=lambda: (
+                (frozenset() if self.tokens is None else self.tokens.workspaces)
+                | self.watched_workspaces()
+            ),
+        )
+
+    def build_model_probe_worker(self) -> ModelProbeWorker | None:
+        if (
+            not self.runs_model_probe_worker
+            or not self.model_probe_workspaces
+            or self.model_client is None
+            or self.spending is None
+        ):
+            return None
+
+        def policy_for(workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
+            return self.request_policy(
+                workspace_id,
+                lambda: self.readonly_database.session(workspace_id),
+                released_places=no_place_released,
+            )
+
+        return ModelProbeWorker(
+            self.database,
+            client=self.model_client,
+            spending=self.spending,
+            policy_for=policy_for,
+            workspaces=lambda: self.model_probe_workspaces,
+        )
+
     def build_creature_worker(self) -> CreatureDraftWorker | None:
         """What drafts the creatures of the listed workspaces, or None where this process has no
         model client, no looks namespace or no such workspace. Each draft's requests carry the
@@ -865,12 +1047,18 @@ class Services:
                 released_places=no_place_released,
             )
 
+        from exulanica.api.reference_pictures import creature_picture_notes_authority
+
         return CreatureDraftWorker(
             self.database,
             client=self.model_client,
             policy_for=policy_for,
             looks_for=looks.for_workspace,
             workspaces=lambda: workspaces,
+            picture_notes_authority=creature_picture_notes_authority(
+                manifest=self.model_client.manifest,
+                offered_to=self.pictures_offered_to,
+            ),
         )
 
     def build_reference_worker(self) -> ReferenceWorker | None:
@@ -1019,14 +1207,27 @@ class Services:
         The question is judged by the workspace's rules as the host judges it, on ``connection``,
         which the caller lends idle: for a society's ``engine``, that engine's description alone.
         """
-        refusal = model_refusal(
-            role, self.model_client, load_manifest(), _asked(role, engine), model
-        )
+        manifest = self.workspace_choice_manifest(connection, workspace_id, engine)
+        client = self.model_client
+        if (
+            client is not None
+            and model["model_id"] not in load_manifest().models
+            and model["model_id"] in manifest.models
+        ):
+            client = client.with_chosen_manifest(
+                manifest,
+                {
+                    key: (role.key, role.terms(engine).prompt_version)
+                    for key in manifest.models.keys() - load_manifest().models.keys()
+                },
+            )
+        refusal = model_refusal(role, client, manifest, _asked(role, engine), model)
         if refusal is not None or self.model_client is None:
             return refusal
+        assert client is not None
         return question_refusal(
             role,
-            self.model_client.with_policy(
+            client.with_policy(
                 self.request_policy(
                     workspace_id, borrowing(connection), released_places=no_place_released
                 )
@@ -1406,6 +1607,21 @@ def build_services(
         runs_reference_worker=plays_references_here(env_get("REFERENCE_WORKER", environ)),
         reference_workspaces=reference_workspaces(env_get("REFERENCE_WORKSPACES", environ)),
         reference_pictures=reads_pictures_here(env_get("REFERENCE_PICTURES", environ)),
+        admits_workspace_models=_explicitly_enabled(
+            env_get("WORKSPACE_MODELS", environ),
+            "workspace_models_not_boolean",
+            "EXULANICA_WORKSPACE_MODELS",
+        ),
+        runs_model_probe_worker=_explicitly_enabled(
+            env_get("MODEL_PROBE_WORKER", environ),
+            "model_probe_worker_not_boolean",
+            "EXULANICA_MODEL_PROBE_WORKER",
+        ),
+        model_probe_workspaces=tuple(
+            uuid.UUID(value.strip())
+            for value in (env_get("MODEL_PROBE_WORKSPACES", environ) or "").split(",")
+            if value.strip()
+        ),
         runs_creature_worker=plays_creatures_here(env_get("CREATURE_WORKER", environ)),
         creature_workspaces=creature_workspaces(env_get("CREATURE_WORKSPACES", environ)),
         reference_adapter_for=lambda source: configured_adapter(source, environ),

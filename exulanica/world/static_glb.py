@@ -68,8 +68,11 @@ __all__ = [
     "PreparedGlb",
     "StaticGlbLimits",
     "StaticGlbRefused",
+    "StaticMeshCoverage",
+    "StaticMeshInstanceBounds",
     "inspect_static_glb",
     "prepare_static_glb",
+    "static_mesh_instance_bounds",
 ]
 
 #: The content profile this module admits.
@@ -1461,3 +1464,161 @@ def _verify_output(output: bytes, dimensions: Mapping[str, int], limits: StaticG
     }
     if any(abs(measured[name] - dimensions[name]) > 1 for name in dimensions):
         raise _refuse("invalid_geometry", "the prepared container does not keep its dimensions")
+
+
+@dataclass(frozen=True, slots=True)
+class StaticMeshInstanceBounds:
+    """One active rendered mesh's exact final-byte bounds, in glTF metres."""
+
+    node_index: int
+    mesh_index: int
+    minimum: tuple[Fraction, Fraction, Fraction]
+    maximum: tuple[Fraction, Fraction, Fraction]
+    triangles: int
+    matrix: tuple[Fraction, ...]
+    local_absmax: tuple[Fraction, Fraction, Fraction]
+
+
+@dataclass(frozen=True, slots=True)
+class StaticMeshCoverage:
+    """Pure validated geometry/resource facts, never a source authorization verdict."""
+
+    content_sha256: str
+    byte_size: int
+    instances: tuple[StaticMeshInstanceBounds, ...]
+    draw_calls: int
+    rendered_vertices: int
+    rendered_triangles: int
+    decoded_texels: int
+
+
+def _coverage_fraction_bound(values: Sequence[Fraction]) -> None:
+    # Prevent deeply nested extreme transforms from becoming unbounded rational arithmetic.
+    if any(
+        max(value.numerator.bit_length(), value.denominator.bit_length()) > 4096 for value in values
+    ):
+        raise _refuse(
+            "resource_limit_exceeded", "exact coverage transform exceeds arithmetic limit"
+        )
+
+
+def _coverage_local(node: Mapping[str, Any]) -> tuple[Fraction, ...]:
+    """The admitted glTF transform formula evaluated on exact binary input ratios."""
+
+    def number(value: int | float) -> Fraction:
+        # glTF JSON numbers become binary64 in the renderer, including integer JSON tokens.
+        return Fraction(float(value))
+
+    if "matrix" in node:
+        return tuple(number(value) for value in node["matrix"])
+    tx, ty, tz = map(number, node.get("translation", (0, 0, 0)))
+    x, y, z, w = map(number, node.get("rotation", (0, 0, 0, 1)))
+    sx, sy, sz = map(number, node.get("scale", (1, 1, 1)))
+    return (
+        (1 - 2 * (y * y + z * z)) * sx,
+        2 * (x * y + z * w) * sx,
+        2 * (x * z - y * w) * sx,
+        Fraction(0),
+        2 * (x * y - z * w) * sy,
+        (1 - 2 * (x * x + z * z)) * sy,
+        2 * (y * z + x * w) * sy,
+        Fraction(0),
+        2 * (x * z + y * w) * sz,
+        2 * (y * z - x * w) * sz,
+        (1 - 2 * (x * x + y * y)) * sz,
+        Fraction(0),
+        tx,
+        ty,
+        tz,
+        Fraction(1),
+    )
+
+
+def static_mesh_instance_bounds(
+    payload: bytes,
+    *,
+    decode_image: Callable[[bytes], tuple[int, int]],
+    limits: StaticGlbLimits = LIMITS,
+) -> StaticMeshCoverage:
+    """Validate exact final bytes and cover every indexed active-scene mesh instance.
+
+    This never prepares or rewrites bytes. It reuses the static profile's bounded parser and full
+    data checks, including nonindexed triangles. Bounds follow all parent/node transforms using
+    exact rational arithmetic; accessor min/max declarations are not geometry authority. Images
+    are fully decoded through the caller's existing decode site. No registry, store or cache I/O.
+    """
+    inspected = inspect_static_glb(payload, limits)
+    _scan(inspected, inspected.accessors, inspected.meshes)
+    for image in inspected.images:
+        encoded = inspected.bin_chunk[image.offset : image.offset + image.length]
+        try:
+            measured = tuple(decode_image(encoded))
+        except Exception as error:
+            raise _refuse(
+                "invalid_image", f"images[{image.index}] does not decode: {type(error).__name__}"
+            ) from None
+        if measured != (image.width_px, image.height_px):
+            raise _refuse("invalid_image", f"images[{image.index}] decoded size differs")
+    nodes = inspected.document["nodes"]
+    identity = tuple(Fraction(i % 5 == 0) for i in range(16))
+    stack = [(number, identity) for number in reversed(inspected.roots)]
+    result = []
+    arrays: dict[int, array[Any]] = {}
+    while stack:
+        number, parent = stack.pop()
+        node = nodes[number]
+        local = _coverage_local(node)
+        _coverage_fraction_bound(local)
+        world = tuple(
+            sum(parent[k * 4 + row] * local[column * 4 + k] for k in range(4))
+            for column in range(4)
+            for row in range(4)
+        )
+        _coverage_fraction_bound(world)
+        if "mesh" in node:
+            mesh = node["mesh"]
+            lows: list[Fraction | None] = [None, None, None]
+            highs: list[Fraction | None] = [None, None, None]
+            triangles = 0
+            local_absmax = [Fraction(0)] * 3
+            for primitive in inspected.meshes[mesh]:
+                for index in (primitive.position, primitive.indices):
+                    if index is not None and index not in arrays:
+                        arrays[index] = _values(inspected.bin_chunk, inspected.accessors[index])
+                coordinates = arrays[primitive.position]
+                indices = (
+                    range(primitive.vertices)
+                    if primitive.indices is None
+                    else arrays[primitive.indices]
+                )
+                triangles += primitive.triangles
+                for index in set(indices):
+                    p = tuple(Fraction(coordinates[index * 3 + k]) for k in range(3))
+                    for axis in range(3):
+                        local_absmax[axis] = max(local_absmax[axis], abs(p[axis]))
+                    transformed = tuple(
+                        sum(world[k + r * 4] * p[r] for r in range(3)) + world[k + 12]
+                        for k in range(3)
+                    )
+                    _coverage_fraction_bound(transformed)
+                    for k, value in enumerate(transformed):
+                        lows[k] = value if lows[k] is None else min(lows[k], value)
+                        highs[k] = value if highs[k] is None else max(highs[k], value)
+            if any(v is None for v in (*lows, *highs)):
+                raise _refuse("invalid_geometry", "an active mesh has no covered vertex")
+            result.append(
+                StaticMeshInstanceBounds(
+                    number, mesh, tuple(lows), tuple(highs), triangles, world, tuple(local_absmax)
+                )
+            )
+        stack.extend((child, world) for child in reversed(node.get("children", [])))
+    counts = inspected.counts
+    return StaticMeshCoverage(
+        hashlib.sha256(payload).hexdigest(),
+        len(payload),
+        tuple(result),
+        counts["draw_calls"],
+        counts["rendered_vertices"],
+        counts["rendered_triangles"],
+        counts["texels"],
+    )

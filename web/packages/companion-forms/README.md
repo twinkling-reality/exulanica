@@ -1,16 +1,10 @@
 # @exulanica/companion-forms
 
-The Companion form bake-off. A private development surface that renders one identity three ways so
-a depth decision can be made from evidence instead of taste.
+A private development surface that renders one identity three ways.
 
-`frontier-roadmap.md` gates genuine 3D Companion depth behind four questions, and asks for three
-prototypes before the contract is approved:
-
-> treat genuine 3D Companion depth as a new renderer, asset-provenance, performance, and
-> accessibility decision rather than relabeling SVG shading as 3D; prototype 2D, bounded relief,
-> and world-rendered forms before approving that contract
-
-This package is those three prototypes and those four questions, as columns.
+[ADR-0003](../../../docs/adr/0003-renderer-selection.md) records the shipping Companion as the
+original DOM and SVG form. This package keeps the 2D, bounded-relief, and world-rendered
+comparison so that form can be read against the other two. It is not an open approval gate.
 
 ## Running it
 

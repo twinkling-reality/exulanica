@@ -1,6 +1,7 @@
 """The society engine table is the one statement of which engines exist and what each can do.
 
-Everything that used to restate a list of engines derives it from ``society-engines.v4.json``.
+Everything that used to restate a list of engines derives it from the newest
+``society-engines.v<N>.json``.
 These tests hold the places that cannot derive, because they are fixed text, to the table: the
 implemented engine modules, the live schema's checks, triggers and indexes, a SQL literal in a
 file another lane is restructuring, and the browser's generated copy. Each one fails when the
@@ -222,6 +223,8 @@ def test_the_source_scan_sees_a_quoted_engine_list(tmp_path):
 # table cannot write; this reads every such object back and compares it with the table.
 
 SCHEMA_OBJECTS = {
+    # Observer projection accepts the same things state family as ParticipationRuntime.eligible.
+    "participant_scope": lambda: {e.engine for e in ENGINES if e.state_family == "things"},
     "world_society_engine_version_check": lambda: {e.engine for e in ENGINES},
     "tg_world_society_input_binding": lambda: set(INPUT_ENGINES),
     "tg_world_society_v2_event_binding": lambda: set(INPUT_ENGINES),
@@ -350,19 +353,32 @@ def _without_maximum(engines):
     return tuple(dataclasses.replace(engine, population_maximum=None) for engine in engines)
 
 
-def test_the_earlier_tables_are_this_one_but_for_the_maximum_an_engine_states():
-    """``society-engines.v2.json`` and ``society-engines.v3.json`` stay beside this one, read by
-    the same loader. The third is this one with a maximum of 512 people stated for the engines a
-    town's society is made with, which this one states none for; the second is the third without
-    its engine for a world holding things."""
+def test_the_earlier_tables_are_this_one_but_for_what_each_version_came_to_state():
+    """Every earlier table stays beside this one, read by the same loader by its version. The
+    fourth is this one without a site among the grounds a society of things stands on; the third
+    is the fourth with a maximum of 512 people stated for the engines a town's society is made
+    with; the second is the third without its engine for a world holding things."""
+    fourth_path = ENGINES_PATH.with_name("society-engines.v4.json")
     third_path = ENGINES_PATH.with_name("society-engines.v3.json")
     second_path = ENGINES_PATH.with_name("society-engines.v2.json")
-    engines, default, creates, holding = load_engine_table(third_path)
-    assert (default, dict(creates), holding) == (
-        DEFAULT_ENGINE,
-        dict(CREATES),
-        CREATES_HOLDING_THINGS,
+    assert ENGINES_PATH.name == f"society-engines.v{society_engines.TABLE_VERSION}.json"
+    assert sorted(
+        int(path.name.split(".v")[1].split(".")[0])
+        for path in ENGINES_PATH.parent.glob("society-engines.v*.json")
+    ) == list(range(1, society_engines.TABLE_VERSION + 1))
+    fourth = load_engine_table(fourth_path)
+    assert fourth[:3] == (ENGINES, DEFAULT_ENGINE, CREATES)
+    assert CREATES_HOLDING_THINGS is not None and fourth[3] is not None
+    assert fourth[3].engine == CREATES_HOLDING_THINGS.engine
+    assert fourth[3].grounds == ("authored_starter", "generated_town", "made_world")
+    assert CREATES_HOLDING_THINGS.grounds == (
+        "authored_starter",
+        "generated_site",
+        "generated_town",
+        "made_world",
     )
+    engines, default, creates, holding = load_engine_table(third_path)
+    assert (default, dict(creates), holding) == (DEFAULT_ENGINE, dict(CREATES), fourth[3])
     assert _without_maximum(engines) == _without_maximum(ENGINES)
     assert {e.engine: e.population_maximum for e in engines} == {
         "exulanica-society/v1": 512,
@@ -392,21 +408,37 @@ def test_the_earlier_tables_are_this_one_but_for_the_maximum_an_engine_states():
     assert json.loads(second_path.read_text(encoding="utf-8")) == third
 
 
-def test_a_world_holding_things_is_a_society_of_things_only_over_grounds_one_stands_on():
-    """The grounds the table names for a world holding things are society grounds the catalog
-    states, and none is a world made from a world kind, which the living society alone lives in."""
-    from exulanica.world.generated_worlds import KIND_COMPOSERS
+def test_a_table_is_read_by_its_version_so_a_later_one_needs_no_new_reader(tmp_path):
+    """A version that states nothing new is read with no edit of the loader: what a table may
+    state follows from its number. One above the table this host reads is refused, since this
+    host cannot know what it came to state, and so is the first, which another shape holds."""
+    current = json.loads(ENGINES_PATH.read_text(encoding="utf-8"))
+    for version, read in ((society_engines.TABLE_VERSION, True), (99, False), (1, False)):
+        stated = tmp_path / f"society-engines.v{version}.json"
+        stated.write_text(
+            json.dumps({**current, "profile": f"exulanica.society-engines/v{version}"}),
+            encoding="utf-8",
+        )
+        if read:
+            assert load_engine_table(stated)[0] == ENGINES
+        else:
+            with pytest.raises(ValueError, match="not a society engine table"):
+                load_engine_table(stated)
+
+
+def test_every_saved_world_s_ground_holding_things_is_a_society_of_things():
+    """The grounds the table names for a world holding things are the society grounds the catalog
+    states, a world made from a world kind among them: on a host that offers societies of things
+    a version holding a thing its author placed is one, whatever its ground."""
     from exulanica.world.society_grounds import created_engine, society_grounds
 
     assert CREATES_HOLDING_THINGS is not None
     assert society_engine(CREATES_HOLDING_THINGS.engine).state_family == "things"
     grounds = {ground.key: ground for ground in society_grounds()}
-    assert set(CREATES_HOLDING_THINGS.grounds) <= set(grounds)
+    assert set(CREATES_HOLDING_THINGS.grounds) == set(grounds)
     for key, ground in grounds.items():
-        named = key in CREATES_HOLDING_THINGS.grounds
-        assert named != (ground.composer_key in KIND_COMPOSERS), key
-        expected = CREATES_HOLDING_THINGS.engine if named else created_engine(ground)
-        assert created_engine(ground, holding_things=True) == expected, key
+        assert created_engine(ground, holding_things=True) == CREATES_HOLDING_THINGS.engine, key
+        assert created_engine(ground) != CREATES_HOLDING_THINGS.engine, key
 
 
 def test_the_browser_copy_is_generated_from_the_table():
@@ -414,7 +446,8 @@ def test_the_browser_copy_is_generated_from_the_table():
         ROOT / "web" / "packages" / "app" / "src" / "society-engines.generated.ts"
     ).read_text(encoding="utf-8")
     text = ENGINES_PATH.read_text(encoding="utf-8")
-    assert f"export const SOCIETY_ENGINES_V4_JSON = String.raw`{text}`;" in generated
+    assert f"export const SOCIETY_ENGINES_JSON = String.raw`{text}`;" in generated
+    assert f"export const SOCIETY_ENGINES_FILE = '{ENGINES_PATH.name}';" in generated
     names = " | ".join(f"'{engine.engine}'" for engine in ENGINES)
     assert f"export type SocietyEngineProfile = {names};" in generated
 

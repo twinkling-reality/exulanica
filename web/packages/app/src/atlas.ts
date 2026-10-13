@@ -87,6 +87,7 @@ export async function mountAtlas(
     readonly generatedTile?: GeneratedTileMount;
     /** A world made from a world kind; see `composition/site-world.ts`. */
     readonly generatedSite?: GeneratedSiteMount;
+    readonly generatedRegionId?: IslandId;
     readonly authoredRegion?: AuthoredRegion;
     /** Placed depth estimates for that region; ignored without one, because they have no root. */
     readonly authoredPointMaps?: readonly AuthoredPointMapPlacement[];
@@ -112,6 +113,7 @@ export async function mountAtlas(
     ...(presentation?.generatedTile === undefined
       ? {}
       : { generatedTile: presentation.generatedTile }),
+    ...(presentation?.generatedRegionId === undefined ? {} : { generatedRegionId: presentation.generatedRegionId }),
     ...(presentation?.generatedSite === undefined
       ? {}
       : { generatedSite: presentation.generatedSite }),

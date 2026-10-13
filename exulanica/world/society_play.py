@@ -71,8 +71,8 @@ ANSWERS_PER_MINUTE: Final = 12
 #: How many minutes in a row a played being carries on with no answer from its person before the
 #: host gives it back (``player_left``).
 QUIET_MINUTES: Final = 5
-#: The contract catalogs' version a played being's requests are asked under, or a later one the
-#: engine's terms state: the sixth first states the person's own walk to a spot (``point``), its
+#: The action catalog version a played being's requests are asked under: the sixth first states
+#: the person's own walk to a spot (``point``), its
 #: policy holding the fifth's bounds, and the seventh adds following another being and stopping
 #: (``follow``, ``stop_following``) with the bound on those options.
 PLAY_CATALOG_VERSION: Final = 7
@@ -108,12 +108,15 @@ class PlayRefused(ValueError):
 
 
 def play_contract(role: DecisionRole, engine: str) -> DecisionContract:
-    """The contract a played being's request, its turn and its answer are read under: the engine's
-    terms, with the catalogs that state the person's own walk to a spot, never older than the
-    terms' own."""
+    """The player's own action vocabulary with the engine's current bounded policy.
+
+    Model catalogs are not supersets of the player's: they deliberately omit its walk-to-point
+    action. The explicit player catalog retains that action and following; the policy retains
+    at least the bounds both require.
+    """
     versions = dict(role.terms(engine).versions)
-    for catalog in (role.action_catalog, role.policy_catalog):
-        versions[catalog] = max(int(versions[catalog]), PLAY_CATALOG_VERSION)
+    versions[role.action_catalog] = PLAY_CATALOG_VERSION
+    versions[role.policy_catalog] = max(int(versions[role.policy_catalog]), PLAY_CATALOG_VERSION)
     return role.contract(versions)
 
 

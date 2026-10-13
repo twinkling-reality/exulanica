@@ -29,6 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
+from exulanica.models.identity import chat_model_identity
 from exulanica.models.manifest import Role
 from exulanica.selection.calls import CallLog, ModelCall
 from exulanica.selection.world_drafting import verbatim_bounds
@@ -191,7 +192,8 @@ def choose_tool(
                 max_tokens=max_tokens,
                 deadline_s=left,
             )
-            log.record(answered.call)
+            log.record(answered.call, manifest=client.manifest)
+            identity = chat_model_identity(answered.call, client.manifest)
             form = answered.value.model_dump()
             problem = _problem(form, description)
             if problem is None:
@@ -204,7 +206,7 @@ def choose_tool(
                     form["tool"],
                     tuple(description[start:end] for start, end in at),
                     None,
-                    answered.call.served_model_id,
+                    identity.model_id,
                     log.calls,
                     tuple(at),
                 )

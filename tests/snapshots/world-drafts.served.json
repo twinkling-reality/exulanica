@@ -3,7 +3,7 @@
   "offered": true,
   "code": null,
   "detail": null,
-  "calls_at_most": 9,
+  "calls_at_most": 16,
   "starts": {
    "an_hour": 12,
    "left": 12,
@@ -81,12 +81,48 @@
     "meaning": "This credential may not read drafts here: reading needs world.read."
    },
    {
+    "code": "world_draft_bound_too_small",
+    "meaning": "The confirmed ceiling cannot cover this operation."
+   },
+   {
+    "code": "world_draft_configuration_changed",
+    "meaning": "The accepted model configuration changed."
+   },
+   {
     "code": "world_draft_failed",
     "meaning": "The draft stopped before a world was made."
    },
    {
+    "code": "world_draft_funding_refused",
+    "meaning": "Durable provider bounds could not be opened."
+   },
+   {
+    "code": "world_draft_interrupted",
+    "meaning": "The interrupted draft was not asked again."
+   },
+   {
+    "code": "world_draft_key_reused",
+    "meaning": "The request key already holds different terms."
+   },
+   {
     "code": "world_draft_model_failed",
     "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "world_draft_operation_changed",
+    "meaning": "Read changed operation terms before confirming."
+   },
+   {
+    "code": "world_draft_price_expired",
+    "meaning": "The accepted operation sheet expired before dispatch."
+   },
+   {
+    "code": "world_draft_price_unavailable",
+    "meaning": "No fresh provider rates cover this operation."
+   },
+   {
+    "code": "world_draft_spending_not_durable",
+    "meaning": "Durable spending authority is required."
    },
    {
     "code": "world_draft_unanswered",
@@ -95,6 +131,10 @@
    {
     "code": "world_draft_unknown",
     "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "world_draft_worker_not_running",
+    "meaning": "This host is not running its world draft worker."
    },
    {
     "code": "world_limit_reached",
@@ -112,16 +152,461 @@
     "code": "worlds_read_only",
     "meaning": "This server's database role cannot register a world."
    }
-  ]
+  ],
+  "operation": {
+   "profile": "exulanica.world-draft-operation/v1",
+   "pipeline_version": 3,
+   "basis": "full_context_reservation_ceiling",
+   "estimate_is_expected_spend": false,
+   "read_at": "2026-01-01T00:00:00Z",
+   "expires_at": "2026-01-01T00:01:00Z",
+   "maximum_usd": "1.42270464",
+   "calls_at_most": 16,
+   "providers": [
+    {
+     "provider": "nebius_token_factory",
+     "ceiling_usd": "1.42270464",
+     "max_calls": 16
+    }
+   ],
+   "prices": [
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+     "input_usd_per_mtok": "0.2",
+     "output_usd_per_mtok": "0.6",
+     "input_tokens_at_most": 262144,
+     "metadata_context_window_tokens": 262144,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "rate_read_at": "2026-01-01T00:00:00Z"
+    },
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+     "input_usd_per_mtok": "0.14",
+     "output_usd_per_mtok": "0.28",
+     "input_tokens_at_most": 1048576,
+     "metadata_context_window_tokens": 1048576,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "rate_read_at": "2026-01-01T00:00:00Z"
+    },
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "input_usd_per_mtok": "0.3",
+     "output_usd_per_mtok": "0.9",
+     "input_tokens_at_most": 262144,
+     "metadata_context_window_tokens": 262144,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "rate_read_at": "2026-01-01T00:00:00Z"
+    }
+   ],
+   "paths": [
+    {
+     "tool": "kind",
+     "stages": [
+      {
+       "role": "world_tool_chooser",
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2,
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "models": [
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920"
+      },
+      {
+       "role": "kind_drafter",
+       "schema_attempts_at_most": 3,
+       "wire_attempts_per_request_at_most": 1,
+       "dispatches_at_most": 3,
+       "answer_tokens_at_most": 32768,
+       "models": [
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+         "reservation_usd": "0.15597568"
+        }
+       ],
+       "ceiling_usd": "0.46792704"
+      },
+      {
+       "role": "look_chooser",
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2,
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "models": [
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920"
+      },
+      {
+       "role": "setting_chooser",
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2,
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "models": [
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920"
+      }
+     ]
+    },
+    {
+     "tool": "specification",
+     "stages": [
+      {
+       "role": "world_tool_chooser",
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2,
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "models": [
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920"
+      },
+      {
+       "role": "specification_drafter",
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2,
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 16384,
+       "models": [
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "reservation_usd": "0.09338880"
+        },
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "reservation_usd": "0.06225920"
+        }
+       ],
+       "ceiling_usd": "0.37355520"
+      },
+      {
+       "role": "look_chooser",
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2,
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "models": [
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920"
+      },
+      {
+       "role": "setting_chooser",
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2,
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "models": [
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "provider": "nebius_token_factory",
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920"
+      }
+     ]
+    }
+   ],
+   "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  }
  },
  "started": {
   "draft_id": "00000000-0000-0000-0000-000000000001",
-  "state": "choosing",
+  "request_id": "00000000-0000-0000-0000-000000000002",
+  "operation": {
+   "basis": "full_context_reservation_ceiling",
+   "paths": [
+    {
+     "tool": "kind",
+     "stages": [
+      {
+       "role": "world_tool_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "kind_drafter",
+       "models": [
+        {
+         "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.15597568"
+        }
+       ],
+       "ceiling_usd": "0.46792704",
+       "dispatches_at_most": 3,
+       "answer_tokens_at_most": 32768,
+       "schema_attempts_at_most": 3,
+       "wire_attempts_per_request_at_most": 1
+      },
+      {
+       "role": "look_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "setting_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      }
+     ]
+    },
+    {
+     "tool": "specification",
+     "stages": [
+      {
+       "role": "world_tool_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "specification_drafter",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.09338880"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.06225920"
+        }
+       ],
+       "ceiling_usd": "0.37355520",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 16384,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "look_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "setting_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      }
+     ]
+    }
+   ],
+   "prices": [
+    {
+     "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+     "provider": "nebius_token_factory",
+     "rate_read_at": "2026-01-01T00:00:00Z",
+     "input_usd_per_mtok": "0.2",
+     "output_usd_per_mtok": "0.6",
+     "input_tokens_at_most": 262144,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "metadata_context_window_tokens": 262144
+    },
+    {
+     "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+     "provider": "nebius_token_factory",
+     "rate_read_at": "2026-01-01T00:00:00Z",
+     "input_usd_per_mtok": "0.14",
+     "output_usd_per_mtok": "0.28",
+     "input_tokens_at_most": 1048576,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "metadata_context_window_tokens": 1048576
+    },
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "provider": "nebius_token_factory",
+     "rate_read_at": "2026-01-01T00:00:00Z",
+     "input_usd_per_mtok": "0.3",
+     "output_usd_per_mtok": "0.9",
+     "input_tokens_at_most": 262144,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "metadata_context_window_tokens": 262144
+    }
+   ],
+   "profile": "exulanica.world-draft-operation/v1",
+   "read_at": "2026-01-01T00:00:00Z",
+   "providers": [
+    {
+     "provider": "nebius_token_factory",
+     "max_calls": 16,
+     "ceiling_usd": "1.42270464"
+    }
+   ],
+   "expires_at": "2026-01-01T00:01:00Z",
+   "maximum_usd": "1.42270464",
+   "calls_at_most": 16,
+   "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+   "pipeline_version": 3,
+   "estimate_is_expected_spend": false
+  },
+  "recovered": false,
+  "accounting": {
+   "profile": "exulanica.world-draft-accounting/v1",
+   "reported_usd": "0",
+   "held_usd": "0",
+   "unknown_liability_usd": "0",
+   "reconciled_usd": "0",
+   "total_known": true,
+   "attempts": []
+  },
+  "state": "queued",
   "description": "a small farm with a farmhouse, a barn and a duck pond",
   "started_at": "2026-01-01T00:00:00Z",
   "elapsed_seconds": 0,
   "poll_after_seconds": 3,
-  "deadline_seconds": 570,
+  "deadline_seconds": 1300,
   "tool": null,
   "entry": null,
   "made": [],
@@ -201,12 +686,48 @@
     "meaning": "This credential may not read drafts here: reading needs world.read."
    },
    {
+    "code": "world_draft_bound_too_small",
+    "meaning": "The confirmed ceiling cannot cover this operation."
+   },
+   {
+    "code": "world_draft_configuration_changed",
+    "meaning": "The accepted model configuration changed."
+   },
+   {
     "code": "world_draft_failed",
     "meaning": "The draft stopped before a world was made."
    },
    {
+    "code": "world_draft_funding_refused",
+    "meaning": "Durable provider bounds could not be opened."
+   },
+   {
+    "code": "world_draft_interrupted",
+    "meaning": "The interrupted draft was not asked again."
+   },
+   {
+    "code": "world_draft_key_reused",
+    "meaning": "The request key already holds different terms."
+   },
+   {
     "code": "world_draft_model_failed",
     "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "world_draft_operation_changed",
+    "meaning": "Read changed operation terms before confirming."
+   },
+   {
+    "code": "world_draft_price_expired",
+    "meaning": "The accepted operation sheet expired before dispatch."
+   },
+   {
+    "code": "world_draft_price_unavailable",
+    "meaning": "No fresh provider rates cover this operation."
+   },
+   {
+    "code": "world_draft_spending_not_durable",
+    "meaning": "Durable spending authority is required."
    },
    {
     "code": "world_draft_unanswered",
@@ -215,6 +736,10 @@
    {
     "code": "world_draft_unknown",
     "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "world_draft_worker_not_running",
+    "meaning": "This host is not running its world draft worker."
    },
    {
     "code": "world_limit_reached",
@@ -316,12 +841,48 @@
     "meaning": "This credential may not read drafts here: reading needs world.read."
    },
    {
+    "code": "world_draft_bound_too_small",
+    "meaning": "The confirmed ceiling cannot cover this operation."
+   },
+   {
+    "code": "world_draft_configuration_changed",
+    "meaning": "The accepted model configuration changed."
+   },
+   {
     "code": "world_draft_failed",
     "meaning": "The draft stopped before a world was made."
    },
    {
+    "code": "world_draft_funding_refused",
+    "meaning": "Durable provider bounds could not be opened."
+   },
+   {
+    "code": "world_draft_interrupted",
+    "meaning": "The interrupted draft was not asked again."
+   },
+   {
+    "code": "world_draft_key_reused",
+    "meaning": "The request key already holds different terms."
+   },
+   {
     "code": "world_draft_model_failed",
     "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "world_draft_operation_changed",
+    "meaning": "Read changed operation terms before confirming."
+   },
+   {
+    "code": "world_draft_price_expired",
+    "meaning": "The accepted operation sheet expired before dispatch."
+   },
+   {
+    "code": "world_draft_price_unavailable",
+    "meaning": "No fresh provider rates cover this operation."
+   },
+   {
+    "code": "world_draft_spending_not_durable",
+    "meaning": "Durable spending authority is required."
    },
    {
     "code": "world_draft_unanswered",
@@ -330,6 +891,10 @@
    {
     "code": "world_draft_unknown",
     "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "world_draft_worker_not_running",
+    "meaning": "This host is not running its world draft worker."
    },
    {
     "code": "world_limit_reached",
@@ -347,23 +912,297 @@
     "code": "worlds_read_only",
     "meaning": "This server's database role cannot register a world."
    }
-  ]
+  ],
+  "operation": null
  },
  "ready_place": {
   "draft_id": "00000000-0000-0000-0000-000000000001",
+  "request_id": "00000000-0000-0000-0000-000000000002",
+  "operation": {
+   "basis": "full_context_reservation_ceiling",
+   "paths": [
+    {
+     "tool": "kind",
+     "stages": [
+      {
+       "role": "world_tool_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "kind_drafter",
+       "models": [
+        {
+         "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.15597568"
+        }
+       ],
+       "ceiling_usd": "0.46792704",
+       "dispatches_at_most": 3,
+       "answer_tokens_at_most": 32768,
+       "schema_attempts_at_most": 3,
+       "wire_attempts_per_request_at_most": 1
+      },
+      {
+       "role": "look_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "setting_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      }
+     ]
+    },
+    {
+     "tool": "specification",
+     "stages": [
+      {
+       "role": "world_tool_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "specification_drafter",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.09338880"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.06225920"
+        }
+       ],
+       "ceiling_usd": "0.37355520",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 16384,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "look_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "setting_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      }
+     ]
+    }
+   ],
+   "prices": [
+    {
+     "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+     "provider": "nebius_token_factory",
+     "rate_read_at": "2026-01-01T00:00:00Z",
+     "input_usd_per_mtok": "0.2",
+     "output_usd_per_mtok": "0.6",
+     "input_tokens_at_most": 262144,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "metadata_context_window_tokens": 262144
+    },
+    {
+     "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+     "provider": "nebius_token_factory",
+     "rate_read_at": "2026-01-01T00:00:00Z",
+     "input_usd_per_mtok": "0.14",
+     "output_usd_per_mtok": "0.28",
+     "input_tokens_at_most": 1048576,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "metadata_context_window_tokens": 1048576
+    },
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "provider": "nebius_token_factory",
+     "rate_read_at": "2026-01-01T00:00:00Z",
+     "input_usd_per_mtok": "0.3",
+     "output_usd_per_mtok": "0.9",
+     "input_tokens_at_most": 262144,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "metadata_context_window_tokens": 262144
+    }
+   ],
+   "profile": "exulanica.world-draft-operation/v1",
+   "read_at": "2026-01-01T00:00:00Z",
+   "providers": [
+    {
+     "provider": "nebius_token_factory",
+     "max_calls": 16,
+     "ceiling_usd": "1.42270464"
+    }
+   ],
+   "expires_at": "2026-01-01T00:01:00Z",
+   "maximum_usd": "1.42270464",
+   "calls_at_most": 16,
+   "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+   "pipeline_version": 3,
+   "estimate_is_expected_spend": false
+  },
+  "recovered": false,
+  "accounting": {
+   "profile": "exulanica.world-draft-accounting/v1",
+   "reported_usd": "0.00070000",
+   "held_usd": "0",
+   "unknown_liability_usd": "0",
+   "reconciled_usd": "0",
+   "total_known": true,
+   "attempts": [
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "role": "world_tool_chooser",
+     "state": "settled",
+     "reserved_usd": "0.07956480",
+     "settled_usd": "0.00021000",
+     "cost_basis": "reported",
+     "prompt_tokens": 100,
+     "completion_tokens": 200
+    },
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+     "role": "kind_drafter",
+     "state": "settled",
+     "reserved_usd": "0.15597568",
+     "settled_usd": "0.00007000",
+     "cost_basis": "reported",
+     "prompt_tokens": 100,
+     "completion_tokens": 200
+    },
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "role": "look_chooser",
+     "state": "settled",
+     "reserved_usd": "0.07956480",
+     "settled_usd": "0.00021000",
+     "cost_basis": "reported",
+     "prompt_tokens": 100,
+     "completion_tokens": 200
+    },
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "role": "setting_chooser",
+     "state": "settled",
+     "reserved_usd": "0.07956480",
+     "settled_usd": "0.00021000",
+     "cost_basis": "reported",
+     "prompt_tokens": 100,
+     "completion_tokens": 200
+    }
+   ]
+  },
   "state": "ready",
   "description": "",
   "started_at": "2026-01-01T00:00:00Z",
   "elapsed_seconds": 0,
   "poll_after_seconds": null,
-  "deadline_seconds": 570,
+  "deadline_seconds": 1300,
   "tool": {
    "key": "place",
    "chosen_by": "model"
   },
   "entry": {
-   "entry_id": "00000000-0000-0000-0000-000000000002",
-   "world_id": "world:generated:00000000-0000-0000-0000-000000000003",
+   "entry_id": "00000000-0000-0000-0000-000000000003",
+   "world_id": "world:generated:00000000-0000-0000-0000-000000000001",
    "title": "A test farm",
    "source_kind": "generated",
    "source_snapshot_id": "00000000-0000-0000-0000-000000000004",
@@ -386,6 +1225,7 @@
      -1
     ]
    },
+   "generated_terrain": null,
    "society_engine": "exulanica-society/v5",
    "authored_version_id": "00000000-0000-0000-0000-000000000005",
    "authored_state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
@@ -450,8 +1290,8 @@
     "look": "ground.floor_tile",
     "drawn": 1,
     "box_mm": [
-     9100,
-     4850,
+     8600,
+     5550,
      0
     ]
    },
@@ -474,8 +1314,8 @@
     "look": "ground.floor_wood",
     "drawn": 2,
     "box_mm": [
-     9100,
-     3350,
+     8600,
+     3750,
      0
     ]
    },
@@ -486,8 +1326,8 @@
     "look": "structure.farmhouse",
     "drawn": 1,
     "box_mm": [
-     12000,
-     9500,
+     13500,
+     9000,
      5600
     ]
    },
@@ -498,8 +1338,8 @@
     "look": "structure.barn",
     "drawn": 1,
     "box_mm": [
-     13500,
-     11500,
+     16000,
+     9000,
      4500
     ]
    },
@@ -520,7 +1360,7 @@
     "label": "hay bale",
     "form": "fixture",
     "look": "prop.hay_bale",
-    "drawn": 6,
+    "drawn": 5,
     "box_mm": [
      1200,
      1200,
@@ -532,10 +1372,10 @@
     "label": "field",
     "form": "area",
     "look": "ground.crop_rows",
-    "drawn": 3,
+    "drawn": 2,
     "box_mm": [
      39500,
-     28000,
+     42500,
      0
     ]
    },
@@ -640,12 +1480,48 @@
     "meaning": "This credential may not read drafts here: reading needs world.read."
    },
    {
+    "code": "world_draft_bound_too_small",
+    "meaning": "The confirmed ceiling cannot cover this operation."
+   },
+   {
+    "code": "world_draft_configuration_changed",
+    "meaning": "The accepted model configuration changed."
+   },
+   {
     "code": "world_draft_failed",
     "meaning": "The draft stopped before a world was made."
    },
    {
+    "code": "world_draft_funding_refused",
+    "meaning": "Durable provider bounds could not be opened."
+   },
+   {
+    "code": "world_draft_interrupted",
+    "meaning": "The interrupted draft was not asked again."
+   },
+   {
+    "code": "world_draft_key_reused",
+    "meaning": "The request key already holds different terms."
+   },
+   {
     "code": "world_draft_model_failed",
     "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "world_draft_operation_changed",
+    "meaning": "Read changed operation terms before confirming."
+   },
+   {
+    "code": "world_draft_price_expired",
+    "meaning": "The accepted operation sheet expired before dispatch."
+   },
+   {
+    "code": "world_draft_price_unavailable",
+    "meaning": "No fresh provider rates cover this operation."
+   },
+   {
+    "code": "world_draft_spending_not_durable",
+    "meaning": "Durable spending authority is required."
    },
    {
     "code": "world_draft_unanswered",
@@ -654,6 +1530,10 @@
    {
     "code": "world_draft_unknown",
     "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "world_draft_worker_not_running",
+    "meaning": "This host is not running its world draft worker."
    },
    {
     "code": "world_limit_reached",
@@ -675,19 +1555,292 @@
  },
  "ready_town": {
   "draft_id": "00000000-0000-0000-0000-000000000001",
+  "request_id": "00000000-0000-0000-0000-000000000002",
+  "operation": {
+   "basis": "full_context_reservation_ceiling",
+   "paths": [
+    {
+     "tool": "kind",
+     "stages": [
+      {
+       "role": "world_tool_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "kind_drafter",
+       "models": [
+        {
+         "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.15597568"
+        }
+       ],
+       "ceiling_usd": "0.46792704",
+       "dispatches_at_most": 3,
+       "answer_tokens_at_most": 32768,
+       "schema_attempts_at_most": 3,
+       "wire_attempts_per_request_at_most": 1
+      },
+      {
+       "role": "look_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "setting_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      }
+     ]
+    },
+    {
+     "tool": "specification",
+     "stages": [
+      {
+       "role": "world_tool_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "specification_drafter",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.09338880"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.06225920"
+        }
+       ],
+       "ceiling_usd": "0.37355520",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 16384,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "look_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "setting_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      }
+     ]
+    }
+   ],
+   "prices": [
+    {
+     "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+     "provider": "nebius_token_factory",
+     "rate_read_at": "2026-01-01T00:00:00Z",
+     "input_usd_per_mtok": "0.2",
+     "output_usd_per_mtok": "0.6",
+     "input_tokens_at_most": 262144,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "metadata_context_window_tokens": 262144
+    },
+    {
+     "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+     "provider": "nebius_token_factory",
+     "rate_read_at": "2026-01-01T00:00:00Z",
+     "input_usd_per_mtok": "0.14",
+     "output_usd_per_mtok": "0.28",
+     "input_tokens_at_most": 1048576,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "metadata_context_window_tokens": 1048576
+    },
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "provider": "nebius_token_factory",
+     "rate_read_at": "2026-01-01T00:00:00Z",
+     "input_usd_per_mtok": "0.3",
+     "output_usd_per_mtok": "0.9",
+     "input_tokens_at_most": 262144,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "metadata_context_window_tokens": 262144
+    }
+   ],
+   "profile": "exulanica.world-draft-operation/v1",
+   "read_at": "2026-01-01T00:00:00Z",
+   "providers": [
+    {
+     "provider": "nebius_token_factory",
+     "max_calls": 16,
+     "ceiling_usd": "1.42270464"
+    }
+   ],
+   "expires_at": "2026-01-01T00:01:00Z",
+   "maximum_usd": "1.42270464",
+   "calls_at_most": 16,
+   "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+   "pipeline_version": 3,
+   "estimate_is_expected_spend": false
+  },
+  "recovered": false,
+  "accounting": {
+   "profile": "exulanica.world-draft-accounting/v1",
+   "reported_usd": "0.00084000",
+   "held_usd": "0",
+   "unknown_liability_usd": "0",
+   "reconciled_usd": "0",
+   "total_known": true,
+   "attempts": [
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "role": "world_tool_chooser",
+     "state": "settled",
+     "reserved_usd": "0.07956480",
+     "settled_usd": "0.00021000",
+     "cost_basis": "reported",
+     "prompt_tokens": 100,
+     "completion_tokens": 200
+    },
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "role": "specification_drafter",
+     "state": "settled",
+     "reserved_usd": "0.09338880",
+     "settled_usd": "0.00021000",
+     "cost_basis": "reported",
+     "prompt_tokens": 100,
+     "completion_tokens": 200
+    },
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "role": "look_chooser",
+     "state": "settled",
+     "reserved_usd": "0.07956480",
+     "settled_usd": "0.00021000",
+     "cost_basis": "reported",
+     "prompt_tokens": 100,
+     "completion_tokens": 200
+    },
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "role": "setting_chooser",
+     "state": "settled",
+     "reserved_usd": "0.07956480",
+     "settled_usd": "0.00021000",
+     "cost_basis": "reported",
+     "prompt_tokens": 100,
+     "completion_tokens": 200
+    }
+   ]
+  },
   "state": "ready",
   "description": "",
   "started_at": "2026-01-01T00:00:00Z",
   "elapsed_seconds": 0,
   "poll_after_seconds": null,
-  "deadline_seconds": 570,
+  "deadline_seconds": 1300,
   "tool": {
    "key": "town",
    "chosen_by": "model"
   },
   "entry": {
-   "entry_id": "00000000-0000-0000-0000-000000000002",
-   "world_id": "world:generated:00000000-0000-0000-0000-000000000003",
+   "entry_id": "00000000-0000-0000-0000-000000000003",
+   "world_id": "world:generated:00000000-0000-0000-0000-000000000001",
    "title": "A small town",
    "source_kind": "generated",
    "source_snapshot_id": "00000000-0000-0000-0000-000000000004",
@@ -747,6 +1900,7 @@
     }
    },
    "generated_site": null,
+   "generated_terrain": null,
    "society_engine": "exulanica-society/v5",
    "authored_version_id": "00000000-0000-0000-0000-000000000005",
    "authored_state_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
@@ -911,12 +2065,48 @@
     "meaning": "This credential may not read drafts here: reading needs world.read."
    },
    {
+    "code": "world_draft_bound_too_small",
+    "meaning": "The confirmed ceiling cannot cover this operation."
+   },
+   {
+    "code": "world_draft_configuration_changed",
+    "meaning": "The accepted model configuration changed."
+   },
+   {
     "code": "world_draft_failed",
     "meaning": "The draft stopped before a world was made."
    },
    {
+    "code": "world_draft_funding_refused",
+    "meaning": "Durable provider bounds could not be opened."
+   },
+   {
+    "code": "world_draft_interrupted",
+    "meaning": "The interrupted draft was not asked again."
+   },
+   {
+    "code": "world_draft_key_reused",
+    "meaning": "The request key already holds different terms."
+   },
+   {
     "code": "world_draft_model_failed",
     "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "world_draft_operation_changed",
+    "meaning": "Read changed operation terms before confirming."
+   },
+   {
+    "code": "world_draft_price_expired",
+    "meaning": "The accepted operation sheet expired before dispatch."
+   },
+   {
+    "code": "world_draft_price_unavailable",
+    "meaning": "No fresh provider rates cover this operation."
+   },
+   {
+    "code": "world_draft_spending_not_durable",
+    "meaning": "Durable spending authority is required."
    },
    {
     "code": "world_draft_unanswered",
@@ -925,6 +2115,10 @@
    {
     "code": "world_draft_unknown",
     "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "world_draft_worker_not_running",
+    "meaning": "This host is not running its world draft worker."
    },
    {
     "code": "world_limit_reached",
@@ -946,12 +2140,285 @@
  },
  "refused": {
   "draft_id": "00000000-0000-0000-0000-000000000001",
+  "request_id": "00000000-0000-0000-0000-000000000002",
+  "operation": {
+   "basis": "full_context_reservation_ceiling",
+   "paths": [
+    {
+     "tool": "kind",
+     "stages": [
+      {
+       "role": "world_tool_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "kind_drafter",
+       "models": [
+        {
+         "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.15597568"
+        }
+       ],
+       "ceiling_usd": "0.46792704",
+       "dispatches_at_most": 3,
+       "answer_tokens_at_most": 32768,
+       "schema_attempts_at_most": 3,
+       "wire_attempts_per_request_at_most": 1
+      },
+      {
+       "role": "look_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "setting_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      }
+     ]
+    },
+    {
+     "tool": "specification",
+     "stages": [
+      {
+       "role": "world_tool_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "specification_drafter",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.09338880"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.06225920"
+        }
+       ],
+       "ceiling_usd": "0.37355520",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 16384,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "look_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      },
+      {
+       "role": "setting_chooser",
+       "models": [
+        {
+         "model_id": "nvidia/nemotron-3-super-120b-a12b",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.07956480"
+        },
+        {
+         "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+         "provider": "nebius_token_factory",
+         "reservation_usd": "0.05304320"
+        }
+       ],
+       "ceiling_usd": "0.31825920",
+       "dispatches_at_most": 4,
+       "answer_tokens_at_most": 1024,
+       "schema_attempts_at_most": 2,
+       "wire_attempts_per_request_at_most": 2
+      }
+     ]
+    }
+   ],
+   "prices": [
+    {
+     "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+     "provider": "nebius_token_factory",
+     "rate_read_at": "2026-01-01T00:00:00Z",
+     "input_usd_per_mtok": "0.2",
+     "output_usd_per_mtok": "0.6",
+     "input_tokens_at_most": 262144,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "metadata_context_window_tokens": 262144
+    },
+    {
+     "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+     "provider": "nebius_token_factory",
+     "rate_read_at": "2026-01-01T00:00:00Z",
+     "input_usd_per_mtok": "0.14",
+     "output_usd_per_mtok": "0.28",
+     "input_tokens_at_most": 1048576,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "metadata_context_window_tokens": 1048576
+    },
+    {
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "provider": "nebius_token_factory",
+     "rate_read_at": "2026-01-01T00:00:00Z",
+     "input_usd_per_mtok": "0.3",
+     "output_usd_per_mtok": "0.9",
+     "input_tokens_at_most": 262144,
+     "rate_response_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "metadata_context_window_tokens": 262144
+    }
+   ],
+   "profile": "exulanica.world-draft-operation/v1",
+   "read_at": "2026-01-01T00:00:00Z",
+   "providers": [
+    {
+     "provider": "nebius_token_factory",
+     "max_calls": 16,
+     "ceiling_usd": "1.42270464"
+    }
+   ],
+   "expires_at": "2026-01-01T00:01:00Z",
+   "maximum_usd": "1.42270464",
+   "calls_at_most": 16,
+   "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+   "pipeline_version": 3,
+   "estimate_is_expected_spend": false
+  },
+  "recovered": false,
+  "accounting": {
+   "profile": "exulanica.world-draft-accounting/v1",
+   "reported_usd": "0.00042000",
+   "held_usd": "0",
+   "unknown_liability_usd": "0",
+   "reconciled_usd": "0",
+   "total_known": true,
+   "attempts": [
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "role": "world_tool_chooser",
+     "state": "settled",
+     "reserved_usd": "0.07956480",
+     "settled_usd": "0.00021000",
+     "cost_basis": "reported",
+     "prompt_tokens": 100,
+     "completion_tokens": 200
+    },
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+     "role": "kind_drafter",
+     "state": "settled",
+     "reserved_usd": "0.15597568",
+     "settled_usd": "0.00007000",
+     "cost_basis": "reported",
+     "prompt_tokens": 100,
+     "completion_tokens": 200
+    },
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+     "role": "kind_drafter",
+     "state": "settled",
+     "reserved_usd": "0.15597568",
+     "settled_usd": "0.00007000",
+     "cost_basis": "reported",
+     "prompt_tokens": 100,
+     "completion_tokens": 200
+    },
+    {
+     "provider": "nebius_token_factory",
+     "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+     "role": "kind_drafter",
+     "state": "settled",
+     "reserved_usd": "0.15597568",
+     "settled_usd": "0.00007000",
+     "cost_basis": "reported",
+     "prompt_tokens": 100,
+     "completion_tokens": 200
+    }
+   ]
+  },
   "state": "refused",
   "description": "",
   "started_at": "2026-01-01T00:00:00Z",
   "elapsed_seconds": 0,
   "poll_after_seconds": null,
-  "deadline_seconds": 570,
+  "deadline_seconds": 1300,
   "tool": {
    "key": "place",
    "chosen_by": "model"
@@ -1040,12 +2507,48 @@
     "meaning": "This credential may not read drafts here: reading needs world.read."
    },
    {
+    "code": "world_draft_bound_too_small",
+    "meaning": "The confirmed ceiling cannot cover this operation."
+   },
+   {
+    "code": "world_draft_configuration_changed",
+    "meaning": "The accepted model configuration changed."
+   },
+   {
     "code": "world_draft_failed",
     "meaning": "The draft stopped before a world was made."
    },
    {
+    "code": "world_draft_funding_refused",
+    "meaning": "Durable provider bounds could not be opened."
+   },
+   {
+    "code": "world_draft_interrupted",
+    "meaning": "The interrupted draft was not asked again."
+   },
+   {
+    "code": "world_draft_key_reused",
+    "meaning": "The request key already holds different terms."
+   },
+   {
     "code": "world_draft_model_failed",
     "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "world_draft_operation_changed",
+    "meaning": "Read changed operation terms before confirming."
+   },
+   {
+    "code": "world_draft_price_expired",
+    "meaning": "The accepted operation sheet expired before dispatch."
+   },
+   {
+    "code": "world_draft_price_unavailable",
+    "meaning": "No fresh provider rates cover this operation."
+   },
+   {
+    "code": "world_draft_spending_not_durable",
+    "meaning": "Durable spending authority is required."
    },
    {
     "code": "world_draft_unanswered",
@@ -1054,6 +2557,10 @@
    {
     "code": "world_draft_unknown",
     "meaning": "The server holds no draft this person started with this id."
+   },
+   {
+    "code": "world_draft_worker_not_running",
+    "meaning": "This host is not running its world draft worker."
    },
    {
     "code": "world_limit_reached",

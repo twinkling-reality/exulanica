@@ -60,35 +60,83 @@ def identity_comparisons(root: Path = ROOT) -> dict[str, int]:
     engines = {engine.engine for engine in ENGINES}
     modules = sorted((root / "exulanica").rglob("*.py"))
     trees = {path: ast.parse(path.read_text(encoding="utf-8")) for path in modules}
-    constants = {
-        target.id
-        for tree in trees.values()
-        for node in tree.body
-        if isinstance(node, ast.Assign | ast.AnnAssign)
-        and isinstance(node.value, ast.Constant)
-        and node.value.value in engines
-        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
-        if isinstance(target, ast.Name)
+    by_module = {
+        ".".join(path.relative_to(root).with_suffix("").parts).removesuffix(".__init__"): tree
+        for path, tree in trees.items()
     }
+    # Resolve constants in their owning module, including imported aliases and re-exports.
+    # An unrelated module's THINGS_PROFILE is not an engine merely because the name matches.
+    packages = {
+        ".".join(path.relative_to(root).parent.parts)
+        for path in modules
+        if path.name == "__init__.py"
+    }
+    bindings: dict[str, dict[str, str]] = {name: {} for name in by_module}
+    assignments: list[tuple[str, str, ast.expr]] = []
+    for module, tree in by_module.items():
+        for node in tree.body:
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    bindings[module][alias.asname or alias.name.split(".")[0]] = (
+                        alias.name if alias.asname else alias.name.split(".")[0]
+                    )
+            elif isinstance(node, ast.ImportFrom):
+                prefix = node.module or ""
+                if node.level:
+                    package = module if module in packages else module.rsplit(".", 1)[0]
+                    parts = package.split(".")
+                    prefix = ".".join(parts[: len(parts) - node.level + 1])
+                    if node.module:
+                        prefix += "." + node.module
+                for alias in node.names:
+                    bindings[module][alias.asname or alias.name] = f"{prefix}.{alias.name}"
+            elif isinstance(node, ast.Assign | ast.AnnAssign) and node.value is not None:
+                for target in node.targets if isinstance(node, ast.Assign) else [node.target]:
+                    if isinstance(target, ast.Name):
+                        bindings[module][target.id] = f"{module}.{target.id}"
+                        assignments.append((module, target.id, node.value))
 
-    def names_an_engine(node: ast.expr) -> bool:
-        if isinstance(node, ast.Constant):
-            return node.value in engines
+    def qualified(module: str, node: ast.expr) -> str | None:
         if isinstance(node, ast.Name):
-            return node.id in constants
+            return bindings[module].get(node.id)
         if isinstance(node, ast.Attribute):
-            return node.attr in constants
+            parent = qualified(module, node.value)
+            return f"{parent}.{node.attr}" if parent else None
+        return None
+
+    identities: set[str] = set()
+
+    def names_an_engine(module: str, node: ast.expr) -> bool:
+        if isinstance(node, ast.Constant):
+            return isinstance(node.value, str) and node.value in engines
         if isinstance(node, ast.Tuple | ast.List | ast.Set):
-            return any(names_an_engine(element) for element in node.elts)
-        return False
+            return any(names_an_engine(module, element) for element in node.elts)
+        return qualified(module, node) in identities
+
+    while True:
+        additions = {
+            f"{module}.{name}"
+            for module, name, value in assignments
+            if names_an_engine(module, value)
+        }
+        additions.update(
+            f"{module}.{name}"
+            for module, names in bindings.items()
+            for name, target in names.items()
+            if target in identities
+        )
+        if additions <= identities:
+            break
+        identities.update(additions)
 
     found: dict[str, int] = {}
     for path, tree in trees.items():
+        module = ".".join(path.relative_to(root).with_suffix("").parts).removesuffix(".__init__")
         count = sum(
             1
             for node in ast.walk(tree)
             if isinstance(node, ast.Compare)
-            and any(names_an_engine(side) for side in (node.left, *node.comparators))
+            and any(names_an_engine(module, side) for side in (node.left, *node.comparators))
         )
         if count:
             found[path.relative_to(root).as_posix()] = count
@@ -111,7 +159,8 @@ def test_the_scan_finds_a_comparison_by_constant_text_and_tuple(tmp_path):
     (package / "profiles.py").write_text('PLANTED = "exulanica-society/v2"\n', encoding="utf-8")
     (package / "asks.py").write_text(
         "from exulanica.profiles import PLANTED\n"
-        "def choose(row, module):\n"
+        "import exulanica.profiles as module\n"
+        "def choose(row):\n"
         "    if row['engine_version'] == PLANTED:\n"
         "        return 1\n"
         "    if row['engine_version'] != 'exulanica-society/v3':\n"
@@ -120,6 +169,26 @@ def test_the_scan_finds_a_comparison_by_constant_text_and_tuple(tmp_path):
         "        return 3\n"
         "    return row['engine_version'] == 'exulanica-society/v9'\n",
         encoding="utf-8",
+    )
+    assert identity_comparisons(tmp_path) == {"exulanica/asks.py": 3}
+
+
+def test_engine_names_resolve_through_imports_without_cross_module_collisions(tmp_path):
+    package = tmp_path / "exulanica"
+    package.mkdir()
+    (package / "profiles.py").write_text('PROFILE = "exulanica-society/v2"\n')
+    (package / "other.py").write_text('PROFILE = "exulanica.reference-bundle/v1"\n')
+    (package / "__init__.py").write_text("from .profiles import PROFILE as REEXPORTED\n")
+    (package / "asks.py").write_text(
+        "from exulanica import REEXPORTED as ENGINE\n"
+        "from .other import PROFILE\n"
+        "import exulanica.profiles as engines\n"
+        "import exulanica.other as unrelated\n"
+        "import exulanica.profiles\n"
+        "def choose(row, arbitrary):\n"
+        "    return (row == ENGINE, row == engines.PROFILE,\n"
+        "            row == exulanica.profiles.PROFILE, row == PROFILE,\n"
+        "            row == unrelated.PROFILE, row == arbitrary.PROFILE)\n"
     )
     assert identity_comparisons(tmp_path) == {"exulanica/asks.py": 3}
 

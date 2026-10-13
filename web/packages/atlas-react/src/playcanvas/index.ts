@@ -142,7 +142,7 @@ export type { ClaimResult } from './probes.js';
 export { probeAll, probeGlobalSort, probeSplatBudget, probeWebGpu } from './probes.js';
 
 export type {
-  AtlasBindingOptions,
+  SourceSurfacePick, AtlasBindingOptions,
   FrameReport,
   IslandVisual,
   PlacementCheck,
@@ -180,7 +180,7 @@ export type {
 export { OwnedDistrictRuntime } from './owned-district-runtime.js';
 export { KIND_SIDES } from './society/seating.js';
 export type {
-  KindPlace, KindSeat, KindSide, KindUse, SeatingLayout, SeatingMiss, SeatingObject, StreetFurniture, StreetFurniturePart,
+  FixtureSeat, KindPlace, KindSeat, KindSide, KindUse, SeatingLayout, SeatingMiss, SeatingObject, StreetFurniture, StreetFurniturePart,
 } from './society/seating.js';
 export type { FlightKindLook, FlightSamples, FlightState, FlightWindow } from './flight/types.js';
 export type {

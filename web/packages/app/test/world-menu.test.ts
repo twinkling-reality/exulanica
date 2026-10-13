@@ -56,7 +56,7 @@ describe('World menu', () => {
     });
     const make = menu.root.querySelector<HTMLButtonElement>('[data-command=make]')!;
     expect(make.querySelector('.world-menu-entry-label')?.textContent).toBe('Create a world');
-    expect(make.querySelector('.world-menu-entry-detail')?.textContent).toBe('Start a new town');
+    expect(make.querySelector('.world-menu-entry-detail')?.textContent).toBe('Create another world');
     expect(make.getAttribute('aria-label')).toBe('Create a world');
     make.click();
     expect(onMakeWorld).toHaveBeenCalledOnce();
@@ -183,14 +183,14 @@ describe('World menu', () => {
     });
     const make = menu.root.querySelector<HTMLButtonElement>('[data-command=make]')!;
     const detail = () => make.querySelector('.world-menu-entry-detail')?.textContent;
-    expect(detail()).toBe('Start a new town');
+    expect(detail()).toBe('Create another world');
     menu.setMake({ state: 'unavailable', words: { happened: 'This server cannot build new towns.' } });
     expect(make.getAttribute('aria-disabled')).toBe('true');
     expect(make.disabled).toBe(false);
     expect(detail()).toBe('This server cannot build new towns.');
     menu.setMake({ state: 'unknown', words: null });
     expect(make.hasAttribute('aria-disabled')).toBe(false);
-    expect(detail()).toBe('Start a new town');
+    expect(detail()).toBe('Create another world');
     menu.setMake({ state: 'available', words: null });
     expect(make.dataset['state']).toBe('available');
   });

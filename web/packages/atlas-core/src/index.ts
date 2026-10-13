@@ -685,6 +685,7 @@ export {
   readStylePackManifest,
   resolveLookRole,
   resolveStylePack,
+  stylePackFamilies,
   splitLookRole,
   stretchCoordinate,
   swatchKeyOf,
@@ -727,3 +728,17 @@ export {
 } from './surface-material.js';
 export type { StylePiece, StylePieceGroup } from './style-piece.js';
 export { StylePieceRefusal, readStylePiece } from './style-piece.js';
+
+export { SupportNavigation, SupportNavigationError, readSupportNavigation } from './support-navigation.js';
+export type { SupportState, SupportSurface, SupportNetworkDocument } from './support-navigation.js';
+
+export { TriangleQuery, TRIANGLE_QUERY_LIMITS } from './triangle-query.js';
+export type { TriangleQueryGeometry, TriangleQueryHit, TriangleQueryPoint, TriangleQueryWork } from './triangle-query.js';
+
+export { HeightfieldGeometryError, readHeightfieldGeometry, pointContact } from './heightfield-geometry.js';
+export type { HeightfieldGeometry, HeightfieldGeometryDocument, HeightfieldDigest, HeightfieldPoint, HeightfieldPointContact, HeightfieldRational, HeightfieldTriangleSelector } from './heightfield-geometry.js';
+export { HEIGHTFIELD_PERSON_POLICY, readHeightfieldContact, at as heightfieldAt, sweep as heightfieldSweep, passivePatch as heightfieldPassivePatch } from './heightfield-contact.js';
+export type { HeightfieldContact, HeightfieldContactDocument, HeightfieldContactResult, HeightfieldObstruction, HeightfieldRefusal } from './heightfield-contact.js';
+
+export { terrainGroundPose, terrainMillimetres } from './navigation.js';
+export type { TerrainState, TerrainNavigation, TerrainGroundPose, TerrainOccupancyProof, VerifiedTerrainOccupancy } from './navigation.js';

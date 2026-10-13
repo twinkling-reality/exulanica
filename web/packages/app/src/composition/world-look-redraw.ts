@@ -119,6 +119,7 @@ export function swappableDrawing<T extends { readonly look: WorldLookState }>(
             ? { packId, manifestSha256: null, source: 'default' }
             : {
               packId: pack.packId, manifestSha256: pack.manifestSha256, source: 'redraw',
+              ...(pack.own?.wearable === true ? { own: true, ...(pack.own.base === null ? {} : { ownBase: pack.own.base }) } : {}),
               ...(pack.setting === undefined ? {} : { setting: pack.setting.document }),
             });
         } catch (error) {
@@ -157,6 +158,13 @@ export function swappableDrawing<T extends { readonly look: WorldLookState }>(
         },
         get animating() {
           return attachment?.animating ?? false;
+        },
+        sourceCurrent() {
+          return attachment?.sourceCurrent?.() === true;
+        },
+        pickSource(origin, direction) {
+          return attachment?.sourceCurrent?.() === true
+            ? attachment.pickSource?.(origin, direction) ?? null : null;
         },
         dispose() {
           shell.removeEventListener(WORLD_LOOK_REDRAW_EVENT, onRedraw);

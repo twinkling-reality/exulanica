@@ -1,5 +1,6 @@
 import type { NavigationWorld } from '@exulanica/atlas-core';
 import type * as pc from 'playcanvas';
+import type { TerrainDressingAttachment } from '../generated-site/terrain-dressing.js';
 import type { CameraState } from '../controls.js';
 
 /**
@@ -68,6 +69,10 @@ export interface GeneratedTileMetrics {
 
 export interface GeneratedTileAttachment {
   readonly metrics: GeneratedTileMetrics;
+  /** Immutable source geometry only, in the displayed scene frame. */
+  readonly pickSource?: TerrainDressingAttachment['pick'];
+  /** Current source authority, without casting another ray. */
+  readonly sourceCurrent?: () => boolean;
   /**
    * Whether something the attachment draws is moving, such as the vehicles a tile's traffic
    * drives: the binding draws every frame while it is, and at its settled rate when it is not.

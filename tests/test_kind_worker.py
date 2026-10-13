@@ -179,6 +179,62 @@ class _PoolWithItsOwnLock(Executor):
             pass
 
 
+def test_discarded_pool_cannot_overwrite_a_replacement_jobs_kept_answer():
+    pools = [_PoolWithItsOwnLock(), _PoolWithItsOwnLock()]
+    worker = KindWorker(lambda: pools.pop(0))
+    kept = Kept(4)
+    assert worker.run("same", 0.001, lambda: {}, workspace="w", kept=kept).status == "overran"
+    old = worker._executor
+    worker._discard(old)
+    assert worker.run("same", 0.001, lambda: {}, workspace="w", kept=kept).status == "overran"
+    new = worker._executor
+    new.futures[0].set_result({"answer": "new"})
+    old.futures[0].set_result({"answer": "private obsolete answer"})
+    assert kept.get("same") == {"answer": "new"}
+    worker.close()
+
+
+def test_closed_worker_never_keeps_a_late_result():
+    pool = _PoolWithItsOwnLock()
+    worker = KindWorker(lambda: pool)
+    kept = Kept(4)
+    assert worker.run("secret", 0.001, lambda: {}, workspace="w", kept=kept).status == "overran"
+    worker.close()
+    pool.futures[0].set_result({"answer": "private"})
+    assert kept.get("secret") is None
+
+
+def test_erased_receipts_drop_their_caches_and_late_compositions_only(monkeypatch):
+    pool = _PoolWithItsOwnLock()
+    worker = KindWorker(lambda: pool)
+    monkeypatch.setattr(worker_module, "_worker", worker)
+    composer = worker_module.WorkerComposer("ours")
+    erased = "a" * 64
+    other = "b" * 64
+    erased_key = worker_module.drawing_key("ours", erased)
+    other_key = worker_module.drawing_key("ours", other)
+    foreign_key = worker_module.drawing_key("theirs", erased)
+    for key in (erased_key, other_key, foreign_key):
+        worker.drawings.put(key, {"body": key})
+    place = worker_module.place_key("ours", erased, "place:1")
+    worker.places.put(place, {"place": "private"})
+    composer.drawn = (erased_key, {"body": "private late composition"})
+    running_key = worker_module.place_key("ours", erased, "place:2")
+    assert (
+        worker.run(running_key, 0.001, lambda: {}, workspace="ours", kept=worker.places).status
+        == "overran"
+    )
+    worker.forget_receipts("ours", frozenset({erased}))
+    composer.keep()
+    pool.futures[0].set_result({"place": "private late result"})
+    assert worker.drawings.get(erased_key) is None
+    assert worker.places.get(place) is None
+    assert worker.places.get(running_key) is None
+    assert worker.drawings.get(other_key) == {"body": other_key}
+    assert worker.drawings.get(foreign_key) == {"body": foreign_key}
+    worker.close()
+
+
 def test_nothing_is_handed_to_the_pool_while_the_workers_own_lock_is_held() -> None:
     pool = _PoolWithItsOwnLock()
     worker = KindWorker(lambda: pool, waiting=8, per_workspace=8)

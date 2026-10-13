@@ -270,7 +270,9 @@ catalog is answered `unchanged`.
 ```bash
 EXULANICA_DATABASE_URL=<owner URL> EXULANICA_DATA_DIR=.exulanica/local \
   uv run exulanica-character-catalog publish --apply
-``` A database made by `exulanica-local-db` is upgraded only by its `upgrade`
+```
+
+A database made by `exulanica-local-db` is upgraded only by its `upgrade`
 command. Other existing databases, such as a retained reference copy, need a separately reviewed
 backup and activation path rather than an implicit startup upgrade; that procedure is not in this
 repository.
@@ -291,7 +293,8 @@ If `EXULANICA_DATA_DIR` is unset, the store defaults to `.exulanica/local`. It d
 The token above may read and edit the library and the world and nothing else. Each grant lists
 its `permissions` from the closed vocabulary in [security-floor.md](security-floor.md), and a
 grant that lists none stops startup. Add `intake.write` to upload, `model.invoke` to ask a
-question or choose a model for a world's people, and so on.
+question or choose a model for a world's people, `being.act` to play one of a world's beings, and
+so on.
 
 With `NEBIUS_API_KEY` set, the model client also needs the origins it may reach, and how the
 process spends, and startup stops without either:
@@ -420,6 +423,68 @@ development-only, read-only synthetic fixture, not the authenticated backend or 
 acceptance run. Stop the landing server before starting the application on its default port, or use
 the port printed by Vite. There is no single command that starts Exulanica end to end.
 See [capability boundaries](README.md#capability-boundaries) and [product direction](product-direction.md).
+
+### Opt-in world interface previews
+
+The source adapters under [`tools/previews`](../tools/previews/) preserve experimental
+interfaces without replacing the production application's entry point. They use the native
+application and authenticated world reads. Their source transformations refuse changed bootstrap
+seams; they are development tools, not deployment launchers or an approved visual system.
+
+Both launchers require `EXULANICA_REVIEW_RUNTIME_STATE_FILE`, the path to a private JSON descriptor
+with `ports.api` and an absolute `token_file` path. The descriptor and bearer file must stay outside
+Git. Use an existing authorized runtime; the preview never creates replacement worlds. Do not log
+the injected browser environment or raw transformed source, which can contain credentials.
+
+```bash
+EXULANICA_REVIEW_RUNTIME_STATE_FILE=/absolute/private/runtime.json \
+  node tools/previews/world-workspace/serve.mjs
+
+node tools/previews/product-uiux/build-home.mjs
+EXULANICA_REVIEW_RUNTIME_STATE_FILE=/absolute/private/runtime.json \
+  node tools/previews/product-uiux/serve.mjs
+```
+
+The world workspace uses loopback port19974 and an owned `?entry=<entry-id>`. It shows center aiming,
+limited object-relative discovery, proximity-gated Inspect, declared entity data, and separate
+behavior/activity and selected-record Companion flows. Model offers come from the server's role
+catalog; an assigned model does not prove a connected provider or a recorded decision. These
+adapters do not provide whole-world semantic selection, a global Companion, or renderer performance
+acceptance. Their initial6m/7m inspect thresholds are prototype presentation settings.
+
+The product preview uses19972: `/home` serves its rebuildable landing output and `/?workspace=1`
+opens the chooser. Ordinary saved-entry navigation forwards to19974. Native camera previews stay
+on19972 and refuse writes. The tracked capture catalog is empty; live previews use actual saved
+worlds. An optional private `EXULANICA_REVIEW_PREVIEWS_DIRECTORY` can supply a capture catalog and
+images bound to matching entry/version/style/state identities. Keep captures and runtime data
+private. The source adapters have browser/esbuild and focused boundary checks; they are outside the
+production packages' strict TypeScript project graph.
+
+The workspace's isolated observer mode requires an explicitly supplied descriptor for API20031,
+`EXULANICA_REVIEW_PORT=20032` and `EXULANICA_REVIEW_OBSERVER_ONLY=1`. It has a separate cache, permits
+only GET/HEAD on its native API proxy and hides assignment, playback and Companion POST controls.
+The backend must also enforce read-only authorization. This viewer reads stored activity; it does
+not claim its process is a credentialed executor. It does not launch a model pilot.
+
+### Offline entity-model pilot guards
+
+[`tools/prototypes/entity-model-pilot`](../tools/prototypes/entity-model-pilot/) contains opt-in
+guard and cleanup prototypes using the production playback, model-accounting and spending
+interfaces. Run their isolated fake-interface checks explicitly:
+
+```bash
+uv run pytest -q tools/prototypes/entity-model-pilot
+node tools/previews/world-workspace/verify-discovery.mjs
+node tools/previews/world-workspace/verify-observer-requests.mjs
+```
+
+The tests deny real network connections, PostgreSQL connections and service construction. They
+cover identity/scope fencing, bounded one-tick execution, decision/deadline/retry stopping, retained
+accounting, and committed pause/revocation readback. They do not prove an actual copied runtime,
+exclusive execution, live model quality, or a provider invoice ceiling. A live integration still
+requires truthful copied-state/resource readers, an explicit execution allowance, and real
+observer/bootstrap and cleanup preflight. These source files contain no credentials or saved-world
+fixtures and are not an automatic paid launcher.
 
 ## Documentation changes
 

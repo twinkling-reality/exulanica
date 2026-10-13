@@ -13,7 +13,7 @@ A society of things records, in its first input, the modules it runs, by version
 runs exactly those (:func:`recorded_modules`). So a module version stays in this table while any
 stored society names it, and a new version is a new row beside the last: a society made before it
 replays as it was made. A new society records :func:`current_modules`, every built module at its
-newest version.
+newest version; the resident day additionally requires explicit opt-in.
 
 Every lookup goes through :func:`ability_module`, which refuses a module the table does not
 state by name, and :func:`built_module`, which also refuses a row that is not built with the
@@ -36,14 +36,17 @@ __all__ = [
     "BEFORE_RECORDED",
     "CROSSING",
     "CROSSING_NAMING_VISITORS",
+    "DAY",
     "FOLLOW",
     "FOLLOW_KEEPING_NEAR",
+    "FOLLOW_PERSISTENT",
     "HANDS",
     "HANDS_FROM_OWN_SIDE",
     "MODULES_PATH",
     "NOTICE",
     "PURPOSEFUL",
     "PURPOSEFUL_BY_KIND",
+    "PURPOSEFUL_BY_KIND_WEIGHTS",
     "REMEMBER",
     "SAY",
     "AbilityError",
@@ -61,11 +64,14 @@ __all__ = [
 ]
 
 MODULES_PATH: Final = Path(__file__).with_name("ability-modules.v1.json")
+DAY: Final = "exulanica-ability/day/v1"
 TABLE_PROFILE: Final = "exulanica.ability-modules/v1"
 #: The module identities the engine's own code names. Each is a row of the table.
 PURPOSEFUL: Final = "exulanica-ability/purposeful/v1"
 #: The planner's choices gated by kind: a being does only the routine's activities its kind lists.
 PURPOSEFUL_BY_KIND: Final = "exulanica-ability/purposeful/v2"
+#: Autonomous choices read the kind's purposeful weights; explicit choices keep capability gates.
+PURPOSEFUL_BY_KIND_WEIGHTS: Final = "exulanica-ability/purposeful/v3"
 SAY: Final = "exulanica-ability/say/v1"
 CROSSING: Final = "exulanica-ability/crossing/v1"
 #: Crossing whose summaries name a visitor by what it is, from outside, never as simulated.
@@ -77,6 +83,8 @@ FOLLOW: Final = "exulanica-ability/follow/v1"
 #: Following, built: a being keeps near the one it follows, re-planned each minute it has nothing
 #: else under way. The first version was stated and never built, so no society records it.
 FOLLOW_KEEPING_NEAR: Final = "exulanica-ability/follow/v2"
+#: A chosen pursuit continues between decision opportunities without per-minute answers.
+FOLLOW_PERSISTENT: Final = "exulanica-ability/follow/v3"
 NOTICE: Final = "exulanica-ability/notice/v1"
 REMEMBER: Final = "exulanica-ability/remember/v1"
 #: The modules a society of things runs whose first input records none: the ones every society
@@ -285,12 +293,12 @@ def built_module(module: str) -> AbilityModule:
     return found
 
 
-def current_modules() -> tuple[str, ...]:
+def current_modules(*, day: bool = False) -> tuple[str, ...]:
     """What a new society of things records: every built module at its newest built version, in
-    module order."""
+    module order. The resident day needs explicit opt-in and a retained day input."""
     newest: dict[str, AbilityModule] = {}
     for row in ability_modules().values():
-        if row.status != "built":
+        if row.status != "built" or (row.module == DAY and not day):
             continue
         held = newest.get(row.name)
         if held is None or row.version > held.version:

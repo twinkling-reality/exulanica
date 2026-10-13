@@ -21,7 +21,7 @@ import { REQUEST_REFUSALS } from '../words/problems.js';
 
 export type ActionGroup = 'build' | 'people' | 'ask' | 'explore' | 'system';
 /** `companion`: offered only as a step of a Companion plan (`ui/actions/planned.ts`). */
-export type ActionPlacement = 'rail' | 'top-bar' | 'palette' | 'panel:people' | 'panel:objects' | 'companion';
+export type ActionPlacement = 'rail' | 'top-bar' | 'palette' | 'panel:people' | 'panel:objects' | 'companion' | 'card:look';
 
 /** A refusal as a person reads it: what happened, then what to do next. */
 export interface RefusalWords {
@@ -80,6 +80,7 @@ const PEOPLE_ROLE = 'society_decision';
 const MINDS_BUDGET = 'POST /world/versions/{version_id}/models/{role_key}/budget';
 /** A living town's people taking in what was placed after they came. */
 const TAKE_IN = 'POST /world/versions/{version_id}/society/take-in';
+const THING_LOOK = 'POST /world/versions/{version_id}/society/things/{thing_id}/look';
 const THING_MOVE = 'POST /world/versions/{version_id}/things/{thing_id}/move';
 const THING_REMOVE = 'POST /world/versions/{version_id}/things/{thing_id}/remove';
 const PRESENCE = 'POST /world/versions/{version_id}/society/presence';
@@ -88,6 +89,8 @@ const PLAY = 'POST /world/versions/{version_id}/society/play';
 const PLAY_GIVE_BACK = 'POST /world/versions/{version_id}/society/play/{subject_id}/give-back';
 /** Making a town, read from the workspace's creation descriptors (`GET /worlds/capabilities`). */
 const MAKE_GENERATED = 'POST /worlds/generated';
+/** A separately confirmed workspace proposal; its own offer names the spending bound. */
+const DRAFT_WORLD = 'POST /worlds/drafts';
 
 const NOBODY_HERE: RefusalWords = {
   happened: 'Nobody lives in this world yet.',
@@ -469,6 +472,17 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     refusals: THING_REFUSALS,
   },
   {
+    id: 'things.look', label: 'Choose a look', hint: 'Choose an available look made for this body',
+    icon: 'design', group: 'build', placement: ['card:look'], operation: THING_LOOK,
+    spendsNothing: true,
+    refusals: {
+      unavailable_society_input: PEOPLE_UNREAD,
+      look_unfit: { happened: 'That look does not fit this body.', next: 'Choose one of the looks offered on its card.' },
+      look_not_shipped: { happened: 'That look is no longer available.', next: 'Read its card again, then choose another look.' },
+      no_looks_available: { happened: 'This body has no available look to choose.', next: 'Read its card again after a look is admitted.' },
+    },
+  },
+  {
     id: 'things.move', label: 'Move a thing', hint: 'Move a placed thing to where you are pointing',
     icon: 'arrange', group: 'build', placement: ['companion'], operation: THING_MOVE,
     refusals: THING_EDIT_REFUSALS,
@@ -608,7 +622,12 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     icon: 'info', group: 'explore', placement: ['palette'],
   },
   {
-    id: 'world.make', label: 'Create a world', hint: 'Start a new town from a recipe',
+    id: 'world.draft', label: 'Make a world from a sentence',
+    hint: 'Describe a world and have it drafted, after seeing what a draft may spend',
+    icon: 'world', group: 'build', placement: ['companion'], operation: DRAFT_WORLD,
+  },
+  {
+    id: 'world.make', label: 'Create a world', hint: 'Describe the world you want to create',
     icon: 'world', group: 'system', placement: ['palette'], operation: MAKE_GENERATED,
     refusals: {
       world_limit_reached: {

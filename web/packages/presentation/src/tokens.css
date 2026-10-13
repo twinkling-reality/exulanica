@@ -30,12 +30,19 @@
 :root {
   color-scheme: light;
 
+  --ui-font-brand: "IBM Plex Sans", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --ui-font-code: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+
   /* Shared signed-out light plane, matched to the public landing surface. */
-  --ui-light-canvas: #f7f9f7;
+  --ui-light-canvas: #ffffff;
   --ui-light-ink: #121715;
   --ui-light-ink-soft: #35413b;
   --ui-light-ink-faint: #59655f;
   --ui-light-focus: #235c43;
+  --ui-text-compact: 13px;
+  --ui-control-target: 44px;
+  --ui-light-action-hover: #e7efea;
+  --ui-light-action-pressed: color-mix(in srgb, var(--ui-light-ink) 5%, var(--ui-light-action-hover));
 
   --dawn-ground: #dce5df;
   --dawn-field-key: #f1d394;

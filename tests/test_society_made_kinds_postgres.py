@@ -234,15 +234,19 @@ def test_its_card_names_it_as_its_maker_did_with_who_drafted_it_and_who_decides(
             "follow",
             "say",
         ]
-        # Another look is refused by name: it wears its sketch.
+        # Its admitted sketch is a compatible choice, without changing identity or decisions.
         swap = client.post(
             f"{society_route}/things/{being['id']}/look",
             headers=OWNER,
             params=scope,
             json={"look": {"source": "workspace", "sha256": kept.sketch.sha256}},
         )
-        assert swap.status_code in (409, 422), swap.text
-        assert swap.json()["code"] == "look_unfit"
+        assert swap.status_code == 200, swap.text
+        chosen = swap.json()
+        assert chosen["thing_id"] == card["thing_id"]
+        assert chosen["society"] == card["society"]
+        assert chosen["lines"] == card["lines"]
+        assert chosen["look"]["sha256"] == kept.sketch.sha256
 
 
 def test_erasing_the_creature_sends_its_being_away_and_leaves_no_word_of_it_anywhere(

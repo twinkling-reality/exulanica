@@ -69,7 +69,7 @@ treating observations, creations and simulations as the same kind of fact.
 | `companion-runtime` | Turn generation, options, proposal drafting and escapes, with no view layer |
 | `presentation` | Shared tokens, the world-style registry and the Companion's appearance |
 | `formation` | Pipeline stage events and the reducer that turns them into what the page shows |
-| `landing` | The public title, Purpose, Capabilities, Research and Waitlist pages, with no application state |
+| `landing` | The public title, product, use-case, and documentation surfaces, with no application state. Research, journal, roadmap, the blog index, and waitlist are redirects in `web/packages/landing/src/router.ts` |
 | `companion-forms` | A private development surface comparing forms of the Companion |
 | `loom-tess` | One tessellator, built for the server's tile bake and for an edit-time preview |
 | `loom-texture` | Offline, seeded texture sets |
@@ -109,11 +109,11 @@ The contract in `pyproject.toml` owns the exact order.
 
 | Responsibility | Entry points |
 | --- | --- |
-| Society engines, chosen by what each can do | `exulanica/world/society_engines.py`, reading the engine table [`society-engines.v3.json`](../exulanica/world/society-engines.v3.json); the purposeful planner `exulanica/world/society_planner.py` |
-| The ground a society stands on | [`society-ground.v2.json`](../assets/catalogs/society-ground/society-ground.v2.json), read by `exulanica/world/society_grounds.py` |
+| Society engines, chosen by what each can do | `exulanica/world/society_engines.py`, which loads the newest `society-engines.vN.json` beside that module; the purposeful planner `exulanica/world/society_planner.py` |
+| The ground a society stands on | `exulanica/world/society_grounds.py`, catalog version 6, [`society-ground.v6.json`](../assets/catalogs/society-ground/society-ground.v6.json) |
 | Composing and serving a society | `exulanica/api/society_runtime.py` and the routes in `exulanica/api/routes/society.py` |
 | Playback | `exulanica/api/society_control_worker.py` |
-| Decision roles | The registry [`decision-roles.v4.json`](../assets/catalogs/roles/decision-roles.v4.json), `exulanica/world/decision_roles.py`, one adapter per role in `exulanica/world/roles/`, the one path in `exulanica/world/role_decisions.py`, the decider descriptor `exulanica/world/deciders.py`, an outside program's port `exulanica/api/external_asking.py`, the decision tables of migrations `0117_a_decision_role_s_documents_are_admitted_by_their_shape.sql` and `0122_a_model_may_decide_a_town_s_signal.sql`, and each role's host in `exulanica/api/role_hosts.py`, served by `exulanica/api/routes/world_models.py` |
+| Decision roles | The newest `decision-roles.vN.json` under [`assets/catalogs/roles`](../assets/catalogs/roles), loaded by `exulanica/world/decision_roles.py`, one adapter per role in `exulanica/world/roles/`, the one path in `exulanica/world/role_decisions.py`, the decider descriptor `exulanica/world/deciders.py`, an outside program's port `exulanica/api/external_asking.py`, the decision tables of migrations `0117_a_decision_role_s_documents_are_admitted_by_their_shape.sql` and `0122_a_model_may_decide_a_town_s_signal.sql`, and each role's host in `exulanica/api/role_hosts.py`, served by `exulanica/api/routes/world_models.py` |
 | Asking the chosen models | `exulanica/api/decision_host.py` and `exulanica/api/society_person_decisions.py` for people; `exulanica/api/traffic_signal_controller.py` for signals |
 | Comparisons of models | The loop `exulanica/world/society_comparison.py`, the runner `exulanica/api/society_comparison_runner.py`, the one definition path `exulanica/api/society_comparison_start.py`, each verified run's stored drawing `exulanica/world/society_comparison_drawing.py` (migration 0121), the start's claim and lease `exulanica/world/society_comparison_start_repository.py` played by `exulanica/api/society_comparison_worker.py`, the command `exulanica/orchestration/compare.py` and the Compare view `web/packages/app/src/ui/society-comparison.ts` with its start controls `society-comparison-start.ts` |
 | Movement | The registry `exulanica/movement/registry.py`, reading [`movement-modules.v1.json`](../exulanica/movement/movement-modules.v1.json), with `walking.py` and `flight.py` beside it |

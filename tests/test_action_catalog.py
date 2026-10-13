@@ -86,7 +86,7 @@ def test_every_action_the_page_sends_by_a_route_is_an_entry_with_the_same_words_
     registry = _registry()
     routed = {ident: entry for ident, entry in registry.items() if entry["route"] is not None}
     # Counted from the page's own file, so a registry that changes shape fails here by name.
-    assert len(registry) == 37 and len(routed) == 23
+    assert len(registry) == 39 and len(routed) == 25
     offered = {action.id: action for action in action_catalog.offered()}
     assert set(offered) == set(routed)
     for ident, entry in routed.items():
@@ -100,7 +100,6 @@ def test_an_id_that_is_not_offered_is_reserved_and_names_no_way_to_run():
     held_back = {a.id: a for a in action_catalog.actions() if a.status != action_catalog.OFFERED}
     assert set(held_back) == {
         "creatures.make",
-        "world.draft",
         "world.observe",
         "beings.answer",
         "world.leave",
@@ -132,8 +131,13 @@ def test_the_plan_word_of_each_action_is_the_one_the_page_sends_it_as():
         if action.plan_word is not None
     }
     assert stated == sent_as
-    # Every routed action but making a world can be planned.
-    assert [a.id for a in action_catalog.offered() if a.plan_word is None] == ["world.make"]
+    # The card's existing look chooser is direct, scoped and free. It has no invented
+    # Companion word; a selection uses the authoritative native look route.
+    direct = {a.id: a for a in action_catalog.offered() if a.plan_word is None}
+    assert set(direct) == {"world.make", "things.look"}
+    assert all(not action.spends_or_destroys for action in direct.values())
+    assert direct["things.look"].subjects == ("being", "thing")
+    assert _registry()["things.look"]["route"] == direct["things.look"].route
 
 
 # -- the catalog against the planner -------------------------------------------------------------
@@ -157,12 +161,22 @@ def test_each_plan_word_is_the_planner_s_and_commits_by_the_action_s_route():
         words.add(word)
         if word in edits:
             assert edits[word] == action.route, action.id
+        elif action.id == "world.draft":
+            from exulanica.selection.world_draft_plan import OPERATION
+
+            assert (word, action.route, action.spend_read) == (
+                "draft_world",
+                OPERATION,
+                "GET /worlds/drafts",
+            )
         else:
             assert word in simulation and action.route in simulation_routes, action.id
     # Every word the planner can draft as a step is some action's, but ``other``, which is the
     # planner saying it cannot express a request; the page's table holds two words more, for an
     # appearance, which is another kind of plan and is sent as no action.
-    planner = {operation.value for operation in plan.WorldEditOperation} | simulation
+    planner = (
+        {operation.value for operation in plan.WorldEditOperation} | simulation | {"draft_world"}
+    )
     assert planner - words == {"other"}
     assert set(_plan_words()) - planner == NEVER_SENT - {"other"}
     assert {word for word, ident in _plan_words().items() if ident is None} == NEVER_SENT
@@ -190,7 +204,7 @@ def test_an_action_costs_the_one_who_acts_exactly_where_its_route_asks_a_model()
         assert (action.cost_class != "none") == (asks and not narrowed), action.id
         if action.cost_class != "none":
             spending.add(action.id)
-    assert spending == {"pieces.request", "minds.choose"}
+    assert spending == {"pieces.request", "minds.choose", "world.draft"}
 
 
 def test_everything_that_spends_or_destroys_runs_as_a_plan_step_under_a_yes():
@@ -198,6 +212,7 @@ def test_everything_that_spends_or_destroys_runs_as_a_plan_step_under_a_yes():
     assert set(touched) == {
         "pieces.request",
         "minds.choose",
+        "world.draft",
         "objects.undo",
         "objects.remove",
         "things.remove",
@@ -301,7 +316,9 @@ def test_an_action_is_served_with_its_route_s_permissions_and_its_operation_s_st
     ]
     held = frozenset({Permission.WORLD_WRITE})
     served = {action["id"]: action for action in capabilities._actions(operations, held)}
-    assert list(served) == [action.id for action in action_catalog.offered()]
+    assert list(served) == [
+        action.id for action in action_catalog.offered() if action.subjects != ("workspace",)
+    ]
 
     # One route performs three actions: each is served with that route's state.
     for ident in ("clock.play", "clock.pause", "clock.speed"):
@@ -322,11 +339,24 @@ def test_an_action_is_served_with_its_route_s_permissions_and_its_operation_s_st
     }
     assert mind["cost_class"] == "model_calls"
     # An action no operation of the version projects says so and states no state: its route's
-    # permissions are still its own.
+    # permissions are still its own. Acting as a being has a permission of its own beside the
+    # read of the world, so this caller, who edits the world and holds neither, is not permitted
+    # it.
     play = served["beings.play"]
     assert (play["projected"], play["state"], play["code"]) == (False, None, None)
-    assert play["requires"] == ["world.write"] and play["permitted"] is True
-    # Nothing of a reserved id is served.
+    assert play["requires"] == ["being.act", "world.read"] and play["permitted"] is False
+    # A caller who reads the world and may act as a being is permitted both acts of a play the
+    # catalog offers, by that same typed list, and nothing that edits the world.
+    player = frozenset({Permission.WORLD_READ, Permission.BEING_ACT})
+    played = {action["id"]: action for action in capabilities._actions(operations, player)}
+    for ident in ("beings.play", "beings.give-back"):
+        assert played[ident]["requires"] == ["being.act", "world.read"], ident
+        assert played[ident]["permitted"] is True, ident
+    assert sorted(ident for ident, action in played.items() if action["permitted"]) == [
+        "beings.give-back",
+        "beings.play",
+    ]
+    # Workspace drafting has its own read/plan surface and is not a world-version action.
     assert not {"world.leave", "world.report", "world.draft", "beings.answer"} & set(served)
     # A caller holding nothing is permitted nothing.
     assert not any(action["permitted"] for action in capabilities._actions(operations, frozenset()))

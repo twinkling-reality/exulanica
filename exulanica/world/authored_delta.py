@@ -190,4 +190,6 @@ def _compose(sections: Mapping[str, Sequence[Any]]) -> dict[str, Any]:
         document[section.key] = [
             section.document(value) for value in sorted(values, key=section.sort_key)
         ]
+    if any(thing.support is not None for thing in sections["things"]):
+        document["schema_version"] = 5
     return document

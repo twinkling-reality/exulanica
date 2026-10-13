@@ -1,0 +1,37 @@
+{
+  "origin": "original authored geometry",
+  "asset_license": "CC0-1.0",
+  "writer": "exulanica-body-surfaces/v1",
+  "authoring_tool": "scripts/things/author_surfaces.py",
+  "body_builder": "exulanica-body-builder/v1",
+  "model_outputs": [],
+  "model_receipts": [],
+  "external_asset_sources": [],
+  "variants": [
+    "porcelain-v3",
+    "celadon-v3",
+    "jade-look-v1"
+  ],
+  "motion": "existing per-role presentation; each supplied kind is stationary and has only wait/say",
+  "files": {
+    "LICENSE.txt": "d5f541c152bb95234def1fa7e2a5e10cf905e6e26da407dd65372d198b17ef5f",
+    "authoring.json": "75281f750e0fc5acbfb27bb28f5cf0ed26e7e2abbf816b76bea9018ce57a82e4",
+    "celadon-v3/body.glb": "3765c9fb750815a05701f0019912c568c50d46c55eb276bb3c2ea57c82170c59",
+    "celadon-v3/kind.json": "9b49c1b274c69659668ff09f8512933a554db1ee5f1227ad1c8ee6f5f33a8f80",
+    "celadon-v3/look.json": "f29720d1f761e08f049d307ba0328f4199e751c1e76b7a837c561f20205a0d2a",
+    "celadon-v3/plan.json": "a3fe173c448ecfbfc45e7d745d8ae4a718f83722e115d8d2dd77eb5b6dfe5b13",
+    "celadon-v3/receipt.json": "2f861a369fa37f3937fe69d800a9673b8f529d744ff47e38baac4da28c37b183",
+    "celadon-v3/recipe.json": "67be44e10bc157e15ee609ba19440e650849f6ba100b4ffb912b4d9fb2f4ece6",
+    "jade-authoring.json": "4c769a079f9bd2becae8d479704f2346dc039cf1efd6c389e22881c56bf6289e",
+    "jade-look-v1/body.glb": "bbc0804646e1eb426fbbaf9bf338e61a365b2f065a0ec04dafdb7e431838d64b",
+    "jade-look-v1/look.json": "db84eb6ad74d149324075939402384743fdabae7d1c8c5f6d73a68fb1659ef62",
+    "jade-look-v1/receipt.json": "dece48cbe341035165ddb890840433116ac9d7ea67f2af40495b2ff7ec29f30e",
+    "porcelain-v3/body.glb": "2689b8f6957220d05704e23d59e07e37d5718ff6773e37bfc8f34e1c33165ce3",
+    "porcelain-v3/kind.json": "4619a2efcaa0911939b790dc2ea998a114cce1583c51dbe44753187213d60205",
+    "porcelain-v3/look.json": "d7a8d5a47f508ece356d4549e53376195c7c68f35d66b7f3f26f4423a7e5dbfe",
+    "porcelain-v3/plan.json": "56f1831881bf7347db3e31a26ba63e8885f77726850542d929d25d840081d732",
+    "porcelain-v3/receipt.json": "6ecf707bb8c0c74af3693d3febec1ed046e9b5a27d93d86ceda9c4ab2ef5b59c",
+    "porcelain-v3/recipe.json": "b7785c5618e99d27d4251ecc7030d988abfdea898c9b896b09b6dd0eb5a3a38b",
+    "variant-authoring.json": "6c1f640e3f7102fba7b12d4c644e7e19f64f590d1a13da87dfc3f52eb18655ec"
+  }
+}

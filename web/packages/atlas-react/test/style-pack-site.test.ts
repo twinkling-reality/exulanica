@@ -17,7 +17,7 @@ import {
   borderReachMm, readGroundBorders, readSiteInterior, readSiteScenery, readStylePackManifest, readSurfaceMaterials, readSurfacePatterns, resolveStylePack, sceneryBeyond,
   type GroundBorders, type LookFamily, type ResolvedStylePack, type SiteInteriorCatalog, type SiteSceneryCatalog, type StylePackFile, type SurfaceMaterials, type SurfacePatterns,
 } from '@exulanica/atlas-core';
-import { baseGroundSlot, ceilingRests, parseSiteDrawing, sceneryOf, siteMount, siteNavigationWorld, type SiteDrawing } from '../src/playcanvas/generated-site/index.js';
+import { baseGroundSlot, ceilingRests, parseStructuredSiteDrawing, sceneryOf, siteMount, siteNavigationWorld, type StructuredSiteDrawing } from '../src/playcanvas/generated-site/index.js';
 import type { RenderShading } from '../src/playcanvas/generated-tile/look.js';
 import { fetchPackPieces, packSiteDresser, type FetchedPieces, type SiteDressingSummary } from '../src/playcanvas/style-pack/index.js';
 import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
@@ -136,7 +136,7 @@ function slot(identity: string, lookRole: string, primitive: string, position: n
 }
 
 /** A yard: tilled ground, a shed of brick with a plank door and a thatched roof, a fence, a bench, a farmer and a barn only a pack fills. */
-const drawing: SiteDrawing = parseSiteDrawing({
+const drawing: StructuredSiteDrawing = parseStructuredSiteDrawing({
   profile: 'exulanica.site-drawing/v1',
   world_id: 'world-1',
   receipt_sha256: 'a'.repeat(64),
@@ -175,7 +175,7 @@ function nullApp(): { app: pc.AppBase; camera: pc.Entity; environmentRoot: pc.En
 }
 
 async function dressedSite(
-  shading: RenderShading, materials?: SurfaceMaterials, site: SiteDrawing = drawing, patterns?: SurfacePatterns,
+  shading: RenderShading, materials?: SurfaceMaterials, site: StructuredSiteDrawing = drawing, patterns?: SurfacePatterns,
   beyondIt: { readonly scenery?: SiteSceneryCatalog; readonly plant?: boolean; readonly interior?: SiteInteriorCatalog; readonly borders?: GroundBorders } = {},
 ) {
   const pack = sitePack(beyondIt.plant === true);
@@ -200,19 +200,20 @@ async function dressedSite(
 describe('a site dressed in a pack that carries the surface material catalog', () => {
   it('draws a leaf the pack does not state in its material, not the family default, and says what it read', async () => {
     const site = await dressedSite(PBR, MATERIALS);
-    // Tilled soil, a thatched roof and a brick wall whose texture set a site cannot hold: each its own material.
+    // Unstated soil and thatch take their material; a stated texture that was not prepared stays unavailable.
     expect(site.shape('ground').material.name).toBe('style-pack:material:ground.soil');
     expect(site.rgb(site.shape('ground').material)).toEqual(colourOf('soil'));
     expect(site.shape('shed:roof').material.name).toBe('style-pack:material:roof.thatch');
     expect(site.rgb(site.shape('shed:roof').material)).toEqual(colourOf('thatch'));
-    expect(site.shape('shed:wall:0').material.name).toBe('style-pack:material:wall.brick');
+    expect(site.shape('shed:wall:0').material.name).toBe('generated-tile-unavailable');
+    expect(site.attachment.metrics.unavailableSurfaces).toBe(1);
     // The pieces stand as before: a leaf's material never takes a slot a piece fills.
     expect((site.root.findByName('fence') as pc.Entity).enabled).toBe(false);
-    expect(site.summaries).toEqual([{ surfaces: 0, materials: 3, unknownLooks: ['boundary.picket'], patterned: 0, pieces: 2, placed: 4, undressed: 2, inkSegments: 0, sceneryPieces: 0, bordered: 0, borderNeighboursLeftOut: 0 }]);
+    expect(site.summaries).toEqual([{ surfaces: 1, materials: 2, unknownLooks: ['boundary.picket'], patterned: 0, pieces: 2, placed: 4, undressed: 2, inkSegments: 0, sceneryPieces: 0, bordered: 0, borderNeighboursLeftOut: 0 }]);
     // The ground beyond the site wears the very material the dressed ground wears: soil to the horizon.
     expect(site.beyond()).toBe(site.shape('ground').material);
     expect(site.beyond().name).toBe('style-pack:material:ground.soil');
-    expect(site.canvas.dataset['siteMaterials']).toBe('3');
+    expect(site.canvas.dataset['siteMaterials']).toBe('2');
     expect(JSON.parse(site.canvas.dataset['siteUnknownLooks']!)).toEqual(['boundary.picket']);
     site.attachment.dispose();
     expect('siteMaterials' in site.canvas.dataset || 'siteUnknownLooks' in site.canvas.dataset).toBe(false);
@@ -229,7 +230,7 @@ describe('a site dressed in a pack that carries the surface material catalog', (
   });
 
   it('gives a leaf that names no material its family default as before, and counts its words', async () => {
-    const yard = parseSiteDrawing({
+    const yard = parseStructuredSiteDrawing({
       profile: 'exulanica.site-drawing/v1', world_id: 'world-1', receipt_sha256: 'a'.repeat(64),
       kind: { kind: 'fixture_yard', version: 1, label: 'Yard' },
       extent: { widthMm: 12_000, depthMm: 12_000, enclosure: 'open' },
@@ -255,7 +256,7 @@ describe('a site dressed in a pack that carries the surface material catalog', (
 });
 
 describe('a site dressed in a pack that carries the surface patterns', () => {
-  const yard = parseSiteDrawing({
+  const yard = parseStructuredSiteDrawing({
     profile: 'exulanica.site-drawing/v1', world_id: 'world-1', receipt_sha256: 'a'.repeat(64),
     kind: { kind: 'fixture_yard', version: 1, label: 'Yard' },
     extent: { widthMm: 12_000, depthMm: 12_000, enclosure: 'open' },
@@ -325,9 +326,10 @@ describe('a site dressed in a pack', () => {
     site.attachment.dispose();
   });
 
-  it('dresses a leaf the pack gives a texture set as its family default, a site holding no texture images', async () => {
+  it('shows the unavailable surface when a named texture set was not prepared', async () => {
     const site = await dressedSite(PBR);
-    expect(site.shape('shed:wall:0').material.name).toBe('style-pack:surface:wall.default');
+    expect(site.shape('shed:wall:0').material.name).toBe('generated-tile-unavailable');
+    expect(site.attachment.metrics.unavailableSurfaces).toBe(1);
     site.attachment.dispose();
   });
 
@@ -392,7 +394,7 @@ describe('a site dressed in a pack', () => {
 });
 
 /** A place of one ground over its whole extent and one wall, in the served shape: 40 m by 30 m. */
-const placeOn = (ground: string, enclosure: 'open' | 'indoor' = 'open'): SiteDrawing => parseSiteDrawing({
+const placeOn = (ground: string, enclosure: 'open' | 'indoor' = 'open'): StructuredSiteDrawing => parseStructuredSiteDrawing({
   profile: 'exulanica.site-drawing/v1',
   world_id: 'world:generated:beyond',
   receipt_sha256: 'a'.repeat(64),
@@ -602,7 +604,7 @@ describe('the inside of an indoor made place', () => {
   });
 
   it('lies on the tallest box the place draws, whatever it is, the first of those as tall', () => {
-    const market = parseSiteDrawing({
+    const market = parseStructuredSiteDrawing({
       profile: 'exulanica.site-drawing/v1', world_id: 'world:generated:market', receipt_sha256: 'a'.repeat(64),
       kind: { kind: 'fixture_market', version: 1, label: 'Market' },
       extent: { widthMm: 20_000, depthMm: 16_000, enclosure: 'indoor' },
@@ -622,7 +624,7 @@ describe('the inside of an indoor made place', () => {
     });
     expect(ceilingRests(market)?.identity).toBe('hall:wall:0');
     // A place that draws no box has nothing for a ceiling to lie on.
-    expect(ceilingRests(parseSiteDrawing({
+    expect(ceilingRests(parseStructuredSiteDrawing({
       profile: 'exulanica.site-drawing/v1', world_id: 'world:generated:bare', receipt_sha256: 'a'.repeat(64),
       kind: { kind: 'fixture_bare', version: 1, label: 'Bare' },
       extent: { widthMm: 10_000, depthMm: 10_000, enclosure: 'indoor' },
@@ -656,7 +658,7 @@ describe('the borders between a made place\'s grounds', () => {
   // path up the middle over both (laid turned a quarter), a lake in the shore, a tent's floor.
   // With `lane`, a lane whose leaf names no material lies under the clearing's corner: a ruled ground
   // no pack dresses, which gives way to the grass over it.
-  const camp = (enclosure: 'open' | 'indoor' = 'open', lane = false): SiteDrawing => parseSiteDrawing({
+  const camp = (enclosure: 'open' | 'indoor' = 'open', lane = false): StructuredSiteDrawing => parseStructuredSiteDrawing({
     profile: 'exulanica.site-drawing/v1', world_id: 'world:generated:camp', receipt_sha256: 'a'.repeat(64),
     kind: { kind: 'fixture_camp', version: 1, label: 'Camp' },
     extent: { widthMm: 40_000, depthMm: 30_000, enclosure },
@@ -862,7 +864,7 @@ describe('the borders between a made place\'s grounds', () => {
 
   it('says how many neighbours were left out of a ground that has more than its working carries', async () => {
     // A field with six tracks across it: four are worked against, two are counted.
-    const field = parseSiteDrawing({
+    const field = parseStructuredSiteDrawing({
       profile: 'exulanica.site-drawing/v1', world_id: 'world:generated:field', receipt_sha256: 'a'.repeat(64),
       kind: { kind: 'fixture_field', version: 1, label: 'Field' },
       extent: { widthMm: 60_000, depthMm: 30_000, enclosure: 'open' },
@@ -929,3 +931,13 @@ describe('the borders between a made place\'s grounds', () => {
     off.attachment.dispose();
   });
 });
+
+ it('keeps canonical elevated support top planes at their exact declared rectangle', async () => {
+  const fixture=JSON.parse(readFileSync('packages/atlas-react/test/fixtures/site-support.v2.json','utf8'));
+  const drawing=parseStructuredSiteDrawing(fixture.drawing);
+  const site=await dressedSite(PBR,MATERIALS,drawing,PATTERNS,{borders:BORDERS});
+  const plane=drawing.slots.find(s=>s.part==='walking_support')!;
+  const node=site.shape(plane.identity).node;
+  expect(node.getLocalScale().x).toBe(2);expect(node.getLocalScale().z).toBe(2);
+  site.attachment.dispose();site.app.destroy();
+ });

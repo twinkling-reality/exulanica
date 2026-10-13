@@ -1,7 +1,7 @@
 """The reference bundle: the notes one drafter receives, and where each came from.
 
-Profile ``exulanica.reference-bundle/v1``, a canonical JSON document named by the sha256 of its
-bytes. It is drafting input, never world content and never a claim about the real world:
+Profiles ``exulanica.reference-bundle/v1`` and ``v2`` are canonical JSON documents named by
+the sha256 of their bytes. They are drafting input, never world content or claims about reality:
 
 * ``notes``: at most :data:`MAX_NOTES`, each one line about one aspect, with its basis:
   ``web_description`` (drafted by a model from a web source's words, which are not kept) or
@@ -40,6 +40,8 @@ __all__ = [
     "MISSED_STEPS",
     "PROFILE",
     "PURPOSES",
+    "THINGS_PICTURE_PROFILE",
+    "THINGS_PROFILE",
     "BundleCall",
     "BundleError",
     "BundleNote",
@@ -49,7 +51,9 @@ __all__ = [
 ]
 
 PROFILE: Final = "exulanica.reference-bundle/v1"
-#: Which drafter a bundle serves. ``things`` is named for the thing-kind drafter to come.
+THINGS_PROFILE: Final = "exulanica.reference-bundle/v2"
+THINGS_PICTURE_PROFILE: Final = "exulanica.reference-bundle/v3"
+#: Which drafter a bundle serves. The v2 vocabulary is limited to ``things``.
 PURPOSES: Final = ("world_draft", "kind", "look", "pieces", "things")
 BASES: Final = ("web_description", "own_picture")
 #: Steps a partial bundle may name as not finished.
@@ -129,14 +133,15 @@ class ReferenceBundle:
     model_calls: tuple[BundleCall, ...]
     outcome: str
     missed: tuple[str, ...]
+    profile: str = PROFILE
 
     def __post_init__(self) -> None:
         # Every bundle, however it was built, is one read_bundle would accept.
-        _parts(self.document(), load_reference_catalogs())
+        _parts(self.document(), None)
 
     def document(self) -> dict[str, Any]:
         return {
-            "profile": PROFILE,
+            "profile": self.profile,
             "purpose": self.purpose,
             "workspace_id": str(self.workspace_id),
             "world_id": None if self.world_id is None else str(self.world_id),
@@ -255,15 +260,18 @@ def _call(where: str, value: object) -> BundleCall:
 
 def read_bundle(document: object, *, catalogs: ReferenceCatalogs | None = None) -> ReferenceBundle:
     """``document`` as a reference bundle, or :class:`BundleError` naming where it fails."""
-    return ReferenceBundle(
-        **_parts(document, catalogs if catalogs is not None else load_reference_catalogs())
-    )
+    return ReferenceBundle(**_parts(document, catalogs))
 
 
-def _parts(document: object, catalogs: ReferenceCatalogs) -> dict[str, Any]:
+def _parts(document: object, catalogs: ReferenceCatalogs | None) -> dict[str, Any]:
     raw = _object("the bundle", document, _KEYS)
-    if raw["profile"] != PROFILE:
-        raise BundleError(f"the bundle's profile is {PROFILE}")
+    profile = _choice("profile", raw["profile"], (PROFILE, THINGS_PROFILE, THINGS_PICTURE_PROFILE))
+    if profile in (THINGS_PROFILE, THINGS_PICTURE_PROFILE) and raw["purpose"] != "things":
+        raise BundleError("a things reference bundle serves things")
+    catalogs = catalogs or load_reference_catalogs(
+        aspect_version=2 if profile in (THINGS_PROFILE, THINGS_PICTURE_PROFILE) else 1,
+        picture_version=2 if profile == THINGS_PICTURE_PROFILE else 1,
+    )
     try:
         canonical_json(dict(raw))
     except Exception as error:  # a float, or any other value canonical JSON refuses
@@ -305,6 +313,12 @@ def _parts(document: object, catalogs: ReferenceCatalogs) -> dict[str, Any]:
                 f"{where}.text is one line of at most {MAX_NOTE_CHARACTERS} characters"
             )
         basis = _choice(f"{where}.basis", note["basis"], BASES)
+        if (
+            profile in (THINGS_PROFILE, THINGS_PICTURE_PROFILE)
+            and basis == "own_picture"
+            and aspect not in catalogs.picture_aspects
+        ):
+            raise BundleError(f"{where}: this aspect is not open to pictures")
         picture_id = (
             None if note["picture_id"] is None else _uuid(f"{where}.picture_id", note["picture_id"])
         )
@@ -322,6 +336,7 @@ def _parts(document: object, catalogs: ReferenceCatalogs) -> dict[str, Any]:
         raise BundleError("exactly a partial bundle names the steps it missed, each once")
     world = raw["world_id"]
     return dict(
+        profile=profile,
         purpose=_choice("purpose", raw["purpose"], PURPOSES),
         workspace_id=_uuid("workspace_id", raw["workspace_id"]),
         world_id=None if world is None else _uuid("world_id", world),

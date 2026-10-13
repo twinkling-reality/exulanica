@@ -123,8 +123,14 @@ export interface SocietyInhabitantSnapshot {
     readonly input_sha256: string;
   };
   readonly motion_path_mm?: readonly (readonly [number, number])[];
-  /** v4: inside premises. Interiors are not drawn; the person is counted, not placed. */
+  /** Living engine's legacy location flag, which may also mark a stay at an outdoor workplace. */
   readonly indoors?: boolean;
+  /**
+   * The current location's destination and physical enclosure from the same consumed input.
+   * When stated, this overrides the legacy indoor flag, including an explicitly outdoor stay.
+   * A goal's intended destination does not establish the person's current location.
+   */
+  readonly location_destination?: { readonly id: string; readonly indoors: boolean };
   /** v4: this inhabitant's own walking budget per simulated minute. */
   readonly walk_speed_mm_per_tick?: number;
   /**

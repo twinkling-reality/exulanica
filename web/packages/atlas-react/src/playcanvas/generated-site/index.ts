@@ -9,13 +9,15 @@
 
 export type {
   SiteDrawing,
+  StructuredSiteDrawing,
+  TerrainSiteDrawing,
   SiteFit,
   SitePrimitive,
   SiteRectMm,
   SiteSlot,
   SiteUvFrame,
 } from './site-drawing.js';
-export { SITE_DRAWING_PROFILE, SiteDrawingError, parseSiteDrawing } from './site-drawing.js';
+export { SITE_DRAWING_PROFILE, SITE_DRAWING_TERRAIN_PROFILE, SITE_DRAWING_DRESSED_TERRAIN_PROFILE, isTerrainSiteDrawing, SiteDrawingError, parseSiteDrawing, parseStructuredSiteDrawing } from './site-drawing.js';
 export { SITE_WALKER_RADIUS_M, siteNavigationWorld, siteStart, siteSurface } from './site-navigation.js';
 export type { DrawnSiteSlots } from './site-primitives.js';
 export { drawSiteSlots, slotColour } from './site-primitives.js';
@@ -27,3 +29,6 @@ export { SITE_CEILING, ceilingRests, drawSiteCeiling, lightFromAbove } from './s
 export type { DrawnScenery } from './site-scenery.js';
 export { SCENERY_STONES, SCENERY_TREES, drawSiteScenery, sceneryOf } from './site-scenery.js';
 export { SITE_BEYOND_DROP_M, baseGroundSlot, siteMount } from './site-mount.js';
+
+export {readTerrainDressing, prepareTerrainDressing, createDressingReadiness} from './terrain-dressing.js';
+export type {PreparedDressing, TerrainDressing, TerrainDressingInstance} from './terrain-dressing.js';

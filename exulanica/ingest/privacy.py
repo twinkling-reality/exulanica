@@ -420,24 +420,15 @@ def record_human_screening(
         for region in sensitive_regions
         if not isinstance(region, dict) or region.get("state") not in _REGION_STATES
     ]
-    # A region in a masked state used to block outright, and the comment here recorded why and
-    # what would end it: "the masking stages are not yet wired into the pipeline, so nothing
-    # anywhere would actually hide this person before depth read them", and "when masking is wired
-    # end to end this becomes eligible if every masked region has a current masked_source
-    # derivative, which is the whole point of the design".
+    # DECIDED 2026-09-07. A masked region blocks unless this photograph has a masked_source
+    # derivative under the key the current regions and consents produce, so a mask built before
+    # somebody changed their mind does not count. An outright block on any masked region made an
+    # eligible screening unreachable: a photograph containing somebody who has not consented
+    # could obtain none, so the only screenings that could be written were empty region lists,
+    # the statement "there is nobody here" that this layer exists to retire.
     #
-    # DECIDED 2026-09-07: masking is wired end to end, so this is that rule. The conservative
-    # version had stopped protecting anybody and started making the feature unreachable: a
-    # photograph containing somebody who has not consented could obtain no eligible screening at
-    # all, so the only screenings production could write were empty region lists, which is the
-    # statement "there is nobody here" that this whole layer exists to retire.
-    #
-    # What replaces it is not weaker, it is checkable. A masked region blocks unless this
-    # photograph has a masked_source derivative under the key TODAY's regions and consents
-    # produce, so a mask built before somebody changed their mind does not count. `unknown` still
-    # masks and is still the important member of the set: somebody was seen and nobody decided,
-    # and "nobody decided" is the case default deny exists for. It now means "mask them", not
-    # "refuse the photograph".
+    # `unknown` masks. Somebody was seen and nobody decided, and "nobody decided" is the case
+    # default deny exists for. It means "mask them", not "refuse the photograph".
     #
     # Two things behind this that are not this function's to enforce, and are enforced anyway.
     # Migration 0037's tg_geometry_reads_the_masked_derivative refuses a point map that does not

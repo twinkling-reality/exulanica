@@ -14,3 +14,6 @@ export type { PackVehicleBodies } from './vehicle-bodies.js';
 export { VEHICLE_BODY_SWATCH, packVehicleBodies } from './vehicle-bodies.js';
 export type { SiteDressingSummary, SitePackDressing } from './site-dresser.js';
 export { packSiteDresser } from './site-dresser.js';
+
+export { SiteTextures, siteSurfaceMm, siteTextureMesh } from './site-textures.js';
+export type { SiteTextureMetrics } from './site-textures.js';

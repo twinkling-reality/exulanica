@@ -286,6 +286,27 @@ class AccountWorkspaceSource:
         except psycopg.Error as exc:
             raise AccountWorkspaceUnavailable("account workspace discovery is unavailable") from exc
 
+    def recovery_candidates(self) -> frozenset[uuid.UUID]:
+        """Workspace IDs for content-free obligation recovery, including revoked accounts.
+
+        This is not runtime authority. Consumers must restrict these candidates to already
+        erased obligations and must never resume ordinary work from this enumeration.
+        """
+        try:
+            with psycopg.connect(
+                self.account_database_url,
+                autocommit=True,
+                row_factory=dict_row,
+                connect_timeout=_DATABASE_TIMEOUT_SECONDS,
+            ) as connection:
+                _prepare(connection)
+                rows = connection.execute(
+                    "select workspace_id from account_workspace order by workspace_id"
+                ).fetchall()
+                return frozenset(row["workspace_id"] for row in rows)
+        except psycopg.Error as exc:
+            raise AccountWorkspaceUnavailable("account recovery discovery is unavailable") from exc
+
     def recent(self, guest_seconds: int) -> frozenset[uuid.UUID]:
         """Every active owner's workspace and every guest's seen within ``guest_seconds``, on a
         fresh account-role connection: the workspaces whose people are there."""

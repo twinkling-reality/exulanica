@@ -10,6 +10,7 @@ import {
   WORLD_LOOKS,
   addressedWorldLook,
   listedDefault,
+  listedWorkspaceStylePacks,
   listedSettings,
   listedVersion,
   prepareWorldLook,
@@ -110,7 +111,7 @@ describe('the look a generated world opens in', () => {
     const base = { packId: 'exulanica.cozy-town', version: 3, manifestSha256: 'b'.repeat(64) };
     const own = { packId: 'generated.cozy-town', version: 2, manifestSha256: 'c'.repeat(64) };
     expect(worldLookChoice('', { ...own, own: { base, wearable: true } }))
-      .toEqual({ packId: 'generated.cozy-town', manifestSha256: 'c'.repeat(64), source: 'world', ownBase: base });
+      .toEqual({ packId: 'generated.cozy-town', manifestSha256: 'c'.repeat(64), source: 'world', own: true, ownBase: base });
     expect(worldLookChoice('', { ...own, own: { base, wearable: false } }))
       .toEqual({ packId: 'exulanica.cozy-town', manifestSha256: 'b'.repeat(64), source: 'world' });
     expect(worldLookChoice('', { ...own, own: { base: null, wearable: false } }))
@@ -491,3 +492,58 @@ describe('the named parts a host lists for a setting', () => {
     expect(await listedSettings(ACCESS)).toBeNull();
   });
 });
+
+describe('standalone workspace appearance authority', () => {
+  const folder = '../assets/style-packs/kits/original.tide-garden';
+  const manifest = JSON.parse(readFileSync(`${folder}/manifest.json`, 'utf8'));
+  const digest = sha256(new TextEncoder().encode(canonicalJson(manifest)));
+  const fetchOwn = (corrupt = false, ready = true) => vi.fn(async (input: string, init?: RequestInit) => {
+    expect(new Headers(init?.headers).get('Authorization')).toBe(`Bearer ${ACCESS.token}`);
+    const path = input.slice(ACCESS.baseUrl.length);
+    if (path === `/workspace-style-packs/${digest}`) return new Response(JSON.stringify({ manifest_sha256:digest, pack_id:manifest.pack_id, ready, manifest:corrupt?{...manifest,title:'Wrong bytes'}:manifest }));
+    const file = manifest.files.find((entry:{sha256:string})=>path===`/workspace-style-packs/${digest}/files/${entry.sha256}`);
+    if(file !== undefined) return new Response(new Uint8Array(readFileSync(`${folder}/${file.path}`)));
+    throw new Error(`Standalone workspace content must not use a library route: ${path}`);
+  });
+  it('retains explicit workspace source with no base and reads pinned modules through authorized routes',async()=>{
+    const choice=worldLookChoice('',{ packId:manifest.pack_id,version:1,manifestSha256:digest,own:{base:null,wearable:true} });
+    expect(choice).toEqual({packId:manifest.pack_id,manifestSha256:digest,source:'world',own:true});
+    const fetched=fetchOwn();vi.stubGlobal('fetch',fetched);
+    const prepared=await prepareWorldLook(ACCESS,choice.packId!,TEXTURES,[],choice.manifestSha256,null,null,choice.own);
+    expect(prepared.pack.chain).toHaveLength(1);expect(prepared.families.get('roof')!.fit).toBe('contain');
+    expect(fetched.mock.calls.every(([url])=>url.startsWith(`${ACCESS.baseUrl}/workspace-style-packs/`))).toBe(true);
+  });
+  it('refuses a non-ready or mismatched workspace manifest without a library substitute',async()=>{
+    vi.stubGlobal('fetch',fetchOwn(false,false));await expect(prepareWorldLook(ACCESS,manifest.pack_id,TEXTURES,[],digest,null,null,true)).rejects.toThrow('not the ready version');
+    vi.stubGlobal('fetch',fetchOwn(true));await expect(prepareWorldLook(ACCESS,manifest.pack_id,TEXTURES,[],digest,null,null,true)).rejects.toThrow('not the one its digest names');
+  });
+});
+
+ describe('workspace look options', () => {
+  const raw = JSON.parse(readFileSync('../assets/style-packs/kits/original.tide-garden/manifest.json', 'utf8'));
+  const digest = sha256(new TextEncoder().encode(canonicalJson(raw)));
+  const entry = { source: 'workspace', ready: true, withdrawn: false, pack_id: raw.pack_id, version: raw.version, manifest_sha256: digest, base: null };
+  it('lists an exact admitted workspace version with credentials and retains its standalone authority', async () => {
+    const asked: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer '+ACCESS.token);
+      asked.push(url);
+      return new Response(JSON.stringify(url.endsWith('/world/style-packs')
+        ? { profile: STYLE_PACK_LIST_PROFILE, packs: [], workspace_packs: [entry, { ...entry, withdrawn: true }, { ...entry, ready: false }] }
+        : { ...entry, manifest: raw }));
+    }));
+    expect(await listedWorkspaceStylePacks(ACCESS)).toMatchObject([{ pack_id: raw.pack_id, version: raw.version, source: 'workspace', ownBase: null, manifest_sha256: digest }]);
+    expect(asked).toEqual([ACCESS.baseUrl+'/world/style-packs', ACCESS.baseUrl+'/workspace-style-packs/'+digest]);
+  });
+  it.each(['withdrawn', 'mismatched'] as const)('omits a version that becomes %s after the list read, without a library substitution', async problem => {
+    const asked: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      asked.push(url);
+      if (url.endsWith('/world/style-packs')) return new Response(JSON.stringify({profile:STYLE_PACK_LIST_PROFILE, workspace_packs:[entry]}));
+      if (problem==='withdrawn') return new Response('{}',{status:409});
+      return new Response(JSON.stringify({...entry,manifest:{...raw,title:'Different bytes'}}));
+    }));
+    expect(await listedWorkspaceStylePacks(ACCESS)).toEqual([]);
+    expect(asked.every(url=>url.endsWith('/world/style-packs')||url.includes('/workspace-style-packs/'))).toBe(true);
+  });
+ });

@@ -1,5 +1,5 @@
 import { materialOfLeaf, type RoofForm, type RoofForms, type SurfaceMaterials } from '@exulanica/atlas-core';
-import type { SiteDrawing, SiteSlot } from './site-drawing.js';
+import type { StructuredSiteDrawing, SiteSlot } from './site-drawing.js';
 
 /**
  * A site's roofs shaped by what they are made of.
@@ -190,7 +190,7 @@ export interface ShapedRoofs {
 const NONE: ShapedRoofs = Object.freeze({ meshes: new Map<string, RoofMesh>(), undrawn: new Set<string>() });
 
 /** Every roof of a drawing that its material's form shapes. */
-export function shapeRoofs(drawing: SiteDrawing, materials: SurfaceMaterials | null, forms: RoofForms | null): ShapedRoofs {
+export function shapeRoofs(drawing: StructuredSiteDrawing, materials: SurfaceMaterials | null, forms: RoofForms | null): ShapedRoofs {
   if (materials === null || forms === null) return NONE;
   const meshes = new Map<string, RoofMesh>();
   const undrawn = new Set<string>();

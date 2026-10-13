@@ -50,6 +50,7 @@ __all__ = [
     "Runaway",
     "checked_payload",
     "embedding_from_body",
+    "record_reply_usage",
     "result_from_body",
     "runaway_shape",
 ]
@@ -90,7 +91,7 @@ def runaway_shape(answer: str) -> Runaway | None:
     return None
 
 
-def _record_attempt(
+def record_reply_usage(
     budget: BudgetGuard,
     *,
     role: Role | str,
@@ -150,7 +151,7 @@ def result_from_body(
     # Recorded before anything about the reply is believed, a reply with no choices included: the
     # request reached the provider and came back, so it may be billed, and the ledger, the budget
     # and a request's own record must each see it.
-    usage = _record_attempt(
+    usage = record_reply_usage(
         budget,
         role=role,
         spec=spec,
@@ -299,7 +300,7 @@ def embedding_from_body(
 ) -> EmbeddingResult:
     # Recorded before a vector is read, as a chat reply is: a malformed row is the provider's
     # answer to a request it may bill.
-    usage = _record_attempt(
+    usage = record_reply_usage(
         budget,
         role=role,
         spec=spec,

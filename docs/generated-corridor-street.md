@@ -152,8 +152,9 @@ small request for a whole city, rather than a revalidation per tile.
 
 ## 7. What draws, and what does not
 
-Measured from the container the route serves for tile (2, 0), baked by tessellator 17 at commit
-de0ccbd4, container sha256 `93df0715f5...`. The counts are
+Measured from tessellator 17's container for tile (2, 0) at commit de0ccbd4, container sha256
+`93df0715f5...`. These counts are that container. They are not a claim about which container a
+clone's store serves. The counts are
 `docs/artifacts/corridor/corridor-drawn.log.txt`, which names the container it read by DIGEST
 rather than by file name, so it cannot be read against a different container without the mismatch
 showing. Every bake writes the same measurement into its own row's receipt and onto
@@ -163,7 +164,11 @@ showing. Every bake writes the same measurement into its own row's receipt and o
 facades, 89 rooftop objects, 78 vitrines, 51 interior backings, 36 pieces of street furniture, 33
 parcels, 32 massings, 30 street trees, 6 curb edges, 3 street segments and the terrain. Of **1 582
 drawn surfaces, 1 496 are dressed** by a material record and 86 are not: 85 facade ground bands and
-the terrain.
+the terrain. A later bake of the same tile, container `e59f6cf05d`, is the container
+`tests/test_visual_gate_targets.py` names `WORLD_DRAWN`. The grammar contract measures that
+container as 1 637 drawn surfaces, 1 551 dressed, and the same 86 undressed. The reader accepts
+tessellator version 20 only (`TESSELLATOR_SOURCE_VERSION` in
+`web/packages/loom-tess/src/core/expand.ts`).
 
 **83 entries state unavailable**, and each names the expander it waits for:
 
@@ -181,11 +186,12 @@ neighbours and 31 on rear walls, and the north terrace is eight buildings from x
 the walked pose, the wall, ground band, fascia, glazing, shopfront frame and stall riser are all
 dressed by a material record, and the only undressed surface is the terrain.
 
-**Not known:** what appears as the magenta unavailable state through the shop windows in a picture
-of this street. The interior backings draw (tessellator 16), which makes the question testable,
-and the experiment is written down, unrun, in
-[magenta-comparison.md](artifacts/corridor/magenta-comparison.md). Until it is run, a caption for a
-picture of this street should say the magenta is an unavailable surface and stop there.
+On the generated street, the 2026-09-18 facade-openings measurement found every interior backing,
+glazing, and door dressed. The undressed surfaces on that tile were 85 facade ground bands and the
+terrain. The unrun comparison in
+[magenta-comparison.md](artifacts/corridor/magenta-comparison.md) remains the protocol written for
+two earlier predictions. It does not establish what a picture of the generated street shows
+through a shop window.
 
 ## 8. The walk, and the pose it starts from
 
@@ -250,9 +256,11 @@ include a known event is an illustration of that event, not a walk.
 
 **What the pictures must not imply.** The pale ground at the base of the frontages is the
 **parcels' lot ground**, the private ground behind the frontage line, and not the footway. And the
-magenta seen through every shop window is an unavailable surface whose visibility is
-unexplained: see section 7, and the experiment written down in
-[magenta-comparison.md](artifacts/corridor/magenta-comparison.md). A frame that would need either
+2026-09-18 facade-openings measurement found every interior backing, glazing, and door on the
+generated street dressed. The undressed surfaces were 85 facade ground bands and the terrain. The
+unrun comparison in
+[magenta-comparison.md](artifacts/corridor/magenta-comparison.md) does not establish what a
+picture shows through a shop window. A frame that would need either
 sentence to be read correctly is evidence of a stage, not a picture of a street, and should not be
 used where the sentence cannot travel with it.
 
@@ -260,9 +268,10 @@ used where the sentence cannot travel with it.
 
 Every bake of one tile document is stored beside the others (migration 0077), each keyed by
 `uuid5(stage version, stage params digest, tile inputs digest)`. The corridor tile (2, 0) has been
-baked by six tessellator versions, and the one the route serves is tessellator 17: params digest
+baked by six tessellator versions. One of those bakes is tessellator 17: params digest
 `33d663f8`, 11 153 540 bytes, container `93df0715f5`, `render_batch` `91350a9045` and
-`nav_envelope` `35388d7849`. Each bake key after the first was computed from the stage parameters
+`nav_envelope` `35388d7849`. The reader accepts tessellator version 20 only. This section does
+not name the container a clone's store serves. Each bake key after the first was computed from the stage parameters
 before its bake ran, with the bake refused if it disagreed, and each matched.
 
 The triangle digests say what a tessellator version changed, and the container's size and digest

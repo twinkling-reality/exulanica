@@ -40,9 +40,11 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import hashlib
 import json
 import re
 import unicodedata
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Final, Literal
@@ -53,12 +55,22 @@ from exulanica.grammar.errors import InvalidParameterError, InvalidRecordError
 from exulanica.grammar.grammars.site.plan import (
     ACCESS,
     ENCLOSURES,
+    LOOK_FAMILIES,
     PATTERNS,
     PLACEMENTS,
     ROOF_FORMS,
 )
 from exulanica.world.kinds.catalogs import KindCatalogs, load_kind_catalogs
-from exulanica.world.kinds.document import GENERATOR_KEY, GENERATOR_VERSION, PROFILE, KindRefused
+from exulanica.world.kinds.document import (
+    GENERATOR_KEY,
+    GENERATOR_VERSION,
+    PROFILE,
+    REQUIREMENTS_PROFILE,
+    KindRefused,
+)
+from exulanica.world.kinds.requirements import OMISSION_CODES
+from exulanica.world.kinds.shape_classes import load_shape_classes
+from exulanica.world.kinds.thing_leaves import load_thing_leaves
 from exulanica.world.society_catalogs import RoutineModel
 
 __all__ = [
@@ -186,23 +198,41 @@ _BRIEFS: Final[dict[tuple[object, ...], type[BaseModel]]] = {}
 
 
 def brief_form(
-    catalogs: KindCatalogs | None = None, routine: RoutineModel | None = None
+    catalogs: KindCatalogs | None = None,
+    routine: RoutineModel | None = None,
+    *,
+    fixture_vocabulary: bool = True,
+    requirement_contract: bool = False,
 ) -> type[BaseModel]:
-    """The brief a model fills: what the place holds, nested, with no keys and no references;
+    """The brief a model fills: nested contents, no keys, and optional exact-label claims;
     every closed word a list to choose from, and each object's arrays last."""
-    catalogs = load_kind_catalogs() if catalogs is None else catalogs
+    catalogs = (
+        load_kind_catalogs(bounds_version=2 if requirement_contract else 1)
+        if (catalogs is None)
+        else catalogs
+    )
     if routine is None:
         from exulanica.world.society_living import town_routine
 
         routine = town_routine()
-    built = (tuple(sorted(catalogs.sha256.items())), routine.sha256)
+    built = (
+        tuple(sorted(catalogs.sha256.items())),
+        routine.sha256,
+        fixture_vocabulary,
+        requirement_contract,
+    )
     found = _BRIEFS.get(built)
     if found is None:
-        found = _BRIEFS[built] = _build(catalogs, routine)
+        found = _BRIEFS[built] = _build(catalogs, routine, fixture_vocabulary, requirement_contract)
     return found
 
 
-def _build(catalogs: KindCatalogs, routine: RoutineModel) -> type[BaseModel]:
+def _build(
+    catalogs: KindCatalogs,
+    routine: RoutineModel,
+    fixture_vocabulary: bool,
+    requirement_contract: bool,
+) -> type[BaseModel]:
     bound = catalogs.bound
     label = _text(bound("label_characters"))
     description = _text(bound("description_characters"))
@@ -248,11 +278,19 @@ def _build(catalogs: KindCatalogs, routine: RoutineModel) -> type[BaseModel]:
                 "label": (label, ...),
                 "description": (description, ...),
                 "look": (_look(FORM_LOOKS["fixture"]), ...),
+                **(
+                    {"size_source": (Literal["stated", "catalog"], "stated")}
+                    if fixture_vocabulary
+                    else {}
+                ),
                 "count": (count, ...),
                 "pattern": (Literal[patterns], ...),
                 "width_mm": (_whole(sizes), ...),
                 "depth_mm": (_whole(sizes), ...),
-                "height_mm": (_whole(sizes), ...),
+                "height_mm": (
+                    _whole(bound("fixture_height_mm") if requirement_contract else sizes),
+                    ...,
+                ),
                 "seats": (_whole(places), ...),
                 "stands": (_whole(places), ...),
                 "sleepers": (_whole(bound("sleepers")), ...),
@@ -282,12 +320,35 @@ def _build(catalogs: KindCatalogs, routine: RoutineModel) -> type[BaseModel]:
             "label": (label, ...),
             "description": (description, ...),
             "look": (_look(FORM_LOOKS["structure"]), ...),
+            **(
+                {
+                    "shape_class": (
+                        Literal[
+                            (
+                                "",
+                                *(
+                                    k
+                                    for k, s in load_shape_classes().entries.items()
+                                    if s.form == "structure"
+                                ),
+                            )
+                        ],
+                        "",
+                    ),
+                    "shape_source": (Literal["stated", "catalog"], "stated"),
+                }
+                if requirement_contract
+                else {}
+            ),
             "count": (count, ...),
             "width_mm": (span("Width", bound("structure_width_mm")), ...),
             "depth_mm": (span("Depth", bound("structure_depth_mm")), ...),
             "storeys": (span("Storeys", bound("storeys")), ...),
             "storey_height_mm": (_whole(bound("storey_height_mm")), ...),
-            "roof_form": (Literal[ROOF_FORMS], ...),
+            "roof_form": (
+                Literal[(*ROOF_FORMS, "catalog")] if requirement_contract else Literal[ROOF_FORMS],
+                ...,
+            ),
             "roof_look": (_look(("roof",)), ...),
             "wall_look": (_look(("wall",)), ...),
             "door_width_mm": (_whole(bound("door_width_mm")), ...),
@@ -339,12 +400,57 @@ def _build(catalogs: KindCatalogs, routine: RoutineModel) -> type[BaseModel]:
         {
             "label": (label, ...),
             "look": (_look(FORM_LOOKS["boundary"]), ...),
+            **(
+                {
+                    "shape_class": (
+                        Literal[
+                            (
+                                "",
+                                *(
+                                    k
+                                    for k, s in load_shape_classes().entries.items()
+                                    if s.form == "boundary"
+                                ),
+                            )
+                        ],
+                        "",
+                    ),
+                    "shape_source": (Literal["stated", "catalog"], "stated"),
+                }
+                if requirement_contract
+                else {}
+            ),
             "height_mm": (_whole(bound("boundary_height_mm")), ...),
             "thickness_mm": (_whole(bound("boundary_thickness_mm")), ...),
             "gate_width_mm": (_whole(bound("gate_width_mm")), ...),
         },
     )
     words = _model("PlaceWords", {"here": (label, ...), "around": (label, ...)})
+    requirement = (
+        _model(
+            "Requirement",
+            {
+                "words": (_text((1, 1000)), ...),
+                "status": (Literal["fulfilled", "omitted"], ...),
+                "omission": (Literal[("", *OMISSION_CODES)], ...),
+                "form": (Literal[("", *FORM_LOOKS)], ...),
+                "look": (
+                    Annotated[str, Field(pattern=rf"^($|({'|'.join(LOOK_FAMILIES)})\.{_KEY})$")],
+                    ...,
+                ),
+                "shape_class": (Literal[("", *load_shape_classes().entries)], ...),
+                "roof_form": (Literal[("", *ROOF_FORMS)], ...),
+                "minimum_count": (_whole((1, 512)), ...),
+                "roles": (
+                    listed(Literal[tuple(catalogs.role_forms)], len(catalogs.role_forms)),
+                    ...,
+                ),
+                "part_labels": (listed(label, 48), ...),
+            },
+        )
+        if requirement_contract
+        else None
+    )
     return _model(
         "WorldKindBrief",
         {
@@ -362,7 +468,13 @@ def _build(catalogs: KindCatalogs, routine: RoutineModel) -> type[BaseModel]:
             "place_words": (words, ...),
             "spine": (spine, ...),
             "boundary": (boundary, ...),
+            **(
+                {"not_supported": (listed(_text((1, 1000)), 48), [])}
+                if fixture_vocabulary and not requirement_contract
+                else {}
+            ),
             "zones": (listed(zone, bound("zones")[1], 1), ...),
+            **({"requirements": (listed(requirement, 48, 1), ...)} if requirement_contract else {}),
         },
     )
 
@@ -414,6 +526,63 @@ def _span(raw: Mapping[str, int], module: int = 1) -> Any:
     return low if low == high else {"from": low, "to": high}
 
 
+def compile_requirements(
+    requirements: Sequence[Mapping[str, Any]],
+    parts: Sequence[Mapping[str, Any]],
+    description: str,
+) -> tuple[list[dict[str, Any]], tuple[tuple[int, int], ...]]:
+    """Resolve exact, unique part labels to identities and retain only source offsets."""
+    from exulanica.selection.world_drafting import verbatim_bounds
+    from exulanica.world.kinds.document import KindRefused
+
+    by_label: dict[str, list[str]] = defaultdict(list)
+    for part in parts:
+        by_label[part["label"]].append(part["key"])
+    compiled, omitted = [], []
+    for index, raw in enumerate(requirements):
+        where = f"requirements[{index}]"
+        span = verbatim_bounds(raw["words"], description)
+        if span is None:
+            raise KindRefused(
+                "kind_document_invalid",
+                "requirement words must be copied without cutting a replaced name",
+                f"{where}.words",
+            )
+        targets = []
+        for label in raw["part_labels"]:
+            found = by_label.get(label, [])
+            if len(found) != 1:
+                raise KindRefused(
+                    "kind_requirement_unmet",
+                    "target label is missing or ambiguous",
+                    f"{where}.part_labels",
+                )
+            targets.append(found[0])
+        compiled.append(
+            {
+                "key": f"requirement_{index + 1}",
+                "source_span": list(span),
+                "parts": targets,
+                **{
+                    name: raw[name]
+                    for name in (
+                        "status",
+                        "omission",
+                        "form",
+                        "roles",
+                        "look",
+                        "shape_class",
+                        "roof_form",
+                        "minimum_count",
+                    )
+                },
+            }
+        )
+        if raw["status"] == "omitted" and span not in omitted:
+            omitted.append(span)
+    return compiled, tuple(omitted)
+
+
 @dataclass(frozen=True, slots=True)
 class Compiled:
     """A kind document compiled from a brief, with where in the brief each of its parts, use
@@ -431,13 +600,21 @@ class Compiled:
     sizing: tuple[str, ...] = ()
     #: For each of the document's zones, which of the brief's it is.
     zones: tuple[str, ...] = ()
+    #: Transient drafting evidence; saved kind documents keep only resolved dimensions.
+    fixture_vocabulary: Mapping[str, Any] = field(default_factory=dict)
+    not_supported_at: tuple[tuple[int, int], ...] = ()
 
 
 class _Compiler:
     def __init__(
-        self, brief: Mapping[str, Any], catalogs: KindCatalogs, routine: RoutineModel
+        self,
+        brief: Mapping[str, Any],
+        catalogs: KindCatalogs,
+        routine: RoutineModel,
+        description: str | None,
     ) -> None:
         self.brief = brief
+        self.description = description
         self.catalogs = catalogs
         self.module = _module(catalogs, str(brief["enclosure"]))
         self.spacing = int(routine.policy["standing_spacing_mm"])
@@ -449,6 +626,9 @@ class _Compiler:
         self.uses: list[dict[str, Any]] = []
         self.use_origins: list[str] = []
         self.stated_uses: dict[str, str] = {}
+        self.defaulted_fixtures: list[str] = []
+        self.unlisted_fixtures: list[str] = []
+        self.vocabulary_sha256 = ""
 
     def _use(self, label: str, where: str, content: Mapping[str, Any]) -> str:
         """The key of the use class ``content`` states, made once for the same words."""
@@ -511,6 +691,24 @@ class _Compiler:
 
     def fixture(self, raw: Mapping[str, Any], where: str) -> str:
         part = self._common(raw, "fixture")
+        leaf = None
+        if "size_source" in raw:
+            leaves = load_thing_leaves(version=self.catalogs.bounds_version)
+            self.vocabulary_sha256 = leaves.sha256
+            leaf = leaves.entries.get(part["look"])
+        dimensions = tuple(int(raw[name]) for name in ("width_mm", "depth_mm", "height_mm"))
+        if raw.get("size_source", "stated") == "catalog":
+            if leaf is None:
+                raise KindRefused(
+                    "kind_document_invalid",
+                    "catalog sizing requires a listed fixture look; "
+                    "use stated dimensions otherwise",
+                    f"{where}.size_source",
+                )
+            dimensions = leaf.box_mm
+            self.defaulted_fixtures.append(part["key"])
+        elif leaf is None and "size_source" in raw:
+            self.unlisted_fixtures.append(part["key"])
         use_role = raw["use_role"]
         roles = set(raw["roles"])
         if (
@@ -528,7 +726,7 @@ class _Compiler:
             roles.add(use_role)
         if not roles:
             roles.add("decoration")
-        width = int(raw["width_mm"])
+        width, depth, height = dimensions
         fit = (width + self.spacing) // self.spacing + 1
         seats = stands = 0
         if "seat" in roles:
@@ -556,8 +754,8 @@ class _Compiler:
             roles=sorted(roles),
             use_class=use_class,
             width_mm=width,
-            depth_mm=int(raw["depth_mm"]),
-            height_mm=int(raw["height_mm"]),
+            depth_mm=depth,
+            height_mm=height,
             seats=seats,
             stands=stands,
             sleepers=min(2, max(1, int(raw["sleepers"]))) if "bed" in roles else 0,
@@ -585,7 +783,10 @@ class _Compiler:
         return self._part(part, where)
 
     def structure(self, raw: Mapping[str, Any], where: str) -> str:
+        raw = self.shaped(raw, "structure", where)
         part = self._common(raw, "structure")
+        if "_shape_reference" in raw:
+            part["shape_class"] = raw["_shape_reference"]
         rooms = [
             {
                 "part": self.room(held, f"{where}.rooms[{index}]", raw["use_role"]),
@@ -702,6 +903,36 @@ class _Compiler:
         }
         return zone, tuple(origins)
 
+    def shaped(self, raw: Mapping[str, Any], form: str, where: str) -> Mapping[str, Any]:
+        key = raw.get("shape_class", "")
+        if not key:
+            if raw.get("shape_source") == "catalog" or raw.get("roof_form") == "catalog":
+                raise KindRefused(
+                    "kind_shape_unmet",
+                    "catalog defaults require a declared class",
+                    f"{where}.shape_class",
+                )
+            return raw
+        catalog = load_shape_classes()
+        shape = catalog.entries.get(key)
+        if shape is None or shape.form != form:
+            raise KindRefused(
+                "kind_shape_unmet", "unknown class for this form", f"{where}.shape_class"
+            )
+        resolved = {**raw, "_shape_reference": catalog.reference(key)}
+        if raw.get("shape_source", "stated") == "catalog":
+            if form == "structure":
+                for name in ("width_mm", "depth_mm", "storeys"):
+                    value = shape.number(f"default_{name}")
+                    resolved[name] = {"from": value, "to": value}
+                resolved["storey_height_mm"] = shape.number("default_storey_height_mm")
+            else:
+                for name in ("height_mm", "thickness_mm"):
+                    resolved[name] = shape.number(f"default_{name}")
+        if form == "structure" and raw["roof_form"] == "catalog":
+            resolved["roof_form"] = shape.values["default_roof_form"]
+        return resolved
+
     def compile(self, *, version: int, provenance: Mapping[str, Any], licence: str) -> Compiled:
         brief = self.brief
         spine = brief["spine"]
@@ -722,7 +953,7 @@ class _Compiler:
         walled = brief["site_fenced"] or brief["enclosure"] == "indoor"
         boundary = ""
         if walled or any(zone["fenced"] for zone in brief["zones"]):
-            raw = brief["boundary"]
+            raw = self.shaped(brief["boundary"], "boundary", "boundary")
             boundary = self._part(
                 {
                     "key": self.keys.take(_words(raw["label"]), "boundary"),
@@ -735,6 +966,11 @@ class _Compiler:
                     "height_mm": int(raw["height_mm"]),
                     "thickness_mm": int(raw["thickness_mm"]),
                     "gate_width_mm": int(raw["gate_width_mm"]),
+                    **(
+                        {"shape_class": raw["_shape_reference"]}
+                        if "_shape_reference" in raw
+                        else {}
+                    ),
                 },
                 "boundary",
             )
@@ -798,12 +1034,37 @@ class _Compiler:
             "parts": self.parts,
             "zones": zones,
         }
+        omitted = ()
+        if "requirements" in brief:
+            if self.description is None:
+                raise KindRefused(
+                    "kind_document_invalid", "requirements need their sent source", "requirements"
+                )
+            requirements, omitted = compile_requirements(
+                brief["requirements"], self.parts, self.description
+            )
+            document.update(
+                profile=REQUIREMENTS_PROFILE,
+                requirements=requirements,
+                requirement_source={
+                    "sha256": hashlib.sha256(self.description.encode()).hexdigest(),
+                    "characters": len(self.description),
+                },
+            )
         return Compiled(
             document,
             tuple(self.origins),
             tuple(self.use_origins),
             tuple(holds),
             zones=tuple(stated),
+            fixture_vocabulary={
+                "sha256": self.vocabulary_sha256,
+                "defaulted_parts": self.defaulted_fixtures,
+                "unlisted_parts": self.unlisted_fixtures,
+            }
+            if self.vocabulary_sha256
+            else {},
+            not_supported_at=omitted,
         )
 
 
@@ -1166,16 +1427,21 @@ def compile_brief(
     catalogs: KindCatalogs | None = None,
     routine: RoutineModel | None = None,
     size: bool = True,
+    description: str | None = None,
 ) -> Compiled:
     """The kind document a brief states, at ``version`` with ``provenance`` and ``licence``: its
     keys, references, use classes and figures made here and, with ``size``, its site sized by its
     sample worlds. Nothing here decides whether the kind is kept."""
-    catalogs = load_kind_catalogs() if catalogs is None else catalogs
+    catalogs = (
+        load_kind_catalogs(bounds_version=2 if "requirements" in brief else 1)
+        if (catalogs is None)
+        else catalogs
+    )
     if routine is None:
         from exulanica.world.society_living import town_routine
 
         routine = town_routine()
-    compiled = _Compiler(brief, catalogs, routine).compile(
+    compiled = _Compiler(brief, catalogs, routine, description).compile(
         version=version, provenance=provenance, licence=licence
     )
     if not size:

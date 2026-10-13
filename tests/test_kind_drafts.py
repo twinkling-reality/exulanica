@@ -28,6 +28,56 @@ HERE, THERE, ELSEWHERE = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
 ACTOR, SOMEBODY = uuid.uuid4(), uuid.uuid4()
 
 
+def test_erasing_a_world_forgets_draft_content_without_refunding_its_start():
+    drafts = KindDrafts(starts_per_hour=1)
+    entry = uuid.uuid4()
+    finished = threading.Event()
+
+    def make(draft, holder):
+        holder.made(
+            draft,
+            entry_id=entry,
+            left_out=("my private words",),
+            look={"phrase": "my private look"},
+            made=({"label": "private"},),
+        )
+        finished.set()
+
+    draft = drafts.start(HERE, ACTOR, "private sentence", make, purpose="world")
+    assert finished.wait(5)
+    assert drafts.read(HERE, ACTOR, draft.draft_id, purpose="world").left_out
+    drafts.erase_entries(THERE, {entry})
+    assert drafts.read(HERE, ACTOR, draft.draft_id, purpose="world") is not None
+    drafts.erase_entries(HERE, {entry})
+    assert drafts.read(HERE, ACTOR, draft.draft_id, purpose="world") is None
+    assert drafts.listing(HERE, ACTOR, purpose="world") == ()
+    assert drafts.allowance(HERE, ACTOR).starts_left == 0
+    retained = drafts._drafts[draft.draft_id]
+    assert retained.left_out == retained.made == retained.calls == ()
+    assert retained.look is retained.setting is retained.refusal is retained.entry_id is None
+    assert retained.description == ""
+
+
+def test_world_erased_between_database_commit_and_draft_result_cannot_reappear():
+    drafts = KindDrafts()
+    entry = uuid.uuid4()
+    committed, release, ended = threading.Event(), threading.Event(), threading.Event()
+
+    def make(draft, holder):
+        committed.set()
+        assert release.wait(5)
+        holder.made(draft, entry_id=entry, left_out=("private omitted text",))
+        ended.set()
+
+    draft = drafts.start(HERE, ACTOR, "private", make, purpose="world")
+    assert committed.wait(5)
+    drafts.erase_entries(HERE, {entry})
+    release.set()
+    assert ended.wait(5)
+    assert drafts.read(HERE, ACTOR, draft.draft_id, purpose="world") is None
+    assert drafts._drafts[draft.draft_id].left_out == ()
+
+
 class _Clock:
     def __init__(self) -> None:
         self.now = 1000.0

@@ -1,55 +1,13 @@
-"""Every catalog in the repository says where its content came from, and none is skipped.
+"""Every discovered catalog says where its content came from, and no unknown shape is skipped.
 
-This gate DISCOVERS catalogs. It asks the tree what is there and the code what it requires, and it
-holds no list of catalog ids, because a gate that enumerates is silent about the class nobody
-thought to add. That is not hypothetical here: the rule that authored vocabulary must say why it is
-authored ran over fourteen ids while eighteen city catalogs shipped, and band.v1.json stated a
-ground band on every frontage in the world with no reason at all. Two of the eighteen SCHEMAS did
-not declare the reason field either, so the loader never asked for one.
+Discovery reads every JSON catalog under assets/catalogs instead of maintaining a list of ids.
+Entry catalogs carry a reason for every entry or for an empty vocabulary. Traffic catalogs add
+per-field sources citing a listed reference or declaring a value. Lettering catalogs carry the
+pinned font source; their dedicated tests hold the digests and licence.
 
-Five families ship, in three shapes, and this file makes a substantive claim about each file it
-finds rather than a claim about which test covers it:
-
-*   city, society and world object catalogs, ``entries`` and ``schema_version``: every entry
-    carries a reason.
-*   traffic catalogs, which add ``references``: every entry carries per-field ``sources``, each
-    citing a listed reference or declaring a value; test_traffic_catalogs.py holds their content.
-*   lettering catalogs, ``glyphs``: provenance is the pinned ``source`` of the font the glyphs were
-    converted from; test_lettering_catalog.py holds the digests and the licence.
-
-A new shape fails here. That is the point: it is cheaper to loosen this file deliberately than to
-discover later that a family was never checked.
-
-**Seen to refuse, 2026-09-18, six ways, each restored afterwards.** A check nobody has watched fail
-is a claim about the tree sitting where nothing tests it:
-
-1. A new catalog whose entry has no reason: four rules fire, the shape count, the reason rule, the
-   register rule, and the digest test, because the loader refuses a file the schemas do not name.
-2. The reason removed from band/ground: the reason rule.
-3. action-vocabulary stops saying why it is empty: the empty rule, and the loader refuses it too.
-4. A reason reading "Because it seemed like a sensible height for a shopfront": the register rule.
-5. The band schema stops declaring the reason field: the schema rule, asked of the code.
-6. A register added here that nothing in the tree uses: the register rule, from the other side.
-
-Two errors in that record, both caught because a result looked like an answer. The first run used
-``-x``, so it recorded which test failed FIRST rather than which rules fire; re-run without it,
-case 1 fires four. And the first measurement of what the city fixture rebuild would change compared
-the wrong committed file and produced 7,590 differences, which cannot be true of a catalog reason;
-against the file the fixture test actually pins, exactly one leaf value of 5,985 moves, its catalog
-digest.
-
-A third error, found by the orchestrator rather than by me: all of that was first measured on a tree
-thirty commits behind main, against a catalog set where ``material`` was still v3 with eleven
-entries. The numbers were true of a tree nobody would merge. Re-derived after rebasing, the shape
-held and every figure changed, and the entry count in this file was itself a restatement of what
-test_grammar_catalogs.py already pins, so it is a floor now instead of a total.
-
-The material test in test_grammar_city_catalogs.py had the same defect and is fixed in the same
-commit: it pinned sixteen texture set names inline while the manifest held seventeen. It now asserts
-that every material names a published set and states the partition, which published set no material
-names, today exactly cc0.sign-panel because no surface role names a sign panel yet. Seen to refuse:
-a material naming an unpublished set is caught by the loader before the test runs; a published set
-that no material names fails the partition; two materials depicting one set fail the duplicate rule.
+The checks bind city schema reason fields, accepted provenance registers and published texture
+references to the same discovered content. A discovery floor guards against an empty or truncated
+scan without repeating the number of versioned entry catalogs in a growing repository.
 """
 
 from __future__ import annotations
@@ -100,49 +58,9 @@ def discovered() -> dict[tuple[str, ...], list[Path]]:
 def test_the_discovery_finds_every_family_and_no_unknown_shape():
     found = discovered()
     assert set(found) == {ENTRY_SHAPE, CITED_SHAPE, GLYPH_SHAPE}, sorted(found)
-    # Counted from the tree, so adding a catalog to a family is visible here as a number: eighteen
-    # city catalogs, city version 4's edition of the street hierarchy and city version 5's edition
-    # of the material catalog, forty-four society catalogs (the living society's five, a town's
-    # three, and the two a town's homes by floor area are read from, the purposeful routine's two
-    # versions, what is
-    # recorded and said of each kind of its activity, the legacy identities of the first three
-    # engines, a person's decision contract's two in seven versions each, six versions of a
-    # person's score, four of the protocol, six of the seeds a comparison of models reads,
-    # and a catalog of measured typical comparison costs), what an ask of a model mind typically
-    # costs and how often a being whose mind is a model is asked, the shapes a sentence that sets
-    # a world's budget for its minds may have,
-    # the grounds a society stands on, the words both the inspector and the
-    # Companion say of a simulated person and of each kind of activity, the world object
-    # catalog's three versions and its arrangements, the flight kind catalog, the local
-    # detector's vocabulary, the decision role registry in its eight versions (the third names a
-    # choice's decider, the fourth hosts a society of things' people, the fifth states their own
-    # terms, the sixth their hands, the seventh the rule their lines are held to, the eighth what
-    # they notice and remember), the society
-    # ground catalog's second to sixth versions (the
-    # grounds' navigation forms and population rules, then a site's ground, then the place each
-    # input names and the records its people use, then the kind their people are made of,
-    # then a town admitted by the measured cost of a minute in place of a head count), the
-    # world recipes in four
-    # versions and the two versions of the specification schema their presets are points in,
-    # plus the signal role registry and its policy, observation and response catalogs, the world
-    # clock's two profiles, the protocol and seeds a comparison of signal models reads, and the
-    # replay lines a comparison of a living town's people is read by, in six versions, the
-    # world kinds' look families, engine roles, bounds and society defaults, the reference
-    # sources, the aspects a reference note may be about, the words no outgoing reference
-    # query may carry and the words no note from a person's picture may carry, the four
-    # vocabularies a thing kind is read against (body plans, abilities, offers, and look kinds
-    # in two versions, the second fitting every plan with bones), the body grammar a creature's
-    # body recipe is read against, the names and sentence a society says a drafted body by, the
-    # gaits a drafted body's pace is read by, the
-    # generated piece recipes in two versions, what generating a piece costs and the style
-    # words a piece request carries for each pack, the materials a made place's surfaces are
-    # drawn in by the words of their look roles, in two versions (the second moved six colours),
-    # the forms a roof of each material takes, the pattern each material is drawn with, how the
-    # edge of each ground is broken where it meets another, the
-    # actions a person may take on a world and what is in it, by their stable ids,
-    # and the tools a world is made by from a person's words, each in the words a chooser is
-    # shown.
-    assert len(found[ENTRY_SHAPE]) == 136
+    # A discovery floor catches an empty or truncated scan. Every discovered catalog is
+    # checked below, including new versions; an exact total would restate a growing inventory.
+    assert len(found[ENTRY_SHAPE]) > 100
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
     # mappings, the road derivation and the signal placement.
     assert len(found[CITED_SHAPE]) == 7

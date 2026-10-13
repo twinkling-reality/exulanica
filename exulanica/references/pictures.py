@@ -60,6 +60,7 @@ PICTURE_ROLE: Final = Role.REFERENCE_VISION
 PICTURE_MAX_TOKENS: Final = 512
 #: Why a reading refuses a whole picture, as the page names it.
 REFUSALS: Final = ("shows_people", "shows_text", "not_a_place")
+THINGS_REFUSALS: Final = ("shows_people", "shows_text", "not_a_thing")
 #: Why a note from a picture is dropped before the screen every note passes.
 PICTURE_DROPS: Final = ("aspect_closed", "person_word", "lettering", "cut_word")
 _WORD: Final = re.compile(r"[a-z]+")
@@ -104,7 +105,9 @@ def picture_user_text(catalogs: ReferenceCatalogs) -> str:
 
 
 @functools.cache
-def _schema(aspects: tuple[str, ...], notes: int) -> type[BaseModel]:
+def _schema(
+    aspects: tuple[str, ...], notes: int, refusals: tuple[str, ...] = REFUSALS
+) -> type[BaseModel]:
     note = create_model(
         "PictureNote",
         __config__=ConfigDict(extra="forbid"),
@@ -114,7 +117,7 @@ def _schema(aspects: tuple[str, ...], notes: int) -> type[BaseModel]:
     return create_model(
         "PictureReading",
         __config__=ConfigDict(extra="forbid"),
-        refuse=(Literal[REFUSALS] | None, ...),  # type: ignore[valid-type]
+        refuse=(Literal[refusals] | None, ...),  # type: ignore[valid-type]
         notes=(list[note], Field(max_length=notes)),  # type: ignore[valid-type]
     )
 
@@ -141,7 +144,11 @@ def read_picture(
     """
     prompts = prompts if prompts is not None else reference_prompts()
     catalogs = catalogs if catalogs is not None else load_reference_catalogs()
-    schema = _schema(catalogs.picture_aspects, prompts.picture_notes_maximum)
+    schema = _schema(
+        catalogs.picture_aspects,
+        prompts.picture_notes_maximum,
+        THINGS_REFUSALS if prompts.version == 4 else REFUSALS,
+    )
     messages = [
         {"role": "system", "content": prompts.picture},
         {

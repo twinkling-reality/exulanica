@@ -1,0 +1,7 @@
+/* Product navigation material, taken from landing/src/style.css's nav-group. */
+.ux-noveuis, .pane-title #hero-entry {
+  --menu-accent:#6496a6; --menu-shade:#7da6b3; --menu-wash:#a8cbd2; --menu-light:#e8f0ed;
+  --nav-edge:linear-gradient(115deg,var(--menu-accent),var(--menu-wash) 28%,transparent 53%,var(--menu-accent) 85%,var(--menu-light));
+  --nav-material:radial-gradient(ellipse at 0% 75%,var(--menu-shade),transparent 85%),linear-gradient(105deg,var(--menu-wash),var(--menu-light) 94%);
+  --nav-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 300' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M24 0H88C95 0 99 2 104 5L130 20C135 23 139 24 146 24H216Q240 24 240 48V276Q240 300 216 300H150C143 300 139 298 134 295L108 280C103 277 99 276 92 276H24Q0 276 0 252V24Q0 0 24 0Z'/%3E%3C/svg%3E");
+}

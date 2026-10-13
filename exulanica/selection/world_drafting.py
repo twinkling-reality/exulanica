@@ -68,6 +68,7 @@ from exulanica.epistemics.saved_names import (
 )
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
+from exulanica.models.identity import chat_model_identity
 from exulanica.models.manifest import Role
 from exulanica.selection.calls import CallLog, ModelCall
 
@@ -686,7 +687,8 @@ def draft_world_specification(
                 placeholders=placeholders,
                 max_tokens=max_tokens,
             )
-            log.record(drafted.call)
+            log.record(drafted.call, manifest=client.manifest)
+            identity = chat_model_identity(drafted.call, client.manifest)
             draft, fit, copied, phrases = _read(drafted.value, view, description)
             if fit == SAYS_NOTHING:
                 log.rejected(("fit part with nothing left out and no value set",))
@@ -703,7 +705,7 @@ def draft_world_specification(
                         DraftRefusalCode.DESCRIPTION_NOT_SUPPORTED,
                         _REFUSAL_DETAILS[DraftRefusalCode.DESCRIPTION_NOT_SUPPORTED],
                     ),
-                    model_id=drafted.call.served_model_id,
+                    model_id=identity.model_id,
                     calls=log.calls,
                     not_supported=tuple(description[a:b] for a, b in copied),
                     not_supported_at=copied,

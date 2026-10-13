@@ -16,20 +16,24 @@ A saved world has people once a society is brought into it. Each kind of saved w
 | Generated from a recipe | The footways and doors the town's own records state | The town's spawn point |
 
 In a starter or a world made from photographs the society starts with eight people on a square
-about 24 metres across, routed over a 2 metre lattice; a generated town holds one person for each
-place in a home its premises offer, at most 128, as the ground catalog
-[`society-ground.v2.json`](../../assets/catalogs/society-ground/society-ground.v2.json) states. A
+about 24 metres across, routed over a 2 metre lattice. A generated town starts with one person for
+each place its homes offer, and that count is kept only when a minute of those people fits the
+ground's share of the host's slowest minute, as
+[`society-ground.v6.json`](../../assets/catalogs/society-ground/society-ground.v6.json) states. A
 world made from photographs holds one society, in one region. The owned district built from New York
 open data runs a larger living society of its own and appears only in the development preview.
 
 Which engine runs a society is data. The engine table
-[`society-engines.v4.json`](../../exulanica/world/society-engines.v4.json) states what each engine
+[`society-engines.v5.json`](../../exulanica/world/society-engines.v5.json) states what each engine
 can do. A starter or a world made from photographs is given the purposeful engine,
-`exulanica-society/v2`, and a generated town the living town, `exulanica-society/v5`; both let an
-owner hand people to a model and a comparison run them. On a host that offers societies of things,
-such a world holding a thing its author placed is given the society of things,
-`exulanica-society/v7`, instead, where its beings live on their routines until a person picks a mind
-for one; a world made from a world kind keeps the living society. A world's capability read names the engine
+`exulanica-society/v2`, and a generated town or a world made from a world kind the living town,
+`exulanica-society/v5`; both let an owner hand people to a model and a comparison run them. On a
+host that offers societies of things, any of these worlds holding a thing its author placed is given
+the society of things, `exulanica-society/v7`, instead, where its beings live on their routines
+until a person picks a mind for one. The engine is chosen when people are brought in: a creature
+placed on a farm before its people are brought in acts among them, and a town or a farm peopled
+first keeps its living people, the creature standing where it was put, until its newcomers are
+taken in. A world's capability read names the engine
 ([World API](world-api.md#discovering-what-a-world-supports)).
 The server gives every world its own seed.
 

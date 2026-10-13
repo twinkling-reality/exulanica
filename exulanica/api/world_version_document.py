@@ -371,7 +371,9 @@ def alternate_version_view(
     pinned = workspace_assets or {}
     return AlternateVersionView(
         schema_version=(
-            5
+            6
+            if any(thing.support is not None for thing in version.things)
+            else 5
             if version.things
             else 4
             if pinned

@@ -49,6 +49,17 @@ export type PlacedKind =
   | { readonly source?: 'shipped'; readonly kind: string; readonly version: number; readonly sha256: string }
   | { readonly source: 'workspace'; readonly sha256: string };
 
+/** A saved source-bound horizontal support claim. */
+export interface PlacedThingSupportReference {
+  readonly profile: 'exulanica.support-reference/v1';
+  readonly worldId: string;
+  readonly sourceSnapshotId: string;
+  readonly receiptSha256: string;
+  readonly networkSha256: string;
+  readonly regionId: string;
+  readonly surfaceId: string;
+}
+
 /** A placed thing as the version document lists it, in this page's words. */
 export interface PlacedThingRecord {
   readonly thingId: string;
@@ -62,6 +73,7 @@ export interface PlacedThingRecord {
     readonly scaleMilli: number;
   };
   readonly removed: boolean;
+  readonly support?: PlacedThingSupportReference;
 }
 
 /**
@@ -92,6 +104,8 @@ export interface ThingLayerOptions {
   readonly library: ThingLibrary;
   /** The entity a region's things stand in, or null where this world does not draw that region. */
   readonly regionRoot: (regionId: string) => pc.Entity | null;
+  /** Source-region root only while this exact supported placement has current admitted availability. */
+  readonly supportRoot?: (thing: PlacedThingRecord) => pc.Entity | null;
   /** The shell's signal colour, `#rrggbb`, for the ring under a picked thing. */
   readonly ringColour: string;
   /** Ask the page for another frame: things move between the page's own redraws. */
@@ -227,7 +241,7 @@ export class ThingLayer {
   /** Every thing drawn now, with the look it wears. */
   get drawn(): readonly DrawnThing[] {
     return [...this.entries].flatMap(([placedId, entry]) =>
-      entry.figure === null ? [] : [{ placedId, lookKind: entry.figure.lookKind, look: entry.look ?? '' }]);
+      entry.figure === null || (entry.record.support !== undefined && this.options.supportRoot?.(entry.record) == null) ? [] : [{ placedId, lookKind: entry.figure.lookKind, look: entry.look ?? '' }]);
   }
 
   /** Every placed thing drawn as nothing, and why. */
@@ -255,7 +269,8 @@ export class ThingLayer {
     let best: { pick: ThingPick; distance: number } | null = null;
     for (const [placedId, entry] of this.entries) {
       const figure = entry.figure;
-      if (figure === null || figure.pickVolume === null || !figure.root.enabled) continue;
+      if (figure === null || figure.pickVolume === null || !figure.root.enabled
+          || (entry.record.support !== undefined && this.options.supportRoot?.(entry.record) == null)) continue;
       const distance = rayMeets(figure.root, figure.pickVolume, from, along);
       if (distance === null) continue;
       // The picked thing wins a tie with anything standing in the same place.
@@ -340,7 +355,9 @@ export class ThingLayer {
   private keyOf(record: PlacedThingRecord): string {
     const look = this.lookChoices.get(record.thingId);
     const kind = record.kind.source === 'workspace' ? ['workspace', record.kind.sha256] : [record.kind.kind, record.kind.version, record.kind.sha256];
-    return [...kind, record.regionId, look ? `${look.key}/${look.version}/${look.sha256}` : '-'].join('|');
+    return [...kind, record.regionId, look ? `${look.key}/${look.version}/${look.sha256}` : '-',
+      record.support === undefined ? '-' : JSON.stringify(record.support),
+      record.support === undefined || this.options.supportRoot?.(record) != null ? 'admitted' : 'unavailable'].join('|');
   }
 
   private drop(id: string, entry: Entry): void {
@@ -358,9 +375,14 @@ export class ThingLayer {
 
   private async build(id: string, entry: Entry): Promise<void> {
     const generation = entry.generation;
-    const stale = () => this.destroyed || this.entries.get(id) !== entry || entry.generation !== generation;
+    const stale = () => this.destroyed || this.entries.get(id) !== entry || entry.generation !== generation
+      || (entry.record.support !== undefined && this.options.supportRoot?.(entry.record) == null);
     const { record } = entry;
-    const parent = this.options.regionRoot(record.regionId);
+    if (record.support !== undefined && this.options.supportRoot?.(record) == null) {
+      this.miss(id, 'support_projection_unavailable', 'This saved thing has no current verified support projection.');
+      return;
+    }
+    const parent = record.support === undefined ? this.options.regionRoot(record.regionId) : this.options.supportRoot?.(record) ?? null;
     if (parent === null) {
       this.miss(id, 'region_not_drawn', `This world does not draw the region ${record.regionId}.`);
       return;
@@ -497,6 +519,10 @@ export class ThingLayer {
     for (const entry of this.entries.values()) {
       const figure = entry.figure;
       if (figure === null) continue;
+      if (entry.record.support !== undefined) {
+        figure.setVisible(this.options.supportRoot?.(entry.record) != null);
+        continue;
+      }
       const society = this.society;
       const thing = society === null ? undefined : this.shown.get(entry.record.thingId);
       const holder = thing?.held_by == null || thing.socket == null ? null : { subjectId: thing.held_by, socket: thing.socket };
@@ -565,9 +591,18 @@ export class ThingLayer {
     const figure = entry.figure;
     // A held thing is placed by its holder's pose.
     if (figure === null || entry.heldBy !== null) return;
+    if (entry.record.support !== undefined) {
+      const available = this.options.supportRoot?.(entry.record) != null;
+      figure.setVisible(available);
+      if (!available) {
+        this.miss(entry.record.thingId, 'support_projection_unavailable', 'This saved thing has no current verified support projection.');
+        if (this.picked === entry.record.thingId) this.ring.place(null, 0);
+        return;
+      }
+    }
     const t = entry.record.transform;
     // Where a society runs, an object stands at the state's plan point, turned by the state's yaw.
-    const thing = this.society === null ? undefined : this.shown.get(entry.record.thingId);
+    const thing = this.society === null || entry.record.support !== undefined ? undefined : this.shown.get(entry.record.thingId);
     figure.pose({
       position: thing?.position_mm == null
         ? [t.xMm / 1000, t.yMm / 1000, t.zMm / 1000]

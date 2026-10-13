@@ -1,6 +1,6 @@
 import * as pc from 'playcanvas';
 import { materialOfLeaf, type RoofForms, type SurfaceMaterials } from '@exulanica/atlas-core';
-import type { SiteDrawing, SiteSlot } from './site-drawing.js';
+import type { StructuredSiteDrawing, SiteSlot } from './site-drawing.js';
 import { shapeRoofs } from './site-roofs.js';
 
 /**
@@ -48,7 +48,7 @@ const INDOOR_GROUND_RGB: Rgb = [0.66, 0.55, 0.42];
  * The colour a slot is drawn in when no pack dresses it: its leaf's material in `materials`, else an
  * indoor floor's for a ground indoors, else its family's.
  */
-export function slotColour(slot: SiteSlot, enclosure: SiteDrawing['extent']['enclosure'], materials: SurfaceMaterials | null = null): Rgb {
+export function slotColour(slot: SiteSlot, enclosure: StructuredSiteDrawing['extent']['enclosure'], materials: SurfaceMaterials | null = null): Rgb {
   const material = materials === null || slot.leaf === 'default' ? null : materialOfLeaf(materials, slot.family, slot.leaf);
   if (material !== null) {
     const [r, g, b] = material.swatch.srgb8;
@@ -107,7 +107,7 @@ export interface DrawnSiteSlots {
  * leaf's material where `catalog` names one, and each roof in its material's form where `roofForms`
  * shapes it (`shapeRoofs`); the wall pieces a tent stands in place of are not drawn.
  */
-export function drawSiteSlots(device: pc.GraphicsDevice, drawing: SiteDrawing, catalog: SurfaceMaterials | null = null, roofForms: RoofForms | null = null): DrawnSiteSlots {
+export function drawSiteSlots(device: pc.GraphicsDevice, drawing: StructuredSiteDrawing, catalog: SurfaceMaterials | null = null, roofForms: RoofForms | null = null): DrawnSiteSlots {
   const root = new pc.Entity(`generated-site:${drawing.worldId}`);
   const materials = new Map<string, pc.StandardMaterial>();
   const material = (rgb: Rgb): pc.StandardMaterial => {

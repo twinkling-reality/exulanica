@@ -247,6 +247,7 @@ _SYNTHETIC = {
     "bytea": lambda: "\\x00",
     "int4": lambda: 0,
     "int8": lambda: 0,
+    "numeric": lambda: 0,
     "timestamptz": lambda: "2000-01-01T00:00:00+00:00",
     "jsonb": lambda: {},
     "bool": lambda: False,
@@ -269,6 +270,7 @@ def test_every_kinds_statements_run_against_the_schema(repository, spine_schema)
     assert read_withdrawals(connection) == []
     assert stale_withdrawals(connection, []) == []
     for kind in CATALOG:
+        assert all(types[(kind.table, column)][0] == "numeric" for column in kind.decimal_columns)
         row = {}
         for (table, column), (type_name, type_kind) in types.items():
             if table != kind.table:
@@ -282,7 +284,27 @@ def test_every_kinds_statements_run_against_the_schema(repository, spine_schema)
                 )[0]["enumlabel"]
             elif type_name in _SYNTHETIC:
                 row[column] = _SYNTHETIC[type_name]()
+        if kind.kind == "piece_erasure_obligation":
+            row.update(basis=None, usd=None)
+        if kind.kind == "world_kind_erasure":
+            row["version"] = 1
         with connection.transaction(force_rollback=True):
+            if kind.kind == "piece_erasure_obligation":
+                connection.execute(
+                    "select set_config('exulanica.workspace_id', %s, true)",
+                    (row["workspace_id"],),
+                )
+            if kind.kind in {"world_erasure", "world_kind_erasure"}:
+                # Restore installs scoped immutable erasures even when creation postdates backup.
+                connection.execute(
+                    "select set_config('exulanica.workspace_id', %s, true)", (row["workspace_id"],)
+                )
+                connection.execute(
+                    "insert into restore_control "
+                    "(checkpoint_id,checkpoint_sha256,state,restore_id) "
+                    "values (%s,%s,'replaying',%s)",
+                    (uuid.uuid4(), "a" * 64, uuid.uuid4()),
+                )
             written = "carried" if kind.carry_absent else "absent"
             assert reapply(connection, Carried(kind.kind, row), WRITERS) == written, kind.kind
 

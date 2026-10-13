@@ -105,7 +105,7 @@ const yourWorlds = (page) => page.evaluate(`(() => { const gate = ${SAVED_WORLD_
 /** The words the inspector's why-button reads, from the catalog the page draws them from. */
 function whyWords() {
   const catalog = JSON.parse(readFileSync(join(REPOSITORY, 'assets', 'catalogs', 'society-words',
-    'society-inhabitant-words.v1.json'), 'utf8'));
+    'society-inhabitant-words.v2.json'), 'utf8'));
   const entry = catalog.entries.find((e) => e.code === 'ask_why');
   if (entry === undefined) throw new Error('the society words catalog has no ask_why entry');
   return entry.words;
@@ -121,7 +121,7 @@ function catalogWords(key) {
 /** A society words catalog entry's words, or null where the catalog states none. */
 function optionalCatalogWords(key) {
   const catalog = JSON.parse(readFileSync(join(REPOSITORY, 'assets', 'catalogs', 'society-words',
-    'society-inhabitant-words.v1.json'), 'utf8'));
+    'society-inhabitant-words.v2.json'), 'utf8'));
   return catalog.entries.find((e) => e.key === key)?.words ?? null;
 }
 

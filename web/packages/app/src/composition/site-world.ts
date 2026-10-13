@@ -1,3 +1,5 @@
+import { holdTerrainOccupancy, type TerrainOccupancyLease } from './terrain-occupancy.js';
+import type { TerrainOccupancyProof } from '@exulanica/atlas-core';
 /**
  * A saved world made from a world kind, drawn from its site's served drawing.
  *
@@ -26,7 +28,7 @@
  * pack's light and dressing on the same host, so the person stays where they stand.
  */
 
-import type { GeneratedSiteMount, SiteDrawing } from '@exulanica/atlas-react/generated-site';
+import type { GeneratedSiteMount, SiteDrawing, TerrainSiteDrawing } from '@exulanica/atlas-react/generated-site';
 import { accessHeaders, type Credentials } from '../config.js';
 import { say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
@@ -38,6 +40,11 @@ import type { SightBlocker } from './arrival-view.js';
 import type { AppEnvironment } from './session-state.js';
 import { siteSightRings } from './sight.js';
 import { WORLD_LOOK_ATTRIBUTE, swappableDrawing, type WorldLookState } from './world-look-redraw.js';
+import { rememberSiteSeats } from './site-furniture.js';
+
+function isTerrainSiteDrawing(drawing: SiteDrawing): drawing is TerrainSiteDrawing {
+  return drawing.profile === 'exulanica.site-drawing/v3' || drawing.profile === 'exulanica.site-drawing/v4';
+}
 
 /** How many times the page asks for a drawing the server's kind worker has not finished. */
 export const DRAWING_ASKS = 6;
@@ -88,8 +95,9 @@ export async function loadSiteWorld(
   wait: (ms: number) => Promise<void> = sleep,
   search: string = typeof window === 'undefined' ? '' : window.location.search,
   bound: WorldStylePackBinding | null = null,
+  currentEntry?: () => SavedWorldEntry | null,
 ): Promise<SiteWorld | null> {
-  if (entry.generatedSite == null) return null;
+  if (entry.generatedSite == null && entry.generatedTerrain == null) return null;
   const query = new URLSearchParams({ world_id: entry.worldId });
   const url = `${access.baseUrl}/world/versions/${encodeURIComponent(entry.authoredVersionId)}`
     + `/site?${query.toString()}`;
@@ -117,7 +125,13 @@ export async function loadSiteWorld(
   }
   const drawing = parseSiteDrawing(body);
   if (drawing.worldId !== entry.worldId) throw new Error("This world's drawing names another world.");
-  return siteInLook(access, drawing, new TextEncoder().encode(text).byteLength, search, bound);
+  if (isTerrainSiteDrawing(drawing)) {
+    const terrain = entry.generatedTerrain;
+    if (terrain == null || (terrain.dressingSha256 !== undefined && terrain.dressingSha256 !== (drawing.profile === 'exulanica.site-drawing/v4' ? drawing.dressingSha256 : undefined)) || terrain.regionId !== drawing.regionId || terrain.geometrySha256 !== drawing.terrain.geometry.sha256
+        || terrain.contactSha256 !== drawing.terrain.sha256 || terrain.arrivalMm.some((v, i) => v !== drawing.arrival.positionMm[i])
+        || terrain.arrivalFacingMm.some((v, i) => v !== drawing.arrival.facingMm[i])) throw new Error("This world's terrain drawing differs from its saved entry.");
+  } else if (entry.generatedSite == null) throw new Error("This world's drawing is not its declared terrain.");
+  return siteInLook(access, drawing, new TextEncoder().encode(text).byteLength, search, bound, entry, currentEntry);
 }
 
 /**
@@ -130,8 +144,10 @@ async function siteInLook(
   servedBytes: number,
   search: string,
   bound: WorldStylePackBinding | null,
+  entry: SavedWorldEntry,
+  currentEntry?: () => SavedWorldEntry | null,
 ): Promise<SiteWorld> {
-  const [{ siteMount }, worldLook, { SURFACE_MATERIALS: materials }, { ROOF_FORMS: roofForms }, { SURFACE_PATTERNS: patterns }, { SITE_SCENERY: scenery }, { SITE_INTERIOR: interior }, { GROUND_BORDERS: borders }] = await Promise.all([
+  const [{ siteMount, createDressingReadiness }, worldLook, { SURFACE_MATERIALS: materials }, { ROOF_FORMS: roofForms }, { SURFACE_PATTERNS: patterns }, { SITE_SCENERY: scenery }, { SITE_INTERIOR: interior }, { GROUND_BORDERS: borders }] = await Promise.all([
     import('@exulanica/atlas-react/generated-site'),
     import('../world-look.js'),
     import('../surface-materials.js'),
@@ -141,6 +157,13 @@ async function siteInLook(
     import('../site-interior.js'),
     import('../ground-borders.js'),
   ]);
+  const preparedDressing = drawing.profile === 'exulanica.site-drawing/v4' ? await import('./terrain-dressing.js').then(module => module.loadTerrainDressing(access, drawing.dressing)) : undefined;
+  const dressingReadiness = createDressingReadiness();
+  const terrainLease = await readTerrainOccupancy(access, entry, drawing, currentEntry);
+  const terrainOccupancy = terrainLease.read;
+  const terrainOptions = isTerrainSiteDrawing(drawing) ? {terrainOccupancy, dressingReadiness, ...(preparedDressing === undefined ? {} : {preparedDressing})} : {};
+  const measure = new URLSearchParams(search).has('measure') ? { measure: true } : {};
+  const seated = (seats: Parameters<typeof rememberSiteSeats>[2]): (() => void) => rememberSiteSeats(entry.entryId, entry.authoredVersionId!, seats);
   /** The pack a choice draws: its own, or for the default the pack the host's list marks so, by its digest. */
   const resolved = async (choice: WorldLookChoice): Promise<WorldLookChoice> => {
     if (choice.source !== 'default') return choice;
@@ -150,14 +173,25 @@ async function siteInLook(
   };
   /** The mount in a resolved choice's pack, or in the tile look for none. Throws when the pack cannot be read. */
   const mounted = async (choice: WorldLookChoice): Promise<GeneratedSiteMount> => {
-    if (choice.packId === null) return siteMount(drawing, { servedBytes, materials, roofForms, scenery, interior });
-    const [library, { packSiteDresser }] = await Promise.all([
+    if (choice.packId === null) return siteMount(drawing, { ...measure, ...terrainOptions, seated, servedBytes, materials, roofForms, scenery, interior });
+    const [library, { packSiteDresser }, { prepareTextureSet }, { parseTextureSetManifest, resolveSurfaceLookRole }] = await Promise.all([
       import('../texture-library.js').then((module) => module.committedTextureLibrary()),
       import('@exulanica/atlas-react/style-pack'),
+      import('@exulanica/atlas-react/generated-tile'),
+      import('@exulanica/atlas-core'),
     ]);
-    const prepared = await worldLook.prepareWorldLook(access, choice.packId, library.textureManifest, [], choice.manifestSha256, choice.ownBase ?? null, choice.setting ?? null);
-    const dress = packSiteDresser({ pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading, materials, patterns, borders });
-    return siteMount(drawing, { servedBytes, look: prepared.look, dress, materials, roofForms, scenery, interior });
+    const prepared = await worldLook.prepareWorldLook(access, choice.packId, library.textureManifest, [], choice.manifestSha256, choice.ownBase ?? null, choice.setting ?? null, choice.own ?? false);
+    if (isTerrainSiteDrawing(drawing)) return siteMount(drawing, { ...measure, ...terrainOptions, servedBytes, look: prepared.look });
+    const manifest = parseTextureSetManifest(library.textureManifest);
+    const setIds = new Set(drawing.slots.flatMap(slot => {
+      const surface = resolveSurfaceLookRole(prepared.pack, slot, prepared.families, slot.primitive === 'none' ? 'module' : 'either', materials);
+      return surface?.kind === 'surface' && 'texture_set' in surface.surface ? [surface.surface.texture_set] : [];
+    }));
+    const textures = new Map(await Promise.all([...setIds].map(async setId => [setId,
+      await prepareTextureSet(manifest, setId, entry => library.textureSet(entry.contentSha256)),
+    ] as const)));
+    const dress = packSiteDresser({ textures, look: prepared.look, pack: prepared.pack, families: prepared.families, pieces: prepared.pieces, shading: prepared.look.shading, materials, patterns, borders });
+    return siteMount(drawing, { ...measure, ...terrainOptions, seated, servedBytes, look: prepared.look, dress, materials, roofForms, scenery, interior });
   };
   let choice = worldLook.worldLookChoice(search, bound);
   let mount: GeneratedSiteMount;
@@ -167,14 +201,14 @@ async function siteInLook(
     mount = await mounted(choice);
   } catch (error) {
     reason = error instanceof Error ? error.message : String(error);
-    mount = siteMount(drawing, { servedBytes, materials, roofForms, scenery, interior });
+    mount = siteMount(drawing, { ...measure, ...terrainOptions, seated, servedBytes, materials, roofForms, scenery, interior });
   }
   return {
-    mount,
+    mount: leasedMount(mount, terrainLease),
     look: { pack: choice.packId, source: choice.source, drawn: reason === null && choice.packId !== null, reason },
     async relook(asked) {
       const next = await resolved(asked);
-      return { mount: await mounted(next), look: { pack: next.packId, source: next.source, drawn: next.packId !== null, reason: null } };
+      return { mount: leasedMount(await mounted(next), terrainLease), look: { pack: next.packId, source: next.source, drawn: next.packId !== null, reason: null } };
     },
   };
 }
@@ -198,6 +232,7 @@ export async function openSiteWorld(
   bound: WorldStylePackBinding | null = null,
   /** Handed the place's plan of what stands in a sight line, once its drawing is read and will be drawn. */
   standing: (blockers: readonly SightBlocker[]) => void = () => undefined,
+  currentEntry?: () => SavedWorldEntry | null,
 ): Promise<GeneratedSiteMount | null> {
   env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
   const waiting = (): void => {
@@ -208,11 +243,11 @@ export async function openSiteWorld(
     }));
   };
   try {
-    const world = await loadSiteWorld(access, entry, waiting, undefined, undefined, bound);
+    const world = await loadSiteWorld(access, entry, waiting, undefined, undefined, bound, currentEntry);
     env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
     if (world === null) return null;
     // Every box the drawing draws across the eye height a person walks it at.
-    standing(siteSightRings(world.mount.drawing, world.mount.navigationWorld.eyeHeight * 1000));
+    if (!isTerrainSiteDrawing(world.mount.drawing)) standing(siteSightRings(world.mount.drawing, world.mount.navigationWorld.eyeHeight * 1000));
     const stated = (look: WorldLookState): void => env.shell.setAttribute(WORLD_LOOK_ATTRIBUTE, JSON.stringify(look));
     stated(world.look);
     return switchableSite(world, stated, env.shell);
@@ -225,4 +260,59 @@ export async function openSiteWorld(
     }));
     return null;
   }
+}
+
+/** A proof is valid only while this mount still observes the exact entry it was read for. */
+async function readTerrainOccupancy(access: Credentials, entry: SavedWorldEntry, drawing: SiteDrawing,
+  currentEntry?: () => SavedWorldEntry | null): Promise<TerrainOccupancyLease> {
+  const unavailable: TerrainOccupancyProof = Object.freeze({status: 'unavailable'});
+  const absent: TerrainOccupancyLease = {read: () => unavailable, attach: () => () => undefined};
+  if (!isTerrainSiteDrawing(drawing) || currentEntry === undefined) return absent;
+  let revoked = false;
+  const stillCurrent = (): boolean => {
+    const current = currentEntry();
+    if (current === null || current.worldId !== entry.worldId || current.entryId !== entry.entryId
+        || current.authoredVersionId !== entry.authoredVersionId || current.authoredStateSha256 !== entry.authoredStateSha256
+        || current.currentAuthoredStateSha256 !== entry.authoredStateSha256
+        || current.authoredEditSeq !== entry.authoredEditSeq || current.currentAuthoredEditSeq !== entry.authoredEditSeq
+        || current.sourceSnapshotId !== entry.sourceSnapshotId || current.sourceSnapshotSha256 !== entry.sourceSnapshotSha256
+        || current.generatedTerrain?.geometrySha256 !== drawing.terrain.geometry.sha256 || current.generatedTerrain?.contactSha256 !== drawing.terrain.sha256
+        || current.generatedTerrain?.dressingSha256 !== entry.generatedTerrain?.dressingSha256
+        || current.availability !== 'available') revoked = true;
+    return !revoked;
+  };
+  if (!stillCurrent()) return absent;
+  return holdTerrainOccupancy(async signal => {
+  try {
+    const query = new URLSearchParams({world_id: entry.worldId, expected_state_sha256: entry.authoredStateSha256});
+    const response = await fetch(`${access.baseUrl}/world/versions/${encodeURIComponent(entry.authoredVersionId)}/terrain-contact?${query}`, {
+      headers: {...accessHeaders(access), Accept: 'application/json'}, credentials: 'same-origin', cache: 'no-store', signal,
+    });
+    if (!response.ok || !stillCurrent()) return unavailable;
+    const proof = await response.json() as Record<string, unknown>;
+    const dressed = drawing.profile === 'exulanica.site-drawing/v4';
+    const fields = 'profile world_id version_id source_snapshot_id receipt_sha256 geometry_sha256 contact_sha256 authored_state_sha256 status reason' + (dressed ? ' dressing_sha256' : '');
+    if (proof === null || typeof proof !== 'object' || Object.keys(proof).sort().join(' ') !== fields.split(' ').sort().join(' ')
+        || proof['profile'] !== (dressed ? 'exulanica.terrain-source-proof/v2' : 'exulanica.terrain-source-proof/v1')
+        || (dressed && proof['dressing_sha256'] !== drawing.dressingSha256) || proof['status'] !== 'verified' || proof['reason'] !== null
+        || proof['world_id'] !== entry.worldId || proof['version_id'] !== entry.authoredVersionId
+        || proof['source_snapshot_id'] !== entry.sourceSnapshotId || proof['authored_state_sha256'] !== entry.authoredStateSha256
+        || proof['receipt_sha256'] !== drawing.receiptSha256 || proof['geometry_sha256'] !== drawing.terrain.geometry.sha256
+        || proof['contact_sha256'] !== drawing.terrain.sha256) return unavailable;
+    const accepted: TerrainOccupancyProof = Object.freeze({status: 'verified', worldId: entry.worldId,
+      versionId: entry.authoredVersionId, receiptSha256: drawing.receiptSha256, geometrySha256: drawing.terrain.geometry.sha256,
+      contactSha256: drawing.terrain.sha256, authoredStateSha256: entry.authoredStateSha256});
+    return stillCurrent() ? accepted : unavailable;
+  } catch { return unavailable; }
+  }, stillCurrent);
+}
+
+function leasedMount(mount: GeneratedSiteMount, lease: TerrainOccupancyLease): GeneratedSiteMount {
+  return {...mount, attach(host) {
+    const stop = lease.attach();
+    try {
+      const attachment = mount.attach(host);
+      return {...attachment, get metrics() {return attachment.metrics;}, dispose() {stop(); attachment.dispose();}};
+    } catch (error) {stop(); throw error;}
+  }};
 }

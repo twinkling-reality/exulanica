@@ -553,7 +553,7 @@ def test_the_kind_draft_plan_answers_the_manifests_drafter_with_the_fixture_farm
     from exulanica.selection.kind_drafting import DRAFTER_ROLE
 
     sys.path.insert(0, str(ROOT / "tests"))
-    from kind_briefs import brief_of, fixture_kind, held_to_form
+    from kind_briefs import current_farm_form
 
     plan = json.loads(DRIVE.KIND_DRAFT_PLAN.read_text())
     drafter = load_manifest()[DRAFTER_ROLE].primary.model_id
@@ -562,7 +562,23 @@ def test_the_kind_draft_plan_answers_the_manifests_drafter_with_the_fixture_farm
     assert {rule["match"]["model"] for rule in plan["rules"]} == {drafter}
     assert set(by_words) == set(plan["descriptions"].values())
     ready = by_words[plan["descriptions"]["ready"]]
-    assert json.loads(ready["content"]) == held_to_form(brief_of(fixture_kind("farm")))
+    brief = json.loads(ready["content"])
+    assert brief == current_farm_form("farmhouse", "barn", "duck pond")
+    # The scripted success must compile and admit, not merely conform to its JSON form.
+    from exulanica.selection.kind_brief import compile_brief
+    from exulanica.world.kinds.document import read_kind
+    from exulanica.world.kinds.samples import check_samples
+
+    from kind_briefs import PROVENANCE
+
+    description = plan["descriptions"]["ready"]
+    compiled = compile_brief(
+        brief,
+        description=description,
+        provenance={**PROVENANCE, "words_sha256": hashlib.sha256(description.encode()).hexdigest()},
+    )
+    assert check_samples(read_kind(compiled.document))["verdict"] == "passed"
+    assert {claim["words"] for claim in brief["requirements"]} == {"farmhouse", "barn", "duck pond"}
     assert json.loads(by_words[plan["descriptions"]["refused"]]["content"]) == {"zones": []}
     assert by_words[plan["descriptions"]["failed"]]["status"] == 500
 

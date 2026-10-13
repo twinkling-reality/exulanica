@@ -26,6 +26,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Final
 
+import pytest
 from exulanica.environment import (
     DerivedEnvironmentAsset,
     EnvironmentFeatureInput,
@@ -390,6 +391,20 @@ def society_thing(owner) -> dict[str, Any]:
         "/world/versions/{version_id}/society/things/{thing_id}": thing["id"],
         "/world/versions/{version_id}/society/play/{subject_id}": being,
     }
+
+
+def selected_subject(owner) -> dict[str, Any]:
+    """A real being's subject reference and its owning version, created through the API."""
+    made = society_thing(owner)
+    being = made["/world/versions/{version_id}/society/play/{subject_id}"]
+    return {
+        "/world/versions/{version_id}": made["/world/versions/{version_id}"],
+        "/world/versions/{version_id}/subjects/{ref}": f"being:{being}",
+    }
+
+
+def invented_subject() -> str:
+    return f"being:{uuid.uuid4()}"
 
 
 # -- admitted environment sources --------------------------------------------------------------
@@ -1142,13 +1157,53 @@ def _ended_draft(owner, purpose: str) -> uuid.UUID:
 
 
 def kind_draft(owner) -> uuid.UUID:
-    """A kind's draft in the owner's workspace, ended."""
-    return _ended_draft(owner, "kind")
+    """A durable kind draft refused without inference, owned by this requester."""
+    from exulanica.world.kind_draft_jobs import KindDraftRepository
+
+    repo = KindDraftRepository(owner.repository.connection, owner.workspace_id)
+    ident = repo.submit(
+        actor=owner.actor,
+        description="a small farm",
+        guest=False,
+        starts_maximum=100,
+        workspace_maximum=1,
+        deadline_seconds=600,
+        manifest_sha256="a" * 64,
+        prompt_version="private-fixture",
+    )
+    claimed = repo.claim()
+    assert claimed is not None
+    repo.finish(
+        claimed,
+        dict(
+            state="refused",
+            calls=[],
+            model_id=None,
+            refusal={"code": "kind_not_drafted", "detail": "No kind was drafted."},
+        ),
+    )
+    return ident
 
 
 def world_draft(owner) -> uuid.UUID:
-    """A world's draft in the owner's workspace, ended: read by its own route only."""
-    return _ended_draft(owner, "world")
+    """A durable native world draft refused without inference, made through its repository."""
+    from exulanica.world.world_draft_jobs import WorldDraftRepository, terms_sha256
+
+    from test_world_draft_jobs_postgres import definition
+
+    repository = WorldDraftRepository(owner.repository.connection, owner.workspace_id)
+    words = "a small town"
+    made = repository.submit(
+        actor=owner.actor,
+        request_id=uuid.uuid4(),
+        description=words,
+        terms_sha256=terms_sha256(words, None, None),
+        definition=definition(),
+        guest=False,
+        starts_maximum=100,
+    )
+    repository.end_unstarted(owner.actor, made, "world_draft_funding_refused")
+    return made
 
 
 def reference_request(owner) -> uuid.UUID:
@@ -1335,6 +1390,21 @@ def held_look(owner) -> str:
 def held_kind(owner) -> str:
     """The kind of a creature the owner's workspace holds, by its document's digest."""
     return _held_creature(owner).kind.sha256
+
+
+def held_world_kind(owner) -> str:
+    """A checked library world-kind version (domain, without enabling model drafting)."""
+    from exulanica.world.kinds.document import read_kind
+    from exulanica.world.kinds.repository import WorkspaceKinds
+    from exulanica.world.kinds.samples import check_samples
+
+    from test_world_kinds_postgres import _uploaded
+
+    kind = read_kind(_uploaded("farm"))
+    WorkspaceKinds(owner.repository.connection, owner.workspace_id).append(
+        kind, check_samples(kind), created_by=owner.actor
+    )
+    return kind.sha256
 
 
 def creature_draft(owner) -> str:
@@ -1528,6 +1598,81 @@ def _generated(owner) -> dict[str, Any]:
     return owner.memo["generated"]
 
 
+def support_placement_probe() -> dict[str, Any]:
+    """A complete rigid placement request, before its saved source and state are resolved."""
+    from exulanica.things.kinds import shipped_thing_kinds
+
+    return {
+        "params": {"world_id": WORLD},
+        "json": {
+            "base_state_sha256": "0" * 64,
+            "thing_id": "thing:support-probe",
+            "kind": shipped_thing_kinds()[("lantern", 1)].reference(),
+            "region_id": "region:generated",
+            "position_mm": [50400, -5340],
+            "yaw_microradians": 0,
+            "origin_role": "fictional",
+            "support": {
+                "profile": "exulanica.support-reference/v1",
+                "world_id": WORLD,
+                "source_snapshot_id": "00000000-0000-0000-0000-000000000001",
+                "receipt_sha256": "0" * 64,
+                "network_sha256": "0" * 64,
+                "region_id": "region:generated",
+                "surface_id": "deck",
+            },
+        },
+    }
+
+
+def supported_version(owner) -> uuid.UUID:
+    """A native farm and the retained 150 mm deck fixture (domain worker, saved authority).
+
+    Its world id also exists in the stranger's workspace, so the requests reach the version
+    lookup. Placement and preview use the ordinary API under the provisioned runtime role.
+    """
+    from exulanica.world.generated_worlds import create_kind_world_authorities
+    from exulanica.world.kinds.document import read_kind
+    from exulanica.world.kinds.worker import WorkerComposer
+
+    from kind_briefs import fixture_kind
+    from test_support_site import authoring, context
+
+    if "supported_version" not in owner.memo:
+        kind = read_kind(fixture_kind("farm"))
+        composer = WorkerComposer(owner.workspace_id, support=authoring(context()["base_place"]))
+        composed = composer(kind, kind.values(kind.presets[0][0]), WORLD)
+        snapshot, _, version = create_kind_world_authorities(
+            owner.repository.connection,
+            workspace_id=owner.workspace_id,
+            actor=owner.actor,
+            title="Existence support fixture",
+            kind=kind.kind,
+            version=kind.version,
+            composed=composed,
+        )
+        composer.keep()
+        prefix = f"/world/versions/{version}"
+        drawing = _ok(in_world(owner, "GET", prefix + "/site"), 200)
+        held = _ok(in_world(owner, "GET", prefix), 200)
+        request = support_placement_probe()
+        request["json"]["base_state_sha256"] = held["state_sha256"]
+        request["json"]["support"].update(
+            source_snapshot_id=str(snapshot),
+            receipt_sha256=drawing["receipt_sha256"],
+            network_sha256=drawing["support"]["network"]["document_sha256"],
+        )
+        owner.memo["supported_version"] = version
+        owner.memo["support_placement_request"] = request
+    return owner.memo["supported_version"]
+
+
+def support_placement_request(owner) -> dict[str, Any]:
+    """Placement on the owner's exact saved deck, away from its actor corridor."""
+    supported_version(owner)
+    return copy.deepcopy(owner.memo["support_placement_request"])
+
+
 def generated_tile(owner) -> dict[str, Any]:
     """A world generated from the small-town recipe (API), and the key its first tile's bake is
     stored under. No test bakes it, so the owner is answered that the world names no such baked
@@ -1701,3 +1846,223 @@ def character_preparation(owner) -> uuid.UUID:
         inputs={"catalog_sha256": zero, "family": {}, "identity_sha256": zero},
     )
     return record.preparation_id
+
+
+# -- model evidence and browser participation --------------------------------------------------
+
+
+def _model_probe(owner):
+    """Prepare a real probe through the API, using the suite's scripted provider transport."""
+    if "model_probe" not in owner.memo:
+        from decimal import Decimal
+
+        from spending_support import spending_client
+        from test_model_probes_postgres import ProbeTransport, _candidate
+
+        bench = owner.fixture("bench")
+        spending = bench.durable()
+        transport = ProbeTransport()
+        client = spending_client(spending, transport)
+        owner.app.state.services = dataclasses.replace(
+            owner.app.state.services,
+            model_client=client,
+            spending=spending,
+            runs_model_probe_worker=True,
+            model_probe_workspaces=(owner.workspace_id,),
+            admits_workspace_models=True,
+        )
+        spec = _candidate()
+        body = {
+            "provider": spec.provider,
+            "model_id": spec.model_id,
+            "request_id": str(uuid.uuid4()),
+        }
+        _ok(owner.request("POST", "/models", json=body), 200)
+        found = _ok(owner.request("POST", "/models/probes/prepare", json=body), 200)
+        ceiling = Decimal(found["definition"]["operation_estimate"]["ceiling_usd"])
+        authority = bench.issue(ceiling=ceiling * 2)
+        bench.grant(authority, owner.workspace_id, ceiling=ceiling)
+        owner.memo["model_probe"] = found
+    return owner.memo["model_probe"]
+
+
+def model_probe(owner) -> str:
+    return _model_probe(owner)["probe_id"]
+
+
+def model_probe_start_request(owner) -> dict[str, Any]:
+    found = _model_probe(owner)
+    return {
+        "json": {
+            "request_id": str(uuid.uuid4()),
+            "definition_sha256": found["definition"]["document_sha256"],
+            "ceiling_usd": found["definition"]["operation_estimate"]["ceiling_usd"],
+        }
+    }
+
+
+def model_binding(owner) -> str:
+    """Execute only scripted replies, then retain the normal proven execution snapshot."""
+    from exulanica.world.model_probe_worker import ModelProbeWorker
+
+    from spending_support import WorkspacePolicy
+
+    found = _model_probe(owner)
+    _ok(
+        owner.request(
+            "POST", f"/models/probes/{found['probe_id']}/start", **model_probe_start_request(owner)
+        ),
+        202,
+    )
+    services = owner.app.state.services
+    worker = ModelProbeWorker(
+        services.database,
+        client=services.model_client,
+        spending=services.spending,
+        policy_for=WorkspacePolicy,
+        workspaces=lambda: (owner.workspace_id,),
+    )
+    assert worker.turn(owner.workspace_id)
+    source = services.workspace_execution_source(
+        owner.workspace_id,
+        found["definition"]["engine"],
+        frozenset({found["definition"]["model_id"]}),
+    )
+    assert source is not None
+    return source[2]
+
+
+def removable_world(owner) -> str:
+    return _generated(owner)["world_id"]
+
+
+def _invited_world(owner):
+    """A generated world, a kept creature and a real society, read by a bound browser."""
+    if "invited_world" not in owner.memo:
+        from datetime import UTC, datetime, timedelta
+
+        from exulanica.api.participation import ParticipationRuntime
+        from exulanica.api.society_making import SocietyHooks
+        from exulanica.api.society_runtime import SocietyRuntime
+        from exulanica.participation.contracts import notice_reference
+        from exulanica.world.society_composition import reviewed_affordance_registry
+
+        runtime = SocietyRuntime(
+            store=owner.store,
+            authored_bindings=[],
+            reviewed_affordances=reviewed_affordance_registry(),
+        )
+        state = owner.app.state
+        # Participation retains its own configured services and hooks. Other builders keep
+        # the fixture adapter registered for their versions after this scoped construction.
+        with pytest.MonkeyPatch.context() as configured:
+            configured.setattr(
+                state,
+                "services",
+                dataclasses.replace(
+                    state.services, societies_of_things=True, society_runtime=runtime
+                ),
+            )
+            configured.setattr(state, "society_initial_input", runtime.initial_input)
+            configured.setattr(state, "society_input_authorizer", runtime.authorize)
+            configured.setattr(state, "society_authored_edit", runtime.authored_edit, raising=False)
+            entry = _generated(owner)
+            version = entry["authored_version_id"]
+            root = f"/world/versions/{version}"
+            params = {"world_id": entry["world_id"]}
+            base = _ok(owner.request("GET", root, params=params), 200)["state_sha256"]
+            east, height, south = entry["generated_ground"]["arrival_mm"]
+            kind = held_kind(owner)
+            _ok(
+                owner.request(
+                    "POST",
+                    root + "/things",
+                    params=params,
+                    json={
+                        "base_state_sha256": base,
+                        "thing_id": "existence-creature",
+                        "kind": {"source": "workspace", "sha256": kind},
+                        "region_id": "region:generated",
+                        "pose": {
+                            "x_mm": east,
+                            "y_mm": height,
+                            "z_mm": south,
+                            "yaw_microradians": 0,
+                        },
+                        "origin_role": "fictional",
+                    },
+                ),
+                201,
+            )
+            _ok(
+                owner.request(
+                    "POST",
+                    root + "/society",
+                    params=params,
+                    json={"region_id": "region:generated", "profile": THINGS},
+                ),
+                200,
+                201,
+            )
+            participation = ParticipationRuntime(state.services, SocietyHooks.of_app(owner.app))
+            participation.verify()
+            state.participation = participation
+            invitation = _ok(
+                owner.request(
+                    "POST",
+                    "/world/invitations",
+                    params=params,
+                    json={
+                        "idempotency_key": str(uuid.uuid4()),
+                        "version_id": version,
+                        "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+                        "world_words": "A town to observe",
+                    },
+                ),
+                200,
+            )
+            _ok(
+                owner.request(
+                    "POST",
+                    "/participation/redeem",
+                    json={
+                        "invitation": invitation["invitation"],
+                        "notice_sha256": notice_reference()["sha256"],
+                    },
+                ),
+                200,
+            )
+            owner.memo["invited_world"] = {"entry": entry, "invitation": invitation}
+    return owner.memo["invited_world"]
+
+
+def invitation(owner) -> str:
+    return _invited_world(owner)["invitation"]["grant_id"]
+
+
+def participation_file(owner) -> dict[str, str]:
+    grant = invitation(owner)
+    body = _ok(owner.request("GET", f"/participation/{grant}/world"), 200)
+    assert body["files"]
+    return {
+        "/participation/{grant_id}": grant,
+        "/participation/{grant_id}/world/files/{sha256}": body["files"][0]["sha256"],
+    }
+
+
+def participation_tile(owner) -> dict[str, str]:
+    from types import SimpleNamespace
+
+    from test_generated_worlds import _baker
+
+    grant = invitation(owner)
+    api = SimpleNamespace(repository=owner.repository, database=owner.app.state.services.database)
+    outcomes = _baker(api, owner.tiles, owner.tmp_path, owner.fixture("monkeypatch")).drain(
+        [owner.workspace_id]
+    )
+    assert outcomes and all(outcome.status == "baked" for outcome in outcomes)
+    body = _ok(owner.request("GET", f"/participation/{grant}/world"), 200)
+    return {
+        "/participation/{grant_id}": grant,
+        "/participation/{grant_id}/world/tiles/{baked_tile_id}": body["tiles"][0]["baked_tile_id"],
+    }

@@ -24,6 +24,8 @@ export interface CardMindChoice {
   readonly line: string;
   /** A short note at its right ("Lowest cost"), or null. */
   readonly badge: string | null;
+  /** The served token rates, not a quote or approval for running the model. */
+  readonly price?: string;
   readonly now: boolean;
   /** Why it cannot be chosen here, in words, or null. */
   readonly refused: string | null;
@@ -159,6 +161,8 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
   const root = el('section', { class: 'thing-card', 'aria-label': 'What this is' });
   let subject: string | null = null;
   let choosing = false;
+  let pendingMind: string | null = null;
+  let selectionRevision = 0;
   let busy = false;
   let outcome: string | null = null;
   let lookChoosing = false;
@@ -176,11 +180,11 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
     const changeable = mind.choices.length > 0;
     const toggle = changeable
       ? el('button', {
-        type: 'button', class: 'thing-card-change', text: choosing ? 'Done' : 'Change',
+        type: 'button', class: 'thing-card-change', text: choosing ? 'Cancel' : 'Change', disabled: busy,
         'data-action': 'card.mind.change', 'aria-expanded': String(choosing),
       })
       : null;
-    toggle?.addEventListener('click', () => { choosing = !choosing; draw(); });
+    toggle?.addEventListener('click', () => { choosing = !choosing; pendingMind = null; outcome = null; draw(); });
     const box = row('Mind', mind.mark === null ? [] : [markPill(mind.mark)], toggle);
     if (!choosing) {
       box.append(
@@ -190,11 +194,11 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
       );
     } else {
       box.append(el('p', { class: 'thing-card-muted', text: mind.ask }));
-      const list = el('div', { class: 'thing-card-choices', role: 'list' });
+      const list = el('div', { class: 'thing-card-choices', role: 'group', 'aria-label': 'Choose a mind' });
       for (const choice of mind.choices) {
         const button = el('button', {
           type: 'button', class: 'thing-card-choice', 'data-action': 'card.mind.choose', 'data-key': choice.key,
-          role: 'listitem',
+          'aria-pressed': String(pendingMind === choice.key),
         }, [
           el('span', { class: 'thing-card-choice-text' }, [
             el('span', { class: 'thing-card-choice-name', text: choice.name }),
@@ -202,13 +206,25 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
             ...(choice.now || choice.badge === null ? [] : [el('span', { class: 'thing-card-badge', text: choice.badge })]),
           ]),
           ...(choice.now ? [el('span', { class: 'thing-card-now-badge', text: 'Now' })] : []),
+          ...(pendingMind === choice.key ? [el('span', { class: 'thing-card-now-badge', text: 'Selected' })] : []),
         ]);
         button.toggleAttribute('data-now', choice.now);
         button.disabled = busy || choice.now || choice.refused !== null;
-        button.addEventListener('click', () => { void choose(choice.key); });
+        button.addEventListener('click', () => { pendingMind = choice.key; outcome = null; draw(); });
         list.append(button);
       }
-      box.append(list, el('p', {
+      const selected = mind.choices.find(choice => choice.key === pendingMind && !choice.now && choice.refused === null);
+      const price = el('p', {
+        class: 'thing-card-faint thing-card-price', role: 'status',
+        text: selected === undefined ? 'Choose a mind to review its rates.'
+          : selected.price ?? 'This server names no price for this model.',
+      });
+      const apply = el('button', {
+        type: 'button', class: 'thing-card-apply', 'data-action': 'card.mind.apply',
+        text: busy ? 'Applying mind…' : 'Apply mind', disabled: busy || selected === undefined,
+      });
+      apply.addEventListener('click', () => { if (selected !== undefined) void choose(selected.key); });
+      box.append(list, price, apply, el('p', { class: 'thing-card-faint', text: 'Assignment does not start a model call. Running it uses the world’s model budget.' }), el('p', {
         class: 'thing-card-faint', text: busy ? 'Choosing…' : mind.when,
       }));
     }
@@ -349,39 +365,51 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
 
   async function choose(key: string): Promise<void> {
     if (busy) return;
+    const revision = selectionRevision;
     busy = true;
     draw();
     try {
-      outcome = await handlers.onChoose(key);
+      const result = await handlers.onChoose(key);
+      if (revision !== selectionRevision) return;
+      outcome = result;
       choosing = false;
+      pendingMind = null;
     } catch {
+      if (revision !== selectionRevision) return;
       outcome = 'The mind was not changed. Try again in a moment.';
     } finally {
-      busy = false;
-      draw();
+      if (revision === selectionRevision) { busy = false; draw(); }
     }
   }
 
   async function chooseLook(key: string): Promise<void> {
     const onLook = handlers.onLook;
     if (lookBusy || onLook === undefined) return;
+    const revision = selectionRevision;
     lookBusy = true;
     lookOutcome = null;
     draw();
     try {
-      lookOutcome = await onLook(key);
+      const result = await onLook(key);
+      if (revision !== selectionRevision) return;
+      lookOutcome = result;
       lookChoosing = false;
     } catch {
+      if (revision !== selectionRevision) return;
       lookOutcome = { words: 'The look was not changed. Try again in a moment.', proof: null };
     } finally {
-      lookBusy = false;
-      draw();
+      if (revision === selectionRevision) { lookBusy = false; draw(); }
     }
   }
 
   function draw(): void {
     const model = current;
     if (model === null) { root.replaceChildren(); return; }
+    const active = document.activeElement instanceof HTMLElement && root.contains(document.activeElement)
+      && root.dataset['subject'] === model.subject ? document.activeElement : null;
+    const action = active?.dataset['action'];
+    const key = active?.dataset['key'];
+    const scroll = root.querySelector('.thing-card-choices')?.scrollTop ?? 0;
     const title = el('div', { class: 'thing-card-title' }, [
       el('h3', { text: model.title }),
       ...(model.mark === null ? [] : [markPill(model.mark)]),
@@ -407,14 +435,26 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
     parts.push(came);
     root.replaceChildren(...parts);
     root.dataset['subject'] = model.subject;
+    const choices = root.querySelector('.thing-card-choices');
+    if (choices !== null) choices.scrollTop = scroll;
+    if (action !== undefined) {
+      const controls = [...root.querySelectorAll<HTMLButtonElement>('button[data-action]')];
+      const restored = controls.find(control => control.dataset['action'] === action && control.dataset['key'] === key && !control.disabled)
+        ?? controls.find(control => control.dataset['action'] === 'card.mind.change' && !control.disabled);
+      restored?.focus({ preventScroll: true });
+    }
   }
 
   return {
     root,
     render(model) {
       if (model.subject !== subject) {
+        selectionRevision += 1;
         subject = model.subject;
         choosing = false;
+        pendingMind = null;
+        busy = false;
+        lookBusy = false;
         outcome = null;
         lookChoosing = false;
         lookOutcome = null;

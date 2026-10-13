@@ -49,6 +49,7 @@ the capacity class, as an account's is.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager
 from typing import Annotated
@@ -64,7 +65,9 @@ from exulanica.api.permissions import (
     MEMBERSHIP_ROLE_PERMISSIONS,
     SELF_CHARGING_TILE_ROUTES,
     Authentication,
+    BrowserRequires,
     Channel,
+    Granted,
     Permission,
     PermissionRefused,
     Public,
@@ -79,6 +82,7 @@ from exulanica.door.bridges import Bridge, BridgeNotAccepted
 from exulanica.door.secrets import ChannelNotAccepted, ChannelSession, open_channel
 from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.identity import IdentityRepository
+from exulanica.participation.repository import ParticipantScope, ParticipationRefused
 from exulanica.selection.validation import Session
 
 __all__ = [
@@ -120,6 +124,7 @@ _AUTHORISED_GRANT = "exulanica_authorised_grant"
 #: Where it leaves what a channel route's door credential resolved to: the bridge, or the channel.
 _DOOR_BRIDGE = "exulanica_door_bridge"
 _DOOR_CHANNEL = "exulanica_door_channel"
+_PARTICIPANT = "exulanica_participant"
 
 
 def _matched_path(request: Request) -> str | None:
@@ -190,6 +195,9 @@ async def authorise_route(request: Request) -> None:
     if isinstance(rule, Channel):
         await run_in_threadpool(_authorise_channel, request, rule)
         return
+    if isinstance(rule, Granted):
+        await run_in_threadpool(_authorise_participant, request, rule)
+        return
     await run_in_threadpool(_authorise, request, path)
 
 
@@ -256,6 +264,13 @@ def _authorise(request: Request, path: str | None) -> None:
     services = get_services(request)
     try:
         rule = require(held, request.method, path)
+        if isinstance(rule, BrowserRequires) and (
+            request.headers.get("authorization") is not None
+            or services.accounts is None
+            or getattr(request.app.state, "participation", None) is None
+            or (rule.owner_only and not owns_workspace(request, session))
+        ):
+            raise PermissionRefused(method=request.method, path=path, missing=rule.permissions)
     except PermissionRefused as refused:
         with services.database.session(session.workspace_id) as connection:
             record_refusal(
@@ -278,6 +293,48 @@ def _authorise(request: Request, path: str | None) -> None:
             charge_tiles(connection, session.workspace_id, TILES_PER_REQUEST)
     setattr(request.state, _AUTHORISED, session)
     setattr(request.state, _AUTHORISED_GRANT, held)
+
+
+def _authorise_participant(request: Request, rule: Granted) -> None:
+    session, held, _creator = _resolve(request, request.headers.get("authorization"))
+    services = get_services(request)
+    path = _matched_path(request)
+    try:
+        if request.headers.get("authorization") is not None or not rule.permissions <= held:
+            raise ParticipationRefused()
+        runtime = getattr(request.app.state, "participation", None)
+        if runtime is None:
+            raise ParticipationRefused()
+        try:
+            grant = uuid.UUID(request.path_params.get("grant_id", ""))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise ParticipationRefused() from exc
+        scope = runtime.open(grant, session.actor, check_sources=rule.check_sources)
+    except ParticipationRefused as exc:
+        refused = PermissionRefused(method=request.method, path=path, missing=rule.permissions)
+        with services.database.session(session.workspace_id) as connection:
+            record_refusal(
+                connection, workspace_id=session.workspace_id, actor=session.actor, refused=refused
+            )
+        raise refused from exc
+    claim_workspace(request.scope, session.workspace_id)
+    setattr(request.state, _PARTICIPANT, scope)
+    setattr(request.state, _AUTHORISED, session)
+    setattr(request.state, _AUTHORISED_GRANT, held)
+
+
+def current_participant(request: Request) -> ParticipantScope:
+    scope = getattr(request.state, _PARTICIPANT, None)
+    if scope is None:
+        rule = rule_for(request.method, _matched_path(request))
+        if not isinstance(rule, Granted):
+            raise ParticipationRefused()
+        _authorise_participant(request, rule)
+        scope = getattr(request.state, _PARTICIPANT)
+    return scope
+
+
+CurrentParticipant = Annotated[ParticipantScope, Depends(current_participant)]
 
 
 def current_session(

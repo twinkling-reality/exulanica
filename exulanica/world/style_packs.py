@@ -27,9 +27,10 @@ import hashlib
 import json
 import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from dataclasses import field as dataclass_field
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, NoReturn
 
 from exulanica_pieces.budgets import BUDGETS_PROFILE, PieceBudget, read_budgets
 
@@ -42,15 +43,18 @@ __all__ = [
     "PREVIEW_MAX_BYTES",
     "PROFILE",
     "LookFamily",
+    "LookFamilyCatalog",
     "PieceBudget",
     "StylePackContext",
     "StylePackRefused",
     "canonical_json",
+    "context_for_manifest",
     "is_plain_text",
     "load_context",
     "manifest_sha256",
     "read_manifest",
     "read_piece_budgets",
+    "require_chain_catalog",
     "role_offer",
     "split_look_role",
 ]
@@ -138,9 +142,17 @@ class LookFamily:
 
 
 @dataclass(frozen=True, slots=True)
+class LookFamilyCatalog:
+    sha256: str
+    families: Mapping[str, LookFamily]
+
+
+@dataclass(frozen=True, slots=True)
 class StylePackContext:
     families: Mapping[str, LookFamily]
     texture_sets: frozenset[str]
+    family_catalogs: Mapping[int, LookFamilyCatalog] = dataclass_field(default_factory=dict)
+    legacy_families: Mapping[str, LookFamily] | None = None
 
 
 Reader = Callable[[Any, str], Any]
@@ -159,7 +171,7 @@ class _Optional:
     read: Reader
 
 
-def _fail(reason: str, path: str, detail: str) -> Any:
+def _fail(reason: str, path: str, detail: str) -> NoReturn:
     raise StylePackRefused(reason, path, detail)
 
 
@@ -472,6 +484,53 @@ def split_look_role(role: str, path: str) -> tuple[str, str]:
     return family, leaf
 
 
+def _catalog_pin(value: Any, path: str, context: StylePackContext) -> dict[str, Any]:
+    pin = _object(
+        value,
+        path,
+        {
+            "version": _integer(1, 1_000_000),
+            "sha256": _pattern(_SHA256, "a lowercase SHA-256"),
+        },
+    )
+    known = context.family_catalogs.get(pin["version"])
+    if known is None:
+        _fail("reference", _join(path, "version"), "names no retained look-family catalog")
+    if known.sha256 != pin["sha256"]:
+        _fail("reference", _join(path, "sha256"), "does not match the retained catalog bytes")
+    return pin
+
+
+def context_for_manifest(
+    manifest: Mapping[str, Any], context: StylePackContext
+) -> StylePackContext:
+    """Select only a retained appearance catalog, preserving legacy semantics when absent.
+
+    The digest is of the retained file's exact bytes. No manifest may supply a path or URL.
+    Selection does not change a kind's catalog or canonical drawing.
+    """
+    legacy = context.families if context.legacy_families is None else context.legacy_families
+    if "look_family_catalog" not in manifest:
+        return replace(context, families=legacy, legacy_families=legacy)
+    pin = _catalog_pin(manifest["look_family_catalog"], "look_family_catalog", context)
+    return replace(
+        context, families=context.family_catalogs[pin["version"]].families, legacy_families=legacy
+    )
+
+
+def require_chain_catalog(chain: Sequence[Mapping[str, Any]]) -> None:
+    """A chain shares one explicit pin, or every manifest keeps the legacy absence.
+
+    Catalog selection is not inherited: an unpinned child cannot reinterpret a pinned base,
+    nor can a pinned child reinterpret historical pieces from an unpinned base.
+    """
+    if chain and any(
+        manifest.get("look_family_catalog") != chain[0].get("look_family_catalog")
+        for manifest in chain[1:]
+    ):
+        _fail("reference", "base", "every manifest of a chain must select the same look catalog")
+
+
 def role_offer(
     chain: Sequence[Mapping[str, Any]], role: str, context: StylePackContext
 ) -> str | None:
@@ -482,6 +541,9 @@ def role_offer(
     leaf, then the family's default, a surface or a module as the family takes. A slot's size can
     still pass a dressed role to the primitive at draw time; this is the question a role asks of a
     look."""
+    require_chain_catalog(chain)
+    if chain:
+        context = context_for_manifest(chain[0], context)
     family, leaf = split_look_role(role, "role")
     kind = context.families.get(family)
     if kind is None:
@@ -503,10 +565,18 @@ def role_offer(
 def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
     """Read a manifest, or refuse it with the first rule it breaks, by reason and path."""
 
+    selected = context_for_manifest({}, context)
+
+    def select_catalog(value: Any, path: str) -> dict[str, Any]:
+        nonlocal selected
+        pin = _catalog_pin(value, path, context)
+        selected = context_for_manifest({"look_family_catalog": pin}, context)
+        return pin
+
     def look_role_key(dressings: tuple[str, ...]) -> Callable[[str, str], None]:
         def read(key: str, path: str) -> None:
             family, _leaf = split_look_role(key, path)
-            known = context.families.get(family)
+            known = selected.families.get(family)
             if known is None:
                 _fail("reference", path, f"names no look family {json.dumps(family)}")
             elif known.dressing not in dressings:
@@ -652,6 +722,7 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
                     ),
                 },
             ),
+            "look_family_catalog": _Optional(select_catalog),
             "surfaces": _record(look_role_key(("surface", "both")), surface, 256),
             "modules": _record(
                 look_role_key(("module", "both")),
@@ -695,7 +766,7 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
             ),
         },
     )
-    _check_whole(manifest, context)
+    _check_whole(manifest, selected)
     return manifest
 
 
@@ -852,22 +923,35 @@ def manifest_sha256(manifest: Mapping[str, Any]) -> str:
 
 
 def load_context(root: Path) -> StylePackContext:
-    """The world kinds' look families and the texture manifest's set ids, read from ``root``."""
-    catalog = json.loads(
-        (root / "assets/catalogs/world-kinds/look-family.v1.json").read_text(encoding="utf-8")
-    )
-    families = {
-        entry["key"]: LookFamily(
-            fit=entry["fit"],
-            dressing=entry["dressing"],
-            fill_minimum_permille=entry["fill_minimum_permille"],
-            fill_maximum_permille=entry["fill_maximum_permille"],
-        )
-        for entry in catalog["entries"]
-    }
+    """Legacy families, retained appearance catalogs and texture ids from trusted ``root``.
+
+    Only these explicit retained filenames are registered, never a manifest-supplied path or a
+    latest-version glob. The optional v2 file allows minimal legacy fixture roots to keep working.
+    """
+    catalogs: dict[int, LookFamilyCatalog] = {}
+    for version in (1, 2):
+        path = root / f"assets/catalogs/world-kinds/look-family.v{version}.json"
+        if version == 2 and not path.exists():
+            continue
+        raw = path.read_bytes()
+        catalog = json.loads(raw)
+        if catalog["catalog_id"] != "look-family" or catalog["catalog_version"] != version:
+            raise ValueError(f"{path}: is not look-family catalog version {version}")
+        families = {
+            entry["key"]: LookFamily(
+                fit=entry["fit"],
+                dressing=entry["dressing"],
+                fill_minimum_permille=entry["fill_minimum_permille"],
+                fill_maximum_permille=entry["fill_maximum_permille"],
+            )
+            for entry in catalog["entries"]
+        }
+        catalogs[version] = LookFamilyCatalog(hashlib.sha256(raw).hexdigest(), families)
     textures = json.loads((root / "assets/textures/manifest.json").read_text(encoding="utf-8"))
     sets = frozenset(str(entry["set_id"]) for entry in textures["sets"])
-    return StylePackContext(families=families, texture_sets=sets)
+    return StylePackContext(
+        families=catalogs[1].families, texture_sets=sets, family_catalogs=catalogs
+    )
 
 
 def read_piece_budgets(root: Path) -> dict[str, PieceBudget]:

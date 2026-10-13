@@ -62,8 +62,8 @@ from test_world_objects_api import CUBE, PARAMETERS, STRANGER_TOKEN, transform
 from test_world_objects_api import objects_api as imported_objects_api  # noqa: F401
 from test_world_objects_postgres import another_connection
 from tests_support_api import EVERY_PERMISSION, scratch_database
-from world_structure_fixtures import structural_candidate
-from world_support import registered_world
+from world_structure_fixtures import invalidate_snapshot_source, structural_candidate
+from world_support import fixture_workspace, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -336,10 +336,7 @@ def _unknown_attachment(api, repository, version):
 
 
 def _invalidated(api, repository, version):
-    repository.insert_tombstone(
-        scope="workspace", requested_by=uuid.uuid4(), reason="the person deleted their world"
-    )
-    repository.connection.commit()
+    invalidate_snapshot_source(repository, api.world_id, api.snapshot_id, api.actor)
     return reviewed(version), "source_invalidated", version
 
 
@@ -399,7 +396,8 @@ def test_absent_foreign_and_other_world_versions_answer_the_same_bytes(objects_a
     version = objects_api.version()
     body = reviewed(version)
     # The stranger holds a world of the same id, so its request reaches the version it names.
-    registered_world(repository.connection, objects_api.stranger_workspace_id)
+    with fixture_workspace(repository.connection, objects_api.stranger_workspace_id):
+        registered_world(repository.connection, objects_api.stranger_workspace_id)
     for route in (preview, apply):
         absent = route(objects_api, uuid.uuid4(), body)
         other_world = route(objects_api, version["version_id"], body, "world:authored:elsewhere")

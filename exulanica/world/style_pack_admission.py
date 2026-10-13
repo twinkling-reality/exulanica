@@ -234,6 +234,7 @@ def admit(
     budgets: Mapping[str, style_packs.PieceBudget],
     lod1_share_permille: int,
     resolve_base: BaseResolver,
+    resolve_base_manifest: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
 ) -> AdmittedStylePack:
     """Every check that needs no accessor data, in the order above, or the first refusal."""
     declaration = parse_declaration(declaration_raw)
@@ -284,6 +285,17 @@ def admit(
     if manifest["base"] is not None:
         named = manifest["base"]
         source = resolve_base(named)
+        if resolve_base_manifest is not None:
+            try:
+                style_packs.require_chain_catalog((manifest, resolve_base_manifest(named)))
+            except style_packs.StylePackRefused as refused:
+                raise StylePackAdmissionRefused(
+                    "invalid_style_data", str(refused), path=refused.path
+                ) from refused
+        elif "look_family_catalog" in manifest:
+            raise StylePackAdmissionRefused(
+                "invalid_style_data", "the pinned base manifest must be checked", path="base"
+            )
         base = PackBase(source, named["pack_id"], named["version"], named["manifest_sha256"])
 
     listed = {file["path"]: file for file in manifest["files"]}

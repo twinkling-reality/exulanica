@@ -1,0 +1,13 @@
+/* Tune strength and the clear upper portion once, or override them on a reading surface. */
+.pane.section-atmosphere {
+  --section-fade-strength: 24%;
+  --section-fade-start: 20%;
+  background: linear-gradient(180deg,
+    var(--reading-canvas) var(--section-fade-start),
+    color-mix(in srgb,var(--section-light) 12%,var(--reading-canvas)) 55%,
+    color-mix(in srgb,var(--section-color) var(--section-fade-strength),var(--reading-canvas)) 100%);
+  /* Remain anchored to the pane while its article scrolls. */
+  background-attachment: scroll;
+}
+.documentation-pane.section-atmosphere { --section-fade-strength: 12%; --section-fade-start: 35%; }
+@media(forced-colors:active) { .pane.section-atmosphere { background: Canvas; } }

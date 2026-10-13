@@ -85,7 +85,8 @@ owner's workspace and each guest's while the guest is there
 Implementation:
 
 - shared identity, draws, events and digests: `exulanica/world/society.py`;
-- which engines exist and what each can do: `exulanica/world/society-engines.v4.json`, read by
+- which engines exist and what each can do: `exulanica/world/society-engines.v5.json`, the newest
+  version beside the module, read by
   `exulanica/world/society_engines.py`;
 - the grounds a society stands on, with what people walk, the population rule, lattice and
   declared area of each, the dependency its input names its place under, the kinds of the
@@ -101,10 +102,14 @@ Implementation:
 - the living town: the living society's modules with its input's projection
   (`place_from_town_input`) and a person's decisions in it,
   `exulanica/world/society_living_decisions.py`;
-- the v4 living society: `exulanica/world/society_living.py`, its routine catalogs
+- the v4 living society:   `exulanica/world/society_living.py`, the rule of its day
+  (what a person with needs, a home and perhaps a job does next,
+  and for how long: pure functions of the person, the place, the routine, the seed and the minute),
+  its routine catalogs
   `exulanica/world/society_catalogs.py` over `assets/catalogs/society/`, the place contract
   `exulanica/world/society_place.py`, the generated-city place `exulanica/world/society_city_place.py`
   and run measurements `exulanica/world/society_metrics.py`;
+- the optional resident day in a society of things;
 - purposeful policy and input validation: `exulanica/world/society_planner.py`;
 - how people walk, for every engine but v1: the walking movement module,
   `exulanica/movement/walking.py` ([movement modules contract](movement-modules-contract.md#walking));
@@ -128,7 +133,7 @@ Implementation:
 
 ## Engines and what each can do
 
-`exulanica/world/society-engines.v4.json` states which engine profiles exist and, for each,
+`exulanica/world/society-engines.v5.json` states which engine profiles exist and, for each,
 whether a society may still be created with it, whether it consumes authorised inputs, whether the
 playback worker may play it (and the refusal it gives when not), whether it takes directed actions,
 model decisions or experiments, whether the world's owner may choose a model that decides for one
@@ -140,8 +145,9 @@ created with (`creates`: a district's, a saved world's, and a town's, a saved wo
 records state its walking surfaces and homes), which the browser reads rather than naming an
 engine, and, from its third version, the engine a saved world takes instead where its version holds
 a thing its author placed and the host offers societies of things (`creates_holding_things`: the
-society of things, over the society grounds it names, the ones a society of things stands on; a
-world made from a world kind is lived in by the living society alone, so it is not named). A saved
+society of things, over the society grounds it names, the ones a society of things stands on:
+from the fifth version every ground a saved world has, a world made from a world kind among them).
+A saved
 world's entry and its version's capability read state that engine while the version holds no
 society; a society already held keeps its engine; and a creation naming another engine for such a
 world is refused by name (`409 society_engine_differs`). `model_decisions` means the engine's history may hold validated model decisions,
@@ -155,15 +161,22 @@ engines that host each role and so where the owner's model choices are recorded 
 `tests/test_decision_roles.py` holds them equal to the engines whose `owner_model_choice` the table
 states. An engine the table does not state is refused by name wherever it is looked up, and a
 retired one is refused by name when a creation asks for it (`409 society_engine_retired`). The
-table's first shape, `society-engines.v1.json`, its second, `society-engines.v2.json`, and its
-third, `society-engines.v3.json`, stay beside it because evaluation records and the comparison
-drawing of their day name them, each held to this one's rows by a test; the loader and the browser
-read the second and the third as they read the fourth. The fourth differs from the third in one
-thing: an engine may state no maximum population, and the three engines a town's society is made
-with state none. How many people a town holds is its homes' own number, admitted by the measured
+table's earlier versions, `society-engines.v1.json` to `society-engines.v4.json`, stay beside it
+because evaluation records, the comparison drawing of their day and the societies made under them
+name them, each held to this one's rows by a test. The loader and the browser read the newest
+version the directory holds and read any table from the second on by its profile's number: what a
+table may state is what its version had come to state (an engine for a world holding things from
+the third, no maximum population from the fourth), so a version that states nothing new is a new
+file and a run of `pnpm run society-engines:sync`, with no reader to edit. The fifth differs from
+the fourth in one word, `generated_site` among the grounds a society of things stands on. The
+fourth differs from the third in one thing: an engine may state no maximum population, and the
+three engines a town's society is made with state none. How many people a town holds is its homes' own number, admitted by the measured
 cost of their minute where the society is made ("A town's people and the cost of their minute",
 below); migration 0191 holds those engines to their minimum alone in the society row's check and
-lets a town's input record a population of any size.
+lets a town's input record a population of any size. Migration 0191 is forward only, as every
+migration here: to go back, a later migration would narrow both checks again, and could only
+after every society of more than 512 people and every input recording more than 512 was erased,
+since a check that a stored row fails cannot be added.
 
 | Engine | Created | Inputs | Playback | Directed actions | Model decisions | Owner chooses models | Compared | Experiments | Sent away | Saved world | Population |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -1622,6 +1635,18 @@ indoor activity places the person at the premises' access node with `indoors: tr
 are always on the graph or on a spot, so v4 needs no position bound. `motion_path_mm` records
 every point passed in the minute. Weather and resources are recorded as unavailable with a reason.
 
+The society read's `places.living_destinations` states each enabled destination's
+`destination_id`, `use_class`, `label` and `indoors`, copied from the input consumed by the
+returned state. This destination fact distinguishes an outdoor workplace from an indoor one.
+The living engine's recorded `location.indoors` is also true for an occupant assigned no standing
+spot, including a worker in an outdoor field; it does not alone establish that the place is
+indoors. This read projection leaves recorded states and replay unchanged. Readers that resolve
+physical visibility use the destination fact when the location names a served destination,
+with the recorded location flag as the fallback when no destination fact is available. The
+browser resolves the current location against this list, never against a goal or intended action.
+An outdoor destination remains visible even when the legacy location flag is true; an indoor
+arrival stays visible along its recorded approach and hides at the endpoint.
+
 **Events.** V4 emits `goal_selected`, `route_progressed`, `action_completed`, `replanned` and
 `blocked` with the v2 envelope, plus the minute of day, the place digest, the inhabitant's needs
 and, for each carriageway crossing entered, `{crossing_id, arrival_second, duration_seconds}`
@@ -1860,8 +1885,9 @@ homes.
 The society of things (`exulanica/world/society_things.py`) is the purposeful society where
 everybody is a thing of a stated kind ([things contract](things-contract.md)). A society is made
 with it by name over a saved world's own lattice ground, a starter, a world made from photographs or
-a generated town (`creates` does not name it, so a new world's society stays v2 unless asked for); a
-world made from a world kind is lived in by the living society only, and refuses it. The route makes
+a generated town or a world made from a world kind (`creates` does not name it, so a new world's
+society stays its ground's engine unless asked for, or unless its version holds a thing its author
+placed). The route makes
 one only on a host that sets `EXULANICA_SOCIETY_OF_THINGS` on, and refuses it by name elsewhere
 (`society_engine_not_offered`). Its people walk, choose, stay and talk by the purposeful planner's
 rules, use their hands where a decider chooses or the world's owner asks (below), and follow
@@ -1925,9 +1951,9 @@ read by an older release.
 (`modules`: sorted, each once, each a built row of
 [`ability-modules.v1.json`](../exulanica/abilities/ability-modules.v1.json)), and its minutes run
 exactly those for its whole life, whatever a later table adds; no later input states them. A new
-society records every built module at its newest version: today purposeful
-(`exulanica-ability/purposeful/v2`, below), say, crossing, hands (`exulanica-ability/hands/v2`,
-below), notice (`exulanica-ability/notice/v1`) and memory (`exulanica-ability/remember/v1`), the
+society records the default modules at their newest built versions: purposeful
+(`exulanica-ability/purposeful/v3`, below), say, crossing, hands (`exulanica-ability/hands/v2`,
+below), follow (`exulanica-ability/follow/v3`), notice (`exulanica-ability/notice/v1`) and memory (`exulanica-ability/remember/v1`), the
 last two as the [minds contract](minds-contract.md) states.
 A society whose first input names none, made before modules were
 recorded, runs purposeful, say and crossing (`BEFORE_RECORDED`), so its people never use their
@@ -1946,8 +1972,48 @@ its kind states and every other at the society's own
 records none walks by the first walking, at one budget for everybody, as it always did
 (`tests/test_society_walking_paces.py`).
 
-**The routine held to each kind.** Under the purposeful module's second version
-(`exulanica-ability/purposeful/v2`), a being does only the routine's activities its kind lists. The
+**A recorded resident day.** The optional `exulanica-ability/day/v1` module runs a resident's
+needs, home stays, work shifts and visits through the shared living-day rules. It requires an
+available first walking-surfaces-v3 input with both `people` and a `day` record. The record
+(`exulanica.resident-day/v1`) retains the source place binding, pinned routine binding, starting
+minute, destination facts and capacities, deterministic outdoor standing nodes, shortages and its
+own digest. Later inputs carry no day record. A society retains that context in `day_context`
+and runs it for its life; older inputs record neither the module nor these fields and keep their
+previous state and replay.
+
+Residents start in their own homes, with `day_home`, `day_work`, needs and a current `day` stay
+(activity, destination, end tick and shift day). The clock advances one minute per tick. The
+planner chooses and walks every route; the day module supplies a goal only when no explicit
+choice or ongoing action takes precedence. Finished stays relieve their stated need, completed
+shifts record their day, and arrivals use the routine's duration. A standing activity has no
+destination. Placed beings and visitors receive no resident day. Explicit movement leaves a home;
+waiting in a home does not place its resident outside.
+
+A resident's `location.indoors` is the destination's physical indoor fact, with
+`location.destination_id` identifying the place. A farmer working at an outdoor field remains
+outside on a distinct standing node. Outdoor workers and visitors use separately allocated clear
+nodes reachable from the destination's access node. Insufficient nodes are recorded as shortages;
+no extra capacity is invented. Indoor occupants reserve no street node, so several households
+can use one doorway. An unavailable input blocks movement while clock, needs and stay completion
+continue; a removed current walking node blocks the affected resident until a valid input supports
+that position again.
+
+Interior occupants are withheld from outdoor hearing, following, hands actions and perceived
+surroundings. People sharing an interior can hear and perceive each other; hands and following
+remain outdoor actions. Pending hands or follow actions crossing that boundary end with
+`actor_inside` or `target_inside`. Day arrivals establish interior state before hands and following are applied. Speech retains
+the physical boundary where its speaker and hearers stood when the minute began. Model context includes the resident's current stay, clock and physical interior
+state, and its surroundings use the shared day activity words.
+
+Production composition leaves this module disabled. `SocietyRuntime(resident_day=True)` is an
+explicit integration seam, without a deployment setting or user-facing enablement. Enabling it
+for the product also requires the world reader and renderer to consume the conditional interior
+state, hide interior occupants from the exterior crowd, and present day actions coherently. The
+backend checks exercise a full-occupancy town, a farm day, retained-input checkpoint replay,
+unavailable inputs, explicit choices and interior interaction boundaries.
+
+**The routine held to each kind.** Under the purposeful module's second and third versions
+(`exulanica-ability/purposeful/v2` and `/v3`), a being does only the routine's activities its kind lists. The
 routine never sets out for it to rest, visit, stand or talk where its kind does not list that
 activity, and the options its decider is asked with leave the same out. A talk takes two beings
 whose kinds both list talk, so a villager never stops to talk with a lantern spirit. A request
@@ -1960,6 +2026,68 @@ so, and a visitor, whose kind talks but does not rest, stays free to talk. A soc
 the first version runs it for its whole life, every being doing all five as before, and its stored
 minutes replay byte for byte (`tests/test_society_kind_gates.py`, a history the code before the
 second version recorded, a spirit resting, standing, visiting and talking in it).
+
+The third version also uses the admitted kind's authored weights for ordinary autonomous
+`wait`, `stand`, `talk`, `rest` and `visit` choices. An omitted or zero weight excludes an
+activity from that distribution; an empty map or no available weighted activity leads to safe
+waiting, never an implicit return to world defaults. Only these five preferences are read:
+hands, following and `follow_holders_of` remain outside routine selection. A person with no
+kind retains the world's distribution. Missing workspace run forms provide no capability or
+preference fallback.
+
+Conversation remains the first draw, with positive talk preference required on both sides of
+an automatic pairing. Explicit admitted conversation choices do not inherit that preference
+restriction. The second draw includes available rest, visit and stand choices plus weighted
+waiting. World-owned durations, relief and geometry remain unchanged. A tired being with rest
+capability still prefers a reachable rest place even with zero rest weight; without rest
+capability its need remains zero. A completed destination is relinquished before waiting so
+an all-wait preference does not reserve a seat indefinitely. Unavailable navigation, invalid
+position and failure to find room remain real refusals.
+
+Intentional waiting is active idle with no goal or route and a stationary motion path. Its
+reason distinguishes `routine_wait` from `no_weighted_activity`; the reader describes both
+as waiting. Existing goals, accepted model pursuit, explicit choices and resident-day policies
+keep their own rules. The recorded first and second versions preserve their previous state
+and event results. Nearest-routine inputs with activity targets remain inadmissible; the third
+version does not widen that input contract. Focused coverage lives in
+`tests/test_society_routine_weights.py` and `tests/test_society_routine_weights_postgres.py`.
+
+**On a site's ground.** A world made from a world kind (a farm, a cafe, anything a kind lays
+out) is lived in as a society of things as a town is, composed by the same builder over the site's
+own surfaces: the input is `exulanica.society-input/walking-surfaces-v3` recording the navigation
+profile `site-walking-surfaces/v1`, its place dependency is the `site_place`, and `people` is the
+frame made over the site's own place under the routine the site's receipt names, so a farmer's
+job is at a field and somebody who lives off the site has their home at its entry. The places
+people stand at to use a placed thing are kept clear of what is built there: the site's blocked
+boxes (its structures, its areas, the fixtures that block, its closed zones and its walls' pieces,
+the list its own walking graph is laid clear of), which only the site's records state. The kind
+worker hands them over beside the place it makes from those records, and an input composed
+without them is refused by name rather than composed over open ground. A being placed inside a
+structure is stood at the nearest place of the walking graph, as anywhere. A thing's input carries
+no place: each later input is composed over the place the kind worker keeps, which an authored
+edit asks for and waits for before its transaction
+([world kinds](world-kinds-contract.md)); a place not made in that time is answered as being made
+(`503`, ask again). The site's ground keeps its head count of 128; a minute of a society of things
+over a site has not been measured.
+
+The engine is chosen when a site's people are brought in, as on a town: a creature placed before
+then acts among the site's people from their first minute, and a site peopled first keeps its
+living society, with the creature standing where it was put, until its newcomers are taken in
+(`POST .../society/take-in`).
+
+A site may state more people than its walking graph has places to stand: a small school of 126
+people on 69 places. Genesis then starts several people on one place, the state holds every one of
+them as living there, and all but a few stand still with nowhere to go, under the default modules, which stand each being on a place of its own without interior occupancy. No head count is refused
+for it.
+
+**Where people start.** Without a recorded resident day, genesis starts a society's people in the parts of the walking graph that
+hold something to go to, a target. A site may offer nothing to visit or rest at and still have
+people who live there: where a first input offers no target at all but states its people (the
+`people` frame), they start in the parts of the graph their own premises' doors are in. Such
+people stand and talk, which is all the purposeful routine offers where there is nothing to visit;
+the day module is what gives them a day. An input that offers any target is read as it always
+was, so no society that exists starts anywhere else, and an input with neither a target nor
+people starts nobody (`409 no_reachable_targets`).
 
 **On a town's ground.** A society of things over a generated town reads
 `exulanica.society-input/walking-surfaces-v3` (migration 0169): the town's walking-surfaces-v1
@@ -2097,25 +2225,31 @@ first, unchanged, and every event they record names v7; then the things phase:
   (`hands_missed`) when the thing or the other being is gone (`thing_gone`) or the module's three
   minutes of walking pass first (`out_of_reach`). A hands act takes no line, and the routine never
   chooses one;
-* where the society runs the follow module (`exulanica-ability/follow/v2`, every society of things
-  made since it was built), who follows whom, in the order of the beings' numbers, over where the
-  minute's walks ended. A being whose decider chose to follow another (offered where its kind
-  lists follow, toward a being within hearing reach whose kind offers `be_followed`) begins to
-  (`followed`, `chose_to_follow`, naming the other by kind and number; one following somebody else
-  first stops, `chose_otherwise`), and its state says whom it follows and since when. It follows
-  while its decider chooses each minute to go on, as a person playing it does (a minute with no
-  answer carries on; carrying on is offered at its choice point too while it follows). It stops
-  (`stopped_following`) when its decider chooses to stop (`chose_to_stop_following`) or anything but
-  going on or saying something (`chose_otherwise`), in a minute nobody decides for it, as when it is
-  given back to its routine (`not_kept`), when the one it follows is not here (`target_gone`), or
-  after the module's three minutes in a row ending more than its 2,000 mm off with no open node
-  within that distance (`lost_target`). Before the planner moves anybody, each
-  follower that a direct request or another choice did not take that minute is given its walk
-  from where everybody stood as the minute began: within the 2,000 mm it waits where it stands
+* where the society runs the follow module, who follows whom, in the order of the beings' numbers,
+  over where the minute's walks ended. A being whose decider chose to follow another (offered
+  where its kind lists follow, toward a being within hearing reach whose kind offers
+  `be_followed`) begins to (`followed`, `chose_to_follow`, naming the other by kind and number;
+  one following somebody else first stops, `chose_otherwise`), and its state says whom it follows
+  and since when. New societies record `exulanica-ability/follow/v3`, which keeps this accepted
+  intent between decision opportunities, including a missing answer or change of controller.
+  No per-minute model call is required to maintain pursuit. A society that recorded version 2
+  still requires a keeping decision each minute and stops with `not_kept` when nobody decides
+  for it, as when it is given back to its routine. A played being's unanswered minute supplies
+  carry-on under its existing rules.
+  A follower stops (`stopped_following`) when its decider chooses to stop
+  (`chose_to_stop_following`) or anything but going on or saying something (`chose_otherwise`).
+  In version 3, an applied direct owner command also stops pursuit with `chose_otherwise`, so
+  following cannot replace that new command on the next minute; a refused command does not.
+  Target departure (`target_gone`), either party entering an interior (`actor_inside` or
+  `target_inside`), and the module's three consecutive minutes more than 2,000 mm away with no
+  open node within that distance (`lost_target`) also stop it. Before the planner moves anybody,
+  each follower that a direct request or another choice did not take that minute is given its
+  walk from where everybody stood as the minute began: within 2,000 mm it waits where it stands
   when nothing is under way, and farther off it stands at the open node within that distance
-  nearest itself, a stand under way ending for the walk as a request ends a stay. Only a person
-  playing a being is offered following (the seventh action and policy catalogs,
-  [decision roles](decision-roles-contract.md#a-person-playing-a-being)); the routine never follows;
+  nearest itself, a stand under way ending for the walk as a request ends a stay. Current model
+  terms offer follow and stop only with version 3; player controls retain version-2 support
+  ([decision roles](decision-roles-contract.md#a-society-of-things-people)). The routine never
+  initiates following, and a body without admitted movement gains none from these choices;
 * where the society runs the memory module, last: the minute's events, in the order it recorded
   them, are written into the memory of each being a model or a program decides for (one a receipt
   the minute consumed names, or a visitor its own program decides for, from that minute on), as

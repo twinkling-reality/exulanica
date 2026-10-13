@@ -282,12 +282,13 @@ def _tell_societies(
     if observer is None:
         return
     versions = connection.execute(
-        "select distinct t.version_id from world_alternate_thing t join world_society s "
+        "select distinct t.world_id,t.version_id from world_alternate_thing t join world_society s "
         "on s.workspace_id=t.workspace_id and s.world_id=t.world_id and s.version_id=t.version_id "
         "where t.workspace_id=%s and t.kind_source='workspace' and t.kind_sha256=%s "
         "and not t.removed order by t.version_id",
         (session.workspace_id, bytes.fromhex(kind_sha256)),
     ).fetchall()
+    runtime = get_services(request).society_runtime
     started = _clock()
     for told, row in enumerate(versions):
         if _clock() - started >= TELLING_SECONDS:
@@ -297,6 +298,16 @@ def _tell_societies(
             )
             break
         try:
+            if runtime is not None:
+                # A site world's place, which a society of things' input does not carry, is made
+                # and waited for before the telling's transaction, for what is left of the budget.
+                runtime.prepare_authored_edit(
+                    connection,
+                    session,
+                    row["world_id"],
+                    row["version_id"],
+                    seconds=max(0.0, TELLING_SECONDS - (_clock() - started)),
+                )
             with connection.transaction():
                 observer(connection, session, row["version_id"])
         except Exception:

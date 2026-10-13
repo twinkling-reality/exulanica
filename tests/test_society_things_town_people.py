@@ -72,6 +72,19 @@ UNCHANGED = {
 }
 
 
+#: The modules f676d996's composer recorded. Compatibility inputs retain these pins even when
+#: new societies select a newer module; the engine must replay the retained versions exactly.
+RECORDED_MODULES = (
+    "exulanica-ability/crossing/v2",
+    "exulanica-ability/follow/v2",
+    "exulanica-ability/hands/v2",
+    "exulanica-ability/notice/v1",
+    "exulanica-ability/purposeful/v2",
+    "exulanica-ability/remember/v1",
+    "exulanica-ability/say/v1",
+)
+
+
 def _sha(value: Any) -> str:
     return hashlib.sha256(canonical_json(value)).hexdigest()
 
@@ -176,8 +189,9 @@ def test_a_later_input_that_states_no_people_reads_the_same_as_the_first():
 def test_an_input_with_no_frame_and_its_society_are_the_bytes_they_were(things: str):
     placed = town._scene_things() if things == "scene" else []
     document = town._compose(*placed)
-    # The bytes were recorded before a first input recorded its movement modules: the same input
-    # without that list, whose society walks by the first walking, as every stored one does.
+    # Reconstruct the retained input: it pins the ability modules that f676d996 composed, and
+    # predates recorded movement modules. Replay uses those pins and the first walking.
+    document["modules"] = list(RECORDED_MODULES)
     del document["movement_modules"]
     document = _resealed(document)
     assert "people" not in document

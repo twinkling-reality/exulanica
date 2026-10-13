@@ -9,13 +9,14 @@ from the cost ledger's row for it, with its outcome and whether its cost is know
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, Final
 
-from exulanica.models.manifest import Role
+from exulanica.models.identity import chat_model_identity, reported_model_identity
+from exulanica.models.manifest import Manifest, ModelSpec, Role
 from exulanica.models.results import NO_MODEL_IN_RESPONSE, ChatResult, EmbeddingResult
 from exulanica.models.usage import CallOutcome, CallUsage, CostBasis, usd_string
 
@@ -26,6 +27,7 @@ __all__ = [
     "CallLog",
     "CallsOnFailure",
     "ModelCall",
+    "admitted_model_call",
     "noted_calls",
 ]
 
@@ -212,6 +214,26 @@ def _reported(usage: Mapping[str, Any], key: str) -> int | None:
     return int(value)
 
 
+def admitted_model_call(
+    call: ModelCall, manifest: Manifest, *, admitted_specs: Iterable[ModelSpec] = ()
+) -> ModelCall:
+    """Withhold unadmitted identity while retaining every measured accounting field."""
+    if call.served_model is None:
+        return call
+    admitted_specs = tuple(admitted_specs)
+    specs = (*manifest.models.values(), *admitted_specs)
+    providers = {s.provider for s in specs if s.model_id == call.requested_model}
+    identity = reported_model_identity(
+        call.served_model,
+        provider=next(iter(providers)) if len(providers) == 1 else "",
+        manifest=manifest,
+        admitted_specs=admitted_specs,
+    )
+    return replace(
+        call, served_model=identity.model_id, served_model_unavailable=identity.unavailable
+    )
+
+
 class CallLog:
     """The calls one question made, in order, and every attempt it paid for.
 
@@ -265,9 +287,27 @@ class CallLog:
         # A result from a client this log did not observe, as a test double hands back.
         self._entries.append(call)
 
-    def record(self, call: ChatResult) -> ChatResult:
-        """Note one completed call and hand it straight back, so a call site stays one line."""
-        self._received(call.usage, ModelCall.from_result(call))
+    def record(
+        self,
+        call: ChatResult,
+        *,
+        manifest: Manifest | None = None,
+        admitted_specs: Iterable[ModelSpec] = (),
+    ) -> ChatResult:
+        """Record a completed call, optionally withholding identity outside admitted pairs.
+
+        The raw result is returned unchanged; an authoring workflow separately admits its
+        immutable provenance. Historical callers without a manifest retain their contract.
+        """
+        record = ModelCall.from_result(call)
+        if manifest is not None:
+            identity = chat_model_identity(call, manifest, admitted_specs=admitted_specs)
+            record = replace(
+                record,
+                served_model=identity.model_id,
+                served_model_unavailable=identity.unavailable,
+            )
+        self._received(call.usage, record)
         return call
 
     def record_embedding(self, result: EmbeddingResult, latency_ms: int) -> None:

@@ -1334,6 +1334,37 @@ class WorldStyleRepository:
         library = self._style_packs if self._style_packs is not None else style_pack_library()
         return library.holds(binding.pack_id, binding.version, binding.manifest_sha256)
 
+    def requested_pack(
+        self,
+        binding: StylePackBinding,
+        *,
+        setting: Any = None,
+        setting_parts: Mapping[str, str] | None = None,
+    ) -> StylePackBinding:
+        """Resolve a request's exact identity in the library or this workspace's wearable packs.
+
+        No request-supplied workspace or source selects the authority. Preview and apply still
+        recheck availability under their write/asset locks; this read grants no later write.
+        """
+        if not self._library_holds(binding):
+            binding = self._own_pack(replace(binding, source="workspace"), resolve=True)
+            if not binding.wearable:
+                raise InvalidStyleData(
+                    f"style pack {binding.pack_id} version {binding.version} with manifest "
+                    f"{binding.manifest_sha256} is not an available pack of this host's library "
+                    "or this workspace"
+                )
+        chain = self._pack_chain(binding)
+        if chain is None:
+            raise InvalidStyleData("the style pack's complete manifest chain is unavailable")
+        try:
+            selected = bound_setting(
+                chain, style_pack_context(), document=setting, chosen=setting_parts
+            )
+        except (SettingRefused, StylePackRefused) as refused:
+            raise InvalidStyleData(f"the world's setting is refused: {refused}") from refused
+        return replace(binding, setting=selected)
+
     def _require_library_pack(self, binding: StylePackBinding) -> None:
         if not self._library_holds(binding):
             raise InvalidStyleData(
@@ -1344,8 +1375,8 @@ class WorldStyleRepository:
     def _require_pack(self, binding: StylePackBinding) -> None:
         """A pack new state may name: the library's at exactly that version and digest, or a version
         of this workspace's own pack, by its own id, version and digest, while it may be worn (the
-        schema holds the same at insert). Which callers may name a workspace's own version is
-        theirs: the appearance routes build only library bindings."""
+        schema holds the same at insert). The appearance route resolves request identities against
+        this workspace before these locked checks run again."""
         if binding.source == "library":
             self._require_library_pack(binding)
             self._require_setting(binding)

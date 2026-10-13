@@ -80,7 +80,7 @@ def test_a_society_of_things_is_asked_under_its_newest_prompt_with_the_listener_
     person = decision_roles().role("society_decision")
     things = person.terms(THINGS_PROFILE)
     assert decision_roles().version >= 8
-    assert things.prompt_version == "society-person-choice/v5"
+    assert things.prompt_version == "society-person-choice/v6"
     assert things.line_rules == frozenset({"names_no_listener"}) <= LINE_RULES
     assert "without naming or describing them" in things.instruction
     assert "(the knight, a villager)" not in things.instruction
@@ -88,7 +88,10 @@ def test_a_society_of_things_is_asked_under_its_newest_prompt_with_the_listener_
     # Every other engine's people are asked as before, with no rule beside the line rule.
     assert person.terms().line_rules == frozenset()
     assert person.terms_with_prompt(things.prompt_version) == things
-    assert person.terms_with_prompt(PROMPT_V3) is None
+    assert person.terms_with_prompt(PROMPT_V3).line_rules == frozenset()
+    assert person.terms_with_prompt("society-person-choice/v5").line_rules == frozenset(
+        {"names_no_listener"}
+    )
 
 
 def test_a_line_naming_its_listener_is_asked_once_more_and_a_clean_one_taken():
@@ -128,6 +131,12 @@ def test_a_receipt_s_line_is_held_to_the_rule_its_request_s_prompt_states():
     naming = {**result, "proposal": {**result["proposal"], "line": "Fine evening, villager."}}
     with pytest.raises(ValueError, match="names or describes the one it is said to"):
         validate_decision_receipt(receipt_for(request, 1, naming), request)
+    # An already reserved request keeps its older prompt's rule after a registry upgrade.
+    pending = copy.deepcopy(request)
+    pending["provider_config"]["prompt_version"] = "society-person-choice/v5"
+    pending = seal({key: value for key, value in pending.items() if key != "document_sha256"})
+    with pytest.raises(ValueError, match="names or describes the one it is said to"):
+        validate_decision_receipt(receipt_for(pending, 1, naming), pending)
     # A request asked under the third prompt, which held lines to no such rule, reads as it did.
     earlier = copy.deepcopy(request)
     earlier["provider_config"]["prompt_version"] = PROMPT_V3

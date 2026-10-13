@@ -828,6 +828,27 @@ def test_a_keep_refused_after_its_record_is_reached_by_the_workspace_s_erasure(l
     assert not looks.in_namespace(_container(creature))
 
 
+def test_a_creature_guard_refused_after_the_blob_write_leaves_erasable_inventory(looks):
+    from exulanica.references.for_drafting import NotesRefused
+
+    creature = _creature()
+    checks = []
+
+    def guard():
+        checks.append(True)
+        if len(checks) == 2:
+            raise NotesRefused("reference_withdrawn")
+
+    with pytest.raises(NotesRefused):
+        looks.store.keep_creature(creature, created_by=ACTOR, guard=guard)
+    assert len(checks) == 2
+    assert set(_counts(looks.connection).values()) == {0}
+    assert looks.in_namespace(_container(creature))
+    looks.erase_workspace()
+    looks.purge_worker().drain()
+    assert not looks.in_namespace(_container(creature))
+
+
 def test_containers_kept_before_the_inventory_are_recorded_by_the_migration_s_backfill(
     looks, monkeypatch
 ):

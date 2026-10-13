@@ -44,6 +44,7 @@ not be a change to the module that decides whether a model's answer enters canon
 from __future__ import annotations
 
 import copy
+import json
 import logging
 import random
 import time
@@ -61,6 +62,7 @@ from exulanica.models.errors import (
     TransportError,
 )
 from exulanica.models.manifest import Manifest, ModelSpec, Role
+from exulanica.models.provider_catalog import ProviderPrice
 from exulanica.models.spending import (
     SpendingGate,
     SpendingRefused,
@@ -153,11 +155,53 @@ class ModelChain:
         # No credential, not even a prefix of one. A truncated key in a traceback is still a leak.
         return f"ModelChain(providers={sorted(self._manifest.providers)!r})"
 
+    def maximum_wire_attempts(self, role: Role) -> int:
+        """A conservative finite dispatch bound, including every fallback and retry."""
+        return len(self._manifest[role].chain) * self._max_attempts
+
+    def with_prices(self, manifest: Manifest, limits: Mapping[Role, tuple[int, int]]) -> ModelChain:
+        """Retain this chain's gates/retry policy, using validated prices and request limits."""
+        bound = copy.copy(self)
+        bound._manifest = manifest
+        bound._priced_limits = dict(limits)
+        return bound
+
     def with_budget(self, budget: BudgetGuard) -> ModelChain:
         """This chain, reserving and recording every attempt against ``budget`` instead."""
         bound = copy.copy(self)
         bound._budget = budget
         return bound
+
+    def for_probe(
+        self,
+        manifest: Manifest,
+        observe_response: Callable[[Mapping[str, Any]], object] | None = None,
+    ) -> ModelChain:
+        """A private candidate request, retaining every gate and issuing one attempt only."""
+        if manifest.providers != self._manifest.providers or manifest.roles != self._manifest.roles:
+            raise ValueError("a probe cannot replace providers or automatic role bindings")
+        bound = copy.copy(self)
+        bound._manifest = manifest
+        bound._max_attempts = 1
+        bound._spending_required = True
+        bound._probe_response = observe_response
+        return bound
+
+    def provider_prices(self, provider: str) -> dict[str, ProviderPrice]:
+        """Read current provider rates through the same credential and guarded transport."""
+        from exulanica.models.provider_catalog import prices
+
+        known = {
+            spec.model_id: (spec.input_usd_per_mtok, spec.output_usd_per_mtok)
+            for spec in self._manifest.models.values()
+            if spec.provider == provider
+        }
+        return prices(
+            self._manifest.provider(provider).base_url,
+            self._api_keys[provider],
+            known,
+            transport=self._transport,
+        )
 
     def with_spending(self, gate: SpendingGate) -> ModelChain:
         """This chain, admitting every attempt by ``gate`` as well as by its budget guard."""
@@ -268,6 +312,9 @@ class ModelChain:
                 retryable=False,
                 reached_provider=True,
             )
+        observer = getattr(self, "_probe_response", None)
+        if observer is not None:
+            observer(body)
         return body
 
     def worst_case_seconds(self, role: Role) -> float:
@@ -337,6 +384,18 @@ class ModelChain:
         ``deadline_ended`` and charged as a timeout is, and when no time is left the request is
         not sent and is recorded as never sent, at no cost. Neither is retried.
         """
+        limits = getattr(self, "_priced_limits", None)
+        if limits is not None:
+            limit = limits.get(Role(role))
+            # The byte envelope includes schema/repair payloads. It is not a tokenizer's
+            # measured count; the operation reserves the full supported context separately.
+            size = len(json.dumps(payload, ensure_ascii=True).encode("ascii"))
+            if limit is None or size > limit[0] or max_tokens > limit[1]:
+                raise ProviderRefused(
+                    "this request exceeds its quoted input/output envelope",
+                    provider=spec.provider,
+                    reason="world_draft_request_limit_exceeded",
+                )
         for attempt in range(1, self._max_attempts + 1):
             wait = timeout
             cut = False

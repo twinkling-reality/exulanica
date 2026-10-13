@@ -52,7 +52,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from exulanica.canonical import sha256_of_canonical
-from exulanica.world.errors import UnknownWorldResource
+from exulanica.world.errors import UnknownWorldResource, WorldRemoved
 from exulanica.world.workspace_lock import lock_workspace
 
 __all__ = [
@@ -470,8 +470,23 @@ def require_world(
     """
     world = workspace_world(connection, workspace_id, world_id)
     if world is None:
+        refuse_removed_world(connection, workspace_id, world_id)
         raise UnknownWorldResource("no such world")
     return world
+
+
+def refuse_removed_world(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str
+) -> None:
+    """A removed identifier never creates or serves a world again, within its workspace."""
+    if (
+        connection.execute(
+            "select 1 from world_erasure where workspace_id=%s and world_id=%s",
+            (workspace_id, world_id),
+        ).fetchone()
+        is not None
+    ):
+        raise WorldRemoved("This world was removed.")
 
 
 def refuse_past_limit(
@@ -492,8 +507,8 @@ def refuse_past_limit(
     first, unlocked: a cheap early refusal that may be stale, never a permission.
 
     The day's tiles are counted from the worlds the workspace made in the window and each one's
-    receipt, every tile of a world made, baked already or not. Nothing here reads whether a world
-    was later removed, so removing and making again cannot reopen the bound.
+    receipt, every tile of a world made, baked already or not. Removed worlds contribute their
+    retained creation time and tile count, so removing and making again cannot reopen the bound.
     """
     counted = current_world_count_policy() if policy is None else policy
     limit = counted.limit(kind, guest=guest)
@@ -520,8 +535,12 @@ def refuse_past_limit(
             "  and jsonb_typeof(r.receipt->'tiles')='array' "
             "where i.workspace_id=%s and i.kind=%s "
             "  and i.created_at > statement_timestamp() - make_interval(secs => %s) "
-            "group by i.world_id, i.created_at order by i.created_at, i.world_id",
-            (workspace_id, kind, window),
+            "group by i.world_id, i.created_at "
+            "union all select made_at as created_at, tiles, statement_timestamp() as now "
+            "from world_erasure where workspace_id=%s and %s='generated' "
+            "and made_at > statement_timestamp() - make_interval(secs => %s) "
+            "order by created_at",
+            (workspace_id, kind, window, workspace_id, kind, window),
         ).fetchall()
     spent = sum(row["tiles"] for row in made)
     if spent + tiles <= most:
@@ -579,6 +598,7 @@ def register_world(
                     f"world {world_id!r} is registered as {existing.kind}, not {kind}"
                 )
             return existing
+        refuse_removed_world(connection, workspace_id, world_id)
         refuse_past_limit(connection, workspace_id, kind, policy=policy, guest=guest, tiles=tiles)
         with connection.cursor(row_factory=dict_row) as cursor:
             row = cursor.execute(

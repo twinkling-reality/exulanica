@@ -10,8 +10,8 @@ wrong, so this module handles **both** observed shapes rather than trusting eith
     ``{"colours": [...]}`` while ``reasoning_content`` held five numbered thinking steps.
 *   Thinking inlined in ``message.content`` inside a ``<think>`` block. `runtime-verification.md`
     section 5 states this is what happens and that ``reasoning_content`` is null. Its own
-    archived artifacts contradict it. That contradiction is flagged in the handoff notes; the
-    code refuses to depend on which one is right, because being wrong in either direction means
+    archived artifacts contradict it. The code refuses to depend on which one is right, because
+    being wrong in either direction means
     a model's scratch work is parsed as a fact.
 
 The third case is the dangerous one and it is why ``complete`` exists: an **unterminated** open

@@ -68,6 +68,8 @@ BACKUP_SET_PROFILE: Final = "exulanica.installation-backup/v1"
 #: channel credential, so owners open their grants again, and a secret the door prunes after its
 #: retention never leaves an older backup holding a revocation a later checkpoint cannot carry.
 EPHEMERAL_TABLES: Final = (
+    "world_grant_entry",
+    "participation_redemption_refusal",
     "account_login_attempt",
     "account_browser_session",
     "door_secret",

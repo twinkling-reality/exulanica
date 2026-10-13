@@ -142,6 +142,10 @@ RUNTIME_UPDATES: dict[str, str] = {
     "world_project_share": "stopping a share sets withdrawn_at (world/project_context.py)",
     "world_society": "a society advances its tick and state; request triggers lock it",
     "world_society_control": "playback leases, pauses and schedules; event triggers lock it",
+    "world_grant_entry": (
+        "redemption sets used_at and revocation sets revoked_at once; only those columns are "
+        "granted (participation/repository.py and migration 0199)"
+    ),
     "world_clock": (
         "a transition, each committed society minute and each sealed traffic minute move a "
         "coupled world's positions forward (world/world_clock_repository.py)"
@@ -489,3 +493,51 @@ def test_a_tombstone_is_written_once_whoever_holds_update(provisioned, repositor
     assert {k: v for k, v in after.items() if k != "purge_completed_at"} == {
         k: v for k, v in before.items() if k != "purge_completed_at"
     }
+
+
+def test_participant_projections_keep_no_runtime_write_grants(
+    provisioned, repository, spine_schema
+):
+    """Reprovisioning removes old blanket grants without changing owner-reading views."""
+    from exulanica.db.participant_role import PARTICIPANT_COLUMNS, PARTICIPANT_VIEWS
+
+    # Simulate the previous runtime provisioning, including unnecessary grants made by hand.
+    for name in sorted(PARTICIPANT_VIEWS):
+        _grant(provisioned, "grant insert, update, delete on {} to {}", name, RUNTIME_ROLE)
+    provision_runtime_role(provisioned)
+    rows = provisioned.execute(
+        "select c.relname,pg_relation_is_updatable(c.oid,true) as events,"
+        "coalesce('security_barrier=true'=any(c.reloptions),false) as barrier,"
+        "coalesce('security_invoker=true'=any(c.reloptions),false) as invoker "
+        "from pg_class c where c.relnamespace=current_schema()::regnamespace "
+        "and c.relname=any(%s)",
+        (sorted(PARTICIPANT_VIEWS),),
+    ).fetchall()
+    assert {row["relname"] for row in rows} == PARTICIPANT_VIEWS
+    assert all(row["events"] == 0 and row["barrier"] and not row["invoker"] for row in rows)
+    for name in sorted(PARTICIPANT_VIEWS):
+        for role in (RUNTIME_ROLE, EXECUTOR_ROLE):
+            for verb in ("INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"):
+                assert not provisioned.execute(
+                    "select has_table_privilege(%s,%s,%s) as allowed", (role, name, verb)
+                ).fetchone()["allowed"], (role, name, verb)
+    _, scratch = spine_schema
+    with scratch_role_database(scratch, RUNTIME_ROLE).session(repository.workspace_id) as runtime:
+        for name in sorted(PARTICIPANT_VIEWS):
+            column = PARTICIPANT_COLUMNS[name][0]
+            for statement in (
+                sql.SQL("insert into {} default values").format(sql.Identifier(name)),
+                sql.SQL("update {} set {}={} where false").format(
+                    sql.Identifier(name), sql.Identifier(column), sql.Identifier(column)
+                ),
+                sql.SQL("delete from {} where false").format(sql.Identifier(name)),
+            ):
+                # PostgreSQL may reject a non-updatable JOIN view during rewrite, before
+                # checking ACLs. Both boundaries deny mutation; the exact ACL is proven above.
+                with pytest.raises(
+                    (
+                        psycopg.errors.InsufficientPrivilege,
+                        psycopg.errors.ObjectNotInPrerequisiteState,
+                    )
+                ):
+                    runtime.execute(statement)

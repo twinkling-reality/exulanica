@@ -8,9 +8,11 @@ declare module '*.css';
 interface ImportMetaEnv {
   readonly DEV: boolean;
   readonly VITE_ATLAS_URL?: string;
-  readonly VITE_WAITLIST_URL?: string;
 }
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** HTML fixtures are imported as text by the route-metadata check. */
+declare module '*.html?raw' { const source: string; export default source; }

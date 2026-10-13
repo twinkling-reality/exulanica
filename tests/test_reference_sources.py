@@ -155,6 +155,24 @@ def test_the_adapter_sends_the_catalogued_shape_and_nothing_else() -> None:
     }
 
 
+def test_search_transport_keeps_the_workers_measured_search_allowance() -> None:
+    """The transport must not cut a search before its independently budgeted stage ends."""
+    from exulanica.models.manifest import load_manifest
+    from exulanica.references.worker import stage_seconds
+
+    timeouts: list[float] = []
+
+    class Timed(FakeTransport):
+        def post_json(self, url, *, headers, payload, timeout):
+            timeouts.append(timeout)
+            return super().post_json(url, headers=headers, payload=payload, timeout=timeout)
+
+    adapter = TavilySearch(_source(), transport=Timed([_answer()]), credential=CREDENTIAL)
+    adapter.search(_query())
+    assert timeouts == [35.0]
+    assert timeouts[0] == stage_seconds(load_manifest()).search
+
+
 def test_leads_hold_excerpts_and_picture_descriptions_and_no_address_title_or_picture() -> None:
     transport = FakeTransport([_answer()])
     leads = TavilySearch(_source(), transport=transport, credential=CREDENTIAL).search(_query())

@@ -6,10 +6,10 @@ points, never by timing, as ``tests/test_tombstone_workspace_lock_postgres.py`` 
 * the tombstone first: it holds its transaction open after its insert; the ask is seen waiting for
   the workspace's lock, and when the tombstone commits the ask is refused as tombstoned;
 * the ask first: it is paused right after taking the lock; the tombstone is refused 40001 at once
-  (migration 0137), the ask commits its request, and the deletion sent again cancels it.
+  (migration 0137), the ask commits its request, and the deletion sent again erases it.
 
-The control runs first: with the store's lock taken out, the tombstone-first order leaves a
-``requested`` row in the deleted workspace, so the test can fail.
+The control takes the store's lock out: the registration's foreign key still prevents an orphan,
+but the writer gets a database error instead of the store's explicit tombstone refusal.
 """
 
 from __future__ import annotations
@@ -119,15 +119,15 @@ def _tombstone_first(spine_schema, workspace_id, *, expect_wait: bool) -> BaseEx
         observer.close()
 
 
-def test_the_control_without_the_lock_leaves_a_request_in_a_deleted_workspace(
+def test_without_the_workspace_lock_the_registration_key_still_prevents_an_orphan(
     workspace, spine_schema, monkeypatch
 ) -> None:
     monkeypatch.setattr(store, "lock_workspace", lambda connection, workspace_id: None)
-    outcome = _tombstone_first(spine_schema, workspace, expect_wait=False)
-    assert outcome is None, outcome
+    outcome = _tombstone_first(spine_schema, workspace, expect_wait=True)
+    assert isinstance(outcome, psycopg.errors.ForeignKeyViolation), outcome
     observer = connection_in(spine_schema, workspace)
     try:
-        assert _requested(observer, workspace) == 1
+        assert _requested(observer, workspace) == 0
     finally:
         observer.close()
 
@@ -142,7 +142,7 @@ def test_an_ask_after_the_tombstone_waits_and_is_refused(workspace, spine_schema
         observer.close()
 
 
-def test_a_tombstone_during_an_ask_is_refused_and_sent_again_cancels_it(
+def test_a_tombstone_during_an_ask_is_refused_and_sent_again_erases_it(
     workspace, spine_schema, monkeypatch
 ) -> None:
     held, release = threading.Event(), threading.Event()
@@ -166,11 +166,11 @@ def test_a_tombstone_during_an_ask_is_refused_and_sent_again_cancels_it(
         assert _requested(observer, workspace) == 1
         _workspace_tombstone(deleter, workspace)
         assert _requested(observer, workspace) == 0
-        [row] = observer.execute(
+        rows = observer.execute(
             "select state, failure from piece_request where workspace_id = %s",
             (workspace,),
         ).fetchall()
-        assert (row["state"], row["failure"]) == ("cancelled", "workspace_deleted")
+        assert rows == []
     finally:
         release.set()
         deleter.close()

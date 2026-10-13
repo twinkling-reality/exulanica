@@ -23,7 +23,7 @@ from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.transport import HttpResponse
-from exulanica.references import store
+from exulanica.references import drafting, store
 from exulanica.references.bundle import read_bundle
 from exulanica.references.pictures import PictureUnavailable, ReferencePicture
 from exulanica.references.worker import ReferenceWorker
@@ -127,7 +127,7 @@ def scene(repository):
             web=False,
             description="a harbour town",
             withheld_words=["Rosalind"],
-            prompts_sha256="e" * 64,
+            prompts_sha256=drafting.reference_prompts().sha256,
             pictures=pictures,
         )
         return made

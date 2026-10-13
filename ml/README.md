@@ -73,14 +73,10 @@ that run. The intended route is the container:
 ml/container/run.sh IMAGE@sha256:... EXPORT_DIR OUT_DIR "approval reference" --epochs 20
 ```
 
-The first run is not scheduled. It needs four things:
-
-- a lockfile for this project, which does not exist yet. Resolving torch is a download, so making
-  one waits for a yes. Nothing checks for it yet: the change that adds it should also make `train`
-  refuse to start without it and record its digest in the receipt;
-- an operator's yes to building the image, which downloads it;
-- an operator's yes to the GPU time;
-- a place to keep the weights and the receipt.
+This project has no lockfile. Resolving torch is a download, and nothing checks for a lockfile.
+The change that adds one should also make `train` refuse to start without it and record its
+digest in the receipt. Weights and the receipt need a directory the operator chooses. The
+approval variable above is the permission to run.
 
 ## Tests
 

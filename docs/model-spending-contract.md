@@ -48,7 +48,19 @@ admission:
   cancelled (`exulanica/api/comparison_spending.py`,
   [comparisons](society-experiments.md#running-a-comparison)). A start whose bound or calls the
   grant has not left room for is refused before anything is written; it is never given a smaller
-  bound. Comparisons are the only work that opens one.
+  bound. Whole-world drafts also open provider bounds under their accepted operation sheet.
+
+A whole-world draft (`GET /worlds/drafts`) quotes fresh provider rates separately from its
+operation ceiling. The ceiling covers full admitted input contexts, actual output limits,
+schema repairs, transport retries and fallbacks across either tool path. Provider ceilings sum
+to one accepted total; they are reservation bounds, not expected spend or invoices. The explicit
+native POST rechecks the sheet and opens idempotent `world-draft:<draft id>:<provider>` bounds.
+Every dispatch is fenced by the live durable job claim inside the same witnessed transaction as
+financial dispatch. A cancellation that commits first prevents dispatch; a dispatch that commits
+first retains its in-flight liability and may settle after cancellation. Restart recovery reads
+saved results without inference, and erasure retains financial identities without refunding spend.
+The [world drafting contract](world-kinds-contract.md#a-world-made-from-a-sentence) owns request
+identity, readback and content retention.
 
 Nothing is granted because a workspace exists: a workspace with no live grant refuses every attempt
 as `spending_not_granted`, and no import, seed or restore creates a grant (spending tables never
@@ -141,13 +153,12 @@ the request; each attempt inside is admitted as `<key>#<n>` in order, so the rep
 the same attempts. Outside one, every attempt has a fresh key and is accounted durably but is not
 deduplicated.
 
-No production caller makes its requests inside one yet. Every attempt of the API, the workers, the
-comparisons and the decision host is admitted under a fresh `auto:` key
-(`exulanica/models/chain.py`). So a request a caller replays after a crash, or a job its queue runs
-again, is admitted as new attempts: what each reserves is held and settled as
-[section 3](#3-an-attempt-from-admission-to-settlement) says, and the authority still bounds what is
-spent, but the same request can be sent, and billed, twice. The deduplication in the table holds
-for a caller that passes a key, which today is the tests
+The reference worker and the creature-draft worker admit inside `spending_request_key`, keyed by
+job id (`exulanica/references/worker.py`, `exulanica/selection/creature_drafts.py`). An attempt
+with no enclosing key is admitted under a fresh `auto:` key from `next_request_key` in
+`exulanica/models/spending.py`. A request those two workers replay after a crash is the same
+attempts. A request with no enclosing key can be sent, and billed, twice. The API, the decision
+host, and comparisons do not pass a request key
 ([section 12](#12-what-this-does-not-provide)).
 
 | An attempt with the key is | Asking again |
@@ -289,7 +300,11 @@ read; reconciliation is an operator's act.
   workspace policy names, set by the composition from the authenticated session; a client composed
   with the authority refuses a request with none.
 - `process`: the process spends within its fuse alone, and `/readyz` says that a restart or another
-  process starts it again at zero.
+  process starts it again at zero. Native-kind draft jobs remain durable in this mode, but their
+  durability adds no installation-wide monetary ceiling. An interrupted running draft is not
+  automatically dispatched again. With durable spending, dispatch binds the live draft claim to
+  its reservation; cancellation before dispatch refuses the send, while a dispatched attempt
+  still settles its liability if cancellation prevents publication.
 - `EXULANICA_SPENDING_WITNESS_DIR` names the witness directory; a durable process without it refuses
   to spend under a witnessed authority, and `/readyz` says so. A directory with no marker is named
   in `/readyz` too: the process refuses to spend under any authority whose directory is recorded.
@@ -380,12 +395,12 @@ taken effect, so asking again would repeat the step.
   under the same key starts it at zero, still inside its grant and authority, which are carried. A
   restore that lost no ledger step needs no reconciliation, so a bound closed after its backup is
   open again unless a sealed restore checkpoint carried the closure; what it committed is accurate.
-- OPEN. Deduplicating a replayed request is a delivered mechanism with no production caller: no API,
-  worker or comparison path passes `spending_request_key`, so a request replayed after a crash is
-  admitted as new attempts, within the allowance, and may be sent and billed again (section 4). The
-  decision host, by its decision request, and derivative jobs, by job and stage, are its planned
-  first users. Comparisons, which open durable bounds (section 2), pass no request key either: a
-  takeover's replayed ask is admitted as a new attempt, within the comparison's bound.
+- OPEN. Deduplicating a replayed request is delivered for the reference worker and the
+  creature-draft worker, each keyed by job id. No committed API, decision-host, or comparison
+  path passes `spending_request_key`. A request those paths replay after a crash is admitted as
+  new attempts, within the allowance, and may be sent and billed again (section 4). Comparisons,
+  which open durable bounds (section 2), pass no request key either: a takeover's replayed ask
+  is admitted as a new attempt, within the comparison's bound.
 - OPEN. An attempt admitted and never dispatched holds its reservation against the authority until
   an admission of its workspace takes the authority's row or an operator runs `expire`. An admission
   refused before the row (no live grant, an authority that changed or is suspended, a witness that

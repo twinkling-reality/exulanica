@@ -16,7 +16,7 @@ client, and examples. The product never imports, depends on or packages it
 
 | Who | Does | Time |
 | --- | --- | --- |
-| The world's owner | Issues a grant to the agents' bridge naming a world version and either one of its own things or a body of the agent's own, with a direct channel credential (`exulanica-agent grant`, or `POST /door/grants` with `channel_credential` true), and hands the key to whoever runs the agent | under a minute |
+| The world's owner | Issues a grant to the agents' bridge naming a world version and either one of its own things or a body of the agent's own, with a direct channel credential (`exulanica-agent grant`, or `POST /door/grants` with `channel_credential` true). The token needs `world.write` and `door.grant`. The owner hands the key to whoever runs the agent | under a minute |
 | The agent's developer | Installs `exulanica-agent`, sets the world's address and the key, starts the quickstart or adds the facade to an MCP client | a few minutes |
 | The world | Asks the agent at its thing's next turn and carries on whether or not it answers | one or two world minutes (8 seconds each at normal speed) |
 
@@ -24,7 +24,8 @@ The owner can end the grant at any moment (`POST /door/grants/{grant_id}/revoke`
 own routine decides for the thing from then on. The owner can also replace the key
 (`exulanica-agent key`, `POST /door/grants/{grant_id}/channel-credentials`): a grant has one key at
 a time, so the earlier key stops working at once, and the agent holding it is told in words why its
-connection ended.
+connection ended. Replacing the key and revoking the grant need the same `world.write` and
+`door.grant` pair. A token of only `world.read` and `world.write` is refused `403 not_authorised`.
 
 ## What the server needs
 
@@ -41,9 +42,10 @@ A deployment admits outside agents with one entry in `EXULANICA_DOOR_BRIDGES`
 
 ## Bringing an agent in
 
-With Python, [`examples/quickstart.py`](../../bridges/agents/examples/quickstart.py) is a whole agent
-in 24 lines of code whose mind is an open model on Nebius Token Factory; one line switches it to an
-NVIDIA Nemotron mind. The key is read from `EXULANICA_AGENT_KEY`, or from a file named by
+With Python, [`examples/quickstart.py`](../../bridges/agents/examples/quickstart.py) runs an agent
+with a model on Nebius Token Factory. Set `NEBIUS_MODEL` to an available provider model ID that
+supports tool calls, and `NEBIUS_API_KEY` to your provider key. The agent key is read from
+`EXULANICA_AGENT_KEY`, or from a file named by
 `EXULANICA_AGENT_KEY_FILE` so that it never shows on a screen or in a process list. Each turn hands
 the mind `turn.messages` and `turn.tool`, which are exactly the messages and the forced function one
 of the world's own models receives, and answers with `turn.act(action, line)`.

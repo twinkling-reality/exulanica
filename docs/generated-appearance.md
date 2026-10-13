@@ -4,8 +4,9 @@ Status: research, not a product surface. Track A measured 64 model-made texture 
 structure (section 9): seams sit inside the published sets' own range, structure edges are kept,
 and every picked tile was looked at at 1:1. No model-made set is published or pinned, and Track B
 has not run. Generated assets (section 11), static pieces a model makes for a style pack, are a
-prototype: the records, the post-process and the writer run with a stub in place of the models, and
-no model has made a piece. The code is `ml/appearance/` ([its README](../ml/appearance/README.md)).
+prototype: the records, the post-process and the writer also run with a stub. Rented sessions
+have made pieces, and section 11 records them, including each refusal. The code is `ml/appearance/`
+([its README](../ml/appearance/README.md)).
 
 ## 1. In plain words
 

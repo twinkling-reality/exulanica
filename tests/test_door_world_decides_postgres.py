@@ -28,8 +28,8 @@ import uuid
 from typing import Any
 
 import pytest
+from exulanica.api import services as services_module
 from exulanica.api.routes import door as door_routes
-from exulanica.api.routes import society_models as society_models_routes
 from exulanica.db.session import Database
 from exulanica.door import sweep as sweep_module
 from exulanica.door.bridges import load_bridge_directory
@@ -84,7 +84,7 @@ def _application(door, monkeypatch):
     monkeypatch.setenv("EXULANICA_API_TOKENS", json.dumps({TOKEN: every, UNPAID: unpaid}))
     manifest, model_id = decisions._offered()
     monkeypatch.setattr(door_routes, "load_manifest", lambda: manifest)
-    monkeypatch.setattr(society_models_routes, "load_manifest", lambda: manifest)
+    monkeypatch.setattr(services_module, "load_manifest", lambda: manifest)
     entries = json.loads(
         door_support.bridges_setting(
             listed=False, workspaces=[str(world["workspace"])], hold_seconds=1

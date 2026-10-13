@@ -1,0 +1,181 @@
+/* Calm reading planes and fine-edged controls, derived from the public navigation. */
+:root {
+  --reading-marker-size: 17px;
+  --reading-column: 540px;
+  --reading-axis-height: clamp(96px,25vh,320px);
+  --capability-reading-width: 720px;
+  --reading-title-leading: 1.15;
+  --reading-title-tracking: -.035em;
+  --reading-lead-leading: 1.5;
+  --reading-compact-label: 14px;
+  --reading-target: 44px;
+  --reading-focus-weight: 2px;
+  --reading-focus-offset: 4px;
+  --capability-diagram-size: 440px;
+  --capability-diagram-compact: 360px;
+  --capability-control-size: 264px;
+  --capability-line-weight: 2px;
+  --reading-canvas: var(--landing-canvas);
+  --reading-ink: var(--landing-ink);
+  --reading-body: var(--landing-ink-soft);
+  --reading-muted: var(--landing-ink-faint);
+  --reading-accent: #53652f;
+  --reading-focus: var(--landing-focus);
+  --reading-line: #d4dbd2;
+  --reading-edge: #a7b59b;
+  --reading-surface: #f5f7f1;
+  --reading-hover: #eef2e7;
+  --reading-action-hover: var(--landing-action-hover);
+  --reading-action-pressed: var(--landing-action-pressed);
+  --reading-selected: #e8eedf;
+  --reading-pressed: #dce5cf;
+  --reading-disabled: #65705f;
+  --reading-error: #893e4d;
+  --reading-error-surface: #fbf0f2;
+  --reading-radius: 9px;
+  --reading-corner-tight: 4px;
+  --reading-corner-soft: 12px;
+  --reading-control-profile: var(--reading-corner-tight) var(--reading-corner-soft) var(--reading-corner-tight) var(--reading-corner-soft);
+  --reading-action-corner: 2px;
+  --reading-action-sweep: 8px;
+  --reading-action-profile: var(--reading-action-corner) var(--reading-action-sweep) var(--reading-action-corner) var(--reading-action-corner);
+  --reading-frame-profile: var(--reading-action-corner) 10px var(--reading-action-corner) var(--reading-action-corner);
+  --reading-panel-profile: 6px 20px 6px 20px;
+  --reading-row-radius: 3px;
+  --reading-title: clamp(30px, 3vw, 40px);
+  --reading-section: clamp(22px, 2.2vw, 26px);
+  --reading-lead-size: 18px;
+  --reading-purpose-size: clamp(21px,2vw,22px);
+  --reading-body-size: 16px;
+  --reading-label: var(--ui-text-compact);
+  --reading-leading: 1.7;
+  --reading-weight-title: 300;
+  --reading-weight-control: 400;
+  --reading-weight-selected: 500;
+  --reading-control-size: var(--ui-control-target);
+  --reading-icon-size: 16px;
+  --reading-space-1: 8px;
+  --reading-space-2: 16px;
+  --reading-space-3: 24px;
+  --reading-space-4: 32px;
+  --reading-space-5: 48px;
+  --reading-motion: var(--interaction-duration);
+  --reading-motion-quick: var(--motion-quick);
+  --reading-ease: var(--interaction-ease);
+  --reading-control-fill: linear-gradient(145deg, var(--reading-canvas), var(--reading-surface));
+  --reading-inset-edge: inset 0 1px 0 var(--reading-canvas);
+  --reading-elevation: 0 16px 40px rgb(18 23 21 / 10%), 0 2px 6px rgb(18 23 21 / 5%);
+  --reading-dialog-elevation: 0 28px 80px rgb(18 23 21 / 18%);
+  --reading-scrim: rgb(18 23 21 / 28%);
+  --reading-method-get: #316753;
+  --reading-method-get-surface: #d9eae2;
+  --reading-method-post: #735184;
+  --reading-method-post-surface: #eae0f0;
+  --reading-method-delete: #8b3e4e;
+  --reading-method-delete-surface: #f8e9ed;
+  --reading-method-change: #795c29;
+  --reading-method-change-surface: #f6edda;
+}
+/* Documentation distinguishes actions, frames and metadata without repeating menu silhouettes. */
+:is(.documentation-pane,.documentation-search) {
+  --reading-accent: var(--landing-ink);
+  --reading-line: color-mix(in srgb, var(--landing-ink) 15%, var(--landing-canvas));
+  --reading-edge: color-mix(in srgb, var(--landing-ink) 35%, var(--landing-canvas));
+  --reading-surface: color-mix(in srgb, var(--landing-ink) 2%, var(--landing-canvas));
+  --reading-hover: color-mix(in srgb, var(--landing-ink) 4%, var(--landing-canvas));
+  --reading-selected: color-mix(in srgb, var(--landing-ink) 6%, var(--landing-canvas));
+  --reading-pressed: color-mix(in srgb, var(--landing-ink) 9%, var(--landing-canvas));
+  --reading-disabled: var(--landing-ink-faint);
+  --reading-control-profile: 8px;
+  --reading-action-corner: 8px;
+  --reading-action-sweep: 8px;
+  --reading-action-profile: 8px;
+  --reading-frame-profile: 12px;
+  --reading-panel-profile: 16px;
+  --reading-row-radius: 4px;
+  --reading-tag-profile: 999px;
+  --reading-menu-size: 36px;
+  --reading-control-fill: var(--landing-canvas);
+  --reading-inset-edge: none;
+}
+/* Code is an inset reading surface; syntax is the color-bearing content. */
+.documentation-pane {
+  --reading-code-canvas: color-mix(in srgb, var(--reading-ink) 4%, var(--reading-canvas));
+  --reading-code-ink: var(--reading-ink);
+  --reading-code-muted: var(--reading-muted);
+  --reading-code-edge: var(--reading-line);
+  --reading-code-hover: var(--reading-action-hover);
+  --reading-code-selected: var(--reading-selected);
+  --reading-code-string: var(--reading-method-get);
+  --reading-code-keyword: var(--reading-method-post);
+  --reading-code-comment: var(--reading-muted);
+  --reading-code-error: var(--reading-error);
+  --reading-code-copy-width: 96px;
+}
+:root[data-theme='landing-dark'] .documentation-pane {
+  --reading-code-string: #b8d8cc;
+  --reading-code-keyword: #d5bde4;
+}
+:is(.site-page,.docs-article) :is(h1,h2,h3) { color: var(--reading-ink); font-weight: 400; letter-spacing: -.035em; }
+:is(.site-page,.docs-article) h1 { font-size: var(--reading-title); line-height: 1.15; }
+:is(.site-page,.docs-article) h2 { font-size: var(--reading-section); line-height: 1.25; }
+:is(.site-page,.docs-article) p { color: var(--reading-body); line-height: var(--reading-leading); }
+:is(.site-page,.documentation-pane,.documentation-search) :is(a,button,input,summary):focus-visible { outline: 2px solid var(--reading-focus); outline-offset: 3px; }
+.nav-direct { text-decoration: none; }
+
+/* Copy glyphs change only when the clipboard confirms completion. */
+.copy-glyph { position: relative; display: inline-flex; width: var(--reading-icon-size); height: var(--reading-icon-size); flex: none; }
+.copy-glyph .icon { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity var(--reading-motion-quick) var(--reading-ease), transform var(--reading-motion-quick) var(--reading-ease); }
+.copy-glyph .icon-check { opacity: 0; transform: scale(.8); }
+[data-copy-state='success'] > .copy-glyph .icon-copy { opacity: 0; transform: scale(.8); }
+[data-copy-state='success'] > .copy-glyph .icon-check { opacity: 1; transform: scale(1); }
+[data-copy-state='pending'] > .copy-glyph { opacity: .5; }
+
+/* Page actions share state vocabulary; their contour follows the enclosing reading surface. */
+.reading-tools { display: flex; align-items: center; flex-wrap: wrap; gap: var(--reading-space-1); margin-top: var(--reading-space-3); font-size: var(--reading-label); }
+.reading-tools :is(button,a) { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: var(--reading-space-1); min-height: var(--reading-control-size); padding: 0 12px; border: 1px solid var(--reading-line); border-radius: var(--reading-control-profile); background: var(--reading-control-fill); box-shadow: var(--reading-inset-edge); color: var(--reading-body); font: inherit; text-decoration: none; cursor: pointer; transition: background var(--reading-motion) var(--reading-ease), border-color var(--reading-motion) var(--reading-ease), color var(--reading-motion) var(--reading-ease); }
+.reading-tools :is(button,a):hover { border-color: var(--reading-edge); background: var(--reading-action-hover, var(--reading-hover)); color: var(--reading-ink); }
+.reading-tools :is(button,a):active { background: var(--reading-action-pressed, var(--reading-pressed)); }
+.reading-tools button:disabled { cursor: wait; color: var(--reading-disabled); background: var(--reading-surface); }
+.reading-tools button[data-copy-state='success'] { color: var(--reading-accent); background: var(--reading-selected); border-color: var(--reading-edge); }
+.reading-tools button[data-copy-state='error'] { color: var(--reading-error); border-color: var(--reading-error); }
+.reading-tools .icon { width: var(--reading-icon-size); height: var(--reading-icon-size); flex: none; }
+.reading-status { color: var(--reading-muted); font-size: 12px; }
+.reading-tools-compact { position: relative; gap: 0; }
+.reading-button-group { display: inline-flex; align-items: stretch; }
+.reading-button-group > button:first-child { border-radius: var(--reading-action-corner) 0 0 var(--reading-action-corner); }
+.reading-button-group .reading-menu-toggle { border-left: 0; border-radius: 0 var(--reading-action-sweep) var(--reading-action-corner) 0; min-width: var(--reading-control-size); padding: 0 12px; }
+.reading-menu-toggle .icon { transition: transform var(--reading-motion) var(--reading-ease); }
+.reading-menu-toggle[aria-expanded='true'] { background: var(--reading-selected); color: var(--reading-accent); }
+.reading-menu-toggle[aria-expanded='true'] .icon { transform: rotate(180deg); }
+.reading-menu { position: absolute; right: 0; top: calc(100% + var(--reading-space-1)); width: 216px; padding: 4px; border: 1px solid var(--reading-line); border-radius: var(--reading-frame-profile); background: var(--reading-canvas); box-shadow: var(--reading-elevation); z-index: 5; animation: reading-reveal var(--reading-motion) var(--reading-ease) both; }
+.reading-menu :is(a,button) { min-height: var(--reading-menu-size); width: 100%; justify-content: flex-start; gap: 10px; padding: 4px 10px; border: 0; border-radius: var(--reading-action-profile); background: transparent; box-shadow: none; }
+.reading-menu :is(a,button):focus-visible { background: var(--reading-hover); outline-offset: -2px; }
+.reading-tools-compact .reading-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.reading-status-error { color: var(--reading-error); }
+.reading-tools-compact .reading-status-error { width: 232px; height: auto; overflow: visible; clip-path: none; top: calc(100% + var(--reading-space-1)); right: 0; padding: 12px; border: 1px solid var(--reading-error); border-radius: var(--reading-control-profile); background: var(--reading-error-surface); box-shadow: var(--reading-elevation); z-index: 6; animation: reading-reveal var(--reading-motion) var(--reading-ease) both; }
+
+/* One chevron for native disclosures; their semantics and keyboard behavior remain native. */
+:is(.docs-navigation,.docs-outline,.docs-chapter details) > summary { list-style: none; cursor: pointer; align-items: center; gap: 12px; min-height: var(--reading-control-size); }
+:is(.docs-navigation,.docs-outline,.docs-chapter details) > summary::-webkit-details-marker { display: none; }
+:is(.docs-navigation,.docs-outline,.docs-chapter details) > summary::after { content: ''; width: 6px; height: 6px; flex: none; margin-left: auto; margin-right: 3px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform var(--reading-motion) var(--reading-ease); color: var(--reading-muted); }
+:is(.docs-navigation,.docs-outline,.docs-chapter details)[open] > summary::after { transform: rotate(45deg); color: var(--reading-accent); }
+:is(.docs-navigation,.docs-outline,.docs-chapter details) > summary:hover { color: var(--reading-accent); background: var(--reading-hover); }
+:is(.docs-navigation,.docs-outline,.docs-chapter details) > summary:active { background: var(--reading-pressed); }
+:is(.docs-navigation,.docs-outline,.docs-chapter details)[open] > :not(summary) { animation: reading-reveal var(--reading-motion) var(--reading-ease) both; }
+@keyframes reading-reveal { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width:760px) {
+  .documentation-pane { --reading-menu-size: 44px; }
+  .reading-tools-compact .reading-menu, .reading-tools-compact .reading-status-error { left: 0; right: auto; }
+}
+@media (prefers-reduced-motion:reduce) {
+  :root { --reading-motion: 0ms; --reading-motion-quick: 0ms; }
+  :is(.reading-tools,.documentation-search,.documentation-pane) *, :is(.reading-tools,.documentation-search,.documentation-pane) *::before, :is(.reading-tools,.documentation-search,.documentation-pane) *::after { animation: none; transition: none; scroll-behavior: auto; }
+}
+:root[data-motion='reduced'] :is(.reading-tools,.documentation-search,.documentation-pane) *,
+:root[data-motion='reduced'] :is(.reading-tools,.documentation-search,.documentation-pane) *::before,
+:root[data-motion='reduced'] :is(.reading-tools,.documentation-search,.documentation-pane) *::after { animation: none; transition: none; scroll-behavior: auto; }
+@media (forced-colors:active) {
+  .reading-tools :is(button,a), .reading-menu { background: Canvas; box-shadow: none; border-color: ButtonText; }
+  .reading-tools button[data-copy-state] { color: ButtonText; }
+}

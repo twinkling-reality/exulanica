@@ -1,7 +1,7 @@
 """Who a simulated person is and what they are doing, in the words the inspector uses.
 
 The words are one data file,
-``assets/catalogs/society-words/society-inhabitant-words.v1.json``, which the browser's inspector
+``assets/catalogs/society-words/society-inhabitant-words.v3.json``, which the browser's inspector
 reads too (``web/packages/app/src/society-inhabitant-words.ts``). The choice of sentence for a
 state is code on both sides, and both are held to one set of cases,
 ``tests/fixtures/society-inhabitant-words/cases.json``, which ``tests/test_inhabitant_words.py`` and
@@ -45,7 +45,7 @@ CATALOG_PATH: Final = (
     / "assets"
     / "catalogs"
     / "society-words"
-    / "society-inhabitant-words.v1.json"
+    / "society-inhabitant-words.v3.json"
 )
 
 ACTIVITY_WORDS_PATH: Final = CATALOG_PATH.with_name("society-activity-words.v1.json")
@@ -336,7 +336,9 @@ def inhabitant_words(
     met = (partner(partner_id) if partner_id else None) or phrase["partner_unknown"]
     kind, status = action.get("kind"), action.get("status")
     completed = status == "completed"
-    if status == "blocked":
+    if status == "blocked" or (
+        kind == "idle" and action.get("reason") in ("routine_wait", "no_weighted_activity")
+    ):
         chosen = "waiting"
     elif kind == "move":
         goal_kind = goal.get("kind") if goal is not None else None

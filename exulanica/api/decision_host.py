@@ -53,6 +53,7 @@ from exulanica.models.errors import (
     ProviderRefused,
     TransportError,
 )
+from exulanica.models.identity import chat_model_identity
 from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec
 from exulanica.models.policy import HostedRequestPolicy, NoHostedRequestPolicy
 from exulanica.models.spending import SpendingRefused
@@ -155,7 +156,10 @@ def _error_class(exc: BaseException) -> str:
 def _failure_reason(exc: BaseException) -> str:
     """How a failure that ended a subject's call is recorded, by the error that ended it."""
     if isinstance(exc, ProviderRefused):
-        return exc.reason
+        # Provider admission and response-binding checks share this exception. A new lower-level
+        # refusal cannot author a reason the role's stored receipt/replay vocabulary does not
+        # admit; the failed call remains unavailable and its attempt evidence stays recorded.
+        return exc.reason if exc.reason in GENERIC_REASONS else "model_call_failed"
     if isinstance(exc, SpendingRefused):
         # The durable authority's own reason. The host asks under no request key, so an
         # idempotency refusal cannot reach here; it would still be named for what it is not.
@@ -700,8 +704,10 @@ def ask(
         finally:
             slot.release()
             role_slot.release()
-        log.record(chosen.call)
-        served = chosen.call.served_model_id
+        log.record(chosen.call, manifest=sender.manifest, admitted_specs=(asked.spec,))
+        served = chat_model_identity(
+            chosen.call, sender.manifest, admitted_specs=(asked.spec,)
+        ).model_id
         option = next(o for o in context["options"] if o["label"] == chosen.label)
         takes_line = option.get("kind") in getattr(role.adapter, "LINE_KINDS", frozenset())
         if takes_line != bool(chosen.line):
@@ -870,6 +876,10 @@ class DecisionHost:
         None
     )
 
+    binding_source: (
+        Callable[[uuid.UUID, str, frozenset[str]], tuple[ModelClient, Manifest, str] | None] | None
+    ) = None
+
     def before_minute(self, claim: ControlClaim, lease_ends: float) -> bool:
         """Ask every chosen subject at a choice point; True when the coming minute runs alone.
 
@@ -888,6 +898,36 @@ class DecisionHost:
             self.discovered is None or claim.workspace_id not in self.discovered()
         ):
             return self._answer_played(claim)
+        if self.binding_source is not None:
+            with self.database.session(claim.workspace_id) as connection:
+                row = SocietyRepository(
+                    connection, claim.workspace_id, world_id=claim.world_id
+                )._row(claim.version_id)
+                selected = set()
+                if row is not None:
+                    choices = SocietyModelChoiceRepository(
+                        connection, claim.workspace_id, world_id=claim.world_id
+                    )
+                    for role in decision_roles().hosted_by(row["engine_version"]):
+                        for subject, choice in choices.deciding(
+                            claim.version_id, role, role.contract_for(row["engine_version"])
+                        ).items():
+                            if choice["model"] and role.adapter.due(row["state"], subject):
+                                selected.add(choice["model"]["model_id"])
+            source = (
+                None
+                if row is None
+                else self.binding_source(
+                    claim.workspace_id, row["engine_version"], frozenset(selected)
+                )
+            )
+            bound = dataclasses.replace(self, binding_source=None)
+            if source is not None:
+                client, manifest, digest = source
+                bound = dataclasses.replace(
+                    bound, client=client, manifest=manifest, manifest_sha256=digest
+                )
+            return bound.before_minute(claim, lease_ends)
         session = Session(workspace_id=claim.workspace_id, actor=claim.actor)
         with self.database.session(claim.workspace_id) as connection:
             society = SocietyRepository(

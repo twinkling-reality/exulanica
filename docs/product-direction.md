@@ -1,8 +1,10 @@
 # Product direction
 
-Exulanica: Worlds for AI Agents. A person builds a world, and open models run what happens inside
-it, each doing what it is good at; the person can swap one model for another and see the
-difference. This document owns product scope, delivery order and acceptance criteria. Living
+Exulanica: Worlds for AI Agents. People create places and inhabitants, shape their
+interactions, discover useful models, and develop worlds into projects they can explore and
+build on. Comparing models on the same saved world is one capability, and it is the first
+milestone. This document owns the public name, product scope, delivery order and acceptance
+criteria. Living
 contracts describe supported operations; scoped evaluation records establish what a particular
 execution demonstrated.
 
@@ -33,14 +35,16 @@ execution demonstrated.
 
 ## Product purpose
 
-Build a world. Let open models run what happens in it. Swap one and see the difference.
+Worlds for AI Agents. Build a world. Create its places and inhabitants. Let open models take
+roles the engine validates, and compare those models when that is the question.
 
 A person builds a world exactly how they want it: a small town, a familiar place, a fantasy city.
 The things in it that act are its agents: the people in the world, animals, vehicles and
 decision-makers such as a shopkeeper or a traffic system. Streets, benches and buildings do not
-act; they are the world the agents act in. Open models run the agents, each model in a role it is
-good at, side by side in one world the person controls. Swapping the model behind a role and
-running the same starting world again shows what each model does differently.
+act; they are the world the agents act in. Open models can take distinct roles the engine
+validates. Comparing those models on the same saved world is one capability, and it is the
+[first milestone](#first-milestone). Which roles are registered is stated in
+[implementation status](#implementation-status).
 
 Hugging Face's "State of Open Models: Summer 2026" (published 2026-08-14) counts about 2.96 million
 public model repositories and reports that roughly 85.6% of models have fewer than 200 lifetime
@@ -139,9 +143,10 @@ versioned catalogs under [`assets/catalogs`](../assets/catalogs).
 A fixture, test or recorded run establishes its stated boundary. Package verification is not
 runnable import; a successful upload is not a reconstructed place; a renderer is not a simulator.
 
+Bounded text speech, nearby hearing and recent-event memory are implemented for capable beings.
+Sustained conversational behavior and representative live-model social quality remain unverified.
 Not built: roles beyond a person and a junction signal; vehicles, weather or an economy run by
-models; conversations with words or voices; a model choice in the owned district's living society;
-and a retraining loop. No evaluation
+models; voice; a model choice in the owned district's living society; and a retraining loop. No evaluation
 record measures whether a model-run signal improves traffic, and no improvement is claimed.
 
 ## First milestone
@@ -154,7 +159,7 @@ what accepts it and where the implementation stands.
 
 | Deliverable | Acceptance evidence | Status |
 | --- | --- | --- |
-| A world to run | A small town from the catalogs opens as a saved version in the application, with its people visible and moving under the deterministic planner. | Implemented for towns two and three tiles long. A person makes a small town or a market town from the presets of a specification and changes its values within the ranges the served schema states, its street mix and the shares of its kinds of building and shop included (World menu, Create); the server holds the values to the schema, generates the town from the city grammar, saves it as a generated world, bakes its tiles off the request, and the application draws the town once its tiles are baked, with its vehicles driving its streets ([ADR-0027](adr/0027-a-generated-world-is-drawn-in-its-own-world.md)). Its people, one per place in a home its premises offer (30 to 56 in 20 small towns and 56 to 98 in 20 market towns), walk its footways from tile to tile and live the living town's routine, at home, at their premises' shifts and on errands while its shops are open, and the owner can choose a model for a group of them. The [living-world rehearsal](evaluation/2026-09-25-rehearsal-living-world.json) passed the small square's version of this deliverable in part. |
+| A world to run | A small town from the catalogs opens as a saved version in the application, with its people visible and moving under the deterministic planner. | Implemented for towns two and three tiles long. A person makes a small town or a market town from the presets of a specification and changes its values within the ranges the served schema states, its street mix and the shares of its kinds of building and shop included (World menu, Create); the server holds the values to the schema, generates the town from the city grammar, saves it as a generated world, bakes its tiles off the request, and the application draws the town once its tiles are baked, with its vehicles driving its streets ([ADR-0027](adr/0027-a-generated-world-is-drawn-in-its-own-world.md)). Its people, one per place in a home its premises offer, are admitted by the measured cost of a minute on the host that makes the society ([society ground v6](../assets/catalogs/society-ground/society-ground.v6.json)). World-recipe v3 recorded 30 to 56 people over 20 small-town identities and 56 to 98 over 20 market-town identities. The served catalog is world-recipe v4, and those counts are not restated in its preset reasons. They walk its footways from tile to tile and live the living town's routine, at home, at their premises' shifts and on errands while its shops are open, and the owner can choose a model for a group of them. The [living-world rehearsal](evaluation/2026-09-25-rehearsal-living-world.json) passed the small square's version of this deliverable in part. |
 | A model per group | The people are split into named groups, and each group's decisions come from the open model chosen for it, through the one hosted policy boundary. The engine validates every proposed action; an invalid proposal is refused with its reason and the person keeps a valid state. | Implemented. The owner chooses a model for a person or a group, asked through the policy boundary; an answer the engine refuses is recorded with its reason, and the routine decides that turn. |
 | Recorded decisions | Every decision stores the model that served it, the observation it saw and the validated action. A run replays exactly from those records without calling a model. | Implemented. Every request and receipt is stored with the model that served it, and replay reads them without a call. |
 | Swap and compare | Two runs start from the same saved version and differ only in one group's model. The application shows them side by side, with the people and events that differ. | Implemented for one simulated hour, started from the application's Compare view within a bound its owner states, or from a local command, for a group or everybody in a generated town as for the small square, and for a living town's whole day, started through the API or the local command and played, sealed and read hour by hour. The Compare view shows the runs finishing, then the verdict, then for one seed what each side's group did and what each person did minute by minute, the group first and the people whose hours differed most at the top, with every number and each side's view from above one step away. |
@@ -246,7 +251,7 @@ acceptance criterion, accepted only when its measured evidence exists.
 | 3. Movement modules | Walking, flight and roads, each one engine module driven by catalog data ([movement modules contract](movement-modules-contract.md)); small birds fly and perch on the objects that host them, and a generated town's vehicles drive its roads | Roads for worlds other than generated towns; flying kinds beyond the small bird | A dragon, a plane and a bird are content that use the flight module, not code written for each; a world that needs vehicles runs roads through the module |
 | 4. Measured results per model | The person's score, computed exactly from what the engine recorded and declared as reviewed catalog data; judged comparisons pre-registered on held-out seeds | Scores for any role other than the person | Each role's result is computed exactly from world data, with what counts as good declared per role as reviewed data; comparisons use a pre-registered held-out set, as the [model selection](#model-selection-and-compute-priorities) rules require |
 | 5. The retraining loop | No export of runs for training | Runs exported in an existing open environment format, so that existing open tools evaluate or retrain a model on a world; Exulanica does not build a trainer. The format is chosen among Prime Intellect's verifiers, NVIDIA's NeMo Gym and OpenEnv by exporting one role and checking that a trainer's loader accepts it, that rescoring from the stored records reproduces the role's score exactly, and that the agent sees no engine control. Running uses a hosted API; retraining needs a model's open weights on a GPU. Reward design per role and guards against reward gaming are the hard part. | One role, one score, one retraining and a measured improvement on held-out runs |
-| 6. People who talk | Talking is a routine activity with no words: people stand and talk, and the society records that information passed, not what was said ([society contract](synthetic-society-contract.md)) | A conversation role: the engine decides who talks with whom and when, each line comes from the open model chosen for that person, from what they observe and remember, is held to the role's declared limits, stored and replayed without a call, and no words are invented where no model is chosen. Open voice models read each line in one voice per person, never a real person's. Speech models take listening roles, such as telling who spoke when, in a scene the world sets up for the model a person wants to try | A listening model's account of who said what and when is scored against the world's own exact record of the conversation, and swapping it for another model shows the difference beside a same-model control; every model used passes the [licence rules](license-matrix.md) for its use |
+| 6. People who talk | Routine talk records an activity without words. Capable beings also say bounded decider-authored text, hear nearby lines, retain recent speech and event memory, and replay recorded speech without a model call ([decision roles](decision-roles-contract.md#a-society-of-things-people), [minds](minds-contract.md)). | Representative evaluation of sustained, coherent conversations grounded in observations and memory, beyond bounded individual lines. Open voice models read each line in one voice per person, never a real person's. Speech models take listening roles, such as telling who spoke when, in a scene the world sets up for the model a person wants to try | A listening model's account of who said what and when is scored against the world's own exact record of the conversation, and swapping it for another model shows the difference beside a same-model control; every model used passes the [licence rules](license-matrix.md) for its use |
 
 Content generation (concept images, image-to-3D) comes later and is not a pipeline Exulanica
 builds. Generated content is imported from existing tools with its origin labelled generated,

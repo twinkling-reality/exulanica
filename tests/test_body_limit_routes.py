@@ -88,6 +88,35 @@ def test_the_kinds_routes_state_limits_the_application_applies():
     assert all(limit < MAX_BODY_BYTES // 1000 for limit in stated.values())
 
 
+def test_terrain_authoring_is_bounded_before_authentication_or_json_parsing():
+    from types import SimpleNamespace
+
+    from exulanica.api.admission import AdmissionSettings
+    from exulanica.api.app import create_app
+    from exulanica.api.routes.generated_worlds import TERRAIN_BODY_MAXIMUM
+
+    # No database or authentication service exists: middleware must refuse the body first.
+    services = SimpleNamespace(
+        society_base_tick_interval_ms=1000, society_runtime=None, admission=AdmissionSettings()
+    )
+    app = create_app(services, verify=False)
+    client = TestClient(app)
+    declared = client.post(
+        "/worlds/generated/terrain",
+        headers={"Content-Length": str(TERRAIN_BODY_MAXIMUM + 1)},
+        content=b"",
+    )
+    assert declared.status_code == 413
+    assert declared.json()["code"] == "body_too_large"
+    streamed = client.post(
+        "/worlds/generated/terrain",
+        headers={"Content-Type": "application/json"},
+        content=(b" " * 65_536 for _ in range(TERRAIN_BODY_MAXIMUM // 65_536 + 1)),
+    )
+    assert streamed.status_code == 413
+    assert streamed.json()["code"] == "body_too_large"
+
+
 def _asgi(limited: BodyLimit, scope: dict[str, object]) -> list[dict[str, object]]:
     """Run one request through the body limit; every message it sends."""
     import anyio

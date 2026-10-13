@@ -1,6 +1,6 @@
 import * as pc from 'playcanvas';
 import type { SiteInterior } from '@exulanica/atlas-core';
-import type { SiteDrawing, SiteSlot } from './site-drawing.js';
+import type { StructuredSiteDrawing, SiteSlot } from './site-drawing.js';
 
 /**
  * The inside of an indoor made place, drawn: a ceiling over its whole extent and the look's sun
@@ -19,7 +19,7 @@ export const SITE_CEILING = 'site-ceiling';
  * practice a wall piece), the first of them where several are as high. Null where it draws no box.
  * The ceiling is drawn at that top and, once the place is dressed, in what that box is drawn in.
  */
-export function ceilingRests(drawing: SiteDrawing): SiteSlot | null {
+export function ceilingRests(drawing: StructuredSiteDrawing): SiteSlot | null {
   let highest: SiteSlot | null = null;
   for (const slot of drawing.slots) {
     if (slot.primitive !== 'box') continue;
@@ -41,7 +41,7 @@ export interface DrawnCeiling {
  * over the whole extent, in the renderer's frame (east, up, south; a site's y is north). It casts
  * no shadow: the light is under it.
  */
-export function drawSiteCeiling(drawing: SiteDrawing, rests: SiteSlot, interior: SiteInterior): DrawnCeiling {
+export function drawSiteCeiling(drawing: StructuredSiteDrawing, rests: SiteSlot, interior: SiteInterior): DrawnCeiling {
   const heightMm = rests.positionMm[2] + rests.boxMm[2];
   const { widthMm, depthMm } = drawing.extent;
   const colour = new pc.StandardMaterial();

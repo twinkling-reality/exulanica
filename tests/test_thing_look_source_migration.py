@@ -30,7 +30,7 @@ from psycopg.conninfo import make_conninfo
 
 import pg_harness
 from world_structure_fixtures import structural_candidate
-from world_support import registered_world
+from world_support import historical_world_fixture_schema, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -67,7 +67,10 @@ def test_0167_reads_stored_choices_as_shipped_and_indexes_said_events_by_speaker
             base = env_get("TEST_DATABASE_URL")
             assert base is not None
             database = Database(url=make_conninfo(base, options=f"-csearch_path={scratch},public"))
-            with database.session(workspace) as connection:
+            with (
+                historical_world_fixture_schema(admin, support=True),
+                database.session(workspace) as connection,
+            ):
                 world = registered_world(connection, workspace)
                 structures = WorldStructureRepository(connection, workspace, world_id=world)
                 preview = structures.preview(structural_candidate(), proposed_by=actor)

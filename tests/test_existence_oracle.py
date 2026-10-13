@@ -48,8 +48,8 @@ import itertools
 import json
 import uuid
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
-from types import MappingProxyType
+from dataclasses import dataclass, replace
+from types import MappingProxyType, SimpleNamespace
 
 import pytest
 from exulanica.api import permissions
@@ -92,6 +92,7 @@ from route_probes import (
     id_addresses,
     id_routes,
 )
+from spending_support import bench as bench
 from test_material_recipes import CATALOG
 from tests_support_api import EVERY_PERMISSION, scratch_database
 from world_support import registered_world
@@ -201,7 +202,16 @@ class Existence:
         return Caller(self.as_stranger)
 
     def _send(self, token: str, method: str, path: str, **kwargs):
-        headers = {"Authorization": f"Bearer {token}", **kwargs.pop("headers", {})}
+        if path.startswith(("/participation/", "/world/invitations")):
+            # These routes deliberately require an authenticated browser, not a bearer.
+            name = (
+                "stranger"
+                if token == _STRANGER_TOKEN
+                else ("recipient" if path.startswith("/participation/") else "owner")
+            )
+            headers = {"x-existence-browser": name, **kwargs.pop("headers", {})}
+        else:
+            headers = {"Authorization": f"Bearer {token}", **kwargs.pop("headers", {})}
         return self.client.request(method, path, headers=headers, **kwargs)
 
     def real(self, address: str, kind: Owned | Shared | None = None) -> str:
@@ -242,7 +252,7 @@ def _provide_society_input(existence: Existence):
 
 
 @pytest.fixture
-def existence(tmp_path, photo_dir, repository, spine_schema):
+def existence(tmp_path, photo_dir, repository, spine_schema, request):
     """An application over the test schema, connected as runtime roles, with two tokens.
 
     The stranger's workspace owns nothing but a world of its own, registered under the id the
@@ -313,6 +323,30 @@ def existence(tmp_path, photo_dir, repository, spine_schema):
         door=DoorRuntime(database=database, bridges=door_support.bridges()),
         content_stores=local_content_stores(tmp_path / "data"),
     )
+    from exulanica.api.authorisation import TokenNotAccepted
+    from exulanica.selection.validation import Session
+
+    browser_sessions = {
+        "owner": Session(repository.workspace_id, actor),
+        "stranger": Session(stranger, uuid.UUID(grants[_STRANGER_TOKEN]["actor"])),
+        "recipient": Session(uuid.uuid4(), uuid.uuid4()),
+    }
+
+    class BrowserAccounts:
+        def browser_session(self, browser_request):
+            name = browser_request.headers.get("x-existence-browser")
+            if name not in browser_sessions:
+                raise TokenNotAccepted("no test browser session")
+            return SimpleNamespace(
+                session=browser_sessions[name],
+                role="guest" if name == "recipient" else "owner",
+                creator=False,
+            )
+
+        def owned_workspace_active(self, workspace):
+            return workspace in {repository.workspace_id, stranger}
+
+    services = replace(services, accounts=BrowserAccounts())
     app = create_app(services, verify=False)
     # A 500 is an answer to compare, not an exception to stop at: a foreign id that makes the
     # server fail where an invented one does not is exactly what this file looks for.
@@ -327,6 +361,7 @@ def existence(tmp_path, photo_dir, repository, spine_schema):
             photo_dir=photo_dir,
             tmp_path=tmp_path,
         )
+        owner.fixture = request.getfixturevalue
         app.state.society_initial_input = _provide_society_input(owner)
         app.state.society_input_authorizer = lambda _connection, _session, _document: None
         yield owner
@@ -420,6 +455,11 @@ def existence_problems(existence: Existence, method: str, path: str, probe=None)
     if any(answer.status >= 500 for answer in answers.values()):
         problems.append(f"{route} failed on a stranger's request: {foreign}")
     owner = ask(existence.request, real)
+    if (
+        any(isinstance(kind, Owned) and kind.owner_succeeds for kind in kinds.values())
+        and not 200 <= owner.status < 300
+    ):
+        problems.append(f"{route} did not succeed for its owner: {owner}")
     if owner == foreign:
         problems.append(
             f"{route} answers its owner exactly as it answers a stranger ({owner}), so nothing "

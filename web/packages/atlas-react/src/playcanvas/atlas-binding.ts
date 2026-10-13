@@ -87,14 +87,13 @@ import {
   groundMount,
   worldNavigation,
   worldViews,
-  type AuthoredRegion,
-  type OwnedDistrictGround,
-  type GeneratedSiteMount,
+  validateGeneratedObjectRegion,
+  type WorldKindOptions,
   type WorldKind,
 } from './world-kind.js';
 import { cityView, worldStart, type CityView, type OpeningPlacements } from './camera-views.js';
 import { AuthoredRegionSociety } from './society/authored-society.js';
-import type { GeneratedTileAttachment, GeneratedTileMount } from './generated-tile/binding-contract.js';
+import type { GeneratedTileAttachment } from './generated-tile/binding-contract.js';
 import { PlayerAvatar } from './player-avatar.js';
 import { FollowCamera, playerCameraAimHeight, type PlayerCameraMode } from './player-camera.js';
 import {
@@ -145,6 +144,7 @@ import { sceneInspectionViews, calibratedCameraFrustum, type SceneInspectionView
 import { PROOF_LENS_SPLAT_MODIFIER, createSceneSplatAsset, type TrainedSceneGeometry } from './scene-splats.js';
 import {
   SceneObjectRuntime,
+  placedCatalogObjectSubject,
   type ObjectRepresentationRegistration,
   type PlacedAuthoredObject,
 } from './scene-objects.js';
@@ -169,6 +169,7 @@ import {
   staticMeshGroupRepresentation,
   staticMeshRepresentation,
 } from './representation-binding.js';
+export { placedCatalogObjectSubject } from './scene-objects.js';
 import { DataViewOverlay } from './data-view/overlay.js';
 import type { DataViewOverlayPlan } from './data-view/overlay-plan.js';
 
@@ -342,53 +343,10 @@ export function residencyFrameInputs(input: {
   };
 }
 
-/**
- * The representation subject for one object placed from the reviewed catalog.
- *
- * What exists for it is a display record and the reviewed asset's identity: its key as the label
- * and its content digest as the one reference. It has no structured source records, so it claims
- * none. `extent` is the object root's local bounds, before authored placement is applied.
- */
-export function placedCatalogObjectSubject(
-  object: PlacedAuthoredObject,
-  extent: {
-    readonly min: readonly [number, number, number];
-    readonly max: readonly [number, number, number];
-  },
-): RepresentationSubject {
-  const frameId = `authored-object:${object.objectId}:object-local`;
-  return Object.freeze({
-    subjectId: object.objectId,
-    subjectKind: 'object',
-    sceneId: null,
-    frameId,
-    origin: 'authored',
-    sourceRefs: Object.freeze([object.asset.contentSha256]),
-    availability: 'available',
-    rendered: true,
-    // These are deterministic presentation samples of the authored triangles, not measurements.
-    points: 'mesh-surface-samples',
-    compatibleBlend: true,
-    bounds: Object.freeze({
-      frameId,
-      units: 'scene-units',
-      origin: 'authored',
-      basis: 'authored-bounds',
-      min: extent.min,
-      max: extent.max,
-    }),
-    label: object.asset.assetKey,
-    dataAvailable: false,
-    unavailableReason: 'Generated whole-object surface samples from static renderer triangles; not observed measurements, semantic parts or segmentation.',
-  });
-}
-
-export interface AtlasBindingOptions extends OpeningPlacements {
+export interface AtlasBindingOptions extends OpeningPlacements, WorldKindOptions {
   readonly canvas: HTMLCanvasElement;
   readonly overlayParent: HTMLElement;
   readonly scene: AtlasScene;
-  /** Source-independent authored ground. It is a region, never a capture-backed Atlas island. */
-  readonly authoredRegion?: AuthoredRegion;
   /**
    * Depth estimates from the account holder's own photographs, placed by them in that region.
    *
@@ -432,14 +390,8 @@ export interface AtlasBindingOptions extends OpeningPlacements {
   readonly residencyBudget?: number;
   /** Ceiling on the backing-store pixel ratio. Never raises a display above its own ratio. */
   readonly maxPixelRatio?: number;
-  /** Admitted owned geography. One semantic document drives rendering and collision. */
-  readonly ownedDistrict?: OwnedDistrictGround;
-  /**
-   * A generated tile, or with `generatedSite` a world kind's site, in place of a district: it
-   * supplies the ground, the collision and the opening stance, and draws itself into the scene.
-   */
-  readonly generatedTile?: GeneratedTileMount;
-  readonly generatedSite?: GeneratedSiteMount;
+  /** The authorized saved generated region, registered for objects in the same environment frame. */
+  readonly generatedRegionId?: IslandId;
   /** Optional current rights/record refinements for known renderer subjects. */
   readonly representationSubjects?: readonly RepresentationSubject[];
 }
@@ -460,6 +412,18 @@ export interface FrameReport {
 }
 
 /** A tiny structural check that the presentation transform survived the trip into the engine. */
+/** Immutable source identity; native scene handles stay inside the binding. */
+export interface SourceSurfacePick {
+  readonly kind: 'terrain-dressing';
+  readonly instanceId: string;
+  readonly assetKey: string;
+  readonly contentSha256: string;
+  readonly nodeIndex: number;
+  readonly meshIndex: number;
+  readonly primitiveIndex: number;
+  readonly distance: number;
+}
+
 export interface PlacementCheck {
   readonly islandId: IslandId;
   readonly maxErrorMetres: number;
@@ -801,6 +765,7 @@ export class AtlasBinding {
     const theme = options.theme ?? DAWN_THEME;
     const initialArtProfile = options.artProfile ?? DEFAULT_WORLD_ART_PROFILE;
     const kind = describeWorldKind(options);
+    validateGeneratedObjectRegion(kind, options.scene, options.generatedRegionId);
     const device = await pc.createGraphicsDevice(options.canvas, {
       deviceTypes: [...(options.deviceTypes ?? ['webgl2'])],
       antialias: true,
@@ -987,6 +952,12 @@ export class AtlasBinding {
     const trainedScenes: Array<AtlasBinding['trainedScenes'][number]> = [];
 
     const objectRoots = new Map<IslandId, pc.Entity>();
+    if (options.generatedRegionId !== undefined) {
+      const root = new pc.Entity(`generated-objects:${options.generatedRegionId}`);
+      // Object poses already carry their region-local height. The society's arrival plane is not an offset.
+      environmentRoot.addChild(root);
+      objectRoots.set(options.generatedRegionId, root);
+    }
     let authoredPointMaps: AuthoredPointMaps | null = null;
     let authoredSociety: AuthoredRegionSociety | null = null;
     const authoredRegion = authoredRegionOf(kind);
@@ -1643,6 +1614,29 @@ export class AtlasBinding {
     const position = this.camera.getPosition();
     const forward = this.camera.forward;
     return { origin: [position.x + this.renderOriginState.origin.x, position.y + this.renderOriginState.origin.y, position.z + this.renderOriginState.origin.z], direction: [forward.x, forward.y, forward.z] };
+  }
+
+  /** Current immutable source authority, without a geometry query. */
+  sourceSurfaceCurrent(): boolean {
+    return this.generatedTile?.sourceCurrent?.() === true;
+  }
+
+  /** Select in the source-world frame used by interactionRay and pointerRay. */
+  pickSourceSurface(origin: readonly [number, number, number], direction: readonly [number, number, number]): SourceSurfacePick | null {
+    if (!this.sourceSurfaceCurrent() || ![...origin, ...direction].every(Number.isFinite)) return null;
+    const length = Math.hypot(...direction);
+    if (length === 0) return null;
+    const offset = this.renderOriginState.origin;
+    const hit = this.generatedTile?.pickSource?.(
+      [origin[0] - offset.x, origin[1] - offset.y, origin[2] - offset.z],
+      [direction[0] / length, direction[1] / length, direction[2] / length],
+    );
+    if (hit == null || !Number.isFinite(hit.distance) || hit.distance < 0 || !this.sourceSurfaceCurrent()) return null;
+    const surface = hit.surface;
+    return Object.freeze({ kind: 'terrain-dressing', instanceId: surface.instanceId,
+      assetKey: surface.assetKey, contentSha256: surface.contentSha256,
+      nodeIndex: surface.nodeIndex, meshIndex: surface.meshIndex,
+      primitiveIndex: surface.primitiveIndex, distance: hit.distance });
   }
 
   /** Set a city view and hold it as it names (`camera-views.ts`); a kind without them ignores this. */

@@ -1,0 +1,100 @@
+{
+  "profile": "exulanica.site-drawing/v3",
+  "world_id": "world:terrain",
+  "region_id": "region:generated",
+  "receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "composer": {
+    "key": "site-plan",
+    "version": 3
+  },
+  "frame": "region-local-east-up-south-mm",
+  "bounds_mm": {
+    "east": [
+      0,
+      4000
+    ],
+    "south": [
+      -4000,
+      0
+    ]
+  },
+  "terrain": {
+    "geometry": {
+      "component_id": "terrain:arrival",
+      "diagonal": "a-c-b,b-c-d",
+      "east_mm": [
+        0,
+        2000,
+        4000
+      ],
+      "frame": "region-local-east-up-south-mm",
+      "height_mm": [
+        1000,
+        1500,
+        2000,
+        1000,
+        1500,
+        2000,
+        1000,
+        1500,
+        2000
+      ],
+      "profile": "exulanica.heightfield-geometry/v1",
+      "provenance": {
+        "generator_id": "fixture:terrain",
+        "generator_version": 1,
+        "input_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "kind": "authored",
+        "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "south_mm": [
+        -4000,
+        -2000,
+        0
+      ]
+    },
+    "geometry_sha256": "5e468ac3a5ca360f189e6ae24a24bf948bd532c51db4fb4697e9f8d126e75bf0",
+    "contact": {
+      "component_id": "terrain:arrival",
+      "geometry_sha256": "5e468ac3a5ca360f189e6ae24a24bf948bd532c51db4fb4697e9f8d126e75bf0",
+      "obstructions": [],
+      "policy": "person-square-680x1800-dry350-slope6248-v1",
+      "profile": "exulanica.heightfield-contact/v1"
+    },
+    "contact_sha256": "e5e2bc0587f66947637de103e9b61dd744f15d1d9423489228d7e42c362d8b09"
+  },
+  "arrival": {
+    "contact": {
+      "component_id": "terrain:arrival",
+      "geometry_sha256": "5e468ac3a5ca360f189e6ae24a24bf948bd532c51db4fb4697e9f8d126e75bf0",
+      "height_mm": {
+        "denominator": "1",
+        "numerator": "1250"
+      },
+      "normal": [
+        "-1",
+        "4",
+        "0"
+      ],
+      "triangle": [
+        0,
+        0,
+        1
+      ]
+    },
+    "facing_mm": [
+      1000,
+      0
+    ],
+    "position_mm": [
+      1000,
+      1250,
+      -2000
+    ]
+  },
+  "capabilities": {
+    "passive_flat_patch": true,
+    "person_navigation": true,
+    "society_projection": "unavailable"
+  }
+}

@@ -1,0 +1,2305 @@
+{
+  "profile": "exulanica.heightfield-conformance/v1",
+  "cases": [
+    {
+      "name": "closed-flat",
+      "geometry": {
+        "profile": "exulanica.heightfield-geometry/v1",
+        "component_id": "terrain:test",
+        "frame": "region-local-east-up-south-mm",
+        "east_mm": [
+          -2000,
+          -1000,
+          0,
+          1000,
+          2000
+        ],
+        "south_mm": [
+          -2000,
+          -1000,
+          0,
+          1000,
+          2000
+        ],
+        "height_mm": [
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500
+        ],
+        "diagonal": "a-c-b,b-c-d",
+        "provenance": {
+          "kind": "authored",
+          "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "generator_id": "fixture:terrace",
+          "generator_version": 1,
+          "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      },
+      "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+      "contact": {
+        "profile": "exulanica.heightfield-contact/v1",
+        "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+        "component_id": "terrain:test",
+        "policy": "person-square-680x1800-dry350-slope6248-v1",
+        "obstructions": []
+      },
+      "contact_sha256": "bb0e395d30efae9c453d8f1fba121cba4a7430b9fada7b0b590fc85e2ac21cc3",
+      "points": [
+        {
+          "position": [
+            -2000,
+            -2000
+          ],
+          "expected": {
+            "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+            "component_id": "terrain:test",
+            "triangle": [
+              0,
+              0,
+              0
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        },
+        {
+          "position": [
+            2000,
+            2000
+          ],
+          "expected": {
+            "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+            "component_id": "terrain:test",
+            "triangle": [
+              3,
+              3,
+              1
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        },
+        {
+          "position": [
+            0,
+            0
+          ],
+          "expected": {
+            "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+            "component_id": "terrain:test",
+            "triangle": [
+              1,
+              1,
+              1
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        },
+        {
+          "position": [
+            -500,
+            -500
+          ],
+          "expected": {
+            "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+            "component_id": "terrain:test",
+            "triangle": [
+              1,
+              1,
+              0
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        },
+        {
+          "position": [
+            2001,
+            0
+          ],
+          "expected": null
+        }
+      ],
+      "sweeps": [
+        {
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            0,
+            0
+          ],
+          "expected": {
+            "status": "clear",
+            "reason": null,
+            "contact": {
+              "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+              "component_id": "terrain:test",
+              "triangle": [
+                1,
+                1,
+                1
+              ],
+              "height_mm": {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              "normal": [
+                "0",
+                "1",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              {
+                "numerator": "500",
+                "denominator": "1"
+              }
+            ],
+            "triangles": 6
+          }
+        },
+        {
+          "start": [
+            -700,
+            -700
+          ],
+          "end": [
+            700,
+            700
+          ],
+          "expected": {
+            "status": "clear",
+            "reason": null,
+            "contact": {
+              "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+              "component_id": "terrain:test",
+              "triangle": [
+                2,
+                2,
+                1
+              ],
+              "height_mm": {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              "normal": [
+                "0",
+                "1",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              {
+                "numerator": "500",
+                "denominator": "1"
+              }
+            ],
+            "triangles": 18
+          }
+        },
+        {
+          "start": [
+            1660,
+            0
+          ],
+          "end": [
+            1660,
+            0
+          ],
+          "expected": {
+            "status": "clear",
+            "reason": null,
+            "contact": {
+              "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+              "component_id": "terrain:test",
+              "triangle": [
+                1,
+                3,
+                1
+              ],
+              "height_mm": {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              "normal": [
+                "0",
+                "1",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              {
+                "numerator": "500",
+                "denominator": "1"
+              }
+            ],
+            "triangles": 4
+          }
+        },
+        {
+          "start": [
+            1661,
+            0
+          ],
+          "end": [
+            1661,
+            0
+          ],
+          "expected": {
+            "status": "blocked",
+            "reason": "outside_domain",
+            "contact": null,
+            "height_range_mm": null,
+            "triangles": 0
+          }
+        },
+        {
+          "start": [
+            -1000,
+            0
+          ],
+          "end": [
+            1000,
+            1
+          ],
+          "expected": {
+            "status": "blocked",
+            "reason": "segment_limit",
+            "contact": null,
+            "height_range_mm": null,
+            "triangles": 0
+          }
+        }
+      ],
+      "patches": [
+        {
+          "position": [
+            0,
+            0
+          ],
+          "half_width_mm": 700,
+          "height_mm": 500,
+          "expected": {
+            "status": "clear",
+            "reason": null,
+            "contact": {
+              "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+              "component_id": "terrain:test",
+              "triangle": [
+                1,
+                1,
+                1
+              ],
+              "height_mm": {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              "normal": [
+                "0",
+                "1",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              {
+                "numerator": "500",
+                "denominator": "1"
+              }
+            ],
+            "triangles": 8
+          }
+        }
+      ]
+    },
+    {
+      "name": "nonuniform-valley",
+      "geometry": {
+        "profile": "exulanica.heightfield-geometry/v1",
+        "component_id": "terrain:test",
+        "frame": "region-local-east-up-south-mm",
+        "east_mm": [
+          -2000,
+          -1250,
+          -250,
+          500,
+          1750
+        ],
+        "south_mm": [
+          -2000,
+          -1000,
+          250,
+          1000,
+          2000
+        ],
+        "height_mm": [
+          950,
+          856,
+          731,
+          762,
+          918,
+          1050,
+          956,
+          831,
+          862,
+          1018,
+          1175,
+          1081,
+          956,
+          987,
+          1143,
+          1250,
+          1156,
+          1031,
+          1062,
+          1218,
+          1350,
+          1256,
+          1131,
+          1162,
+          1318
+        ],
+        "diagonal": "a-c-b,b-c-d",
+        "provenance": {
+          "kind": "authored",
+          "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "generator_id": "fixture:terrace",
+          "generator_version": 1,
+          "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      },
+      "geometry_sha256": "aa367ab6ccde3db02d870a034bab250701169d6c3abfb43c54c1e1b696461798",
+      "contact": {
+        "profile": "exulanica.heightfield-contact/v1",
+        "geometry_sha256": "aa367ab6ccde3db02d870a034bab250701169d6c3abfb43c54c1e1b696461798",
+        "component_id": "terrain:test",
+        "policy": "person-square-680x1800-dry350-slope6248-v1",
+        "obstructions": []
+      },
+      "contact_sha256": "e9987e21341116b718702f01fa7a66744316c53e05d213b8bffbe4597fd7f0ab",
+      "points": [
+        {
+          "position": [
+            0,
+            0
+          ],
+          "expected": {
+            "geometry_sha256": "aa367ab6ccde3db02d870a034bab250701169d6c3abfb43c54c1e1b696461798",
+            "component_id": "terrain:test",
+            "triangle": [
+              1,
+              2,
+              1
+            ],
+            "height_mm": {
+              "numerator": "2824",
+              "denominator": "3"
+            },
+            "normal": [
+              "-31",
+              "750",
+              "-75"
+            ]
+          }
+        },
+        {
+          "position": [
+            -2000,
+            -2000
+          ],
+          "expected": {
+            "geometry_sha256": "aa367ab6ccde3db02d870a034bab250701169d6c3abfb43c54c1e1b696461798",
+            "component_id": "terrain:test",
+            "triangle": [
+              0,
+              0,
+              0
+            ],
+            "height_mm": {
+              "numerator": "950",
+              "denominator": "1"
+            },
+            "normal": [
+              "94",
+              "750",
+              "-75"
+            ]
+          }
+        },
+        {
+          "position": [
+            -250,
+            250
+          ],
+          "expected": {
+            "geometry_sha256": "aa367ab6ccde3db02d870a034bab250701169d6c3abfb43c54c1e1b696461798",
+            "component_id": "terrain:test",
+            "triangle": [
+              1,
+              1,
+              1
+            ],
+            "height_mm": {
+              "numerator": "956",
+              "denominator": "1"
+            },
+            "normal": [
+              "5",
+              "40",
+              "-4"
+            ]
+          }
+        },
+        {
+          "position": [
+            400,
+            350
+          ],
+          "expected": {
+            "geometry_sha256": "aa367ab6ccde3db02d870a034bab250701169d6c3abfb43c54c1e1b696461798",
+            "component_id": "terrain:test",
+            "triangle": [
+              2,
+              2,
+              0
+            ],
+            "height_mm": {
+              "numerator": "14893",
+              "denominator": "15"
+            },
+            "normal": [
+              "-31",
+              "750",
+              "-75"
+            ]
+          }
+        }
+      ],
+      "sweeps": [
+        {
+          "start": [
+            -900,
+            -1200
+          ],
+          "end": [
+            500,
+            0
+          ],
+          "expected": {
+            "status": "clear",
+            "reason": null,
+            "contact": {
+              "geometry_sha256": "aa367ab6ccde3db02d870a034bab250701169d6c3abfb43c54c1e1b696461798",
+              "component_id": "terrain:test",
+              "triangle": [
+                1,
+                2,
+                1
+              ],
+              "height_mm": {
+                "numerator": "962",
+                "denominator": "1"
+              },
+              "normal": [
+                "-31",
+                "750",
+                "-75"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "5625",
+                "denominator": "7"
+              },
+              {
+                "numerator": "129804",
+                "denominator": "125"
+              }
+            ],
+            "triangles": 13
+          }
+        },
+        {
+          "start": [
+            -500,
+            300
+          ],
+          "end": [
+            800,
+            1000
+          ],
+          "expected": {
+            "status": "clear",
+            "reason": null,
+            "contact": {
+              "geometry_sha256": "aa367ab6ccde3db02d870a034bab250701169d6c3abfb43c54c1e1b696461798",
+              "component_id": "terrain:test",
+              "triangle": [
+                2,
+                3,
+                1
+              ],
+              "height_mm": {
+                "numerator": "27486",
+                "denominator": "25"
+              },
+              "normal": [
+                "-156",
+                "1250",
+                "-125"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "927",
+                "denominator": "1"
+              },
+              {
+                "numerator": "146984",
+                "denominator": "125"
+              }
+            ],
+            "triangles": 12
+          }
+        }
+      ],
+      "patches": [
+        {
+          "position": [
+            0,
+            0
+          ],
+          "half_width_mm": 340,
+          "height_mm": 500,
+          "expected": {
+            "status": "blocked",
+            "reason": "not_flat",
+            "contact": {
+              "geometry_sha256": "aa367ab6ccde3db02d870a034bab250701169d6c3abfb43c54c1e1b696461798",
+              "component_id": "terrain:test",
+              "triangle": [
+                1,
+                2,
+                1
+              ],
+              "height_mm": {
+                "numerator": "2824",
+                "denominator": "3"
+              },
+              "normal": [
+                "-31",
+                "750",
+                "-75"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "897",
+                "denominator": "1"
+              },
+              {
+                "numerator": "74204",
+                "denominator": "75"
+              }
+            ],
+            "triangles": 6
+          }
+        }
+      ]
+    },
+    {
+      "name": "wet-corner-sliver",
+      "geometry": {
+        "profile": "exulanica.heightfield-geometry/v1",
+        "component_id": "terrain:test",
+        "frame": "region-local-east-up-south-mm",
+        "east_mm": [
+          -1000,
+          -750,
+          -500,
+          -250,
+          0,
+          250,
+          500,
+          750,
+          1000
+        ],
+        "south_mm": [
+          -1000,
+          -750,
+          -500,
+          -250,
+          0,
+          250,
+          500,
+          750,
+          1000
+        ],
+        "height_mm": [
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          0,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500
+        ],
+        "diagonal": "a-c-b,b-c-d",
+        "provenance": {
+          "kind": "authored",
+          "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "generator_id": "fixture:terrace",
+          "generator_version": 1,
+          "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      },
+      "geometry_sha256": "83f3d251ec1579d7a3d77e7fd0a34401faef86b81e3e45988c60f1bf4dedb5ba",
+      "contact": {
+        "profile": "exulanica.heightfield-contact/v1",
+        "geometry_sha256": "83f3d251ec1579d7a3d77e7fd0a34401faef86b81e3e45988c60f1bf4dedb5ba",
+        "component_id": "terrain:test",
+        "policy": "person-square-680x1800-dry350-slope6248-v1",
+        "obstructions": []
+      },
+      "contact_sha256": "2ce805085fc28cb4803fa0d5db83c86970eca19302c7f614bef65875edce564d",
+      "points": [
+        {
+          "position": [
+            0,
+            0
+          ],
+          "expected": {
+            "geometry_sha256": "83f3d251ec1579d7a3d77e7fd0a34401faef86b81e3e45988c60f1bf4dedb5ba",
+            "component_id": "terrain:test",
+            "triangle": [
+              3,
+              3,
+              1
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        },
+        {
+          "position": [
+            340,
+            0
+          ],
+          "expected": {
+            "geometry_sha256": "83f3d251ec1579d7a3d77e7fd0a34401faef86b81e3e45988c60f1bf4dedb5ba",
+            "component_id": "terrain:test",
+            "triangle": [
+              3,
+              5,
+              1
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        },
+        {
+          "position": [
+            0,
+            340
+          ],
+          "expected": {
+            "geometry_sha256": "83f3d251ec1579d7a3d77e7fd0a34401faef86b81e3e45988c60f1bf4dedb5ba",
+            "component_id": "terrain:test",
+            "triangle": [
+              5,
+              3,
+              1
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        }
+      ],
+      "sweeps": [
+        {
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            0,
+            0
+          ],
+          "expected": {
+            "status": "blocked",
+            "reason": "wet",
+            "contact": {
+              "geometry_sha256": "83f3d251ec1579d7a3d77e7fd0a34401faef86b81e3e45988c60f1bf4dedb5ba",
+              "component_id": "terrain:test",
+              "triangle": [
+                3,
+                3,
+                1
+              ],
+              "height_mm": {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              "normal": [
+                "0",
+                "1",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "0",
+                "denominator": "1"
+              },
+              {
+                "numerator": "500",
+                "denominator": "1"
+              }
+            ],
+            "triangles": 30
+          }
+        }
+      ],
+      "patches": []
+    },
+    {
+      "name": "steep-corner-sliver",
+      "geometry": {
+        "profile": "exulanica.heightfield-geometry/v1",
+        "component_id": "terrain:test",
+        "frame": "region-local-east-up-south-mm",
+        "east_mm": [
+          -1000,
+          -750,
+          -500,
+          -250,
+          0,
+          250,
+          500,
+          750,
+          1000
+        ],
+        "south_mm": [
+          -1000,
+          -750,
+          -500,
+          -250,
+          0,
+          250,
+          500,
+          750,
+          1000
+        ],
+        "height_mm": [
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          800,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500
+        ],
+        "diagonal": "a-c-b,b-c-d",
+        "provenance": {
+          "kind": "authored",
+          "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "generator_id": "fixture:terrace",
+          "generator_version": 1,
+          "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      },
+      "geometry_sha256": "52fb38157e1776347c7efc95692de96be3c5c6a63c268a0ff72d5ef29e8fa2e9",
+      "contact": {
+        "profile": "exulanica.heightfield-contact/v1",
+        "geometry_sha256": "52fb38157e1776347c7efc95692de96be3c5c6a63c268a0ff72d5ef29e8fa2e9",
+        "component_id": "terrain:test",
+        "policy": "person-square-680x1800-dry350-slope6248-v1",
+        "obstructions": []
+      },
+      "contact_sha256": "0201aad8c2e9b6746af90f82c18d6d16339a19d5c4b9e50180276a5fc73add5f",
+      "points": [
+        {
+          "position": [
+            0,
+            0
+          ],
+          "expected": {
+            "geometry_sha256": "52fb38157e1776347c7efc95692de96be3c5c6a63c268a0ff72d5ef29e8fa2e9",
+            "component_id": "terrain:test",
+            "triangle": [
+              3,
+              3,
+              1
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        },
+        {
+          "position": [
+            340,
+            0
+          ],
+          "expected": {
+            "geometry_sha256": "52fb38157e1776347c7efc95692de96be3c5c6a63c268a0ff72d5ef29e8fa2e9",
+            "component_id": "terrain:test",
+            "triangle": [
+              3,
+              5,
+              1
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        },
+        {
+          "position": [
+            0,
+            340
+          ],
+          "expected": {
+            "geometry_sha256": "52fb38157e1776347c7efc95692de96be3c5c6a63c268a0ff72d5ef29e8fa2e9",
+            "component_id": "terrain:test",
+            "triangle": [
+              5,
+              3,
+              1
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        }
+      ],
+      "sweeps": [
+        {
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            0,
+            0
+          ],
+          "expected": {
+            "status": "blocked",
+            "reason": "steep",
+            "contact": {
+              "geometry_sha256": "52fb38157e1776347c7efc95692de96be3c5c6a63c268a0ff72d5ef29e8fa2e9",
+              "component_id": "terrain:test",
+              "triangle": [
+                3,
+                3,
+                1
+              ],
+              "height_mm": {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              "normal": [
+                "0",
+                "1",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              {
+                "numerator": "800",
+                "denominator": "1"
+              }
+            ],
+            "triangles": 30
+          }
+        }
+      ],
+      "patches": []
+    },
+    {
+      "name": "diagonal-midpoint-headroom",
+      "geometry": {
+        "profile": "exulanica.heightfield-geometry/v1",
+        "component_id": "terrain:test",
+        "frame": "region-local-east-up-south-mm",
+        "east_mm": [
+          -2000,
+          -1000,
+          0,
+          1000,
+          2000
+        ],
+        "south_mm": [
+          -2000,
+          -1000,
+          0,
+          1000,
+          2000
+        ],
+        "height_mm": [
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500
+        ],
+        "diagonal": "a-c-b,b-c-d",
+        "provenance": {
+          "kind": "authored",
+          "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "generator_id": "fixture:terrace",
+          "generator_version": 1,
+          "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      },
+      "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+      "contact": {
+        "profile": "exulanica.heightfield-contact/v1",
+        "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+        "component_id": "terrain:test",
+        "policy": "person-square-680x1800-dry350-slope6248-v1",
+        "obstructions": [
+          {
+            "kind": "aabb",
+            "obstruction_id": "obstacle:test",
+            "bounds_mm": [
+              -10,
+              2000,
+              -10,
+              10,
+              2100,
+              10
+            ]
+          }
+        ]
+      },
+      "contact_sha256": "ed79ecdc782fe61cfe825d37cea5ebab9e255c04296a8c3b4f0d8354bd56c8bc",
+      "points": [
+        {
+          "position": [
+            0,
+            0
+          ],
+          "expected": {
+            "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+            "component_id": "terrain:test",
+            "triangle": [
+              1,
+              1,
+              1
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        }
+      ],
+      "sweeps": [
+        {
+          "start": [
+            -700,
+            -700
+          ],
+          "end": [
+            -700,
+            -700
+          ],
+          "expected": {
+            "status": "clear",
+            "reason": null,
+            "contact": {
+              "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+              "component_id": "terrain:test",
+              "triangle": [
+                1,
+                1,
+                0
+              ],
+              "height_mm": {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              "normal": [
+                "0",
+                "1",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              {
+                "numerator": "500",
+                "denominator": "1"
+              }
+            ],
+            "triangles": 7
+          }
+        },
+        {
+          "start": [
+            700,
+            700
+          ],
+          "end": [
+            700,
+            700
+          ],
+          "expected": {
+            "status": "clear",
+            "reason": null,
+            "contact": {
+              "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+              "component_id": "terrain:test",
+              "triangle": [
+                2,
+                2,
+                1
+              ],
+              "height_mm": {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              "normal": [
+                "0",
+                "1",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              {
+                "numerator": "500",
+                "denominator": "1"
+              }
+            ],
+            "triangles": 7
+          }
+        },
+        {
+          "start": [
+            -700,
+            -700
+          ],
+          "end": [
+            700,
+            700
+          ],
+          "expected": {
+            "status": "blocked",
+            "reason": "obstructed",
+            "contact": {
+              "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+              "component_id": "terrain:test",
+              "triangle": [
+                2,
+                2,
+                1
+              ],
+              "height_mm": {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              "normal": [
+                "0",
+                "1",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              {
+                "numerator": "500",
+                "denominator": "1"
+              }
+            ],
+            "triangles": 18
+          }
+        }
+      ],
+      "patches": []
+    },
+    {
+      "name": "closed-point-obstruction",
+      "geometry": {
+        "profile": "exulanica.heightfield-geometry/v1",
+        "component_id": "terrain:test",
+        "frame": "region-local-east-up-south-mm",
+        "east_mm": [
+          -2000,
+          -1000,
+          0,
+          1000,
+          2000
+        ],
+        "south_mm": [
+          -2000,
+          -1000,
+          0,
+          1000,
+          2000
+        ],
+        "height_mm": [
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500
+        ],
+        "diagonal": "a-c-b,b-c-d",
+        "provenance": {
+          "kind": "authored",
+          "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "generator_id": "fixture:terrace",
+          "generator_version": 1,
+          "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      },
+      "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+      "contact": {
+        "profile": "exulanica.heightfield-contact/v1",
+        "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+        "component_id": "terrain:test",
+        "policy": "person-square-680x1800-dry350-slope6248-v1",
+        "obstructions": [
+          {
+            "kind": "aabb",
+            "obstruction_id": "obstacle:test",
+            "bounds_mm": [
+              340,
+              2300,
+              340,
+              340,
+              2300,
+              340
+            ]
+          }
+        ]
+      },
+      "contact_sha256": "81968e349efb2e272cc4edf2c179203b2b25762665e8bf47c06f9179f739ce4d",
+      "points": [
+        {
+          "position": [
+            0,
+            0
+          ],
+          "expected": {
+            "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+            "component_id": "terrain:test",
+            "triangle": [
+              1,
+              1,
+              1
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        }
+      ],
+      "sweeps": [
+        {
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            0,
+            0
+          ],
+          "expected": {
+            "status": "blocked",
+            "reason": "obstructed",
+            "contact": {
+              "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+              "component_id": "terrain:test",
+              "triangle": [
+                1,
+                1,
+                1
+              ],
+              "height_mm": {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              "normal": [
+                "0",
+                "1",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "500",
+                "denominator": "1"
+              },
+              {
+                "numerator": "500",
+                "denominator": "1"
+              }
+            ],
+            "triangles": 6
+          }
+        }
+      ],
+      "patches": []
+    },
+    {
+      "name": "unknown-obstruction",
+      "geometry": {
+        "profile": "exulanica.heightfield-geometry/v1",
+        "component_id": "terrain:test",
+        "frame": "region-local-east-up-south-mm",
+        "east_mm": [
+          -2000,
+          -1000,
+          0,
+          1000,
+          2000
+        ],
+        "south_mm": [
+          -2000,
+          -1000,
+          0,
+          1000,
+          2000
+        ],
+        "height_mm": [
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500
+        ],
+        "diagonal": "a-c-b,b-c-d",
+        "provenance": {
+          "kind": "authored",
+          "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "generator_id": "fixture:terrace",
+          "generator_version": 1,
+          "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      },
+      "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+      "contact": {
+        "profile": "exulanica.heightfield-contact/v1",
+        "geometry_sha256": "0e420c9343e4e8629329a40895ff3882936e59784389b7fa0580a5580522e20d",
+        "component_id": "terrain:test",
+        "policy": "person-square-680x1800-dry350-slope6248-v1",
+        "obstructions": [
+          {
+            "kind": "unknown",
+            "obstruction_id": "mesh:unknown"
+          }
+        ]
+      },
+      "contact_sha256": "27707f03074a75a1591d369313cd460feb2fa02a479c73af086039a875de42ff",
+      "points": [],
+      "sweeps": [
+        {
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            0,
+            0
+          ],
+          "expected": {
+            "status": "unavailable",
+            "reason": "unknown_obstruction",
+            "contact": null,
+            "height_range_mm": null,
+            "triangles": 0
+          }
+        }
+      ],
+      "patches": []
+    },
+    {
+      "name": "numeric-ties",
+      "geometry": {
+        "profile": "exulanica.heightfield-geometry/v1",
+        "component_id": "terrain:test",
+        "frame": "region-local-east-up-south-mm",
+        "east_mm": [
+          0,
+          250,
+          500,
+          750,
+          1000,
+          1250,
+          1500,
+          1750,
+          2000,
+          2250,
+          2500,
+          2750,
+          3000,
+          3250
+        ],
+        "south_mm": [
+          0,
+          250,
+          500,
+          750,
+          1000,
+          1250,
+          1500,
+          1750,
+          2000,
+          2250,
+          2500,
+          2750,
+          3000,
+          3250
+        ],
+        "height_mm": [
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500,
+          500
+        ],
+        "diagonal": "a-c-b,b-c-d",
+        "provenance": {
+          "kind": "authored",
+          "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "generator_id": "fixture:terrace",
+          "generator_version": 1,
+          "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      },
+      "geometry_sha256": "7c0a5859d24cf83a4fb53e17ec4da7d813e105671fc3caf6fa05fd1720fd4498",
+      "contact": {
+        "profile": "exulanica.heightfield-contact/v1",
+        "geometry_sha256": "7c0a5859d24cf83a4fb53e17ec4da7d813e105671fc3caf6fa05fd1720fd4498",
+        "component_id": "terrain:test",
+        "policy": "person-square-680x1800-dry350-slope6248-v1",
+        "obstructions": []
+      },
+      "contact_sha256": "63db6bc9c2590d3fabb70766002b9ed56ae4170f25b5c9e141852a1687a75cad",
+      "points": [
+        {
+          "position": [
+            2500,
+            2500
+          ],
+          "expected": {
+            "geometry_sha256": "7c0a5859d24cf83a4fb53e17ec4da7d813e105671fc3caf6fa05fd1720fd4498",
+            "component_id": "terrain:test",
+            "triangle": [
+              9,
+              9,
+              1
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        },
+        {
+          "position": [
+            2625,
+            2625
+          ],
+          "expected": {
+            "geometry_sha256": "7c0a5859d24cf83a4fb53e17ec4da7d813e105671fc3caf6fa05fd1720fd4498",
+            "component_id": "terrain:test",
+            "triangle": [
+              10,
+              10,
+              0
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        },
+        {
+          "position": [
+            3250,
+            3250
+          ],
+          "expected": {
+            "geometry_sha256": "7c0a5859d24cf83a4fb53e17ec4da7d813e105671fc3caf6fa05fd1720fd4498",
+            "component_id": "terrain:test",
+            "triangle": [
+              12,
+              12,
+              1
+            ],
+            "height_mm": {
+              "numerator": "500",
+              "denominator": "1"
+            },
+            "normal": [
+              "0",
+              "1",
+              "0"
+            ]
+          }
+        }
+      ],
+      "sweeps": [],
+      "patches": []
+    },
+    {
+      "name": "slope-threshold",
+      "geometry": {
+        "profile": "exulanica.heightfield-geometry/v1",
+        "component_id": "terrain:test",
+        "frame": "region-local-east-up-south-mm",
+        "east_mm": [
+          -1250,
+          0,
+          1250
+        ],
+        "south_mm": [
+          -1250,
+          0,
+          1250
+        ],
+        "height_mm": [
+          2000,
+          2781,
+          3562,
+          2000,
+          2781,
+          3562,
+          2000,
+          2781,
+          3562
+        ],
+        "diagonal": "a-c-b,b-c-d",
+        "provenance": {
+          "kind": "authored",
+          "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "generator_id": "fixture:terrace",
+          "generator_version": 1,
+          "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      },
+      "geometry_sha256": "4a37fb6b7250bc7bf2080eb00067989925e123822327a018d87bf1cf6292c863",
+      "contact": {
+        "profile": "exulanica.heightfield-contact/v1",
+        "geometry_sha256": "4a37fb6b7250bc7bf2080eb00067989925e123822327a018d87bf1cf6292c863",
+        "component_id": "terrain:test",
+        "policy": "person-square-680x1800-dry350-slope6248-v1",
+        "obstructions": []
+      },
+      "contact_sha256": "dbfd9358863a07f87ce3352f9accf8e1f1d3dae73483f3c0bc3d59363b6363ab",
+      "points": [
+        {
+          "position": [
+            0,
+            0
+          ],
+          "expected": {
+            "geometry_sha256": "4a37fb6b7250bc7bf2080eb00067989925e123822327a018d87bf1cf6292c863",
+            "component_id": "terrain:test",
+            "triangle": [
+              0,
+              0,
+              1
+            ],
+            "height_mm": {
+              "numerator": "2781",
+              "denominator": "1"
+            },
+            "normal": [
+              "-781",
+              "1250",
+              "0"
+            ]
+          }
+        },
+        {
+          "position": [
+            125,
+            125
+          ],
+          "expected": {
+            "geometry_sha256": "4a37fb6b7250bc7bf2080eb00067989925e123822327a018d87bf1cf6292c863",
+            "component_id": "terrain:test",
+            "triangle": [
+              1,
+              1,
+              0
+            ],
+            "height_mm": {
+              "numerator": "28591",
+              "denominator": "10"
+            },
+            "normal": [
+              "-781",
+              "1250",
+              "0"
+            ]
+          }
+        }
+      ],
+      "sweeps": [
+        {
+          "start": [
+            0,
+            0
+          ],
+          "end": [
+            0,
+            0
+          ],
+          "expected": {
+            "status": "clear",
+            "reason": null,
+            "contact": {
+              "geometry_sha256": "4a37fb6b7250bc7bf2080eb00067989925e123822327a018d87bf1cf6292c863",
+              "component_id": "terrain:test",
+              "triangle": [
+                0,
+                0,
+                1
+              ],
+              "height_mm": {
+                "numerator": "2781",
+                "denominator": "1"
+              },
+              "normal": [
+                "-781",
+                "1250",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "321071",
+                "denominator": "125"
+              },
+              {
+                "numerator": "374179",
+                "denominator": "125"
+              }
+            ],
+            "triangles": 6
+          }
+        }
+      ],
+      "patches": [
+        {
+          "position": [
+            0,
+            0
+          ],
+          "half_width_mm": 340,
+          "height_mm": 500,
+          "expected": {
+            "status": "blocked",
+            "reason": "not_flat",
+            "contact": {
+              "geometry_sha256": "4a37fb6b7250bc7bf2080eb00067989925e123822327a018d87bf1cf6292c863",
+              "component_id": "terrain:test",
+              "triangle": [
+                0,
+                0,
+                1
+              ],
+              "height_mm": {
+                "numerator": "2781",
+                "denominator": "1"
+              },
+              "normal": [
+                "-781",
+                "1250",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "321071",
+                "denominator": "125"
+              },
+              {
+                "numerator": "374179",
+                "denominator": "125"
+              }
+            ],
+            "triangles": 6
+          }
+        }
+      ]
+    },
+    {
+      "name": "slope-adjacent-piece-headroom",
+      "geometry": {
+        "profile": "exulanica.heightfield-geometry/v1",
+        "component_id": "terrain:test",
+        "frame": "region-local-east-up-south-mm",
+        "east_mm": [
+          0,
+          1000,
+          2000
+        ],
+        "south_mm": [
+          0,
+          1000,
+          2000
+        ],
+        "height_mm": [
+          1000,
+          1500,
+          2000,
+          1000,
+          1500,
+          2000,
+          1000,
+          1500,
+          2000
+        ],
+        "diagonal": "a-c-b,b-c-d",
+        "provenance": {
+          "kind": "authored",
+          "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "generator_id": "fixture:terrace",
+          "generator_version": 1,
+          "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      },
+      "geometry_sha256": "278c6b851741fbb4a39a35320b49f6df6be707caf959988052f7c11540a34cb5",
+      "contact": {
+        "profile": "exulanica.heightfield-contact/v1",
+        "geometry_sha256": "278c6b851741fbb4a39a35320b49f6df6be707caf959988052f7c11540a34cb5",
+        "component_id": "terrain:test",
+        "policy": "person-square-680x1800-dry350-slope6248-v1",
+        "obstructions": [
+          {
+            "kind": "aabb",
+            "obstruction_id": "obstacle:test",
+            "bounds_mm": [
+              950,
+              3350,
+              990,
+              960,
+              3360,
+              1010
+            ]
+          }
+        ]
+      },
+      "contact_sha256": "830b7f609a2187bc553bdec60fd022e18a7c9f420178486ff1fa48d3d8931d7c",
+      "points": [
+        {
+          "position": [
+            1250,
+            1000
+          ],
+          "expected": {
+            "geometry_sha256": "278c6b851741fbb4a39a35320b49f6df6be707caf959988052f7c11540a34cb5",
+            "component_id": "terrain:test",
+            "triangle": [
+              0,
+              1,
+              1
+            ],
+            "height_mm": {
+              "numerator": "1625",
+              "denominator": "1"
+            },
+            "normal": [
+              "-1",
+              "2",
+              "0"
+            ]
+          }
+        }
+      ],
+      "sweeps": [
+        {
+          "start": [
+            1250,
+            1000
+          ],
+          "end": [
+            1250,
+            1000
+          ],
+          "expected": {
+            "status": "blocked",
+            "reason": "obstructed",
+            "contact": {
+              "geometry_sha256": "278c6b851741fbb4a39a35320b49f6df6be707caf959988052f7c11540a34cb5",
+              "component_id": "terrain:test",
+              "triangle": [
+                0,
+                1,
+                1
+              ],
+              "height_mm": {
+                "numerator": "1625",
+                "denominator": "1"
+              },
+              "normal": [
+                "-1",
+                "2",
+                "0"
+              ]
+            },
+            "height_range_mm": [
+              {
+                "numerator": "1455",
+                "denominator": "1"
+              },
+              {
+                "numerator": "1795",
+                "denominator": "1"
+              }
+            ],
+            "triangles": 6
+          }
+        }
+      ],
+      "patches": []
+    }
+  ]
+}

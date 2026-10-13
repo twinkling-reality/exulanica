@@ -155,6 +155,11 @@ def seeds(tmp_path_factory) -> Iterator[Seeds]:
         )["world_id"]
         repository.connection.close()
 
+        # A source workspace before preparation has a world but no saved entry.
+        entryless = _export(
+            admin, root, workspace, tmp_path_factory.mktemp("entryless") / "archive"
+        )
+
         # What `seed_workspace.py prepare` runs once its copy is made, twice.
         with _owner_connection(scratch) as connection:
             prepared = seed_workspace.prepare_workspace(connection, workspace)
@@ -166,12 +171,6 @@ def seeds(tmp_path_factory) -> Iterator[Seeds]:
         ).fetchone()["n"]
 
         archive = _export(admin, root, workspace, tmp_path_factory.mktemp("seed") / "archive")
-        # The control: the same workspace as a prepare that saved no entry left it.
-        admin.execute("delete from saved_world_entry where workspace_id = %s", (workspace,))
-        admin.commit()
-        entryless = _export(
-            admin, root, workspace, tmp_path_factory.mktemp("entryless") / "archive"
-        )
         yield Seeds(
             workspace=workspace,
             world_id=world_id,

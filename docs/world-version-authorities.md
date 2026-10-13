@@ -414,3 +414,14 @@ The problem codes are distinct because the recovery differs:
   through preview then apply, device-only settings that write nothing, Companion attribution and
   the split between a Companion preview and its separate apply, and hydration that keeps device-only
   presentation; `interaction-settings.test.ts` holds the page's controls to the served catalog.
+
+
+## Permanent world removal
+
+A generated world's removal is a distinct authority boundary from editing or taking back an
+edit. Its `world_erasure` record names the retired world and preserves its creation budget;
+it contains no title, prompt, document or content digest. The transaction deletes all versions
+and their child records together, preserves earlier society-erasure records, and prevents the
+world identifier from being registered again. Restore carries the erasure even when the backup
+predates creation. The [saved-world contract](saved-world-entry.md#permanent-removal) owns route
+permissions, refusal states, retained categories and process-cache limitations.

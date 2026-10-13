@@ -1,6 +1,6 @@
 /**
  * Where a thing and its look came from, in words, from their origin records alone: one rule per
- * origin class and per licence fact, never per kind, look or source, so a kind drafted or imported
+ * origin class, catalog source and licence fact, never per kind or look, so a kind drafted or imported
  * tomorrow reads correctly with no code.
  */
 import type { OriginRecord } from '../thing-card-api.js';
@@ -75,12 +75,14 @@ export function creditOf(origin: OriginRecord): CardLink | { readonly text: stri
  * names that model: by `draftedBy`, the name the server reads for it, or else by the model id its
  * own origin records, so the open model behind a made creature is always said.
  */
-export function kindCameWords(label: string, origin: OriginRecord, draftedBy: string | null = null): string {
+export function kindCameWords(label: string, origin: OriginRecord, draftedBy: string | null = null, source: 'workspace' | 'shipped' | null = null): string {
   const named = withArticle(label);
   const a = named.charAt(0).toUpperCase() + named.slice(1);
   switch (origin.class) {
     case 'authored':
-      return origin.by === 'project' ? `${a} is one of Exulanica's own kinds.` : `${a} is a kind made in this workspace.`;
+      if (source === 'workspace') return `${a} is an authored kind available in this workspace.`;
+      if (source === 'shipped') return origin.by === 'project' ? `${a} is one of Exulanica's own kinds.` : `${a} is an authored kind in the library.`;
+      return `${a} is an authored kind.`;
     case 'drafted': {
       const model = draftedBy ?? origin.model?.modelId ?? null;
       return model === null ? `${a} is a kind a model drafted from words.` : `${a} is a kind the open model ${model} drafted from words.`;

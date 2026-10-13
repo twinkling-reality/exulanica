@@ -149,7 +149,7 @@ def things_engine() -> str:
     return engine
 
 
-def record_modules(document: dict[str, Any]) -> None:
+def record_modules(document: dict[str, Any], *, day: bool = False) -> None:
     """Write into a things input what a society's first input alone records, and nothing into a
     later one: the ability modules its minutes run, each built module at its newest version, and
     the movement modules that move its people, the newest of each kind of movement. The society
@@ -160,7 +160,7 @@ def record_modules(document: dict[str, Any]) -> None:
     from exulanica.abilities.registry import current_modules
     from exulanica.movement.registry import current_engine_modules
 
-    document["modules"] = list(current_modules())
+    document["modules"] = list(current_modules(day=day))
     document[MOVEMENT_MODULES_FIELD] = list(current_engine_modules(things_engine()))
 
 
@@ -168,6 +168,22 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
     """The things a v5 input carries, held to their shape: each placed thing once, in id order,
     with its kind's semantics, a ground position, a yaw within one turn, and an arrival point
     exactly where its kind offers arrival through it. An unavailable input carries none."""
+    from exulanica.abilities.registry import DAY
+    from exulanica.world.society_input_policy import WALKING_SURFACES_INPUT_V3
+    from exulanica.world.society_resident_day import validate_frame
+
+    records_day = DAY in document.get("modules", ())
+    if records_day != ("day" in document):
+        raise ValueError("resident day input must match its recorded module")
+    if records_day:
+        if (
+            document["input_seq"] != 1
+            or document["profile"] != WALKING_SURFACES_INPUT_V3
+            or "people" not in document
+            or document["availability"] != "available"
+        ):
+            raise ValueError("resident day requires an available first input with people")
+        validate_frame(document["day"], people=document["people"], document=document)
     _check_reference(document["population_kind"], "the kind a things input's population is made of")
     if "modules" in document:
         from exulanica.abilities.registry import AbilityError, recorded_modules

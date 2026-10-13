@@ -1,8 +1,9 @@
 """A world kind: one typed, versioned, fingerprinted document, read and held to its checks.
 
 A world kind states a kind of place a person can make worlds of (a farm, a building site, a
-cafe, a harbour) as data, profile ``exulanica.world-kind/v1``: its parts in plain words with the
-engine roles that say what the engine does with each, its zones and how they are laid out, its own
+cafe, a harbour) as data, profiles ``exulanica.world-kind/v1`` and ``exulanica.world-kind/v2``:
+its parts in plain words with the engine roles that say what the engine does with each, its zones
+and how they are laid out, its own
 workplaces, shops and homes in the society's use-class form, the values a person may change with
 their ranges, and named presets. A model drafts one from a person's words, a creator uploads one,
 or the team authors one; whichever, the same reader holds it to the same checks, and nothing is
@@ -75,6 +76,7 @@ __all__ = [
     "LICENCES",
     "ORIGINS",
     "PROFILE",
+    "REQUIREMENTS_PROFILE",
     "KindDocument",
     "KindParameter",
     "KindRefused",
@@ -83,6 +85,7 @@ __all__ = [
 ]
 
 PROFILE: Final = "exulanica.world-kind/v1"
+REQUIREMENTS_PROFILE: Final = "exulanica.world-kind/v2"
 #: The composer that generates every kind this module reads: the site grammar's.
 GENERATOR_KEY: Final = "site-plan"
 GENERATOR_VERSION: Final = 1
@@ -95,6 +98,8 @@ _LOOK: Final = re.compile(r"([a-z]+)\.([a-z][a-z0-9_]{0,47})")
 _HEX64: Final = re.compile(r"[0-9a-f]{64}")
 #: The refusals a kind meets, by stage A and stage B, each with what it means.
 KIND_CODES: Final = (
+    ("kind_requirement_unmet", "A declared requirement does not match its placed parts."),
+    ("kind_shape_unmet", "A part does not meet its pinned structural class."),
     (
         "kind_document_invalid",
         (
@@ -380,6 +385,14 @@ class _Reader:
     def bound(self, key: str) -> tuple[int, int]:
         return self.catalogs.bound(key)
 
+    def limits(self, figure: _Figure) -> tuple[int, int]:
+        if figure.value is not None:
+            return figure.value, figure.value
+        if figure.parameter:
+            parameter = self.parameters[figure.parameter]
+            return parameter.minimum, parameter.maximum
+        return figure.start, figure.end
+
     def figure(
         self, where: str, raw: object, bound: str, *, module: int = 0, drawn: bool = False
     ) -> _Figure:
@@ -573,7 +586,10 @@ def _read_part(
     if not isinstance(raw, dict) or raw.get("form") not in FORMS:
         raise _invalid(where, f"states a form, one of {list(FORMS)}")
     form = str(raw["form"])
-    entry = _keys(where, raw, _PART_COMMON | _PART_KEYS[form])
+    shaped = reader.raw["profile"] == REQUIREMENTS_PROFILE and "shape_class" in raw
+    entry = _keys(
+        where, raw, _PART_COMMON | _PART_KEYS[form] | ({"shape_class"} if shaped else set())
+    )
     key = _key(f"{where}.key", entry["key"])
     roles_raw = entry["roles"]
     if not isinstance(roles_raw, list) or not all(type(r) is str for r in roles_raw):
@@ -647,7 +663,12 @@ def _read_part(
         fields["holds"] = _holdings(reader, f"{where}.holds", entry["holds"], allow_empty=True)
     elif form == "fixture":
         for name in ("width_mm", "depth_mm", "height_mm"):
-            fields[name] = _int(f"{where}.{name}", entry[name], reader.bound("fixture_size_mm"))
+            bound = (
+                "fixture_height_mm"
+                if (name == "height_mm" and reader.raw["profile"] == REQUIREMENTS_PROFILE)
+                else "fixture_size_mm"
+            )
+            fields[name] = _int(f"{where}.{name}", entry[name], reader.bound(bound))
         for name in ("seats", "stands"):
             fields[name] = _int(f"{where}.{name}", entry[name], reader.bound("fixture_places"))
         fields["sleepers"] = _int(f"{where}.sleepers", entry["sleepers"], reader.bound("sleepers"))
@@ -672,6 +693,19 @@ def _read_part(
             f"{where}.gate_width_mm", entry["gate_width_mm"], reader.bound("gate_width_mm")
         )
     _check_roles(reader, where, form, roles, use_class, fields, use_classes)
+    if shaped:
+        from exulanica.world.kinds.shape_classes import (
+            ShapeRefused,
+            check_shape,
+            read_shape_reference,
+        )
+
+        try:
+            shape = read_shape_reference(entry["shape_class"], form)
+            check_shape(shape, fields, reader.limits)
+        except ShapeRefused as refused:
+            raise KindRefused("kind_shape_unmet", str(refused), f"{where}.shape_class") from refused
+        fields["shape_class"] = dict(entry["shape_class"])
     return _ReadPart(
         key=key,
         label=_text(f"{where}.label", entry["label"], reader.bound("label_characters")),
@@ -910,7 +944,7 @@ class KindDocument:
     def reference(self) -> dict[str, object]:
         """What a world made from this kind records of it."""
         return {
-            "profile": PROFILE,
+            "profile": self.document["profile"],
             "kind": self.kind,
             "version": self.version,
             "sha256": self.sha256,
@@ -1123,14 +1157,24 @@ def read_kind(
         from exulanica.world.society_living import town_routine
 
         routine = town_routine()
-    catalogs = load_kind_catalogs() if catalogs is None else catalogs
+    profile = document.get("profile") if isinstance(document, dict) else None
+    catalogs = (
+        load_kind_catalogs(bounds_version=2 if profile == REQUIREMENTS_PROFILE else 1)
+        if catalogs is None
+        else catalogs
+    )
     try:
         canonical_json(document)
     except (CanonicalisationError, TypeError, ValueError) as exc:
         raise _invalid("", f"is not canonical JSON: {exc}") from exc
-    raw = _keys("", document, _TOP_KEYS)
-    if raw["profile"] != PROFILE:
-        raise _invalid("profile", f"is {PROFILE}")
+    raw = _keys(
+        "",
+        document,
+        _TOP_KEYS
+        | ({"requirement_source", "requirements"} if profile == REQUIREMENTS_PROFILE else set()),
+    )
+    if raw["profile"] not in (PROFILE, REQUIREMENTS_PROFILE):
+        raise _invalid("profile", f"is {PROFILE} or {REQUIREMENTS_PROFILE}")
     kind = raw["kind"]
     if type(kind) is not str or _KIND.fullmatch(kind) is None:
         raise _invalid("kind", "is a lowercase key of at most 32 characters")
@@ -1322,6 +1366,10 @@ def read_kind(
             )
         )
     _check_size(reader, parts, zones, site, module)
+    if profile == REQUIREMENTS_PROFILE:
+        from exulanica.world.kinds.requirements import check_requirements
+
+        check_requirements(raw, parts, zones, site, reader)
     return KindDocument(
         document=MappingProxyType(dict(raw)),
         sha256=sha256_of_canonical(raw).hex(),

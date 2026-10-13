@@ -27,7 +27,7 @@ import { semanticSimilarity } from './similarity.js';
  * and a surface whose own frame carries real units must not take an arranged position as a place
  * in it.
  *
- * SCOPE. This solves 1 to 5 islands and refuses more. The brief says three to five; the product
+ * SCOPE. This solves 1 to 5 islands and refuses more. The product
  * says most users upload one or two photographs, and one photograph is one island, so the low
  * end has to work. Refusing at six is deliberate: "Do not solve infinite worlds." A force layout
  * whose behaviour was never examined above five islands should fail loudly rather than produce

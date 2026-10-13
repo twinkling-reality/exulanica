@@ -16,7 +16,7 @@ from exulanica.api.dependencies import CurrentSession, ScopedConnection
 from exulanica.api.society_control_worker import HOST_PLAYBACK_REFUSALS, host_playback_refusal
 from exulanica.api.world_scope import WorldId
 from exulanica.selection.validation import Session
-from exulanica.world.society import UnavailableSocietyInput, served_snapshot
+from exulanica.world.society import SocietyPlaceWaiting, UnavailableSocietyInput, served_snapshot
 from exulanica.world.society_control_repository import SocietyControlRepository
 from exulanica.world.society_controls import DEFAULT_BASE_TICK_INTERVAL_MS, effective_interval_ms
 from exulanica.world.world_clock import ClockRefused
@@ -263,6 +263,13 @@ def repository(
 def call(operation: Callable[[], Any]) -> Any:
     try:
         return operation()
+    except SocietyPlaceWaiting as exc:
+        # A site world's place still being made: ask again, as the society routes answer it.
+        return JSONResponse(
+            status_code=503,
+            content={"code": exc.code, "detail": str(exc)},
+            headers={"Retry-After": str(exc.retry_seconds)},
+        )
     except UnavailableSocietyInput as exc:
         return JSONResponse(
             status_code=424, content={"code": "unavailable_society_input", "detail": str(exc)}
@@ -337,7 +344,12 @@ def manual_step(
             "society": served_snapshot(result["society"]),
         }
 
-    return call(step)
+    runtime = request.app.state.services.society_runtime
+    if runtime is None:
+        return call(step)
+    # As the society's own step route: a place the kind worker keeps no longer is made and the
+    # step asked once more.
+    return call(lambda: runtime.with_the_place(connection, session, world_id, version_id, step))
 
 
 @router.get("/events")

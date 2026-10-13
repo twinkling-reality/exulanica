@@ -2,23 +2,28 @@ import {
   DEFAULT_MAXIMUM_SLOPE_DEGREES,
   DEFAULT_MAXIMUM_STEP_HEIGHT_AU,
   DISPLAY_EYE_HEIGHT,
+  SupportNavigationError,
   atlasVec3,
+  terrainGroundPose,
+  type TerrainOccupancyProof,
   type NavigationSurface,
   type NavigationWorld,
   type PolygonObstacle,
   type SurfaceSample,
 } from '@exulanica/atlas-core';
 import type { CameraState } from '../controls.js';
-import type { SiteDrawing, SiteRectMm } from './site-drawing.js';
+import { isTerrainSiteDrawing, type SiteDrawing, type StructuredSiteDrawing, type SiteRectMm } from './site-drawing.js';
 
 /**
- * Where a person walks in a site world, from its drawing's `walk` and nothing else.
+ * Where a person walks in a site world, from its canonical walk or explicit support network.
  *
- * The site's floor is level: a person stands on it wherever it is stated and nowhere beyond it, so
+ * A version 1 site's floor is level: a person stands on it wherever it is stated and nowhere beyond it, so
  * walking off the site's edge recovers them. Every box the drawing says a person keeps out of (a
  * wall piece between openings, a blocking fixture, water) is a polygon obstacle the movement
  * resolver collides against, so a person comes into a building through its door and walks round
- * its furniture. Nothing drawn is read for this: the drawing states both.
+ * its furniture. Nothing drawn is read for this: the drawing states both. Version 2 carries named supports,
+ * solid/headroom clearance and explicit connectors; speculative sampling stays on its entry
+ * surface while accepted movement carries the active surface and connector.
  *
  * The renderer's frame is east, up and south in metres; the site's is x east, y north and z up in
  * millimetres from its south-west corner, which is the region's origin. So a site point (x, y) is
@@ -60,7 +65,7 @@ function ring(rect: SiteRectMm, id: string): PolygonObstacle {
 }
 
 /** The level floor a site states: support on it, none off it. */
-export function siteSurface(drawing: SiteDrawing): NavigationSurface {
+export function siteSurface(drawing: StructuredSiteDrawing): NavigationSurface {
   const floor = drawing.walk.floorMm;
   return Object.freeze({
     sample: (east: number, south: number) => (onRect(floor, east, south) ? LEVEL : null),
@@ -68,13 +73,44 @@ export function siteSurface(drawing: SiteDrawing): NavigationSurface {
 }
 
 /** The navigation world a person exploring a site walks in. */
-export function siteNavigationWorld(drawing: SiteDrawing): NavigationWorld {
-  const [x0, y0, x1, y1] = drawing.walk.floorMm;
+export function siteNavigationWorld(drawing: SiteDrawing, occupancy: TerrainOccupancyProof | (() => TerrainOccupancyProof) = {status: 'unavailable'}): NavigationWorld {
+  if (isTerrainSiteDrawing(drawing)) {
+    const {east, south} = drawing.boundsMm;
+    const reach = Math.hypot(east[1] - east[0], south[1] - south[0]) / 2000;
+    return Object.freeze({
+      terrain: Object.freeze({source: Object.freeze({worldId: drawing.worldId, receiptSha256: drawing.receiptSha256}),
+        get occupancy() { return typeof occupancy === 'function' ? occupancy() : occupancy; }, contact: drawing.terrain,
+        entryMm: Object.freeze([drawing.arrival.positionMm[0], drawing.arrival.positionMm[2]]) as readonly [number, number]}),
+      // A terrain refusal never obtains a sampled or level substitute floor.
+      surface: Object.freeze({sample: () => null}),
+      eyeHeight: DISPLAY_EYE_HEIGHT, cameraRadius: SITE_WALKER_RADIUS_M,
+      centre: atlasVec3((east[0] + east[1]) / 2000, 0, (south[0] + south[1]) / 2000),
+      fieldRadius: reach, recoveryRadius: reach + FIELD_MARGIN_M,
+      maximumSlopeDegrees: DEFAULT_MAXIMUM_SLOPE_DEGREES, maximumStepHeight: DEFAULT_MAXIMUM_STEP_HEIGHT_AU,
+      surfaceSampleSpacing: SUPPORT_SAMPLE_SPACING_M,
+      regions: Object.freeze([]), obstacles: Object.freeze([]), polygonObstacles: Object.freeze([]), traces: Object.freeze([]),
+    });
+  }
+  const support = drawing.support;
+  const bounds = support === undefined ? drawing.walk.floorMm : [
+    Math.min(...support.document.surfaces.map(s => s.rect_mm[0])),
+    -Math.max(...support.document.surfaces.map(s => s.rect_mm[3])),
+    Math.max(...support.document.surfaces.map(s => s.rect_mm[2])),
+    -Math.min(...support.document.surfaces.map(s => s.rect_mm[1])),
+  ];
+  const [x0, y0, x1, y1] = bounds as readonly [number, number, number, number];
   const centreEast = (x0 + x1) / 2 / MILLIMETRES;
   const centreSouth = -(y0 + y1) / 2 / MILLIMETRES;
   const reach = Math.hypot(x1 - x0, y1 - y0) / 2 / MILLIMETRES;
+  if (support !== undefined && (support.document.actor.radius_mm !== 340 || support.document.actor.height_mm !== 1800)) {
+    throw new Error('The support network does not bind the 340 mm / 1800 mm person actor.');
+  }
   return Object.freeze({
-    surface: siteSurface(drawing),
+    ...(support === undefined ? {} : { support }),
+    surface: support === undefined ? siteSurface(drawing) : Object.freeze({ sample: (east: number, south: number) => {
+      try { return Object.freeze({ height: support.at(support.entry, [east * MILLIMETRES, south * MILLIMETRES]) / MILLIMETRES, normal: LEVEL.normal }); }
+      catch (error) { if (!(error instanceof SupportNavigationError)) throw error; return null; }
+    } }),
     eyeHeight: DISPLAY_EYE_HEIGHT,
     cameraRadius: SITE_WALKER_RADIUS_M,
     centre: atlasVec3(centreEast, 0, centreSouth),
@@ -85,10 +121,10 @@ export function siteNavigationWorld(drawing: SiteDrawing): NavigationWorld {
     surfaceSampleSpacing: SUPPORT_SAMPLE_SPACING_M,
     regions: Object.freeze([]),
     obstacles: Object.freeze([]),
-    polygonObstacles: Object.freeze([
+    polygonObstacles: Object.freeze(support === undefined ? [
       ...drawing.walk.blockersMm.map((rect, index) => ring(rect, `site-blocker:${index}`)),
       ...drawing.walk.keepOutMm.map((rect, index) => ring(rect, `site-keep-out:${index}`)),
-    ]),
+    ] : []),
     traces: Object.freeze([]),
   });
 }
@@ -99,11 +135,22 @@ export function siteNavigationWorld(drawing: SiteDrawing): NavigationWorld {
  * facing of (x east, y north) is yaw = atan2(-x, y).
  */
 export function siteStart(drawing: SiteDrawing, navigationWorld: NavigationWorld): CameraState {
+  if (isTerrainSiteDrawing(drawing)) {
+    const [east, , south] = drawing.arrival.positionMm;
+    const accepted = terrainGroundPose(navigationWorld, [east, south]);
+    const height = drawing.arrival.contact.height_mm;
+    return {x: east / 1000, z: south / 1000,
+      y: accepted?.position.y ?? Number(height.numerator) / Number(height.denominator) / 1000 + navigationWorld.eyeHeight,
+      yaw: Math.atan2(-drawing.arrival.facingMm[0], -drawing.arrival.facingMm[1]), pitch: 0,
+      ...(accepted === null ? {} : {terrain: accepted.state})};
+  }
   const [x, y, z] = drawing.arrival.positionMm;
   const [facingEast, facingNorth] = drawing.arrival.facingMm;
   return {
     x: x / MILLIMETRES,
-    y: z / MILLIMETRES + navigationWorld.eyeHeight,
+    y: drawing.support === undefined ? z / MILLIMETRES + navigationWorld.eyeHeight
+      : drawing.support.at(drawing.support.entry, [x, -y]) / MILLIMETRES + navigationWorld.eyeHeight,
+    ...(drawing.support === undefined ? {} : { support: drawing.support.entry }),
     z: -y / MILLIMETRES,
     yaw: Math.atan2(-facingEast, facingNorth),
     pitch: 0,

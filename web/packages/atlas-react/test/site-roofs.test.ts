@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { readRoofForms, readSurfaceMaterials } from '@exulanica/atlas-core';
-import { parseSiteDrawing, ridgeAxis, roofMesh, shapeRoofs, type RoofInput, type RoofMesh } from '../src/playcanvas/generated-site/index.js';
+import { parseStructuredSiteDrawing, ridgeAxis, roofMesh, shapeRoofs, type RoofInput, type RoofMesh } from '../src/playcanvas/generated-site/index.js';
 
 // Relative to web/, where the suite runs.
 const FORMS = readRoofForms(readFileSync('../assets/catalogs/world-kinds/roof-form.v1.json', 'utf8'));
@@ -143,7 +143,7 @@ describe('the roofs of a drawing', () => {
   const slot = (identity: string, lookRole: string, primitive: string, position: number[], yaw: number, box: number[], part = identity.split(':')[0]) =>
     ({ identity, part, label: identity, lookRole, positionMm: position, yawQuarterTurns: yaw, boxMm: box, front: '+y', fit: 'contain', primitive });
   /** Two tents of one part 5 m by 6 m (one roofed in canvas with its door in its south wall, one in glass), a thatched hut, and a palisade. */
-  const drawing = parseSiteDrawing({
+  const drawing = parseStructuredSiteDrawing({
     profile: 'exulanica.site-drawing/v1', world_id: 'world-1', receipt_sha256: 'a'.repeat(64),
     kind: { kind: 'camp', version: 1, label: 'Camp' }, extent: { widthMm: 40_000, depthMm: 40_000, enclosure: 'open' },
     arrival: { positionMm: [20_000, 2000, 0], facingMm: [0, 1] },

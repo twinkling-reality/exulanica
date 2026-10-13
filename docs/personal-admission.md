@@ -44,6 +44,27 @@ with its columns, a grantor who is not the authority's account holder, an author
 current at the grant, a future grant, a deletion and any update other than one withdrawal. A right
 lapses with the authority it was granted under.
 
+**Creature picture-note consent.** `model-right-uses.v2.json` offers `creature_drafter` on the gated
+reference-picture surface, separately from the picture reader. It sends only screened semantic
+notes to draft an invented body and supported actions, without promising geometry recovery or
+visual resemblance. The authenticated admission compares the submitted notice against the current
+server offer. Migration 0205's typed grant inserts a fresh ordinary v1 model-right receipt and
+an immutable `personal_model_right_use` binding in one transaction. The binding names the use,
+server-derived notice, complete model chain and destination; SQL computes its digest and checks
+the same notice and term in the source authority. A preexisting or unbound right cannot be given
+this meaning retrospectively. Runtime callers can read bindings and execute the typed grant;
+they cannot insert, update or delete bindings directly, and readonly callers cannot grant.
+
+SQL enforces source, actor, workspace and right identity; the authenticated application validates
+notice equality against its current manifest and offer. Database permission alone cannot prove
+that a human read the notice. Consumers require an exact current binding for every chain member,
+then recheck it before each attempt and final publication. Stopping or losing either role's
+right, expiry, a person finding or source erasure prevents pending creature publication. Reader
+stops and source erasure withdraw the reference bundle; creature-role stops end further creature
+use. Invented definitions already kept remain until ordinary creature erasure. No source pixels
+or reference block are copied into creature jobs or provenance; model-drafted fields remain
+under their ordinary erasure authority.
+
 **Deny by default.** A capture needs no right only when the presented screening was issued under a
 synthetic or benchmark authority and no other kind of authority in the workspace covers the same
 bytes. Bytes anybody has authorized as personal stay personal whichever receipt a caller presents,

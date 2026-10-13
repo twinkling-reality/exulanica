@@ -82,6 +82,7 @@ import copy
 import time
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import replace
 from decimal import Decimal
 from types import MappingProxyType
 from typing import Any, Final, TypeVar
@@ -119,7 +120,8 @@ from exulanica.models.policy import (
     admitted_payload,
     request_parts,
 )
-from exulanica.models.response import embedding_from_body, result_from_body
+from exulanica.models.provider_catalog import ProviderPrice
+from exulanica.models.response import embedding_from_body, record_reply_usage, result_from_body
 from exulanica.models.results import ChatResult, ChoiceResult, EmbeddingResult, StructuredResult
 from exulanica.models.schema import (
     response_format_for,
@@ -536,6 +538,57 @@ class ModelClient:
             texts = texts[: len(texts) - len(carried)]
         return admitted_payload(payload, texts)
 
+    def maximum_wire_attempts(self, role: Role) -> int:
+        return self._chain.maximum_wire_attempts(role)
+
+    def with_prices(
+        self,
+        prices: Mapping[tuple[str, str], ProviderPrice],
+        *,
+        limits: Mapping[Role, tuple[int, int]],
+    ) -> ModelClient:
+        """A rate-pinned copy with finite request limits, preserving trusted bindings.
+
+        Metadata can shrink a supported context, never widen it or admit another model.
+        Credentials, authorization, cache identities, observers and all spending gates stay.
+        """
+        from dataclasses import replace
+
+        models = dict(self._manifest.models)
+        for (provider, model_id), price in prices.items():
+            spec = self._manifest.spec(model_id)
+            if (
+                spec.provider != provider
+                or price.model_id != model_id
+                or price.context_window_tokens <= 0
+                or any(
+                    not rate.is_finite() or rate < 0
+                    for rate in (price.input_usd_per_mtok, price.output_usd_per_mtok)
+                )
+            ):
+                raise ValueError("model_price_unavailable")
+            models[model_id] = replace(
+                spec,
+                input_usd_per_mtok=price.input_usd_per_mtok,
+                output_usd_per_mtok=price.output_usd_per_mtok,
+                context_window_tokens=min(spec.context_window_tokens, price.context_window_tokens),
+            )
+        roles = {
+            role: replace(
+                binding,
+                primary=models[binding.primary.model_id],
+                fallback=None if binding.fallback is None else models[binding.fallback.model_id],
+            )
+            for role, binding in self._manifest.roles.items()
+        }
+        manifest = replace(
+            self._manifest, models=MappingProxyType(models), roles=MappingProxyType(roles)
+        )
+        bound = copy.copy(self)
+        bound._manifest = manifest
+        bound._chain = self._chain.with_prices(manifest, limits)
+        return bound
+
     def worst_case_seconds(self, role: Role) -> float:
         """The longest one call for this role can take on THIS client, timeouts and retries in.
 
@@ -870,6 +923,32 @@ class ModelClient:
         ``keep_calls`` are the part of this process's budget the ask must leave for other work.
         """
         role = chosen.role
+        scope = getattr(self, "_chosen_scopes", {}).get(model_id)
+        if scope is not None:
+            from exulanica.models import provider_catalog
+
+            guard = getattr(self, "_chosen_guard", None)
+            if guard is None or not guard():
+                raise ProviderRefused(
+                    "the binding is not currently executable",
+                    provider=self._manifest.spec(model_id).provider,
+                    reason="model_binding_stale_or_unavailable",
+                )
+            if scope != (chosen.role, prompt_version):
+                raise ProviderRefused(
+                    "the binding did not probe this task",
+                    provider=self._manifest.spec(model_id).provider,
+                    reason="model_binding_scope_mismatch",
+                )
+            if (
+                provider_catalog.licence_class(self._manifest.spec(model_id).provider, model_id)
+                != provider_catalog.ACCEPTED
+            ):
+                raise ProviderRefused(
+                    "the catalog no longer admits the licence",
+                    provider=self._manifest.spec(model_id).provider,
+                    reason="licence_not_admitted",
+                )
         spec = self._manifest.offered(chosen, model_id)
         if mechanism not in spec.answering:
             raise ChoiceRefused(
@@ -922,6 +1001,24 @@ class ModelClient:
             keep_usd=keep_usd,
             keep_calls=keep_calls,
         )
+        if scope is not None and served.body.get("model") != model_id:
+            # A refused identity is still a returned, potentially billable response. Account
+            # for its reported usage before refusing, without interpreting its answer.
+            record_reply_usage(
+                self._recorder,
+                role=role,
+                spec=served.spec,
+                body=served.body,
+                cache_hit=False,
+                used_fallback=False,
+                latency_s=served.latency_s,
+                usd_bound=served.reserved_usd,
+            )
+            raise ProviderRefused(
+                "the response did not identify the admitted model",
+                provider=spec.provider,
+                reason="model_binding_identity_mismatch",
+            )
         try:
             result = result_from_body(
                 role=role,
@@ -952,6 +1049,99 @@ class ModelClient:
         return ChoiceResult(label=label, mechanism=mechanism, call=result, line=line)
 
     # -- vision ------------------------------------------------------------------------------
+
+    def provider_prices(self, provider: str) -> dict[str, ProviderPrice]:
+        """A non-inference rate read, only for an admitted provider with a credential."""
+        refusal = self._refusals.get(provider)
+        if provider not in self._manifest.providers or refusal is not None:
+            raise ProviderRefused(
+                "the provider is not ready for a rate read",
+                provider=provider,
+                reason=refusal or PROVIDER_NOT_ADMITTED,
+            )
+        return self._chain.provider_prices(provider)
+
+    def with_chosen_manifest(
+        self,
+        manifest: Manifest,
+        scopes: Mapping[str, tuple[str, str]],
+        *,
+        guard: Callable[[], bool] | None = None,
+    ) -> ModelClient:
+        """A private, durably funded chosen-model catalog supplied by the proof owner.
+
+        Added entries can answer only their stated chosen role and prompt. Providers,
+        shipped models and automatic bindings cannot be replaced. The caller owns proof
+        reconstruction; this layer still enforces catalog licence, policy and spending.
+        """
+        extras = set(manifest.models) - set(self._manifest.models)
+        if (
+            replace(manifest, models=self._manifest.models) != self._manifest
+            or set(scopes) != extras
+            or any(manifest.models.get(key) != spec for key, spec in self._manifest.models.items())
+        ):
+            raise ValueError("a chosen catalog cannot replace shipped bindings")
+        bound = copy.copy(self)
+        bound._manifest = manifest
+        bound._chosen_scopes = dict(scopes)
+        bound._chosen_guard = guard
+        bound._chain = self._chain.for_probe(manifest)
+        return bound
+
+    def probe_choice(
+        self,
+        candidate: ModelSpec,
+        chosen: ChosenRoleBinding,
+        messages: Sequence[Mapping[str, Any]],
+        request: ChoiceRequest,
+        *,
+        mechanism: AnsweringMechanism,
+        prompt_version: str,
+        timeout: float,
+        max_tokens: int,
+        response_received: Callable[[Mapping[str, Any]], object] | None = None,
+    ) -> ChoiceResult:
+        """Ask an unverified candidate once within durable spending, without offering it.
+
+        The temporary manifest exists only inside this call. Every policy, egress refusal,
+        credential and spending gate still applies. It never changes this client's manifest,
+        automatic roles, cache or a world's executable choice set.
+        """
+        from exulanica.models import provider_catalog
+
+        if (
+            provider_catalog.licence_class(candidate.provider, candidate.model_id)
+            != provider_catalog.ACCEPTED
+        ):
+            raise ProviderRefused(
+                "the catalog has not admitted this candidate's licence",
+                provider=candidate.provider,
+                reason="licence_not_admitted",
+            )
+        if candidate.provider not in self._manifest.providers:
+            raise ProviderRefused(
+                "the candidate names no configured provider",
+                provider=candidate.provider,
+                reason=PROVIDER_NOT_ADMITTED,
+            )
+        spec = replace(candidate, answering={mechanism: "probe_in_progress"})
+        manifest = replace(self._manifest, models={**self._manifest.models, spec.model_id: spec})
+        probe = copy.copy(self)
+        probe._manifest = manifest
+        probe._chain = self._chain.for_probe(manifest, response_received)
+        texts = tuple(message["content"] for message in messages)
+        if not all(probe.unchanged_by_policies(chosen, candidate.model_id, texts)):
+            raise HostedRequestRefused("the workspace policy changes a probe's fixed inputs")
+        return probe.choose(
+            chosen,
+            candidate.model_id,
+            messages,
+            request,
+            mechanism=mechanism,
+            prompt_version=prompt_version,
+            timeout=timeout,
+            max_tokens=max_tokens,
+        )
 
     def vision(
         self,

@@ -42,7 +42,7 @@ from test_world_package_extension_postgres import _one_version_one_object
 from test_world_package_withdrawal_postgres import WITHDRAWN
 from test_world_package_withdrawal_postgres import people as imported_people  # noqa: F401
 from world_structure_fixtures import structural_candidate
-from world_support import registered_world
+from world_support import fixture_workspace, registered_world
 
 pytestmark = pytest.mark.postgres
 
@@ -115,7 +115,9 @@ def _bad_parent_root(repository, tmp_path, **_):
 
 
 def _a_world_another_workspace_holds(repository, tmp_path, **_):
-    elsewhere = registered_world(repository.connection, uuid.uuid4(), "world:personal:elsewhere")
+    stranger = uuid.uuid4()
+    with fixture_workspace(repository.connection, stranger):
+        elsewhere = registered_world(repository.connection, stranger, "world:personal:elsewhere")
     return {
         "world_id": elsewhere,
         "expected": "'world:personal:elsewhere' is not a world this workspace holds",

@@ -1,5 +1,5 @@
 /**
- * TEMPORARY development view of the loading and failure states, so they can be looked at without
+ * Development view of the loading and failure states, so they can be looked at without
  * waiting for a slow boot or breaking the server to see a refusal.
  *
  * One state at a time, in a real `#shell`, built by the function the application calls, so the

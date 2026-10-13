@@ -46,6 +46,7 @@ from conftest import scratch_role_database
 from test_thing_store_postgres import ACTOR, _creature, _store
 from test_world_objects_api import objects_api as imported_objects_api  # noqa: F401
 from thing_fixtures import kind_body, placeable_kind
+from world_support import historical_world_fixture_schema
 
 pytestmark = pytest.mark.postgres
 
@@ -405,12 +406,20 @@ def test_a_shipped_thing_stored_before_the_migration_reads_as_it_always_was(monk
             base = env_get("TEST_DATABASE_URL")
             assert base is not None
             database = Database(url=make_conninfo(base, options=f"-csearch_path={scratch},public"))
-            with monkeypatch.context() as before, database.session(workspace) as connection:
-                # Today's thing reader names the migration's column. The version is made holding no
+            with (
+                historical_world_fixture_schema(admin),
+                monkeypatch.context() as before,
+                database.session(workspace) as connection,
+            ):
+                # Today's reader names the migration's column. The version holds no
                 # thing yet, which is all the reader before the migration ever read of it.
                 before.setattr(WorldObjectRepository, "_things", lambda _self, _version_id: ())
                 _snapshot, _style, version_id = create_starter_authorities(
-                    connection, workspace_id=workspace, actor=actor, title="Kept", world_id=world_id
+                    connection,
+                    workspace_id=workspace,
+                    actor=actor,
+                    title="Kept",
+                    world_id=world_id,
                 )
                 # The row as the code before the migration wrote it: no source column yet.
                 connection.execute(
@@ -433,7 +442,10 @@ def test_a_shipped_thing_stored_before_the_migration_reads_as_it_always_was(monk
                 )
             admin.execute(migration.sql)
             admin.commit()
-            with database.session(workspace) as connection:
+            with (
+                historical_world_fixture_schema(admin, erasure=False, support=True),
+                database.session(workspace) as connection,
+            ):
                 version = WorldObjectRepository(
                     connection,
                     workspace,

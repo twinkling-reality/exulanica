@@ -261,6 +261,20 @@ def test_a_stranger_never_gets_a_403(deployment, method, path):
     that can be reached with another workspace's id must answer as though it were not there.
     """
     response = deployment.as_stranger(method, deployment.fill(path), **ROUTE_PROBES[(method, path)])
+    if (method, path) in {
+        ("GET", "/participation/notice"),
+        ("POST", "/participation/redeem"),
+        ("GET", "/world/invitations"),
+        ("POST", "/world/invitations"),
+    }:
+        # These collection routes require an enabled browser session. This deployment has
+        # bearer tokens only, so even its owner is refused before any resource is consulted.
+        # Id-addressed invitation/participant routes retain the ordinary concealed sweep.
+        owner = deployment.as_owner(method, deployment.fill(path), **ROUTE_PROBES[(method, path)])
+        assert response.status_code == owner.status_code == 403
+        assert response.json() == owner.json()
+        assert response.json()["code"] == "not_authorised"
+        return
     assert response.status_code != 403, (
         f"{method} {path} returned 403 to a stranger, which confirms the resource exists"
     )

@@ -50,6 +50,7 @@ from dataclasses import dataclass
 from typing import Any, Final, Literal
 
 from exulanica.world.specification_samples import sample_process_pool
+from exulanica.world.terrain_authoring import TERRAIN_COMPOSER_VERSIONS
 
 __all__ = [
     "CHECKS_KEPT",
@@ -145,6 +146,13 @@ class Kept:
             self._items.move_to_end(key)
             while len(self._items) > self._size:
                 self._items.popitem(last=False)
+
+    def forget(self, prefixes: tuple[str, ...]) -> None:
+        """Remove retained answers under exact namespaces, without retaining their digests."""
+        with self._lock:
+            for key in list(self._items):
+                if key.startswith(prefixes):
+                    del self._items[key]
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,14 +276,29 @@ def _placed(
     place_id: str, receipt: Mapping[str, Any], records: tuple[object, ...]
 ) -> dict[str, Any]:
     """The place a site world's society walks, made from its records within the walking graph's
-    budget, or why it cannot be, by name."""
+    budget, or why it cannot be, by name. With the place goes ``blocked``, the site's blocked
+    boxes as plain figures: what a society of things keeps a placed thing's standing places clear
+    of, which only the records state and the place does not carry."""
     from exulanica.grammar.errors import CatalogError
     from exulanica.world.composers.site_plan import society_place
     from exulanica.world.errors import InvalidStructuralData
-    from exulanica.world.society_site_place import GraphOverBudget
+    from exulanica.world.society_site_place import GraphOverBudget, site_blocked_boxes
 
     try:
-        return {"status": "done", "place": society_place(place_id, receipt, records)}
+        if receipt["composer"]["version"] in TERRAIN_COMPOSER_VERSIONS:
+            from exulanica.world.composers.site_plan import receipt_terrain
+
+            receipt_terrain(receipt)
+            return {
+                "status": "refused",
+                "code": "terrain_society_projection_unavailable",
+                "detail": "This terrain has no society projection.",
+            }
+        return {
+            "status": "done",
+            "place": society_place(place_id, receipt, records),
+            "blocked": site_blocked_boxes(records),
+        }
     except GraphOverBudget as exc:
         return {
             "status": "refused",
@@ -304,17 +327,32 @@ def check_job(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def compose_job(
-    workspace: str, document: dict[str, Any], values: dict[str, int], world_id: str
+    workspace: str,
+    document: dict[str, Any],
+    values: dict[str, int],
+    world_id: str,
+    support: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compose the world the kind makes with ``values`` for ``world_id`` and draw it, with the
     place its society walks (the one its checks built), or say why not."""
     from exulanica.world.composers.site_plan import compose_kind
     from exulanica.world.kinds.document import read_kind
     from exulanica.world.kinds.samples import SiteRefused
+    from exulanica.world.society_site_place import site_blocked_boxes
+    from exulanica.world.support_surfaces import SupportRefused
 
     place_id = site_ground_place_id()
     try:
-        composed = compose_kind(read_kind(document), values, world_id, place_id=place_id)
+        composed = compose_kind(
+            read_kind(document), values, world_id, place_id=place_id, support=support
+        )
+    except SupportRefused as refused:
+        return {
+            "status": "support_refused",
+            "code": refused.code,
+            "detail": refused.detail,
+            "where": refused.where,
+        }
     except SiteRefused as refused:
         return {"status": "refused", "code": refused.code, "refusals": list(refused.refusals)}
     records = tuple(composed.records)
@@ -324,7 +362,33 @@ def compose_job(
         "composed": composed,
         **_drawn(world_id, composed.receipt, composed.receipt_sha256, records),
         "place_id": place_id,
-        "placed": {"status": "done", "place": composed.place},
+        # Kept as the place job keeps it: the place, and the site's blocked boxes beside it.
+        "placed": {
+            "status": "done",
+            "place": composed.place,
+            "blocked": site_blocked_boxes(records),
+        },
+    }
+
+
+def compose_terrain_job(workspace: str, authoring: dict, world_id: str) -> dict[str, Any]:
+    """Admit and draw retained terrain in the existing bounded process worker."""
+    from exulanica.world.composers.site_plan import compose_terrain
+    from exulanica.world.terrain_authoring import TerrainAuthoringRefused
+
+    try:
+        composed = compose_terrain(authoring, world_id)
+    except TerrainAuthoringRefused as exc:
+        return {"status": "terrain_refused", "code": exc.code, "detail": exc.detail}
+    records = tuple(composed.records)
+    _keep_records(workspace, composed.receipt_sha256, records)
+    place_id = site_ground_place_id()
+    return {
+        "status": "done",
+        "composed": composed,
+        **_drawn(world_id, composed.receipt, composed.receipt_sha256, records),
+        "place_id": place_id,
+        "placed": _placed(place_id, composed.receipt, records),
     }
 
 
@@ -357,7 +421,7 @@ class _Running:
     """A job handed to the pool: the pool, when, whose, where it is kept, and its future once the
     pool has taken it."""
 
-    __slots__ = ("executor", "future", "kept", "started", "workspace")
+    __slots__ = ("executor", "future", "invalidated", "kept", "started", "workspace")
 
     def __init__(
         self, executor: Executor, started: float, workspace: str, kept: Kept | None
@@ -366,6 +430,7 @@ class _Running:
         self.started = started
         self.workspace = workspace
         self.kept = kept
+        self.invalidated = False
         self.future: Future[dict[str, Any]] | None = None
 
 
@@ -400,12 +465,67 @@ class KindWorker:
         self._executor: Executor | None = None
         self._running: dict[str, _Running] = {}
         self._closed = False
+        self._epoch = 0
         #: Finished checks, by their workspace and the kind document's digest.
         self.checks = Kept(CHECKS_KEPT)
         #: Finished drawings, by their workspace and receipt's digest.
         self.drawings = Kept(DRAWINGS_KEPT)
         #: Finished places, by their workspace, receipt's digest and place, each read a copy.
         self.places = Kept(PLACES_KEPT, copies=True)
+
+    @property
+    def epoch(self) -> int:
+        with self._lock:
+            return self._epoch
+
+    def forget_receipts(self, workspace: str, digests: frozenset[str]) -> None:
+        """Evict erased worlds' parent answers and discard the owned child holding documents.
+
+        This worker uses one shared child, so its other in-flight jobs become unavailable and
+        can retry from durable inputs. Other worlds' finished parent answers stay available.
+        Late results cannot refill caches; no removed content digest is retained by this method.
+        Other API processes still require their own invalidation.
+        """
+        if not digests:
+            return
+        with self._lock:
+            self._epoch += 1
+            self.drawings.forget(tuple(drawing_key(workspace, digest) for digest in digests))
+            self.checks.forget((f"terrain-coverage:v1:{workspace}:",))
+            self.places.forget(tuple(f"place:{workspace}:{digest}:" for digest in digests))
+            executor, self._executor = self._executor, None
+            for running in self._running.values():
+                running.invalidated = True
+            self._running.clear()
+        if executor is not None:
+            _terminate(executor)
+
+    def forget_kind(self, workspace: str, digest: str) -> None:
+        """Discard a kept kind's checks and owned child, invalidating late completions."""
+        with self._lock:
+            self._epoch += 1
+            self.checks.forget((check_key(workspace, digest),))
+            executor, self._executor = self._executor, None
+            for running in self._running.values():
+                running.invalidated = True
+            self._running.clear()
+        if executor is not None:
+            _terminate(executor)
+
+    def keep_composed(
+        self,
+        epoch: int,
+        drawn: tuple[str, dict[str, Any]] | None,
+        placed: tuple[str, dict[str, Any]] | None,
+    ) -> None:
+        """Publish a completed composition only while its worker generation is still current."""
+        with self._lock:
+            if self._closed or epoch != self._epoch:
+                return
+            if drawn is not None:
+                self.drawings.put(*drawn)
+            if placed is not None:
+                self.places.put(*placed)
 
     def run(
         self,
@@ -453,7 +573,11 @@ class KindWorker:
         # Added once the future is recorded: a future already done runs it at once, here.
         future.add_done_callback(functools.partial(self._finished, key, running))
         try:
-            return JobOutcome("done", future.result(timeout=seconds))
+            value = future.result(timeout=seconds)
+            with self._lock:
+                if running.invalidated:
+                    return JobOutcome("unavailable")
+            return JobOutcome("done", value)
         except FutureTimeout:
             return JobOutcome("overran")
         except (BrokenProcessPool, CancelledError):
@@ -480,15 +604,21 @@ class KindWorker:
             if self._executor is executor:
                 self._executor = None
             for key in [k for k, running in self._running.items() if running.executor is executor]:
+                self._running[key].invalidated = True
                 del self._running[key]
         _terminate(executor)
 
     def _finished(self, key: str, running: _Running, future: Future[dict[str, Any]]) -> None:
-        # Kept first, so a request arriving as the job ends reads it rather than starting it again.
-        if not future.cancelled() and future.exception() is None and running.kept is not None:
-            running.kept.put(key, future.result())
         with self._lock:
             if self._running.get(key) is running:
+                # Publish and retire under one lock. An obsolete pool's late callback may
+                # neither restore discarded content nor overwrite a replacement job's answer.
+                if (
+                    not future.cancelled()
+                    and future.exception() is None
+                    and running.kept is not None
+                ):
+                    running.kept.put(key, future.result())
                 del self._running[key]
 
     def close(self) -> None:
@@ -497,6 +627,8 @@ class KindWorker:
         with self._lock:
             self._closed = True
             executor, self._executor = self._executor, None
+            for running in self._running.values():
+                running.invalidated = True
             self._running.clear()
         if executor is not None:
             _terminate(executor)
@@ -528,29 +660,45 @@ class WorkerComposer:
     generation runs on a request's thread or a draft's, and then keeps :attr:`drawn` and
     :attr:`placed` with :meth:`keep`."""
 
-    def __init__(self, workspace: Any) -> None:
+    def __init__(self, workspace: Any, *, support: Mapping[str, Any] | None = None) -> None:
         self.workspace = str(workspace)
+        self._worker = kind_worker()
+        self._epoch = self._worker.epoch
+        self._support = None if support is None else copy.deepcopy(dict(support))
+        self._support_key = ""
+        if self._support is not None:
+            from exulanica.canonical import sha256_of_canonical
+            from exulanica.world.support_surfaces import SupportRefused
+
+            try:
+                self._support_key = f":support:{sha256_of_canonical(self._support).hex()}"
+            except (TypeError, ValueError) as exc:
+                raise SupportRefused("support", "is canonical integer JSON") from exc
         #: The last world's drawing and its society's place, each by where the worker keeps it.
         self.drawn: tuple[str, dict[str, Any]] | None = None
         self.placed: tuple[str, dict[str, Any]] | None = None
 
     def __call__(self, kind: Any, values: Mapping[str, int], world_id: str) -> Any:
         from exulanica.world.kinds.samples import SiteRefused
+        from exulanica.world.support_surfaces import SupportRefused
 
-        outcome = kind_worker().run(
+        outcome = self._worker.run(
             f"compose:{self.workspace}:{kind.sha256}:{world_id}:"
-            f"{json.dumps(dict(values), sort_keys=True)}",
+            f"{json.dumps(dict(values), sort_keys=True)}" + self._support_key,
             COMPOSE_SECONDS,
             compose_job,
             self.workspace,
             dict(kind.document),
             dict(values),
             world_id,
+            self._support,
             workspace=self.workspace,
         )
         if outcome.status != "done" or outcome.value is None:
             raise KindWorkWaiting(outcome.status, kept=False, reason=outcome.reason)
         answer = outcome.value
+        if answer["status"] == "support_refused":
+            raise SupportRefused(answer["where"], answer["detail"])
         if answer["status"] == "refused":
             raise SiteRefused(answer["code"], answer["refusals"])
         composed = answer["composed"]
@@ -567,8 +715,92 @@ class WorkerComposer:
     def keep(self) -> None:
         """Keep the made world's drawing and its society's place where the worker reads them:
         the page reads the drawing next, and bringing people in reads the place."""
-        worker = kind_worker()
-        if self.drawn is not None:
-            worker.drawings.put(*self.drawn)
-        if self.placed is not None:
-            worker.places.put(*self.placed)
+        self._worker.keep_composed(self._epoch, self.drawn, self.placed)
+
+
+class TerrainWorkerComposer:
+    """Compose explicit terrain using the existing workspace cache and erasure epoch."""
+
+    def __init__(self, workspace: Any) -> None:
+        self.workspace = str(workspace)
+        self._worker = kind_worker()
+        self._epoch = self._worker.epoch
+        self.drawn: tuple[str, dict[str, Any]] | None = None
+        self.placed: tuple[str, dict[str, Any]] | None = None
+
+    def __call__(self, authoring: dict, world_id: str) -> Any:
+        from exulanica.canonical import sha256_of_canonical
+        from exulanica.world.terrain_authoring import TerrainAuthoringRefused
+
+        try:
+            source_sha = sha256_of_canonical(authoring).hex()
+        except (TypeError, ValueError) as exc:
+            raise TerrainAuthoringRefused("Terrain source must be canonical integer JSON") from exc
+        outcome = self._worker.run(
+            f"compose-terrain:{self.workspace}:{source_sha}:{world_id}",
+            COMPOSE_SECONDS,
+            compose_terrain_job,
+            self.workspace,
+            copy.deepcopy(authoring),
+            world_id,
+            workspace=self.workspace,
+        )
+        if outcome.status != "done" or outcome.value is None:
+            raise KindWorkWaiting(outcome.status, kept=False, reason=outcome.reason)
+        answer = outcome.value
+        if answer["status"] == "terrain_refused":
+            raise TerrainAuthoringRefused(answer["detail"])
+        composed = answer["composed"]
+        self.drawn = (
+            drawing_key(self.workspace, composed.receipt_sha256),
+            {"status": "done", "body": answer["body"], "sha256": answer["sha256"]},
+        )
+        self.placed = (
+            place_key(self.workspace, composed.receipt_sha256, answer["place_id"]),
+            answer["placed"],
+        )
+        return composed
+
+    def keep(self) -> None:
+        """Retain results only while their workspace erasure epoch still matches."""
+        self._worker.keep_composed(self._epoch, self.drawn, self.placed)
+
+
+def terrain_dressing_coverage_job(document: dict, components: dict[str, bytes]) -> dict[str, Any]:
+    """Pure bounded decoding and exact coverage; it grants no current source authority."""
+    from exulanica.world.asset_preparation import decode_texture
+    from exulanica.world.terrain_dressing import compile_terrain_dressing, read_terrain_dressing
+
+    try:
+        coverage = compile_terrain_dressing(
+            read_terrain_dressing(document), components, decode_image=decode_texture
+        )
+    except ValueError as exc:
+        return {"status": "refused", "detail": str(exc)}
+    return {"status": "done", "coverage": coverage}
+
+
+class TerrainDressingWorkerCompiler:
+    """Cache pure coverage in existing bounded kind checks, scoped to a workspace and source."""
+
+    def __init__(self, workspace: Any) -> None:
+        self.workspace = str(workspace)
+        self.worker = kind_worker()
+
+    def __call__(self, dressing: Any, components: dict[str, bytes]) -> Any:
+        from exulanica.world.terrain_authoring import TerrainAuthoringRefused
+
+        outcome = self.worker.run(
+            f"terrain-coverage:v1:{self.workspace}:{dressing.sha256}",
+            DRAWING_SECONDS,
+            terrain_dressing_coverage_job,
+            dressing.document(),
+            components,
+            workspace=self.workspace,
+            kept=self.worker.checks,
+        )
+        if outcome.status != "done" or outcome.value is None:
+            raise KindWorkWaiting(outcome.status, kept=True, reason=outcome.reason)
+        if outcome.value["status"] != "done":
+            raise TerrainAuthoringRefused(outcome.value["detail"])
+        return outcome.value["coverage"]

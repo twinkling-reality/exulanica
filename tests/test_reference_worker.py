@@ -28,7 +28,7 @@ from exulanica.models.client import ModelClient
 from exulanica.models.manifest import load_manifest
 from exulanica.models.spending import SpendingRefused, SpendingTicket
 from exulanica.models.transport import HttpResponse
-from exulanica.references import store
+from exulanica.references import drafting, store
 from exulanica.references.adapters.base import ReferenceSourceUnavailable
 from exulanica.references.adapters.tavily import TavilySearch
 from exulanica.references.bundle import read_bundle
@@ -178,7 +178,7 @@ def scene(repository, monkeypatch):
         arguments.update(changes)
         return ReferenceWorker(_Database(repository), **arguments)
 
-    def request(web: bool = True, purpose: str = "kind"):
+    def request(web: bool = True, purpose: str = "kind", *, prompts_sha256: str | None = None):
         made, _ = store.create_request(
             connection,
             workspace_id,
@@ -188,7 +188,7 @@ def scene(repository, monkeypatch):
             web=web,
             description="a harbour town with whitewashed houses and blue doors",
             withheld_words=["Rosalind", "Teague"],
-            prompts_sha256="e" * 64,
+            prompts_sha256=prompts_sha256 or drafting.reference_prompts().sha256,
         )
         return made
 
@@ -503,10 +503,11 @@ def test_a_spent_rate_is_known_before_the_planner_is_paid(scene, monkeypatch) ->
 
 def test_each_step_has_its_measured_share_and_the_job_their_sum() -> None:
     """The drafting role's timeout for the planner and the reader (25 s, from its manifest basis),
-    and the nine searches measured on 2026-10-09 (longest 9,657 ms, times 2, up to 5 s: 20 s)."""
+    and the eighteen searches measured on 2026-10-09 (longest 17,440 ms, times 2, up to 5 s:
+    35 s)."""
     stages = stage_seconds(load_manifest())
-    assert (stages.plan, stages.search, stages.read) == (25.0, 20.0, 25.0)
-    assert stages.total(pictures=0, web=True) == 70.0
+    assert (stages.plan, stages.search, stages.read) == (25.0, 35.0, 25.0)
+    assert stages.total(pictures=0, web=True) == 85.0
     assert stages.total(pictures=2, web=False) == 2 * stages.picture
 
 

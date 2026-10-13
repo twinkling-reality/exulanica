@@ -12,7 +12,7 @@ import { rungProperties } from './rung.js';
  * TERMINOLOGY. docs/architecture-overview.md 1.1 calls these "island frames"; the module
  * boundary table and the product framing both say island. docs/interaction-model.md 1.2 calls
  * the same thing `RegionFrame_i` and says "region" throughout. They are the same object. This
- * package uses `Island` and the divergence is recorded in the handover notes.
+ * package uses `Island`.
  */
 export interface Island {
   readonly islandId: IslandId;

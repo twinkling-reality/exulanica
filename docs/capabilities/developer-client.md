@@ -133,14 +133,19 @@ from exulanica_client import ApiRefusal, WorldClient
 client = WorldClient("https://<api>", token)
 world = client.saved_worlds()[0]
 version = client.version(world["authored_version_id"], world_id=world["world_id"])
+support = client.get(
+    f"/world/versions/{version['version_id']}/capabilities",
+    query={"world_id": version["world_id"]},
+)
 cube = next(asset for asset in client.assets() if asset["asset_key"] == "cc0.marker-cube")
 try:
     placed = client.place_object(
         version,
         object_id="tool:lamp",
         asset_sha256=cube["content_sha256"],
-        # An authored starter world names its region; a personal world's objects name theirs.
-        region_id=world["authored_scene"]["region"]["region_id"],
+        # The capability read lists a region for a starter, a generated town, and a world
+        # from photographs. authored_scene.region.region_id is only an authored starter.
+        region_id=support["regions"]["region_ids"][0],
         transform={"x_mm": 0, "y_mm": 0, "z_mm": 0, "yaw_microradians": 0, "scale_milli": 1000},
         origin_role="fictional",
         saved_entry=world,
@@ -166,7 +171,9 @@ review as a diff.
 
 ## What it does not do
 
-- It does not create saved worlds, versions or tokens. It edits the saved worlds the person has.
+- The walkthrough does not create saved worlds, versions, or tokens. It edits the saved worlds
+  the person has. `capabilities --exercise` does make one world, by `POST /world-entries/starter`
+  or `POST /worlds/generated`, and edits only that world. Neither command mints a token.
 - It does not retry a refused edit. On a stale base (`409 stale_object_base`) it stops with the
   server's reason, because a blind retry is the lost update the base exists to prevent.
   [`scripts/world_client_example.py`](../../scripts/world_client_example.py) shows re-reading and

@@ -49,7 +49,8 @@ export function attachWorldSentence(sheet: SentenceSheet, options: {
   const box = buildWorldSentence({
     offer: options.offer,
     readOffer: () => client.offer(),
-    start: (description) => client.start(description),
+    start: (description, submission) => client.start(description, submission),
+    memory: client.memory,
     read: (draftId) => client.read(draftId),
     open: options.open,
     recipes: () => {

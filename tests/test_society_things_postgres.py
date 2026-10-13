@@ -22,7 +22,7 @@ import dataclasses
 import uuid
 
 import pytest
-from exulanica.abilities.registry import PURPOSEFUL_BY_KIND
+from exulanica.abilities.registry import PURPOSEFUL_BY_KIND_WEIGHTS
 from exulanica.world.crossings import (
     CROSSINGS_PER_MINUTE,
     BoundCrossing,
@@ -186,7 +186,7 @@ def test_a_spirit_in_a_society_made_now_never_does_what_its_kind_does_not_list(w
             .fetchone()
         )
         world["connection"].commit()
-        assert PURPOSEFUL_BY_KIND in stored["modules"]
+        assert PURPOSEFUL_BY_KIND_WEIGHTS in stored["modules"]
         [spirit] = [p for p in society["state"]["inhabitants"] if p["placed_id"] == "spirit"]
         # Asked to send the spirit to the bench, the society refuses by name.
         scope, _, society_route = routes(world)

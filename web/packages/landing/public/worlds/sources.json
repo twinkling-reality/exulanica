@@ -1,0 +1,2003 @@
+{
+  "profile": "exulanica.website-world-captures/v1",
+  "worlds": [
+    {
+      "id": "small-town",
+      "image": "small-town.jpg",
+      "recipe": "small_town",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 500,
+        "typology_weight_loft_building_permille": 500,
+        "typology_weight_mansion_block_permille": 500,
+        "typology_weight_rowhouse_permille": 500,
+        "typology_weight_shophouse_permille": 500,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "source": "Existing application capture, copied from web/packages/app/public/your-worlds/small_town.jpg. Exact original capture time and saved-world identity were not recorded with the asset.",
+      "image_sha256": "334306468b0595e0bf0549b3e95a3df728910f0c0600595adb8f708fa5531ea6"
+    },
+    {
+      "id": "market-town",
+      "image": "market-town.jpg",
+      "recipe": "market_town",
+      "values": {
+        "city_extent_x_mm": 384000,
+        "block_length_mm": 140000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 500,
+        "typology_weight_loft_building_permille": 500,
+        "typology_weight_mansion_block_permille": 500,
+        "typology_weight_rowhouse_permille": 500,
+        "typology_weight_shophouse_permille": 500,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "source": "Existing application capture, copied from web/packages/app/public/your-worlds/market_town.jpg. Exact original capture time and saved-world identity were not recorded with the asset.",
+      "image_sha256": "a553203b556d5f86118a01c23dba3fa414cb02a929f53020add9a72ad92f3ad3"
+    },
+    {
+      "id": "narrow-streets",
+      "image": "narrow-streets.jpg",
+      "recipe": "small_town",
+      "values": {
+        "cross_street_hierarchy": "narrow_street",
+        "storey_band_low": 3,
+        "storey_band_high": 5,
+        "typology_weight_rowhouse_permille": 1000,
+        "typology_weight_apartment_block_permille": 0,
+        "typology_weight_loft_building_permille": 0,
+        "typology_weight_mansion_block_permille": 0,
+        "typology_weight_shophouse_permille": 0
+      },
+      "source": "Actual application capture of a generated world created through POST /worlds/generated in an isolated local synthetic workspace; no model calls.",
+      "world_id": "world:generated:a8bcf85e-7adf-4d0f-bfda-1a9a990e7ced",
+      "entry_id": "01a1287a-ecab-7073-9035-fda1bdd14f30",
+      "authored_version_id": "1d1dbcb8-4c73-456a-b181-ecc43c6a28e3",
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "80df3560e55ac2441fe4281031522081ae715bd5954771fb1a0b22f34ecd3819",
+          "baked_tile_id": "a649c00d-6934-56d9-a377-08d82dd54887",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "c77f54cb32a37d896081190aed0cb48e333d50c0ea5fbd7c373066d5cb678faf",
+          "baked_tile_id": "08797aa9-8731-5df7-a42c-33bb32e61ea1",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-10",
+      "camera": "Application keyboard controls; screenshot cropped to exclude interface chrome.",
+      "image_sha256": "e99fca56bbc9ca30bd5b957fa1d972caac3301adf6c7f00e8f76760d846b567d",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 880
+      }
+    },
+    {
+      "id": "three-high-streets",
+      "image": "three-high-streets.jpg",
+      "recipe": "market_town",
+      "values": {
+        "high_street_count": 3
+      },
+      "source": "Actual application capture of a generated world created through POST /worlds/generated in an isolated local synthetic workspace; no model calls.",
+      "world_id": "world:generated:5882e293-68e9-4533-89c4-01591acd3e1d",
+      "entry_id": "01a1287a-f18c-79f4-b0d9-372962ab5f06",
+      "authored_version_id": "d957d7f7-a764-4095-b0c8-cab57dac0eca",
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "4c3f9216a1f57d4706352308d21a408a55b27f19caddfdc17d43a8fb0d8fd539",
+          "baked_tile_id": "c5d535b0-da09-5c7d-a3e1-3b0cd6987cb7",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "bc29f9b34b5d762fe57a59db6309067a98fb42094a59aa554aedbd46a3061b80",
+          "baked_tile_id": "36e01416-105f-597b-bc8b-8562372ea4fc",
+          "state": "baked"
+        },
+        {
+          "tile_x": 2,
+          "tile_y": 0,
+          "tile_inputs_digest": "c284ccf1bd309fe9eaa16da16915c21375edf3ea0917fdd05610ed96ac919939",
+          "baked_tile_id": "19fb9717-cc7f-5f46-bab5-35661e31e780",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-10",
+      "camera": "Application keyboard controls; screenshot cropped to exclude interface chrome.",
+      "image_sha256": "f2031eb3d9b735489b52411ac867f2a6a546c2b5d50cdba0991040ac4a1036ea",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 880
+      }
+    },
+    {
+      "id": "compact-cozy",
+      "recipe": "small_town",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 500,
+        "typology_weight_loft_building_permille": 500,
+        "typology_weight_mansion_block_permille": 500,
+        "typology_weight_rowhouse_permille": 500,
+        "typology_weight_shophouse_permille": 500,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "style_pack": {
+        "pack_id": "exulanica.cozy-town",
+        "version": 3,
+        "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc"
+      },
+      "image": "compact-cozy.jpg",
+      "source": "Actual application screenshot of this saved generated world, created through POST /worlds/generated in an isolated synthetic workspace. No model calls.",
+      "workspace_id": "fb195c6f-9084-4c93-bb98-e8c0903023ac",
+      "title": "A small town \u00b7 Cozy town",
+      "saved_world_title": "Compact Town \u00b7 Cozy",
+      "recipe_label": "A small town",
+      "style_title": "Cozy town",
+      "world_id": "world:generated:04dad1a0-ee73-4d85-9063-251510084ced",
+      "entry_id": "01a12bd3-b195-732a-87f1-d16903af0006",
+      "authored_version_id": "e763ac72-3ff0-4bd4-979f-bdb5e0cef801",
+      "style_version_id": "ee7fdb0c-c4f8-478f-b53d-a26548deb305",
+      "entry": {
+        "entry_id": "01a12bd3-b195-732a-87f1-d16903af0006",
+        "world_id": "world:generated:04dad1a0-ee73-4d85-9063-251510084ced",
+        "title": "Compact Town \u00b7 Cozy",
+        "source_kind": "generated",
+        "source_snapshot_id": "88865af2-7ae3-46e2-b45c-41be4f7961c6",
+        "source_snapshot_sha256": "e1a06ae69af0b3589a428888282282dba6a5a709e5f2cdbdf7228e9c96bca50e",
+        "authored_scene": null,
+        "declared_floor": null,
+        "generated_ground": {
+          "recipe_key": "small_town",
+          "recipe_label": "A small town",
+          "region_id": "region:generated",
+          "arrival_mm": [
+            132166,
+            -2,
+            -71775
+          ],
+          "arrival_facing_mm": [
+            0,
+            7775
+          ],
+          "tiles": [
+            {
+              "tile_x": 0,
+              "tile_y": 0,
+              "tile_inputs_digest": "7e36cbdc44f97389763e21add09a4608f104692ddb41dde063b42cc36a1242c5",
+              "baked_tile_id": "973bde28-ff02-536f-969d-a9d24830c337",
+              "state": "baked"
+            },
+            {
+              "tile_x": 1,
+              "tile_y": 0,
+              "tile_inputs_digest": "2264c01adfbdcbce10961622d87a4c9e727737012059cad4f5deea026161664d",
+              "baked_tile_id": "e7695c86-31ea-5576-85ce-c52b1a3622f5",
+              "state": "baked"
+            }
+          ],
+          "specification": "world-specification.v2",
+          "values": {
+            "block_length_mm": 90000,
+            "city_extent_x_mm": 256000,
+            "cross_street_hierarchy": "local_street",
+            "ground_floor_use_weight_bakery_permille": 500,
+            "ground_floor_use_weight_bookshop_permille": 500,
+            "ground_floor_use_weight_cafe_permille": 500,
+            "ground_floor_use_weight_grocery_permille": 500,
+            "ground_floor_use_weight_office_permille": 500,
+            "ground_floor_use_weight_pharmacy_permille": 500,
+            "ground_floor_use_weight_restaurant_permille": 500,
+            "ground_floor_use_weight_workshop_permille": 500,
+            "high_street_count": 1,
+            "storey_band_high": 4,
+            "storey_band_low": 2,
+            "typology_weight_apartment_block_permille": 500,
+            "typology_weight_loft_building_permille": 500,
+            "typology_weight_mansion_block_permille": 500,
+            "typology_weight_rowhouse_permille": 500,
+            "typology_weight_shophouse_permille": 500
+          }
+        },
+        "generated_site": null,
+        "society_engine": "exulanica-society/v5",
+        "authored_version_id": "e763ac72-3ff0-4bd4-979f-bdb5e0cef801",
+        "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "authored_edit_seq": 0,
+        "current_authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "current_authored_edit_seq": 0,
+        "style_version_id": "ee7fdb0c-c4f8-478f-b53d-a26548deb305",
+        "revision": 2,
+        "availability": "available",
+        "unavailable_reason": null,
+        "source_attachments": [],
+        "previous_source_attachments": [],
+        "created_by": "63ad7e51-7aff-47a4-8241-29798a6eff50",
+        "created_at": "2026-10-11T16:37:36.242492Z",
+        "updated_at": "2026-10-11T16:37:36.302471Z",
+        "takes_photographs": false,
+        "arrival": null,
+        "arrival_unavailable_reason": null,
+        "arrival_scene": null
+      },
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "7e36cbdc44f97389763e21add09a4608f104692ddb41dde063b42cc36a1242c5",
+          "baked_tile_id": "973bde28-ff02-536f-969d-a9d24830c337",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "2264c01adfbdcbce10961622d87a4c9e727737012059cad4f5deea026161664d",
+          "baked_tile_id": "e7695c86-31ea-5576-85ce-c52b1a3622f5",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-11",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 840
+      },
+      "camera": "Actual application arrival camera, reframed using focused arrow-key controls. Screenshot cropped to exclude toolbar and title; no image synthesis or scene modification.",
+      "image_sha256": "73487bc67e49e7694ab6b347816586b361493eff0497c040750432bb261cc80a",
+      "image_bytes": 113715,
+      "capture_complete": true,
+      "featured": true
+    },
+    {
+      "id": "compact-finished",
+      "recipe": "small_town",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 500,
+        "typology_weight_loft_building_permille": 500,
+        "typology_weight_mansion_block_permille": 500,
+        "typology_weight_rowhouse_permille": 500,
+        "typology_weight_shophouse_permille": 500,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "style_pack": {
+        "pack_id": "exulanica.finished-town",
+        "version": 3,
+        "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444"
+      },
+      "image": "compact-finished.jpg",
+      "source": "Actual application screenshot of this saved generated world, created through POST /worlds/generated in an isolated synthetic workspace. No model calls.",
+      "workspace_id": "fb195c6f-9084-4c93-bb98-e8c0903023ac",
+      "title": "A small town \u00b7 Finished town",
+      "saved_world_title": "Compact Town \u00b7 Finished",
+      "recipe_label": "A small town",
+      "style_title": "Finished town",
+      "world_id": "world:generated:2fed4392-87c4-46d3-a887-cac272f6c89b",
+      "entry_id": "01a12bd3-b475-70f0-a1bb-e22ba1b16ddd",
+      "authored_version_id": "4464976b-7f17-47ff-be15-75696e6d2bb4",
+      "style_version_id": "64d1eae2-df8a-4d97-87f3-018f5ce3b2d8",
+      "entry": {
+        "entry_id": "01a12bd3-b475-70f0-a1bb-e22ba1b16ddd",
+        "world_id": "world:generated:2fed4392-87c4-46d3-a887-cac272f6c89b",
+        "title": "Compact Town \u00b7 Finished",
+        "source_kind": "generated",
+        "source_snapshot_id": "4b2c80d1-65f3-461e-8a03-e129bbd81d80",
+        "source_snapshot_sha256": "af240abd75986e2dd29c7ce7fe966a8342358dce95f32fdbde992b03bfeadf2a",
+        "authored_scene": null,
+        "declared_floor": null,
+        "generated_ground": {
+          "recipe_key": "small_town",
+          "recipe_label": "A small town",
+          "region_id": "region:generated",
+          "arrival_mm": [
+            121985,
+            64,
+            -55450
+          ],
+          "arrival_facing_mm": [
+            0,
+            -8550
+          ],
+          "tiles": [
+            {
+              "tile_x": 0,
+              "tile_y": 0,
+              "tile_inputs_digest": "fd8b306d5722ac6a63ac14cefda1f81d2169c78f6e1942ed2d951ee641e94cca",
+              "baked_tile_id": "29e6bd05-3479-5117-b1e2-30cb8eb16916",
+              "state": "baked"
+            },
+            {
+              "tile_x": 1,
+              "tile_y": 0,
+              "tile_inputs_digest": "a8e9aa893e1615a73d073d0a79179a2ed5ca912bf0f08b4791c2f9816cc1b207",
+              "baked_tile_id": "ce5466e8-11f2-5cf5-b97f-abe8fd840b57",
+              "state": "baked"
+            }
+          ],
+          "specification": "world-specification.v2",
+          "values": {
+            "block_length_mm": 90000,
+            "city_extent_x_mm": 256000,
+            "cross_street_hierarchy": "local_street",
+            "ground_floor_use_weight_bakery_permille": 500,
+            "ground_floor_use_weight_bookshop_permille": 500,
+            "ground_floor_use_weight_cafe_permille": 500,
+            "ground_floor_use_weight_grocery_permille": 500,
+            "ground_floor_use_weight_office_permille": 500,
+            "ground_floor_use_weight_pharmacy_permille": 500,
+            "ground_floor_use_weight_restaurant_permille": 500,
+            "ground_floor_use_weight_workshop_permille": 500,
+            "high_street_count": 1,
+            "storey_band_high": 4,
+            "storey_band_low": 2,
+            "typology_weight_apartment_block_permille": 500,
+            "typology_weight_loft_building_permille": 500,
+            "typology_weight_mansion_block_permille": 500,
+            "typology_weight_rowhouse_permille": 500,
+            "typology_weight_shophouse_permille": 500
+          }
+        },
+        "generated_site": null,
+        "society_engine": "exulanica-society/v5",
+        "authored_version_id": "4464976b-7f17-47ff-be15-75696e6d2bb4",
+        "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "authored_edit_seq": 0,
+        "current_authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "current_authored_edit_seq": 0,
+        "style_version_id": "64d1eae2-df8a-4d97-87f3-018f5ce3b2d8",
+        "revision": 2,
+        "availability": "available",
+        "unavailable_reason": null,
+        "source_attachments": [],
+        "previous_source_attachments": [],
+        "created_by": "63ad7e51-7aff-47a4-8241-29798a6eff50",
+        "created_at": "2026-10-11T16:37:36.983381Z",
+        "updated_at": "2026-10-11T16:37:37.035397Z",
+        "takes_photographs": false,
+        "arrival": null,
+        "arrival_unavailable_reason": null,
+        "arrival_scene": null
+      },
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "fd8b306d5722ac6a63ac14cefda1f81d2169c78f6e1942ed2d951ee641e94cca",
+          "baked_tile_id": "29e6bd05-3479-5117-b1e2-30cb8eb16916",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "a8e9aa893e1615a73d073d0a79179a2ed5ca912bf0f08b4791c2f9816cc1b207",
+          "baked_tile_id": "ce5466e8-11f2-5cf5-b97f-abe8fd840b57",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-11",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 840
+      },
+      "camera": "Actual application arrival camera, reframed using focused arrow-key controls. Screenshot cropped to exclude toolbar and title; no image synthesis or scene modification.",
+      "image_sha256": "977f1616b543571eb4e426fc5ac636350718e160c4ffcbb7b418b7c681bb2373",
+      "image_bytes": 278020,
+      "capture_complete": true,
+      "featured": true
+    },
+    {
+      "id": "compact-toon",
+      "recipe": "small_town",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 500,
+        "typology_weight_loft_building_permille": 500,
+        "typology_weight_mansion_block_permille": 500,
+        "typology_weight_rowhouse_permille": 500,
+        "typology_weight_shophouse_permille": 500,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "style_pack": {
+        "pack_id": "exulanica.toon-town",
+        "version": 3,
+        "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37"
+      },
+      "image": "compact-toon.jpg",
+      "source": "Actual application screenshot of this saved generated world, created through POST /worlds/generated in an isolated synthetic workspace. No model calls.",
+      "workspace_id": "fb195c6f-9084-4c93-bb98-e8c0903023ac",
+      "title": "A small town \u00b7 Toon town",
+      "saved_world_title": "Compact Town \u00b7 Toon",
+      "recipe_label": "A small town",
+      "style_title": "Toon town",
+      "world_id": "world:generated:365684c3-5f71-4584-b5cf-a8b465425639",
+      "entry_id": "01a12bd3-b746-78b0-acda-a2d3fb157c91",
+      "authored_version_id": "18e2d63d-dbcb-46e8-95f7-7d01bab8f359",
+      "style_version_id": "01b572a9-087b-44a9-8ff7-c782d91bf6ff",
+      "entry": {
+        "entry_id": "01a12bd3-b746-78b0-acda-a2d3fb157c91",
+        "world_id": "world:generated:365684c3-5f71-4584-b5cf-a8b465425639",
+        "title": "Compact Town \u00b7 Toon",
+        "source_kind": "generated",
+        "source_snapshot_id": "fc090d35-94bc-4666-9bb4-e5cafb1ba575",
+        "source_snapshot_sha256": "5d65a9ca43df53b61b539a09e6d5b1ac27c5429367b3cf444c41effc51e22a88",
+        "authored_scene": null,
+        "declared_floor": null,
+        "generated_ground": {
+          "recipe_key": "small_town",
+          "recipe_label": "A small town",
+          "region_id": "region:generated",
+          "arrival_mm": [
+            132166,
+            40,
+            -71825
+          ],
+          "arrival_facing_mm": [
+            0,
+            7825
+          ],
+          "tiles": [
+            {
+              "tile_x": 0,
+              "tile_y": 0,
+              "tile_inputs_digest": "30e2db502ad6b9ca5d57d6c39d41170836f2de4be7d7e5adaa19cfbe653535a7",
+              "baked_tile_id": "a29b0e48-cb40-5223-b107-5090664bf4ab",
+              "state": "baked"
+            },
+            {
+              "tile_x": 1,
+              "tile_y": 0,
+              "tile_inputs_digest": "59cd55f988bc472f5e7700e7c3e3ed8062af7aaf24dda2ab36b533281d277caa",
+              "baked_tile_id": "68de5bc9-9306-53ff-b860-67e3d19e2b8f",
+              "state": "baked"
+            }
+          ],
+          "specification": "world-specification.v2",
+          "values": {
+            "block_length_mm": 90000,
+            "city_extent_x_mm": 256000,
+            "cross_street_hierarchy": "local_street",
+            "ground_floor_use_weight_bakery_permille": 500,
+            "ground_floor_use_weight_bookshop_permille": 500,
+            "ground_floor_use_weight_cafe_permille": 500,
+            "ground_floor_use_weight_grocery_permille": 500,
+            "ground_floor_use_weight_office_permille": 500,
+            "ground_floor_use_weight_pharmacy_permille": 500,
+            "ground_floor_use_weight_restaurant_permille": 500,
+            "ground_floor_use_weight_workshop_permille": 500,
+            "high_street_count": 1,
+            "storey_band_high": 4,
+            "storey_band_low": 2,
+            "typology_weight_apartment_block_permille": 500,
+            "typology_weight_loft_building_permille": 500,
+            "typology_weight_mansion_block_permille": 500,
+            "typology_weight_rowhouse_permille": 500,
+            "typology_weight_shophouse_permille": 500
+          }
+        },
+        "generated_site": null,
+        "society_engine": "exulanica-society/v5",
+        "authored_version_id": "18e2d63d-dbcb-46e8-95f7-7d01bab8f359",
+        "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "authored_edit_seq": 0,
+        "current_authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "current_authored_edit_seq": 0,
+        "style_version_id": "01b572a9-087b-44a9-8ff7-c782d91bf6ff",
+        "revision": 2,
+        "availability": "available",
+        "unavailable_reason": null,
+        "source_attachments": [],
+        "previous_source_attachments": [],
+        "created_by": "63ad7e51-7aff-47a4-8241-29798a6eff50",
+        "created_at": "2026-10-11T16:37:37.687770Z",
+        "updated_at": "2026-10-11T16:37:37.758373Z",
+        "takes_photographs": false,
+        "arrival": null,
+        "arrival_unavailable_reason": null,
+        "arrival_scene": null
+      },
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "30e2db502ad6b9ca5d57d6c39d41170836f2de4be7d7e5adaa19cfbe653535a7",
+          "baked_tile_id": "a29b0e48-cb40-5223-b107-5090664bf4ab",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "59cd55f988bc472f5e7700e7c3e3ed8062af7aaf24dda2ab36b533281d277caa",
+          "baked_tile_id": "68de5bc9-9306-53ff-b860-67e3d19e2b8f",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-11",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 840
+      },
+      "camera": "Actual application arrival camera, reframed using focused arrow-key controls. Screenshot cropped to exclude toolbar and title; no image synthesis or scene modification.",
+      "image_sha256": "ab7bbd85d7648af6a029a93bcbec094c464067ac4cfefed728a28fd642646d78",
+      "image_bytes": 234302,
+      "capture_complete": true,
+      "featured": true
+    },
+    {
+      "id": "rowhouses-cozy",
+      "recipe": "small_town",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 3,
+        "storey_band_high": 5,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "narrow_street",
+        "typology_weight_apartment_block_permille": 0,
+        "typology_weight_loft_building_permille": 0,
+        "typology_weight_mansion_block_permille": 0,
+        "typology_weight_rowhouse_permille": 1000,
+        "typology_weight_shophouse_permille": 0,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "style_pack": {
+        "pack_id": "exulanica.cozy-town",
+        "version": 3,
+        "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc"
+      },
+      "image": "rowhouses-cozy.jpg",
+      "source": "Actual application screenshot of this saved generated world, created through POST /worlds/generated in an isolated synthetic workspace. No model calls.",
+      "workspace_id": "562db664-dd7a-43e4-ad6e-e48953f5d6b1",
+      "title": "A small town \u00b7 Cozy town",
+      "saved_world_title": "Narrow Rowhouses \u00b7 Cozy",
+      "recipe_label": "A small town",
+      "style_title": "Cozy town",
+      "world_id": "world:generated:25e80680-dfbe-48e3-9b45-0f197ea4f720",
+      "entry_id": "01a12bd4-11c4-7715-909b-15381858f7c1",
+      "authored_version_id": "42975fe8-5c1e-432b-a9af-39dbe32835c8",
+      "style_version_id": "903c9e3d-856f-4bde-bb15-49a8de4bd247",
+      "entry": {
+        "entry_id": "01a12bd4-11c4-7715-909b-15381858f7c1",
+        "world_id": "world:generated:25e80680-dfbe-48e3-9b45-0f197ea4f720",
+        "title": "Narrow Rowhouses \u00b7 Cozy",
+        "source_kind": "generated",
+        "source_snapshot_id": "5cc33ef9-6fa2-441e-8517-1908faabaa64",
+        "source_snapshot_sha256": "b572b6b3f48a415ca50f009c5ebef8984ee8224f0a617268ce805919e1e2b426",
+        "authored_scene": null,
+        "declared_floor": null,
+        "generated_ground": {
+          "recipe_key": "small_town",
+          "recipe_label": "A small town",
+          "region_id": "region:generated",
+          "arrival_mm": [
+            123811,
+            10,
+            -72000
+          ],
+          "arrival_facing_mm": [
+            0,
+            8000
+          ],
+          "tiles": [
+            {
+              "tile_x": 0,
+              "tile_y": 0,
+              "tile_inputs_digest": "c15d070622f58b54aac91b76a0cf325cf0a496c46543a3153387b79ae81706f8",
+              "baked_tile_id": "0bd4cca7-2f2f-5003-89da-acd09be9ead4",
+              "state": "baked"
+            },
+            {
+              "tile_x": 1,
+              "tile_y": 0,
+              "tile_inputs_digest": "8fa2217c67afdc027eb803f42815b86fe2713fc833fb152b84ddf2a5b038ad3f",
+              "baked_tile_id": "497484b9-3f2f-50ef-8f37-71156d06964b",
+              "state": "baked"
+            }
+          ],
+          "specification": "world-specification.v2",
+          "values": {
+            "block_length_mm": 90000,
+            "city_extent_x_mm": 256000,
+            "cross_street_hierarchy": "narrow_street",
+            "ground_floor_use_weight_bakery_permille": 500,
+            "ground_floor_use_weight_bookshop_permille": 500,
+            "ground_floor_use_weight_cafe_permille": 500,
+            "ground_floor_use_weight_grocery_permille": 500,
+            "ground_floor_use_weight_office_permille": 500,
+            "ground_floor_use_weight_pharmacy_permille": 500,
+            "ground_floor_use_weight_restaurant_permille": 500,
+            "ground_floor_use_weight_workshop_permille": 500,
+            "high_street_count": 1,
+            "storey_band_high": 5,
+            "storey_band_low": 3,
+            "typology_weight_apartment_block_permille": 0,
+            "typology_weight_loft_building_permille": 0,
+            "typology_weight_mansion_block_permille": 0,
+            "typology_weight_rowhouse_permille": 1000,
+            "typology_weight_shophouse_permille": 0
+          }
+        },
+        "generated_site": null,
+        "society_engine": "exulanica-society/v5",
+        "authored_version_id": "42975fe8-5c1e-432b-a9af-39dbe32835c8",
+        "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "authored_edit_seq": 0,
+        "current_authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "current_authored_edit_seq": 0,
+        "style_version_id": "903c9e3d-856f-4bde-bb15-49a8de4bd247",
+        "revision": 2,
+        "availability": "available",
+        "unavailable_reason": null,
+        "source_attachments": [],
+        "previous_source_attachments": [],
+        "created_by": "86757cfe-302b-46df-8754-e2862e9e3952",
+        "created_at": "2026-10-11T16:38:00.845842Z",
+        "updated_at": "2026-10-11T16:38:00.936170Z",
+        "takes_photographs": false,
+        "arrival": null,
+        "arrival_unavailable_reason": null,
+        "arrival_scene": null
+      },
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "c15d070622f58b54aac91b76a0cf325cf0a496c46543a3153387b79ae81706f8",
+          "baked_tile_id": "0bd4cca7-2f2f-5003-89da-acd09be9ead4",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "8fa2217c67afdc027eb803f42815b86fe2713fc833fb152b84ddf2a5b038ad3f",
+          "baked_tile_id": "497484b9-3f2f-50ef-8f37-71156d06964b",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-11",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 840
+      },
+      "camera": "Actual application arrival camera, reframed using focused arrow-key controls. Screenshot cropped to exclude toolbar and title; no image synthesis or scene modification.",
+      "image_sha256": "5da65b9a32b61a6c8501d0a67fb2a86e3c0c1b6d81cce08f6320b099f9679a5a",
+      "image_bytes": 186721,
+      "capture_complete": true,
+      "featured": true
+    },
+    {
+      "id": "rowhouses-finished",
+      "recipe": "small_town",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 3,
+        "storey_band_high": 5,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "narrow_street",
+        "typology_weight_apartment_block_permille": 0,
+        "typology_weight_loft_building_permille": 0,
+        "typology_weight_mansion_block_permille": 0,
+        "typology_weight_rowhouse_permille": 1000,
+        "typology_weight_shophouse_permille": 0,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "style_pack": {
+        "pack_id": "exulanica.finished-town",
+        "version": 3,
+        "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444"
+      },
+      "image": "rowhouses-finished.jpg",
+      "source": "Actual application screenshot of this saved generated world, created through POST /worlds/generated in an isolated synthetic workspace. No model calls.",
+      "workspace_id": "562db664-dd7a-43e4-ad6e-e48953f5d6b1",
+      "title": "A small town \u00b7 Finished town",
+      "saved_world_title": "Narrow Rowhouses \u00b7 Finished",
+      "recipe_label": "A small town",
+      "style_title": "Finished town",
+      "world_id": "world:generated:8ea4decc-5673-4ba2-afcc-1b81ea631a77",
+      "entry_id": "01a12bd4-15b9-74bd-8a1f-6d794355df6c",
+      "authored_version_id": "f1463b57-a2e2-4fa0-942f-edaa7aa3b93f",
+      "style_version_id": "96f3a86b-46e8-4ab3-b5b0-4ac070d21c96",
+      "entry": {
+        "entry_id": "01a12bd4-15b9-74bd-8a1f-6d794355df6c",
+        "world_id": "world:generated:8ea4decc-5673-4ba2-afcc-1b81ea631a77",
+        "title": "Narrow Rowhouses \u00b7 Finished",
+        "source_kind": "generated",
+        "source_snapshot_id": "bb3a289a-dabb-42bf-866a-9c691a990012",
+        "source_snapshot_sha256": "731a733bb1ba26285993db91499e0e5c44bbb0242ef06ef819717200b3c605e8",
+        "authored_scene": null,
+        "declared_floor": null,
+        "generated_ground": {
+          "recipe_key": "small_town",
+          "recipe_label": "A small town",
+          "region_id": "region:generated",
+          "arrival_mm": [
+            128907,
+            2,
+            -72350
+          ],
+          "arrival_facing_mm": [
+            0,
+            8350
+          ],
+          "tiles": [
+            {
+              "tile_x": 0,
+              "tile_y": 0,
+              "tile_inputs_digest": "5abf8b8ddaf71518c30a06c20a217e4d947fd0cb9c090ee799f2830b21dbaa44",
+              "baked_tile_id": "1ab9f150-a27f-52d2-9289-199c2057e657",
+              "state": "baked"
+            },
+            {
+              "tile_x": 1,
+              "tile_y": 0,
+              "tile_inputs_digest": "99133a8a91d97d2e46f77596c9719630114af40524e35c0f25088cdf9ac2cb02",
+              "baked_tile_id": "83365639-7d04-51e7-a1d0-d3c0bcc3502d",
+              "state": "baked"
+            }
+          ],
+          "specification": "world-specification.v2",
+          "values": {
+            "block_length_mm": 90000,
+            "city_extent_x_mm": 256000,
+            "cross_street_hierarchy": "narrow_street",
+            "ground_floor_use_weight_bakery_permille": 500,
+            "ground_floor_use_weight_bookshop_permille": 500,
+            "ground_floor_use_weight_cafe_permille": 500,
+            "ground_floor_use_weight_grocery_permille": 500,
+            "ground_floor_use_weight_office_permille": 500,
+            "ground_floor_use_weight_pharmacy_permille": 500,
+            "ground_floor_use_weight_restaurant_permille": 500,
+            "ground_floor_use_weight_workshop_permille": 500,
+            "high_street_count": 1,
+            "storey_band_high": 5,
+            "storey_band_low": 3,
+            "typology_weight_apartment_block_permille": 0,
+            "typology_weight_loft_building_permille": 0,
+            "typology_weight_mansion_block_permille": 0,
+            "typology_weight_rowhouse_permille": 1000,
+            "typology_weight_shophouse_permille": 0
+          }
+        },
+        "generated_site": null,
+        "society_engine": "exulanica-society/v5",
+        "authored_version_id": "f1463b57-a2e2-4fa0-942f-edaa7aa3b93f",
+        "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "authored_edit_seq": 0,
+        "current_authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "current_authored_edit_seq": 0,
+        "style_version_id": "96f3a86b-46e8-4ab3-b5b0-4ac070d21c96",
+        "revision": 2,
+        "availability": "available",
+        "unavailable_reason": null,
+        "source_attachments": [],
+        "previous_source_attachments": [],
+        "created_by": "86757cfe-302b-46df-8754-e2862e9e3952",
+        "created_at": "2026-10-11T16:38:01.877294Z",
+        "updated_at": "2026-10-11T16:38:01.947862Z",
+        "takes_photographs": false,
+        "arrival": null,
+        "arrival_unavailable_reason": null,
+        "arrival_scene": null
+      },
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "5abf8b8ddaf71518c30a06c20a217e4d947fd0cb9c090ee799f2830b21dbaa44",
+          "baked_tile_id": "1ab9f150-a27f-52d2-9289-199c2057e657",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "99133a8a91d97d2e46f77596c9719630114af40524e35c0f25088cdf9ac2cb02",
+          "baked_tile_id": "83365639-7d04-51e7-a1d0-d3c0bcc3502d",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-11",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 840
+      },
+      "camera": "Actual application arrival camera, reframed using focused arrow-key controls. Screenshot cropped to exclude toolbar and title; no image synthesis or scene modification.",
+      "image_sha256": "1951605e6f0dd08387b916d52fc53e7caabcf34858fbdbba33a098b945f589b0",
+      "image_bytes": 219292,
+      "capture_complete": true,
+      "featured": true
+    },
+    {
+      "id": "rowhouses-toon",
+      "recipe": "small_town",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 3,
+        "storey_band_high": 5,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "narrow_street",
+        "typology_weight_apartment_block_permille": 0,
+        "typology_weight_loft_building_permille": 0,
+        "typology_weight_mansion_block_permille": 0,
+        "typology_weight_rowhouse_permille": 1000,
+        "typology_weight_shophouse_permille": 0,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "style_pack": {
+        "pack_id": "exulanica.toon-town",
+        "version": 3,
+        "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37"
+      },
+      "image": "rowhouses-toon.jpg",
+      "source": "Actual application screenshot of this saved generated world, created through POST /worlds/generated in an isolated synthetic workspace. No model calls.",
+      "workspace_id": "562db664-dd7a-43e4-ad6e-e48953f5d6b1",
+      "title": "A small town \u00b7 Toon town",
+      "saved_world_title": "Narrow Rowhouses \u00b7 Toon",
+      "recipe_label": "A small town",
+      "style_title": "Toon town",
+      "world_id": "world:generated:5b214047-2cbe-42ea-a292-9305e4c1be9a",
+      "entry_id": "01a12bd4-191f-7afe-8339-cac6905797db",
+      "authored_version_id": "8a795999-1ab8-4eed-81c0-17cd354b0ad2",
+      "style_version_id": "b657fb24-3c13-41fe-bffa-e6622e58be48",
+      "entry": {
+        "entry_id": "01a12bd4-191f-7afe-8339-cac6905797db",
+        "world_id": "world:generated:5b214047-2cbe-42ea-a292-9305e4c1be9a",
+        "title": "Narrow Rowhouses \u00b7 Toon",
+        "source_kind": "generated",
+        "source_snapshot_id": "5cbe6870-c5e0-460c-a7b5-0cb556381664",
+        "source_snapshot_sha256": "d77ad08faddce285609ada44f5fb6c49c48d6e842bf5170ecf51861aeceeb022",
+        "authored_scene": null,
+        "declared_floor": null,
+        "generated_ground": {
+          "recipe_key": "small_town",
+          "recipe_label": "A small town",
+          "region_id": "region:generated",
+          "arrival_mm": [
+            123811,
+            34,
+            -71450
+          ],
+          "arrival_facing_mm": [
+            0,
+            7450
+          ],
+          "tiles": [
+            {
+              "tile_x": 0,
+              "tile_y": 0,
+              "tile_inputs_digest": "af89ef03c162ee1698fc0db3ce3bab48770394e448fc298803fb54875afbcf77",
+              "baked_tile_id": "7f980093-4e5c-5105-9f6c-b1d271154b80",
+              "state": "baked"
+            },
+            {
+              "tile_x": 1,
+              "tile_y": 0,
+              "tile_inputs_digest": "edd94d15205903a959dc6c831be3a779561bcea2902a0e669b4470df3134e8bc",
+              "baked_tile_id": "95164d3a-b92d-5fca-8039-86a3af9c7c25",
+              "state": "baked"
+            }
+          ],
+          "specification": "world-specification.v2",
+          "values": {
+            "block_length_mm": 90000,
+            "city_extent_x_mm": 256000,
+            "cross_street_hierarchy": "narrow_street",
+            "ground_floor_use_weight_bakery_permille": 500,
+            "ground_floor_use_weight_bookshop_permille": 500,
+            "ground_floor_use_weight_cafe_permille": 500,
+            "ground_floor_use_weight_grocery_permille": 500,
+            "ground_floor_use_weight_office_permille": 500,
+            "ground_floor_use_weight_pharmacy_permille": 500,
+            "ground_floor_use_weight_restaurant_permille": 500,
+            "ground_floor_use_weight_workshop_permille": 500,
+            "high_street_count": 1,
+            "storey_band_high": 5,
+            "storey_band_low": 3,
+            "typology_weight_apartment_block_permille": 0,
+            "typology_weight_loft_building_permille": 0,
+            "typology_weight_mansion_block_permille": 0,
+            "typology_weight_rowhouse_permille": 1000,
+            "typology_weight_shophouse_permille": 0
+          }
+        },
+        "generated_site": null,
+        "society_engine": "exulanica-society/v5",
+        "authored_version_id": "8a795999-1ab8-4eed-81c0-17cd354b0ad2",
+        "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "authored_edit_seq": 0,
+        "current_authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "current_authored_edit_seq": 0,
+        "style_version_id": "b657fb24-3c13-41fe-bffa-e6622e58be48",
+        "revision": 2,
+        "availability": "available",
+        "unavailable_reason": null,
+        "source_attachments": [],
+        "previous_source_attachments": [],
+        "created_by": "86757cfe-302b-46df-8754-e2862e9e3952",
+        "created_at": "2026-10-11T16:38:02.740902Z",
+        "updated_at": "2026-10-11T16:38:02.811850Z",
+        "takes_photographs": false,
+        "arrival": null,
+        "arrival_unavailable_reason": null,
+        "arrival_scene": null
+      },
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "af89ef03c162ee1698fc0db3ce3bab48770394e448fc298803fb54875afbcf77",
+          "baked_tile_id": "7f980093-4e5c-5105-9f6c-b1d271154b80",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "edd94d15205903a959dc6c831be3a779561bcea2902a0e669b4470df3134e8bc",
+          "baked_tile_id": "95164d3a-b92d-5fca-8039-86a3af9c7c25",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-11",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 840
+      },
+      "camera": "Actual application arrival camera, reframed using focused arrow-key controls. Screenshot cropped to exclude toolbar and title; no image synthesis or scene modification.",
+      "image_sha256": "34c0e38d2aaf0d6782b28f01b8fc76794d481fd39262aad2a0572441415c0bf8",
+      "image_bytes": 124841,
+      "capture_complete": true,
+      "featured": true
+    },
+    {
+      "id": "high-streets-cozy",
+      "recipe": "market_town",
+      "values": {
+        "city_extent_x_mm": 384000,
+        "block_length_mm": 140000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 3,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 500,
+        "typology_weight_loft_building_permille": 500,
+        "typology_weight_mansion_block_permille": 500,
+        "typology_weight_rowhouse_permille": 500,
+        "typology_weight_shophouse_permille": 500,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "style_pack": {
+        "pack_id": "exulanica.cozy-town",
+        "version": 3,
+        "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc"
+      },
+      "image": "high-streets-cozy.jpg",
+      "source": "Actual application screenshot of this saved generated world, created through POST /worlds/generated in an isolated synthetic workspace. No model calls.",
+      "workspace_id": "e95a2c12-f3e2-43c9-91b4-af841853758a",
+      "title": "A market town \u00b7 Cozy town",
+      "saved_world_title": "Three High Streets \u00b7 Cozy",
+      "recipe_label": "A market town",
+      "style_title": "Cozy town",
+      "world_id": "world:generated:9ba08f60-3c68-4911-b60c-d516be3ebdb8",
+      "entry_id": "01a12bd4-1273-7193-8654-488c1bfba090",
+      "authored_version_id": "56ce96e6-7c92-48b6-9bf4-472edaac6f41",
+      "style_version_id": "c8d93eb2-eef1-40f4-ac62-8ea8302d6e01",
+      "entry": {
+        "entry_id": "01a12bd4-1273-7193-8654-488c1bfba090",
+        "world_id": "world:generated:9ba08f60-3c68-4911-b60c-d516be3ebdb8",
+        "title": "Three High Streets \u00b7 Cozy",
+        "source_kind": "generated",
+        "source_snapshot_id": "2b921627-f8c4-4779-bb66-8ad95f61a6de",
+        "source_snapshot_sha256": "eb73fd9ed79ec7e2f1956b2892c4ea75817bd8398b5f1e803ef16d9566a73dbe",
+        "authored_scene": null,
+        "declared_floor": null,
+        "generated_ground": {
+          "recipe_key": "market_town",
+          "recipe_label": "A market town",
+          "region_id": "region:generated",
+          "arrival_mm": [
+            192000,
+            46,
+            -55350
+          ],
+          "arrival_facing_mm": [
+            0,
+            -8650
+          ],
+          "tiles": [
+            {
+              "tile_x": 0,
+              "tile_y": 0,
+              "tile_inputs_digest": "670a21f54d8aa3c30792944357b4fdceb47ad46648125315ce26eeac2d138df6",
+              "baked_tile_id": "24342d6d-d616-546a-8890-42040cae0d26",
+              "state": "baked"
+            },
+            {
+              "tile_x": 1,
+              "tile_y": 0,
+              "tile_inputs_digest": "314704f33391ee7ed469cf4b73e63ca4cfeb6c10fed7ac1d57b762efa6b7cda2",
+              "baked_tile_id": "fd3869ff-acae-53ec-a4b3-1f875a2e46c7",
+              "state": "baked"
+            },
+            {
+              "tile_x": 2,
+              "tile_y": 0,
+              "tile_inputs_digest": "27dbb465fdac74e2c5e4769146f13fbcb31ac0fdd0bb2319edb014e1484d27f8",
+              "baked_tile_id": "d7ff5f37-69c6-5359-9f46-f8feef2e59b5",
+              "state": "baked"
+            }
+          ],
+          "specification": "world-specification.v2",
+          "values": {
+            "block_length_mm": 140000,
+            "city_extent_x_mm": 384000,
+            "cross_street_hierarchy": "local_street",
+            "ground_floor_use_weight_bakery_permille": 500,
+            "ground_floor_use_weight_bookshop_permille": 500,
+            "ground_floor_use_weight_cafe_permille": 500,
+            "ground_floor_use_weight_grocery_permille": 500,
+            "ground_floor_use_weight_office_permille": 500,
+            "ground_floor_use_weight_pharmacy_permille": 500,
+            "ground_floor_use_weight_restaurant_permille": 500,
+            "ground_floor_use_weight_workshop_permille": 500,
+            "high_street_count": 3,
+            "storey_band_high": 4,
+            "storey_band_low": 2,
+            "typology_weight_apartment_block_permille": 500,
+            "typology_weight_loft_building_permille": 500,
+            "typology_weight_mansion_block_permille": 500,
+            "typology_weight_rowhouse_permille": 500,
+            "typology_weight_shophouse_permille": 500
+          }
+        },
+        "generated_site": null,
+        "society_engine": "exulanica-society/v5",
+        "authored_version_id": "56ce96e6-7c92-48b6-9bf4-472edaac6f41",
+        "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "authored_edit_seq": 0,
+        "current_authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "current_authored_edit_seq": 0,
+        "style_version_id": "c8d93eb2-eef1-40f4-ac62-8ea8302d6e01",
+        "revision": 2,
+        "availability": "available",
+        "unavailable_reason": null,
+        "source_attachments": [],
+        "previous_source_attachments": [],
+        "created_by": "3391c7de-9b95-4531-a390-c54dcb82ccb2",
+        "created_at": "2026-10-11T16:38:01.023546Z",
+        "updated_at": "2026-10-11T16:38:01.112571Z",
+        "takes_photographs": false,
+        "arrival": null,
+        "arrival_unavailable_reason": null,
+        "arrival_scene": null
+      },
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "670a21f54d8aa3c30792944357b4fdceb47ad46648125315ce26eeac2d138df6",
+          "baked_tile_id": "24342d6d-d616-546a-8890-42040cae0d26",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "314704f33391ee7ed469cf4b73e63ca4cfeb6c10fed7ac1d57b762efa6b7cda2",
+          "baked_tile_id": "fd3869ff-acae-53ec-a4b3-1f875a2e46c7",
+          "state": "baked"
+        },
+        {
+          "tile_x": 2,
+          "tile_y": 0,
+          "tile_inputs_digest": "27dbb465fdac74e2c5e4769146f13fbcb31ac0fdd0bb2319edb014e1484d27f8",
+          "baked_tile_id": "d7ff5f37-69c6-5359-9f46-f8feef2e59b5",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-11",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 840
+      },
+      "camera": "Actual application arrival camera, reframed using focused arrow-key controls. Screenshot cropped to exclude toolbar and title; no image synthesis or scene modification.",
+      "image_sha256": "9d41388447904eaa405da4d02562036d705c81d999f1a5d54cb1159834bce195",
+      "image_bytes": 204057,
+      "capture_complete": true,
+      "featured": true
+    },
+    {
+      "id": "high-streets-finished",
+      "recipe": "market_town",
+      "values": {
+        "city_extent_x_mm": 384000,
+        "block_length_mm": 140000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 3,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 500,
+        "typology_weight_loft_building_permille": 500,
+        "typology_weight_mansion_block_permille": 500,
+        "typology_weight_rowhouse_permille": 500,
+        "typology_weight_shophouse_permille": 500,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "style_pack": {
+        "pack_id": "exulanica.finished-town",
+        "version": 3,
+        "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444"
+      },
+      "image": "high-streets-finished.jpg",
+      "source": "Actual application screenshot of this saved generated world, created through POST /worlds/generated in an isolated synthetic workspace. No model calls.",
+      "workspace_id": "e95a2c12-f3e2-43c9-91b4-af841853758a",
+      "title": "A market town \u00b7 Finished town",
+      "saved_world_title": "Three High Streets \u00b7 Finished",
+      "recipe_label": "A market town",
+      "style_title": "Finished town",
+      "world_id": "world:generated:1df8701e-f114-4a70-9f09-265b1212ea9d",
+      "entry_id": "01a12bd4-1799-73a6-b169-6117af2b2310",
+      "authored_version_id": "5d131ee8-dded-4e9e-bb21-3befb48597da",
+      "style_version_id": "a9988efe-76b8-4332-b428-57aaf63b081e",
+      "entry": {
+        "entry_id": "01a12bd4-1799-73a6-b169-6117af2b2310",
+        "world_id": "world:generated:1df8701e-f114-4a70-9f09-265b1212ea9d",
+        "title": "Three High Streets \u00b7 Finished",
+        "source_kind": "generated",
+        "source_snapshot_id": "50dd9b3d-292c-4104-b145-8d401bdcf2b5",
+        "source_snapshot_sha256": "bf35201ddb319aee0d55fbb76941346b5f8c1dcf1e815af52f7c66b3d5769546",
+        "authored_scene": null,
+        "declared_floor": null,
+        "generated_ground": {
+          "recipe_key": "market_town",
+          "recipe_label": "A market town",
+          "region_id": "region:generated",
+          "arrival_mm": [
+            190624,
+            71,
+            -56025
+          ],
+          "arrival_facing_mm": [
+            0,
+            -7975
+          ],
+          "tiles": [
+            {
+              "tile_x": 0,
+              "tile_y": 0,
+              "tile_inputs_digest": "92260122af67b2093297715e6869215e861288edc411441530796621895c7089",
+              "baked_tile_id": "5a7e8c8a-277b-50c2-9081-06719efe4544",
+              "state": "baked"
+            },
+            {
+              "tile_x": 1,
+              "tile_y": 0,
+              "tile_inputs_digest": "1e6ed3dd84b3bf1e02fef32d3217c1e363f958cb3b4423425a155c95435b8675",
+              "baked_tile_id": "bf17bc6f-017b-5f77-9ad3-03736f015154",
+              "state": "baked"
+            },
+            {
+              "tile_x": 2,
+              "tile_y": 0,
+              "tile_inputs_digest": "edde163505bcee62d910b2e640e90142720b477ab73787f7880ba9cbc73879a7",
+              "baked_tile_id": "49a50da3-1f08-541e-9d86-09fb1efe39ae",
+              "state": "baked"
+            }
+          ],
+          "specification": "world-specification.v2",
+          "values": {
+            "block_length_mm": 140000,
+            "city_extent_x_mm": 384000,
+            "cross_street_hierarchy": "local_street",
+            "ground_floor_use_weight_bakery_permille": 500,
+            "ground_floor_use_weight_bookshop_permille": 500,
+            "ground_floor_use_weight_cafe_permille": 500,
+            "ground_floor_use_weight_grocery_permille": 500,
+            "ground_floor_use_weight_office_permille": 500,
+            "ground_floor_use_weight_pharmacy_permille": 500,
+            "ground_floor_use_weight_restaurant_permille": 500,
+            "ground_floor_use_weight_workshop_permille": 500,
+            "high_street_count": 3,
+            "storey_band_high": 4,
+            "storey_band_low": 2,
+            "typology_weight_apartment_block_permille": 500,
+            "typology_weight_loft_building_permille": 500,
+            "typology_weight_mansion_block_permille": 500,
+            "typology_weight_rowhouse_permille": 500,
+            "typology_weight_shophouse_permille": 500
+          }
+        },
+        "generated_site": null,
+        "society_engine": "exulanica-society/v5",
+        "authored_version_id": "5d131ee8-dded-4e9e-bb21-3befb48597da",
+        "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "authored_edit_seq": 0,
+        "current_authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "current_authored_edit_seq": 0,
+        "style_version_id": "a9988efe-76b8-4332-b428-57aaf63b081e",
+        "revision": 2,
+        "availability": "available",
+        "unavailable_reason": null,
+        "source_attachments": [],
+        "previous_source_attachments": [],
+        "created_by": "3391c7de-9b95-4531-a390-c54dcb82ccb2",
+        "created_at": "2026-10-11T16:38:02.354386Z",
+        "updated_at": "2026-10-11T16:38:02.420820Z",
+        "takes_photographs": false,
+        "arrival": null,
+        "arrival_unavailable_reason": null,
+        "arrival_scene": null
+      },
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "92260122af67b2093297715e6869215e861288edc411441530796621895c7089",
+          "baked_tile_id": "5a7e8c8a-277b-50c2-9081-06719efe4544",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "1e6ed3dd84b3bf1e02fef32d3217c1e363f958cb3b4423425a155c95435b8675",
+          "baked_tile_id": "bf17bc6f-017b-5f77-9ad3-03736f015154",
+          "state": "baked"
+        },
+        {
+          "tile_x": 2,
+          "tile_y": 0,
+          "tile_inputs_digest": "edde163505bcee62d910b2e640e90142720b477ab73787f7880ba9cbc73879a7",
+          "baked_tile_id": "49a50da3-1f08-541e-9d86-09fb1efe39ae",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-11",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 840
+      },
+      "camera": "Actual application arrival camera, reframed using focused arrow-key controls. Screenshot cropped to exclude toolbar and title; no image synthesis or scene modification.",
+      "image_sha256": "fb252e79434cfde567d310d12049f84b915d6fe0c096aee3ec45862aa1ea14d3",
+      "image_bytes": 222468,
+      "capture_complete": true,
+      "featured": true
+    },
+    {
+      "id": "high-streets-toon",
+      "recipe": "market_town",
+      "values": {
+        "city_extent_x_mm": 384000,
+        "block_length_mm": 140000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 3,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 500,
+        "typology_weight_loft_building_permille": 500,
+        "typology_weight_mansion_block_permille": 500,
+        "typology_weight_rowhouse_permille": 500,
+        "typology_weight_shophouse_permille": 500,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "style_pack": {
+        "pack_id": "exulanica.toon-town",
+        "version": 3,
+        "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37"
+      },
+      "image": "high-streets-toon.jpg",
+      "source": "Actual application screenshot of this saved generated world, created through POST /worlds/generated in an isolated synthetic workspace. No model calls.",
+      "workspace_id": "e95a2c12-f3e2-43c9-91b4-af841853758a",
+      "title": "A market town \u00b7 Toon town",
+      "saved_world_title": "Three High Streets \u00b7 Toon",
+      "recipe_label": "A market town",
+      "style_title": "Toon town",
+      "world_id": "world:generated:85dba2e5-6563-4bc4-bde4-57db7e8e7362",
+      "entry_id": "01a12bd4-1d07-730b-b41d-2ee9c1dbdf2a",
+      "authored_version_id": "1ba95639-f944-401f-a22c-b919c6775e6e",
+      "style_version_id": "0edb5da7-84e9-43fd-b920-b16e618737e9",
+      "entry": {
+        "entry_id": "01a12bd4-1d07-730b-b41d-2ee9c1dbdf2a",
+        "world_id": "world:generated:85dba2e5-6563-4bc4-bde4-57db7e8e7362",
+        "title": "Three High Streets \u00b7 Toon",
+        "source_kind": "generated",
+        "source_snapshot_id": "aee17b09-25b9-470e-a926-5652869b7f50",
+        "source_snapshot_sha256": "9108f0d84fc5f12cd8a1e47e7f0daf638c89658ab5fa5a44b3c1e1654dce356f",
+        "authored_scene": null,
+        "declared_floor": null,
+        "generated_ground": {
+          "recipe_key": "market_town",
+          "recipe_label": "A market town",
+          "region_id": "region:generated",
+          "arrival_mm": [
+            196003,
+            163,
+            -55050
+          ],
+          "arrival_facing_mm": [
+            0,
+            -8950
+          ],
+          "tiles": [
+            {
+              "tile_x": 0,
+              "tile_y": 0,
+              "tile_inputs_digest": "caab3312f4aaf50f4b55ff9032b2ad3fc1a98c2d4e9a5ede968c8db08dd436a7",
+              "baked_tile_id": "c5b0dfcd-0187-5739-87e4-b7dd5a557178",
+              "state": "baked"
+            },
+            {
+              "tile_x": 1,
+              "tile_y": 0,
+              "tile_inputs_digest": "a166ed5118d4f45cc53b3f1c55a82799ef8bbdb076c14258437cfc96a635a938",
+              "baked_tile_id": "cc5370e4-59c2-512a-91cb-f502cf7fe84f",
+              "state": "baked"
+            },
+            {
+              "tile_x": 2,
+              "tile_y": 0,
+              "tile_inputs_digest": "8f2af90964b0580e5d788e2229e413117271232005567e3667c81bcb23e8cfd7",
+              "baked_tile_id": "b8743df5-d01e-50f3-b6f5-70719fdc2fc0",
+              "state": "baked"
+            }
+          ],
+          "specification": "world-specification.v2",
+          "values": {
+            "block_length_mm": 140000,
+            "city_extent_x_mm": 384000,
+            "cross_street_hierarchy": "local_street",
+            "ground_floor_use_weight_bakery_permille": 500,
+            "ground_floor_use_weight_bookshop_permille": 500,
+            "ground_floor_use_weight_cafe_permille": 500,
+            "ground_floor_use_weight_grocery_permille": 500,
+            "ground_floor_use_weight_office_permille": 500,
+            "ground_floor_use_weight_pharmacy_permille": 500,
+            "ground_floor_use_weight_restaurant_permille": 500,
+            "ground_floor_use_weight_workshop_permille": 500,
+            "high_street_count": 3,
+            "storey_band_high": 4,
+            "storey_band_low": 2,
+            "typology_weight_apartment_block_permille": 500,
+            "typology_weight_loft_building_permille": 500,
+            "typology_weight_mansion_block_permille": 500,
+            "typology_weight_rowhouse_permille": 500,
+            "typology_weight_shophouse_permille": 500
+          }
+        },
+        "generated_site": null,
+        "society_engine": "exulanica-society/v5",
+        "authored_version_id": "1ba95639-f944-401f-a22c-b919c6775e6e",
+        "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "authored_edit_seq": 0,
+        "current_authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "current_authored_edit_seq": 0,
+        "style_version_id": "0edb5da7-84e9-43fd-b920-b16e618737e9",
+        "revision": 2,
+        "availability": "available",
+        "unavailable_reason": null,
+        "source_attachments": [],
+        "previous_source_attachments": [],
+        "created_by": "3391c7de-9b95-4531-a390-c54dcb82ccb2",
+        "created_at": "2026-10-11T16:38:03.717171Z",
+        "updated_at": "2026-10-11T16:38:03.822857Z",
+        "takes_photographs": false,
+        "arrival": null,
+        "arrival_unavailable_reason": null,
+        "arrival_scene": null
+      },
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "caab3312f4aaf50f4b55ff9032b2ad3fc1a98c2d4e9a5ede968c8db08dd436a7",
+          "baked_tile_id": "c5b0dfcd-0187-5739-87e4-b7dd5a557178",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "a166ed5118d4f45cc53b3f1c55a82799ef8bbdb076c14258437cfc96a635a938",
+          "baked_tile_id": "cc5370e4-59c2-512a-91cb-f502cf7fe84f",
+          "state": "baked"
+        },
+        {
+          "tile_x": 2,
+          "tile_y": 0,
+          "tile_inputs_digest": "8f2af90964b0580e5d788e2229e413117271232005567e3667c81bcb23e8cfd7",
+          "baked_tile_id": "b8743df5-d01e-50f3-b6f5-70719fdc2fc0",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-11",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 840
+      },
+      "camera": "Actual application arrival camera, reframed using focused arrow-key controls. Screenshot cropped to exclude toolbar and title; no image synthesis or scene modification.",
+      "image_sha256": "03bab4f0965c4123a277c6caae1f1d523f3ae14d43016686d3d3b58e081cb1e3",
+      "image_bytes": 198763,
+      "capture_complete": true,
+      "featured": true
+    },
+    {
+      "id": "apartment-district",
+      "recipe": "small_town",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 1000,
+        "typology_weight_loft_building_permille": 0,
+        "typology_weight_mansion_block_permille": 0,
+        "typology_weight_rowhouse_permille": 0,
+        "typology_weight_shophouse_permille": 0,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "style_pack": {
+        "pack_id": "exulanica.finished-town",
+        "version": 3,
+        "manifest_sha256": "67adb7466c8c82a90800d568db6796eb6569f86ab4487c74909a25b9645d6444"
+      },
+      "source": "Actual application screenshot of this saved generated world, created through POST /worlds/generated in an isolated synthetic workspace. No model calls.",
+      "workspace_id": "b13bc428-a226-45fc-8332-6f7c71c124c7",
+      "image": "apartment-district.jpg",
+      "title": "Apartment District \u00b7 Finished",
+      "saved_world_title": "Apartment District \u00b7 Finished",
+      "recipe_label": "A small town",
+      "style_title": "Finished town",
+      "world_id": "world:generated:befeddfc-4d28-4c0d-8622-41d5fda04ab0",
+      "entry_id": "01a12c02-1ed8-7d2b-af56-99c38ec1f890",
+      "authored_version_id": "15dcbf36-680e-4675-9be6-d85df4bdfb6e",
+      "style_version_id": "53e176cc-3d04-4074-bc13-30f27c46dc3c",
+      "entry": {
+        "entry_id": "01a12c02-1ed8-7d2b-af56-99c38ec1f890",
+        "world_id": "world:generated:befeddfc-4d28-4c0d-8622-41d5fda04ab0",
+        "title": "Apartment District \u00b7 Finished",
+        "source_kind": "generated",
+        "source_snapshot_id": "e5b4ca7b-7c79-43b0-a2ea-3ea3b32fab85",
+        "source_snapshot_sha256": "8a92e89b88186ae6d2cbeffb78975503cbb99a65ea99bcf55df931738cd54671",
+        "authored_scene": null,
+        "declared_floor": null,
+        "generated_ground": {
+          "recipe_key": "small_town",
+          "recipe_label": "A small town",
+          "region_id": "region:generated",
+          "arrival_mm": [
+            132177,
+            45,
+            -71650
+          ],
+          "arrival_facing_mm": [
+            0,
+            7650
+          ],
+          "tiles": [
+            {
+              "tile_x": 0,
+              "tile_y": 0,
+              "tile_inputs_digest": "d567b01c100652cafdd3255532e0be0bd131b7c1343a3938f2a8612de0962e41",
+              "baked_tile_id": "4713a3e0-9fba-5ce7-b4c5-766472137591",
+              "state": "baked"
+            },
+            {
+              "tile_x": 1,
+              "tile_y": 0,
+              "tile_inputs_digest": "3b5a6f69081096ce33231d807920d09ee65f974ef0c1dbdfa5334fa6a04bed2a",
+              "baked_tile_id": "ca75fff7-8fe9-50d8-a88f-d0d05cca8d27",
+              "state": "baked"
+            }
+          ],
+          "specification": "world-specification.v2",
+          "values": {
+            "block_length_mm": 90000,
+            "city_extent_x_mm": 256000,
+            "cross_street_hierarchy": "local_street",
+            "ground_floor_use_weight_bakery_permille": 500,
+            "ground_floor_use_weight_bookshop_permille": 500,
+            "ground_floor_use_weight_cafe_permille": 500,
+            "ground_floor_use_weight_grocery_permille": 500,
+            "ground_floor_use_weight_office_permille": 500,
+            "ground_floor_use_weight_pharmacy_permille": 500,
+            "ground_floor_use_weight_restaurant_permille": 500,
+            "ground_floor_use_weight_workshop_permille": 500,
+            "high_street_count": 1,
+            "storey_band_high": 4,
+            "storey_band_low": 2,
+            "typology_weight_apartment_block_permille": 1000,
+            "typology_weight_loft_building_permille": 0,
+            "typology_weight_mansion_block_permille": 0,
+            "typology_weight_rowhouse_permille": 0,
+            "typology_weight_shophouse_permille": 0
+          }
+        },
+        "generated_site": null,
+        "society_engine": "exulanica-society/v5",
+        "authored_version_id": "15dcbf36-680e-4675-9be6-d85df4bdfb6e",
+        "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "authored_edit_seq": 0,
+        "current_authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "current_authored_edit_seq": 0,
+        "style_version_id": "53e176cc-3d04-4074-bc13-30f27c46dc3c",
+        "revision": 2,
+        "availability": "available",
+        "unavailable_reason": null,
+        "source_attachments": [],
+        "previous_source_attachments": [],
+        "created_by": "c46ccf04-df96-41cd-9b54-8d96123f8767",
+        "created_at": "2026-10-11T17:28:18.874045Z",
+        "updated_at": "2026-10-11T17:28:18.926789Z",
+        "takes_photographs": false,
+        "arrival": null,
+        "arrival_unavailable_reason": null,
+        "arrival_scene": null
+      },
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "d567b01c100652cafdd3255532e0be0bd131b7c1343a3938f2a8612de0962e41",
+          "baked_tile_id": "4713a3e0-9fba-5ce7-b4c5-766472137591",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "3b5a6f69081096ce33231d807920d09ee65f974ef0c1dbdfa5334fa6a04bed2a",
+          "baked_tile_id": "ca75fff7-8fe9-50d8-a88f-d0d05cca8d27",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-11",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 460
+      },
+      "camera": "Actual application arrival camera. Screenshot cropped to exclude toolbar, title and foreground vehicle; no image synthesis or scene modification.",
+      "image_sha256": "8945442ad58d383dbd74a51a6695f6c81a1ab1a1c22aaf295cff02b2f483181d",
+      "image_bytes": 171057,
+      "capture_complete": true,
+      "featured": true
+    },
+    {
+      "id": "loft-quarter",
+      "recipe": "small_town",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 0,
+        "typology_weight_loft_building_permille": 1000,
+        "typology_weight_mansion_block_permille": 0,
+        "typology_weight_rowhouse_permille": 0,
+        "typology_weight_shophouse_permille": 0,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "style_pack": {
+        "pack_id": "exulanica.cozy-town",
+        "version": 3,
+        "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc"
+      },
+      "source": "Actual application screenshot of this saved generated world, created through POST /worlds/generated in an isolated synthetic workspace. No model calls.",
+      "workspace_id": "b13bc428-a226-45fc-8332-6f7c71c124c7",
+      "image": "loft-quarter.jpg",
+      "title": "Loft Quarter \u00b7 Cozy",
+      "saved_world_title": "Loft Quarter \u00b7 Cozy",
+      "recipe_label": "A small town",
+      "style_title": "Cozy town",
+      "world_id": "world:generated:57cdfff3-9654-45b0-85a8-817507591d4a",
+      "entry_id": "01a12c02-217c-7eb4-b0b8-c364f4a53ee6",
+      "authored_version_id": "5245d3c4-6d7c-4a2a-98db-6908c7f81b1d",
+      "style_version_id": "044db96a-0d46-4c03-aafd-d2c35f18692b",
+      "entry": {
+        "entry_id": "01a12c02-217c-7eb4-b0b8-c364f4a53ee6",
+        "world_id": "world:generated:57cdfff3-9654-45b0-85a8-817507591d4a",
+        "title": "Loft Quarter \u00b7 Cozy",
+        "source_kind": "generated",
+        "source_snapshot_id": "2d0e7e37-68a8-4fe7-ad41-be38d5626064",
+        "source_snapshot_sha256": "ed8314ee537ad553e7978ebe0d74c79af3c1a95b7408152a2e8c51b20be738bc",
+        "authored_scene": null,
+        "declared_floor": null,
+        "generated_ground": {
+          "recipe_key": "small_town",
+          "recipe_label": "A small town",
+          "region_id": "region:generated",
+          "arrival_mm": [
+            131495,
+            -14,
+            -71850
+          ],
+          "arrival_facing_mm": [
+            0,
+            7850
+          ],
+          "tiles": [
+            {
+              "tile_x": 0,
+              "tile_y": 0,
+              "tile_inputs_digest": "74bce2bce1b9fdd898b863c15e3a924e76f982204d8675b7058a9b02eac2ee4d",
+              "baked_tile_id": "363203c5-b5e5-536f-810f-a5981056caed",
+              "state": "baked"
+            },
+            {
+              "tile_x": 1,
+              "tile_y": 0,
+              "tile_inputs_digest": "0aa50b0f9d8c8af7b2d30781930c7ae4fe676b5a64bf915fb68f1c1f4effc9f1",
+              "baked_tile_id": "1705bcfa-369a-5bfd-b380-9f53a0298197",
+              "state": "baked"
+            }
+          ],
+          "specification": "world-specification.v2",
+          "values": {
+            "block_length_mm": 90000,
+            "city_extent_x_mm": 256000,
+            "cross_street_hierarchy": "local_street",
+            "ground_floor_use_weight_bakery_permille": 500,
+            "ground_floor_use_weight_bookshop_permille": 500,
+            "ground_floor_use_weight_cafe_permille": 500,
+            "ground_floor_use_weight_grocery_permille": 500,
+            "ground_floor_use_weight_office_permille": 500,
+            "ground_floor_use_weight_pharmacy_permille": 500,
+            "ground_floor_use_weight_restaurant_permille": 500,
+            "ground_floor_use_weight_workshop_permille": 500,
+            "high_street_count": 1,
+            "storey_band_high": 4,
+            "storey_band_low": 2,
+            "typology_weight_apartment_block_permille": 0,
+            "typology_weight_loft_building_permille": 1000,
+            "typology_weight_mansion_block_permille": 0,
+            "typology_weight_rowhouse_permille": 0,
+            "typology_weight_shophouse_permille": 0
+          }
+        },
+        "generated_site": null,
+        "society_engine": "exulanica-society/v5",
+        "authored_version_id": "5245d3c4-6d7c-4a2a-98db-6908c7f81b1d",
+        "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "authored_edit_seq": 0,
+        "current_authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "current_authored_edit_seq": 0,
+        "style_version_id": "044db96a-0d46-4c03-aafd-d2c35f18692b",
+        "revision": 2,
+        "availability": "available",
+        "unavailable_reason": null,
+        "source_attachments": [],
+        "previous_source_attachments": [],
+        "created_by": "c46ccf04-df96-41cd-9b54-8d96123f8767",
+        "created_at": "2026-10-11T17:28:19.551190Z",
+        "updated_at": "2026-10-11T17:28:19.605000Z",
+        "takes_photographs": false,
+        "arrival": null,
+        "arrival_unavailable_reason": null,
+        "arrival_scene": null
+      },
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "74bce2bce1b9fdd898b863c15e3a924e76f982204d8675b7058a9b02eac2ee4d",
+          "baked_tile_id": "363203c5-b5e5-536f-810f-a5981056caed",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "0aa50b0f9d8c8af7b2d30781930c7ae4fe676b5a64bf915fb68f1c1f4effc9f1",
+          "baked_tile_id": "1705bcfa-369a-5bfd-b380-9f53a0298197",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-11",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 460
+      },
+      "camera": "Actual application arrival camera. Screenshot cropped to exclude toolbar, title and foreground vehicle; no image synthesis or scene modification.",
+      "image_sha256": "e5d23741d6f33da405add88e00b007c0e3a1f8937bd30532750a28f46e9a35d3",
+      "image_bytes": 91676,
+      "capture_complete": true,
+      "featured": true
+    },
+    {
+      "id": "shophouse-quarter",
+      "recipe": "small_town",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 0,
+        "typology_weight_loft_building_permille": 0,
+        "typology_weight_mansion_block_permille": 0,
+        "typology_weight_rowhouse_permille": 0,
+        "typology_weight_shophouse_permille": 1000,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "style_pack": {
+        "pack_id": "exulanica.toon-town",
+        "version": 3,
+        "manifest_sha256": "af8205f7e379cf5d81b777a298a67c6081b2afb1dd0a07d26515ca393cce4c37"
+      },
+      "source": "Actual application screenshot of this saved generated world, created through POST /worlds/generated in an isolated synthetic workspace. No model calls.",
+      "workspace_id": "b13bc428-a226-45fc-8332-6f7c71c124c7",
+      "image": "shophouse-quarter.jpg",
+      "title": "Shophouse Quarter \u00b7 Toon",
+      "saved_world_title": "Shophouse Quarter \u00b7 Toon",
+      "recipe_label": "A small town",
+      "style_title": "Toon town",
+      "world_id": "world:generated:afe038d3-4a40-4c14-a0db-305af6f99fe4",
+      "entry_id": "01a12c02-246b-7e15-a3f0-15e5ba60961d",
+      "authored_version_id": "b2b12f3a-2e9b-46d8-b9e4-f535bc2af879",
+      "style_version_id": "f278ff40-f725-453a-953c-27837a065943",
+      "entry": {
+        "entry_id": "01a12c02-246b-7e15-a3f0-15e5ba60961d",
+        "world_id": "world:generated:afe038d3-4a40-4c14-a0db-305af6f99fe4",
+        "title": "Shophouse Quarter \u00b7 Toon",
+        "source_kind": "generated",
+        "source_snapshot_id": "2332d5b8-5a08-4e82-b044-24ea035c7624",
+        "source_snapshot_sha256": "9c766fbc47ecb3d01f486bd5e01925bedbe6a6059a0d4d5ecf4bdce1653e5521",
+        "authored_scene": null,
+        "declared_floor": null,
+        "generated_ground": {
+          "recipe_key": "small_town",
+          "recipe_label": "A small town",
+          "region_id": "region:generated",
+          "arrival_mm": [
+            128000,
+            16,
+            -56150
+          ],
+          "arrival_facing_mm": [
+            0,
+            -7850
+          ],
+          "tiles": [
+            {
+              "tile_x": 0,
+              "tile_y": 0,
+              "tile_inputs_digest": "ca2d9180608be8af8c575303814afc592814f08491f72e080357962e219187f1",
+              "baked_tile_id": "f0911c44-7122-5788-8faf-f0bcb2004790",
+              "state": "baked"
+            },
+            {
+              "tile_x": 1,
+              "tile_y": 0,
+              "tile_inputs_digest": "f4df65cd9504264b886ae65d5c67d90280ce8b7f73209a9c66120de12c39b29a",
+              "baked_tile_id": "002bfed9-29ba-5e98-b2c1-c6ef38e5350a",
+              "state": "baked"
+            }
+          ],
+          "specification": "world-specification.v2",
+          "values": {
+            "block_length_mm": 90000,
+            "city_extent_x_mm": 256000,
+            "cross_street_hierarchy": "local_street",
+            "ground_floor_use_weight_bakery_permille": 500,
+            "ground_floor_use_weight_bookshop_permille": 500,
+            "ground_floor_use_weight_cafe_permille": 500,
+            "ground_floor_use_weight_grocery_permille": 500,
+            "ground_floor_use_weight_office_permille": 500,
+            "ground_floor_use_weight_pharmacy_permille": 500,
+            "ground_floor_use_weight_restaurant_permille": 500,
+            "ground_floor_use_weight_workshop_permille": 500,
+            "high_street_count": 1,
+            "storey_band_high": 4,
+            "storey_band_low": 2,
+            "typology_weight_apartment_block_permille": 0,
+            "typology_weight_loft_building_permille": 0,
+            "typology_weight_mansion_block_permille": 0,
+            "typology_weight_rowhouse_permille": 0,
+            "typology_weight_shophouse_permille": 1000
+          }
+        },
+        "generated_site": null,
+        "society_engine": "exulanica-society/v5",
+        "authored_version_id": "b2b12f3a-2e9b-46d8-b9e4-f535bc2af879",
+        "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "authored_edit_seq": 0,
+        "current_authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "current_authored_edit_seq": 0,
+        "style_version_id": "f278ff40-f725-453a-953c-27837a065943",
+        "revision": 2,
+        "availability": "available",
+        "unavailable_reason": null,
+        "source_attachments": [],
+        "previous_source_attachments": [],
+        "created_by": "c46ccf04-df96-41cd-9b54-8d96123f8767",
+        "created_at": "2026-10-11T17:28:20.302211Z",
+        "updated_at": "2026-10-11T17:28:20.357047Z",
+        "takes_photographs": false,
+        "arrival": null,
+        "arrival_unavailable_reason": null,
+        "arrival_scene": null
+      },
+      "tiles": [
+        {
+          "tile_x": 0,
+          "tile_y": 0,
+          "tile_inputs_digest": "ca2d9180608be8af8c575303814afc592814f08491f72e080357962e219187f1",
+          "baked_tile_id": "f0911c44-7122-5788-8faf-f0bcb2004790",
+          "state": "baked"
+        },
+        {
+          "tile_x": 1,
+          "tile_y": 0,
+          "tile_inputs_digest": "f4df65cd9504264b886ae65d5c67d90280ce8b7f73209a9c66120de12c39b29a",
+          "baked_tile_id": "002bfed9-29ba-5e98-b2c1-c6ef38e5350a",
+          "state": "baked"
+        }
+      ],
+      "capture_date": "2026-10-11",
+      "capture_clip_css_pixels": {
+        "x": 100,
+        "y": 80,
+        "width": 1600,
+        "height": 460
+      },
+      "camera": "Actual application arrival camera. Screenshot cropped to exclude toolbar, title and foreground vehicle; no image synthesis or scene modification.",
+      "image_sha256": "f13d38cd5ec8b802127eeb9c40bd6a266bcdbc5b10bf9e6172f09c4e02f9e4a0",
+      "image_bytes": 77032,
+      "capture_complete": true,
+      "featured": true
+    }
+  ]
+}

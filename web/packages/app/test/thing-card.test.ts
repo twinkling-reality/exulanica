@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // The thing card for a person: what they are, what they are doing, what mind runs them (with the
-// AI mark whenever a model is asked), the mind changed in two clicks through Who decides' own
+// AI mark whenever a model is asked), the mind selection reviewed before assignment through Who decides' own
 // choose, and where they came from. Expected words come from the design the operator approved
 // (deliveries CARD design.md sections 1, 2 and 5) and from the models read's served names.
 import { describe, expect, it, vi } from 'vitest';
@@ -75,7 +75,7 @@ describe('the thing card for a person', () => {
     expect(root.textContent).toContain(refused);
   });
 
-  it('changes their mind in two clicks, by Who decides\' own choose, and says what came of it', async () => {
+  it('stages the model and shows its served rates before assigning it', async () => {
     const { card, root, decide } = mount();
     card.view.show('person-0', about({ running: null, words: 'Their own routine.' }));
     click(root, 'card.mind.change');
@@ -87,6 +87,9 @@ describe('the thing card for a person', () => {
     expect(choices.map((choice) => choice.querySelector('.thing-card-now-badge, .thing-card-badge')?.textContent))
       .toEqual(['Now', 'Lowest cost', 'About 3 times the lowest cost']);
     click(root, 'card.mind.choose', `nebius ${NEMOTRON.modelId}`);
+    expect(decide).not.toHaveBeenCalled();
+    expect(root.querySelector('.thing-card-price')?.textContent).toContain('US$0.06 per million tokens');
+    click(root, 'card.mind.apply');
     await settle();
     expect(decide).toHaveBeenCalledWith({
       role: 'people', subjectIds: ['person-0'], model: { provider: 'nebius', modelId: NEMOTRON.modelId },
@@ -101,6 +104,9 @@ describe('the thing card for a person', () => {
     card.view.show('person-0', about({ running: run(QWEN), words: 'Qwen3 235B Instruct, which you chose.' }));
     click(root, 'card.mind.change');
     click(root, 'card.mind.choose', 'routine');
+    expect(decide).not.toHaveBeenCalled();
+    expect(root.querySelector('.thing-card-price')?.textContent).toBe('No model calls. No model cost.');
+    click(root, 'card.mind.apply');
     await settle();
     expect(decide).toHaveBeenCalledWith({ role: 'people', subjectIds: ['person-0'], model: null });
   });
@@ -130,6 +136,40 @@ describe('the thing card for a person', () => {
     expect(root.querySelector('[data-action="card.mind.choose"]')).not.toBeNull();
     card.view.show('person-1', about({ running: null, words: 'Their own routine.' }));
     expect(root.querySelector('[data-action="card.mind.choose"]')).toBeNull();
+  });
+
+  it('cancels staged assignment and clears it when the selected person changes', () => {
+    const { card, root, decide } = mount();
+    card.view.show('person-0', about({ running: null, words: 'Their own routine.' }));
+    click(root, 'card.mind.change');
+    click(root, 'card.mind.choose', `nebius ${NEMOTRON.modelId}`);
+    click(root, 'card.mind.change');
+    click(root, 'card.mind.change');
+    expect(root.querySelector<HTMLButtonElement>('[data-action="card.mind.apply"]')?.disabled).toBe(true);
+    click(root, 'card.mind.choose', `nebius ${NEMOTRON.modelId}`);
+    card.view.show('person-1', about({ running: null, words: 'Their own routine.' }));
+    click(root, 'card.mind.change');
+    expect(root.querySelector<HTMLButtonElement>('[data-action="card.mind.apply"]')?.disabled).toBe(true);
+    expect(decide).not.toHaveBeenCalled();
+  });
+
+  it('discards late assignment feedback even when selection returns to the original person', async () => {
+    const { card, root, decide } = mount();
+    let finish!: (value: { recorded: boolean; words: string }) => void;
+    decide.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    card.view.show('person-0', about({ running: null, words: 'Their own routine.' }));
+    click(root, 'card.mind.change');
+    click(root, 'card.mind.choose', `nebius ${NEMOTRON.modelId}`);
+    click(root, 'card.mind.apply');
+    card.view.show('person-1', about({ running: null, words: 'Their own routine.' }));
+    expect(root.dataset['subject']).toBe('person-1');
+    card.view.show('person-0', about({ running: null, words: 'Their own routine.' }));
+    click(root, 'card.mind.change');
+    finish({ recorded: true, words: 'Old assignment completed.' });
+    await settle();
+    expect(root.textContent).not.toContain('Old assignment completed.');
+    expect(root.querySelector('[data-action="card.mind.choose"]')).not.toBeNull();
+    expect(root.querySelector<HTMLButtonElement>('[data-action="card.mind.apply"]')?.disabled).toBe(true);
   });
 
   it('builds the same words without a page, from what Selected knows', () => {

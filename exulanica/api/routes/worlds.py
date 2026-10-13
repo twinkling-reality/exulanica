@@ -21,8 +21,8 @@ import datetime as dt
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from exulanica.api.dependencies import (
@@ -30,9 +30,12 @@ from exulanica.api.dependencies import (
     ReadOnlyConnection,
     ScopedConnection,
     get_services,
+    owns_workspace,
 )
 from exulanica.api.services import Services
 from exulanica.graph.personal_sources import personal_sources
+from exulanica.world.generated_worlds import forget_generated_records
+from exulanica.world.kinds.worker import kind_worker
 from exulanica.world.personal_composition import (
     PersonalWorldPlan,
     PersonalWorldRefused,
@@ -40,6 +43,7 @@ from exulanica.world.personal_composition import (
     personal_world_plan,
 )
 from exulanica.world.workspace_lock import lock_workspace
+from exulanica.world.world_erasure import WorldErasureRefused, erase_world, removal_preview
 from exulanica.world.worlds import (
     WorldLimitReached,
     WorldsReadOnly,
@@ -309,3 +313,72 @@ def compose_personal_source_world(
         style_version_id=composed["style_version_id"],
         saved_entry_id=plan.saved_entry_id,
     )
+
+
+class WorldRemovalView(BaseModel):
+    """What permanently removing this generated world affects."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    world_id: str
+    title: str | None
+    counts: dict[str, int]
+    consequences: list[str]
+    retained: list[str]
+
+
+def _removal_refused(exc: WorldErasureRefused) -> JSONResponse:
+    return JSONResponse(
+        status_code=403 if exc.code == "world_not_yours" else 409,
+        content={"code": exc.code, "detail": exc.detail},
+    )
+
+
+@router.get("/{world_id}/removal", response_model=WorldRemovalView)
+def preview_world_removal(
+    world_id: str,
+    request: Request,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+) -> WorldRemovalView | JSONResponse:
+    """Read removal consequences. Only its creator or workspace owner can remove a world."""
+    try:
+        return WorldRemovalView.model_validate(
+            removal_preview(
+                connection,
+                session.workspace_id,
+                world_id,
+                actor=session.actor,
+                by_owner=owns_workspace(request, session),
+            )
+        )
+    except WorldErasureRefused as exc:
+        return _removal_refused(exc)
+
+
+@router.delete("/{world_id}", status_code=204)
+def remove_world(
+    world_id: str,
+    request: Request,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> Response:
+    """Permanently remove a generated world; a backup restore honors the removal again."""
+    try:
+        # Closing this session commits before local cache invalidation. A refused transaction
+        # must not discard a still-accessible world's draft memory.
+        with services.database.session(session.workspace_id) as connection:
+            _erasure, entry_ids, receipt_digests = erase_world(
+                connection,
+                session.workspace_id,
+                world_id,
+                erased_by=session.actor,
+                by_owner=owns_workspace(request, session),
+            )
+    except WorldErasureRefused as exc:
+        return _removal_refused(exc)
+    if services.kind_drafts is not None:
+        services.kind_drafts.erase_entries(session.workspace_id, set(entry_ids))
+    kind_worker().forget_receipts(str(session.workspace_id), receipt_digests)
+    forget_generated_records(receipt_digests)
+    return Response(status_code=204)

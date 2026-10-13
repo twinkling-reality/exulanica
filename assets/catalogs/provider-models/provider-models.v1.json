@@ -1,0 +1,710 @@
+{
+  "catalog_id": "provider-models",
+  "catalog_version": 1,
+  "schema_version": 1,
+  "profile": "exulanica.provider-models/v1",
+  "source_build": "Derived: each entry is what a provider states of one model it serves (its type, its use cases and the words of its licence), read from the source and on the day the entry names; an operator's command rewrites the entries from the provider's public catalog. Authored: each licence class is this product's reading of that model's own row in docs/license-matrix.md, with the row's verdict word, and no command writes one.",
+  "fallback": "A model with no entry cannot be added, and a model with no licence class is not classified, whatever the provider says of its licence.",
+  "entries": [
+    {
+      "key": "nebius_token_factory|MiniMaxAI/MiniMax-M3",
+      "provider": "nebius_token_factory",
+      "model_id": "MiniMaxAI/MiniMax-M3",
+      "type": "text2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "reasoning",
+        "function_calling",
+        "code",
+        "context_and_rag",
+        "image",
+        "video",
+        "responses_api"
+      ],
+      "licence_stated": "MiniMax-M3",
+      "licence_url": "https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/LICENSE",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the shipped manifest already declares, stated here as the provider states it; a test holds its type and use cases to agree with the manifest's."
+    },
+    {
+      "key": "nebius_token_factory|NousResearch/Hermes-4-405B",
+      "provider": "nebius_token_factory",
+      "model_id": "NousResearch/Hermes-4-405B",
+      "type": "text2text",
+      "use_cases": [
+        "text",
+        "code",
+        "complex_writing",
+        "context_and_rag",
+        "function_calling",
+        "reasoning",
+        "summarization",
+        "responses_api"
+      ],
+      "licence_stated": "Llama 3.1 License",
+      "licence_url": "https://github.com/meta-llama/llama-models/blob/main/models/llama3_1/LICENSE",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "provider": "nebius_token_factory",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "type": "text2text",
+      "use_cases": [
+        "text",
+        "code",
+        "function_calling",
+        "context_and_rag",
+        "fine_tune",
+        "responses_api"
+      ],
+      "licence_stated": "Apache 2.0 License",
+      "licence_url": "https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the shipped manifest already declares, stated here as the provider states it; a test holds its type and use cases to agree with the manifest's."
+    },
+    {
+      "key": "nebius_token_factory|Qwen/Qwen3-30B-A3B-Instruct-2507",
+      "provider": "nebius_token_factory",
+      "model_id": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+      "type": "text2text",
+      "use_cases": [
+        "text",
+        "code",
+        "function_calling",
+        "context_and_rag",
+        "fine_tune",
+        "responses_api"
+      ],
+      "licence_stated": "Apache 2.0 License",
+      "licence_url": "https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|Qwen/Qwen3-Embedding-8B",
+      "provider": "nebius_token_factory",
+      "model_id": "Qwen/Qwen3-Embedding-8B",
+      "type": "embedding",
+      "use_cases": [
+        "pair classification",
+        "reranking",
+        "multilabel classification",
+        "multilingual",
+        "classification",
+        "clustering",
+        "retrieval"
+      ],
+      "licence_stated": "Apache 2.0 License",
+      "licence_url": "https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the shipped manifest already declares, stated here as the provider states it; a test holds its type and use cases to agree with the manifest's."
+    },
+    {
+      "key": "nebius_token_factory|Qwen/Qwen3.5-397B-A17B",
+      "provider": "nebius_token_factory",
+      "model_id": "Qwen/Qwen3.5-397B-A17B",
+      "type": "text2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "code",
+        "reasoning",
+        "function_calling",
+        "context_and_rag",
+        "responses_api"
+      ],
+      "licence_stated": "Apache 2.0 License",
+      "licence_url": "https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|Qwen/Qwen3.8-27B",
+      "provider": "nebius_token_factory",
+      "model_id": "Qwen/Qwen3.8-27B",
+      "type": "image2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "image",
+        "reasoning",
+        "code",
+        "function_calling",
+        "context_and_rag",
+        "responses_api"
+      ],
+      "licence_stated": "Apache 2.0 License",
+      "licence_url": "https://huggingface.co/Qwen/Qwen3.8-27B/blob/main/LICENSE",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|deepseek-ai/DeepSeek-V4-Flash-0731",
+      "provider": "nebius_token_factory",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "type": "text2text",
+      "use_cases": [
+        "text",
+        "reasoning",
+        "function_calling",
+        "code",
+        "context_and_rag",
+        "responses_api",
+        "fine_tune"
+      ],
+      "licence_stated": "MIT License",
+      "licence_url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/main/LICENSE",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the shipped manifest already declares, stated here as the provider states it; a test holds its type and use cases to agree with the manifest's."
+    },
+    {
+      "key": "nebius_token_factory|deepseek-ai/DeepSeek-V4-Pro",
+      "provider": "nebius_token_factory",
+      "model_id": "deepseek-ai/DeepSeek-V4-Pro",
+      "type": "text2text",
+      "use_cases": [
+        "text",
+        "code",
+        "reasoning",
+        "function_calling",
+        "context_and_rag",
+        "responses_api"
+      ],
+      "licence_stated": "DeepSeek License",
+      "licence_url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/LICENSE",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|deepseek-ai/DeepSeek-V4-Pro-0813",
+      "provider": "nebius_token_factory",
+      "model_id": "deepseek-ai/DeepSeek-V4-Pro-0813",
+      "type": "text2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "code",
+        "reasoning",
+        "function_calling",
+        "context_and_rag",
+        "responses_api"
+      ],
+      "licence_stated": "MIT License",
+      "licence_url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813/raw/main/LICENSE",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|deepseek-ai/DeepSeek-V4.1-Flash",
+      "provider": "nebius_token_factory",
+      "model_id": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "type": "image2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "image",
+        "code",
+        "responses_api"
+      ],
+      "licence_stated": "MIT",
+      "licence_url": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/blob/df42c109f1defefcbfcedbe7d905718a12266e40/LICENSE",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|google/gemma-3-27b-it",
+      "provider": "nebius_token_factory",
+      "model_id": "google/gemma-3-27b-it",
+      "type": "text2text",
+      "use_cases": [
+        "text",
+        "image",
+        "function_calling"
+      ],
+      "licence_stated": "Gemma License",
+      "licence_url": "https://ai.google.dev/gemma/terms",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|moonshotai/Kimi-K2.6",
+      "provider": "nebius_token_factory",
+      "model_id": "moonshotai/Kimi-K2.6",
+      "type": "image2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "image",
+        "code",
+        "complex_writing",
+        "context_and_rag",
+        "function_calling",
+        "reasoning",
+        "summarization",
+        "responses_api"
+      ],
+      "licence_stated": "mit",
+      "licence_url": "https://huggingface.co/moonshotai/Kimi-K2.6/blob/main/LICENSE",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|moonshotai/Kimi-K2.7-Code",
+      "provider": "nebius_token_factory",
+      "model_id": "moonshotai/Kimi-K2.7-Code",
+      "type": "text2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "image",
+        "code",
+        "complex_writing",
+        "context_and_rag",
+        "function_calling",
+        "reasoning",
+        "summarization",
+        "responses_api"
+      ],
+      "licence_stated": "mit",
+      "licence_url": "https://huggingface.co/moonshotai/Kimi-K2.7-Code/blob/main/LICENSE",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|moonshotai/Kimi-K3",
+      "provider": "nebius_token_factory",
+      "model_id": "moonshotai/Kimi-K3",
+      "type": "image2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "image",
+        "code",
+        "function_calling",
+        "reasoning",
+        "context_and_rag",
+        "responses_api"
+      ],
+      "licence_stated": "Kimi K3 License",
+      "licence_url": "https://huggingface.co/moonshotai/Kimi-K3/blob/main/LICENSE",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "provider": "nebius_token_factory",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "type": "text2text",
+      "use_cases": [
+        "text",
+        "reasoning",
+        "function_calling",
+        "code",
+        "context_and_rag",
+        "responses_api"
+      ],
+      "licence_stated": "nvidia-open-model-license",
+      "licence_url": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the shipped manifest already declares, stated here as the provider states it; a test holds its type and use cases to agree with the manifest's."
+    },
+    {
+      "key": "nebius_token_factory|nvidia/Nemotron-3-Ultra-550b-a55b",
+      "provider": "nebius_token_factory",
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "type": "text2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "summarization",
+        "context_and_rag",
+        "code",
+        "reasoning",
+        "function_calling",
+        "complex_writing",
+        "responses_api"
+      ],
+      "licence_stated": "openmdw-1.1",
+      "licence_url": "https://openmdw.ai/license/1-1/",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the shipped manifest already declares, stated here as the provider states it; a test holds its type and use cases to agree with the manifest's."
+    },
+    {
+      "key": "nebius_token_factory|nvidia/Nemotron-3_5-Lightning",
+      "provider": "nebius_token_factory",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "type": "text2text",
+      "use_cases": [
+        "text",
+        "reasoning",
+        "function_calling",
+        "code",
+        "context_and_rag",
+        "responses_api"
+      ],
+      "licence_stated": "OpenMDW v1.1",
+      "licence_url": "https://openmdw.ai/license/1-1/",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the shipped manifest already declares, stated here as the provider states it; a test holds its type and use cases to agree with the manifest's."
+    },
+    {
+      "key": "nebius_token_factory|nvidia/nemotron-3-super-120b-a12b",
+      "provider": "nebius_token_factory",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "type": "text2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "summarization",
+        "context_and_rag",
+        "code",
+        "reasoning",
+        "function_calling",
+        "complex_writing",
+        "responses_api"
+      ],
+      "licence_stated": "nvidia-open-model-license",
+      "licence_url": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the shipped manifest already declares, stated here as the provider states it; a test holds its type and use cases to agree with the manifest's."
+    },
+    {
+      "key": "nebius_token_factory|openai/gpt-oss-120b",
+      "provider": "nebius_token_factory",
+      "model_id": "openai/gpt-oss-120b",
+      "type": "text2text",
+      "use_cases": [
+        "text",
+        "code",
+        "fine_tune",
+        "function_calling",
+        "reasoning"
+      ],
+      "licence_stated": "Apache 2.0 License",
+      "licence_url": "https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|openbmb/MiniCPM-V-4_5",
+      "provider": "nebius_token_factory",
+      "model_id": "openbmb/MiniCPM-V-4_5",
+      "type": "image2text",
+      "use_cases": [
+        "text",
+        "image",
+        "summarization",
+        "context_and_rag"
+      ],
+      "licence_stated": "Apache 2.0 License",
+      "licence_url": "https://github.com/OpenBMB/MiniCPM-V/blob/main/LICENSE",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the shipped manifest already declares, stated here as the provider states it; a test holds its type and use cases to agree with the manifest's."
+    },
+    {
+      "key": "nebius_token_factory|zai-org/GLM-5.1",
+      "provider": "nebius_token_factory",
+      "model_id": "zai-org/GLM-5.1",
+      "type": "text2text",
+      "use_cases": [
+        "text",
+        "reasoning",
+        "function_calling",
+        "context_and_rag",
+        "code",
+        "responses_api"
+      ],
+      "licence_stated": "MIT License",
+      "licence_url": "https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/mit.md",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|zai-org/GLM-5.2",
+      "provider": "nebius_token_factory",
+      "model_id": "zai-org/GLM-5.2",
+      "type": "text2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "code",
+        "function_calling",
+        "reasoning",
+        "context_and_rag"
+      ],
+      "licence_stated": "MIT License",
+      "licence_url": "https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/mit.md",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|zai-org/GLM-5.3",
+      "provider": "nebius_token_factory",
+      "model_id": "zai-org/GLM-5.3",
+      "type": "text2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "code",
+        "function_calling",
+        "reasoning",
+        "context_and_rag",
+        "responses_api"
+      ],
+      "licence_stated": "GLM-5.3 License",
+      "licence_url": "https://huggingface.co/zai-org/GLM-5.3/blob/main/LICENSE",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    },
+    {
+      "key": "nebius_token_factory|zai-org/GLM-5.3-Flash",
+      "provider": "nebius_token_factory",
+      "model_id": "zai-org/GLM-5.3-Flash",
+      "type": "image2text",
+      "use_cases": [
+        "dedicated-endpoint",
+        "text",
+        "image",
+        "code",
+        "function_calling",
+        "reasoning",
+        "context_and_rag",
+        "responses_api"
+      ],
+      "licence_stated": "MIT License",
+      "licence_url": "https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/mit.md",
+      "source": "https://tokenfactory.nebius.com/api/public/models_info",
+      "read_on": "2026-10-10",
+      "reason": "A model the provider serves that the shipped manifest does not declare, stated here as the provider states it. Its licence class is authored below from its own row of the licence matrix, never from the provider's name for the licence."
+    }
+  ],
+  "licence_classes": [
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "nvidia/Nemotron-3_5-Lightning",
+      "class": "accepted",
+      "verdict": "SHIP",
+      "matrix": "docs/license-matrix.md",
+      "row": "`nvidia/Nemotron-3_5-Lightning`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "class": "accepted",
+      "verdict": "SHIP",
+      "matrix": "docs/license-matrix.md",
+      "row": "`nvidia/nemotron-3-super-120b-a12b`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "class": "accepted",
+      "verdict": "SHIP",
+      "matrix": "docs/license-matrix.md",
+      "row": "`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-*`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "class": "accepted",
+      "verdict": "SHIP",
+      "matrix": "docs/license-matrix.md",
+      "row": "`nvidia/Nemotron-3-Ultra-550b-a55b`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "MiniMaxAI/MiniMax-M3",
+      "class": "conditional",
+      "verdict": "CONDITIONAL",
+      "matrix": "docs/license-matrix.md",
+      "row": "`MiniMaxAI/MiniMax-M3`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "openbmb/MiniCPM-V-4_5",
+      "class": "accepted",
+      "verdict": "SHIP",
+      "matrix": "docs/license-matrix.md",
+      "row": "`openbmb/MiniCPM-V-4_5`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "Qwen/Qwen3-Embedding-8B",
+      "class": "accepted",
+      "verdict": "SHIP",
+      "matrix": "docs/license-matrix.md",
+      "row": "`Qwen/Qwen3-Embedding-8B`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "class": "accepted",
+      "verdict": "SHIP",
+      "matrix": "docs/license-matrix.md",
+      "row": "`Qwen/Qwen3-235B-A22B-Instruct-2507`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+      "class": "accepted",
+      "verdict": "SHIP",
+      "matrix": "docs/license-matrix.md",
+      "row": "`Qwen/Qwen3-30B-A3B-Instruct-2507`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "Qwen/Qwen3.5-397B-A17B",
+      "class": "accepted",
+      "verdict": "SHIP",
+      "matrix": "docs/license-matrix.md",
+      "row": "`Qwen/Qwen3.5-397B-A17B`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "openai/gpt-oss-120b",
+      "class": "accepted",
+      "verdict": "SHIP",
+      "matrix": "docs/license-matrix.md",
+      "row": "`openai/gpt-oss-120b`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "class": "accepted",
+      "verdict": "SHIP",
+      "matrix": "docs/license-matrix.md",
+      "row": "`deepseek-ai/DeepSeek-V4-Flash-0731`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "moonshotai/Kimi-K2.6",
+      "class": "accepted",
+      "verdict": "SHIP if needed",
+      "matrix": "docs/license-matrix.md",
+      "row": "`moonshotai/Kimi-K2.6`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "moonshotai/Kimi-K2.7-Code",
+      "class": "accepted",
+      "verdict": "SHIP if needed",
+      "matrix": "docs/license-matrix.md",
+      "row": "`moonshotai/Kimi-K2.7-Code`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "moonshotai/Kimi-K3",
+      "class": "rejected",
+      "verdict": "AVOID",
+      "matrix": "docs/license-matrix.md",
+      "row": "`moonshotai/Kimi-K3`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "zai-org/GLM-5.1",
+      "class": "accepted",
+      "verdict": "SHIP if needed",
+      "matrix": "docs/license-matrix.md",
+      "row": "`zai-org/GLM-5.1`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "zai-org/GLM-5.2",
+      "class": "accepted",
+      "verdict": "SHIP if needed",
+      "matrix": "docs/license-matrix.md",
+      "row": "`zai-org/GLM-5.2`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "Qwen/Qwen3.8-27B",
+      "class": "accepted",
+      "verdict": "SHIP if needed",
+      "matrix": "docs/license-matrix.md",
+      "row": "`Qwen/Qwen3.8-27B`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "deepseek-ai/DeepSeek-V4-Pro",
+      "class": "accepted",
+      "verdict": "SHIP if needed",
+      "matrix": "docs/license-matrix.md",
+      "row": "`deepseek-ai/DeepSeek-V4-Pro`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "deepseek-ai/DeepSeek-V4-Pro-0813",
+      "class": "accepted",
+      "verdict": "SHIP if needed",
+      "matrix": "docs/license-matrix.md",
+      "row": "`deepseek-ai/DeepSeek-V4-Pro-0813`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "class": "accepted",
+      "verdict": "SHIP if needed",
+      "matrix": "docs/license-matrix.md",
+      "row": "`deepseek-ai/DeepSeek-V4.1-Flash`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "zai-org/GLM-5.3-Flash",
+      "class": "accepted",
+      "verdict": "SHIP if needed",
+      "matrix": "docs/license-matrix.md",
+      "row": "`zai-org/GLM-5.3-Flash`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "zai-org/GLM-5.3",
+      "class": "accepted",
+      "verdict": "SHIP if needed",
+      "matrix": "docs/license-matrix.md",
+      "row": "`zai-org/GLM-5.3`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "google/gemma-3-27b-it",
+      "class": "conditional",
+      "verdict": "CONDITIONAL",
+      "matrix": "docs/license-matrix.md",
+      "row": "`google/gemma-3-27b-it`"
+    },
+    {
+      "provider": "nebius_token_factory",
+      "model_id": "NousResearch/Hermes-4-405B",
+      "class": "conditional",
+      "verdict": "CONDITIONAL",
+      "matrix": "docs/license-matrix.md",
+      "row": "`NousResearch/Hermes-4-405B`"
+    }
+  ]
+}

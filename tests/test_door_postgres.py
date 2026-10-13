@@ -1072,18 +1072,28 @@ def test_an_idle_held_poll_opens_about_one_short_connection_a_second(door, monke
     cursor = _frames(door, channel, _hello(door, channel).json()["cursor"]).json()["cursor"]
     client, _runtime = door["application"](_bridges(door["world"]["workspace"], hold_seconds=3))
     door = {**door, "client": client}
+    from contextvars import ContextVar
+
     import exulanica.db.session as session_module
 
+    # Count this request's credential/head connections, including its anyio thread hops. The
+    # lifespan's durable job worker has its own context and must not be attributed to the poll.
+    poll_scope = ContextVar("counted_door_poll", default=False)
     opened = []
     connect = session_module.psycopg.connect
 
     def counting(*args, **kwargs):
-        opened.append(time.monotonic())
+        if poll_scope.get():
+            opened.append(time.monotonic())
         return connect(*args, **kwargs)
 
     monkeypatch.setattr(session_module.psycopg, "connect", counting)
+    token = poll_scope.set(True)
     started = time.monotonic()
-    idle = _frames(door, channel, cursor)
+    try:
+        idle = _frames(door, channel, cursor)
+    finally:
+        poll_scope.reset(token)
     elapsed = time.monotonic() - started
     assert idle.status_code == 200 and idle.json()["frames"] == []
     # One for the credential, one for the poll's first read (its presence and head together), and
@@ -1833,7 +1843,10 @@ def test_only_door_prune_removes_global_rows_and_never_a_revoked_secret(door):
     # A revocation is a withdrawal written once: the revoked secret is kept for good.
     assert left == {"old_secret": 0, "revoked_secret": 1, "refusals": 1}
     with (
-        pytest.raises(psycopg.errors.CheckViolation, match="revoked door secret is kept"),
+        pytest.raises(
+            psycopg.errors.CheckViolation,
+            match="door_secret is deleted only when its world is erased whole",
+        ),
         admin.transaction(),
     ):
         admin.execute("delete from door_secret where secret_sha256 = %s", ("2" * 64,))

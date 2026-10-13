@@ -78,6 +78,19 @@ def _drawn_on(base: dict[str, Any], pack_id: str) -> dict[str, Any]:
     return style_packs.read_manifest(manifest, CONTEXT)
 
 
+def test_a_derived_look_preserves_its_explicit_appearance_catalog_only():
+    legacy = _cozy()
+    historical = _build([legacy])
+    pinned = copy.deepcopy(legacy)
+    pinned["look_family_catalog"] = {"version": 2, "sha256": CONTEXT.family_catalogs[2].sha256}
+    built = _build([pinned])
+    assert built.manifest["look_family_catalog"] == pinned["look_family_catalog"]
+    style_packs.require_chain_catalog([built.manifest, pinned])
+    assert "look_family_catalog" not in historical.manifest
+    assert _build([legacy]).canonical == historical.canonical
+    assert built.content_sha256 != historical.content_sha256
+
+
 def test_a_derived_look_is_drawn_on_the_library_pack_and_states_only_its_new_pieces() -> None:
     served = style_pack_library().pack(COZY)
     assert served is not None

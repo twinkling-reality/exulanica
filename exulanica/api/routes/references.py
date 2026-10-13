@@ -61,7 +61,7 @@ from exulanica.references import store
 from exulanica.references.adapters import ReferenceSourceUnavailable
 from exulanica.references.bundle import read_bundle
 from exulanica.references.catalogs import web_source
-from exulanica.references.drafting import reference_prompts
+from exulanica.references.drafting import prompts_for_request
 from exulanica.references.pictures import PICTURE_ROLE
 from exulanica.selection.world_drafting import sendable
 from exulanica.spending.status import workspace_status
@@ -416,7 +416,7 @@ def request_reference(
             web=body.web,
             description=sent.text,
             withheld_words=(),
-            prompts_sha256=reference_prompts().sha256,
+            prompts_sha256=prompts_for_request(body.purpose, pictures=bool(body.pictures)).sha256,
             request_id=key,
             request_sha256=None if key is None else _request_sha256(body),
             pictures=tuple(pictures),

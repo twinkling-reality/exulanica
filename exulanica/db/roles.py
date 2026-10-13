@@ -70,6 +70,7 @@ import psycopg
 from psycopg import sql
 
 from exulanica.db.account_roles import ACCOUNT_TABLES, revoke_account_access
+from exulanica.db.participant_role import PARTICIPANT_VIEWS, grant_participant_membership
 from exulanica.db.registries import REGISTRY_TABLES
 from exulanica.errors import ExulanicaError
 
@@ -145,6 +146,7 @@ BACKUP_ROLE: Final = "exulanica_backup"
 #: registry table in :data:`exulanica.db.registries.REGISTRY_TABLES` is one; the rest are these.
 READ_ONLY_TABLES: Final = (
     *REGISTRY_TABLES,
+    "personal_model_right_use",
     "restore_control",
     "restore_replay_receipt",
     "schema_migrations",
@@ -165,6 +167,8 @@ READ_ONLY_TABLES: Final = (
     # The piece batch migration: the operator registers and closes generation sessions with the
     # owner connection; the generation worker only reads the register.
     "generation_session",
+    # Erasure alone creates immutable recovery obligations; progress is appended separately.
+    "piece_erasure_settlement",
 )
 
 #: What the runtime may call on migration 0124's durable spending: admit, dispatch and settle an
@@ -189,6 +193,18 @@ SPENDING_READ_FUNCTIONS: Final = (("spending_authority_facts", ""),)
 
 #: Tables the runtime may read and append to and may not update. See the module docstring.
 INSERT_ONLY_TABLES: Final = (
+    "world_grant",
+    "world_grant_revision",
+    "world_grant_principal",
+    "world_grant_revocation",
+    "world_grant_departure",
+    "participation_redemption_refusal",
+    "piece_erasure_settlement_event",
+    "model_probe",
+    "model_probe_start",
+    "model_probe_receipt",
+    "model_probe_outcome",
+    "workspace_model_binding_snapshot",
     "tombstone",
     "workspace_baked_tile",
     "material_bake_request",
@@ -298,6 +314,9 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0190 appends what a world may spend on its beings' model minds and refuses every
     # update and delete of one.
     "world_minds_budget",
+    # Migration 0193 appends each fact a workspace has about a model it added (added, probed, a
+    # probe not finished, removed) and refuses every update and delete of one.
+    "workspace_model",
     # The piece request migration records each ask under a caller's key once and refuses every
     # update of one.
     "piece_ask",
@@ -347,6 +366,20 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0182 appends a workspace's erasure of one society, whose trigger deletes every row
     # that records the society as the definer owner; it refuses every update and delete.
     "society_erasure",
+    "world_erasure",
+    "world_kind_erasure",
+    "world_draft_start",
+    "world_draft_request",
+    "world_draft_input",
+    "world_draft_bound",
+    "world_draft_bound_closed",
+    "world_draft_progress",
+    "world_draft_attempt",
+    "world_draft_outcome",
+    "kind_draft_start",
+    "kind_draft_input",
+    "kind_draft_attempt",
+    "kind_draft_outcome",
 )
 
 #: Tables the runtime may read and never write (migration 0173): the style pack attempt counters
@@ -370,6 +403,7 @@ STYLE_PACK_RUNTIME_FUNCTIONS: Final = (
 #: back and grants it on these columns alone. Migration 0149's door secrets gain the time an invite
 #: was used and the time a secret was revoked, each once, and nothing else about a secret changes.
 COLUMN_UPDATE_TABLES: Final[tuple[tuple[str, tuple[str, ...]], ...]] = (
+    ("world_grant_entry", ("used_at", "revoked_at")),
     ("door_secret", ("used_at", "revoked_at")),
     # The piece batch migration: a request's decided settlement is marked settled once.
     ("piece_settlement", ("settled_at",)),
@@ -377,18 +411,27 @@ COLUMN_UPDATE_TABLES: Final[tuple[tuple[str, tuple[str, ...]], ...]] = (
 
 #: Tables the read-only role is never granted: migration 0149's door secrets and refused
 #: redemptions hold digests no selection reads, and 0149 grants them to the runtime alone.
-READ_ONLY_WITHHELD_TABLES: Final = ("door_secret", "door_redemption_refusal")
+READ_ONLY_WITHHELD_TABLES: Final = (
+    "door_secret",
+    "door_redemption_refusal",
+    "world_grant_entry",
+    "participation_redemption_refusal",
+)
 
 #: Functions with their owner's rights the runtime executes for the door. The runtime holds no
 #: DELETE: migration 0149's ``door_prune`` removes the door's global rows past their retention, a
 #: bounded batch at a time, and its tables' triggers refuse every other delete.
 DOOR_RUNTIME_FUNCTIONS: Final = (("door_prune", "integer"),)
+PARTICIPATION_RUNTIME_FUNCTIONS: Final = (("participation_prune", "integer"),)
 
 #: Functions with their owner's rights the runtime executes for references. The runtime holds no
 #: UPDATE on ``reference_lookup``: the retention migration's ``reference_lookup_clear_queries``
 #: clears a workspace's search query text once it is past its retention, and the table's trigger
 #: refuses every other change.
-REFERENCE_RUNTIME_FUNCTIONS: Final = (("reference_lookup_clear_queries", "uuid"),)
+REFERENCE_RUNTIME_FUNCTIONS: Final = (
+    ("reference_lookup_clear_queries", "uuid"),
+    ("grant_creature_note_model_right", "uuid,uuid,jsonb,jsonb"),
+)
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a
 #: predicate row even though it cannot update one.
@@ -660,6 +703,20 @@ def provision_runtime_role(
             sql.SQL("grant {} on all tables in schema {} to {}").format(writes, schema, role_name)
         )
         revoke_account_access(connection, role=role)
+        # Participant projections are read boundaries, never runtime write surfaces. Keep
+        # their owner-reading semantics; only the participant role may execute their scope.
+        views = connection.execute(
+            "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace "
+            "where n.nspname=current_schema() and c.relkind='v' and c.relname=any(%s)",
+            (sorted(PARTICIPANT_VIEWS),),
+        ).fetchall()
+        for view in views:
+            name = view["relname"] if isinstance(view, dict) else view[0]
+            connection.execute(
+                sql.SQL(
+                    "revoke insert, update, delete, truncate, references, trigger on {} from {}"
+                ).format(sql.Identifier(name), role_name)
+            )
         _grant_caption_purge_checks(connection, schema, role_name)
         for table in sorted(_present_tables(connection, SPENDING_ADMIN_TABLES)):
             connection.execute(
@@ -677,9 +734,23 @@ def provision_runtime_role(
                 connection.execute(
                     sql.SQL("revoke all on {} from {}").format(sql.Identifier(table), role_name)
                 )
+        _grant_functions(
+            connection, schema, role_name, (("draft_person_allowance", "uuid, integer"),)
+        )
         if not read_only:
+            _grant_functions(
+                connection,
+                schema,
+                role_name,
+                (
+                    ("world_draft_forget_input", "uuid"),
+                    ("kind_draft_forget_input", "uuid"),
+                    ("kind_draft_prune", ""),
+                ),
+            )
             _grant_functions(connection, schema, role_name, SPENDING_RUNTIME_FUNCTIONS)
             _grant_functions(connection, schema, role_name, DOOR_RUNTIME_FUNCTIONS)
+            _grant_functions(connection, schema, role_name, PARTICIPATION_RUNTIME_FUNCTIONS)
             _grant_functions(connection, schema, role_name, REFERENCE_RUNTIME_FUNCTIONS)
             _grant_functions(connection, schema, role_name, STYLE_PACK_RUNTIME_FUNCTIONS)
             connection.execute(
@@ -734,6 +805,8 @@ def provision_runtime_role(
                 schema, writes, role_name
             )
         )
+        if not read_only:
+            grant_participant_membership(connection, role)
 
 
 def provision_purge_role(

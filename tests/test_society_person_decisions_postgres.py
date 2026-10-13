@@ -51,7 +51,7 @@ from exulanica.models.transport import HttpResponse
 from exulanica.selection.inhabitant_words import inhabitant_words_catalog
 from exulanica.selection.society_question import EVENT_LINES
 from exulanica.world.decision_roles import DecisionRole, load_decision_roles
-from exulanica.world.society import SocietyBytesNotRead
+from exulanica.world.society import SocietyBytesNotRead, UnavailableSocietyInput
 from exulanica.world.society_controls import LEASE_SECONDS, MAX_CATCHUP_TICKS, ControlClaim
 from exulanica.world.society_decision_contract import (
     at_choice_point,
@@ -269,6 +269,80 @@ def _callers(client, world, *, listed: bool) -> dict[str, tuple[dict[str, str], 
         name: ({"Authorization": f"Bearer {token}"}, directory[token]["actor"])
         for token, (name, _, _) in grants.items()
     }
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_latest_model_decision_opens_its_authorized_receipt_without_execution(app, monkeypatch):
+    world, client = app
+    services = _services(client)
+    manifest, model_id = _offered()
+    transport = _Chooser()
+    snapshot, _ = _choosing(world, client, services, manifest, model_id, transport)
+    after = stays._step(world, client, snapshot)
+    callers = _callers(client, world, listed=True)
+    reader = callers["reader"][0]
+    scope, version, society = routes(world)
+    asked = transport.call_count
+    requests = _requests(services, world, snapshot)
+    receipts = _decisions(services, world, snapshot)
+    expected = {receipt["request_id"]: receipt for receipt in receipts}
+    native = client.get(society + "/models", headers=reader, params=scope)
+    assert native.status_code == 200, native.text
+    latest = native.json()["latest"]
+    assert latest
+    for suffix in ("/models", "/inventory"):
+        response = client.get(version + suffix, headers=reader, params=scope)
+        assert response.status_code == 200, response.text
+        role = next(role for role in response.json()["roles"] if role["subject"] == "person")
+        assert role["view"]["latest"] == latest
+    for summary in latest:
+        identity = summary["request_id"]
+        assert str(uuid.UUID(identity)) == identity
+        detail = client.get(society + "/decisions/" + identity, headers=reader, params=scope)
+        assert detail.status_code == 200, detail.text
+        record = detail.json()
+        assert record["status"] == "completed"
+        assert record["request"]["request_id"] == identity
+        assert record["decision"] == expected[identity]
+        assert record["request"]["subject_id"] == summary["subject_id"]
+        assert record["decision"]["decision_seq"] == summary["decision_seq"]
+        assert record["decision"]["provider"]["model_id"] == summary["model_id"]
+        assert summary["consumed_tick"] == after["current_tick"]
+    assert _requests(services, world, snapshot) == requests
+    assert _decisions(services, world, snapshot) == receipts
+    current = client.get(society, headers=reader, params=scope)
+    assert current.json()["state_sha256"] == after["state_sha256"]
+    assert transport.call_count == asked
+
+    identity = latest[0]["request_id"]
+    route = society + "/decisions/" + identity
+    unknown = client.get(society + "/decisions/" + str(uuid.uuid4()), headers=reader, params=scope)
+    foreign = client.get(route, headers=callers["stranger"][0], params=scope)
+    other_world = client.get(route, headers=reader, params={"world_id": "world:unavailable"})
+    other_version = client.get(
+        f"/world/versions/{uuid.uuid4()}/society/decisions/{identity}",
+        headers=reader,
+        params=scope,
+    )
+    assert (
+        unknown.status_code
+        == foreign.status_code
+        == other_world.status_code
+        == other_version.status_code
+        == 404
+    )
+
+    def withdrawn(_connection, _session, _document):
+        raise UnavailableSocietyInput("the decision input was withdrawn")
+
+    monkeypatch.setattr(client.app.state, "society_input_authorizer", withdrawn)
+    denied = client.get(route, headers=reader, params=scope)
+    assert denied.status_code == 424, denied.text
+    assert denied.json()["code"] == "unavailable_society_input"
+    assert "request" not in denied.json() and "decision" not in denied.json()
+    assert _requests(services, world, snapshot) == requests
+    assert _decisions(services, world, snapshot) == receipts
+    assert transport.call_count == asked
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
@@ -645,9 +719,9 @@ def test_only_a_caller_who_may_ask_models_changes_whose_model_runs_a_person(app,
     """
     world, client = app
     manifest, model_id = _offered()
-    import exulanica.api.routes.society_models as route_module
+    import exulanica.api.services as services_module
 
-    monkeypatch.setattr(route_module, "load_manifest", lambda: manifest)
+    monkeypatch.setattr(services_module, "load_manifest", lambda: manifest)
     snapshot = stays._inhabited(world, client)
     callers = _callers(client, world, listed=True)
     scope, _, society = routes(world)
@@ -699,9 +773,9 @@ def test_only_a_caller_who_may_ask_models_changes_whose_model_runs_a_person(app,
 def test_the_route_names_each_refused_choice(app, monkeypatch):
     world, client = app
     manifest, model_id = _offered()
-    import exulanica.api.routes.society_models as route_module
+    import exulanica.api.services as services_module
 
-    monkeypatch.setattr(route_module, "load_manifest", lambda: manifest)
+    monkeypatch.setattr(services_module, "load_manifest", lambda: manifest)
     snapshot = stays._inhabited(world, client)
     scope, _, society = routes(world)
     people = sorted(person["id"] for person in snapshot["state"]["inhabitants"])
@@ -738,7 +812,7 @@ def test_the_route_names_each_refused_choice(app, monkeypatch):
             for m, s in manifest.models.items()
         },
     )
-    monkeypatch.setattr(route_module, "load_manifest", lambda: no_longer)
+    monkeypatch.setattr(services_module, "load_manifest", lambda: no_longer)
     again = choose(key, people[:1], model)
     assert (again.status_code, again.json()["choice_seq"]) == (200, 1), again.text
     assert choose(uuid.uuid4(), people[:1], model).json()["code"] == "model_not_offered"

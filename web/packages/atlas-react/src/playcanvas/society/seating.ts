@@ -91,6 +91,21 @@ export interface SeatingLayout {
   readonly targets: ReadonlyMap<string, string | null>;
   /** The street furniture of a generated town, from its own records; absent where the world has none. */
   readonly streetFurniture?: readonly StreetFurniture[];
+  /** Declared site seats, with the geometry actually drawn. */
+  readonly fixtureSeats?: readonly FixtureSeat[];
+}
+
+export interface FixtureSeat {
+  readonly objectId: string;
+  /** Non-indexed triangle vertices in society-root metres: east, up, south. */
+  readonly triangles: readonly number[];
+  readonly normals: readonly number[];
+  /** The source's presentation height hint, in the same frame. */
+  readonly heightHintM: number;
+  /** Contact above the human-seat presentation ceiling is unsupported. */
+  readonly maximumHeightM: number;
+  /** Declared fixture front, about renderer up with -Z forward. */
+  readonly facing: number;
 }
 
 /** Where a person at a place is drawn. Metres and radians in the society root's frame. */
@@ -126,7 +141,8 @@ export type SeatingMiss =
   | 'object-not-drawn'
   | 'kind-has-no-use'
   | 'kind-states-no-places'
-  | 'no-place-within-rounding';
+  | 'no-place-within-rounding'
+  | 'fixture-seat-contact-unavailable';
 
 export type SeatingResult =
   | { readonly kind: 'place'; readonly drawing: PlaceDrawing }
@@ -196,6 +212,8 @@ export function placeDrawing(
   if (!layout.targets.has(targetId)) return { kind: 'miss', reason: 'target-unknown' };
   const objectId = layout.targets.get(targetId) ?? null;
   if (objectId === null) return { kind: 'miss', reason: 'target-has-no-object' };
+  const fixture = layout.fixtureSeats?.find((seat) => seat.objectId === objectId);
+  if (fixture !== undefined) return fixtureSeatDrawing(fixture, positionMm);
   const object = layout.objects.find((held) => held.objectId === objectId);
   if (object === undefined) return { kind: 'miss', reason: 'object-not-drawn' };
   const use = layout.uses.get(object.assetKey);
@@ -232,6 +250,45 @@ export function placeDrawing(
     kind: 'place',
     drawing: { objectId, placeIndex, facing: sideFacing(object, place.faces), seat },
   };
+}
+
+/** Contact at the recorded place, restricted to the target's own drawn upward faces. */
+export function fixtureSeatDrawing(fixture: FixtureSeat, positionMm: readonly [number, number]): SeatingResult {
+  const x = positionMm[0] / 1000, z = positionMm[1] / 1000;
+  let height: number | null = null;
+  let suitable = false;
+  const p = fixture.triangles;
+  for (let i = 0; i + 8 < p.length; i += 9) {
+    const ax = p[i]!, az = p[i + 2]!, bx = p[i + 3]!, bz = p[i + 5]!, cx = p[i + 6]!, cz = p[i + 8]!;
+    const denominator = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+    if (Math.abs(denominator) < 1e-12) continue;
+    const a = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / denominator;
+    const b = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / denominator;
+    const c = 1 - a - b;
+    // Numerical tolerance only: this never grows a missing corner or a hole into a seat.
+    if (Math.min(a, b, c) < -1e-8) continue;
+    const y = a * p[i + 1]! + b * p[i + 4]! + c * p[i + 7]!;
+    const ex = bx - ax, ey = p[i + 4]! - p[i + 1]!, ez = bz - az;
+    const fx = cx - ax, fy = p[i + 7]! - p[i + 1]!, fz = cz - az;
+    const normalY = ez * fx - ex * fz;
+    const normalLength = Math.hypot(ey * fz - ez * fy, normalY, ex * fy - ey * fx);
+    const candidate = Math.abs(normalY) / normalLength >= 0.98
+      && [1, 4, 7].every(offset => fixture.normals[i + offset]! >= 0.98);
+    if (Number.isFinite(y) && (height === null || y > height + 1e-8)) {
+      height = y;
+      suitable = candidate;
+    } else if (height !== null && Math.abs(y - height) <= 1e-8 && !candidate) {
+      // Coincident faces that disagree about their side do not establish a unique upper seat.
+      suitable = false;
+    }
+  }
+  if (height === null || !suitable || height < fixture.heightHintM || height > fixture.maximumHeightM + 0.001) {
+    return { kind: 'miss', reason: 'fixture-seat-contact-unavailable' };
+  }
+  return { kind: 'place', drawing: {
+    objectId: fixture.objectId, placeIndex: 0, facing: fixture.facing,
+    seat: { position: [x, height, z], facing: fixture.facing },
+  } };
 }
 
 /**

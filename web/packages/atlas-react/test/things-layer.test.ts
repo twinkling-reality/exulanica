@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as pc from 'playcanvas';
 import type { LookDrawing } from '../src/playcanvas/things/documents.js';
 import { ThingLibrary } from '../src/playcanvas/things/library.js';
@@ -30,7 +30,7 @@ function instance(look: LookDrawing) {
   return Promise.resolve({ model, tracks: new Map<string, pc.AnimTrack>() });
 }
 
-function setup() {
+function setup(supportAvailable?: () => boolean, instantiate = instance) {
   const canvas = document.createElement('canvas');
   const device = new pc.NullGraphicsDevice(canvas);
   const app = new pc.AppBase(canvas);
@@ -47,7 +47,8 @@ function setup() {
   const served = servedLibrary();
   const library = new ThingLibrary(served.list, (digest) => served.fetch(digest));
   const layer = new ThingLayer({
-    app, camera, library, regionRoot: (id) => (id === 'a' ? region : null), ringColour: '#f4ff91', instantiate: instance,
+    app, camera, library, regionRoot: (id) => (id === 'a' ? region : null), ringColour: '#f4ff91', instantiate,
+    ...(supportAvailable === undefined ? {} : {supportRoot: () => supportAvailable() ? app.root : null}),
   });
   return { app, region, layer, served };
 }
@@ -65,6 +66,94 @@ function firstLookKind(kind: string): string {
 }
 
 describe('a version\'s placed things, drawn by their looks', () => {
+  it('withholds only bound things, including a previously drawn item, without loading or grounding them', async () => {
+    const { app, layer, served } = setup();
+    const support = {
+      profile: 'exulanica.support-reference/v1' as const, worldId: 'world:generated:test',
+      sourceSnapshotId: '00000000-0000-0000-0000-000000000001', receiptSha256: 'a'.repeat(64),
+      networkSha256: 'b'.repeat(64), regionId: 'a', surfaceId: 'deck',
+    };
+    const ordinary = placed(served, 'well-1', 'well');
+    const before = placed(served, 'gate-1', 'gate');
+    const bound = { ...before, transform: at(1000, 150, 2000), support };
+    try {
+      await layer.setPlaced([ordinary, before]);
+      const prior = layer.figureOf('gate-1')!;
+      const destroyed = vi.spyOn(prior, 'destroy');
+      const make = vi.spyOn(layer.maker, 'make');
+      await layer.setPlaced([ordinary, bound]);
+      expect(destroyed).toHaveBeenCalledOnce();
+      expect(make).not.toHaveBeenCalled();
+      expect(layer.figureOf('gate-1')).toBeNull();
+      expect(layer.drawn.map((one) => one.placedId)).toEqual(['well-1']);
+      expect(layer.misses.map((one) => [one.placedId, one.reason]))
+        .toEqual([['gate-1', 'support_projection_unavailable']]);
+      // Repeated snapshots, removal/undo and changing a look cannot restore a grounded proxy.
+      await layer.setPlaced([ordinary, bound]);
+      await layer.setLook('gate-1', null);
+      await layer.setPlaced([ordinary, { ...bound, removed: true }]);
+      expect(layer.misses).toEqual([]);
+      await layer.setPlaced([ordinary, bound]);
+      expect(layer.figureOf('gate-1')).toBeNull();
+      expect(make).not.toHaveBeenCalled();
+      // An actual authored freeform move removes affinity; that distinct record can draw again.
+      await layer.setPlaced([ordinary, before]);
+      expect(layer.figureOf('gate-1')).not.toBeNull();
+      expect(layer.misses).toEqual([]);
+    } finally {
+      layer.destroy();
+      app.destroy();
+    }
+  });
+
+  it('draws an admitted passive object in the source frame, independent of ground society omission or pose', async () => {
+    let available = true;
+    const {app, region, layer, served} = setup(() => available);
+    region.setLocalPosition(10, 9, 5); // A translated society arrival must not add nine metres to support height.
+    const bound = {...placed(served, 'gate-1', 'gate', at(1000, 3150, 2000)), support: {
+      profile: 'exulanica.support-reference/v1' as const, worldId: 'world', sourceSnapshotId: 'snapshot',
+      receiptSha256: 'a'.repeat(64), networkSha256: 'b'.repeat(64), regionId: 'a', surfaceId: 'deck',
+    }};
+    try {
+      await layer.setPlaced([bound]);
+      const figure = layer.figureOf('gate-1')!;
+      expect(figure.root.parent).toBe(app.root);
+      expect(figure.root.getPosition().y).toBeCloseTo(3.15);
+      const emptySociety = {things: [], inhabitants: []} as unknown as Parameters<ThingLayer['setSociety']>[0];
+      layer.setSociety(emptySociety, null); app.fire('update', .016);
+      expect(figure.root.enabled).toBe(true);
+      expect(layer.pick([1, 4, 8], [0, 0, -1])?.pick.placedId).toBe('gate-1');
+      layer.setSociety({...emptySociety!, things: [{id: 'society-gate', placed_id: 'gate-1', kind: bound.kind,
+        position_mm: [99000, 99000], height_mm: 0, yaw_microradians: 0, held_by: null}]} as never, null);
+      app.fire('update', .016);
+      expect(figure.root.getPosition().x).toBe(1); expect(figure.root.getPosition().y).toBeCloseTo(3.15);
+      available = false;
+      expect(layer.pick([1, 4, 8], [0, 0, -1])).toBeNull();
+      app.fire('update', .016); expect(figure.root.enabled).toBe(false);
+      await layer.setPlaced([bound]); expect(layer.figureOf('gate-1')).toBeNull();
+      expect(layer.misses[0]?.reason).toBe('support_projection_unavailable');
+      available = true; await layer.setPlaced([bound]); expect(layer.figureOf('gate-1')).not.toBeNull();
+      await layer.setPlaced([{...bound, removed: true}]); expect(layer.figureOf('gate-1')).toBeNull();
+      await layer.setPlaced([bound]); expect(layer.figureOf('gate-1')!.root.getPosition().y).toBeCloseTo(3.15);
+    } finally {layer.destroy(); app.destroy();}
+  });
+
+  it('discards a pending supported figure after source withdrawal', async () => {
+    let available = true, release!: () => void, entered = false;
+    const pending = new Promise<void>(resolve => {release = resolve;});
+    const {app, layer, served} = setup(() => available, async look => {entered = true; await pending; return instance(look);});
+    const bound = {...placed(served, 'gate-1', 'gate', at(0, 150, 0)), support: {
+      profile: 'exulanica.support-reference/v1' as const, worldId: 'world', sourceSnapshotId: 'snapshot',
+      receiptSha256: 'a'.repeat(64), networkSha256: 'b'.repeat(64), regionId: 'a', surfaceId: 'deck',
+    }};
+    try {
+      const loading = layer.setPlaced([bound]);
+      await vi.waitFor(() => expect(entered).toBe(true));
+      available = false; await layer.setPlaced([bound]); release(); await loading;
+      expect(layer.figureOf('gate-1')).toBeNull(); expect(layer.drawn).toEqual([]);
+    } finally {release(); layer.destroy(); app.destroy();}
+  });
+
   it('draws each thing by the look kind of its kind\'s first look, where the version puts it', async () => {
     const { layer, served } = setup();
     await layer.setPlaced([

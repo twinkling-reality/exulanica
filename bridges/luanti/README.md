@@ -25,7 +25,7 @@ with a label that names no game. Such a deployment also declares the bridge with
 game (`tools/cross_once.py declare OUT --label WORDS --game WORDS --mapping
 luanti-minetest-game.v4.json`), which are the words a world shows for where a visitor came from.
 
-## What works today, and what does not yet
+## What the gate does
 
 | Part | State |
 | --- | --- |

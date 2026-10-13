@@ -1,0 +1,7 @@
+SPDX-License-Identifier: CC0-1.0
+
+The original body geometry, appearance declarations and asset documents in this directory
+are dedicated to the public domain under CC0 1.0 Universal.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+The reusable authoring code is covered by the repository's Apache-2.0 license.

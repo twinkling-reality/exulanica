@@ -14,7 +14,7 @@ import type { FromEarlier, PlanStep, StepAnswer } from '../../companion-actions-
 import { actionSpec, type ActionSpec } from './registry.js';
 
 /**
- * Every word of the planner's vocabulary, and the registry entry it is sent as. `null` is a word
+ * Every word of the selection and workspace planners' vocabularies, and the registry entry it is sent as. `null` is a word
  * deliberately not sent from a plan: an appearance change is reviewed in Design before it is
  * applied (atlas-world-customization-contract.md 7), and `other` is the planner saying it cannot
  * express the request, which it never prepares as a step.
@@ -50,6 +50,8 @@ export const PLAN_ACTIONS: Readonly<Record<string, string | null>> = Object.free
   // placed after its people came (MAKE's package 1b): each sheet says what it comes to first.
   set_minds_budget: 'minds.budget',
   take_in: 'people.take-in',
+  // A workspace proposal has its own prepare/outcome profile, separate from selection plans.
+  draft_world: 'world.draft',
   other: null,
 });
 

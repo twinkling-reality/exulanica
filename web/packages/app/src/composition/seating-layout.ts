@@ -7,7 +7,7 @@
  * generated town's street furniture from the town's own tile records (`town-furniture.ts`).
  * Nothing here decides where anybody is; the crowd reads a person's place from their own state.
  */
-import type { SeatingLayout, SeatingObject, StreetFurniture } from '@exulanica/atlas-react/playcanvas';
+import type { FixtureSeat, SeatingLayout, SeatingObject, StreetFurniture } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyPlaces } from '../society-api.js';
 import type { AlternateVersion, ReviewedAsset } from '../world-objects-api.js';
 
@@ -21,6 +21,7 @@ export function seatingLayout(
   version: AlternateVersion | null,
   places: SocietyPlaces | null,
   streetFurniture: readonly StreetFurniture[] = [],
+  fixtureSeats: readonly FixtureSeat[] = [],
 ): SeatingLayout | null {
   if (version === null || places === null) return null;
   const uses = new Map(
@@ -38,5 +39,5 @@ export function seatingLayout(
       scaleMilli: object.transform.scaleMilli,
     }));
   const targets = new Map(places.targets.map((target) => [target.targetId, target.objectId] as const));
-  return { uses, objects, targets, ...(streetFurniture.length === 0 ? {} : { streetFurniture }) };
+  return { uses, objects, targets, ...(streetFurniture.length === 0 ? {} : { streetFurniture }), ...(fixtureSeats.length === 0 ? {} : { fixtureSeats }) };
 }

@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
+from exulanica.models.identity import chat_model_identity
 from exulanica.models.manifest import Role
 from exulanica.selection.calls import CallLog, ModelCall
 from exulanica.selection.request_names import RequestNames
@@ -139,7 +140,8 @@ def draft_environment_operation(
                 prompt_version=ENVIRONMENT_PROMPT_VERSION,
                 placeholders=placeholders,
             )
-            log.record(drafted.call)
+            log.record(drafted.call, manifest=client.manifest)
+            identity = chat_model_identity(drafted.call, client.manifest)
             value = drafted.value.operation
             if value is None:
                 return EnvironmentProposalDecision(
@@ -148,13 +150,13 @@ def draft_environment_operation(
                         EnvironmentRefusalCode.UNSUPPORTED,
                         "the request does not exactly match a supported environment operation",
                     ),
-                    model_id=drafted.call.served_model_id,
+                    model_id=identity.model_id,
                     calls=log.calls,
                 )
             return EnvironmentProposalDecision(
                 operation=EnvironmentOperation(value),
                 refusal=None,
-                model_id=drafted.call.served_model_id,
+                model_id=identity.model_id,
                 calls=log.calls,
             )
         except (StructuredOutputError, TruncatedResponseError) as rejected:

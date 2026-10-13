@@ -4,10 +4,8 @@ Status: the browser reads baked texture sets and baked `.owd` tiles, draws a til
 `render_batch` with physically based materials under one versioned look, and stands the player on
 its `nav_envelope`. A saved world generated from a recipe draws the baked tiles its entry declares
 ([section 7.3](#73-a-saved-worlds-own-tiles), [ADR-0027](adr/0027-a-generated-world-is-drawn-in-its-own-world.md));
-naming any other tile is development evaluation only. The baked corridor street loads through the
-product route on the development page with its surfaces dressed: at tessellator 17, 1,496 of the
-corridor tile's 1,582 drawn surfaces are dressed by a material record
-([generated corridor](generated-corridor-street.md#7-what-draws-and-what-does-not)).
+naming any other tile is development evaluation only. Dressing counts for a named corridor
+container are in the [generated corridor street](generated-corridor-street.md#7-what-draws-and-what-does-not).
 
 The code is `web/packages/atlas-core/src/texture-set.ts` (the texture set reader),
 `web/packages/atlas-react/src/playcanvas/generated-tile/` (materials, look, environment, tile

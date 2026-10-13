@@ -323,3 +323,16 @@ describe('a world\'s own setting in the Look sheet', () => {
     expect(text(root, '.look-sheet-title')).toBe('Cozy town');
   });
 });
+
+ it('keeps same-named library and workspace choices distinct, including an older current look', async () => {
+  const library={...pack('same.look','Library'),choiceId:'library:same:3:aaa',version:3};
+  const own={...pack('same.look','Workspace'),choiceId:'workspace:same:4:bbb',version:4};
+  const onUse=vi.fn(async (_option: LookOption)=> 'Saved');
+  const built=buildLookSheet({worldTitle:'Study',onUse,onClose:()=>{}});
+  built.show([library,own],own.choiceId,{earlier:{packId:own.choiceId,version:2,picture:null}});
+  const cards=[...built.root.querySelectorAll<HTMLButtonElement>('[role=option]')];
+  expect(cards.map(card=>card.querySelector('.look-sheet-caption')?.textContent)).toEqual(['Look 1','Now · version 2','Version 4']);
+  cards[0]!.click();built.root.querySelector<HTMLButtonElement>('.look-sheet-use')!.click();
+  await vi.waitFor(()=>expect(onUse).toHaveBeenCalled());
+  expect(onUse.mock.calls[0]?.[0]).toEqual(library);
+ });

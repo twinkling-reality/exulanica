@@ -95,6 +95,10 @@ def _where(state: Mapping[str, Any], target_id: str) -> Sequence[int] | None:
     """Where a thing on the ground or a being stands; None for a held thing or nobody here."""
     for person in state["inhabitants"]:
         if person["id"] == target_id:
+            from exulanica.world.society_resident_day import inside
+
+            if inside(person):
+                return None
             return person["position_mm"]
     for thing in state["things"]:
         if thing["id"] == target_id:
@@ -115,6 +119,10 @@ def approach_node(
     squared distance and then node id, first among the nodes nobody waiting would be in the way
     at, so the being comes up on its own side."""
     from exulanica.world.society_planner import open_ground, open_node_near
+    from exulanica.world.society_resident_day import inside
+
+    if inside(being):
+        return None
 
     point = _where(state, target_id)
     if point is None:
@@ -282,6 +290,10 @@ def _acts_within(
 ) -> list[HandsAct]:
     """Every act ``being``'s hands could do with a thing within ``reach`` of it, or with a being
     within ``between`` of it (``reach`` where none is given)."""
+    from exulanica.world.society_resident_day import inside
+
+    if inside(being):
+        return []
     between = reach if between is None else between
     if "kind" not in being:
         return []
@@ -311,7 +323,7 @@ def _acts_within(
                 found.append(HandsAct("put_down", being["id"], thing["id"], None, None, 0))
             if "give" in abilities:
                 for other in state["inhabitants"]:
-                    if other["id"] == being["id"]:
+                    if other["id"] == being["id"] or inside(other):
                         continue
                     distance = _distance(here, other["position_mm"])
                     if distance > between or "receive" not in _offers(_kind(state, other["kind"])):
@@ -325,6 +337,8 @@ def _acts_within(
                         )
         elif "take" in abilities and holder in people:
             other = people[holder]
+            if inside(other):
+                continue
             distance = _distance(here, other["position_mm"])
             socket = _free_socket(state, being, thing_kind)
             if (

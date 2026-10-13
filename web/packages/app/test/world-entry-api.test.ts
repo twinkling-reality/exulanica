@@ -835,3 +835,13 @@ function parseFixture() {
     updatedAt: '2026-09-19T12:00:00Z',
   };
 }
+
+it('reads terrain independently of kind sites and rejects conflicting generated declarations', async () => {
+  const client = (body: unknown) => new WorldEntryClient({baseUrl:'https://terrain.test',token:'t',fetch:async()=>Response.json(body)});
+  const terrain = {region_id:'region:generated',arrival_mm:[1000,1250,-2000],arrival_facing_mm:[1000,0],geometry_sha256:'b'.repeat(64),contact_sha256:'c'.repeat(64)};
+  const [entry] = await client([wire({source_kind:'generated',generated_terrain:terrain})]).entries();
+  expect(entry?.generatedTerrain).toEqual({regionId:'region:generated',arrivalMm:[1000,1250,-2000],arrivalFacingMm:[1000,0],geometrySha256:'b'.repeat(64),contactSha256:'c'.repeat(64)});
+  expect(entry?.generatedSite).toBeNull();expect(entry?.declaredFloor).toBeNull();expect(entry?.societyEngine).toBeNull();
+  await expect(client([wire({generated_terrain:terrain})]).entries()).rejects.toThrow();
+  await expect(client([wire({source_kind:'generated',generated_terrain:{...terrain,arrival_facing_mm:[0,0]}})]).entries()).rejects.toThrow();
+});

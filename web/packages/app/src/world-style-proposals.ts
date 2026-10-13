@@ -2,8 +2,8 @@
  * Typed handoff for an upstream conversational proposal service.
  *
  * This inbox does not call a model, store conversation text, or translate prose into style data.
- * A future authenticated service supplies the already-structured, provenance-bearing proposal;
- * Atlas still validates it through the local recipe registry and backend preview lifecycle.
+ * It takes an already-structured, provenance-bearing proposal. Atlas validates that proposal
+ * through the local recipe registry and backend preview lifecycle.
  */
 
 import type { UpstreamWorldStyleProposal } from './world-style-api.js';

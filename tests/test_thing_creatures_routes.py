@@ -112,6 +112,7 @@ def test_asking_queues_a_draft_that_is_kept_and_served(served):
     asked = _ask(client, "a gentle horse that walks the hills")
     assert asked.status_code == 202
     draft = asked.json()
+    assert "references" not in draft
     assert (draft["profile"], draft["status"], draft["kind"]) == (
         "exulanica.creature-draft/v1",
         "queued",
@@ -124,12 +125,51 @@ def test_asking_queues_a_draft_that_is_kept_and_served(served):
     )
     assert worker.run_once(workspace_id) == "kept"
     kept = _get(client, path).json()
+    assert "references" not in kept
     assert kept["status"] == "kept" and kept["label"] == "hill walker"
     assert kept["kind"]["kind"] == "hill_walker" and kept["model"]["model_id"]
     # The sketch the draft names is served by the workspace's own look routes.
     look = _get(client, f"/things/looks/{kept['look']['sha256']}")
     assert look.status_code == 200 and look.json()["look"] == kept["look"]["look"]
     assert _get(client, f"/things/kinds/{kept['kind']['sha256']}").status_code == 200
+
+
+def test_reference_identity_is_opt_in_and_only_the_requester_reads_its_use(served):
+    from reference_fixtures import finished_reference
+
+    client, database, workspace_id, stores = served
+    actor = client.app.state.services.tokens.session_for(_OWNER).actor
+    with database.session(workspace_id) as connection:
+        reference_id = finished_reference(
+            connection,
+            workspace_id,
+            actor=actor,
+            purpose="things",
+        )
+    asked = client.post(
+        "/things/creatures",
+        json={"words": "a gentle horse", "reference_id": str(reference_id)},
+        headers={"Authorization": f"Bearer {_OWNER}"},
+    )
+    assert asked.status_code == 202
+    assert asked.json()["references"] == {"reference_id": str(reference_id), "state": "pending"}
+    path = f"/things/creatures/drafts/{asked.json()['draft_id']}"
+    assert _get(client, path, _OTHER).status_code == 404
+    assert _get(client, path, _ELSEWHERE).status_code == 404
+    assert (
+        _worker(
+            database,
+            workspace_id,
+            stores,
+            _transport(
+                form_of("horse", label="hill walker"),
+            ),
+        ).run_once(workspace_id)
+        == "kept"
+    )
+    used = _get(client, path).json()["references"]
+    assert used["state"] == "used" and used["reference_id"] == str(reference_id)
+    assert used["basis"] == ["web_description"] and used["notes"] == 3
 
 
 def test_a_kept_draft_reads_as_erased_once_its_creature_is_erased(served):
@@ -249,6 +289,7 @@ def test_the_offer_says_whether_a_workspace_may_ask_and_how_long_drafts_take(ser
         "expired",
         "not_served",
         "request_refused",
+        "reference_withdrawn",
         "spending_refused",
         "stranded",
     ]

@@ -34,9 +34,9 @@ from exulanica.world.society_city_place import (
     place_from_city_documents,
     place_from_city_records,
 )
+from exulanica.world.society_day import activity_targets as _targets
 from exulanica.world.society_living import (
     LivingPlace,
-    _targets,
     advance_living_society,
     initial_living_society,
 )

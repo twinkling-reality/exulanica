@@ -17,9 +17,9 @@ hold and that this directory holds exactly the generations the run record pins.
 
 ## What no longer exists
 
-- The image build log and the weights-fetch log. I deleted the instance before pulling them. Every
-  line quoted from them in `../track-a-session-1.log.txt` was quoted while they existed and cannot be
-  checked now.
+- The image build log and the weights-fetch log. The instance was removed before those logs were
+  copied. Every line quoted from them in `../track-a-session-1.log.txt` was quoted while they
+  existed and cannot be rechecked.
 - The latents. They were never retained, which is why the band in painted render a1 cannot be placed
   more precisely than the latent grid from this run's output alone.
 

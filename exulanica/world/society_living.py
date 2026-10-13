@@ -69,6 +69,14 @@ from exulanica.world.society_choice import (
     choice_question,
     option_key,
 )
+from exulanica.world.society_day import OptionRow as _OptionRow
+from exulanica.world.society_day import admitting_destinations as _admitting
+from exulanica.world.society_day import day_options as _options
+from exulanica.world.society_day import rule_pick as _from_options
+from exulanica.world.society_day import seeded_span as _span
+from exulanica.world.society_day import staffed_workplaces as _staffed
+from exulanica.world.society_day import start_node as _start_node
+from exulanica.world.society_day import stay_ticks as _stay_ticks
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_input_policy import LIVING_INPUTS
 from exulanica.world.society_place import (
@@ -100,8 +108,6 @@ LIVING_PROFILE: Final = "exulanica-society/v4"
 #: The living town: this engine over a saved world whose input carries its living place.
 LIVING_TOWN_PROFILE: Final = "exulanica-society/v5"
 TICK_SECONDS: Final = 60
-#: One row of the closed answer set: urgency, activity key, the activity, the pick, and why.
-_OptionRow = tuple[int, str, "Activity", dict, str]
 _WEATHER_UNAVAILABLE: Final = {
     "availability": "unavailable",
     "reason": "no weather source is connected to this society",
@@ -115,10 +121,6 @@ _RESOURCES_UNAVAILABLE: Final = {
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)
-
-
-def _span(seed: str, domain: str, ordinal: int, low: int, high: int) -> int:
-    return low + _number(seed, domain, ordinal) % (high - low + 1)
 
 
 def _clone(value: Any) -> Any:
@@ -619,23 +621,6 @@ def living_places_follow(previous_place: LivingPlace, current_place: LivingPlace
         _require(current[key] == previous[key], f"place changed immutable {key}")
 
 
-def _weight(seed: str, routine: RoutineModel, activity: Activity, ordinal: int) -> int:
-    spread = activity.weight * routine.policy["preference_spread_milli"] // 2000
-    return activity.weight + _span(seed, f"preference:{activity.key}", ordinal, -spread, spread)
-
-
-def _shift_due(person: dict, minute: int, day: int, lead: int) -> tuple[bool, int, int]:
-    """Whether the shift is due now, the day it belongs to, and minutes until it ends."""
-    work = person["work"]
-    start, length = work["shift_start_minute"], work["shift_minutes"]
-    for shift_day in (day, day - 1):
-        begin = shift_day * MINUTES_PER_DAY + start
-        now = day * MINUTES_PER_DAY + minute
-        if begin - lead <= now < begin + length and person["last_shift_day"] != shift_day:
-            return True, shift_day, begin + length - now
-    return False, day, 0
-
-
 def advance_living_society(
     state: dict[str, Any],
     seed: str,
@@ -1041,116 +1026,6 @@ def _question(
     )
 
 
-def _start_node(person: dict) -> str:
-    loc = person["location"]
-    return loc["node_id"] if loc["edge"] is None else loc["edge"]["to_node_id"]
-
-
-def _options(
-    person: dict,
-    place: LivingPlace,
-    routine: RoutineModel,
-    seed: str,
-    tick: int,
-    minute: int,
-    day: int,
-    spot_holder: dict,
-    visitors: dict,
-    admitting: frozenset[str] | None = None,
-) -> list[_OptionRow]:
-    """Every activity this inhabitant can act on now, the pressing ones alone when any press.
-
-    This is the closed answer set, and it is a function of its own so that something other than
-    the rule in :func:`_from_options` can be offered the same rows. A set assembled separately
-    for a model would be a second source of truth for what was possible, which is the failure
-    this project names most.
-
-    A pressing activity with nowhere to go is stepped over here, and :func:`_targets` says
-    why. It cannot be said in v4: a goal's ``because`` and a blocked action's reason are both
-    canonical state, ``_replay_living`` recomputes every stored transition digest from genesis,
-    and the pinned digests in ``tests/test_society_living.py`` carry the rule in one line, that
-    a change there is a new profile. Measured either side: consuming the reason moves the
-    tick-30 digest and leaves behaviour identical over 240 ticks, while returning it moves
-    nothing at all. So it is returned and unused. v4 does not consume it.
-    :func:`_require_work_is_walkable` refuses that unwalkable-work society at creation instead.
-
-    **The shortage is not handed to the seam either, and for the same reason.** Putting it into a
-    :class:`~exulanica.world.society_choice.ChoiceQuestion` would let a model answer on grounds
-    v4's own record cannot carry, and a decision that cannot be reproduced from the record is the
-    thing the seam exists to avoid. The shortage stays out of the question.
-    """
-    start = _start_node(person)
-    paths = place.paths(start)
-    loc = person["location"]
-    here_spot = loc["spot_id"] if loc["edge"] is None else None
-    here_dest = loc["destination_id"] if loc["edge"] is None else None
-    last = person["last_completed"] or {}
-    pressing = []
-    fallback = []
-    for key in sorted(routine.activities):
-        activity = routine.activities[key]
-        if activity.mode == "shift":
-            if person["work"] is None:
-                continue
-            due, shift_day, _ = _shift_due(
-                person, minute, day, routine.policy["commute_lead_minutes"]
-            )
-            if not due:
-                continue
-            urgency, is_pressing, because = activity.weight, True, "the shift is due"
-        else:
-            if activity.need not in person["needs"] or not activity.open_at(minute):
-                continue
-            need = routine.needs[activity.need]
-            value = person["needs"][activity.need]
-            urgency = value * _weight(seed, routine, activity, person["ordinal"]) // 1000
-            is_pressing = value >= need.threshold
-            because = f"{need.label} at {value} of 1000"
-            if not is_pressing:
-                because = f"nothing pressing; {because}"
-        # The shortage is deliberately discarded: v4 cannot record it (see this function's
-        # docstring).
-        targets, _shortage = _targets(
-            person,
-            place,
-            activity,
-            paths,
-            here_spot,
-            here_dest,
-            spot_holder,
-            visitors,
-            admitting,
-        )
-        if not targets:
-            continue
-        if activity.mode == "shift":
-            targets = [{**t, "shift_day": shift_day} for t in targets]
-        if activity.setting == "standing":
-            pick = targets[_number(seed, f"stroll:{tick}", person["ordinal"]) % len(targets)]
-        else:
-            pick = min(
-                targets,
-                key=lambda t: (
-                    t["destination_id"] == last.get("destination_id"),
-                    t["load_milli"],
-                    t["cost_mm"],
-                    t["destination_id"] or "",
-                    t["spot_id"] or "",
-                ),
-            )
-        row = (urgency, key, activity, pick, because)
-        (pressing if is_pressing else fallback).append(row)
-    return pressing or fallback
-
-
-def _from_options(pool: list[_OptionRow]) -> tuple[Activity, dict, str] | str:
-    """The rule: the most pressing row, or the reason nothing was possible. Never randomised."""
-    if not pool:
-        return "no_reachable_place_with_room"
-    _, _, activity, pick, because = max(pool, key=lambda row: (row[0], row[1]))
-    return activity, pick, because
-
-
 def _choose(
     person: dict,
     place: LivingPlace,
@@ -1166,203 +1041,6 @@ def _choose(
     return _from_options(
         _options(person, place, routine, seed, tick, minute, day, spot_holder, visitors)
     )
-
-
-def _staffed(state: dict[str, Any], routine: RoutineModel) -> frozenset[str] | None:
-    """The workplaces one of whose workers is at work there, or None under a routine whose use
-    classes keep no hours, where nobody asks."""
-    if not routine.keeps_hours:
-        return None
-    return frozenset(
-        p["action"]["destination_id"]
-        for p in state["inhabitants"]
-        if p["action"]["kind"] in routine.activities
-        and routine.activities[p["action"]["kind"]].mode == "shift"
-        and p["action"]["status"] == "active"
-    )
-
-
-def _admitting(
-    place: LivingPlace, routine: RoutineModel, minute: int, staffed: frozenset[str] | None
-) -> frozenset[str] | None:
-    """The destinations that admit a visitor this minute, or None where every one does.
-
-    Under a routine whose use classes keep hours (a town's), a destination of such a use class
-    admits visitors inside its opening hours, and a workplace only while one of its workers is at
-    work there; a destination of no use class, or of one that states no hours, admits them as
-    always, by its activity's own window alone.
-    """
-    if staffed is None:
-        return None
-    admitting = set()
-    for dest_id, dest in place.destinations.items():
-        use = routine.use_classes.get(dest["use_class"]) if dest["use_class"] else None
-        if (
-            use is None
-            or use.opening is None
-            or (use.open_at(minute) and (not use.staff_per_unit or dest_id in staffed))
-        ):
-            admitting.add(dest_id)
-    return frozenset(admitting)
-
-
-def _targets(
-    person: dict,
-    place: LivingPlace,
-    activity: Activity,
-    paths: dict,
-    here_spot: str | None,
-    here_dest: str | None,
-    spot_holder: dict,
-    visitors: dict,
-    admitting: frozenset[str] | None = None,
-) -> tuple[list[dict], str | None]:
-    """Every target this activity could take now, and when there are none, which shortage it is.
-
-    Nothing here offers it, the places that do are full, and no route reaches them are three
-    findings with three different fixes, and an empty list reports all three as one. The reason
-    is counted from the same pass that builds the rows, so it cannot describe a different walk
-    over the place than the one that found nothing.
-    """
-    rows = []
-
-    def route_cost(node_id: str) -> int | None:
-        found = paths.get(node_id)
-        return None if found is None else found[0]
-
-    if activity.setting in ("home", "work"):
-        held = person[activity.setting]
-        if held is None:
-            return [], f"this person has no {activity.setting}"
-        dest = place.destinations.get(held["destination_id"])
-        if dest is None:
-            return [], f"the place no longer holds this person's {activity.setting}"
-        cost = route_cost(dest["node_id"])
-        if cost is None:
-            return [], f"no route reaches this person's {activity.setting}"
-        return [
-            {
-                "destination_id": dest["destination_id"],
-                "spot_id": None,
-                "node_id": dest["node_id"],
-                "kind": activity.setting,
-                "cost_mm": cost,
-                "load_milli": 0,
-            }
-        ], None
-    if activity.setting == "standing":
-        pool = place.plain_spots or sorted(place.spots)
-        taken_spots = out_of_reach = already_here = 0
-        for spot_id in pool:
-            if spot_id == here_spot:
-                already_here += 1
-                continue
-            if spot_id in spot_holder:
-                taken_spots += 1
-                continue
-            spot = place.spots[spot_id]
-            cost = route_cost(spot["node_id"])
-            if cost is None:
-                out_of_reach += 1
-                continue
-            rows.append(
-                {
-                    "destination_id": None,
-                    "spot_id": spot_id,
-                    "node_id": spot["node_id"],
-                    "kind": "spot",
-                    "cost_mm": cost,
-                    "load_milli": 0,
-                }
-            )
-        return rows, None if rows else _shortage(
-            "standing spot", out_of_reach, taken_spots, already_here
-        )
-    offered = out_of_reach = no_room = already_here = closed = 0
-    for dest_id, dest in sorted(place.destinations.items()):
-        if activity.affordance not in dest["affordances"]:
-            continue
-        offered += 1
-        if admitting is not None and dest_id not in admitting:
-            closed += 1
-            continue
-        # Somewhere this person is already standing, and somewhere with no room, are both places
-        # that offer this: only the count of destinations OFFERING it may decide whether the
-        # place publishes any. A person in the only cafe wanting a meal is the first case, and
-        # reporting that as "nowhere here offers eating" is the collapse this function exists to
-        # stop, one level down from the empty list itself.
-        if dest_id == here_dest:
-            already_here += 1
-            continue
-        if not dest["visitor_capacity"]:
-            no_room += 1
-            continue
-        cost = route_cost(dest["node_id"])
-        if cost is None:
-            out_of_reach += 1
-            continue
-        if dest["indoors"]:
-            taken = visitors.get(dest_id, 0)
-            if taken >= dest["visitor_capacity"]:
-                no_room += 1
-                continue
-            rows.append(
-                {
-                    "destination_id": dest_id,
-                    "spot_id": None,
-                    "node_id": dest["node_id"],
-                    "kind": "visitor",
-                    "cost_mm": cost,
-                    "load_milli": taken * 1000 // dest["visitor_capacity"],
-                }
-            )
-            continue
-        free = [s for s in dest["spot_ids"] if s not in spot_holder and s != here_spot]
-        if not free:
-            no_room += 1
-            continue
-        taken = sum(1 for s in dest["spot_ids"] if s in spot_holder)
-        rows.append(
-            {
-                "destination_id": dest_id,
-                "spot_id": free[0],
-                "node_id": dest["node_id"],
-                "kind": "spot",
-                "cost_mm": cost,
-                "load_milli": taken * 1000 // len(dest["spot_ids"]),
-            }
-        )
-    if rows:
-        return rows, None
-    if not offered:
-        return [], f"this place publishes nowhere that offers {activity.affordance}"
-    return [], _shortage(
-        f"place that offers {activity.affordance}", out_of_reach, no_room, already_here, closed
-    )
-
-
-def _shortage(
-    what: str, out_of_reach: int, no_room: int, already_here: int = 0, closed: int = 0
-) -> str:
-    """Why no target of this kind is open, naming every cause that got this far.
-
-    Every non-zero count is stated, because a person kept indoors by a full street, one kept
-    indoors by a cut in the walking graph, and one standing in the only place that would have
-    served want three different things done, and a message naming only the largest cause sends
-    the reader to whichever happened to win.
-    """
-    causes = []
-    if out_of_reach:
-        causes.append(f"no route reaches {out_of_reach}")
-    if no_room:
-        causes.append(f"{no_room} {'has' if no_room == 1 else 'have'} no room")
-    if already_here:
-        causes.append(f"this person is already at {already_here}")
-    if closed:
-        causes.append(f"{closed} {'is' if closed == 1 else 'are'} closed")
-    if not causes:
-        return f"this place publishes no {what}"
-    return f"no {what} is open to this person: {', '.join(causes)}"
 
 
 def _plan(
@@ -1490,20 +1168,7 @@ def _arrive(
         "destination_id": goal["destination_id"],
         "indoors": goal["spot_id"] is None,
     }
-    if activity.mode == "shift":
-        work = person["work"]
-        begin = goal["shift_day"] * MINUTES_PER_DAY + work["shift_start_minute"]
-        duration = max(1, begin + work["shift_minutes"] - absolute)
-    elif dest is not None and dest["duration_ticks"] is not None:
-        duration = dest["duration_ticks"]
-    else:
-        duration = _span(
-            seed,
-            f"duration:{activity.key}:{tick}",
-            person["ordinal"],
-            activity.duration_minimum,
-            activity.duration_maximum,
-        )
+    duration = _stay_ticks(person, activity, dest, seed, tick, absolute, goal["shift_day"])
     person["route"] = None
     person["action"] = {
         "kind": activity.key,

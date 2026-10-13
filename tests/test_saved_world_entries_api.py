@@ -32,6 +32,7 @@ from exulanica.world.starter import authored_starter_candidate
 from conftest import photo_bytes
 from test_world_objects_api import STRANGER_TOKEN, ObjectsApi
 from test_world_objects_api import objects_api as imported_objects_api  # noqa: F401
+from world_structure_fixtures import invalidate_snapshot_source
 
 pytestmark = pytest.mark.postgres
 
@@ -1315,10 +1316,9 @@ def test_entry_is_not_an_existence_oracle_across_workspaces(objects_api, reposit
 
 def test_deleted_source_keeps_entry_but_blocks_opening(objects_api, repository):
     entry, _version, _style = _create_entry(objects_api, repository)
-    repository.insert_tombstone(
-        scope="workspace", requested_by=uuid.uuid4(), reason="the person deleted their world"
+    invalidate_snapshot_source(
+        repository, objects_api.world_id, objects_api.snapshot_id, objects_api.actor
     )
-    repository.connection.commit()
 
     response = objects_api.get(f"/world-entries/{entry['entry_id']}")
     assert response.status_code == 200

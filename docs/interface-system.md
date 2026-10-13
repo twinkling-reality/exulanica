@@ -1,6 +1,6 @@
 # Interface system
 
-This contract owns how the browser application looks, where its surfaces sit, how its actions are
+This contract owns the browser application and public reading interface, including how each looks, where its surfaces sit, how its actions are
 declared and offered, and how it speaks. It covers the design tokens, the components, the icon set,
 the layout regions and their stacking order, the action registry and its availability, and the words
 (the voice guide, the glossary and how a refusal is said). What a person does in a world, and how
@@ -32,10 +32,9 @@ Components and layout read semantic roles and never write a literal of their own
   disabled, soft and text variants. Light is the default; `data-ui-scheme="dark"` on the root
   element chooses the dark scheme and `"system"` follows the operating system. The Settings choice
   "Light or dark" (Light, Dark, Follow the system; Light unless changed) writes that attribute, and
-  the page sets it before its first paint. The way in (Your worlds and Create a world) is a stage:
-  `data-ui-stage="dark"` on its root gives it exactly the dark values in every scheme, because it
-  shows worlds full screen and a world keeps its own light. Reduced transparency and high contrast make surfaces
-  opaque.
+  the page sets it before its first paint. Your worlds and sentence creation follow the selected
+  scheme. Tool-specific recipe creation retains its own stage. Reduced transparency and high
+  contrast make surfaces opaque.
 - Type: one family wherever the brand speaks. IBM Plex Sans sets interface text and titles
   (`--font-ui`, with `--font-display` the same family), IBM Plex Mono sets labels, keys and codes
   (`--font-mono`); `web/packages/presentation/src/tokens.css` loads both, so the landing page and the
@@ -89,7 +88,8 @@ The application is the brand; the world, and what speaks from inside it, is the 
 | Top bar, tool rail, inspector panels, confirmation, Search, notices, heads-up notes | the brand tokens |
 | World menu (plain cards; the World tile wears the blend), Settings, Library, Character, Compare, Design, Photos, the recorded-result reader | the brand tokens |
 | The way in: the credential gate, opening a world | the brand tokens |
-| Your worlds and Create a world | the brand tokens on the dark stage, whatever the Light or dark choice |
+| Your worlds and sentence creation | the brand tokens in the selected scheme |
+| Recipe creation | the brand tokens on its dark stage |
 | The world on the canvas; the Companion's speech, choices and command buttons; Design's previews of the world | the world's profile |
 | Provenance, uncertainty, caution and error, wherever they are drawn | the world's hue, at the lightness the surface under them needs |
 
@@ -105,6 +105,48 @@ Every brand surface but the stage follows the Settings choice "Light or dark"; t
 tokens; `web/packages/app/test/ui-brand-surfaces.test.ts` holds Aeroheart's meaning roles at their
 floor (text 4.5, marks 3) on every brand surface in both schemes, words on the blend at AA, and
 bridge.css reading exactly the meaning roles theme.ts writes.
+
+### Public reading and controls
+
+The website extends the brand's restrained typography and fine navigation edges into a calm
+reading system. The orbit and shaped category menus carry the expressive silhouettes and color
+fields. Articles use aligned text, quiet surfaces and compact controls. The public site offers a light/dark control beside its external header links. Light is the default;
+the choice persists across public routes and reloads in origin-local storage under
+`exulanica.public.theme.v1`. When storage is unavailable, it still applies for the current page
+session. The public preference is independent of application settings and authored world lighting.
+
+| Decision | Public reading rule |
+| --- | --- |
+| Typeface and weight | Shared `--ui-font-brand` and `--ui-font-code` in `web/packages/presentation/src/tokens.css` supply IBM Plex Sans and Mono. Documentation titles use 300 at 32-40px; section titles use 400 at 22px. Reading text uses 400 at 15-16px with 1.7 line height. Compact controls share `--ui-text-compact` at 13px and weight 400; selected items use 500. Thin weights belong to large high-contrast titles, never utility text. |
+| Hierarchy and casing | Noun-based navigation, guide names and page actions use Title Case. Prose, descriptive disclosures and feedback use sentence case. Preserve language and protocol spellings such as cURL, Python and GET. Product Overview explains purpose; documentation Introduction helps a reader choose and begin a task. |
+| Rhythm and proportions | Use the reading space scale of 8, 16, 24, 32 and 48px, with 4px for compact internal gaps. Reading columns share the site's gutter and heading alignment. Guides constrain article width to 680px; API pages separate definitions and examples. Standalone controls and touch navigation have at least 44px targets. Desktop rail links and page-action menu items may use 36px rows; mobile menu items retain 44px targets. |
+| Contours and edges | Choose geometry by responsibility. The shared secondary action has a compact 30px face with 4px corners inside a 44px target. Documentation guide destinations and paging reuse that action. Page utilities use 8px corners, content/code/table frames use 12px and search uses 16px. Metadata tags use capsules; compact rows use 4px corners. A split control joins its halves without doubling the shared border. Frames have one fine edge. The shaped global navigation and primary application entry retain their established treatments. |
+| Color and layers | The light scheme uses a white canvas, ink `#121715`, body `#35413b` and muted text `#59655f`; dark uses canvas `#14191c`, ink `#edf1f3`, body `#c1ccd1` and muted text `#9baab2`. Base surfaces and borders derive from ink and canvas. Scheme-aware `--landing-action-hover` and `--landing-action-pressed` supply interaction states; the light aliases retain the shared presentation roles and soft green hover. Tags communicate actual categories, HTTP methods or response status rather than repeating that a destination is a guide or API page. Reading rails stay quiet. Menus and search receive elevation; content tables and code frames do not. Code uses a quiet inset surface in the selected scheme; legible syntax carries color rather than a separate toolbar fill. |
+| Selection and focus | Current guide and section links use stronger site ink and weight, without colored bars or filled tiles. Search selection uses a neutral wash and fine edge; active request tabs use stronger text and a lower edge marker. Keyboard focus uses a visible 2px ring, inset on code reading areas and within compact menu rows. Standalone destinations use `routeLink`, which delegates to the shared secondary action; embedded prose links retain a fine underline. Paging shows the destination with one directional arrow below a shared rule. Its accessible name and `rel` identify Previous or Next. Copy and export actions pair readable labels with small functional icons. Search, disclosure and paging icons communicate function; ordinary destination controls need no repeated arrow or kind label. Hover and pressed states do not move reading text. |
+| Unavailability and failure | Pending clipboard actions disable duplicate requests and show Copying. Copied and its confirmation glyph appear only after clipboard completion. Code copy reuses the compact secondary control, with a quiet face at rest and hover/focus affordances. Its label and glyph show completion, with live feedback available to assistive technology. Failure guidance occupies a separate visible row and cannot cover the example. Failure restores the action label and gives visible, announced manual-copy guidance. Disabled state reduces emphasis without concealing the label. Error ink and border accompany words; color alone does not communicate a failure. |
+| Motion | Reading transitions reuse the public navigation's 180ms duration and `cubic-bezier(.22,1,.36,1)` easing; result state changes use the shared 130ms quick duration. A 3px opening reveal, rotating disclosure chevron, dialog entry/exit fade and tab-panel fade explain state changes. Hover color and borders transition without shifting labels; copy glyphs crossfade only on confirmed completion. Reading text has no continuous animation. Reduced motion suppresses transitions and reveals under the OS preference or `data-motion="reduced"`; state, keyboard behavior and feedback remain available. |
+
+`web/packages/landing/src/reading-system.css` owns these reading tokens, page actions and native
+disclosure indicators. `documentation.css` owns article/rail layout and code, table and API
+components. `documentation-search.css` owns search geometry and states. Component files consume
+those roles rather than adding literal palettes or successive corrective layers. Shared compact text,
+minimum targets and light action states originate in presentation tokens. `ui/action.ts` and
+`style.css` own the public secondary action; documentation adds only destination and paging layout.
+`web/packages/landing/README.md` gives the frontend application and verification guidance.
+
+The documentation shell keeps one site navigation, with search above the guide rail. Mobile
+navigation and outlines use native disclosures; operation and property disclosures share their
+indicator and states. Search keeps a single dialog, keyboard selection, contextual matching and
+exact section and operation links. Markdown copy, view and download come from the same content
+builders as the article. `ui/copy-feedback.ts` owns clipboard completion feedback for page and code
+controls. Opening and closing presentation must preserve native links, modified clicks, focus
+restoration and disclosure deep links.
+
+Verify normal text at 4.5:1, large titles and focus indicators at 3:1, and error text on its actual
+surface. Review desktop, intermediate and narrow widths, long paths/tables, open and closed
+controls, keyboard operation, clipboard refusal, forced colors and reduced motion. A unit test
+pass does not establish visual quality. Documentation has no additional site header or global
+footer.
 
 ## 3. Layout regions
 
@@ -185,31 +227,58 @@ for people who are not on the streets.
 
 ### Your worlds and Create a world
 
-Your worlds (`web/packages/app/src/composition/world-entry.ts`, `ui/your-worlds.css`) is the first
-screen after signing in, before any world opens, whether the person has one saved world or many.
-It names the chosen world large, with one line on what it is, its actions (Open, View values,
-Create a world) and when it was established; under it a strip of cards holds every saved world,
-the most recently changed first, and a last card for Create a world. Moving to a card chooses it;
-pressing a card or Open opens it. A person whose only world is the untouched starter square sees
-"Create your world", with Create a world as the primary action. A world that cannot open says why
-when chosen and pressed; Create a world refused by the workspace says the action's words. Keys:
-the arrows choose, Enter opens, N creates, V views a generated world's values; none fires while a
-person types. The World menu's
-Your worlds entry keeps a picture of the open world and loads the page afresh, which starts here.
-Behind the page the chosen world's picture fills the right side, fading into the page towards the
-words, the top and the strip and drifting slowly (still under reduced motion); a world with no
-picture of its own or from its recipe shows the plain page, never a stand-in.
+Your worlds (`web/packages/app/src/composition/world-entry.ts`, `ui/your-worlds.css`) is the saved
+world library. The page heading identifies the library, each card identifies its own world, and
+the command edge offers opening the selected world or beginning creation. The strip orders saved
+worlds by their last change. Clicking a card selects it; Enter, Open or double-clicking opens it.
+Arrow keys select, N creates and V inspects saved generation details; shortcuts do not fire while
+typing. Unavailable worlds retain their identity and explanation. A narrow world viewport offers
+returning to the library instead of leaving the person at a message with no action.
+Counters, dates, stock descriptions and an empty photograph offer are omitted. Photograph actions
+appear only when there is reviewed source material or an attempted action needs attention.
 
-A card's picture is the world's own frame, kept in the person's browser only a few seconds after
-the world opens and again when they leave it for Your worlds; until there is one, a world made from
-a recipe shows a frame of a town made from that recipe, captured from the running application and
-shipped in `web/packages/app/public/your-worlds/`, and any other world shows the brand blend. View
-values (or V) is shown for a generated world: it opens Create a world holding the recipe and every
-value the world was made with, as the saved entry serves them from its generation receipt
-(`generated_ground.values`), checked as a person's own edit is, with a line saying whose values
-they are and that creating from them makes a new world while that one stays as it is. Nothing
-changes an existing world's values. A world made before its values were kept says it has none to
-show.
+Cards use each world's kept browser frame or its recipe capture. The library has no decorative
+full-screen world backdrop. Selection does not resize the cards.
+Saved generation details show the exact retained specification and values, including unknown keys.
+Creating another world from those inputs is a separate action; inspecting a receipt never changes
+or creates a world.
+
+Ordinary creation (`composition/world-creation.ts`, `ui/world-sentence.ts`, `ui/world-creation.css`)
+reads the creation offer, submits the description, follows the served draft and opens its saved
+result. The field grows with its contents. Return and Create world or Open world stay at the bottom.
+Modified Enter submits; Enter alone adds a line. Creation details disclose model calls and handling
+of the description. A missing provider offers Configure AI instead of a disabled creation action.
+Setup retains the description, links to the configured installation guide and rechecks availability.
+Provider credentials and spending authority remain server configuration; this surface does not write
+them. A running draft can be resumed from the offer when the person returns.
+
+An operation offer displays its exact dollar reservation ceiling outside collapsed details. This is
+a maximum reservation, not an estimate of the final charge. Creation submits the displayed terms
+and ceiling with a fresh request identity. If the offer expires before a new request is sent, the
+page displays a refreshed ceiling and requires another press; it never accepts an increased limit
+silently. A server without an operation offer is described as providing no dollar limit.
+
+Failure to read the offer keeps an editable description and a retry action. A missing creation
+route, expired session, denied permission, unreadable response and unreachable service give
+different recovery directions. Description memory lasts for the current page session, including
+closing and reopening creation; a page reload clears it. An ambiguous submission retains the
+original description, request identity and accepted terms for an explicit retry. Queued or running
+work is followed by its returned identity; after acceptance, request-recovery memory retains that
+identity rather than the description. Recovery belongs to the authenticated page session and is
+not reused by another account. Closing and reopening the screen preserves it; a reload clears
+this local memory. Interrupted progress offers checking the same draft again and disables another start
+while its outcome is unknown. With a legacy server that supplies no request identity, recovery
+reads the running draft from the offer instead of repeating an ambiguous creation request.
+
+Entry typography and command controls live in `presentation/src/entry-style.css`, shared by the
+chooser, sentence creation and setup. Entry surfaces inherit the application's semantic colors
+so Light, Dark and System apply to every step.
+
+The shared navigation timing lives in `presentation/src/navigation-motion.ts`. App surface changes
+use `ui/surface-motion.ts`, while landing navigation uses its surface-transition controller. Reduced
+motion disables those durations. Each controller retains its own focus and navigation responsibilities.
+
+Saved recipe inputs retain their tool-specific creation path, described below.
 
 Create a world (`ui/world-recipes.ts`, `ui/world-description.ts`, `ui/create-world.css`) is one full
 sheet in the same language: describing the town in the person's own words comes first, the recipes

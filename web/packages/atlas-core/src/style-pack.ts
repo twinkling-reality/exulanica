@@ -185,6 +185,7 @@ export interface StylePackManifest {
   } | null;
   readonly edge: { readonly ground: Srgb8; readonly drop_mm: number; readonly reach_mm: number } | null;
   readonly palette: { readonly encoding: typeof STYLE_PACK_COLOUR_ENCODING; readonly swatches: readonly StylePackSwatch[] };
+  readonly look_family_catalog?: { readonly version: number; readonly sha256: string };
   readonly surfaces: Readonly<Record<string, StylePackSurface>>;
   readonly modules: Readonly<Record<string, { readonly variants: readonly StylePackVariant[] }>>;
   readonly files: readonly StylePackFile[];
@@ -203,6 +204,8 @@ export interface LookFamily {
 export interface StylePackContext {
   readonly families: ReadonlyMap<string, LookFamily>;
   readonly textureSets: ReadonlySet<string>;
+  readonly legacyFamilies?: ReadonlyMap<string, LookFamily>;
+  readonly familyCatalogs?: ReadonlyMap<number, { readonly sha256: string; readonly families: ReadonlyMap<string, LookFamily> }>;
 }
 
 // ------------------------------------------------------------------------------------- reading
@@ -399,9 +402,10 @@ export function splitLookRole(role: string, path: string): { family: string; lea
  * together) follow the shape checks, in a fixed order, so both readers name the same first fault.
  */
 export function readStylePackManifest(value: Json, context: StylePackContext): StylePackManifest {
+  let families = context.legacyFamilies ?? context.families;
   const lookRoleKey = (dressings: readonly LookFamily['dressing'][]) => (key: string, path: string): void => {
     const { family } = splitLookRole(key, path);
-    const known = context.families.get(family);
+    const known = families.get(family);
     if (known === undefined) fail('reference', path, `names no look family ${JSON.stringify(family)}`);
     if (!dressings.includes(known!.dressing)) fail('reference', path, `family ${JSON.stringify(family)} is not dressed this way`);
   };
@@ -439,6 +443,11 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
         key: pattern(KEY, 'a swatch key'), srgb8, roughness_permille: permille(0, 1000), metalness_permille: permille(0, 1000), emission_permille: permille(0, 1000),
       }), 0, STYLE_PACK_MAX_SWATCHES),
     }),
+    look_family_catalog: optional((v, p) => {
+      const pin = object(v, p, { version: integer(1, 1_000_000), sha256: pattern(SHA256, 'a lowercase SHA-256') }) as { version: number; sha256: string };
+      families = stylePackFamilies({ look_family_catalog: pin }, context);
+      return pin;
+    }),
     surfaces: record(lookRoleKey(['surface', 'both']), (v, p) => {
       const keys = v !== null && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v as object) : [];
       return keys.includes('texture_set')
@@ -469,7 +478,17 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
       media_type: oneOf(STYLE_PACK_MEDIA_TYPES),
     }), 0, STYLE_PACK_MAX_FILES),
   }) as unknown as StylePackManifest;
-  return checkWhole(manifest, context);
+  return checkWhole(manifest, { ...context, families });
+}
+
+/** A manifest's explicitly pinned catalog, or the legacy context when it names none. */
+export function stylePackFamilies(manifest: Pick<StylePackManifest, 'look_family_catalog'>, context: StylePackContext): ReadonlyMap<string, LookFamily> {
+  const pin = manifest.look_family_catalog;
+  if (pin === undefined) return context.legacyFamilies ?? context.families;
+  const catalog = context.familyCatalogs?.get(pin.version);
+  if (catalog === undefined) return fail('reference', 'look_family_catalog.version', 'names no retained look-family catalog');
+  if (catalog.sha256 !== pin.sha256) fail('reference', 'look_family_catalog.sha256', 'does not match the retained catalog bytes');
+  return catalog.families;
 }
 
 function checkWhole(manifest: StylePackManifest, context: StylePackContext): StylePackManifest {
@@ -616,6 +635,11 @@ export function resolveStylePack(chain: readonly StylePackManifest[]): ResolvedS
     }
   }
   if (chain[chain.length - 1]!.base !== null) throw new StylePackRefusal('reference', 'base', 'the chain ends at a pack that names a base');
+  const catalogIdentity = (manifest: StylePackManifest): string => manifest.look_family_catalog === undefined
+    ? 'legacy' : `${manifest.look_family_catalog.version}:${manifest.look_family_catalog.sha256}`;
+  if (chain.some(manifest => catalogIdentity(manifest) !== catalogIdentity(chain[0]!))) {
+    fail('reference', 'base', 'every manifest of a chain must select the same look catalog');
+  }
   const swatches = new Map<string, StylePackSwatch>();
   const surfaces: Record<string, StylePackSurface> = {};
   const modules: Record<string, ResolvedModule> = {};

@@ -164,10 +164,10 @@ class SocietyControlRepository:
     def _now(self) -> dt.datetime:
         return self.connection.execute("select clock_timestamp() as now").fetchone()["now"]
 
-    def _control(self, society_id: uuid.UUID) -> dict | None:
+    def _control(self, society_id: uuid.UUID, *, lock: bool = True) -> dict | None:
         return self.connection.execute(
             "select * from world_society_control where workspace_id=%s and "
-            "society_id=%s for update",
+            "society_id=%s" + (" for update" if lock else ""),
             (self.workspace_id, society_id),
         ).fetchone()
 
@@ -303,10 +303,13 @@ class SocietyControlRepository:
             "play_eligible": society_engine(society["engine_version"]).playback,
         }
 
-    def read(self, version_id: uuid.UUID) -> dict:
+    def read(self, version_id: uuid.UUID, *, lock: bool = True) -> dict:
+        """Saved controls and defaults, without initialization. ``lock=False`` permits
+        composition in a read-only transaction; subsequent writes revalidate their bases.
+        """
         with self.connection.transaction():
             society = self._scope(version_id)
-            return self._public(society, self._control(society["society_id"]))
+            return self._public(society, self._control(society["society_id"], lock=lock))
 
     def events(self, version_id: uuid.UUID, *, limit: int = 64) -> list[dict]:
         with self.connection.transaction():

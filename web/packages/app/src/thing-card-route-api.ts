@@ -10,6 +10,7 @@
  * card was read, which the look swap shows as its proof.
  */
 import { accessHeaders, type Credentials } from './config.js';
+import { actionSpec } from './ui/actions/registry.js';
 import { readOrigin, type OriginRecord } from './thing-card-api.js';
 
 export const THING_CARD_PROFILE = 'exulanica.thing-card/v1';
@@ -175,8 +176,13 @@ export type LookChoiceOutcome =
 export async function chooseThingLook(
   access: Credentials, worldId: string, versionId: string, thingId: string, ref: CardLookReference, fetcher: typeof fetch = fetch,
 ): Promise<LookChoiceOutcome> {
-  const response = await fetcher(cardPath(access, worldId, versionId, thingId, '/look'), {
-    method: 'POST',
+  const operation = actionSpec('things.look').operation;
+  if (operation === undefined) throw new Error('The look action has no route.');
+  const [method, template] = operation.split(' ', 2) as [string, string];
+  const path = template.replace('{version_id}', encodeURIComponent(versionId))
+    .replace('{thing_id}', encodeURIComponent(thingId));
+  const response = await fetcher(`${access.baseUrl}${path}?world_id=${encodeURIComponent(worldId)}`, {
+    method,
     headers: { ...accessHeaders(access, 'POST'), 'Content-Type': 'application/json' },
     credentials: 'same-origin',
     body: JSON.stringify({ look: lookBody(ref) }),

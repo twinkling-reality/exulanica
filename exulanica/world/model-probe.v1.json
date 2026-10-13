@@ -1,0 +1,2706 @@
+{
+  "profile": "exulanica.model-probe-cases/v1",
+  "role": "society_decision",
+  "engine": "exulanica-society/v7",
+  "mechanisms": [
+    "json_schema",
+    "tool_call"
+  ],
+  "plain_cases": 6,
+  "line_cases": 16,
+  "plain_at_least": 5,
+  "line_at_least": 14,
+  "answer_tokens": 2048,
+  "cases": [
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 14 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-2-bench:rest",
+          "walk_mm": 14000
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 10 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-3-bench:rest",
+          "walk_mm": 10000
+        },
+        {
+          "action": "stand",
+          "activity": "stand",
+          "kind": "stand",
+          "label": "stand a while nearby",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "visit_planter_tree",
+          "kind": "target",
+          "label": "by a tree, 10 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-1-planter_tree:visit",
+          "walk_mm": 10000
+        },
+        {
+          "action": "go",
+          "activity": "rest_cafe_table",
+          "kind": "target",
+          "label": "sitting at a cafe table, 10 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-6-cafe_table:rest",
+          "walk_mm": 10000
+        },
+        {
+          "action": "wait",
+          "activity": null,
+          "kind": "wait",
+          "label": "wait here a minute",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "rest_seating_planter",
+          "kind": "target",
+          "label": "resting on a planter seat, 16 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-5-seating_planter:rest",
+          "walk_mm": 16000
+        },
+        {
+          "action": "go",
+          "activity": "visit_market_stall",
+          "kind": "target",
+          "label": "at a market stall, 18 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-4-market_stall:visit",
+          "walk_mm": 18000
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 9,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 14 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-2-bench:rest",
+          "walk_mm": 14000
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 10 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-3-bench:rest",
+          "walk_mm": 10000
+        },
+        {
+          "action": "stand",
+          "activity": "stand",
+          "kind": "stand",
+          "label": "stand a while nearby",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "visit_planter_tree",
+          "kind": "target",
+          "label": "by a tree, 10 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-1-planter_tree:visit",
+          "walk_mm": 10000
+        },
+        {
+          "action": "go",
+          "activity": "rest_cafe_table",
+          "kind": "target",
+          "label": "sitting at a cafe table, 10 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-6-cafe_table:rest",
+          "walk_mm": 10000
+        },
+        {
+          "action": "wait",
+          "activity": null,
+          "kind": "wait",
+          "label": "wait here a minute",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "rest_seating_planter",
+          "kind": "target",
+          "label": "resting on a planter seat, 16 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-5-seating_planter:rest",
+          "walk_mm": 16000
+        },
+        {
+          "action": "go",
+          "activity": "visit_market_stall",
+          "kind": "target",
+          "label": "at a market stall, 18 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-4-market_stall:visit",
+          "walk_mm": 18000
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 9,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 12 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-2-bench:rest",
+          "walk_mm": 12000
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 8 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-3-bench:rest",
+          "walk_mm": 8000
+        },
+        {
+          "action": "stand",
+          "activity": "stand",
+          "kind": "stand",
+          "label": "stand a while nearby",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "visit_planter_tree",
+          "kind": "target",
+          "label": "by a tree, 8 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-1-planter_tree:visit",
+          "walk_mm": 8000
+        },
+        {
+          "action": "go",
+          "activity": "rest_cafe_table",
+          "kind": "target",
+          "label": "sitting at a cafe table, 12 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-6-cafe_table:rest",
+          "walk_mm": 12000
+        },
+        {
+          "action": "wait",
+          "activity": null,
+          "kind": "wait",
+          "label": "wait here a minute",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "rest_seating_planter",
+          "kind": "target",
+          "label": "resting on a planter seat, 14 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-5-seating_planter:rest",
+          "walk_mm": 14000
+        },
+        {
+          "action": "go",
+          "activity": "visit_market_stall",
+          "kind": "target",
+          "label": "at a market stall, 16 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-4-market_stall:visit",
+          "walk_mm": 16000
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 8,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 12 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-2-bench:rest",
+          "walk_mm": 12000
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 8 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-3-bench:rest",
+          "walk_mm": 8000
+        },
+        {
+          "action": "stand",
+          "activity": "stand",
+          "kind": "stand",
+          "label": "stand a while nearby",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "visit_planter_tree",
+          "kind": "target",
+          "label": "by a tree, 8 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-1-planter_tree:visit",
+          "walk_mm": 8000
+        },
+        {
+          "action": "go",
+          "activity": "rest_cafe_table",
+          "kind": "target",
+          "label": "sitting at a cafe table, 12 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-6-cafe_table:rest",
+          "walk_mm": 12000
+        },
+        {
+          "action": "wait",
+          "activity": null,
+          "kind": "wait",
+          "label": "wait here a minute",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "rest_seating_planter",
+          "kind": "target",
+          "label": "resting on a planter seat, 14 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-5-seating_planter:rest",
+          "walk_mm": 14000
+        },
+        {
+          "action": "go",
+          "activity": "visit_market_stall",
+          "kind": "target",
+          "label": "at a market stall, 16 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-4-market_stall:visit",
+          "walk_mm": 16000
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 8,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 10 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-2-bench:rest",
+          "walk_mm": 10000
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 6 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-3-bench:rest",
+          "walk_mm": 6000
+        },
+        {
+          "action": "stand",
+          "activity": "stand",
+          "kind": "stand",
+          "label": "stand a while nearby",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "visit_planter_tree",
+          "kind": "target",
+          "label": "by a tree, 6 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-1-planter_tree:visit",
+          "walk_mm": 6000
+        },
+        {
+          "action": "go",
+          "activity": "rest_cafe_table",
+          "kind": "target",
+          "label": "sitting at a cafe table, 10 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-6-cafe_table:rest",
+          "walk_mm": 10000
+        },
+        {
+          "action": "wait",
+          "activity": null,
+          "kind": "wait",
+          "label": "wait here a minute",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "rest_seating_planter",
+          "kind": "target",
+          "label": "resting on a planter seat, 12 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-5-seating_planter:rest",
+          "walk_mm": 12000
+        },
+        {
+          "action": "go",
+          "activity": "visit_market_stall",
+          "kind": "target",
+          "label": "at a market stall, 14 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-4-market_stall:visit",
+          "walk_mm": 14000
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 7,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 10 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-2-bench:rest",
+          "walk_mm": 10000
+        },
+        {
+          "action": "go",
+          "activity": "rest_bench",
+          "kind": "target",
+          "label": "resting on a bench, 6 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-3-bench:rest",
+          "walk_mm": 6000
+        },
+        {
+          "action": "stand",
+          "activity": "stand",
+          "kind": "stand",
+          "label": "stand a while nearby",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "visit_planter_tree",
+          "kind": "target",
+          "label": "by a tree, 6 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-1-planter_tree:visit",
+          "walk_mm": 6000
+        },
+        {
+          "action": "go",
+          "activity": "rest_cafe_table",
+          "kind": "target",
+          "label": "sitting at a cafe table, 10 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-6-cafe_table:rest",
+          "walk_mm": 10000
+        },
+        {
+          "action": "wait",
+          "activity": null,
+          "kind": "wait",
+          "label": "wait here a minute",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "go",
+          "activity": "rest_seating_planter",
+          "kind": "target",
+          "label": "resting on a planter seat, 12 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-5-seating_planter:rest",
+          "walk_mm": 12000
+        },
+        {
+          "action": "go",
+          "activity": "visit_market_stall",
+          "kind": "target",
+          "label": "at a market stall, 14 m away",
+          "target_id": "authored:3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002:small_square-1-4-market_stall:visit",
+          "walk_mm": 14000
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 7,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+          "kind": "say_to",
+          "label": "say something to emi ash 5 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 8,
+            "who": "faye ash 6 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 13,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 15,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 18,
+            "who": "dara ash 4 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 9,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "3a749531-02bf-5147-8481-80a64706b73e",
+          "kind": "say_to",
+          "label": "say something to bela ash 2 (a villager), 3 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+          "kind": "say_to",
+          "label": "say something to emi ash 5 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 3,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 8,
+            "who": "faye ash 6 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 15,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 18,
+            "who": "dara ash 4 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 9,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "3a749531-02bf-5147-8481-80a64706b73e",
+          "kind": "say_to",
+          "label": "say something to bela ash 2 (a villager), 3 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+          "kind": "say_to",
+          "label": "say something to emi ash 5 (a villager), 3 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 3,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 3,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 4,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 9,
+            "who": "faye ash 6 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 16,
+            "who": "dara ash 4 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 8,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+          "kind": "say_to",
+          "label": "say something to emi ash 5 (a villager), 3 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 3,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 9,
+            "who": "faye ash 6 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 11,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 13,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 16,
+            "who": "dara ash 4 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 8,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+          "kind": "say_to",
+          "label": "say something to emi ash 5 (a villager), 4 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "3a749531-02bf-5147-8481-80a64706b73e",
+          "kind": "say_to",
+          "label": "say something to bela ash 2 (a villager), 3 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 3,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 4,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 10,
+            "who": "faye ash 6 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 11,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 14,
+            "who": "dara ash 4 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 7,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+          "kind": "say_to",
+          "label": "say something to emi ash 5 (a villager), 4 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "3a749531-02bf-5147-8481-80a64706b73e",
+          "kind": "say_to",
+          "label": "say something to bela ash 2 (a villager), 3 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 3,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 4,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 4,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 10,
+            "who": "faye ash 6 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 14,
+            "who": "dara ash 4 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 7,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+          "kind": "say_to",
+          "label": "say something to emi ash 5 (a villager), 4 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 4,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 10,
+            "who": "faye ash 6 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 10,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 11,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 14,
+            "who": "dara ash 4 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 7,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+          "kind": "say_to",
+          "label": "say something to emi ash 5 (a villager), 6 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "3a749531-02bf-5147-8481-80a64706b73e",
+          "kind": "say_to",
+          "label": "say something to bela ash 2 (a villager), 3 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": {
+          "good_for": "others can visit it",
+          "words": "by a tree"
+        },
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 3,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 6,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 10,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 12,
+            "who": "dara ash 4 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 13,
+            "who": "faye ash 6 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 9,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "ee0bb89e-aefb-5e54-bb09-5b71ab6810bc",
+          "kind": "say_to",
+          "label": "say something to cleo ash 3 (a villager), 4 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "3a749531-02bf-5147-8481-80a64706b73e",
+          "kind": "say_to",
+          "label": "say something to bela ash 2 (a villager), 3 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": {
+          "good_for": "others can visit it",
+          "words": "by a tree"
+        },
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 3,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 4,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 6,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 12,
+            "who": "dara ash 4 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 13,
+            "who": "faye ash 6 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 9,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+          "kind": "say_to",
+          "label": "say something to emi ash 5 (a villager), 8 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 8,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 8,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 10,
+            "who": "dara ash 4 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 10,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 14,
+            "who": "faye ash 6 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 9,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+          "kind": "say_to",
+          "label": "say something to emi ash 5 (a villager), 8 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "3a749531-02bf-5147-8481-80a64706b73e",
+          "kind": "say_to",
+          "label": "say something to bela ash 2 (a villager), 3 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 3,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 8,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 8,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 10,
+            "who": "dara ash 4 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 14,
+            "who": "faye ash 6 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 9,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "ee0bb89e-aefb-5e54-bb09-5b71ab6810bc",
+          "kind": "say_to",
+          "label": "say something to cleo ash 3 (a villager), 4 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "3a749531-02bf-5147-8481-80a64706b73e",
+          "kind": "say_to",
+          "label": "say something to bela ash 2 (a villager), 3 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 3,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 4,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 8,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 10,
+            "who": "dara ash 4 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 14,
+            "who": "faye ash 6 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 9,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "6dc4e300-40dd-506a-b719-b9df96670e7e",
+          "kind": "say_to",
+          "label": "say something to dara ash 4 (a villager), 7 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 7,
+            "who": "dara ash 4 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 9,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 10,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 12,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 17,
+            "who": "faye ash 6 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 12,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "6dc4e300-40dd-506a-b719-b9df96670e7e",
+          "kind": "say_to",
+          "label": "say something to dara ash 4 (a villager), 7 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "3a749531-02bf-5147-8481-80a64706b73e",
+          "kind": "say_to",
+          "label": "say something to bela ash 2 (a villager), 3 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 3,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 7,
+            "who": "dara ash 4 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 9,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 10,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 17,
+            "who": "faye ash 6 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 12,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "ee0bb89e-aefb-5e54-bb09-5b71ab6810bc",
+          "kind": "say_to",
+          "label": "say something to cleo ash 3 (a villager), 4 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "3a749531-02bf-5147-8481-80a64706b73e",
+          "kind": "say_to",
+          "label": "say something to bela ash 2 (a villager), 3 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 3,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 4,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 6,
+            "who": "dara ash 4 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 12,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 18,
+            "who": "faye ash 6 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 13,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    },
+    {
+      "being": {
+        "kind": "knight",
+        "summary": "An armoured knight who walks, carries things, hands them over and says things."
+      },
+      "branch_id": "3f8a2c14-0b6e-4f41-9a1a-0d0d5c5f0002",
+      "doing": {
+        "kind": "idle",
+        "reason": "awaiting_goal",
+        "status": "active"
+      },
+      "engine": "exulanica-society/v7",
+      "heard": [],
+      "holding": [],
+      "last_activity": null,
+      "line_characters_maximum": 200,
+      "need_milli": 500,
+      "options": [
+        {
+          "action": "say_all",
+          "activity": null,
+          "kind": "say_all",
+          "label": "say something to everyone near you",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "6dc4e300-40dd-506a-b719-b9df96670e7e",
+          "kind": "say_to",
+          "label": "say something to dara ash 4 (a villager), 6 m away",
+          "target_id": null,
+          "walk_mm": null
+        },
+        {
+          "action": "say_to",
+          "activity": null,
+          "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+          "kind": "say_to",
+          "label": "say something to ari ash 1 (a villager), 2 m away",
+          "target_id": null,
+          "walk_mm": null
+        }
+      ],
+      "profile": "exulanica.society-decision-context/v2",
+      "rest_at_need_milli": 750,
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b",
+      "surroundings": {
+        "at": null,
+        "beings": [
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 2,
+            "who": "ari ash 1 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": true,
+            "holding": [],
+            "kind": "villager",
+            "metres": 6,
+            "who": "dara ash 4 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 8,
+            "who": "cleo ash 3 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 12,
+            "who": "bela ash 2 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 12,
+            "who": "emi ash 5 (a villager)"
+          },
+          {
+            "doing": "waiting",
+            "from_elsewhere": false,
+            "hears_you": false,
+            "holding": [],
+            "kind": "villager",
+            "metres": 18,
+            "who": "faye ash 6 (a villager)"
+          }
+        ],
+        "more_beings": 0,
+        "more_things": 0,
+        "things": [
+          {
+            "good_for": [
+              "visitors arrive through it",
+              "visitors leave through it"
+            ],
+            "metres": 13,
+            "what": "gate"
+          }
+        ]
+      },
+      "tick": 0,
+      "under_way": false
+    }
+  ],
+  "sources": {
+    "assets/catalogs/roles/decision-roles.v6.json": "032d55a2b260d8aeb5f17e73c771c649608ac9f62c8db86ac07a02d8c267ad57",
+    "assets/catalogs/society/society-decision-action.v4.json": "42618724a4e0a1a805b1f2ecd8327060b94657f5007271e4503d23ba81e9910d",
+    "assets/catalogs/society/society-decision-policy.v4.json": "bca0c429e4efd12a49f6a8416746cfd74aec27ff3ed81c402e52644e675592c6"
+  },
+  "provenance": {
+    "origin": "original",
+    "generator": "scripts/measure_society_mind_probe.py contexts",
+    "generator_sha256": "4eed7faabcbd23a9b630602963399113cb79afc2436bc546e902ae2e99c73223",
+    "licence": "Apache-2.0",
+    "purpose": "Synthetic choices generated without inference. Spoken-line cases offer only real speech actions, so a passing probe must actually supply a line."
+  }
+}

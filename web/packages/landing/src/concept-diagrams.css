@@ -1,0 +1,4 @@
+/* One unframed particle stage; every study uses the same bounds and optical weight. */
+.capability-concept { display: block; width: 100%; height: auto; overflow: hidden; margin-inline: auto; }
+.concept-frame { grid-area: 1 / 1; width: 100%; }
+.concept-art { pointer-events: none; }

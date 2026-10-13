@@ -1,0 +1,132 @@
+{
+  "creates": {
+    "district": {
+      "engine": "exulanica-society/v4",
+      "reason": "A society the app creates over an owned district is the living society, the one engine whose routines, occupancy and population read a district's streets, premises and stated surface heights."
+    },
+    "saved_world": {
+      "engine": "exulanica-society/v2",
+      "reason": "A society a person brings into their own saved world is the purposeful society: the engine that stands on a saved world's ground, takes directed actions, lets its people be sent away and brought back, and lets the world's owner choose a model for a person."
+    },
+    "town": {
+      "engine": "exulanica-society/v5",
+      "reason": "A society a person brings into a saved world whose own records state its walking surfaces and homes (a town generated from a recipe) is the living town: its people live in the town's homes, work its premises' shifts and run errands while its shops are open, and the world's owner may choose a model for a person. A town whose society was made before this engine keeps it."
+    }
+  },
+  "creates_holding_things": {
+    "engine": "exulanica-society/v7",
+    "grounds": [
+      "authored_starter",
+      "generated_site",
+      "generated_town",
+      "made_world"
+    ],
+    "reason": "A saved world whose version holds a thing its author placed, on a host that offers societies of things, is brought to life as a society of things, so the beings placed in it live there with the ground's own people: over the grounds a society of things stands on, a lattice's authored ground, a generated town's walking surfaces and the walking surfaces of a world made from a world kind, whose people are made from the site's own place. A world holding no placed thing, or a host that offers no society of things, keeps its ground's engine."
+  },
+  "default_engine": "exulanica-society/v1",
+  "engines": [
+    {
+      "comparisons": false,
+      "creatable": true,
+      "directed_actions": false,
+      "engine": "exulanica-society/v1",
+      "experiments": false,
+      "model_decisions": false,
+      "owner_model_choice": false,
+      "playback": false,
+      "playback_refusal": "legacy_society_not_playable",
+      "population": {"maximum": 512, "minimum": 100},
+      "presence": false,
+      "reason": "Seeded synthetic motion over a district. It reads no authorised input, so an edit never reaches it and nothing but its own seed decides where anybody goes; the worker does not play it, and it holds the 100 to 512 people a district was sized for.",
+      "saved_world": false,
+      "state_family": "legacy",
+      "takes_inputs": false
+    },
+    {
+      "comparisons": true,
+      "creatable": true,
+      "directed_actions": true,
+      "engine": "exulanica-society/v2",
+      "experiments": false,
+      "model_decisions": true,
+      "owner_model_choice": true,
+      "playback": true,
+      "playback_refusal": null,
+      "population": {"minimum": 1},
+      "presence": true,
+      "reason": "Purposeful goals, routes and the two reviewed activities over authorised inputs, with typed user-directed actions, and the person whose world it lives in can send its people away and bring them back. The world's owner may choose a model for a person: that person takes, at the planner's own choice point, the model's validated choice from a stored receipt, replayed without a call; with no choice nothing changes. A comparison runs the same hour of it with each of several deciders from the same genesis, beside the society and never changing it. It stands on a district or on a saved world's own ground, where it starts with the population its ground states, so its floor is one; a district's floor of 100 is the initializer's. It states no maximum population: how many people it holds is its ground's, a stated figure or the people a town's homes house, whom a host admits by the measured cost of their minute (the society ground catalog's minute_cost).",
+      "saved_world": true,
+      "state_family": "purposeful",
+      "takes_inputs": true
+    },
+    {
+      "comparisons": false,
+      "creatable": false,
+      "directed_actions": true,
+      "engine": "exulanica-society/v3",
+      "experiments": false,
+      "model_decisions": true,
+      "owner_model_choice": false,
+      "playback": true,
+      "playback_refusal": null,
+      "population": {"maximum": 512, "minimum": 1},
+      "presence": false,
+      "reason": "Retired: no society is created with it, and its explicitly requested model proposals are refused, because the purposeful society's owner-chosen models decide for a person with validated receipts, replay and comparisons, and a second way for a model to decide for one person would be two rules for one thing. A stored one reads, advances and replays as it was recorded: the purposeful society plus a bounded cast with local observations, communicated beliefs and the validated proposals its history holds. Its people are not sent away: its cast would leave and return with memories this version does not model.",
+      "saved_world": true,
+      "state_family": "purposeful",
+      "takes_inputs": true
+    },
+    {
+      "comparisons": false,
+      "creatable": true,
+      "directed_actions": false,
+      "engine": "exulanica-society/v4",
+      "experiments": true,
+      "model_decisions": false,
+      "owner_model_choice": false,
+      "playback": true,
+      "playback_refusal": null,
+      "population": {"maximum": 65536, "minimum": 1},
+      "presence": false,
+      "reason": "The living society: catalogued routines, occupancy and a population sized to its place. Its place contract reads streets, occupancy and stated surface heights, which a saved world's flat ground does not state, so it stands on a district only; it takes no directed actions or model decisions.",
+      "saved_world": false,
+      "state_family": "living",
+      "takes_inputs": true
+    },
+    {
+      "comparisons": true,
+      "creatable": true,
+      "directed_actions": false,
+      "engine": "exulanica-society/v5",
+      "experiments": false,
+      "model_decisions": true,
+      "owner_model_choice": true,
+      "playback": true,
+      "playback_refusal": null,
+      "population": {"minimum": 1},
+      "presence": false,
+      "reason": "The living town: the living society's catalogued needs, routines and occupancy over a saved world whose own records state its walking surfaces and homes. Its input carries the town's living place, so it walks the town's footways, corners, crossings and doors across tile seams and replays from its stored inputs alone; one inhabitant lives in each place in a home, a share of them work the shifts their workplace's use class names, and a premises admits visitors in its opening hours while one of its workers is there. The world's owner may choose a model for a person: that person takes, at the engine's own choice point, the model's validated choice among the options the engine itself offers, applied before anybody else acts in that minute and replayed from a stored receipt without a call; with no choice nothing changes. It takes no directed actions, its people are not sent away, and a comparison replays its recorded inputs under the fourth person score. Its population is the town's homes, which the ground's own rule bounds, so its floor is one. It states no maximum population: how many people it holds is its ground's, a stated figure or the people a town's homes house, whom a host admits by the measured cost of their minute (the society ground catalog's minute_cost).",
+      "saved_world": true,
+      "state_family": "living",
+      "takes_inputs": true
+    },
+    {
+      "comparisons": true,
+      "creatable": true,
+      "directed_actions": true,
+      "engine": "exulanica-society/v7",
+      "experiments": false,
+      "model_decisions": true,
+      "owner_model_choice": true,
+      "playback": true,
+      "playback_refusal": null,
+      "population": {"minimum": 1},
+      "presence": false,
+      "reason": "The purposeful society with things, over a saved world's own ground, where everybody is a thing of a stated kind. Its people are the villagers its ground's population brings, the beings the world's author placed in its version, and visitors that cross in from an outside program: each visitor arrives at the arrival point of a gate the author placed, and leaves when its program sends it away or its grant ends. An author's placed objects stand where the version puts them, block walking where their kind says and offer the rests and visits their kind offers. The world's owner may choose a model for a person, and the program that sent a visitor decides for it: each takes, at the planner's own choice points, a validated choice from a stored receipt, replayed without a call. It takes directed actions for anybody but a visitor and its people are not sent away. A comparison of models runs an hour of it from its genesis, where nobody has crossed in, so it compares the world's own beings, scored by the sixth person score, which counts the lines they said and what they did with their hands; it is offered once a reading line has been measured for its runs. Its population is its ground's, with the beings placed and the visitors arrived beside it, so its floor is one. It states no maximum population: how many people it holds is its ground's, a stated figure or the people a town's homes house, whom a host admits by the measured cost of their minute (the society ground catalog's minute_cost).",
+      "saved_world": true,
+      "state_family": "things",
+      "takes_inputs": true
+    }
+  ],
+  "profile": "exulanica.society-engines/v5"
+}

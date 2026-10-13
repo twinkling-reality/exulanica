@@ -140,7 +140,12 @@ export interface SocietyPlaces {
   readonly clearanceMm: number;
   readonly targets: readonly SocietyPlace[];
   readonly unreachable: readonly SocietyUnreachablePlace[];
-  readonly livingDestinations?: ReadonlyMap<string, { readonly useClass: string | null; readonly label: string | null }>;
+  readonly livingDestinations?: ReadonlyMap<string, {
+    readonly useClass: string | null;
+    readonly label: string | null;
+    /** Physical enclosure, absent when an older response does not state it. */
+    readonly indoors?: boolean;
+  }>;
   /**
    * Where a site world's people are and walk, in their ground's own words, as the server serves
    * them with the places its input states; null for a town's, whose words are the catalog's own.
@@ -192,7 +197,7 @@ function routineBinding(value: unknown): NonNullable<OwnedSocietyState['routine'
  * A persisted v4 state in the shape the renderer and inspector read. Roles, indoor presence,
  * speed and the simulated clock are copied from canonical fields; nothing is derived here.
  */
-function livingPresentation(row: Readonly<Record<string, unknown>>, state: Readonly<Record<string, unknown>>): OwnedSocietyState {
+function livingPresentation(row: Readonly<Record<string, unknown>>, state: Readonly<Record<string, unknown>>, places: SocietyPlaces | null): OwnedSocietyState {
   const population = record(state['population']);
   const clock = record(state['clock']);
   const routine = routineBinding(state['routine']);
@@ -222,7 +227,9 @@ function livingPresentation(row: Readonly<Record<string, unknown>>, state: Reado
     const location = record(person['location']), action = record(person['action']), explanation = record(person['explanation']);
     const path = person['motion_path_mm'];
     if (!textValue(person['id']) || ids.has(person['id']) || person['synthetic'] !== true || !point(person['position_mm']) ||
-        'display_name' in person || typeof location['indoors'] !== 'boolean' || !integer(person['walk_speed_mm_per_tick'], 1) ||
+        'display_name' in person || typeof location['indoors'] !== 'boolean' ||
+        !(location['destination_id'] === undefined || location['destination_id'] === null || textValue(location['destination_id'])) ||
+        !integer(person['walk_speed_mm_per_tick'], 1) ||
         !textValue(action['kind']) || !['active', 'completed', 'blocked'].includes(String(action['status'])) ||
         !(action['destination_id'] === null || textValue(action['destination_id'])) || !textValue(action['reason']) ||
         !textValue(explanation['summary']) || !Array.isArray(explanation['event_ids']) || !explanation['event_ids'].every(textValue) ||
@@ -235,6 +242,10 @@ function livingPresentation(row: Readonly<Record<string, unknown>>, state: Reado
     if ((role && !textValue(role['label'])) || (goal && (!textValue(goal['activity']) || !textValue(goal['because']) || !textValue(goal['reason'])))) {
       throw new Error('Invalid living society role or goal');
     }
+    // The location names the reached destination. A goal or action may name somewhere the
+    // person has not reached, and the raw indoor flag also marks stays at outdoor workplaces.
+    const destinationId = location['destination_id'];
+    const destination = typeof destinationId === 'string' ? places?.livingDestinations?.get(destinationId) : undefined;
     return {
       id: person['id'],
       synthetic: true as const,
@@ -245,6 +256,9 @@ function livingPresentation(row: Readonly<Record<string, unknown>>, state: Reado
       position_mm: person['position_mm'],
       motion_path_mm: path as readonly (readonly [number, number])[],
       indoors: location['indoors'],
+      ...(typeof destinationId === 'string' && destination?.indoors !== undefined
+        ? { location_destination: Object.freeze({ id: destinationId, indoors: destination.indoors }) }
+        : {}),
       walk_speed_mm_per_tick: person['walk_speed_mm_per_tick'],
       needs: record(person['needs']) as Readonly<Record<string, number>>,
       action: action as unknown as NonNullable<OwnedSocietyState['inhabitants'][number]['action']>,
@@ -298,6 +312,21 @@ function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null 
       halfDepthMm: held['half_depth_mm'] as number,
     });
   }
+  const destinations = places['living_destinations'];
+  if (destinations !== undefined && !Array.isArray(destinations)) throw new Error('Invalid living destinations');
+  const destinationIds = new Set<string>();
+  const livingDestinations: NonNullable<SocietyPlaces['livingDestinations']> = new Map((destinations ?? []).map((value: unknown) => {
+    const destination = record(value);
+    if (!textValue(destination['destination_id']) || destinationIds.has(destination['destination_id']) ||
+        !(destination['use_class'] === null || textValue(destination['use_class'])) ||
+        !(destination['label'] === null || textValue(destination['label'])) ||
+        !(destination['indoors'] === undefined || typeof destination['indoors'] === 'boolean')) throw new Error('Invalid living destination');
+    destinationIds.add(destination['destination_id']);
+    return [destination['destination_id'], Object.freeze({
+      useClass: destination['use_class'], label: destination['label'],
+      ...(destination['indoors'] === undefined ? {} : { indoors: destination['indoors'] }),
+    })] as const;
+  }));
   return Object.freeze({
     inputSeq: places['input_seq'] as number,
     inputSha256: places['input_sha256'] as string,
@@ -306,13 +335,7 @@ function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null 
     walkableArea,
     clearanceMm: places['clearance_mm'] as number,
     placeWords: parsePlaceWords(places['place_words']),
-    livingDestinations: new Map((Array.isArray(places['living_destinations']) ? places['living_destinations'] : []).map((value) => {
-      const destination = record(value);
-      if (!textValue(destination['destination_id']) ||
-          !(destination['use_class'] === null || textValue(destination['use_class'])) ||
-          !(destination['label'] === null || textValue(destination['label']))) throw new Error('Invalid living destination');
-      return [destination['destination_id'], { useClass: destination['use_class'], label: destination['label'] }] as const;
-    })),
+    livingDestinations,
     targets: Object.freeze(targets.map((value) => {
       const target = record(value);
       const places = target['place_node_ids'];
@@ -377,11 +400,12 @@ export function parseSociety(value: unknown): SocietySnapshot {
         !integer(row['current_tick']) || state['tick'] !== row['current_tick'] || !digest(row['state_sha256'])) {
       throw new Error('Invalid society response');
     }
+    const places = placesOf(row);
     return Object.freeze({
       societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
       ...(textValue(row['region_id']) ? { regionId: row['region_id'] } : {}),
       populationSize: row['population_size'] as number, currentTick: row['current_tick'], stateSha256: row['state_sha256'],
-      state: livingPresentation(row, state), places: placesOf(row), presence: EVERYONE_HERE,
+      state: livingPresentation(row, state, places), places, presence: EVERYONE_HERE,
     });
   }
   const inhabitants = state['inhabitants'];

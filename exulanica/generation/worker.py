@@ -78,7 +78,7 @@ from exulanica.generation.requests import GPU_PROVIDER, GenerationCatalogs
 from exulanica.generation.session import SessionState, session_state
 from exulanica.models.spending import SpendingRefused, SpendingRequest, SpendingTicket
 from exulanica.models.usage import CallUsage, CostBasis
-from exulanica.spending.ledger import DurableSpending
+from exulanica.spending.ledger import DurableSpending, SettlementNotRecorded
 from exulanica.things.kinds import ThingKind
 from exulanica.world.style_pack_library import StylePackLibrary
 
@@ -117,6 +117,8 @@ class PieceGenerationWorker:
     shipped: Mapping[tuple[str, int], ThingKind]
     workspaces: Callable[[], Iterable[uuid.UUID]]
     store_bound: int
+    #: Candidate IDs authorize only content-free erased-obligation recovery, never new work.
+    recovery_workspaces: Callable[[], Iterable[uuid.UUID]] | None = None
     now: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
     #: Takes each made request's passed pieces into its world's look, and back on request; None
     #: leaves every world's look as it is.
@@ -144,11 +146,20 @@ class PieceGenerationWorker:
                     registered=True, window_ends_at=session.window_ends_at, beat=beat, now=now
                 )
         report: dict[str, Any] = {"session": state, "workspaces": {}}
-        for workspace_id in sorted(self.workspaces()):
+        active = set(self.workspaces())
+        recovery = (
+            set(self.recovery_workspaces()) if self.recovery_workspaces is not None else set()
+        )
+        for workspace_id in sorted(active | recovery):
             try:
                 with self.database.session(workspace_id) as connection:
                     # Read for each workspace, so a slow pass never dates a later one's caps early.
-                    done = self._serve(connection, workspace_id, session, state, beat, self.now())
+                    if workspace_id in active:
+                        done = self._serve(
+                            connection, workspace_id, session, state, beat, self.now()
+                        )
+                    else:
+                        done = self._recover_erased(connection, workspace_id, self.now())
             except Exception as failure:  # one workspace's fault never stops the others
                 _LOG.warning(
                     "workspace %s was not served this pass: %s",
@@ -159,6 +170,17 @@ class PieceGenerationWorker:
             if done:
                 report["workspaces"][str(workspace_id)] = done
         return report
+
+    def _recover_erased(
+        self, connection: Any, workspace_id: uuid.UUID, now: datetime
+    ) -> dict[str, int]:
+        """Drain erased obligations without resuming a revoked account's ordinary work."""
+        for batch_id in batches.cancelled_batches(connection, workspace_id, erasure_only=True):
+            entries.write_withdrawn(self.bucket, entries.entry_id(batch_id), now)
+            batches.mark_erasure_withdrawn(connection, workspace_id, batch_id, now)
+        batches.decide_cancelled(connection, workspace_id, erasure_only=True)
+        settled = self._settle_decided(connection, workspace_id, now, erasure_only=True)
+        return {"erasure_settled": settled} if settled else {}
 
     def _serve(
         self,
@@ -176,9 +198,14 @@ class PieceGenerationWorker:
         withdrawn = batches.cancelled_batches(connection, workspace_id)
         for piece_batch_id in withdrawn:
             entries.write_withdrawn(self.bucket, entries.entry_id(piece_batch_id), now)
+            batches.mark_erasure_withdrawn(connection, workspace_id, piece_batch_id, now)
         for piece_batch_id in batches.decide_cancelled(connection, workspace_id):
             if piece_batch_id not in withdrawn:
                 entries.write_withdrawn(self.bucket, entries.entry_id(piece_batch_id), now)
+                batches.mark_erasure_withdrawn(connection, workspace_id, piece_batch_id, now)
+        # Erased requests first observed by the decision pass had no cancellation receipt yet.
+        # Their durable marker is now present, so their obligations may advance in this pass.
+        batches.decide_cancelled(connection, workspace_id)
         ended = self._follow(connection, workspace_id, now)
         settled = self._settle_decided(connection, workspace_id, now)
         answered: list[str] = []
@@ -431,10 +458,12 @@ class PieceGenerationWorker:
 
     # -- settling ---------------------------------------------------------------------------------
 
-    def _settle_decided(self, connection: Any, workspace_id: uuid.UUID, now: datetime) -> int:
+    def _settle_decided(
+        self, connection: Any, workspace_id: uuid.UUID, now: datetime, *, erasure_only: bool = False
+    ) -> int:
         gate = self.spending.for_workspace(workspace_id)
         settled = 0
-        for decided in batches.unsettled(connection, workspace_id):
+        for decided in batches.unsettled(connection, workspace_id, erasure_only=erasure_only):
             ticket = SpendingTicket(
                 reservation_id=decided.reservation_id,
                 authority_id=decided.reservation_authority_id,
@@ -469,7 +498,9 @@ class PieceGenerationWorker:
                     type(failure).__qualname__,
                 )
                 continue
-            batches.mark_settled(connection, workspace_id, decided.piece_request_id, now)
+            batches.mark_settled(
+                connection, workspace_id, decided.piece_request_id, now, erasure_only=erasure_only
+            )
             settled += 1
         return settled
 
@@ -600,6 +631,8 @@ class PieceGenerationWorker:
             return answered, entry
         if not queued:
             # Deleted between its record and its offer: nothing reached a session.
+            entries.write_withdrawn(self.bucket, entry, now)
+            batches.mark_erasure_withdrawn(connection, workspace_id, piece_batch_id, now)
             batches.decide_cancelled(connection, workspace_id, unsent={piece_batch_id})
             return answered, None
         return answered, entry
@@ -686,6 +719,6 @@ def _reservation_open(connection: Any, workspace_id: uuid.UUID, reservation_id: 
         (workspace_id, reservation_id),
     ).fetchone()
     if row is None:
-        return False
+        raise SettlementNotRecorded("the durable reservation is missing")
     state = row["state"] if isinstance(row, Mapping) else row[0]
     return state in ("admitted", "dispatched")

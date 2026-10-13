@@ -186,8 +186,15 @@ def test_account_wide_society_switch_is_strict_and_absent_is_off():
         _explicitly_enabled("sometimes")
 
 
-def test_shutdown_waits_for_active_playback_batch_without_blocking_event_loop(
-    monkeypatch, tmp_path
+@pytest.mark.parametrize(
+    ("factory", "thread_attribute"),
+    [
+        ("build_society_control_worker", "society_control_thread"),
+        ("build_world_draft_worker", "world_draft_thread"),
+    ],
+)
+def test_shutdown_waits_for_active_worker_without_blocking_event_loop(
+    monkeypatch, tmp_path, factory, thread_attribute
 ):
     started, stopping, release = threading.Event(), threading.Event(), threading.Event()
 
@@ -198,7 +205,7 @@ def test_shutdown_waits_for_active_playback_batch_without_blocking_event_loop(
             stopping.set()
             assert release.wait(5), "test failed to release active batch"
 
-    monkeypatch.setattr(Services, "build_society_control_worker", lambda _: Worker())
+    monkeypatch.setattr(Services, factory, lambda _: Worker())
     monkeypatch.setattr("exulanica.api.app.verify_restore", lambda *_: None)
     monkeypatch.setattr("exulanica.api.app.seed_reviewed_assets", lambda *_: None)
     app = SimpleNamespace(
@@ -213,11 +220,11 @@ def test_shutdown_waits_for_active_playback_batch_without_blocking_event_loop(
         try:
             assert await asyncio.to_thread(stopping.wait, 1)
             assert not closing.done()
-            assert app.state.society_control_thread.is_alive()
+            assert getattr(app.state, thread_attribute).is_alive()
         finally:
             release.set()
             await asyncio.wait_for(closing, 2)
-        assert not app.state.society_control_thread.is_alive()
+        assert not getattr(app.state, thread_attribute).is_alive()
 
     asyncio.run(scenario())
 

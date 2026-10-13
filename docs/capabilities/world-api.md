@@ -95,10 +95,10 @@ the tick and state digest they were made against, and a stale base is refused.
 | `GET /world/versions/{version_id}/models` | Every registered decision role (a person, a junction signal): its subjects, offered models, choices and host refusal, with the same declared semantics on each role |
 | `POST /world/versions/{version_id}/models/{role_key}` | Choose a model for some subjects of one role, or none; needs `model.invoke` beside `world.write` |
 | `GET /world/versions/{version_id}/society/models` | The offered models, each person's choice and each model's decisions |
-| `POST /world/versions/{version_id}/society/play` | Start playing one being of a society of things |
+| `POST /world/versions/{version_id}/society/play` | Start playing one being of a society of things; needs `being.act` beside `world.read`, and no `world.write` |
 | `GET /world/versions/{version_id}/society/play/{subject_id}/turn` | What the played being is offered in the minute to come |
-| `POST /world/versions/{version_id}/society/play/{subject_id}/answer` | The player's answer for the minute to come |
-| `POST /world/versions/{version_id}/society/play/{subject_id}/give-back` | Give the being back to what decided for it before |
+| `POST /world/versions/{version_id}/society/play/{subject_id}/answer` | The player's answer for the minute to come; needs `being.act` beside `world.read` |
+| `POST /world/versions/{version_id}/society/play/{subject_id}/give-back` | Give the being back to what decided for it before; needs `being.act` beside `world.read` |
 | `POST /world/versions/{version_id}/society/models` | Choose a model for some people, or their routine, as the route above does for the person role; needs `model.invoke` beside `world.write` |
 | `GET /world/versions/{version_id}/traffic` | A town's vehicles, second by second, from the roads its own records state |
 | `GET /world/versions/{version_id}/society/decisions/{request_id}` | One stored decision: what the model was asked and what it answered |
@@ -199,9 +199,12 @@ A version's read also states:
   region in the list is accepted by `POST .../objects`; any other is refused
   `422 invalid_object_data`. An invalidated source lists none, as `unavailable`.
 - `society`: whether the version holds a society, and its engine, or the engine the engine table
-  creates for this world's ground: `exulanica-society/v2` for a starter or a world from photographs,
-  `exulanica-society/v5` for a generated town. A society creation names its engine, so a client
-  sends the one named here.
+  creates for this world's ground. When the version holds no placed thing, or the host does not
+  set `EXULANICA_SOCIETY_OF_THINGS`, that engine is `exulanica-society/v2` for a starter or a
+  world from photographs and `exulanica-society/v5` for a generated town. A society creation
+  names its engine, so a client sends `society.engine` from this read. The same grounds, and
+  `generated_site`, read `exulanica-society/v7` when the host offers societies of things and the
+  version holds a placed thing. Sending `v2` or `v5` then is `409 society_engine_differs`.
 
 What differs by kind, as the reads state it:
 
@@ -210,6 +213,10 @@ What differs by kind, as the reads state it:
 | Authored starter | `region:starter` | available | yes, by reach | v2 | available once a society is brought | `roads_not_stated` |
 | Generated town | its one generated region | `unsupported`, `arrangement_needs_authored_ground` | no, `authored_affordance_unreachable` | v5 | `unsupported` (`engine_takes_no_directed_actions`, `engine_keeps_its_people`) | available |
 | From photographs | one per place | available; a world of several places names the viewer's region | yes, by reach | v2 | available once a society is brought | `roads_not_stated` |
+
+The society-engine, directed-action, and presence cells are those ground defaults. When the read
+names `exulanica-society/v7`, directed actions are available and presence is `unsupported`
+(`engine_keeps_its_people`).
 
 Making worlds: a starter is refused `saved_world_conflict` once the workspace holds any saved world,
 although the count policy sets no starter limit, and the read says so. A generated world is refused
@@ -247,6 +254,36 @@ A society's events name the input they were played under (`document.input_seq`).
 provenance read gives the authored `edit_seq` it followed and the version's state digest after that
 edit (`delta_sha256`), which is the `result_state_sha256` of that edit in the version's history, so
 an event joins to the edit, and the object, it followed.
+
+### Selected subjects
+
+`GET /world/versions/{version_id}/subjects/{ref}?world_id=W` serves
+`exulanica.subject-offer/v1` for `world`, `being:<UUID>` or `thing:<UUID>`. Being and thing
+references name society identities. Objects, parts, absent subjects and a reference naming the
+wrong subject type answer `404 unknown_reference`. Being and thing properties require a society
+of things; a living town's person is not represented as a thing card.
+
+The response identifies the subject and lists `properties`, `actions` and the society's read
+binding (`tick`, `state_sha256`) when one exists. Properties carry their typed `value`, words,
+`changeable`, the action ids in `by` and a refusal `code`. A being or thing's name, kind, decider,
+look, admitted look options, location, holding, abilities and offers come from its authoritative
+thing card. A world's kind, society presence and population, saved playback mode and speed, and
+mind budget come from their respective reads. A decider identifies whether the reader plays it;
+a budget identifies whether the reader set it. Neither exposes another person's account id.
+
+Subject actions retain the catalog's words, costs and required permissions. `runs_by.bind`
+contains the selected identity; move and remove use the authored placement id, which differs
+from a society identity. A thing with no authored placement cannot be moved or removed by those
+routes. Catalog conditions narrow the served control, presence and society facts: a playing world
+cannot be offered Play again, and a being played by another person cannot be offered for play or
+model choice. Existing operation refusals remain authoritative.
+
+An offer performs no action, advances no time, calls no model and spends nothing. It answers with
+`Cache-Control: private, no-store`. The existing Companion preparation route can prepare its
+planned actions; the person confirms and the client sends the existing write route, whose
+permissions, stale-base checks, receipts and replay remain authoritative. Choosing a look uses
+`things.look` and the existing card look route, without advancing the society. Unavailable society
+inputs answer `424 unavailable_society_input` through the card's source authorization.
 
 ### Actions by their ids
 

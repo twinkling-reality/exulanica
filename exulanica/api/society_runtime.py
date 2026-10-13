@@ -25,7 +25,7 @@ import logging
 import threading
 import uuid
 import weakref
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Annotated, Any, Final, Literal
 
@@ -114,6 +114,7 @@ from exulanica.world.society_living import current_routine, input_routine, town_
 from exulanica.world.society_place import place_sha256
 from exulanica.world.society_planner import input_sha256, validate_society_input
 from exulanica.world.society_repository import SocietyRepository
+from exulanica.world.society_site_place import site_obstructions
 from exulanica.world.society_walking_surfaces import (
     build_walking_surfaces_input,
     walking_surfaces_place,
@@ -210,6 +211,7 @@ class _TownRead:
     #: A town's own buildings, street furniture and trees, read from its records with its place,
     #: which a society of things keeps its things' places clear of.
     obstructions: CityObstructions | None = None
+    support_source: Any = None
 
 
 def _stored_site_place(
@@ -263,6 +265,15 @@ def _site_read(
     except InvalidStructuralData as exc:
         return _TownRead(None, None, str(exc))
     place = _stored_site_place(stored, ground, routine)
+    bound = connection.execute(
+        "select exists(select 1 from world_alternate_thing where workspace_id=%s "
+        "and world_id=%s and version_id=%s and support_snapshot_id is not null "
+        "and not removed and not addition_undone) as present",
+        (binding.workspace_id, binding.world_id, binding.version_id),
+    ).fetchone()["present"]
+    if bound:
+        place = None  # A bound thing requires the canonical source place, not a derived history.
+    blocked = None
     if place is None:
         worker = kind_worker()
         workspace = str(binding.workspace_id)
@@ -287,7 +298,53 @@ def _site_read(
         if answer["status"] != "done":
             return _TownRead(None, None, None, place_refusal=str(answer["detail"]))
         place = answer["place"]
-    return _TownRead(digest, place, None, (), site_receipt=receipt, site_routine=routine)
+        blocked = answer.get("blocked")
+    support_source = None
+    if bound and receipt.get("composer") == {"key": "site-plan", "version": 2}:
+        from exulanica.world.kinds.worker import drawing_job, drawing_key
+        from exulanica.world.support_placement import SupportPlacementRefused
+        from exulanica.world.support_placement_source import source_from_documents
+
+        worker = kind_worker()
+        workspace = str(binding.workspace_id)
+        key = drawing_key(workspace, digest)
+        drawn = worker.drawings.get(key)
+        if drawn is None:
+            outcome = worker.run(
+                key,
+                0,
+                drawing_job,
+                workspace,
+                binding.world_id,
+                dict(receipt),
+                digest,
+                workspace=workspace,
+                kept=worker.drawings,
+            )
+            if outcome.status != "done" or outcome.value is None:
+                return _TownRead(None, None, None, waiting=KindWorkWaiting(outcome.status))
+            drawn = outcome.value
+        if drawn["status"] != "done":
+            return _TownRead(None, None, None, place_refusal=str(drawn["detail"]))
+        try:
+            support_source = source_from_documents(
+                binding.world_id, ground.snapshot_id, digest, json.loads(drawn["body"]), place
+            )
+        except (SupportPlacementRefused, ValueError, KeyError) as exc:
+            return _TownRead(None, None, None, place_refusal=str(exc))
+    return _TownRead(
+        digest,
+        place,
+        None,
+        (),
+        site_receipt=receipt,
+        site_routine=routine,
+        # What a society of things keeps a placed thing's standing places clear of: the site's
+        # blocked boxes, which the worker hands over with the place it makes from the records. A
+        # place lifted from a stored living input comes with none, and a living society asks none.
+        obstructions=None if blocked is None else site_obstructions(blocked),
+        support_source=support_source,
+    )
 
 
 #: What a saved world's input says of the edit it follows, not of what its society reads: its
@@ -401,8 +458,10 @@ class SocietyRuntime:
         authored_bindings: Sequence[AuthoredWorldSocietyBinding] = (),
         reviewed_affordances: Mapping[str, dict[str, Any]],
         composition_profile: str = LEGACY_COMPOSITION,
+        resident_day: bool = False,
     ) -> None:
         self.store = store
+        self._resident_day = resident_day
         if is_authored_ground(input_profile(composition_profile)):
             raise ValueError("the authored-ground policy is selected by binding, not by profile")
         self._composition_profile = composition_profile
@@ -504,12 +563,15 @@ class SocietyRuntime:
         session: Session,
         version_id: uuid.UUID,
         region_id: str | None = None,
+        *,
+        seconds: float = PLACE_SECONDS,
     ) -> None:
         """Before the transaction that brings people into a saved world: a site world's place,
-        made in the kind worker and waited for here, holding no transaction and so no lock, and
-        kept for that transaction to read (:func:`_site_read`, which never waits). A place the
-        worker does not make in time is refused as :class:`KindWorkWaiting`; anything else this
-        reads is read again, and refused if it must be, under the lock.
+        made in the kind worker and waited for here at most ``seconds``, holding no transaction
+        and so no lock, and kept for that transaction to read (:func:`_site_read`, which never
+        waits). A place the worker does not make in time is refused as :class:`KindWorkWaiting`
+        and is kept when the worker finishes it; anything else this reads is read again, and
+        refused if it must be, under the lock.
         """
         if connection.info.transaction_status != TransactionStatus.IDLE:
             raise RuntimeError("a site world's place is waited for outside any transaction")
@@ -528,7 +590,7 @@ class SocietyRuntime:
         workspace = str(binding.workspace_id)
         outcome = worker.run(
             place_key(workspace, digest, ground.place_id),
-            PLACE_SECONDS,
+            seconds,
             place_job,
             workspace,
             dict(receipt),
@@ -537,6 +599,31 @@ class SocietyRuntime:
             workspace=workspace,
             kept=worker.places,
         )
+        if (
+            outcome.status == "done"
+            and receipt.get("composer") == {"key": "site-plan", "version": 2}
+            and connection.execute(
+                "select exists(select 1 from world_alternate_thing where workspace_id=%s "
+                "and world_id=%s and version_id=%s and support_snapshot_id is not null "
+                "and not removed and not addition_undone) as present",
+                (binding.workspace_id, binding.world_id, version_id),
+            ).fetchone()["present"]
+        ):
+            from exulanica.world.kinds.worker import drawing_job, drawing_key
+
+            drawn = worker.run(
+                drawing_key(workspace, digest),
+                seconds,
+                drawing_job,
+                workspace,
+                binding.world_id,
+                dict(receipt),
+                digest,
+                workspace=workspace,
+                kept=worker.drawings,
+            )
+            if drawn.status != "done":
+                raise KindWorkWaiting(drawn.status)
         if outcome.status != "done":
             raise KindWorkWaiting(outcome.status, kept=True, reason=outcome.reason)
 
@@ -1501,6 +1588,63 @@ class SocietyRuntime:
                 elif ref["kind"] == "workspace_asset":
                     self._workspace_ref(connection, session, ref)
 
+    def prepare_authored_edit(
+        self,
+        connection: psycopg.Connection,
+        session: Session,
+        world_id: str,
+        version_id: uuid.UUID,
+        *,
+        seconds: float = PLACE_SECONDS,
+    ) -> None:
+        """Before the transaction of an authored edit, or of anything else that composes this
+        version's next input: where the version holds a society of things over a world made from a
+        world kind, whose inputs carry no place, the site's place is made in the kind worker and
+        waited for here at most ``seconds`` (:meth:`prepare_saved_world`), holding no transaction
+        and so no lock. A process that no longer keeps the place (it started again, or the
+        worker's kept places turned over) then composes the input in the one ask.
+
+        Does nothing for any other version, and nothing inside a transaction. A place not made in
+        time is left to the transaction, which meets it as it stands and answers by name.
+
+        The one read every caller pays is the engine of the society this version holds in
+        ``world_id``, by the workspace, the world and the version: a version another world holds
+        is no society here and prepares nothing.
+        """
+        if connection.info.transaction_status != TransactionStatus.IDLE:
+            return
+        row = connection.execute(
+            "select engine_version from world_society "
+            "where workspace_id=%s and world_id=%s and version_id=%s",
+            (session.workspace_id, world_id, version_id),
+        ).fetchone()
+        if row is None or society_engine(row["engine_version"]).state_family != "things":
+            return
+        try:
+            self.prepare_saved_world(connection, session, version_id, seconds=seconds)
+        except KindWorkWaiting:
+            return
+
+    def with_the_place(
+        self,
+        connection: psycopg.Connection,
+        session: Session,
+        world_id: str,
+        version_id: uuid.UUID,
+        operation: Callable[[], Any],
+    ) -> Any:
+        """``operation`` (a minute, or the telling before one), and once more where it met a site
+        world's place the kind worker keeps no longer (:class:`SocietyPlaceWaiting`): the place is
+        made and waited for in between (:meth:`prepare_authored_edit`), after the transaction the
+        operation ran in has rolled back. An operation that meets no such place reads nothing
+        more for this; a place still not made the second time is refused as it was the first.
+        """
+        try:
+            return operation()
+        except SocietyPlaceWaiting:
+            self.prepare_authored_edit(connection, session, world_id, version_id)
+            return operation()
+
     def authored_edit(
         self, connection: psycopg.Connection, session: Session, version_id: uuid.UUID
     ) -> None:
@@ -1779,20 +1923,29 @@ class SocietyRuntime:
             routine = None
             place = town.place
             if town.site_receipt is not None:
-                # A world made from a world kind is walked only by the living society, under the
-                # routine its receipt names, over the place made from its records under it.
-                if chosen != WALKING_SURFACES_COMPOSITION_V2:
+                # A world made from a world kind is lived in by the living society or as a
+                # society of things, under the routine its receipt names, over the place made
+                # from its records under it; the purposeful society reads a town alone.
+                if chosen == WALKING_SURFACES_COMPOSITION:
                     raise UnavailableSocietyInput(
-                        "a world made from a world kind is lived in by the living society only"
+                        "a world made from a world kind is lived in by the living society or "
+                        "as a society of things"
                     )
-                routine = town.site_routine
-                if routine is None:
+                if town.site_routine is None:
                     raise UnavailableSocietyInput(
                         "the world's routine was not read before the lock"
                     )
-                if living_routine is not None and living_routine.sha256 != routine.sha256:
+                if chosen == WALKING_SURFACES_COMPOSITION_V2:
+                    routine = town.site_routine
+                    if living_routine is not None and living_routine.sha256 != routine.sha256:
+                        raise UnavailableSocietyInput(
+                            "the input names another routine than the world's"
+                        )
+                elif reason is None and town.obstructions is None:
+                    # A society of things keeps what is placed clear of what is built, which
+                    # only the site's records state: the worker hands that over with the place.
                     raise UnavailableSocietyInput(
-                        "the input names another routine than the world's"
+                        "the site's blocked ground was not read with its place"
                     )
             elif chosen == WALKING_SURFACES_COMPOSITION_V2:
                 # A new society's people are made under the routine the town's own receipt pins,
@@ -1800,14 +1953,23 @@ class SocietyRuntime:
                 routine = self._made_under(town) if living_routine is None else living_routine
                 place = self._living_place(ground, town, routine)
             people = None
+            day_place = day_routine = None
             if chosen == WALKING_SURFACES_COMPOSITION_V3 and reason is None:
                 # What the town's people are made from, under the routine the town's receipt
                 # pins: the homes and positions the living town reads, so a society of things
                 # over the town is the same people. Seed-free: its genesis completes it. Every
-                # input states the population it gives; the first alone records the frame.
-                made_under = self._made_under(town)
+                # input states the population it gives; the first alone records the frame. A
+                # site's people are made from the site's own place under the routine its receipt
+                # names, the place its living society would live in.
+                if town.site_receipt is not None and town.site_routine is not None:
+                    made_under, lived_in = town.site_routine, town.place
+                else:
+                    made_under = self._made_under(town)
+                    lived_in = self._living_place(ground, town, made_under)
                 try:
-                    people = people_frame(self._living_place(ground, town, made_under), made_under)
+                    people = people_frame(lived_in, made_under)
+                    if self._resident_day and seq == 1:
+                        day_place, day_routine = lived_in, made_under
                 except TownPeopleRefused as exc:
                     raise UnavailableSocietyInput(
                         f"the town's people could not be stated: {exc}"
@@ -1832,9 +1994,12 @@ class SocietyRuntime:
                 if chosen == WALKING_SURFACES_COMPOSITION_V3
                 else None,
                 people=people,
+                day_place=day_place,
+                day_routine=day_routine,
                 made_kinds=self._made_kinds(connection, binding.workspace_id, version.things)
                 if chosen == WALKING_SURFACES_COMPOSITION_V3
                 else None,
+                support_source=town.support_source,
             )
         raise UnavailableSocietyInput(
             f"no society composition walks a {ground.navigation_form!r} ground"
@@ -2125,8 +2290,10 @@ class SocietyRuntime:
                 raise UnavailableSocietyInput("society input history is unavailable")
             last_document = previous["document"]
             read = self._transaction_read(connection)
-            # A site world's next input is composed from the place its last input carries, so an
-            # edit never waits on the kind worker (:func:`_site_read`).
+            # A site world's next living input is composed from the place its last input carries.
+            # A things input carries none: its place is the one the kind worker keeps, made before
+            # this transaction (:meth:`prepare_authored_edit`); neither read waits here
+            # (:func:`_site_read`).
             self._read_town_ahead(connection, binding, ground, read, last_document)
             self._read_ahead(connection, session, read, composing=binding)
             arrival_authority: ArrivalAuthority | None = None

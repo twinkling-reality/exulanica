@@ -24,15 +24,19 @@
  */
 
 import { fill, say } from '../ui/copy.js';
-import { buildLookRow, buildLookSheet, type LookOption } from '../ui/look-sheet.js';
+import { buildLookRow, buildLookSheet, lookChoiceId, type LookOption } from '../ui/look-sheet.js';
 import type { DraftLook } from '../ui/world-description.js';
 import type { OfferedLook } from '../world-draft-api.js';
 import type { WorldStylePackBinding } from '../world-style-api.js';
 import type { LookLibrary } from './look-library.js';
+import { servedEntryStylePack } from '../world-entry-intent.js';
+import { el } from '../ui/dom.js';
 
 export interface TownLook {
   /** The row above Create this town: the look, why it is this one, and Change look. */
   readonly row: HTMLElement;
+  /** Resolves when the installation has checked a requested entry look. */
+  readonly ready: Promise<void>;
   /**
    * What the making names: the exact pack, or null for none, which the host makes in its default.
    */
@@ -47,7 +51,7 @@ export interface TownLook {
  * they had chosen, which makes it theirs: only the first follows the next draft taken.
  */
 type Chosen =
-  | { readonly by: 'person'; readonly packId: string }
+  | { readonly by: 'person'; readonly packId: string; readonly binding?: WorldStylePackBinding }
   | { readonly by: 'words'; readonly offer: OfferedLook; readonly pressed: boolean };
 
 export function buildTownLook(options: {
@@ -55,14 +59,21 @@ export function buildTownLook(options: {
   readonly library: Promise<LookLibrary>;
   /** Where the Look sheet opens, over Create a world. */
   readonly host: HTMLElement;
+  /** A public entry link must retain its exact served version until explicitly replaced. */
+  readonly initial?: WorldStylePackBinding;
 }): TownLook {
   let looks: LookLibrary | null = null;
+  let requestedProblem: string | null = options.initial === undefined
+    ? null : 'Checking the requested look and version on this installation.';
+  const notice = el('p', { class: 'look-row-line', role: 'status', hidden: requestedProblem === null });
+  notice.textContent = requestedProblem;
   // Null until someone chooses: the host's default, which the making names no pack for.
   let chosen: Chosen | null = null;
   const watchers: (() => void)[] = [];
 
   const listed = (packId: string | null): LookOption | undefined => (
-    packId === null ? undefined : looks?.options.find((option) => option.packId === packId));
+    packId === null ? undefined : looks?.options.find((option) => lookChoiceId(option) === packId)
+      ?? (looks?.options.filter(option => option.packId === packId).length === 1 ? looks?.options.find(option => option.packId === packId) : undefined));
   const packId = (): string | null => (
     chosen === null ? looks?.defaultId ?? null : chosen.by === 'person' ? chosen.packId : chosen.offer.packId);
 
@@ -74,7 +85,11 @@ export function buildTownLook(options: {
         : fill('worldRecipes.look.fromWords', {
           phrases: chosen.offer.lookWords.map((phrase) => fill('worldDescription.quoted', { phrase })).join(', '),
         });
-    row.show(option, line);
+    const binding = chosen?.by === 'person' ? chosen.binding : undefined;
+    row.show(binding === undefined ? option : {
+      ...option, version: binding.version,
+      picture: option.version === binding.version ? option.picture : null,
+    }, binding === undefined ? line : `Requested version ${binding.version}. Review this look before creating; you can choose another.`);
   };
   const changed = (): void => {
     show();
@@ -92,7 +107,9 @@ export function buildTownLook(options: {
       worldTitle: 'A new town',
       choosing: { use: 'Choose this look', now: 'Chosen' },
       onUse: async (option) => {
-        chosen = { by: 'person', packId: option.packId };
+        chosen = { by: 'person', packId: lookChoiceId(option) };
+        requestedProblem = null;
+        notice.hidden = true;
         changed();
         sheet.root.remove();
         focusBack();
@@ -104,28 +121,50 @@ export function buildTownLook(options: {
       },
     });
     options.host.append(sheet.root);
-    sheet.show(library.options, packId());
+    const binding = chosen?.by === 'person' ? chosen.binding : undefined;
+    const earlier = binding !== undefined && library.binding(chosen?.by === 'person' ? chosen.packId : binding.packId)?.manifestSha256 !== binding.manifestSha256
+      ? { packId: chosen?.by === 'person' ? chosen.packId : binding.packId, version: binding.version, picture: null } : null;
+    sheet.show(library.options, requestedProblem === null ? packId() : null, { earlier });
     sheet.focus();
   });
 
-  void options.library.then((library) => {
+  const ready = options.library.then(async (library) => {
     looks = library;
+    if (options.initial !== undefined) {
+      const binding = servedEntryStylePack(options.initial, library.packs);
+      chosen = { by: 'person', packId: (await library.now(binding)).packId ?? binding.packId, binding };
+      requestedProblem = null;
+      notice.hidden = true;
+    }
     changed();
-  }, () => undefined);
+  }).catch((error: unknown) => {
+    if (options.initial === undefined) return;
+    requestedProblem = looks === null
+      ? 'The requested look could not be checked. Reopen this link when the installation is reachable.'
+      : error instanceof Error ? error.message : 'The requested look is unavailable. Choose another look to continue.';
+    notice.textContent = requestedProblem;
+    notice.hidden = false;
+    // Keep an explicit replacement available; never silently use the host's default.
+    const first = looks?.options[0];
+    if (first !== undefined) row.show(first, 'The requested version is unavailable. Choose a look to continue.');
+  });
 
   /** Make an offered look the town's; false, and nothing changes, for one the host does not list. */
   const wear = (offer: OfferedLook, pressed: boolean): boolean => {
     if (listed(offer.packId) === undefined) return false;
+    if (pressed) { requestedProblem = null; notice.hidden = true; }
     chosen = { by: 'words', offer, pressed };
     changed();
     return true;
   };
 
   return {
-    row: row.root,
+    row: options.initial === undefined ? row.root : el('div', {}, [notice, row.root]),
+    ready,
     binding() {
+      if (requestedProblem !== null) throw new Error(requestedProblem);
       if (chosen === null) return null;
-      if (chosen.by === 'person') return looks?.binding(chosen.packId) ?? null;
+      if (chosen.by === 'person') return chosen.binding ?? looks?.binding(chosen.packId) ?? null;
       const offer = chosen.offer;
       return { packId: offer.packId, version: offer.version, manifestSha256: offer.manifestSha256 };
     },
@@ -138,6 +177,7 @@ export function buildTownLook(options: {
         return { title: option.title, kept: own?.title ?? null };
       },
       take(offer) {
+        if (requestedProblem !== null) return false;
         // No offer, or a look step that did not answer: the look shown is kept.
         if (offer === null || offer.state === 'unavailable') return false;
         if (offer.state === 'none') {

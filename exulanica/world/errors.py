@@ -45,6 +45,7 @@ __all__ = [
     "UnavailableAsset",
     "UnknownWorldResource",
     "WorldNotConfigured",
+    "WorldRemoved",
     "WorldStyleError",
 ]
 
@@ -77,6 +78,10 @@ class UnavailableAsset(WorldStyleError):
 
 class UnknownWorldResource(WorldStyleError):
     """A preview, version, or source slot is absent or belongs to another workspace."""
+
+
+class WorldRemoved(WorldStyleError):
+    """This workspace permanently removed the named world."""
 
 
 class InvalidPreviewState(WorldStyleError):

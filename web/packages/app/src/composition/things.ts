@@ -57,6 +57,7 @@ export interface ThingsDependencies {
   readonly credentials: Credentials;
   /** The entity a region's things stand in, or null where this world does not draw that region. */
   readonly regionRoot: ThingLayerOptions['regionRoot'];
+  readonly supportRoot?: ThingLayerOptions['supportRoot'];
   readonly invalidate: () => void;
   readonly reducedMotion: () => boolean;
   /** The library to read from; the host's, read with the credentials, when left out. */
@@ -174,6 +175,7 @@ export function placedThingRecord(thing: PlacedThing): PlacedThingRecord {
       scaleMilli: thing.transform.scaleMilli,
     },
     removed: thing.removed,
+    ...(thing.support === undefined ? {} : { support: thing.support }),
   };
 }
 
@@ -184,6 +186,7 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
     camera: deps.camera,
     library,
     regionRoot: deps.regionRoot,
+    ...(deps.supportRoot === undefined ? {} : {supportRoot: deps.supportRoot}),
     ringColour: signalColour(),
     personColour: worldMarkPersonColour(),
     personEdge: worldMarkPersonInk(),

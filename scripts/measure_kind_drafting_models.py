@@ -439,15 +439,21 @@ def _instructions() -> tuple[str, Any]:
     from exulanica.world.society_living import town_routine
 
     prompt = kind_drafting_prompt()
-    return render_instructions(prompt, load_kind_catalogs(), town_routine()), prompt
+    catalogs = load_kind_catalogs(bounds_version=2 if prompt.version >= 7 else 1)
+    return render_instructions(prompt, catalogs, town_routine()), prompt
 
 
 def _form_sha256() -> str:
     """The SHA-256 of the schema every request sends, as the client sends it."""
     from exulanica.models.schema import response_format_for
     from exulanica.selection.kind_brief import brief_form
+    from exulanica.selection.kind_drafting import kind_drafting_prompt
 
-    return _sha256(canonical_json(response_format_for(brief_form(), arrays_last=True)))
+    prompt = kind_drafting_prompt()
+    form = brief_form(
+        fixture_vocabulary=prompt.version >= 6, requirement_contract=prompt.version >= 7
+    )
+    return _sha256(canonical_json(response_format_for(form, arrays_last=True)))
 
 
 def _registration() -> dict[str, Any]:
@@ -494,7 +500,9 @@ def _registration() -> dict[str, Any]:
         "form_sha256": _form_sha256(),
         "drafter_sha256": _sha256((ROOT / DRAFTER).read_bytes()),
         "compiler_sha256": _sha256((ROOT / COMPILER).read_bytes()),
-        "kind_catalogs": dict(load_kind_catalogs().sha256),
+        "kind_catalogs": dict(
+            load_kind_catalogs(bounds_version=2 if prompt.version >= 7 else 1).sha256
+        ),
         "manifest_sha256": _manifest_sha256(),
         "script": SCRIPT,
         "script_sha256": _sha256((ROOT / SCRIPT).read_bytes()),

@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "catalog_id": "thing-leaf",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "bed",
+      "family": "fixture",
+      "words": "a bed a person sleeps in",
+      "width_mm": 2000,
+      "depth_mm": 2000,
+      "height_mm": 600,
+      "reason": "Authored representative dimensions for a bed a person sleeps in. These are placement defaults, not a measured or approved generated asset.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    },
+    {
+      "key": "bench",
+      "family": "fixture",
+      "words": "a bench to sit on",
+      "width_mm": 2000,
+      "depth_mm": 500,
+      "height_mm": 450,
+      "reason": "Authored representative dimensions for a bench to sit on. These are placement defaults, not a measured or approved generated asset.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    },
+    {
+      "key": "bollard",
+      "family": "fixture",
+      "words": "a mooring bollard on a quay",
+      "width_mm": 500,
+      "depth_mm": 500,
+      "height_mm": 800,
+      "reason": "Authored representative dimensions for a mooring bollard on a quay. These are placement defaults, not a measured or approved generated asset.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    },
+    {
+      "key": "campfire",
+      "family": "fixture",
+      "words": "a campfire ringed with stones",
+      "width_mm": 1500,
+      "depth_mm": 1500,
+      "height_mm": 600,
+      "reason": "Authored representative dimensions for a campfire ringed with stones. These are placement defaults, not a measured or approved generated asset.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    },
+    {
+      "key": "counter",
+      "family": "fixture",
+      "words": "a counter a person serves from behind",
+      "width_mm": 2000,
+      "depth_mm": 800,
+      "height_mm": 1100,
+      "reason": "Authored representative dimensions for a counter a person serves from behind. These are placement defaults, not a measured or approved generated asset.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    },
+    {
+      "key": "crane",
+      "family": "fixture",
+      "words": "a tall dockside crane that lifts cargo",
+      "width_mm": 4000,
+      "depth_mm": 4000,
+      "height_mm": 12000,
+      "reason": "Authored representative dimensions for a tall dockside crane that lifts cargo. These are placement defaults, not a measured or approved generated asset.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    },
+    {
+      "key": "crate",
+      "family": "fixture",
+      "words": "one wooden crate",
+      "width_mm": 1000,
+      "depth_mm": 800,
+      "height_mm": 800,
+      "reason": "Authored representative dimensions for one wooden crate. These are placement defaults, not a measured or approved generated asset.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    },
+    {
+      "key": "fishing_boat",
+      "family": "vehicle",
+      "words": "a small open fishing boat",
+      "width_mm": 2000,
+      "depth_mm": 5000,
+      "height_mm": 2000,
+      "reason": "Authored representative dimensions for a small open fishing boat. These are placement defaults, not a measured or approved generated asset.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    },
+    {
+      "key": "notice_board",
+      "family": "fixture",
+      "words": "a notice board on posts",
+      "width_mm": 1000,
+      "depth_mm": 200,
+      "height_mm": 1500,
+      "reason": "Authored representative dimensions for a notice board on posts. These are placement defaults, not a measured or approved generated asset.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    },
+    {
+      "key": "sleeping_mat",
+      "family": "fixture",
+      "words": "one thin sleeping mat laid on the ground",
+      "width_mm": 2000,
+      "depth_mm": 800,
+      "height_mm": 50,
+      "reason": "Authored placement dimensions for ground bedding, with no asset resemblance or measurement claim. Only world-kind/v2 permits this height.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    },
+    {
+      "key": "stall",
+      "family": "fixture",
+      "words": "a market stall with a top over it",
+      "width_mm": 2000,
+      "depth_mm": 1500,
+      "height_mm": 2200,
+      "reason": "Authored representative dimensions for a market stall with a top over it. These are placement defaults, not a measured or approved generated asset.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    },
+    {
+      "key": "table",
+      "family": "fixture",
+      "words": "a table",
+      "width_mm": 2000,
+      "depth_mm": 800,
+      "height_mm": 750,
+      "reason": "Authored representative dimensions for a table. These are placement defaults, not a measured or approved generated asset.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    },
+    {
+      "key": "well",
+      "family": "fixture",
+      "words": "a low stone well head with no roof",
+      "width_mm": 2000,
+      "depth_mm": 2000,
+      "height_mm": 1200,
+      "reason": "Authored representative dimensions for a low stone well head with no roof. These are placement defaults, not a measured or approved generated asset.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored Exulanica fixture vocabulary and placement defaults"
+      }
+    }
+  ]
+}

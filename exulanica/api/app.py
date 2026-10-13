@@ -81,6 +81,7 @@ from exulanica.api.admission import (
 from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.api.body_limit import BodyLimit, BodyTooLarge
 from exulanica.api.dependencies import authorise_route
+from exulanica.api.participation import ParticipationRuntime
 from exulanica.api.permissions import (
     CreatorGrantRequired,
     PermissionRefused,
@@ -104,7 +105,9 @@ from exulanica.api.routes import (
     intake,
     interaction,
     materials,
+    models,
     operations,
+    participation,
     person_consent,
     personal_admission,
     piece_requests,
@@ -126,6 +129,7 @@ from exulanica.api.routes import (
     society_play,
     spending,
     style_packs,
+    subjects,
     thing_creatures,
     thing_store,
     things,
@@ -138,17 +142,21 @@ from exulanica.api.routes import (
     world_behaviours,
     world_clock,
     world_compositions,
+    world_draft_actions,
     world_drafts,
+    world_entity_query,
     world_entries,
     world_environments,
     world_flight,
     world_generation,
+    world_inventory,
     world_kinds,
     world_making,
     world_models,
     world_objects,
     world_projects,
     world_read,
+    world_support_placement,
     world_things,
     world_traffic,
     world_versions,
@@ -157,6 +165,7 @@ from exulanica.api.routes import (
 )
 from exulanica.api.routes.selection import ModelNotConfigured, failure_extensions
 from exulanica.api.services import Services, build_services
+from exulanica.api.society_making import SocietyHooks
 from exulanica.api.traffic_signal_controller import TrafficSignalController
 from exulanica.corpus.decode import DecodeBusy, configure_decode_concurrency
 from exulanica.db.migrate import verify_schema
@@ -195,6 +204,11 @@ from exulanica.models.errors import (
 )
 from exulanica.models.policy import HostedRequestRefused, NoHostedRequestPolicy
 from exulanica.models.spending import SpendingRefused
+from exulanica.participation.repository import (
+    InvitationConflict,
+    ParticipationRefused,
+    RedemptionLimited,
+)
 from exulanica.selection.validation import RejectionCode, SelectionRejected
 from exulanica.world import (
     ExpiredPreview,
@@ -213,6 +227,7 @@ from exulanica.world import (
     WorldNotConfigured,
     seed_reviewed_assets,
 )
+from exulanica.world.errors import WorldRemoved
 from exulanica.world.flight_input import close_flight_worker
 from exulanica.world.kinds.worker import close_kind_worker
 from exulanica.world.society import SocietyBytesNotRead
@@ -359,6 +374,31 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Creature drafts (a person's words drafted into a creature kept in the workspace's own store)
     # are played here for the workspaces EXULANICA_CREATURE_WORKSPACES lists, unless
     # EXULANICA_CREATURE_WORKER sets them off.
+    model_probe_worker = services.build_model_probe_worker()
+    model_probe_thread = (
+        threading.Thread(
+            target=model_probe_worker.run, args=(society_stop,), name="model-probes", daemon=True
+        )
+        if model_probe_worker is not None
+        else None
+    )
+    app.state.model_probe_worker = model_probe_worker
+    kind_draft_worker = services.build_kind_draft_worker()
+    kind_draft_thread = threading.Thread(
+        target=kind_draft_worker.run, args=(society_stop,), name="kind-drafts", daemon=True
+    )
+    app.state.kind_draft_worker = kind_draft_worker
+    app.state.kind_draft_thread = kind_draft_thread
+    world_draft_worker = services.build_world_draft_worker()
+    world_draft_thread = (
+        threading.Thread(
+            target=world_draft_worker.run, args=(society_stop,), name="world-drafts", daemon=True
+        )
+        if world_draft_worker is not None
+        else None
+    )
+    app.state.world_draft_worker = world_draft_worker
+    app.state.world_draft_thread = world_draft_thread
     creature_worker = services.build_creature_worker()
     creature_thread = (
         threading.Thread(
@@ -396,6 +436,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             comparison_thread.start()
         if reference_thread is not None:
             reference_thread.start()
+        if model_probe_thread is not None:
+            model_probe_thread.start()
+        kind_draft_thread.start()
+        if world_draft_thread is not None:
+            world_draft_thread.start()
         if creature_thread is not None:
             creature_thread.start()
         if services.playback_player != "process":
@@ -422,6 +467,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             await asyncio.to_thread(comparison_thread.join)
         if reference_thread is not None:
             await asyncio.to_thread(reference_thread.join)
+        if model_probe_thread is not None:
+            await asyncio.to_thread(model_probe_thread.join)
+        await asyncio.to_thread(kind_draft_thread.join)
+        if world_draft_thread is not None:
+            await asyncio.to_thread(world_draft_thread.join)
         if creature_thread is not None:
             await asyncio.to_thread(creature_thread.join)
         await asyncio.to_thread(traffic_signals.close)
@@ -436,7 +486,9 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         await asyncio.to_thread(close_kind_worker)
 
 
-def create_app(services: Services | None = None, *, verify: bool = True) -> FastAPI:
+def create_app(
+    services: Services | None = None, *, verify: bool = True, participation_enabled: bool = False
+) -> FastAPI:
     """Build the application. ``services`` is injectable so a test does not read the environment.
 
     ``verify=False`` skips the boot-time schema check, and exists for the tests that build an app
@@ -462,6 +514,11 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         app.state.society_input_authorizer = runtime.authorize
         app.state.society_authored_edit = runtime.authored_edit
     app.state.verify_schema_at_boot = verify
+    app.state.participation = None
+    if participation_enabled:
+        visitor_runtime = ParticipationRuntime(app.state.services, SocietyHooks.of_app(app))
+        visitor_runtime.verify()
+        app.state.participation = visitor_runtime
     app.state.admission = Admission(app.state.services.admission)
     configure_decode_concurrency(app.state.services.admission.decodes)
     # Pure ASGI and just inside the body limit, so a refusal comes before routing, before any body
@@ -474,8 +531,10 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         BodyLimit,
         routes=(
             *world_kinds.BODY_LIMITS,
+            *generated_worlds.BODY_LIMITS,
             *world_making.BODY_LIMITS,
             *door.BODY_LIMITS,
+            *participation.BODY_LIMITS,
             *workspace_assets.BODY_LIMITS,
             *workspace_style_packs.BODY_LIMITS,
             *intake.BODY_LIMITS,
@@ -501,6 +560,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(society_experiments.router)
     app.include_router(character_appearance.router)
     app.include_router(materials.router)
+    app.include_router(models.router)
     app.include_router(workspace_assets.router)
     app.include_router(workspace_style_packs.router)
     app.include_router(tiles.router)
@@ -528,8 +588,11 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(thing_creatures.router)
     app.include_router(world_behaviours.router)
     app.include_router(world_versions.router)
+    app.include_router(world_inventory.router)
+    app.include_router(world_entity_query.router)
     app.include_router(world_environments.router)
     app.include_router(world_things.router)
+    app.include_router(world_support_placement.router)
     app.include_router(world_objects.router)
     app.include_router(world_compositions.router)
     app.include_router(world_arrangements.router)
@@ -539,6 +602,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(world_traffic.router)
     app.include_router(signal_comparisons.router)
     app.include_router(world_models.router)
+    app.include_router(subjects.router)
     app.include_router(capabilities.router)
     app.include_router(interaction.router)
     app.include_router(world_projects.router)
@@ -551,14 +615,31 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(world_kinds.router)
     app.include_router(world_kinds.site_router)
     app.include_router(world_making.router)
+    app.include_router(world_draft_actions.router)
     app.include_router(references.router)
     app.include_router(piece_requests.router)
     app.include_router(world_drafts.router)
     app.include_router(door.router)
+    app.include_router(participation.router)
     # After the last router and before the application is handed to anybody: a route nobody
     # declared, or a declaration for a route that is gone, is a build failure with its name in it.
     require_complete_declaration(app)
     require_capacity_declaration(app)
+
+    @app.exception_handler(ParticipationRefused)
+    @app.exception_handler(InvitationConflict)
+    @app.exception_handler(RedemptionLimited)
+    async def _participation_refused(
+        _request: Request, exc: ParticipationRefused | InvitationConflict | RedemptionLimited
+    ) -> JSONResponse:
+        headers = {"Cache-Control": "private, no-store"}
+        if isinstance(exc, RedemptionLimited):
+            headers["Retry-After"] = "60"
+        return JSONResponse(
+            status_code=exc.status,
+            content={"code": exc.code, "detail": exc.detail},
+            headers=headers,
+        )
 
     @app.exception_handler(BodyTooLarge)
     async def _too_large(_request: Request, exc: BodyTooLarge) -> JSONResponse:
@@ -835,6 +916,10 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     @app.exception_handler(UnavailableAsset)
     async def _unavailable_asset(_request: Request, exc: UnavailableAsset) -> JSONResponse:
         return _problem(424, "unavailable_asset", str(exc))
+
+    @app.exception_handler(WorldRemoved)
+    async def _world_removed(_request: Request, exc: WorldRemoved) -> JSONResponse:
+        return JSONResponse(status_code=410, content={"code": "world_removed", "detail": str(exc)})
 
     @app.exception_handler(UnknownWorldResource)
     async def _unknown_world(_request: Request, exc: UnknownWorldResource) -> JSONResponse:

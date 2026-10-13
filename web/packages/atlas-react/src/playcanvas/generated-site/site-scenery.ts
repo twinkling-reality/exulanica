@@ -3,7 +3,7 @@ import {
   materialOfLeaf, sceneryBeyond,
   type SceneryPiece, type SiteScenery, type SiteSceneryCatalog, type SurfaceMaterials,
 } from '@exulanica/atlas-core';
-import type { SiteDrawing, SiteSlot } from './site-drawing.js';
+import type { StructuredSiteDrawing, SiteSlot } from './site-drawing.js';
 
 /**
  * The scenery beyond a made place, drawn: trees and stones on the ground past the place's rectangle
@@ -61,7 +61,7 @@ export interface DrawnScenery {
  * material with no entry.
  */
 export function sceneryOf(
-  drawing: SiteDrawing, base: SiteSlot | null, catalog: SiteSceneryCatalog, materials: SurfaceMaterials,
+  drawing: StructuredSiteDrawing, base: SiteSlot | null, catalog: SiteSceneryCatalog, materials: SurfaceMaterials,
 ): { readonly scenery: SiteScenery; readonly pieces: SceneryPiece[] } | null {
   if (drawing.extent.enclosure !== 'open') return null;
   const material = base === null ? null : materialOfLeaf(materials, base.family, base.leaf);

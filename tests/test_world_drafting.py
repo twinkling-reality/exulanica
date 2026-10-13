@@ -38,7 +38,12 @@ VIEW = specification_view(specification_document())
 
 
 def _reply(value: object) -> HttpResponse:
-    return HttpResponse(status_code=200, text=json.dumps(chat_body(json.dumps(value))))
+    return HttpResponse(
+        status_code=200,
+        text=json.dumps(
+            chat_body(json.dumps(value), model=load_manifest()[DRAFTER_ROLE].primary.model_id)
+        ),
+    )
 
 
 def _client(*responses: HttpResponse) -> tuple[ModelClient, FakeTransport, RecordingPolicy]:

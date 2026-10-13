@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseActionPlan, type ActionPlan, type PlanStep } from '../src/companion-actions-api.js';
 import { parseWorldCapabilities, type OperationDescriptors } from '../src/capabilities-api.js';
 import { PLAN_ACTIONS, plannedEntry, plannedRequest, stepAnswer } from '../src/ui/actions/planned.js';
-import { actionSpec } from '../src/ui/actions/registry.js';
+import { actionSpec, actionsFor, availability } from '../src/ui/actions/registry.js';
 import { performPlanned, type ActionHost } from '../src/ui/actions/surfaces.js';
 import { toastStack } from '../src/ui/system/components.js';
 
@@ -24,6 +24,10 @@ const plan = (name: string): ActionPlan => parseActionPlan(fixture(name));
 const responses = (name: string): unknown[] => (fixture(name) as { body: unknown }[]).map((row) => row.body);
 const planner = readFileSync(`${repository}/exulanica/selection/action_plan.py`, 'utf8');
 const routes = readFileSync(`${repository}/exulanica/api/routes/selection_actions.py`, 'utf8');
+const workspacePlanner = readFileSync(`${repository}/exulanica/selection/world_draft_plan.py`, 'utf8');
+const workspaceOperation = workspacePlanner.match(/^OPERATION = "([^"]+)"$/m)![1]!;
+const workspaceProfile = workspacePlanner.match(/^PROFILE = "([^"]+)"$/m)![1]!;
+const workspaceWords = [...workspacePlanner.matchAll(/action=\{"operation": "([a-z_]+)"\}/g)].map((m) => m[1]!);
 
 function enumValues(name: string): string[] {
   const start = planner.indexOf(`class ${name}(StrEnum):`);
@@ -34,6 +38,7 @@ function enumValues(name: string): string[] {
 describe('the planner’s vocabulary on the registry', () => {
   it('maps every word the planner can write, or says it is deliberately not sent', () => {
     const words = new Set([
+      ...workspaceWords,
       ...enumValues('WorldEditOperation'),
       ...enumValues('SimulationAction'),
       ...[...planner.matchAll(/"operation": "([a-z_]+_appearance)"/g)].map((m) => m[1]!),
@@ -46,12 +51,34 @@ describe('the planner’s vocabulary on the registry', () => {
   it('sends each mapped word to a route a plan step may name, through an entry with words', () => {
     const allowed = [...routes.slice(routes.indexOf('OutcomeOperation = Literal['), routes.indexOf(']', routes.indexOf('OutcomeOperation = Literal[')))
       .matchAll(/"([A-Z]+ \/[^"]+)"/g)].map((m) => m[1]!);
-    for (const id of Object.values(PLAN_ACTIONS)) {
+    expect(workspaceWords).toEqual(['draft_world']);
+    expect(allowed).not.toContain(workspaceOperation);
+    for (const [word, id] of Object.entries(PLAN_ACTIONS)) {
       if (id === null) continue;
       const spec = actionSpec(id);
-      expect(allowed, id).toContain(spec.operation);
+      const planOperations = workspaceWords.includes(word) ? [workspaceOperation] : allowed;
+      expect(planOperations, id).toContain(spec.operation);
       expect(spec.label.trim(), id).not.toBe('');
     }
+  });
+});
+
+describe('a workspace draft has its own confirmation protocol', () => {
+  it('names the workspace operation without offering a generic world control', () => {
+    expect(PLAN_ACTIONS['draft_world']).toBe('world.draft');
+    const draft = actionSpec('world.draft');
+    expect(draft.operation).toBe(workspaceOperation);
+    expect(draft.placement).toEqual(['companion']);
+    expect(draft.worldScoped).not.toBe(true);
+    expect(availability(draft, null).state).toBe('unknown');
+    for (const placement of ['rail', 'top-bar', 'palette'] as const) {
+      expect(actionsFor(placement)).not.toContain(draft);
+    }
+  });
+
+  it('does not parse a workspace proposal as a selection action plan', () => {
+    const selection = fixture('world-edit-plan') as Record<string, unknown>;
+    expect(() => parseActionPlan({ ...selection, profile: workspaceProfile })).toThrow('profile');
   });
 });
 

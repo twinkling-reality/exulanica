@@ -64,6 +64,8 @@ from exulanica.world.style_packs import (
     _srgb8,
     _text,
     canonical_json,
+    context_for_manifest,
+    require_chain_catalog,
     split_look_role,
 )
 
@@ -184,6 +186,7 @@ def resolve_chain(chain: Sequence[Mapping[str, Any]]) -> ResolvedPack:
     base's, and what it leaves out is the base's."""
     if not 1 <= len(chain) <= CHAIN_MAXIMUM:
         raise StylePackRefused("reference", "base", "a pack resolves through one to four manifests")
+    require_chain_catalog(chain)
     swatches: dict[str, Mapping[str, Any]] = {}
     surfaces: dict[str, Mapping[str, Any]] = {}
     light: Mapping[str, Any] | None = None
@@ -758,6 +761,7 @@ def bound_setting(
     when the parts chosen change nothing of this pack, so a world never names an empty setting."""
     rules = setting_rules() if rules is None else rules
     pack = resolve_chain(chain)
+    context = context_for_manifest(chain[0], context)
     if document is None:
         if chosen is None:
             return None

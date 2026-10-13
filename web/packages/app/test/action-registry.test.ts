@@ -5,6 +5,7 @@ import { parseWorkspaceCreation, parseWorldCapabilities, type WorldCapabilities 
 import {
   ACTIONS,
   availability,
+  actionsFor,
   COMMON_REFUSALS,
   refusalWords,
   UNRECOGNISED_REFUSAL,
@@ -29,6 +30,16 @@ describe('the action registry', () => {
       expect(spec.hint.trim(), spec.id).not.toBe('');
       expect(ICON_NAMES, spec.id).toContain(spec.icon);
       expect(spec.placement.length, spec.id).toBeGreaterThan(0);
+    }
+  });
+
+  it('offers the look action only through its existing selected card, with no Companion word', () => {
+    const look = spec('things.look');
+    expect(look.placement).toEqual(['card:look']);
+    expect(look.spendsNothing).toBe(true);
+    expect(actionsFor('card:look')).toContain(look);
+    for (const placement of ['palette', 'rail', 'top-bar', 'companion'] as const) {
+      expect(actionsFor(placement)).not.toContain(look);
     }
   });
 

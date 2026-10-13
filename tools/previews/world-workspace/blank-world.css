@@ -1,0 +1,10 @@
+/* Activated only after a real saved world mounts. Loading and failures stay readable. */
+body.ux-world-cleared #shell,
+body.ux-world-cleared #product-review {
+  display: none !important;
+}
+
+/* This temporary canvas-only review also fits the Codex side pane. */
+body.ux-world-cleared #atlas {
+  visibility: visible !important;
+}

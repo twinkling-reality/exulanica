@@ -161,6 +161,7 @@ export interface SavedWorldEntry {
    * it.
    */
   readonly generatedSite?: GeneratedSite | null;
+  readonly generatedTerrain?: GeneratedTerrain | null;
   /**
    * The engine a society over this world is created with, as the server derives it from the
    * world's ground: the page names it when it brings people in, and derives none of its own. Null
@@ -242,6 +243,16 @@ export interface GeneratedSite {
   readonly arrivalMm: readonly [east: number, height: number, south: number];
   /** The way a person arriving faces, a plan vector: east, then south. */
   readonly arrivalFacingMm: readonly [east: number, south: number];
+}
+
+/** A generated terrain source, independently of a world-kind site. */
+export interface GeneratedTerrain {
+  readonly dressingSha256?: string;
+  readonly regionId: string;
+  readonly arrivalMm: readonly [east: number, height: number, south: number];
+  readonly arrivalFacingMm: readonly [east: number, south: number];
+  readonly geometrySha256: string;
+  readonly contactSha256: string;
 }
 
 /** A declared floor, in millimetres, as the server serves it on a saved world's entry. */
@@ -874,6 +885,7 @@ export function parseEntry(value: unknown): SavedWorldEntry {
   }
   const generatedGround = parseGeneratedGround(row['generated_ground']);
   const generatedSite = parseGeneratedSite(row['generated_site']);
+  const generatedTerrain = parseGeneratedTerrain(row['generated_terrain']);
   const arrival = parseSavedArrival(row['arrival']);
   const arrivalUnavailableReason = row['arrival_unavailable_reason'];
   if (arrivalUnavailableReason !== undefined && arrivalUnavailableReason !== null
@@ -886,7 +898,7 @@ export function parseEntry(value: unknown): SavedWorldEntry {
   // (a world made from a world kind), never both, and an available one always declares one. One
   // whose receipt no longer generates what it recorded is served unavailable, with the reason
   // named and neither, so the rest of the list still reads.
-  const declared = (generatedGround === null ? 0 : 1) + (generatedSite === null ? 0 : 1);
+  const declared = (generatedGround === null ? 0 : 1) + (generatedSite === null ? 0 : 1) + (generatedTerrain === null ? 0 : 1);
   if (sourceKind !== 'generated' ? declared !== 0
     : declared > 1 || (declared === 0 && availability === 'available')) {
     throw new TypeError('A generated world entry, and only one, declares its generated ground or site.');
@@ -920,6 +932,7 @@ export function parseEntry(value: unknown): SavedWorldEntry {
     declaredFloor: parseDeclaredFloor(row['declared_floor']),
     generatedGround,
     generatedSite,
+    generatedTerrain,
     societyEngine: row['society_engine'] == null ? null : societyEngine(row['society_engine']).engine,
     arrival,
     arrivalUnavailableReason: arrivalUnavailableReason ?? null,
@@ -1006,6 +1019,19 @@ function parseGeneratedSite(value: unknown): GeneratedSite | null {
       integer(facing[1], 'arrival facing south'),
     ]) as GeneratedSite['arrivalFacingMm'],
   });
+}
+
+function parseGeneratedTerrain(value: unknown): GeneratedTerrain | null {
+  if (value == null) return null;
+  const row = record(value, 'generated terrain'), arrival = row['arrival_mm'], facing = row['arrival_facing_mm'];
+  if (!Array.isArray(arrival) || arrival.length !== 3 || !Array.isArray(facing) || facing.length !== 2) throw new TypeError('The generated terrain has no complete arrival.');
+  const position = arrival.map(v => integer(v, 'terrain arrival')), direction = facing.map(v => integer(v, 'terrain facing'));
+  if (position.some(v => Math.abs(v) > 512000) || direction.some(v => Math.abs(v) > 512000) || direction.every(v => v === 0)
+      || row['region_id'] !== 'region:generated') throw new TypeError('The generated terrain has an invalid region arrival.');
+  return Object.freeze({regionId: 'region:generated', arrivalMm: Object.freeze(position) as unknown as GeneratedTerrain['arrivalMm'],
+    arrivalFacingMm: Object.freeze(direction) as unknown as GeneratedTerrain['arrivalFacingMm'],
+    geometrySha256: sha256(row['geometry_sha256'], 'terrain geometry'), contactSha256: sha256(row['contact_sha256'], 'terrain contact'),
+    ...(row['dressing_sha256'] === undefined ? {} : {dressingSha256: sha256(row['dressing_sha256'], 'terrain dressing')})});
 }
 
 /** A generated world's declared drawing, or null when the entry names none. */

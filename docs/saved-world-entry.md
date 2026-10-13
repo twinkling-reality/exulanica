@@ -70,7 +70,11 @@ version, with each value's words, unit and range). `generated_ground.values` is 
 value the world was made with, keyed by that schema's value keys, each an integer or a choice key:
 the preset's values with the ones asked for in their place, so the complete set and not only the
 changed ones. Fixed values are not listed, because no request may state them. Both fields are
-read-only; nothing changes an existing world's values. A new world made from them is
+read-only; nothing changes an existing world's values. The chooser's View values action opens the
+town generator's saved receipt for inspection. It shows recorded schema identity and exact saved
+keys and values, without substituting current defaults or labels from a different specification.
+Historical field labels and units are not supplied by this read. Creating another world from these
+inputs is a separate action. A new world made from them is
 `POST /worlds/generated` with `recipe` set to `generated_ground.recipe_key` and these `values`, and
 the earlier world, its people, runs and comparisons stay bound to its own receipt. A world made
 from a version 1 recipe, which named a whole specification file and recorded no values, states
@@ -96,9 +100,9 @@ engine table's for the ground its snapshot's composer states
 (`exulanica.world.society_grounds.created_engine`), or null for a world no ground is stated for.
 On a host that offers societies of things (`EXULANICA_SOCIETY_OF_THINGS`), an entry whose version
 holds a thing its author placed, on a ground the table's `creates_holding_things` names (a starter,
-a world made from photographs, a generated town), states the society of things,
-`exulanica-society/v7`, so the beings placed there live with the ground's own people; a world made
-from a world kind keeps the living society, which alone lives in it. It is read with the entry, so a
+a world made from photographs, a generated town, a world made from a world kind), states the society
+of things, `exulanica-society/v7`, so the beings placed there live with the ground's own people. It
+is read with the entry, so a
 thing placed after the world opened counts on the next read; nothing stored changes, and a society
 a version already holds keeps its engine. A page names it when it brings people in and derives none
 of its own; a new society of another engine for such a world is refused by name
@@ -111,9 +115,27 @@ only for an entry that states true (`web/packages/app/src/ui/world-identity.ts`)
 
 ## Entry and creation
 
-`GET /world-entries` is the entry catalog. A single available entry opens directly. More than one
-entry produces a choice; none is selected by recency. An unavailable entry is visible and cannot
-be substituted with another world.
+`GET /world-entries` is the entry catalog. The application presents Your worlds before opening a
+world. The most recently changed entry is selected initially; selection does not open it.
+A public `?recipe=<recipe_key>` link selects the most recently changed matching saved entry in the
+current workspace, using its served recipe key rather than its title. If none matches, the existing
+Create a world controls open with that recipe selected, once creation is available. An optional
+`values` query parameter holds a URL-encoded JSON object of configuration values. A configuration
+link matches only entries whose served values contain every requested value; otherwise the creation
+controls load those values and validate them against the server's specification. The link parser
+accepts at most 64 integer or string values and 8,192 decoded characters; malformed data carries
+no entry intent. Recipe defaults and allowed ranges come from the server's specification. An
+unknown recipe or unsupported value is reported in the controls. Following a
+link neither creates nor opens a world; both require the person's action. An unavailable matching
+entry remains visible with its refusal and is not substituted with another world.
+
+An optional `style_pack` query parameter binds a captured appearance as JSON containing
+`pack_id`, `version`, and `manifest_sha256`. The application checks this exact binding against
+the served look library, including retained earlier versions. A styled link opens the creation
+controls for review; recipe-only saved entries cannot establish a matching appearance. An
+unavailable binding blocks creation until the person explicitly chooses an available look.
+The parser rejects duplicate, malformed, oversized or partial bindings and combinations with a
+`look` override. No fallback silently substitutes the default appearance.
 
 Creation has one source-independent first-world path and two explicit personal-source paths:
 
@@ -359,13 +381,45 @@ A making past the worlds held is `world_limit_reached`. A making whose tiles wou
 day's is `tile_budget_reached`, a kind of the same refusal, and its words say when room returns:
 a day after the oldest counted world was made. The day's tiles are counted from the worlds the
 workspace made in the last 24 hours and each one's receipt, every tile of a world made, baked
-already or not, and nothing in the count reads whether a world was later removed. A variable that
+already or not. A removed world contributes its retained creation time and tile count, so
+removal does not reopen the daily allowance. A variable that
 is not a whole number of at least 1 refuses the read by name; it is never taken as no bound.
 `GET /worlds/capabilities` reports the worlds held and the figure in force for the caller, a
-guest's for a guest. Version 2 allowed three generated worlds, a figure that bounded tile bakes
-while no route removed a world; no route removes one yet, so worlds held times the recipes' tile
-maximum still bounds every bake a workspace can ever cause. The figures are chosen, not
-measured: a measurement of bake seconds and stored bytes a tile replaces them.
+guest's for a guest. The figures are chosen, not measured: a measurement of bake seconds
+and stored bytes a tile replaces them.
+
+### Permanent removal
+
+`GET /worlds/{world_id}/removal` returns a generated world's title, affected counts,
+consequences and retained categories. `DELETE /worlds/{world_id}` returns 204 after removing
+its saved entries, versions, authored edits, societies and their records, doors and project
+notes in one transaction. It requires `world.write` and `deletion.write`, and the world's
+creator or a workspace owner. A bearer token can remove only worlds its actor created.
+Photograph and authored-starter worlds are refused as `409 world_kind_not_removable`.
+Active piece generation or spending settlement is refused as `409 generation_pending`.
+
+An unknown or foreign identifier remains `404 unknown_reference`. A removed identifier in
+the caller's workspace is `410 world_removed` and cannot be registered again. Removal keeps
+only the world's identifiers, who and when, its original creation time and tile count. It
+keeps prior society-erasure records, spending records, workspace library kinds and shared
+catalog-generated tiles. Content already sent to an outside model provider is not recalled.
+
+The withdrawal checkpoint carries world erasure even when a backup predates the world's
+creation. Replay removes restored rows and preserves the retired identifier and daily
+allowance. A sealed installation refuses removal as `409 restore_sealed`. A changed withdrawal
+catalog requires a backup and checkpoint made with that catalog before deployment recovery.
+Workspace erasure preserves generation cancellation and monetary recovery as immutable obligations
+and separate withdrawal, decision and settlement receipts. Checkpoints carry those before world
+erasures, preserving exact decimal amounts without storing request words or content digests.
+Restoring deletion records does not bypass the independent
+[spending-witness reconciliation](model-spending-contract.md#7-restore-the-spending-witness)
+required when the spending ledger was also restored.
+
+After commit, the API process discards retained draft content and receipt-derived generation
+caches, and resets its owned kind worker. In-flight kind jobs may retry; other durable worlds
+are unaffected. Separate API processes' retained memory is not immediately evicted. Their world
+reads still require a live registration, and polling a draft whose saved entry is gone clears
+its retained content and returns 404. This is not immediate erasure from every running process.
 
 Every route that reads or changes a world's content requires `world_id`: style, source media,
 versions, objects, environments, compositions, interaction settings, the World Read bundles,

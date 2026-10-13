@@ -107,11 +107,13 @@ from exulanica.world.placed_things import (
     PLACED_THINGS_MAXIMUM,
     UNSCALED_MILLI,
     PlacedThing,
+    SupportReference,
     ThingKindReference,
     ThingPlacement,
     WorkspaceKindReference,
     placeable_by_author,
     placed_thing_document,
+    read_support_reference,
     shipped_kind,
     validate_placed_thing,
 )
@@ -559,6 +561,10 @@ class WorldObjectRepository:
             ):
                 if row.region_id not in regions:
                     raise InvalidObjectData(f"{row.region_id} is not a region of the new snapshot")
+            if any(thing.support is not None for thing in sections["things"]):
+                raise InvalidThingPlacement(
+                    "support_source_changed: a supported thing is not carried to a different source"
+                )
             for override in sections["element_overrides"]:
                 if override.element_id not in elements:
                     raise InvalidObjectData(
@@ -2404,6 +2410,61 @@ class WorldObjectRepository:
             )
         return self._written(version_id)
 
+    def add_thing_on_support(
+        self,
+        version_id: uuid.UUID,
+        placement: ThingPlacement,
+        reference: Mapping[str, Any],
+        source: Any,
+        *,
+        base_state_sha256: str,
+        actor: uuid.UUID,
+    ) -> AlternateVersion:
+        """Place a passive rigid thing through the exact source and current occupancy authority."""
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            thing, _ = self.validate_thing_on_support(
+                version_id,
+                placement,
+                reference,
+                source,
+                base_state_sha256=base_state_sha256,
+            )
+            edit_id = uuid.uuid4()
+            self._insert_thing(version_id, thing, (edit_id, edit_id))
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="add_thing",
+                thing_id=thing.thing_id,
+                before=None,
+                after=placed_thing_document(thing),
+                actor=actor,
+            )
+        return self._written(version_id)
+
+    def validate_thing_on_support(
+        self,
+        version_id: uuid.UUID,
+        placement: ThingPlacement,
+        reference: Mapping[str, Any],
+        source: Any,
+        *,
+        base_state_sha256: str,
+    ) -> tuple[PlacedThing, Any]:
+        """The supported add checks, read only; apply repeats them under its version lock."""
+        from exulanica.world.support_placement import validate_supported_placement
+        from exulanica.world.support_placement_source import placed_kind, placement_context
+
+        row = self.edit_base_row(version_id)
+        self.require_edit_base(row, base_state_sha256)
+        thing = self._validated_thing_placement(row, placement)
+        context = placement_context(self, self._written(version_id), source)
+        receipt = validate_supported_placement(
+            placement, placed_kind(self, thing), reference, context=context
+        )
+        return replace(thing, support=read_support_reference(dict(reference))), receipt
+
     def move_thing(
         self,
         version_id: uuid.UUID,
@@ -2420,12 +2481,14 @@ class WorldObjectRepository:
                 raise InvalidObjectState(f"{thing_id} is removed in this version")
             if current.kind_gone:
                 raise ThingKindGone(f"{thing_id}'s kind is no longer held by its workspace")
-            moved = replace(current, transform=transform)
+            moved = replace(current, transform=transform, support=None)
             validate_placed_thing(moved, region_ids=frozenset({current.region_id}), kinds=None)
             edit_id = uuid.uuid4()
             self.connection.execute(
                 "update world_alternate_thing "
-                "set x_mm=%s,y_mm=%s,z_mm=%s,yaw_microradians=%s,last_edit_id=%s "
+                "set x_mm=%s,y_mm=%s,z_mm=%s,yaw_microradians=%s,last_edit_id=%s,"
+                "support_snapshot_id=null,support_receipt_sha256=null,"
+                "support_network_sha256=null,support_surface_id=null "
                 "where workspace_id=%s and world_id=%s and version_id=%s and thing_id=%s",
                 (
                     transform.x_mm,
@@ -2529,13 +2592,17 @@ class WorldObjectRepository:
     ) -> None:
         created_edit_id, last_edit_id = edit_ids
         workspace = isinstance(thing.kind, WorkspaceKindReference)
+        support = thing.support
+        if support is not None:
+            self._check_support_identity(version_id, support, thing.transform)
         written = self.connection.execute(
             """
             insert into world_alternate_thing(
               workspace_id,world_id,version_id,thing_id,kind_source,kind,kind_version,kind_sha256,
               region_id,x_mm,y_mm,z_mm,yaw_microradians,origin_kind,origin_role,removed,
-              created_edit_id,last_edit_id,addition_undone)
-            values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false)
+              created_edit_id,last_edit_id,addition_undone,support_snapshot_id,
+              support_receipt_sha256,support_network_sha256,support_surface_id)
+            values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false,%s,%s,%s,%s)
             on conflict (workspace_id,world_id,version_id,thing_id) do update set
               kind_source=excluded.kind_source,kind=excluded.kind,
               kind_version=excluded.kind_version,
@@ -2544,7 +2611,10 @@ class WorldObjectRepository:
               yaw_microradians=excluded.yaw_microradians,origin_kind=excluded.origin_kind,
               origin_role=excluded.origin_role,removed=excluded.removed,
               created_edit_id=excluded.created_edit_id,last_edit_id=excluded.last_edit_id,
-              addition_undone=false
+              addition_undone=false,support_snapshot_id=excluded.support_snapshot_id,
+              support_receipt_sha256=excluded.support_receipt_sha256,
+              support_network_sha256=excluded.support_network_sha256,
+              support_surface_id=excluded.support_surface_id
             where world_alternate_thing.addition_undone
             returning thing_id
             """,
@@ -2567,6 +2637,10 @@ class WorldObjectRepository:
                 thing.removed,
                 created_edit_id,
                 last_edit_id,
+                None if support is None else support.source_snapshot_id,
+                None if support is None else bytes.fromhex(support.receipt_sha256),
+                None if support is None else bytes.fromhex(support.network_sha256),
+                None if support is None else support.surface_id,
             ),
         ).fetchone()
         if written is None:
@@ -2581,7 +2655,8 @@ class WorldObjectRepository:
         # erasure is either before a placing edit, which then refuses the kind, or after it.
         rows = self.connection.execute(
             "select t.thing_id,t.kind_source,t.kind,t.kind_version,t.kind_sha256,t.region_id,"
-            "t.x_mm,t.y_mm,t.z_mm,t.yaw_microradians,t.origin_kind,t.origin_role,t.removed,"
+            "t.world_id,t.x_mm,t.y_mm,t.z_mm,t.yaw_microradians,t.origin_kind,t.origin_role,t.removed,"
+            "t.support_snapshot_id,t.support_receipt_sha256,t.support_network_sha256,t.support_surface_id,"
             f"{THING_KIND_GONE_SQL} as kind_gone "
             "from world_alternate_thing t "
             "where t.workspace_id=%s and t.world_id=%s and t.version_id=%s "
@@ -2631,15 +2706,85 @@ class WorldObjectRepository:
         current = placed_thing_document(self._require_thing(version_id, document["thing_id"]))
         if current["kind"] != document["kind"] or current["origin"] != document["origin"]:
             raise InvalidObjectState("stored undo kind disagrees with the thing as it stands")
+        support = self._support_from_document(document)
+        if support is not None:
+            transform = document["transform"]
+            self._check_support_identity(
+                version_id,
+                support,
+                Transform(
+                    transform["x_mm"],
+                    transform["y_mm"],
+                    transform["z_mm"],
+                    transform["yaw_microradians"],
+                    transform["scale_milli"],
+                ),
+            )
+
+    @staticmethod
+    def _support_from_document(document: Mapping[str, Any]) -> SupportReference | None:
+        from exulanica.world.placed_things import SUPPORTED_THING_PROFILE
+
+        keys = {"thing_id", "kind", "region_id", "transform", "origin", "removed"}
+        if "support" not in document:
+            if set(document) != keys:
+                raise InvalidObjectState("stored thing document has an unknown profile")
+            return None
+        if (
+            set(document) != keys | {"profile", "support"}
+            or document["profile"] != SUPPORTED_THING_PROFILE
+        ):
+            raise InvalidObjectState("stored supported thing uses its closed v2 profile")
+        support = read_support_reference(document["support"])
+        if support.region_id != document["region_id"]:
+            raise InvalidObjectState("stored supported thing names another region")
+        return support
+
+    def _check_support_identity(
+        self,
+        version_id: uuid.UUID,
+        support: SupportReference,
+        transform: Transform,
+    ) -> None:
+        from exulanica.world.generated_worlds import generation_receipt
+
+        row = self._version_row(version_id)
+        if (
+            support.world_id != self.world_id
+            or support.source_snapshot_id != row["source_snapshot_id"]
+            or support.region_id not in self._source_region_ids(row["source_snapshot_id"])
+        ):
+            raise InvalidThingPlacement(
+                "support_source_changed: support belongs to another version source"
+            )
+        digest, receipt = generation_receipt(
+            self.connection, self.workspace_id, self.world_id, row["source_snapshot_id"]
+        )
+        network = receipt.get("supports", {}).get("network", {})
+        if (
+            digest != support.receipt_sha256
+            or network.get("document_sha256") != support.network_sha256
+        ):
+            raise InvalidThingPlacement("support_source_changed: pinned receipt or network differs")
+        if support.surface_id not in {s["surface_id"] for s in network.get("surfaces", ())}:
+            raise InvalidThingPlacement("support_source_changed: pinned surface is absent")
+        surface = next(s for s in network["surfaces"] if s["surface_id"] == support.surface_id)
+        validate_transform(transform)
+        if transform.scale_milli != UNSCALED_MILLI or transform.y_mm != surface["support_z_mm"]:
+            raise InvalidThingPlacement(
+                "support_pose_changed: stored pose no longer matches its support"
+            )
 
     def _restore_thing(
         self, version_id: uuid.UUID, document: Mapping[str, Any], edit_id: uuid.UUID
     ) -> None:
         self._check_thing_restore(version_id, document)
         transform = document["transform"]
+        support = self._support_from_document(document)
         self.connection.execute(
             "update world_alternate_thing set region_id=%s,x_mm=%s,y_mm=%s,z_mm=%s,"
-            "yaw_microradians=%s,removed=%s,last_edit_id=%s "
+            "yaw_microradians=%s,removed=%s,last_edit_id=%s,support_snapshot_id=%s,"
+            "support_receipt_sha256=%s,support_network_sha256=%s,support_surface_id=%s "
             "where workspace_id=%s and world_id=%s and version_id=%s and thing_id=%s",
             (
                 document["region_id"],
@@ -2649,6 +2794,10 @@ class WorldObjectRepository:
                 transform["yaw_microradians"],
                 document["removed"],
                 edit_id,
+                None if support is None else support.source_snapshot_id,
+                None if support is None else bytes.fromhex(support.receipt_sha256),
+                None if support is None else bytes.fromhex(support.network_sha256),
+                None if support is None else support.surface_id,
                 self.workspace_id,
                 self.world_id,
                 version_id,
@@ -3141,6 +3290,18 @@ def _thing_from_row(row: Mapping[str, Any]) -> PlacedThing:
         origin=ObjectOrigin(row["origin_kind"], row["origin_role"]),
         removed=row["removed"],
         kind_gone=bool(row["kind_gone"]),
+        support=(
+            None
+            if row["support_snapshot_id"] is None
+            else SupportReference(
+                row["world_id"],
+                row["support_snapshot_id"],
+                bytes(row["support_receipt_sha256"]).hex(),
+                bytes(row["support_network_sha256"]).hex(),
+                row["region_id"],
+                row["support_surface_id"],
+            )
+        ),
     )
 
 

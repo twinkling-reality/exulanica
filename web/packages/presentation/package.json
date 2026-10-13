@@ -6,7 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./companion": "./src/companion.ts",
-    "./tokens.css": "./src/tokens.css"
+    "./tokens.css": "./src/tokens.css",
+    "./navigation-motion": "./src/navigation-motion.ts",
+    "./entry-style.css": "./src/entry-style.css"
   },
   "dependencies": {
     "@exulanica/atlas-core": "workspace:*"

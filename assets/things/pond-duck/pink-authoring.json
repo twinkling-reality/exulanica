@@ -1,0 +1,977 @@
+{
+  "recipe": {
+    "profile": "exulanica.body-recipe/v1",
+    "posture": "upright",
+    "spine": 2,
+    "upper_body": "none",
+    "heads": [
+      {
+        "neck": 0,
+        "jaw": false
+      }
+    ],
+    "limbs": [
+      {
+        "role": "leg",
+        "count": 2,
+        "segments": 3
+      },
+      {
+        "role": "arm",
+        "count": 2,
+        "segments": 2
+      }
+    ],
+    "tail": 1,
+    "extent_mm": {
+      "length": 700,
+      "width": 800,
+      "height": 900,
+      "span": 0
+    },
+    "holds_with": "none",
+    "colours": [
+      "amber",
+      "ivory",
+      "charcoal"
+    ],
+    "appearance": "A plump yellow duck with a round head, broad pale bill, wide eyes, webbed feet, short flippers and three dark tufts."
+  },
+  "body": {
+    "key": "pond_duck",
+    "version": 1,
+    "title": "Pond duck body"
+  },
+  "surface": {
+    "profile": "exulanica.body-surfaces/v1",
+    "recipe_sha256": "8ed7b568c0338dcdfa9321c30708cf0908e0080a4a1a74bd3295e3e519b9e930",
+    "plan_sha256": "9e4b8d540565de3402d6b328f225d6694b89fdbda5d2bdf28b36fa4da4126d2a",
+    "parts": [
+      {
+        "bone": "hips",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            -20,
+            -113
+          ],
+          "radii_mm": [
+            246,
+            190,
+            240
+          ],
+          "segments": 40,
+          "rings": 18,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#d391d4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            0,
+            -42
+          ],
+          "radii_mm": [
+            228,
+            176,
+            208
+          ],
+          "segments": 48,
+          "rings": 20,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#d391d4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            187,
+            -67
+          ],
+          "radii_mm": [
+            219,
+            130,
+            75
+          ],
+          "segments": 40,
+          "rings": 16,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#e9d2e4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            0,
+            200,
+            -91
+          ],
+          "radii_mm": [
+            205,
+            114,
+            38
+          ],
+          "segments": 36,
+          "rings": 12,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#c4aec3",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                -165,
+                267,
+                -85
+              ],
+              "radii_mm": [
+                3,
+                3
+              ]
+            },
+            {
+              "centre_mm": [
+                -80,
+                302,
+                -92
+              ],
+              "radii_mm": [
+                3,
+                3
+              ]
+            },
+            {
+              "centre_mm": [
+                80,
+                302,
+                -92
+              ],
+              "radii_mm": [
+                3,
+                3
+              ]
+            },
+            {
+              "centre_mm": [
+                165,
+                267,
+                -85
+              ],
+              "radii_mm": [
+                3,
+                3
+              ]
+            }
+          ],
+          "segments": 12,
+          "subdivisions": 3
+        },
+        "colour": "#8a7953",
+        "roughness_permille": 800,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -93,
+            146,
+            44
+          ],
+          "radii_mm": [
+            48,
+            27,
+            53
+          ],
+          "segments": 32,
+          "rings": 14,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#fffdf5",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -93,
+            171,
+            45
+          ],
+          "radii_mm": [
+            8,
+            7,
+            11
+          ],
+          "segments": 12,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#242b32",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            93,
+            146,
+            44
+          ],
+          "radii_mm": [
+            48,
+            27,
+            53
+          ],
+          "segments": 32,
+          "rings": 14,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#fffdf5",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            93,
+            171,
+            45
+          ],
+          "radii_mm": [
+            8,
+            7,
+            11
+          ],
+          "segments": 12,
+          "rings": 6,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#242b32",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -38,
+            222,
+            -3
+          ],
+          "radii_mm": [
+            10,
+            12,
+            3
+          ],
+          "segments": 16,
+          "rings": 8,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#8a7953",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            38,
+            222,
+            -3
+          ],
+          "radii_mm": [
+            10,
+            12,
+            3
+          ],
+          "segments": 16,
+          "rings": 8,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#8a7953",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                -20,
+                -10,
+                154
+              ],
+              "radii_mm": [
+                7,
+                7
+              ]
+            },
+            {
+              "centre_mm": [
+                -48,
+                -18,
+                177
+              ],
+              "radii_mm": [
+                5,
+                5
+              ]
+            },
+            {
+              "centre_mm": [
+                -40,
+                -18,
+                187
+              ],
+              "radii_mm": [
+                2,
+                2
+              ]
+            }
+          ],
+          "segments": 12,
+          "subdivisions": 2
+        },
+        "colour": "#333545",
+        "roughness_permille": 800,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                -10,
+                154
+              ],
+              "radii_mm": [
+                7,
+                7
+              ]
+            },
+            {
+              "centre_mm": [
+                0,
+                -18,
+                177
+              ],
+              "radii_mm": [
+                5,
+                5
+              ]
+            },
+            {
+              "centre_mm": [
+                8,
+                -18,
+                187
+              ],
+              "radii_mm": [
+                2,
+                2
+              ]
+            }
+          ],
+          "segments": 12,
+          "subdivisions": 2
+        },
+        "colour": "#333545",
+        "roughness_permille": 800,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "head1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                20,
+                -10,
+                154
+              ],
+              "radii_mm": [
+                7,
+                7
+              ]
+            },
+            {
+              "centre_mm": [
+                54,
+                -18,
+                177
+              ],
+              "radii_mm": [
+                5,
+                5
+              ]
+            },
+            {
+              "centre_mm": [
+                62,
+                -18,
+                187
+              ],
+              "radii_mm": [
+                2,
+                2
+              ]
+            }
+          ],
+          "segments": 12,
+          "subdivisions": 2
+        },
+        "colour": "#333545",
+        "roughness_permille": 800,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "arm1Left1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -107,
+            0,
+            0
+          ],
+          "radii_mm": [
+            98,
+            55,
+            59
+          ],
+          "segments": 28,
+          "rings": 12,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#d391d4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "arm1Left2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -69,
+            0,
+            0
+          ],
+          "radii_mm": [
+            65,
+            43,
+            51
+          ],
+          "segments": 28,
+          "rings": 12,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#d391d4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Left3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                5,
+                6
+              ],
+              "radii_mm": [
+                28,
+                28
+              ]
+            },
+            {
+              "centre_mm": [
+                -24,
+                43,
+                -31
+              ],
+              "radii_mm": [
+                30,
+                30
+              ]
+            }
+          ],
+          "segments": 16,
+          "subdivisions": 2
+        },
+        "colour": "#d391d4",
+        "roughness_permille": 800,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Left3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -29,
+            67,
+            -49
+          ],
+          "radii_mm": [
+            100,
+            128,
+            28
+          ],
+          "segments": 32,
+          "rings": 12,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#e9d2e4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Left3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -90,
+            176,
+            -57
+          ],
+          "radii_mm": [
+            35,
+            67,
+            20
+          ],
+          "segments": 20,
+          "rings": 10,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#e9d2e4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Left3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -29,
+            176,
+            -57
+          ],
+          "radii_mm": [
+            35,
+            67,
+            20
+          ],
+          "segments": 20,
+          "rings": 10,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#e9d2e4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Left3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            32,
+            176,
+            -57
+          ],
+          "radii_mm": [
+            35,
+            67,
+            20
+          ],
+          "segments": 20,
+          "rings": 10,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#e9d2e4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "arm1Right1",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            107,
+            0,
+            0
+          ],
+          "radii_mm": [
+            98,
+            55,
+            59
+          ],
+          "segments": 28,
+          "rings": 12,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#d391d4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "arm1Right2",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            69,
+            0,
+            0
+          ],
+          "radii_mm": [
+            65,
+            43,
+            51
+          ],
+          "segments": 28,
+          "rings": 12,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#d391d4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Right3",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                5,
+                6
+              ],
+              "radii_mm": [
+                28,
+                28
+              ]
+            },
+            {
+              "centre_mm": [
+                24,
+                43,
+                -31
+              ],
+              "radii_mm": [
+                30,
+                30
+              ]
+            }
+          ],
+          "segments": 16,
+          "subdivisions": 2
+        },
+        "colour": "#d391d4",
+        "roughness_permille": 800,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Right3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            29,
+            67,
+            -49
+          ],
+          "radii_mm": [
+            100,
+            128,
+            28
+          ],
+          "segments": 32,
+          "rings": 12,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#e9d2e4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Right3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            -32,
+            176,
+            -57
+          ],
+          "radii_mm": [
+            35,
+            67,
+            20
+          ],
+          "segments": 20,
+          "rings": 10,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#e9d2e4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Right3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            29,
+            176,
+            -57
+          ],
+          "radii_mm": [
+            35,
+            67,
+            20
+          ],
+          "segments": 20,
+          "rings": 10,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#e9d2e4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "leg1Right3",
+        "shape": {
+          "kind": "ellipsoid",
+          "centre_mm": [
+            90,
+            176,
+            -57
+          ],
+          "radii_mm": [
+            35,
+            67,
+            20
+          ],
+          "segments": 20,
+          "rings": 10,
+          "ridges": 0,
+          "ridge_permille": 0
+        },
+        "colour": "#e9d2e4",
+        "roughness_permille": 700,
+        "metallic_permille": 0
+      },
+      {
+        "bone": "tail1",
+        "shape": {
+          "kind": "tube",
+          "sections": [
+            {
+              "centre_mm": [
+                0,
+                -156,
+                -83
+              ],
+              "radii_mm": [
+                65,
+                48
+              ]
+            },
+            {
+              "centre_mm": [
+                0,
+                -244,
+                -42
+              ],
+              "radii_mm": [
+                45,
+                32
+              ]
+            },
+            {
+              "centre_mm": [
+                0,
+                -305,
+                23
+              ],
+              "radii_mm": [
+                4,
+                4
+              ]
+            }
+          ],
+          "segments": 16,
+          "subdivisions": 3
+        },
+        "colour": "#d391d4",
+        "roughness_permille": 800,
+        "metallic_permille": 0
+      }
+    ]
+  },
+  "look": {
+    "look": "pond-duck-pink",
+    "version": 1,
+    "label": "pink duck with a pale bill"
+  },
+  "kind": {
+    "kind": "pond_duck",
+    "version": 1,
+    "label": "psyduck inspired duck",
+    "summary": "An authored reference-inspired duck with a broad bill, wide eyes and webbed feet. This is a primitive mesh preview, not an official or model-generated asset.",
+    "class": "being",
+    "moves": [
+      "exulanica-movement/walking/v1"
+    ],
+    "abilities": [
+      {
+        "key": "wait",
+        "parameters": {}
+      },
+      {
+        "key": "stand",
+        "parameters": {}
+      },
+      {
+        "key": "talk",
+        "parameters": {}
+      },
+      {
+        "key": "rest",
+        "parameters": {}
+      },
+      {
+        "key": "visit",
+        "parameters": {}
+      },
+      {
+        "key": "follow",
+        "parameters": {}
+      },
+      {
+        "key": "say",
+        "parameters": {}
+      }
+    ],
+    "offers": [
+      {
+        "key": "talk_to",
+        "parameters": {}
+      },
+      {
+        "key": "hear",
+        "parameters": {}
+      },
+      {
+        "key": "be_followed",
+        "parameters": {}
+      }
+    ],
+    "routine": {
+      "weights": {
+        "wait": 1000
+      },
+      "follow_holders_of": [],
+      "reason": "Uses the existing purposeful routine and supported recorded actions."
+    },
+    "deciders": {
+      "default": "routine",
+      "allowed": [
+        "routine",
+        "person",
+        "model"
+      ]
+    },
+    "ext": {}
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [
+      {
+        "reference": "user-provided yellow and pink duck visual references",
+        "retrieved_on": null,
+        "revision": null,
+        "licence_page_sha256": null
+      }
+    ],
+    "licence": {
+      "spdx": "LicenseRef-Pond-Duck-Preview",
+      "verdict": "USE-ONLY",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [
+        "2b0f05f8fdb57b9a5e65bdcffdb8e7fe528f2ea1b17b26cb0de517bdbcad5572",
+        "f60272ce4459f45c0c9e204831ac3f8a0b357d81ade0b3e881550292419f41fb"
+      ],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "private"
+  }
+}

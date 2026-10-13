@@ -7,6 +7,11 @@
 # here, so one rule covers both the directory and the symlink.
 .exulanica
 
+# Rebuildable output from opt-in local review tooling.
+tools/previews/**/home-dist/
+tools/previews/**/home-build.json
+tools/previews/**/vite-cache*/
+
 # Secrets and environment
 .env
 .env.*

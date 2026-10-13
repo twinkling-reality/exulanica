@@ -50,7 +50,7 @@ from conftest import TEST_CEILING_USD, TEST_MAX_CALLS, scratch_role_database
 from model_fakes import FakeTransport, chat_body
 from test_society_saved_world_api import OWNER, TOKEN, place, routes
 from tests_support_api import EVERY_PERMISSION
-from world_support import registered_world
+from world_support import fixture_workspace, registered_world
 
 saved_world = helpers.saved_world
 pytestmark = pytest.mark.postgres
@@ -300,9 +300,10 @@ def test_a_society_this_world_does_not_hold_is_answered_as_none_alike_in_every_c
     other = registered_world(
         connection, world["workspace"], f"world:authored:{uuid.uuid4()}", kind=AUTHORED_STARTER
     )
-    stranger_world = registered_world(
-        connection, world["stranger"], f"world:authored:{uuid.uuid4()}", kind=AUTHORED_STARTER
-    )
+    with fixture_workspace(connection, world["stranger"]):
+        stranger_world = registered_world(
+            connection, world["stranger"], f"world:authored:{uuid.uuid4()}", kind=AUTHORED_STARTER
+        )
     connection.commit()
     with world["open_app"]() as client:
         snapshot, _ = _society(world, client)

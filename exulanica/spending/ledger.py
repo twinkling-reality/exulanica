@@ -35,7 +35,7 @@ import secrets
 import threading
 import time
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Final
@@ -290,6 +290,8 @@ class DurableSpending:
         statement: str,
         parameters: tuple[Any, ...],
         held: WitnessHandle | None = None,
+        *,
+        guard: Callable[[psycopg.Connection], None] | None = None,
     ) -> dict[str, Any]:
         """One step's transaction; the witness advanced before its commit and confirmed after."""
         pending: dict[str, Any] | None = None
@@ -300,6 +302,8 @@ class DurableSpending:
             ):
                 connection.execute(f"set local lock_timeout = '{self.lock_timeout_ms}ms'")
                 connection.execute(f"set local statement_timeout = '{self.statement_timeout_ms}ms'")
+                if guard is not None:
+                    guard(connection)
                 row = connection.execute(statement, parameters).fetchone()
                 assert row is not None
                 document: dict[str, Any] = row["document"]
@@ -337,12 +341,16 @@ class DurableSpending:
         authority_id: uuid.UUID | None,
         statement: str,
         parameters: tuple[Any, ...],
+        *,
+        guard: Callable[[psycopg.Connection], None] | None = None,
     ) -> dict[str, Any]:
         """``_run`` under the authority's witness lock, handing the function the witness read."""
         try:
             with self._held(authority_id) as held:
                 document = held.document if held is not None else None
-                return self._run(workspace_id, statement, (*parameters, _json(document)), held)
+                return self._run(
+                    workspace_id, statement, (*parameters, _json(document)), held, guard=guard
+                )
         except WitnessUnavailable as exc:
             raise SpendingRefused(
                 "spending_unavailable",
@@ -418,13 +426,19 @@ class WorkspaceSpending:
             raise refusal_from_document(document)
         raise SpendingRefused("spending_unavailable", detail="authority_changing")
 
-    def dispatch(self, ticket: SpendingTicket) -> None:
+    def dispatch(
+        self,
+        ticket: SpendingTicket,
+        *,
+        guard: Callable[[psycopg.Connection], None] | None = None,
+    ) -> None:
         source = self._source
         document = source._witnessed(
             self.workspace_id,
             ticket.authority_id,
             "select spending_dispatch(%s, %s, %s, %s) as document",
             (self.workspace_id, ticket.reservation_id, ticket.holder or source.holder),
+            guard=guard,
         )
         if document.get("outcome") != "dispatched":
             raise refusal_from_document(document)

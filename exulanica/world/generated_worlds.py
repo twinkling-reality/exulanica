@@ -125,6 +125,16 @@ class GeneratedTile:
 
 _records_lock = threading.Lock()
 _records_kept: OrderedDict[str, tuple[object, ...]] = OrderedDict()
+_records_epoch = 0
+
+
+def forget_generated_records(digests: frozenset[str]) -> None:
+    """Evict removed worlds' derived records in this process, including late cache publication."""
+    global _records_epoch
+    with _records_lock:
+        _records_epoch += 1
+        for digest in digests:
+            _records_kept.pop(digest, None)
 
 
 class SiteRecordsElsewhere(RuntimeError):
@@ -218,6 +228,27 @@ def create_kind_world_authorities(
         # The reason names no kind: a kind drafted from a person's words has a key made from
         # them, and a world's registration outlives its removal. The receipt names the kind.
         reason="generated from a world kind",
+        composed=composed,
+        guest=guest,
+    )
+
+
+def create_terrain_world_authorities(
+    connection: psycopg.Connection,
+    *,
+    workspace_id: uuid.UUID,
+    actor: uuid.UUID,
+    title: str,
+    composed: ComposedWorld,
+    guest: bool = False,
+) -> tuple[uuid.UUID, StyleVersion, uuid.UUID]:
+    """Register the terrain receipt through the same atomic generated-source authority."""
+    return _create_authorities(
+        connection,
+        workspace_id=workspace_id,
+        actor=actor,
+        title=title,
+        reason="generated from terrain source",
         composed=composed,
         guest=guest,
     )
@@ -387,6 +418,7 @@ def town_records(
             "worker"
         )
     with _records_lock:
+        epoch = _records_epoch
         records = _records_kept.get(digest)
         if records is not None:
             _records_kept.move_to_end(digest)
@@ -394,9 +426,10 @@ def town_records(
         composer = receipt["composer"]
         records = composer_module(composer["key"], composer["version"]).records(receipt)
         with _records_lock:
-            _records_kept[digest] = records
-            while len(_records_kept) > _RECORDS_KEPT:
-                _records_kept.popitem(last=False)
+            if epoch == _records_epoch:
+                _records_kept[digest] = records
+                while len(_records_kept) > _RECORDS_KEPT:
+                    _records_kept.popitem(last=False)
     return GeneratedRecords(world_id, snapshot_id, digest, receipt, records)
 
 
@@ -476,6 +509,35 @@ class GeneratedSite:
     region_id: str
     arrival_mm: tuple[int, int, int]
     arrival_facing_mm: tuple[int, int]
+
+
+@dataclass(frozen=True, slots=True)
+class GeneratedTerrain:
+    """A terrain drawing entry without a world-kind or society declaration."""
+
+    region_id: str
+    arrival_mm: tuple[int, int, int]
+    arrival_facing_mm: tuple[int, int]
+    geometry_sha256: str
+    contact_sha256: str
+
+
+def generated_terrain(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, snapshot_id: uuid.UUID
+) -> GeneratedTerrain:
+    """Read the exact retained terrain's entry through its bound source snapshot."""
+    from exulanica.world.composers.site_plan import receipt_terrain
+
+    _, receipt = generation_receipt(connection, workspace_id, world_id, snapshot_id)
+    source = receipt_terrain(receipt)
+    arrival = source.arrival()
+    return GeneratedTerrain(
+        region_id=source.document()["region_id"],
+        arrival_mm=tuple(arrival["position_mm"]),
+        arrival_facing_mm=tuple(arrival["facing_mm"]),
+        geometry_sha256=source.contact.geometry.sha256,
+        contact_sha256=source.contact.sha256,
+    )
 
 
 def states_site(

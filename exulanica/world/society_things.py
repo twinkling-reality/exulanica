@@ -1133,6 +1133,9 @@ def initial_things_society(
         state[MOVEMENT_MODULES_FIELD] = list(document[MOVEMENT_MODULES_FIELD])
     if "people" in document:
         _house_the_population(state, seed, document["people"])
+    from exulanica.world.society_resident_day import initialize
+
+    initialize(state, document, seed)
     state["things"] = _things_of(document, hands=_runs_hands(state))
     minute = _Minute(state, state, seed, document, ())
     # The author's beings first, where they were put; then the population steps aside from them.
@@ -1185,7 +1188,11 @@ def _population_steps_aside(state: dict[str, Any], document: Mapping[str, Any]) 
         if person["came_by"] == "placed"
     }
     for person in state["inhabitants"]:
-        if person["came_by"] != "populated" or person["location"]["node_id"] not in taken:
+        if (
+            person["came_by"] != "populated"
+            or person["location"]["node_id"] not in taken
+            or person.get("location", {}).get("indoors") is True
+        ):
             continue
         held = {other["location"]["node_id"] for other in state["inhabitants"]}
         x, y = person["position_mm"]
@@ -1250,6 +1257,9 @@ def advance_things(
             bound.append(_arrive(minute, crossing, checked))
         else:
             bound.append(_depart(minute, crossing, checked))
+    from exulanica.world.society_resident_day import arrive
+
+    arrive(minute)
     _decided(minute, previous, decisions)
     if _runs_hands(result):
         _asked(minute, asked)
@@ -1344,6 +1354,7 @@ def _decided(
     visitor's quiet minutes are counted, an applied line is said where the speaker stood as the
     minute began and heard by every being then within reach that hears, and an applied leaving
     sends the visitor home; then every visitor whose program stayed quiet long enough leaves."""
+    from exulanica.abilities.registry import recorded_modules, recorded_row
     from exulanica.world.deciders import receipt_decider
     from exulanica.world.society_decision_contract import hearers
 
@@ -1351,6 +1362,7 @@ def _decided(
         return
     reach, kept = _say_bounds()
     began = {person["id"]: person for person in previous["inhabitants"]}
+    say = recorded_row(recorded_modules(previous), "say")
     for receipt, disposition in decisions:
         person = next(
             (p for p in minute.state["inhabitants"] if p["id"] == receipt["subject_id"]), None
@@ -1387,12 +1399,11 @@ def _decided(
             here = {p["id"] for p in minute.state["inhabitants"]}
             # Who heard: within reach where everybody stood as the minute began, and still here.
             origin = began.get(person["id"], person)
-            heard_by = [
-                other["id"]
-                for _distance, other in hearers(
-                    {"inhabitants": [p for i, p in began.items() if i in here]}, origin, reach
-                )
-            ]
+            hearing_state = {"inhabitants": [p for i, p in began.items() if i in here]}
+            if say is not None and say.module == "exulanica-ability/say/v2":
+                # The run forms are authoritative offers, not look data. Keep v1's read unchanged.
+                hearing_state = {**previous, **hearing_state}
+            heard_by = [other["id"] for _distance, other in hearers(hearing_state, origin, reach)]
             # A society made since modules were recorded also keeps the model behind a line, the
             # speaker's name as the page showed it, and what each being said; one made before keeps
             # exactly what its stored minutes recorded, so they replay.
@@ -1543,6 +1554,12 @@ def _hands(minute: _Minute, previous: Mapping[str, Any]) -> None:
         intent = person.get("hands")
         if intent is None:
             continue
+        from exulanica.world.society_resident_day import inside
+
+        other = next((p for p in state["inhabitants"] if p["id"] == intent["with"]), None)
+        if inside(person) or (other is not None and inside(other)):
+            _missed(minute, person, "actor_inside" if inside(person) else "target_inside")
+            continue
         chosen = (intent["ability"], intent["thing"], intent["with"])
         found = next(
             (
@@ -1627,17 +1644,30 @@ def _follow(minute: _Minute, decisions: Sequence[tuple[Mapping[str, Any], Any]])
     (``chose_to_stop_following``) or anything but going on or saying something
     (``chose_otherwise``), when no decider's choice kept it this minute (``not_kept``: a being
     follows while its decider chooses each minute to go on, as a person playing it does, a minute
-    with no answer carrying on), when the one it follows is not here (``target_gone``), or when it
+    with no answer carrying on; version 3 instead retains intent until a new choice or applied
+    owner command supersedes it), when the one it follows is not here (``target_gone``), or when it
     has ended the follow module's ``lost_after_minutes`` minutes in a row farther off than the
     follow distance with no open node within it (``lost_target``); ending within the distance, or
     with such a node to walk to, counts no minute lost."""
+    from exulanica.world.society_actions import ACTION_EVENT_KIND
     from exulanica.world.society_decision_contract import DecisionOption
     from exulanica.world.society_follow import KEEPS_FOLLOWING, approach_node, follow_row
+    from exulanica.world.society_resident_day import inside
 
     state = minute.state
     row = follow_row(state)
     assert row is not None
     within, lost_after = row.value("follow_distance_mm"), row.value("lost_after_minutes")
+    # These are the same recorded action-consumption events live steps and replay supply.
+    # A new owner command ends durable pursuit, so it cannot reassert itself next minute.
+    directed = {
+        str(event.subject_id)
+        for event in minute.events
+        if row.version >= 3
+        and event.kind == ACTION_EVENT_KIND
+        and event.document.get("disposition") == "applied"
+        and event.document.get("origin") == "user"
+    }
     chosen = {
         str(receipt["subject_id"]): DecisionOption.from_record(receipt["proposal"]["option"])
         for receipt, disposition in decisions
@@ -1647,10 +1677,20 @@ def _follow(minute: _Minute, decisions: Sequence[tuple[Mapping[str, Any], Any]])
     for person in sorted(state["inhabitants"], key=lambda p: p["ordinal"]):
         option = chosen.get(person["id"])
         following = person.get("following")
+        if person["id"] in directed:
+            if following is not None:
+                _stop_following(minute, person, "chose_otherwise")
+            continue
         if option is not None and option.kind == "follow":
             target = people.get(str(option.addressee_id))
             if following is not None and (target is None or following["being"] != target["id"]):
                 _stop_following(minute, person, "chose_otherwise" if target else "target_gone")
+            if target is not None and (inside(person) or inside(target)):
+                if person.get("following") is not None:
+                    _stop_following(
+                        minute, person, "actor_inside" if inside(person) else "target_inside"
+                    )
+                continue
             if target is None or (following is not None and following["being"] == target["id"]):
                 continue
             person["following"] = {
@@ -1678,12 +1718,15 @@ def _follow(minute: _Minute, decisions: Sequence[tuple[Mapping[str, Any], Any]])
         if option is not None and option.kind not in KEEPS_FOLLOWING:
             _stop_following(minute, person, "chose_otherwise")
             continue
-        if option is None:
+        if option is None and row.version < 3:
             _stop_following(minute, person, "not_kept")
             continue
         target = people.get(following["being"])
         if target is None:
             _stop_following(minute, person, "target_gone")
+            continue
+        if inside(person) or inside(target):
+            _stop_following(minute, person, "actor_inside" if inside(person) else "target_inside")
             continue
         near = _distance_mm(person["position_mm"], target["position_mm"]) <= within
         if near or approach_node(state, minute.document, person, target, within) is not None:
@@ -1721,7 +1764,15 @@ def _stop_following(minute: _Minute, person: dict[str, Any], reason: str) -> Non
 def _as_began(person: Mapping[str, Any], began: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     """``person`` where it stood as the minute began, where it was here then."""
     then = began.get(person["id"])
-    return dict(person) if then is None else {**person, "position_mm": then["position_mm"]}
+    return (
+        dict(person)
+        if then is None
+        else {
+            **person,
+            "position_mm": then["position_mm"],
+            **({"location": then["location"]} if "day" in person else {}),
+        }
+    )
 
 
 def _distance_mm(a: Sequence[int] | None, b: Sequence[int] | None) -> int:
@@ -1928,6 +1979,9 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
     """A society of things' state, held to its own fields beside the purposeful planner's: every
     person a thing of a kind, by how it came, every thing once, and nothing held by nobody here."""
     _require(state.get("profile") == THINGS_PROFILE, "unsupported society of things profile")
+    from exulanica.world.society_resident_day import validate_state
+
+    validate_state(state)
     if "modules" in state:
         from exulanica.abilities.registry import AbilityError, recorded_modules
 

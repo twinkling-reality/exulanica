@@ -1,7 +1,7 @@
 /**
  * The society engines the server states, read from the backend engine table.
  *
- * `society-engines.generated.ts` carries `exulanica/world/society-engines.v4.json` byte for byte,
+ * `society-engines.generated.ts` carries the newest `exulanica/world/society-engines.v<N>.json` byte for byte,
  * with the union of its engine profiles, so the browser never restates which engines exist, what
  * each can do, how many people it may hold, which engine a new society over each kind of ground
  * is created with, or which one a saved world holding a thing its author placed takes on a host
@@ -10,7 +10,7 @@
  * resembles.
  */
 
-import { SOCIETY_ENGINES_V4_JSON, type SocietyEngineProfile } from './society-engines.generated.js';
+import { SOCIETY_ENGINES_JSON, type SocietyEngineProfile } from './society-engines.generated.js';
 
 export type { SocietyEngineProfile };
 
@@ -100,11 +100,19 @@ export interface EngineTable {
   readonly holdingThings: HoldingThings | null;
 }
 
-/** The profiles that state an engine for a world holding things: the third and the fourth. */
-const HOLDING_PROFILES = ['exulanica.society-engines/v3', 'exulanica.society-engines/v4'];
-/** The one profile in which an engine may state no maximum population. */
-const UNBOUNDED_PROFILE = 'exulanica.society-engines/v4';
-const PROFILES = ['exulanica.society-engines/v2', ...HOLDING_PROFILES];
+/**
+ * A table is read by its profile's version: from the second on, with an engine for a world holding
+ * things from the third and no maximum population from the fourth. A later version that states
+ * nothing new is read with no edit here.
+ */
+const READ_SINCE = 2;
+const HOLDING_SINCE = 3;
+const NO_MAXIMUM_SINCE = 4;
+function profileVersion(profile: unknown): number | null {
+  const match = typeof profile === 'string' ? /^exulanica\.society-engines\/v([1-9][0-9]*)$/.exec(profile) : null;
+  const version = match === null ? null : Number(match[1]);
+  return version !== null && version >= READ_SINCE ? version : null;
+}
 
 function holdingThings(value: unknown, engines: readonly SocietyEngine[]): HoldingThings {
   const held = value as Readonly<Record<string, unknown>> | null;
@@ -119,13 +127,14 @@ function holdingThings(value: unknown, engines: readonly SocietyEngine[]): Holdi
   return Object.freeze({ engine: engine.engine, grounds: Object.freeze([...(grounds as string[])]) });
 }
 
-/** Read one version of the engine table, the second, the third or the fourth, as this module reads its own. */
+/** Read one version of the engine table, from the second on, as this module reads its own. */
 export function readEngineTable(text: string): EngineTable {
   const document = JSON.parse(text) as Readonly<Record<string, unknown>>;
-  if (!PROFILES.includes(document['profile'] as string) || !Array.isArray(document['engines'])) {
+  const version = profileVersion(document['profile']);
+  if (version === null || !Array.isArray(document['engines'])) {
     throw new Error('Invalid society engine table');
   }
-  const unbounded = document['profile'] === UNBOUNDED_PROFILE;
+  const unbounded = version >= NO_MAXIMUM_SINCE;
   const engines = Object.freeze(document['engines'].map((held) => row(held, unbounded)));
   const creatable = (profile: unknown) => engines.find((engine) => engine.engine === profile && engine.creatable);
   if (creatable(document['default_engine']) === undefined) {
@@ -143,7 +152,7 @@ export function readEngineTable(text: string): EngineTable {
     return [ground, engine.engine];
   })) as Record<SocietyGroundKind, SocietyEngineProfile>;
   const holding = document['creates_holding_things'];
-  if (holding !== undefined && !HOLDING_PROFILES.includes(document['profile'] as string)) {
+  if (holding !== undefined && version < HOLDING_SINCE) {
     throw new Error('Invalid society engine table creates_holding_things');
   }
   return {
@@ -154,7 +163,7 @@ export function readEngineTable(text: string): EngineTable {
   };
 }
 
-const TABLE = readEngineTable(SOCIETY_ENGINES_V4_JSON);
+const TABLE = readEngineTable(SOCIETY_ENGINES_JSON);
 
 /** Every engine, in the table's order. */
 export const SOCIETY_ENGINES: readonly SocietyEngine[] = TABLE.engines;

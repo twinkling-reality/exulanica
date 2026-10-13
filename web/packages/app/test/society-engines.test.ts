@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
 import { describe, expect, it } from 'vitest';
-import { SOCIETY_ENGINES_V4_JSON } from '../src/society-engines.generated.js';
+import { SOCIETY_ENGINES_FILE, SOCIETY_ENGINES_JSON } from '../src/society-engines.generated.js';
 import {
   DEFAULT_SOCIETY_ENGINE,
   SOCIETY_ENGINES,
@@ -19,7 +19,10 @@ import { parseSociety } from '../src/society-api.js';
  * name rather than read as one it resembles.
  */
 
-const TABLE = new URL('../../../../exulanica/world/society-engines.v4.json', import.meta.url);
+const WORLD = new URL('../../../../exulanica/world/', import.meta.url);
+// The table the app reads is the newest the backend holds, named by the generated copy itself.
+const TABLE = new URL(SOCIETY_ENGINES_FILE, WORLD);
+const FOURTH = new URL('society-engines.v4.json', WORLD);
 const THIRD = new URL('../../../../exulanica/world/society-engines.v3.json', import.meta.url);
 const SECOND = new URL('../../../../exulanica/world/society-engines.v2.json', import.meta.url);
 
@@ -44,7 +47,11 @@ const purposeful = (profile: string, population: number, goal: unknown = null) =
 
 describe('the society engine table', () => {
   it('is the backend file byte for byte, and every engine it states is readable here', () => {
-    expect(SOCIETY_ENGINES_V4_JSON).toBe(readFileSync(TABLE, 'utf8'));
+    expect(SOCIETY_ENGINES_JSON).toBe(readFileSync(TABLE, 'utf8'));
+    // The newest: no file beside it has a higher version.
+    const versions = readdirSync(WORLD).map((name) => /^society-engines\.v([0-9]+)\.json$/.exec(name))
+      .filter((match) => match !== null).map((match) => Number(match![1]));
+    expect(SOCIETY_ENGINES_FILE).toBe(`society-engines.v${Math.max(...versions)}.json`);
     const names = (JSON.parse(readFileSync(TABLE, 'utf8')) as { engines: { engine: string }[] }).engines.map((row) => row.engine);
     expect(SOCIETY_ENGINES.map((engine) => engine.engine)).toEqual(names);
     expect(names).toContain(DEFAULT_SOCIETY_ENGINE);
@@ -55,32 +62,43 @@ describe('the society engine table', () => {
     const table = JSON.parse(readFileSync(TABLE, 'utf8')) as {
       creates_holding_things: { engine: string; grounds: string[] };
     };
-    const fourth = readEngineTable(readFileSync(TABLE, 'utf8'));
-    expect(fourth.holdingThings).toEqual(table.creates_holding_things && {
+    const current = readEngineTable(readFileSync(TABLE, 'utf8'));
+    expect(current.holdingThings).toEqual(table.creates_holding_things && {
       engine: table.creates_holding_things.engine, grounds: table.creates_holding_things.grounds });
-    expect(societyEngine(fourth.holdingThings?.engine).stateFamily).toBe('things');
+    expect(societyEngine(current.holdingThings?.engine).stateFamily).toBe('things');
+    // A world made from a world kind is among the grounds a society of things stands on.
+    expect(current.holdingThings?.grounds).toContain('generated_site');
     // A world published under the second table reads as it did: the same engines and grounds, and
     // no engine for a world holding things.
     const second = readEngineTable(readFileSync(SECOND, 'utf8'));
     expect(second.holdingThings).toBeNull();
-    expect(second.creates).toEqual(fourth.creates);
-    // A world published under the third table reads as it did too: the same engine for a world
-    // holding things, and every engine with the maximum population that table stated for it.
+    expect(second.creates).toEqual(current.creates);
+    // One published under the third or the fourth reads as it did too: the engine for a world
+    // holding things over the grounds that table named, a site not among them.
     const third = readEngineTable(readFileSync(THIRD, 'utf8'));
+    const fourth = readEngineTable(readFileSync(FOURTH, 'utf8'));
     expect(third.holdingThings).toEqual(fourth.holdingThings);
-    expect(third.creates).toEqual(fourth.creates);
+    expect(fourth.holdingThings?.grounds).toEqual(['authored_starter', 'generated_town', 'made_world']);
+    expect(current.holdingThings).toEqual({ engine: fourth.holdingThings!.engine,
+      grounds: ['authored_starter', 'generated_site', 'generated_town', 'made_world'] });
+    expect(third.creates).toEqual(current.creates);
     expect(second.engines).toEqual(third.engines);
-    // The fourth differs from them only where an engine states no maximum population: the
-    // engines a town's society is made with.
+    // From the fourth an engine may state no maximum population: the engines a town's society is
+    // made with state none, and nothing else about an engine differs from the third.
+    expect(current.engines).toEqual(fourth.engines);
     const unbounded = fourth.engines.filter((engine) => engine.populationMaximum === null);
     expect(unbounded.map((engine) => engine.engine)).toEqual(
       ['exulanica-society/v2', 'exulanica-society/v5', 'exulanica-society/v7']);
     expect(third.engines.map((engine) => engine.populationMaximum)).toEqual([512, 512, 512, 65536, 512, 512]);
     expect(fourth.engines.map((engine) => ({ ...engine, populationMaximum: 0 }))).toEqual(
       third.engines.map((engine) => ({ ...engine, populationMaximum: 0 })));
-    // An engine may state no maximum only in the fourth table.
-    const stated = readFileSync(TABLE, 'utf8').replace('exulanica.society-engines/v4', 'exulanica.society-engines/v3');
+    // An engine may state no maximum only from the fourth table, and a table is read by its
+    // profile's version, so one that states nothing new needs no edit of the reader.
+    const stated = readFileSync(FOURTH, 'utf8').replace('exulanica.society-engines/v4', 'exulanica.society-engines/v3');
     expect(() => readEngineTable(stated)).toThrow('Invalid society engine table');
+    const later = readFileSync(TABLE, 'utf8').replace(/exulanica\.society-engines\/v[0-9]+/, 'exulanica.society-engines/v99');
+    expect(readEngineTable(later).engines).toEqual(current.engines);
+    expect(() => readEngineTable(later.replace('v99', 'v1'))).toThrow('Invalid society engine table');
   });
 
   it('reads which engine each ground is created with, and which engines an owner chooses models in', () => {

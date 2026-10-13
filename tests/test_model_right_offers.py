@@ -51,7 +51,7 @@ pytestmark = pytest.mark.postgres
 #: docs/companion-question.md, "Every hosted request passes one boundary".
 PHOTOGRAPH_ROLES = ("vision", "embedding", "reasoning_cheap")
 #: The requests that name a picture a person gave a world's reference notes, offered on that step.
-REFERENCE_PICTURE_ROLES = ("reference_vision",)
+REFERENCE_PICTURE_ROLES = ("reference_vision", "creature_drafter")
 
 
 def _raw() -> dict:
@@ -96,7 +96,7 @@ def test_no_hosted_notice_says_people_are_hidden_before_the_model_sees_them():
     ("change", "refusal"),
     [
         (lambda raw: raw.update(extra=1), "exactly the keys"),
-        (lambda raw: raw.update(profile="exulanica.model-right-uses/v2"), "declares"),
+        (lambda raw: raw.update(profile="exulanica.model-right-uses/v3"), "declares"),
         (lambda raw: raw.update(notice=raw["notice"].replace("{kept}", "")), "fills exactly"),
         (lambda raw: raw["uses"][0].update(extra=1), "exactly the keys"),
         (lambda raw: raw["uses"][0].update(role="depth"), "no hosted model role"),
@@ -340,6 +340,6 @@ def test_stopping_the_composer_right_refuses_the_next_answer_by_name(upload):
 def test_the_picture_use_s_words_say_its_notes_are_withdrawn():
     """The stop withdraws the reference notes made with a picture (the withdrawal migrations, tested
     in tests/test_reference_withdrawal.py); the words a person grants and stops against say so."""
-    (use,) = [use for use in _raw()["uses"] if use["role"] in REFERENCE_PICTURE_ROLES]
+    (use,) = [use for use in _raw()["uses"] if use["role"] == "reference_vision"]
     for sentence in (use["kept"], use["stop"]):
         assert "withdrawn" in sentence and "stay" not in sentence

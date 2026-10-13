@@ -82,6 +82,8 @@ export interface TravellerChoice {
 /** A person's latest decision, and what the minute that consumed it did with it. */
 export interface PersonDecision extends NamedModelRef {
   readonly subjectId: string;
+  /** The authorized request/receipt read; absent in responses from older servers. */
+  readonly requestId?: string;
   readonly decisionSeq: number;
   readonly baseTick: number;
   /** The minute that took it up, or null while none has. */
@@ -94,6 +96,29 @@ export interface PersonDecision extends NamedModelRef {
   readonly dispositionReason: string | null;
   /** The action the model chose, in its offered words, or null when it chose none. */
   readonly chose: string | null;
+}
+
+/** Stored role documents retain their versioned fields; the server validates their contracts. */
+export interface SocietyDecisionDetail {
+  readonly status: 'in_progress' | 'completed';
+  readonly request: Readonly<Record<string, unknown>>;
+  readonly decision: Readonly<Record<string, unknown>> | null;
+}
+
+/** Check the read's identity and receipt binding without interpreting a role's observation. */
+export function parseSocietyDecisionDetail(value: unknown, requestId: string): SocietyDecisionDetail {
+  const row = object(value);
+  const request = object(row['request']);
+  const decision = maybe(row['decision'], object);
+  const digest = text(request['document_sha256']);
+  if (request['request_id'] !== requestId || !/^[a-f0-9]{64}$/.test(digest)) invalid();
+  if (row['status'] !== (decision === null ? 'in_progress' : 'completed')) invalid();
+  if (decision !== null && (decision['request_id'] !== requestId || decision['request_sha256'] !== digest)) invalid();
+  return {
+    status: decision === null ? 'in_progress' : 'completed',
+    request,
+    decision,
+  };
 }
 
 /** What one model's decisions came to: the numbers a comparison of models reads. */
@@ -277,6 +302,7 @@ export function parseSocietyModels(value: unknown): SocietyModels {
       return {
         ...modelRef(held),
         subjectId: text(held['subject_id']),
+        ...(held['request_id'] === undefined ? {} : { requestId: text(held['request_id']) }),
         decisionSeq: count(held['decision_seq']),
         baseTick: count(held['base_tick']),
         consumedTick: maybe(held['consumed_tick'], count),
@@ -338,6 +364,14 @@ export class SocietyModelsClient {
 
   async read(versionId: string): Promise<SocietyModels> {
     return this.#transport.getJson<unknown>(this.#path(versionId)).then(parseSocietyModels);
+  }
+
+  /** Read under current world authorization; withdrawal and absence remain server refusals. */
+  async readDecision(versionId: string, requestId: string): Promise<SocietyDecisionDetail> {
+    text(requestId);
+    const path = `/world/versions/${encodeURIComponent(versionId)}/society/decisions/${encodeURIComponent(requestId)}`;
+    const scoped = openWorldPath(path, this.#worldId, 'the recorded decision for this world');
+    return this.#transport.getJson<unknown>(scoped).then((value) => parseSocietyDecisionDetail(value, requestId));
   }
 
   /**

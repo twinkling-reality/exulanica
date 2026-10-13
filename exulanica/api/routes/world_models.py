@@ -222,6 +222,18 @@ def world_models(
     request: Request,
     world_id: WorldId,
 ) -> Any:
+    return world_models_document(version_id, connection, session, held, request, world_id)
+
+
+def world_models_document(
+    version_id: uuid.UUID,
+    connection: Any,
+    session: Any,
+    held: Any,
+    request: Request,
+    world_id: str,
+) -> Any:
+    """The native role read, shared by world overviews without a second assignment authority."""
     require_world(connection, session.workspace_id, world_id)
     version = _version(connection, session.workspace_id, world_id, version_id)
     if version is None:

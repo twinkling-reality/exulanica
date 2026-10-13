@@ -97,6 +97,35 @@ _BY_PIECE_REQUEST = (
 
 #: Statements on a world table whose text never names a world.
 ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
+    "exulanica/world/kinds/erasure.py::removal_preview [world_generation_receipt]": (
+        "removal checks whether any world in the workspace uses the authorized kind digest; "
+        "the workspace and exact receipt kind digest scope this read-only dependency count"
+    ),
+    "exulanica/world/world_draft_jobs.py::WorldDraftRepository.by_request [world_draft_start]": (
+        "a preworld draft is found by workspace, actor and idempotency request id; its reserved "
+        "generated identity is returned, before any world need exist"
+    ),
+    "exulanica/world/world_draft_jobs.py::WorldDraftRepository.get [world_draft_start]": (
+        "a preworld draft and its outcome are read by workspace, actor and draft id; joined "
+        "request, input, progress and outcome rows belong to that draft"
+    ),
+    "exulanica/world/draft_admission.py::allowance [world_draft_start]": (
+        "native-kind and world drafts share preworld admission; the active-job read binds "
+        "the workspace on both union branches, while the separate actor-bound function "
+        "returns only the actor's aggregate hourly allowance across workspaces"
+    ),
+    "exulanica/world/world_draft_jobs.py::WorldDraftRepository.claim [world_draft_start]": (
+        "the worker claims one due queued or expired-lease running world_draft job in its "
+        "workspace under the workspace lock and row lock; the draft carries its reserved world"
+    ),
+    "exulanica/world/world_draft_jobs.py::WorldDraftRepository.funding_due [world_draft_start]": (
+        "the worker finds its workspace's queued drafts awaiting funding by their deferred "
+        "run_after time, before those drafts have created worlds"
+    ),
+    "exulanica/world/world_draft_jobs.py::WorldDraftRepository.close_due [world_draft_start]": (
+        "the worker closes only unclosed provider bounds of terminal jobs in its workspace; "
+        "the draft's funding liability persists even when no world was created"
+    ),
     **{
         f"exulanica/world/saved_entries.py::SavedWorldEntryRepository.{name} [saved_world_entry]": (
             _BY_ENTRY

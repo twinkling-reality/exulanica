@@ -149,9 +149,10 @@ TICK_BUDGET_REASON: Final = (
     "market towns three tiles long with cross streets 140 m apart, two to four storeys, one high "
     "street, local cross streets and every share even, the values whose towns held the most places "
     "over this schema's sweep (walking graphs of up to 962 nodes in those towns): one purposeful "
-    "tick of the most people its society ground admits, 128, took 130 ms at the median and 159 ms "
-    "at the 95th percentile on the largest graph, and the most people any of those towns held, "
-    "90, took 90 and 131 ms."
+    "tick of 128 people, the head count a town's ground stated when this was measured, took 130 ms "
+    "at the median and 159 ms at the 95th percentile on the largest graph, and the most people any "
+    "of those towns held, 90, took 90 and 131 ms. A town's ground states no head count now: its "
+    "people are admitted by the measured cost of their minute where a society is made."
 )
 #: Every refusal a request for a world can meet, with its status and what it means: the codes a
 #: page, a model and an API client act on, served in :func:`specification_document`.

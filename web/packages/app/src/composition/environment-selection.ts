@@ -1,3 +1,5 @@
+import { ThingSupportClient } from '../thing-support-api.js';
+import { holdSupportedThings, observeSupportVersions, type SupportVersionObservations } from './thing-support.js';
 import {
   type AtlasScene,
   type DistrictSubject,
@@ -91,6 +93,7 @@ import {
 import type { AppEnvironment, SessionState } from './session-state.js';
 import { seatingLayout } from './seating-layout.js';
 import { townFurniture } from './town-furniture.js';
+import { onSiteSeatsChanged, siteSeats } from './site-furniture.js';
 import { pointerRay, type SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyPlaces } from '../society-api.js';
 import { engineCreatedOver, societyEngine } from '../society-engines.js';
@@ -147,6 +150,7 @@ export interface EnvironmentSelectionDependencies {
   readonly credentials: Credentials;
   readonly onPanelOpen?: () => void;
   readonly onObjects?: () => void;
+  readonly onAuthoredObject?: (objectId: string) => boolean;
   readonly showStatus: (message: string, kind?: 'progress' | 'failure') => void;
   /** Keep a line in the status place until it is taken back with null; `showStatus` when left out. */
   readonly holdStatus?: (message: string | null) => void;
@@ -166,6 +170,7 @@ export interface EnvironmentSelectionDependencies {
   readonly admissionId?: string | null;
   readonly environmentClient?: EnvironmentSelectionClient;
   readonly worldClient?: WorldObjectsClient;
+  readonly supportVersions?: SupportVersionObservations;
   readonly societyClient?: SocietyClient;
   readonly societyControlClient?: SocietyControlClient;
   readonly societyModelsClient?: SocietyModelsClient;
@@ -757,6 +762,7 @@ export function mountEnvironmentSelection(
     onInteract: (() => void) | null;
     onPointerPick: ((clientX: number, clientY: number) => boolean) | null;
   } | null = null;
+  let releaseSourceWatch: (() => void) | null = null;
   let installedPointerPick: ((clientX: number, clientY: number) => boolean) | null = null;
   let priorPointerPick: ((clientX: number, clientY: number) => boolean) | null = null;
   /** Ends the pointer's hint over the world (Play this one) when the world closes. */
@@ -2042,6 +2048,7 @@ export function mountEnvironmentSelection(
 
   async function afterAuthoredEdit(versionId: string): Promise<void> {
     if (savedWorld !== null) {
+      supportedThings.setVersion(null);
       if (phase === 'disposed' || versionId !== savedWorld.versionId || !liveSociety) return;
       const before = new Map((savedObjects() ?? []).map((object) => [object.objectId, object]));
       await readSavedVersion();
@@ -2535,6 +2542,7 @@ export function mountEnvironmentSelection(
 
   /** The seating last built from a version the page read, kept while a re-read fails. */
   let lastSeating: SeatingLayout | null = null;
+  const stopSiteSeats = onSiteSeatsChanged(refreshSeatingLayout);
 
   /**
    * The seating the drawn objects give, or, when the saved version could not be read again, the
@@ -2544,8 +2552,8 @@ export function mountEnvironmentSelection(
   function seatingNow(places: SocietyPlaces | null): SeatingLayout | null {
     const kept = current === null && authoredWorldFailure !== null && lastSeating !== null;
     deps.env.canvas.dataset.societySeatingLayout = kept ? 'kept-after-failed-read' : 'current';
-    if (kept) return lastSeating;
-    lastSeating = seatingLayout(worldClient.assets(), current, places, townFurniture(deps.state.activeWorldEntry?.entryId));
+    if (kept) return { ...lastSeating!, fixtureSeats: siteSeats(deps.state.activeWorldEntry?.entryId, savedWorld?.versionId) };
+    lastSeating = seatingLayout(worldClient.assets(), current, places, townFurniture(deps.state.activeWorldEntry?.entryId), siteSeats(deps.state.activeWorldEntry?.entryId, current?.versionId));
     return lastSeating;
   }
 
@@ -2621,6 +2629,7 @@ export function mountEnvironmentSelection(
       authoredWorldFailure = null;
     } catch (error) {
       current = null;
+      supportedThings.setVersion(null);
       authoredWorldFailure = objectWriteFailure(error);
     }
   }
@@ -2659,6 +2668,7 @@ export function mountEnvironmentSelection(
     // A generated world's people live in the one region its entry declares, in the city's frame
     // its tiles are drawn in, standing where a person arrives (`hostGeneratedSociety`).
     // A world made from a world kind is drawn in its site's frame the same way.
+    if (entry.generatedTerrain != null) return null; // Terrain declares no society projection.
     const generated = entry.generatedGround ?? entry.generatedSite ?? null;
     if (generated != null) {
       const { regionId, arrivalMm } = generated;
@@ -2695,8 +2705,22 @@ export function mountEnvironmentSelection(
    * the authored objects' region root. A library that cannot be read leaves the world as it was and
    * says why on the canvas, never stood in for.
    */
+  const supportVersions = deps.supportVersions ?? observeSupportVersions();
+  const supportedThings = holdSupportedThings({
+    versions: supportVersions,
+    source: () => {
+      const ground = deps.state.atlas?.binding.worldKind?.ground;
+      return ground?.form === 'generated-site' ? ground.site.drawing : null;
+    },
+    read: (versionId, thingId, signal) => new ThingSupportClient({
+      ...deps.credentials, worldId: current?.worldId ?? null,
+    }).read(versionId, thingId, signal),
+    changed: () => { if (things !== null && phase !== 'disposed') void things.setPlaced(current?.things ?? []); },
+  });
+
   async function drawPlacedThings(atlas: NonNullable<SessionState['atlas']>['binding'], regionId: string, forSociety = false): Promise<void> {
     const placed = current?.things ?? [];
+    supportedThings.setVersion(current);
     if (placed.length === 0 && things === null && !forSociety) return;
     try {
       things ??= await mountThings({
@@ -2704,6 +2728,7 @@ export function mountEnvironmentSelection(
         camera: atlas.camera,
         shell: deps.env.shell,
         credentials: deps.credentials,
+        supportRoot: (thing) => supportedThings.available(thing) ? atlas.environmentRoot : null,
         regionRoot: (id) => (id === regionId
           ? (atlas.authoredSociety?.root.parent as ReturnType<ThingsDependencies['regionRoot']> | undefined) ?? null
           : atlas.regionRoots.get(id as IslandId) ?? null),
@@ -2750,23 +2775,27 @@ export function mountEnvironmentSelection(
       // a placed thing in front.
       const open = deps.state.worldSight?.reach(origin, direction) ?? Number.POSITIVE_INFINITY;
       const met = things?.pick(origin, direction) ?? null;
-      const thing = met !== null && met.distance <= open ? met : null;
-      const inhabitantId = atlas.authoredSociety?.pickInhabitant(origin, direction, Math.min(open, thing?.distance ?? Number.POSITIVE_INFINITY)) ?? null;
+      const authored = atlas.objects?.pick(origin, direction, open) ?? null;
+      const thing = met !== null && met.distance <= Math.min(open, authored?.distance ?? Number.POSITIVE_INFINITY) ? met : null;
+      const inhabitantId = atlas.authoredSociety?.pickInhabitant(origin, direction, Math.min(open, thing?.distance ?? Number.POSITIVE_INFINITY, authored?.distance ?? Number.POSITIVE_INFINITY)) ?? null;
       const pick: PlayPick | null = inhabitantId !== null ? { subjectId: inhabitantId, thingId: null }
         : thing !== null ? { subjectId: thing.pick.subjectId, thingId: thing.pick.thingId } : null;
-      return { thing, inhabitantId, pick };
+      return { thing, authored, inhabitantId, pick };
     };
     const pickAlong = (
       origin: readonly [number, number, number], direction: readonly [number, number, number], via: ThingPickVia,
     ): boolean => {
-      const { thing, inhabitantId, pick } = pickedAlong(origin, direction);
+      if (typingInField() || document.querySelector('[aria-modal="true"]:not([hidden])') !== null) return false;
+      const { thing, authored, inhabitantId, pick } = pickedAlong(origin, direction);
       // While a person plays a being, a click acts for it rather than opening a card, and a click
       // on open ground walks there where the minute offers it.
       if (playThisOne?.playing() != null) {
+        if (pick === null && authored !== null) return true;
         if (pick !== null ? playThisOne.onPick(pick) : playThisOne.onGround(atlas.authoredSociety?.groundPoint(origin, direction) ?? null)) return true;
       }
       if (inhabitantId !== null) { inspectInhabitant(inhabitantId); return true; }
       if (thing !== null) { things?.raise(thing.pick, via); return true; }
+      if (authored !== null) return deps.onAuthoredObject?.(authored.objectId) ?? false;
       return false;
     };
     // While playing, the pointer over the world says what a click there would do, once a frame at
@@ -2782,8 +2811,8 @@ export function mountEnvironmentSelection(
       const ray = at === null || document.pointerLockElement != null || atlas.interactionRay === undefined
         ? null : pointerRay(atlas, at.x, at.y);
       if (ray === null) { play.hover(null, false); return; }
-      const { pick } = pickedAlong(ray.origin, ray.direction);
-      play.hover(pick, pick === null && atlas.authoredSociety?.groundPoint(ray.origin, ray.direction) != null);
+      const { pick, authored } = pickedAlong(ray.origin, ray.direction);
+      play.hover(pick, pick === null && authored === null && atlas.authoredSociety?.groundPoint(ray.origin, ray.direction) != null);
     };
     const hoverSoon = (at: { readonly x: number; readonly y: number } | null): void => {
       hoverAt = at;
@@ -2855,6 +2884,65 @@ export function mountEnvironmentSelection(
     atlas.invalidate();
   }
 
+  /** Source scenery is inspectable without an authored object or society subject. */
+  function attachTerrainSelection(entry: NonNullable<SessionState['activeWorldEntry']>): void {
+    const atlas = deps.state.atlas?.binding;
+    if (atlas === undefined) return;
+    workspace.setPlace(entry.title);
+    root.setAttribute('aria-label', 'World scenery selection');
+    workspace.setAvailability(true);
+    root.dataset['state'] = 'ready';
+    selected.textContent = 'Aim at scenery and press E to inspect its source.';
+    reason.textContent = 'Scenery belongs to this world’s saved source.';
+    offerInhabitantsPanel();
+    inhabitantsPanel.unavailable('This terrain does not support inhabitants yet.');
+    let sourceSelected = false;
+    const pick = (origin: readonly [number, number, number], direction: readonly [number, number, number]): boolean => {
+      if (typingInField() || document.querySelector('[aria-modal="true"]:not([hidden])') !== null) return false;
+      const hit = atlas.pickSourceSurface(origin, direction);
+      if (hit === null) return false;
+      const words = hit.instanceId.replace(/[._:-]+/g, ' ').trim();
+      const label = words.length === 0 ? 'Scenery' : words[0]!.toUpperCase() + words.slice(1);
+      sourceSelected = true;
+      workspace.inspect();
+      showInspector();
+      selectedInhabitant = null;
+      chosen = null;
+      deps.onSelect?.(null);
+      place.disabled = true; modify.disabled = true; remove.disabled = true;
+      selected.textContent = label;
+      inspector.show({ subject: `terrain-dressing:${hit.instanceId}:${hit.nodeIndex}:${hit.meshIndex}:${hit.primitiveIndex}`,
+        showSubject: false, title: label, description: 'Immutable scenery from this world’s source.',
+        activity: 'This scenery belongs to the saved source.',
+        details: [['Source instance', hit.instanceId], ['Asset', hit.assetKey], ['Content digest', hit.contentSha256],
+          ['Node / mesh / primitive', `${hit.nodeIndex} / ${hit.meshIndex} / ${hit.primitiveIndex}`]],
+      });
+      return true;
+    };
+    attachedControls = atlas.controls;
+    priorInteract = atlas.controls.onInteract;
+    installedInteract = () => {
+      const ray = atlas.interactionRay();
+      if (!pick(ray.origin, ray.direction)) priorInteract?.();
+    };
+    atlas.controls.onInteract = installedInteract;
+    priorPointerPick = atlas.controls.onPointerPick;
+    installedPointerPick = (x, y) => {
+      const ray = pointerRay(atlas, x, y);
+      return ray !== null && pick(ray.origin, ray.direction);
+    };
+    atlas.controls.onPointerPick = installedPointerPick;
+    const withdraw = (): void => {
+      if (!sourceSelected || atlas.sourceSurfaceCurrent()) return;
+      sourceSelected = false;
+      clearInspector();
+      selected.textContent = 'This scenery’s source is no longer available.';
+    };
+    atlas.app.on('update', withdraw);
+    releaseSourceWatch = () => atlas.app.off('update', withdraw);
+    phase = 'attached';
+  }
+
   async function attach(): Promise<void> {
     const kind = deps.state.atlas?.worldKind;
     if (kind !== undefined) {
@@ -2866,7 +2954,11 @@ export function mountEnvironmentSelection(
     const entry = deps.state.activeWorldEntry;
     if (!deps.env.preview && entry != null
       && (entry.authoredScene != null || entry.declaredFloor != null || entry.generatedGround != null
-        || entry.generatedSite != null)) {
+        || entry.generatedSite != null || entry.generatedTerrain != null)) {
+      if (entry.generatedTerrain != null) {
+        attachTerrainSelection(entry);
+        return;
+      }
       try {
         const regionId = await societyRegion(entry);
         if ((phase as string) === 'disposed') return;
@@ -3121,6 +3213,7 @@ export function mountEnvironmentSelection(
       }
     },
     dispose: () => {
+      stopSiteSeats();
       workspace.dispose();
       representation.dispose();
       releaseRepresentationSelection?.();
@@ -3140,6 +3233,8 @@ export function mountEnvironmentSelection(
       // The being played from this page stays the person's until they give it back or go quiet:
       // the server gives it back after its quiet minutes.
       pointerHover.abort();
+      releaseSourceWatch?.();
+      releaseSourceWatch = null;
       // The paused hint belongs to this world; it goes with it.
       if (arrivalHeld !== null) { arrivalHeld = null; deps.holdStatus?.(null); }
       playThisOne?.dispose();
@@ -3152,6 +3247,7 @@ export function mountEnvironmentSelection(
         if (deps.env.canvas) delete deps.env.canvas.dataset[key];
       }
       if (liveSociety || recording) crowd()?.clearSociety();
+      supportedThings.destroy();
       things?.destroy();
       things = null;
       figuresSet = false;

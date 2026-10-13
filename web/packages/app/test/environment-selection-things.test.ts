@@ -1,5 +1,8 @@
 // @vitest-environment happy-dom
 
+import { readFileSync } from 'node:fs';
+import { parseSiteDrawing } from '@exulanica/atlas-react/generated-site';
+import { observeSupportVersions } from '../src/composition/thing-support.js';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@exulanica/graph-client';
 import type { AtlasScene } from '@exulanica/atlas-core';
@@ -111,7 +114,7 @@ const thingsSociety = (): SocietySnapshot => parseSociety({
   },
 });
 
-function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; readonly everyoneIndoors?: boolean; readonly sight?: Sight } = {}) {
+function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; readonly everyoneIndoors?: boolean; readonly sight?: Sight; readonly objectDistance?: number; readonly supported?: boolean } = {}) {
   const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
   const regionEntity = { name: 'authored-region:region:starter' };
   const crowd = {
@@ -130,10 +133,16 @@ function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; r
     state: { x: 0, y: 1.68, z: 4 }, onInteract: vi.fn() as (() => void) | null, forward: () => ({ x: 0, y: 0, z: -1 }),
     onPointerPick: null as ((clientX: number, clientY: number) => boolean) | null,
   };
+  const sourceDrawing = parseSiteDrawing(JSON.parse(readFileSync('packages/atlas-react/test/fixtures/site-support.v2.json', 'utf8')).drawing);
+  const sourceRoot = {name: 'generated-source'};
+  const supportVersions = observeSupportVersions();
   const binding = {
     app: { app: true }, camera: { forward: { x: 0, y: 0, z: -1 } }, controls, invalidate: vi.fn(),
     interactionRay: () => ({ origin: [0, 1.68, 4] as const, direction: [0, 0, -1] as const }),
+    environmentRoot: sourceRoot,
+    ...(scene.supported ? {worldKind: {ground: {form: 'generated-site', site: {drawing: sourceDrawing}}}} : {}),
     regionRoots: new Map(), ownedDistrict: null, generatedTile: null, authoredSociety: crowd,
+    objects: { pick: vi.fn((_o: unknown, _d: unknown, limit: number) => scene.objectDistance !== undefined && scene.objectDistance <= limit ? { objectId: 'bench', distance: scene.objectDistance } : null) },
     memoryLayerVisible: false, onMemoryLayerChange: null,
   };
   const societyClient = {
@@ -155,7 +164,14 @@ function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; r
     play_ineligible_reason: null, play_eligible: true,
   }, 'version');
   const controlClient = { read: vi.fn(async () => { if (!withSociety) throw missing(); return control(); }), configure: vi.fn(async () => control('playing')), step: vi.fn() };
-  const placed = scene.nothingPlaced === true ? { ...version, things: [] } as unknown as AlternateVersion : version;
+  let placed = scene.nothingPlaced === true ? { ...version, things: [] } as unknown as AlternateVersion : version;
+  if (scene.supported && sourceDrawing.profile === 'exulanica.site-drawing/v2') {
+    placed = {...version, worldId: sourceDrawing.worldId, things: [{...version.things![0]!, regionId: 'region:generated',
+      transform: {...version.things![0]!.transform, xMm: 50400, yMm: 150, zMm: -5340},
+      support: {profile: 'exulanica.support-reference/v1', worldId: sourceDrawing.worldId, sourceSnapshotId: version.sourceSnapshotId,
+        receiptSha256: sourceDrawing.receiptSha256, networkSha256: sourceDrawing.support!.document.document_sha256,
+        regionId: 'region:generated', surfaceId: 'deck'}}]};
+  }
   const worldClient = { connect: vi.fn(async () => ({ assets: [], version: placed })), assets: vi.fn(() => []) };
   const modelsClient = { read: vi.fn(async () => { throw missing(); }), choose: vi.fn() };
   const canvas = document.createElement('canvas');
@@ -164,6 +180,7 @@ function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; r
   const holdStatus = vi.fn();
   // The shell is in the page, as the application's is, so a pick raised on it reaches the document.
   document.body.replaceChildren(shell);
+  const inspectObject = vi.fn(() => true);
   const mounted = mountEnvironmentSelection({
     env: { canvas, shell, preview: false, systemReducedMotion: { matches: false } } as unknown as AppEnvironment,
     state: {
@@ -175,17 +192,41 @@ function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; r
     } as unknown as SessionState,
     scene: { islands: [] } as unknown as AtlasScene,
     credentials: { baseUrl: 'https://example.test', token: 'token' },
-    showStatus, holdStatus, admissionId: null,
+    showStatus, holdStatus, admissionId: null, onAuthoredObject: inspectObject,
+    supportVersions,
     worldClient: worldClient as never, societyClient: societyClient as never, societyControlClient: controlClient as never,
     societyModelsClient: modelsClient as never,
     // No look is chosen for any thing here.
     thingLooksClient: { read: vi.fn(async () => new Map()) },
   });
   document.body.append(mounted.root);
-  return { mounted, crowd, controls, canvas, shell, regionEntity, binding, showStatus, holdStatus };
+  return { mounted, crowd, controls, canvas, shell, regionEntity, binding, showStatus, holdStatus, inspectObject, placed, supportVersions };
 }
 
 describe('a saved world\'s placed things', () => {
+  it('hands the exact source root to admitted support and revokes synchronously before later repaint', async () => {
+    let availability = 'available';
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      const thing = placed.things![0]!;
+      const support = thing.support!;
+      return new Response(JSON.stringify({profile: 'exulanica.support-placement-availability/v1', version_id: placed.versionId,
+        thing_id: thing.thingId, state_sha256: placed.stateSha256, availability,
+        support: {profile: support.profile, world_id: support.worldId, source_snapshot_id: support.sourceSnapshotId,
+          receipt_sha256: support.receiptSha256, network_sha256: support.networkSha256, region_id: support.regionId, surface_id: support.surfaceId}}));
+    });
+    const {mounted, placed, supportVersions, binding} = mount(false, {supported: true});
+    try {
+      await mounted.begin(); const layer = layers.at(-1)!;
+      await vi.waitFor(() => expect(layer.options.supportRoot?.(layer.placed[0]!)).toBe(binding.environmentRoot));
+      expect(layer.placed[0]!.transform.yMm).toBe(150);
+      supportVersions.observe({...placed, editSeq: placed.editSeq + 1});
+      expect(layer.options.supportRoot?.(layer.placed[0]!)).toBeNull();
+      // A reply to a different observed edit never authorizes the old rendered version.
+      availability = 'unavailable';
+      mounted.dispose(); expect(layer.options.supportRoot?.(layer.placed[0]!)).toBeNull();
+    } finally {mounted.dispose(); fetch.mockRestore();}
+  });
+
   it('are handed to the layer in the society\'s region frame, and E picks the nearer of a thing and a person', async () => {
     const { mounted, crowd, controls, canvas, shell, regionEntity } = mount();
     await mounted.begin();
@@ -390,5 +431,73 @@ describe('a saved world\'s placed things', () => {
     await mounted.people.play();
     expect(holdStatus).toHaveBeenLastCalledWith(null);
     mounted.dispose();
+  });
+});
+
+
+describe('authored object hits share saved-world targeting', () => {
+  it('while playing, offers and walks to ground only when no authored object stands in front', async () => {
+    const h = mount(true, { objectDistance: 2 });
+    await h.mounted.begin();
+    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    const layer = layers.at(-1)!;
+    layer.placed = [];
+    h.crowd.pickInhabitant.mockImplementation(() => null);
+    const groundPoint = vi.fn(() => ({ xMm: 1200, zMm: -800 }));
+    Object.assign(h.crowd, { groundPoint });
+    await h.mounted.play('person-0');
+    playClient.answer.mockClear();
+    const frames: FrameRequestCallback[] = [];
+    const animationFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      frames.push(callback);
+      return frames.length;
+    });
+    const hover = () => {
+      h.canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: 640, clientY: 400 }));
+      frames.shift()!(0);
+    };
+    try {
+      hover();
+      expect(document.querySelector('.play-band-hint')?.textContent).toBe('');
+      expect(h.controls.onPointerPick!(640, 400)).toBe(true);
+      h.controls.onInteract!();
+      expect(groundPoint).not.toHaveBeenCalled();
+      expect(playClient.answer).not.toHaveBeenCalled();
+      expect(layer.destination).toBeNull();
+      expect(h.inspectObject).not.toHaveBeenCalled();
+
+      // The same ground becomes actionable once the ray no longer meets the bench.
+      h.binding.objects.pick.mockReturnValue(null);
+      hover();
+      expect(document.querySelector('.play-band-hint')?.textContent).toBe('Click to walk here');
+      expect(h.controls.onPointerPick!(640, 400)).toBe(true);
+      for (let i = 0; i < 6; i += 1) await Promise.resolve();
+      expect(playClient.answer).toHaveBeenCalledOnce();
+      expect(playClient.answer).toHaveBeenLastCalledWith('version', 'person-0', 3, 'walk to a spot you choose', null, { xMm: 1200, zMm: -800 });
+      expect(layer.destination).toEqual({ xMm: 1200, zMm: -800 });
+    } finally {
+      animationFrame.mockRestore();
+      h.mounted.dispose();
+    }
+  });
+  it('opens the nearest object by click and E, retaining modal and typing exclusions', async () => {
+    const h = mount(false, { objectDistance: 2 }); await h.mounted.begin();
+    h.controls.onInteract?.(); expect(h.inspectObject).toHaveBeenLastCalledWith('bench');
+    expect(h.crowd.pickInhabitant.mock.calls.at(-1)?.[2]).toBe(2);
+    h.controls.onPointerPick?.(640, 400); expect(h.inspectObject).toHaveBeenCalledTimes(2);
+    const modal = document.createElement('section'); modal.setAttribute('aria-modal', 'true'); document.body.append(modal);
+    h.controls.onInteract?.(); expect(h.controls.onPointerPick?.(640, 400)).toBe(false);
+    expect(h.inspectObject).toHaveBeenCalledTimes(2); modal.remove();
+    const input = document.createElement('input'); document.body.append(input); input.focus();
+    h.controls.onInteract?.(); expect(h.controls.onPointerPick?.(640, 400)).toBe(false);
+    expect(h.inspectObject).toHaveBeenCalledTimes(2); input.remove(); h.mounted.dispose();
+    expect(h.controls.onPointerPick).toBeNull();
+  });
+  it('does not inspect an object behind a world wall or a nearer placed thing', async () => {
+    const wall = [[-3000, 1800], [3000, 1800], [3000, 2000], [-3000, 2000]] as const;
+    const hidden = mount(false, { objectDistance: 4, sight: planSight([wall], 500) }); await hidden.mounted.begin();
+    hidden.controls.onInteract?.(); hidden.controls.onPointerPick?.(640, 400); expect(hidden.inspectObject).not.toHaveBeenCalled(); hidden.mounted.dispose();
+    const nearerThing = mount(false, { objectDistance: 4 }); await nearerThing.mounted.begin();
+    nearerThing.controls.onInteract?.(); expect(nearerThing.inspectObject).not.toHaveBeenCalled(); nearerThing.mounted.dispose();
   });
 });

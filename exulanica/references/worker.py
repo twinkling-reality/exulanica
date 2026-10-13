@@ -74,13 +74,18 @@ from exulanica.models.spending import (
 from exulanica.models.usage import CallUsage, usd_string
 from exulanica.references import drafting, store
 from exulanica.references.adapters.base import (
+    SEARCH_LONGEST_MS,
     Leads,
     ReferenceAdapter,
     ReferenceSourceUnavailable,
+    search_timeout_seconds,
 )
 from exulanica.references.boundary import SEARCH_ROLE, AdmittedQuery, QueryRefused, admit_query
 from exulanica.references.bundle import (
     MAX_NOTES,
+    PROFILE,
+    THINGS_PICTURE_PROFILE,
+    THINGS_PROFILE,
     BundleCall,
     BundleNote,
     BundlePicture,
@@ -91,6 +96,7 @@ from exulanica.references.notes import keep_notes
 from exulanica.references.pictures import (
     PICTURE_ROLE,
     REFUSALS,
+    THINGS_REFUSALS,
     PictureRead,
     PictureUnavailable,
     ReferencePicture,
@@ -116,11 +122,6 @@ QUERY_CLEAR_SECONDS: Final = 3600.0
 #: How soon a worker tries a failed clear again: not every pass, which would send the database a
 #: refused statement each second while the failure lasts.
 QUERY_CLEAR_RETRY_SECONDS: Final = 60.0
-#: The longest a request runs before it ends partial with what it has.
-#: The longest of the nine searches the LOOKUP live check sent through Tavily on 2026-10-09 (main
-#: 7eef51d1; the spending ledger's dispatch to settle times, 3.2 to 9.7 s): the measured basis of a
-#: search's share of a job, by the manifest's timeout rule.
-SEARCH_LONGEST_MS: Final = 9657
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -144,7 +145,7 @@ def stage_seconds(manifest: Manifest) -> StageSeconds:
     return StageSeconds(
         plan=drafting_seconds,
         picture=float(manifest[PICTURE_ROLE].timeout_seconds),
-        search=float(manifest.timeout_rule.timeout_for(SEARCH_LONGEST_MS)),
+        search=search_timeout_seconds(manifest.timeout_rule),
         read=drafting_seconds,
     )
 
@@ -444,6 +445,13 @@ class ReferenceWorker:
             else self._stages.total(pictures=len(claimed.pictures), web=request.web)
         )
         steps = _Steps(request.web, claimed.pictures)
+        try:
+            prompts = drafting.prompts_for_request(request.purpose, request.prompts_sha256)
+        except ValueError:
+            steps.miss_the_rest("reference_prompts_unavailable")
+            return self._finish(
+                claimed, steps, status="failed", failure="reference_prompts_unavailable"
+            )
         calls: list[BundleCall] = []
         notes: list[BundleNote] = []
         lookups: list[uuid.UUID] = []
@@ -465,6 +473,13 @@ class ReferenceWorker:
         status = "partial" if missed else "complete"
         steps.set("bundle", "done", notes=len(notes))
         bundle = ReferenceBundle(
+            profile=(
+                THINGS_PICTURE_PROFILE
+                if prompts.version == 4
+                else THINGS_PROFILE
+                if prompts.version == 3
+                else PROFILE
+            ),
             purpose=request.purpose,
             workspace_id=claimed.workspace_id,
             world_id=None,
@@ -525,12 +540,21 @@ class ReferenceWorker:
             return
         policy = _Admitted(self._policy_for(claimed.workspace_id), picture, capture_id)
         client = self._client.with_policy(policy)
+        prompts = drafting.prompts_for_request(
+            claimed.request.purpose, claimed.request.prompts_sha256
+        )
+        picture_kwargs = (
+            {"prompts": prompts, "catalogs": drafting.catalogs_for_prompts(prompts)}
+            if prompts.version == 4
+            else {}
+        )
         try:
             read = read_picture(
                 client,
                 picture.image,
                 capture_id=capture_id,
                 deadline_s=self._share(self._stages.picture, started),
+                **picture_kwargs,
             )
         except PictureUnavailable as unavailable:
             # Refused as it was being sent: nothing went, so the bundle does not name it.
@@ -550,14 +574,17 @@ class ReferenceWorker:
                 else self._picture_model()
             )
             pictures.append(BundlePicture(capture_id, picture.right_ids, model))
-        if read.refused in REFUSALS:
+        if read.refused in (*REFUSALS, *THINGS_REFUSALS):
             steps.picture(capture_id, "refused", reason=read.refused)
             return
         if read.refused is not None:
             steps.picture(capture_id, "missed", reason=read.refused)
             return
         screened = screen_picture_notes(
-            read.notes, withheld_words=claimed.withheld_words, saved=names
+            read.notes,
+            withheld_words=claimed.withheld_words,
+            saved=names,
+            catalogs=drafting.catalogs_for_prompts(prompts) if prompts.version == 4 else None,
         )
         notes.extend(
             BundleNote(note.aspect, note.text, "own_picture", capture_id) for note in screened.kept
@@ -683,6 +710,10 @@ class ReferenceWorker:
     ) -> None:
         policy = self._policy_for(claimed.workspace_id)
         client = self._client.with_policy(policy)
+        prompts = drafting.prompts_for_request(
+            claimed.request.purpose, claimed.request.prompts_sha256
+        )
+        catalogs = drafting.catalogs_for_prompts(prompts)
 
         steps.set("plan", "running")
         self._check(claimed, steps, started)
@@ -691,6 +722,8 @@ class ReferenceWorker:
                 client,
                 claimed.description,
                 purpose=claimed.request.purpose,
+                prompts=prompts,
+                catalogs=catalogs,
                 deadline_s=self._share(self._stages.plan, started),
             )
         except (ModelError, SpendingRefused, ExulanicaError) as failure:
@@ -714,6 +747,7 @@ class ReferenceWorker:
                         source=source,
                         policy=policy,
                         withheld_words=claimed.withheld_words,
+                        catalogs=catalogs,
                     )
                 )
             except QueryRefused:
@@ -759,6 +793,8 @@ class ReferenceWorker:
             read = drafting.read_notes(
                 client,
                 leads,
+                prompts=prompts,
+                catalogs=catalogs,
                 deadline_s=self._share(self._stages.read, started),
                 pictures=claimed.request.purpose not in drafting.WITHOUT_PICTURE_DESCRIPTIONS,
             )
@@ -771,6 +807,7 @@ class ReferenceWorker:
             return
         screened = keep_notes(
             read.notes,
+            catalogs=catalogs,
             # The queries too: a note that repeats one carries what was asked, not what was found.
             sources=[
                 text

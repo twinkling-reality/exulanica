@@ -28,7 +28,7 @@ from exulanica.world.project_context import (
     ItemKind,
     ProjectContextBusy,
     ProjectContextRepository,
-    ReferenceRefused,
+    UnknownProjectContext,
 )
 from exulanica.world.starter import create_starter_authorities
 from exulanica.world.worlds import AUTHORED_STARTER, new_world_id
@@ -229,9 +229,8 @@ def test_a_project_created_while_its_workspace_is_deleted_does_not_outlive_it(sp
         for connection in (deleter, creator, observer):
             connection.close()
     [refused] = outcomes
-    # The tombstone invalidated the version's source; the database's guard stands behind that.
-    assert isinstance(refused, ReferenceRefused), refused
-    assert (refused.status, refused.code) == (409, "invalidated_source_version")
+    # The workspace's worlds and versions are gone when the waiting writer gets the lock.
+    assert isinstance(refused, UnknownProjectContext), refused
     live = made["projects"].connection.execute(
         "select count(*) as n from world_project where workspace_id=%s and withdrawn_at is null",
         (made["workspace"],),

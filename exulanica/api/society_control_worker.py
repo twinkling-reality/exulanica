@@ -390,14 +390,23 @@ class SocietyControlWorker:
         try:
             with self.database.session(workspace) as connection:
                 session = Session(workspace_id=workspace, actor=claim.actor)
-                return SocietyRepository(
+                repository = SocietyRepository(
                     connection,
                     workspace,
                     world_id=claim.world_id,
                     input_refresher=lambda version: self.runtime.authored_edit(
                         connection, session, version
                     ),
-                ).tell_of_erased_kinds(claim.version_id)
+                )
+                # A site world's place the kind worker keeps no longer is made and the society
+                # told once more, so a round is not paused for a place that only had to be made.
+                return self.runtime.with_the_place(
+                    connection,
+                    session,
+                    claim.world_id,
+                    claim.version_id,
+                    lambda: repository.tell_of_erased_kinds(claim.version_id),
+                )
         except (UnavailableSocietyInput, SocietyInputBehind) as exc:
             _LOG.error(
                 "A society could not be told of an erased kind before its round: %s",

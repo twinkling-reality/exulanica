@@ -1,16 +1,16 @@
 """A being does only the routine's activities its kind lists, in a society that records so.
 
-A society of things records its ability modules in its first input and runs exactly those for its
-whole life. A new one records ``exulanica-ability/purposeful/v2``: the routine plans, and a decider
-is offered, only those of stand, talk, rest and visit that a being's kind lists, a talk only
-between two beings whose kinds both list talk, and a request for another is refused
-``activity_not_offered``; waiting is everybody's. A lantern spirit's kind lists none of the four,
-so it waits, recorded ``nothing_its_kind_does``; a knight's and a villager's list all four. Only
-resting relieves tiredness, so a being whose kind does not rest is never tired: a visitor, whose
-kind talks but does not rest, stays free to talk. A society that recorded ``purposeful/v1`` plans
-every activity for everybody, as every society made
-before the second version does: ``fixtures/society-things-purposeful-v1.json`` was recorded by the
-code before it (a spirit resting, standing, visiting and talking) and replays byte for byte.
+A society of things records its ability modules in its first input and runs exactly those for
+its whole life. One recording ``exulanica-ability/purposeful/v2`` keeps its capability gates:
+the routine plans, and a decider is offered, only those of stand, talk, rest and visit that a
+being's kind lists, a talk only between two beings whose kinds both list talk, and a request for
+another is refused ``activity_not_offered``; waiting is everybody's. A lantern spirit's kind
+lists none of the four, so it waits, recorded ``nothing_its_kind_does``; a knight's and a
+villager's list all four. Only resting relieves tiredness, so a being whose kind does not rest
+is never tired: a visitor, whose kind talks but does not rest, stays free to talk. A society
+that recorded ``purposeful/v1`` plans every activity for everybody, as every society made before
+the second version does: ``fixtures/society-things-purposeful-v1.json`` was recorded by the code
+before it (a spirit resting, standing, visiting and talking) and replays byte for byte.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import uuid
 from pathlib import Path
 
 import pytest
-from exulanica.abilities.registry import PURPOSEFUL, PURPOSEFUL_BY_KIND
+from exulanica.abilities.registry import PURPOSEFUL, PURPOSEFUL_BY_KIND, PURPOSEFUL_BY_KIND_WEIGHTS
 from exulanica.api.thing_card import _abilities, _offers
 from exulanica.canonical import canonical_json
 from exulanica.things.kinds import shipped_thing_kinds
@@ -37,7 +37,8 @@ from exulanica.world.society_planner import (
 from exulanica.world.society_things import THINGS_PROFILE, advance_things, initial_things_society
 
 import test_society_hands as hands
-from things_society_support import SEED, SOCIETY, arrival, compose, thing
+from things_society_support import SEED, SOCIETY, arrival, thing
+from things_society_support import compose as current_compose
 
 HISTORY = Path(__file__).parent / "fixtures" / "society-things-purposeful-v1.json"
 GATE = thing("gate", "gate", 1, 0, 9_000, yaw=3_141_593)
@@ -46,6 +47,17 @@ KNIGHT = thing("knight", "knight", 1, 3_000, 3_000)
 #: What the routine plans that a kind may leave out, by the option kinds a decider is offered.
 ROUTINE_OPTIONS = frozenset({"target", "stand", "talk"})
 ACTOR = uuid.UUID(int=0xAC7)
+
+
+def compose(*args, **kwargs):
+    """These historical capability-gate cases keep their recorded second-version premise."""
+    document = current_compose(*args, **kwargs)
+    document["modules"] = sorted(
+        PURPOSEFUL_BY_KIND if module == PURPOSEFUL_BY_KIND_WEIGHTS else module
+        for module in document["modules"]
+    )
+    document["document_sha256"] = input_sha256(document)
+    return document
 
 
 def _first_version(document, modules=None):
@@ -103,7 +115,14 @@ def _events_sha256(events) -> str:
     ).hexdigest()
 
 
-def test_a_new_society_records_the_routine_held_to_each_being_s_kind():
+def test_both_current_and_second_version_societies_hold_the_routine_to_kind():
+    current = current_compose((GATE, SPIRIT, KNIGHT))
+    assert PURPOSEFUL_BY_KIND_WEIGHTS in current["modules"]
+    current_state = initial_things_society(SOCIETY, SEED, current, population=4)
+    assert (
+        routine_withheld(current_state, _being(current_state, "lantern_spirit"))
+        == kind_gated_activities()
+    )
     document = compose((GATE, SPIRIT, KNIGHT))
     assert PURPOSEFUL_BY_KIND in document["modules"] and PURPOSEFUL not in document["modules"]
     state = initial_things_society(SOCIETY, SEED, document, population=4)

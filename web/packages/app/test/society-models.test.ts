@@ -4,7 +4,7 @@
 // codes in society-models-words-parity.test.ts.
 import { describe, expect, it, vi } from 'vitest';
 import { mountSocietyModels } from '../src/composition/society-models-mount.js';
-import { SocietyModelsClient, parseSocietyModels } from '../src/society-models-api.js';
+import { SocietyModelsClient, parseSocietyModels, parseSocietyDecisionDetail } from '../src/society-models-api.js';
 import {
   CHOICE_REFUSAL_WORDS,
   HOST_REFUSAL_WORDS,
@@ -57,6 +57,13 @@ function pick(root: HTMLElement, value: string): void {
 }
 
 describe('reading who decides', () => {
+  it('retains the exact request link and leaves older summaries without an invented link', () => {
+    expect(parseSocietyModels(read()).latest[0]).not.toHaveProperty('requestId');
+    const latest = { ...read().latest[0], request_id: 'request-1' };
+    expect(parseSocietyModels(read({ latest: [latest] })).latest[0]?.requestId).toBe('request-1');
+    expect(() => parseSocietyModels(read({ latest: [{ ...latest, request_id: null }] }))).toThrow();
+  });
+
   it('calls a model by the name the server gives it, even one this host no longer offers', () => {
     // The Companion names a model by the same rule (`Manifest.model_name`), so the two never
     // disagree: a choice and a decision by a withdrawn model are not called by its identifier.
@@ -145,6 +152,45 @@ describe('reading who decides', () => {
     expect(choiceWords(both, 'ada')).toContain(HOST_REFUSAL_WORDS['process_budget_spent']);
     // Someone who follows their own routine by choice is never told why.
     expect(choiceWords(parseSocietyModels(read({ host_refusal: 'models_not_run_here' })), 'grace')).toBe('Their own routine.');
+  });
+});
+
+describe('reading a recorded decision', () => {
+  const request = {
+    request_id: 'request-1', document_sha256: 'a'.repeat(64),
+    context: { observations: [{ kind: 'heard', words: 'Come over here.' }] },
+  };
+  const decision = {
+    request_id: 'request-1', request_sha256: request.document_sha256,
+    status: 'accepted', proposal: { option_id: 'follow-neighbor' },
+  };
+  const detail = { status: 'completed', request, decision };
+
+  it('preserves role observations and proposals, and distinguishes a pending request', () => {
+    expect(parseSocietyDecisionDetail(detail, 'request-1')).toEqual(detail);
+    expect(parseSocietyDecisionDetail({ status: 'in_progress', request, decision: null }, 'request-1').decision).toBeNull();
+    expect(() => parseSocietyDecisionDetail(detail, 'another-request')).toThrow();
+    expect(() => parseSocietyDecisionDetail({ ...detail, decision: { ...decision, request_sha256: 'b'.repeat(64) } }, 'request-1')).toThrow();
+    expect(() => parseSocietyDecisionDetail({ ...detail, decision: { ...decision, request_id: 'another-request' } }, 'request-1')).toThrow();
+    expect(() => parseSocietyDecisionDetail({ ...detail, decision: null }, 'request-1')).toThrow();
+  });
+
+  it('scopes the read to the open world and preserves absence and withdrawal refusals', async () => {
+    let responseStatus = 200;
+    const fetcher = vi.fn(async (_url: unknown) => new Response(JSON.stringify(responseStatus === 200 ? detail : { code: 'unavailable' }), {
+      status: responseStatus, headers: { 'content-type': 'application/json' },
+    }));
+    const client = new SocietyModelsClient({ baseUrl: 'https://example.test', token: 't', worldId: 'world:personal:a', fetch: fetcher as typeof fetch });
+    expect(await client.readDecision('version', 'request-1')).toEqual(detail);
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('/world/versions/version/society/decisions/request-1?world_id=world%3Apersonal%3Aa');
+    for (const code of [404, 424]) {
+      responseStatus = code;
+      await expect(client.readDecision('version', 'request-1')).rejects.toThrow();
+    }
+    fetcher.mockClear();
+    const unscoped = new SocietyModelsClient({ baseUrl: 'https://example.test', token: 't', worldId: null, fetch: fetcher as typeof fetch });
+    await expect(unscoped.readDecision('version', 'request-1')).rejects.toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });
 

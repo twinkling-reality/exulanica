@@ -44,6 +44,7 @@ from psycopg.conninfo import make_conninfo
 import pg_harness
 from test_saved_world_entries_api import _renew_reviewed_source, _reviewed_source
 from tests_support_api import EVERY_PERMISSION
+from world_support import historical_world_fixture_schema
 
 pytestmark = pytest.mark.postgres
 
@@ -80,7 +81,9 @@ _STAND_INS = (
     "null::bigint as y_mm,null::bigint as z_mm,null::bigint as yaw_microradians,"
     "null::bigint as scale_milli,null::text as origin_kind,null::text as origin_role,"
     "null::boolean as removed,null::boolean as addition_undone,null::uuid as created_edit_id,"
-    "null::uuid as last_edit_id where false",
+    "null::uuid as last_edit_id,null::uuid as support_snapshot_id,"
+    "null::bytea as support_receipt_sha256,null::bytea as support_network_sha256,"
+    "null::text as support_surface_id where false",
     "alter table world_alternate_version_edit add column point_map_instance_id text",
     # A placed thing and the edit log's thing_id, which migration 0152 adds and the current version
     # read and edit writes name. At 0089 a version held no placed thing, so the empty view and
@@ -93,7 +96,9 @@ _STAND_INS = (
     "null::bigint as x_mm,null::bigint as y_mm,null::bigint as z_mm,"
     "null::bigint as yaw_microradians,null::text as origin_kind,null::text as origin_role,"
     "null::boolean as removed,null::boolean as addition_undone,null::uuid as created_edit_id,"
-    "null::uuid as last_edit_id where false",
+    "null::uuid as last_edit_id,null::uuid as support_snapshot_id,"
+    "null::bytea as support_receipt_sha256,null::bytea as support_network_sha256,"
+    "null::text as support_surface_id where false",
     "alter table world_alternate_version_edit add column thing_id text",
     # A workspace's own kinds and their erasures, which 0159 and 0172 add and the current version
     # read names when it asks whether a placed thing's kind is gone. At 0089 no thing was placed,
@@ -276,117 +281,118 @@ def test_0090_keeps_every_reference_a_populated_0089_database_held(
                 admin.execute("reset role")
                 for version in ("0087", "0088", "0089"):
                     admin.execute(by_version[version].sql)
-            for statement in _STAND_INS:
-                admin.execute(statement)
-            admin.commit()
-            provision_runtime_role(admin)
-            admin.commit()
+            with historical_world_fixture_schema(admin):
+                for statement in _STAND_INS:
+                    admin.execute(statement)
+                admin.commit()
+                provision_runtime_role(admin)
+                admin.commit()
 
-            store = LocalContentAddressedStore(tmp_path / "blobs")
-            actor = uuid.uuid4()
-            workspaces = [uuid.uuid4() for _ in range(3)]
-            tokens = {
-                f"membership-backfill-token-{index}-long-enough-for-tests": w
-                for index, w in enumerate(workspaces)
-            }
-            monkeypatch.setenv(
-                "EXULANICA_API_TOKENS",
-                json.dumps(
-                    {
-                        token: {
-                            "workspace_id": str(workspace),
-                            "actor": str(actor),
-                            "permissions": EVERY_PERMISSION,
+                store = LocalContentAddressedStore(tmp_path / "blobs")
+                actor = uuid.uuid4()
+                workspaces = [uuid.uuid4() for _ in range(3)]
+                tokens = {
+                    f"membership-backfill-token-{index}-long-enough-for-tests": w
+                    for index, w in enumerate(workspaces)
+                }
+                monkeypatch.setenv(
+                    "EXULANICA_API_TOKENS",
+                    json.dumps(
+                        {
+                            token: {
+                                "workspace_id": str(workspace),
+                                "actor": str(actor),
+                                "permissions": EVERY_PERMISSION,
+                            }
+                            for token, workspace in tokens.items()
                         }
+                    ),
+                )
+                owner_database = _database(scratch)
+                photographer = SimpleNamespace(store=store, actor=actor)
+                entries, retries, sources_by_workspace, expiring = {}, {}, {}, {}
+                for index, workspace in enumerate(workspaces):
+                    with owner_database.session(workspace) as connection:
+                        repository = IngestRepository(connection, workspace)
+                        saved = SavedWorldEntryRepository(connection, workspace, store)
+                        entry = saved.create_starter(title=f"World {index}", created_by=actor)
+                        photos = [
+                            _reviewed_source(repository, photographer, minute=10 * index + n)
+                            for n in range(3 - index)
+                        ]
+                        sources_by_workspace[workspace] = photos
+                        if index == 0:
+                            # Two operations, the first with two photographs, and a third holding
+                            # the three ways a reference is unavailable: the authority expired, the
+                            # review expired, the original photograph was deleted. An upgrade that
+                            # carried only readable references would look correct here without them.
+                            retries[workspace] = _attach_as_released_before_0090(
+                                connection, workspace, entry, photos[:2], actor, store
+                            )
+                            entry = saved.entry(entry.entry_id)
+                            _attach_as_released_before_0090(
+                                connection, workspace, entry, photos[2:], actor, store
+                            )
+                            entry = saved.entry(entry.entry_id)
+                            unavailable = [
+                                _reviewed_source(
+                                    repository, photographer, minute=7, valid_for_seconds=2
+                                ),
+                                _short_review(repository, photographer, minute=8),
+                                _reviewed_source(repository, photographer, minute=9),
+                            ]
+                            _attach_as_released_before_0090(
+                                connection, workspace, entry, unavailable, actor, store
+                            )
+                            repository.insert_tombstone(
+                                scope="capture",
+                                capture_id=uuid.UUID(unavailable[2]["capture_id"]),
+                                requested_by=actor,
+                            )
+                            connection.execute("select pg_sleep(2.2)")
+                            expiring[workspace] = unavailable
+                        elif index == 1:
+                            retries[workspace] = _attach_as_released_before_0090(
+                                connection, workspace, entry, photos[:1], actor, store
+                            )
+                        entries[workspace] = saved.entry(entry.entry_id)
+
+                runtime = _database(scratch, role=RUNTIME_ROLE)
+                services = Services(
+                    database=runtime,
+                    readonly_database=runtime,
+                    store=store,
+                    tokens=load_token_directory(),
+                    executor_shares_the_write_role=True,
+                    model_client=None,
+                )
+
+                def read_all(client):
+                    return {
+                        workspace: client.get(
+                            f"/world-entries/{entries[workspace].entry_id}",
+                            headers={"Authorization": f"Bearer {token}"},
+                        ).json()
                         for token, workspace in tokens.items()
                     }
-                ),
-            )
-            owner_database = _database(scratch)
-            photographer = SimpleNamespace(store=store, actor=actor)
-            entries, retries, sources_by_workspace, expiring = {}, {}, {}, {}
-            for index, workspace in enumerate(workspaces):
-                with owner_database.session(workspace) as connection:
-                    repository = IngestRepository(connection, workspace)
-                    saved = SavedWorldEntryRepository(connection, workspace, store)
-                    entry = saved.create_starter(title=f"World {index}", created_by=actor)
-                    photos = [
-                        _reviewed_source(repository, photographer, minute=10 * index + n)
-                        for n in range(3 - index)
-                    ]
-                    sources_by_workspace[workspace] = photos
-                    if index == 0:
-                        # Two operations, the first with two photographs, and a third holding
-                        # the three ways a reference is unavailable: the authority expired, the
-                        # review expired, the original photograph was deleted. An upgrade that
-                        # carried only readable references would look correct here without them.
-                        retries[workspace] = _attach_as_released_before_0090(
-                            connection, workspace, entry, photos[:2], actor, store
-                        )
-                        entry = saved.entry(entry.entry_id)
-                        _attach_as_released_before_0090(
-                            connection, workspace, entry, photos[2:], actor, store
-                        )
-                        entry = saved.entry(entry.entry_id)
-                        unavailable = [
-                            _reviewed_source(
-                                repository, photographer, minute=7, valid_for_seconds=2
-                            ),
-                            _short_review(repository, photographer, minute=8),
-                            _reviewed_source(repository, photographer, minute=9),
-                        ]
-                        _attach_as_released_before_0090(
-                            connection, workspace, entry, unavailable, actor, store
-                        )
-                        repository.insert_tombstone(
-                            scope="capture",
-                            capture_id=uuid.UUID(unavailable[2]["capture_id"]),
-                            requested_by=actor,
-                        )
-                        connection.execute("select pg_sleep(2.2)")
-                        expiring[workspace] = unavailable
-                    elif index == 1:
-                        retries[workspace] = _attach_as_released_before_0090(
-                            connection, workspace, entry, photos[:1], actor, store
-                        )
-                    entries[workspace] = saved.entry(entry.entry_id)
 
-            runtime = _database(scratch, role=RUNTIME_ROLE)
-            services = Services(
-                database=runtime,
-                readonly_database=runtime,
-                store=store,
-                tokens=load_token_directory(),
-                executor_shares_the_write_role=True,
-                model_client=None,
-            )
-
-            def read_all(client):
-                return {
-                    workspace: client.get(
-                        f"/world-entries/{entries[workspace].entry_id}",
-                        headers={"Authorization": f"Bearer {token}"},
-                    ).json()
-                    for token, workspace in tokens.items()
+                with TestClient(create_app(services, verify=False)) as client:
+                    before = read_all(client)
+                assert [len(before[w]["source_attachments"]) for w in workspaces] == [6, 1, 0]
+                reasons = {
+                    member["capture_id"]: member["unavailable_reason"]
+                    for member in before[workspaces[0]]["source_attachments"]
                 }
-
-            with TestClient(create_app(services, verify=False)) as client:
-                before = read_all(client)
-            assert [len(before[w]["source_attachments"]) for w in workspaces] == [6, 1, 0]
-            reasons = {
-                member["capture_id"]: member["unavailable_reason"]
-                for member in before[workspaces[0]]["source_attachments"]
-            }
-            expired_authority, expired_review, deleted = expiring[workspaces[0]]
-            assert reasons[expired_authority["capture_id"]] == "authorization_expired"
-            assert reasons[expired_review["capture_id"]] == "screening_expired"
-            assert reasons[deleted["capture_id"]] == "source_unavailable"
-            assert sum(1 for value in reasons.values() if value is None) == 3
-            counts = _counts(admin)
-            assert counts == {
-                "saved_world_source_attachment": 7,
-                "saved_world_source_attachment_operation": 4,
-            }
+                expired_authority, expired_review, deleted = expiring[workspaces[0]]
+                assert reasons[expired_authority["capture_id"]] == "authorization_expired"
+                assert reasons[expired_review["capture_id"]] == "screening_expired"
+                assert reasons[deleted["capture_id"]] == "source_unavailable"
+                assert sum(1 for value in reasons.values() if value is None) == 3
+                counts = _counts(admin)
+                assert counts == {
+                    "saved_world_source_attachment": 7,
+                    "saved_world_source_attachment_operation": 4,
+                }
 
             admin.execute("drop view saved_world_source_detach")
             admin.execute("drop view saved_world_source_current_membership")

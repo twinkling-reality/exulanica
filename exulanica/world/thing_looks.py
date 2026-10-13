@@ -33,11 +33,14 @@ from exulanica.world.thing_store import admitted_look_by_digest
 __all__ = [
     "LOOK_CHOICES_PROFILE",
     "THING_LOOK_CODES",
+    "EffectiveLook",
     "LookReference",
     "ThingLookRefused",
     "check_crossing_look",
+    "effective_look",
     "look_choices",
     "record_crossing_look",
+    "resolve_look_reference",
 ]
 
 LOOK_CHOICES_PROFILE: Final = "exulanica.thing-look-choices/v1"
@@ -266,3 +269,91 @@ def look_choices(
         "looks": shipped,
         **({"workspace_looks": own} if own else {}),
     }
+
+
+@dataclass(frozen=True, slots=True)
+class EffectiveLook:
+    """An admitted selected/default look; selection never establishes byte availability."""
+
+    reference: LookReference
+    look: Any
+    chosen_by_owner: bool
+
+
+def resolve_look_reference(
+    connection: Any,
+    workspace_id: uuid.UUID,
+    reference: LookReference | None,
+    kind: Any,
+    *,
+    owner: bool = False,
+    workspace_kind: bool = False,
+) -> EffectiveLook | None:
+    """Resolve a selected reference or the kind's default using the card's authority."""
+    if kind is None:
+        return None
+    look = None
+    if reference is not None:
+        look = (
+            admitted_look_by_digest(connection, workspace_id, reference.sha256)
+            if reference.source == "workspace"
+            else shipped_looks().get((reference.look, reference.version))
+        )
+        if look is not None and (
+            look.sha256 != reference.sha256 or (workspace_kind and look.body_plan != kind.plan)
+        ):
+            look = None
+    if look is None:
+        first = next(iter(kind.document["looks"]), None)
+        if first is None:
+            return None
+        if workspace_kind:
+            reference = LookReference(None, None, first["sha256"], "workspace")
+            look = admitted_look_by_digest(connection, workspace_id, reference.sha256)
+        else:
+            reference = LookReference(first["look"], first["version"], first["sha256"])
+            look = shipped_looks().get((reference.look, reference.version))
+            if look is not None and look.sha256 != reference.sha256:
+                look = None
+        owner = False
+    if look is None or reference is None:
+        return None
+    return EffectiveLook(reference, look, owner)
+
+
+def effective_look(
+    connection: Any,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    version_id: uuid.UUID,
+    thing_id: str,
+    kind: Any,
+    *,
+    workspace_kind: bool = False,
+) -> EffectiveLook | None:
+    """The latest still-admitted choice, else the kind's first look, without reading a card."""
+    if kind is None:
+        return None
+    choices = look_choices(connection, workspace_id, world_id, version_id, thing_id=thing_id)
+    rows = (
+        choices.get("workspace_looks", ())
+        if workspace_kind
+        else (*choices["looks"], *choices.get("workspace_looks", ()))
+    )
+    chosen = next((row for row in rows if row["thing_id"] == thing_id), None)
+    reference = None
+    if chosen is not None:
+        raw = chosen["look"]
+        reference = (
+            LookReference(None, None, raw["sha256"], "workspace")
+            if raw.get("source") == "workspace"
+            else LookReference(raw["look"], raw["version"], raw["sha256"])
+        )
+    return resolve_look_reference(
+        connection,
+        workspace_id,
+        reference,
+        kind,
+        owner=chosen is not None and chosen["chosen_by"] == "owner",
+        workspace_kind=workspace_kind,
+    )

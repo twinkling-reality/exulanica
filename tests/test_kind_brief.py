@@ -100,6 +100,8 @@ def _draw(node: Mapping[str, Any], defs: Mapping[str, Any], rng: random.Random, 
     if "anyOf" in node:
         return _draw(rng.choice(node["anyOf"]), defs, rng, name)
     if "enum" in node:
+        if name == "size_source":
+            return "stated"  # random look leaves do not imply catalog membership
         return rng.choice(node["enum"])
     if "const" in node:
         return node["const"]

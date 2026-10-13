@@ -280,7 +280,10 @@ def test_the_read_lists_every_offered_action_by_its_id_with_its_operation_s_stat
     entry = _starter(api)
     document = _capabilities(api, entry)
     actions = {action["id"]: action for action in document["actions"]}
-    assert list(actions) == [action.id for action in action_catalog.offered()]
+    assert list(actions) == [
+        action.id for action in action_catalog.offered() if action.subjects != ("workspace",)
+    ]
+    assert not {"world.make", "world.draft"} & set(actions)
     unprojected = set()
     for ident, action in actions.items():
         run = action["runs_by"]
@@ -299,14 +302,14 @@ def test_the_read_lists_every_offered_action_by_its_id_with_its_operation_s_stat
         assert action["projected"] is True, ident
         assert (action["state"], action["code"]) == (row["state"], row["code"]), ident
         assert (action["requires"], action["permitted"]) == (row["requires"], row["permitted"])
-    # The five whose subject is one being, or the world apart from any version: "ask where its
+    # Subjects beyond the version projection: "ask where its
     # subject is read", never "not permitted" (the owner here holds every permission).
     assert unprojected == {
         "pieces.request",
         "beings.play",
         "beings.give-back",
+        "things.look",
         "minds.budget",
-        "world.make",
     }
     assert all(actions[ident]["permitted"] for ident in unprojected)
     # A starter world holds no society: the clock's three actions share one operation's refusal.

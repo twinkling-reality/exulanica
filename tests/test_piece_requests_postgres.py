@@ -261,23 +261,20 @@ def test_the_workspace_s_open_requests_are_counted(world) -> None:
         _ask(connection, workspace_id)
 
 
-def test_a_workspace_tombstone_cancels_every_open_request_and_takes_no_new_one(world) -> None:
+def test_a_workspace_tombstone_erases_requests_and_takes_no_new_one(world) -> None:
     connection, workspace_id = world.connection, world.workspace_id
     open_, _ = _ask(connection, workspace_id, kinds=(("well", 1), ("gate", 1)))
     _queue(connection, workspace_id, open_[1].piece_request_id)
     (ended,), _ = _ask(connection, workspace_id, kinds=(("lantern", 1),))
     store.cancel_piece_request(connection, workspace_id, ended.piece_request_id)
-    tombstone = connection.execute(
+    connection.execute(
         "insert into tombstone (workspace_id, scope, requested_by, reason) "
         "values (%s, 'workspace', %s, 'test') returning effective_at",
         (workspace_id, ACTOR),
     ).fetchone()
     for record in open_:
-        row = _row(connection, record.piece_request_id)
-        assert (row["state"], row["failure"]) == ("cancelled", "workspace_deleted")
-        assert row["finished_at"] == tombstone["effective_at"]
-    # A request that had already ended keeps how it ended.
-    assert _row(connection, ended.piece_request_id)["failure"] == "cancelled_by_person"
+        assert _row(connection, record.piece_request_id) is None
+    assert _row(connection, ended.piece_request_id) is None
     with pytest.raises(TombstonedError, match="tombstoned"):
         _ask(connection, workspace_id, kinds=(("bench", 1),))
 

@@ -173,8 +173,8 @@ export function openAtmosphere(
     : new pc.Color(...preset.ambient);
   app.scene.exposure = preset.exposure;
   app.scene.fog.type = pc.FOG_LINEAR;
-  // The clear colour for now: `WorldAtmosphere.fogInDisplaySpace` aims the fog at the world's own
-  // sky once it exists.
+  // Initial fog is the clear colour. `WorldAtmosphere.fogInDisplaySpace` aims it at the world's
+  // sky when display-space fog is turned on.
   app.scene.fog.color.set(skyR, skyG, skyB);
   app.scene.fog.start = preset.fog.start;
   app.scene.fog.end = preset.fog.end;

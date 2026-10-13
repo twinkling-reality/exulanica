@@ -10,8 +10,8 @@ envelope (:mod:`exulanica.grammar.catalogs`):
   data are kept, shown and exported, whether it is offered to everyone or to the operator only,
   its cost per call and the one request shape its adapter may send. Adding or replacing a source
   is an entry here plus one adapter in :mod:`exulanica.references.adapters`.
-* ``reference-aspect.v1.json``: what a note may be about, the closed list the planner, the reader
-  and the vision read write against.
+* ``reference-aspect.v1.json``: the closed vocabulary for places and pictures. Version 2 adds
+  anatomy and part layout for web notes about things; picture vocabulary stays unchanged.
 * ``reference-query-screen.v1.json``: words no outgoing query may carry, by category, each with
   the term or reason that rules them out.
 * ``reference-picture-screen.v1.json``: words no note from a person's own picture may carry, by
@@ -23,7 +23,7 @@ from __future__ import annotations
 import functools
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Final, cast
@@ -272,13 +272,23 @@ class ReferenceCatalogs:
 
 
 @functools.cache
-def load_reference_catalogs(directory: Path = CATALOG_DIRECTORY) -> ReferenceCatalogs:
-    """Read and check the reference catalogs; cached per directory."""
+def load_reference_catalogs(
+    directory: Path = CATALOG_DIRECTORY, *, aspect_version: int = 1, picture_version: int = 1
+) -> ReferenceCatalogs:
+    """Read and check the catalogs; cached per directory and closed aspect version."""
+    if aspect_version not in (1, 2):
+        raise ValueError("reference aspect version is 1 or 2")
+    if picture_version not in (1, 2) or (picture_version == 2 and aspect_version != 2):
+        raise ValueError("picture version 2 uses things aspect version 2")
     sources = load_catalog(directory / "reference-source.v1.json", _SOURCE_SCHEMA)
-    aspects = load_catalog(directory / "reference-aspect.v1.json", _ASPECT_SCHEMA)
+    aspects = load_catalog(
+        directory / f"reference-aspect.v{aspect_version}.json",
+        replace(_ASPECT_SCHEMA, catalog_version=aspect_version),
+    )
     screen = load_catalog(directory / "reference-query-screen.v1.json", _SCREEN_SCHEMA)
     picture_screen = load_catalog(
-        directory / "reference-picture-screen.v1.json", _PICTURE_SCREEN_SCHEMA
+        directory / f"reference-picture-screen.v{picture_version}.json",
+        replace(_PICTURE_SCREEN_SCHEMA, catalog_version=picture_version),
     )
     read_sources: dict[str, ReferenceSource] = {}
     for entry in sources.entries:
@@ -325,7 +335,11 @@ def load_reference_catalogs(directory: Path = CATALOG_DIRECTORY) -> ReferenceCat
         aspects=MappingProxyType(read_aspects),
         screened=MappingProxyType(screened),
         picture_screened=MappingProxyType(picture_screened),
-        picture_aspects=tuple(key for key in read_aspects if key not in closed),
+        picture_aspects=(
+            tuple(key for key in read_aspects if key not in closed)
+            if aspect_version == 1 or picture_version == 2
+            else load_reference_catalogs(directory).picture_aspects
+        ),
     )
 
 

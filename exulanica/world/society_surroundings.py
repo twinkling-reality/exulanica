@@ -118,6 +118,10 @@ def _doing(
     from exulanica.world.society_decision_contract import _activity_label
 
     action = person["action"]
+    if person.get("day") is not None and action["status"] == "active":
+        from exulanica.world.society_resident_day import routine_of
+
+        return routine_of(state["day_context"]).activities[person["day"]["activity"]].label
     if action["status"] == "active":
         if action["kind"] == "move":
             return "walking"
@@ -190,6 +194,7 @@ def surroundings(
     minute begins, over the input ``document`` its society consumed last, bounded by ``terms``."""
     from exulanica.world.society_decision_contract import _hears, kind_of
     from exulanica.world.society_planner import routine_of
+    from exulanica.world.society_resident_day import inside, same_space
 
     people = {person["id"]: person for person in state["inhabitants"]}
     me = people.get(subject_id)
@@ -208,7 +213,7 @@ def surroundings(
     beings = sorted(
         (_distance(me["position_mm"], other["position_mm"]), other["id"], other)
         for other in state["inhabitants"]
-        if other["id"] != subject_id
+        if other["id"] != subject_id and same_space(me, other)
     )
     beings = [row for row in beings if row[0] <= terms.reach_mm]
     listed_beings = [
@@ -226,7 +231,7 @@ def surroundings(
     things = sorted(
         (_distance(me["position_mm"], thing["position_mm"]), thing["id"], thing)
         for thing in state["things"]
-        if thing["held_by"] is None and thing.get("position_mm") is not None
+        if thing["held_by"] is None and thing.get("position_mm") is not None and not inside(me)
     )
     things = [row for row in things if row[0] <= terms.reach_mm]
     listed_things = []
@@ -240,7 +245,17 @@ def surroundings(
             }
         )
     block = {
-        "at": _at(me, document, routine, words),
+        "at": (
+            {
+                "words": next(
+                    d["label"]
+                    for d in state["day_context"]["destinations"]
+                    if d["destination_id"] == me["location"]["destination_id"]
+                )
+            }
+            if inside(me)
+            else _at(me, document, routine, words)
+        ),
         "beings": listed_beings,
         "more_beings": min(MORE_MAXIMUM, len(beings) - len(listed_beings)),
         "things": listed_things,

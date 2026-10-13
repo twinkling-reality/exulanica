@@ -280,8 +280,10 @@ the object's root frame owns aggregate bounds, so nested node transforms, region
 authored movement and residency agree without applying placement twice. These are presentation
 samples of the whole object's authored triangles, not measured source points, extracted semantic
 parts or observed segmentation. Authored meshes request eight times the descriptor's base
-surface-sampling density, currently 32 samples per square unit, before the same per-subject and
-global budgets scale the request; district meshes continue to use the descriptor density unchanged.
+surface-sampling density. Data-view style version 1 states 4 samples per square metre, and the
+binding multiplies by 8, so the request is 32 samples per square metre, before the same
+per-subject and global budgets scale the request; district meshes continue to use the descriptor
+density unchanged.
 Demand uses mesh-local triangle area: object and node scaling moves the attached samples with the
 surface but does not resample them to constant world-space density. Skinned, morphed, over-limit
 and otherwise unsupported objects

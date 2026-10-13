@@ -240,8 +240,10 @@ def test_every_table_that_records_a_society_is_erased_with_it_and_only_by_it(app
     keyed = {
         row["table_name"]
         for row in connection.execute(
-            "select table_name from information_schema.columns "
-            "where table_schema = current_schema() and column_name = 'society_id'"
+            "select c.table_name from information_schema.columns c "
+            "join information_schema.tables t on t.table_schema = c.table_schema "
+            "and t.table_name = c.table_name and t.table_type = 'BASE TABLE' "
+            "where c.table_schema = current_schema() and c.column_name = 'society_id'"
         ).fetchall()
     }
     links = connection.execute(

@@ -20,10 +20,11 @@ import pytest
 from exulanica.abilities.registry import (
     BEFORE_RECORDED,
     CROSSING,
-    FOLLOW_KEEPING_NEAR,
+    FOLLOW_PERSISTENT,
     MODULES_PATH,
     PURPOSEFUL,
     PURPOSEFUL_BY_KIND,
+    PURPOSEFUL_BY_KIND_WEIGHTS,
     SAY,
     AbilityError,
     AbilityModuleNotConnected,
@@ -85,7 +86,7 @@ def test_a_new_society_records_each_module_at_its_newest_built_version_and_older
     (tests/test_society_kind_gates.py reads a stored society of it through the planner, the
     options, a request and the card)."""
     newest = current_modules()
-    assert PURPOSEFUL_BY_KIND in newest and PURPOSEFUL not in newest
+    assert PURPOSEFUL_BY_KIND_WEIGHTS in newest and PURPOSEFUL not in newest
     for module in newest:
         row = ability_module(module)
         built = [
@@ -99,7 +100,7 @@ def test_a_new_society_records_each_module_at_its_newest_built_version_and_older
     assert recorded_modules({"modules": list(BEFORE_RECORDED)}) == BEFORE_RECORDED
     assert recorded_row(recorded_modules({}), "purposeful") == built_module(PURPOSEFUL)
     # Following was stated as a first version never built; a new society records the second.
-    assert recorded_row(newest, "follow") == built_module(FOLLOW_KEEPING_NEAR)
+    assert recorded_row(newest, "follow") == built_module(FOLLOW_PERSISTENT)
     with pytest.raises(AbilityError, match="one version of the purposeful module"):
         recorded_row([PURPOSEFUL, PURPOSEFUL_BY_KIND], "purposeful")
 
@@ -148,6 +149,7 @@ def test_a_table_that_breaks_a_rule_is_refused_by_name(tmp_path, change, message
 #: first input recorded, so a row is never edited: a change is a new version beside it, and a new
 #: row joins this list with its digest.
 ROWS_SHA256 = {
+    "exulanica-ability/day/v1": "94c0e966985e536b373affa61af743b6bd1891f7554aa93044c3bf0b2e91bbc7",
     "exulanica-ability/crossing/v1": (
         "fa49cfcedc547827a63dd9376ad2fd3f3b0c6401d810db711986f2ae4c086c27"
     ),
@@ -159,6 +161,9 @@ ROWS_SHA256 = {
     ),
     "exulanica-ability/follow/v2": (
         "bec43870ccfdce763f9d3c5d9dac161707e7349c4e8d5909dcc7d5321d568f1a"
+    ),
+    "exulanica-ability/follow/v3": (
+        "11edfc89b3bf7b647153074c78b168ffaec7db8c2114a86cd5f2ab34cf8f6991"
     ),
     "exulanica-ability/hands/v1": (
         "be1b97b54ef116a851ff9d4452a22fbf6311110c237f65b178ffd1f242d52719"
@@ -172,6 +177,9 @@ ROWS_SHA256 = {
     "exulanica-ability/purposeful/v1": (
         "1602c6b84373e041535ae6c4dd3ee7136ce18e51cb0887270c8d532f5ecf7903"
     ),
+    "exulanica-ability/purposeful/v3": (
+        "ed6125aabff85acf929b4511163e4413d56c80a2d7970ba88d02750e6c48e94a"
+    ),
     "exulanica-ability/purposeful/v2": (
         "6b0441b5bc9b980070864ea1368d6c1d4595116131289752d02d73ffd06102be"
     ),
@@ -181,6 +189,7 @@ ROWS_SHA256 = {
     "exulanica-ability/say/v1": (
         "8732fe7e835dfcc80892e8218c2d4817bbe200c5ee113de4158a48b6fe584778"
     ),
+    "exulanica-ability/say/v2": "d51550762c24237d087a7c24fcdcfb6b5056030826261d8871ebf7003627b286",
 }
 
 

@@ -68,39 +68,30 @@ afterEach(() => {
 });
 
 describe('Your worlds', () => {
-  it('names the most recently changed world first and says when it was established', () => {
+  it('names the most recently changed world without filler metadata', () => {
     const { root } = build([quiet, entry()]);
-    expect(title(root)).toBe('Saturday market');
+    expect(title(root)).toBe('Your worlds');
     expect([...root.querySelectorAll('.your-worlds-card .world-entry-choice-title')].map((n) => n.textContent))
-      .toEqual(['Saturday market', 'Quiet corner', 'Create a world']);
-    expect(root.querySelector('.your-worlds-meta')?.textContent).toContain('Established 4 October 2026');
-    expect(root.querySelector('.your-worlds-meta')?.textContent).toContain('From A market town');
-    expect(root.querySelector('.your-worlds-card .your-worlds-caption')?.textContent).toBe('Established 4 Oct');
-  });
-
-  it('says what each world is and that it keeps its changes, once', () => {
-    const { root } = build([quiet, starter(3)]);
-    const details = [...root.querySelectorAll('.world-entry-choice .world-entry-choice-detail')]
-      .map((node) => node.textContent ?? '');
-    // Newest first: the starter changed on 4 October, Quiet corner on 30 September.
-    expect(details).toEqual([
-      'Authored world · saved changes and appearance',
-      'Generated world · A small town · saved changes and appearance',
-    ]);
+      .toEqual(['Saturday market', 'Quiet corner']);
+    expect(root.querySelector('.your-worlds-meta')).toBeNull();
+    expect(root.querySelector('.your-worlds-caption')).toBeNull();
   });
 
   it('chooses with the arrow keys and opens the chosen world with Enter', () => {
     const { root, open } = build([quiet, entry()]);
     (root.querySelector('.your-worlds-card') as HTMLElement).focus();
     press(document.activeElement!, 'ArrowRight');
-    expect(title(root)).toBe('Quiet corner');
+    expect(root.querySelector('.your-worlds-open')?.getAttribute('aria-label')).toBe('Open Quiet corner');
     press(root, 'Enter');
     expect(open).toHaveBeenCalledWith(quiet);
   });
 
-  it('opens a world when its card is pressed', () => {
+  it('selects on click and opens on double click', () => {
     const { root, open } = build([quiet, entry()]);
     (root.querySelectorAll('button.world-entry-choice')[1] as HTMLButtonElement).click();
+    expect(open).not.toHaveBeenCalled();
+    expect(root.querySelector('.your-worlds-open')?.getAttribute('aria-label')).toBe('Open Quiet corner');
+    root.querySelectorAll('button.world-entry-choice')[1]!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     expect(open).toHaveBeenCalledWith(quiet);
   });
 
@@ -122,7 +113,6 @@ describe('Your worlds', () => {
     setCreate({ state: 'unavailable', words: { happened: 'This workspace already holds as many towns as it may.' } });
     const card = root.querySelector('.your-worlds-create') as HTMLButtonElement;
     expect(card.getAttribute('aria-disabled')).toBe('true');
-    expect(card.textContent).toContain('This workspace already holds as many towns as it may.');
     card.click();
     expect(create).not.toHaveBeenCalled();
     expect(root.querySelector('.your-worlds-status')?.textContent)
@@ -139,12 +129,8 @@ describe('Your worlds', () => {
     expect(onlyUntouchedStarter([starter(3)])).toBe(false);
     expect(onlyUntouchedStarter([starter(), entry()])).toBe(false);
     const { root } = build([starter()]);
-    expect(title(root)).toBe('Create your world');
-    expect((root.querySelector('.your-worlds-actions') as HTMLElement).dataset['primary']).toBe('create');
-    expect(root.querySelector('.your-worlds-open')?.textContent).toContain('Open My world');
-    const changed = build([starter(3)]).root;
-    expect(title(changed)).toBe('My world');
-    expect((changed.querySelector('.your-worlds-actions') as HTMLElement).dataset['primary']).toBe('open');
+    expect(title(root)).toBe('Your worlds');
+    expect(root.querySelector('.your-worlds-create')).not.toBeNull();
   });
 
   it('says why a world cannot open when its card is pressed, and opens nothing', () => {
@@ -180,21 +166,28 @@ describe('View values on Your worlds', () => {
   });
   const button = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('[data-action="worlds.values"]')!;
 
-  it('hands the chosen world, values and all, to Create a world from the button and from V', () => {
+  it('inspects the saved receipt before explicitly creating another world from it', () => {
     const viewValues = vi.fn();
     const world = made({ city_extent_x_mm: 384000, cross_street_hierarchy: 'local_street' });
     const { root } = build([world], { viewValues });
     expect(button(root).hidden).toBe(false);
     expect(button(root).getAttribute('aria-disabled')).toBe('false');
     button(root).click();
+    expect(viewValues).not.toHaveBeenCalled();
+    const dialog = document.querySelector<HTMLDialogElement>('.generation-details')!;
+    expect(dialog.open).toBe(true);
+    expect(dialog.textContent).toContain('world-specification.v2');
+    expect(dialog.querySelector('[data-saved-key="city_extent_x_mm"] dd')?.textContent).toBe('384000');
+    [...dialog.querySelectorAll('button')].find(control => control.textContent === 'Create another from these inputs')!.click();
     expect(viewValues).toHaveBeenLastCalledWith(world);
     press(root.querySelector('.your-worlds-card')!, 'v');
-    expect(viewValues).toHaveBeenCalledTimes(2);
+    expect(document.querySelector<HTMLDialogElement>('.generation-details')?.open).toBe(true);
+    expect(viewValues).toHaveBeenCalledTimes(1);
     // Never while a person types.
     const field = document.createElement('input');
     root.append(field);
     press(field, 'v');
-    expect(viewValues).toHaveBeenCalledTimes(2);
+    expect(viewValues).toHaveBeenCalledTimes(1);
   });
 
   it('says a world made before values were kept has none to show, and opens nothing', () => {

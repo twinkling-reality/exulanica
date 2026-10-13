@@ -555,3 +555,17 @@ def test_a_withdrawn_look_stays_held_and_is_passed_by(provisioned, spine_schema,
         assert admitted_look_by_digest(connection, workspace_id, unread_sha256) is None
         store.withdraw_look("fixture-unread", 1, "no longer read", withdrawn_by=ACTOR)
         assert _counts(connection)["look_withdrawal"] == 2
+
+
+def test_unsupported_skinned_map_writes_neither_look_nor_bytes(provisioned, spine_schema, tmp_path):
+    from test_thing_store_admission import _unsupported_skinned_map
+
+    document, container = _unsupported_skinned_map()
+    workspace = provisioned.workspace_id
+    with _runtime(spine_schema, workspace) as connection:
+        store = _store(connection, workspace, tmp_path)
+        with pytest.raises(ThingStoreRefused) as refused:
+            store.admit_look(document, container, created_by=ACTOR, admit=_admit_any)
+        assert refused.value.code == "look_container_refused"
+        assert set(_counts(connection).values()) == {0}
+        assert not _held(store, container)

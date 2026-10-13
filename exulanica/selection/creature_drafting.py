@@ -34,7 +34,8 @@ import functools
 import hashlib
 import json
 import re
-from collections.abc import Mapping, Sequence
+import uuid
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -43,7 +44,8 @@ from typing import Annotated, Any, Final, Literal
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from exulanica.models.client import ModelClient
-from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
+from exulanica.models.errors import ModelError, StructuredOutputError, TruncatedResponseError
+from exulanica.models.identity import chat_model_identity
 from exulanica.models.manifest import Role
 from exulanica.models.response import Runaway
 from exulanica.selection.calls import CallLog, ModelCall
@@ -78,6 +80,7 @@ __all__ = [
 ]
 
 PROMPT_PATH: Final = Path(__file__).with_name("creature-drafting.v1.json")
+_REFERENCE_PROMPT_PATH: Final = Path(__file__).with_name("creature-drafting.v2.json")
 #: The manifest role a creature is drafted under, bound to the models the drafter's pre-registered
 #: measurement chose (docs/evaluation/2026-10-07-creature-drafter-timings.json).
 DRAFTER_ROLE: Final = Role.CREATURE_DRAFTER
@@ -472,14 +475,29 @@ def draft_creature(
     placeholders: Mapping[Any, str] | None = None,
     log: CallLog | None = None,
     max_tokens: int | None = None,
+    reference_text: str | None = None,
+    reference_bundle_sha256: str | None = None,
+    before_attempt: Callable[[], None] | None = None,
+    photographs: frozenset[uuid.UUID] = frozenset(),
 ) -> CreatureDraftOutcome:
     """Ask the drafter for a creature of ``description``, assemble and check it, with one repair
     and no fallback.
 
     ``description`` is the text as it is sent, every saved name already replaced, and
     ``placeholders`` the record of those replacements, handed to the boundary with the request.
-    ``taken`` holds the keys of kinds this world already has besides the shipped ones."""
-    prompt = creature_drafting_prompt() if prompt is None else prompt
+    ``taken`` holds the keys of kinds this world already has besides the shipped ones. Optional
+    reference text is an authorized, quoted block paired with its bundle digest; it selects the
+    reference-aware prompt without changing the person's words or their digest. ``before_attempt``
+    rechecks that authority before each call, including a repair, without holding network locks.
+    """
+    if (reference_text is None) != (reference_bundle_sha256 is None):
+        raise ValueError("reference notes and their bundle digest are supplied together")
+    if reference_text is not None and (not reference_text.strip() or prompt is not None):
+        raise ValueError("reference notes use the reference-aware prompt and a nonempty block")
+    if prompt is None:
+        prompt = creature_drafting_prompt(
+            PROMPT_PATH if reference_text is None else _REFERENCE_PROMPT_PATH
+        )
     grammar = grammar or body_grammar()
     catalogs = catalogs or thing_catalogs()
     if max_tokens is None:
@@ -491,12 +509,16 @@ def draft_creature(
         {"role": "system", "content": instructions},
         {"role": "user", "content": f'The description:\n"""{description}"""'},
     ]
+    if reference_text is not None:
+        messages[1]["content"] += f"\n\n{reference_text}"
     log = CallLog() if log is None else log
     attempts: list[str] = []
     refusals: list[tuple[str, str, str]] = []
     for attempt in range(1, DRAFT_ATTEMPTS + 1):
         repair: str
         try:
+            if before_attempt is not None:
+                before_attempt()
             drafted = client.structured(
                 role,
                 messages,
@@ -505,21 +527,18 @@ def draft_creature(
                 placeholders=placeholders,
                 max_tokens=max_tokens,
                 arrays_last=True,
+                **({"photographs": photographs, "use_cache": False} if photographs else {}),
             )
-            log.record(drafted.call)
-            binding = client.manifest[role]
-            served = next(
-                (
-                    spec
-                    for spec in (binding.primary, binding.fallback)
-                    if spec is not None and spec.model_id == drafted.call.served_model_id
-                ),
-                binding.primary,
-            )
+            log.record(drafted.call, manifest=client.manifest)
+            identity = chat_model_identity(drafted.call, client.manifest)
+            if identity.model_id is None:
+                failure = ModelError("The response did not identify an admitted model.")
+                log.on_failure(prompt.prompt_version).note(failure)
+                raise failure
             by = {
                 "kind": "model",
-                "provider": served.provider,
-                "model_id": drafted.call.served_model_id,
+                "provider": drafted.call.provider,
+                "model_id": identity.model_id,
                 "prompt_version": prompt.prompt_version,
                 "prompt_sha256": _digest(instructions),
                 "words_sha256": _digest(description),
@@ -534,6 +553,9 @@ def draft_creature(
                     grammar=grammar,
                     catalogs=catalogs,
                     taken=taken,
+                    reference_ingredients=()
+                    if reference_bundle_sha256 is None
+                    else (reference_bundle_sha256,),
                 )
             except CreatureRefused as refused:
                 where = form_where(refused.where, form_values)
@@ -550,7 +572,7 @@ def draft_creature(
                 return CreatureDraftOutcome(
                     creature=creature,
                     refusal=None,
-                    model_id=drafted.call.served_model_id,
+                    model_id=identity.model_id,
                     calls=log.calls,
                     attempts=tuple(attempts),
                     refusals=tuple(refusals),

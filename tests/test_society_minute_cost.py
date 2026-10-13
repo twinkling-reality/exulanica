@@ -256,6 +256,23 @@ def test_every_published_version_of_the_ground_catalog_still_reads():
         assert ground.record_subjects == earlier.record_subjects
 
 
+def test_a_released_catalog_is_not_held_to_the_engine_table_of_a_later_day(tmp_path, monkeypatch):
+    """The catalog this host reads states the points of every engine a town's society is made
+    with, and is refused if it leaves one out. A released version is a document of its day: once
+    a later version is the one read, it loads whatever the engine table has come to state."""
+    from exulanica.world import society_grounds
+
+    def without_an_engine(entries) -> None:
+        entries["generated_town"]["minute_cost"].pop()
+
+    with pytest.raises(CatalogError, match="the engines a town's society"):
+        _malformed(tmp_path, without_an_engine)
+    # The same file, read as a released version beside a newer one.
+    monkeypatch.setattr(society_grounds, "CATALOG_VERSION", CATALOG_VERSION + 1)
+    released = {g.key: g for g in load_society_grounds(tmp_path, version=CATALOG_VERSION)}
+    assert [cost.engine for cost in released["generated_town"].minute_cost] == [V2, V5]
+
+
 def _malformed(tmp_path, change) -> None:
     for path in CATALOG_DIRECTORY.glob("*.json"):
         (tmp_path / path.name).write_bytes(path.read_bytes())

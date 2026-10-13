@@ -37,6 +37,7 @@ from psycopg.types.json import Jsonb
 import pg_harness
 from test_interaction_policy_postgres import apply_patch
 from world_structure_fixtures import structural_candidate
+from world_support import historical_world_fixture_schema
 
 pytestmark = pytest.mark.postgres
 
@@ -114,7 +115,9 @@ def test_0099_registers_every_world_a_populated_schema_held(owner, spine_schema,
                 "null::bigint as z_mm,null::bigint as yaw_microradians,null::text as origin_kind,"
                 "null::text as origin_role,null::boolean as removed,"
                 "null::boolean as addition_undone,null::uuid as created_edit_id,"
-                "null::uuid as last_edit_id where false"
+                "null::uuid as last_edit_id,null::uuid as support_snapshot_id,"
+                "null::bytea as support_receipt_sha256,null::bytea as support_network_sha256,"
+                "null::text as support_surface_id where false"
             )
             admin.execute("alter table world_alternate_version_edit add column thing_id text")
             # A workspace's own kinds and their erasures, which 0159 and 0172 add and the current
@@ -290,7 +293,11 @@ def test_0099_registers_every_world_a_populated_schema_held(owner, spine_schema,
             assert keyed == set(before)
 
             # The crowded workspace keeps both worlds and may not create a third.
-            with database.session(crowded) as connection, pytest.raises(WorldLimitReached):
+            with (
+                historical_world_fixture_schema(admin),
+                database.session(crowded) as connection,
+                pytest.raises(WorldLimitReached),
+            ):
                 register_world(
                     connection,
                     crowded,

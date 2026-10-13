@@ -59,6 +59,7 @@ from asset_lock_support import recorded_store_reads
 from comparison_support import SEEDS, seeded_catalogs
 from retired_society_support import plant_in_saved_world, plant_retired_decision
 from tests_support_api import EVERY_PERMISSION, scratch_database
+from world_support import fixture_workspace
 
 pytestmark = pytest.mark.postgres
 saved_world = helpers.saved_world
@@ -861,7 +862,7 @@ def _second_world(world, monkeypatch) -> dict:
     """A saved world in another workspace, and a token for its owner beside the first's."""
     workspace, actor = uuid.uuid4(), uuid.uuid4()
     world_id = f"world:authored:{uuid.uuid4()}"
-    with world["connection"].transaction():
+    with fixture_workspace(world["connection"], workspace), world["connection"].transaction():
         _snapshot, version_id = helpers.make_starter(
             world["connection"], workspace, actor, world_id, helpers.AUTHORED_GROUND_MODULE_VERSION
         )

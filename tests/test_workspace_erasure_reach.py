@@ -6,10 +6,11 @@ it. This reads the migrations the way ``tests/test_world_identity_inventory.py``
 inside a function the migrations define, or named in ``KEPT`` below with the reason its rows stay.
 No database is needed.
 
-``KEPT`` may only shrink. A workspace table with neither a delete nor an entry fails, and so does
+The unresolved debt in ``KEPT`` may only shrink; new erasures may add their immutable records.
+A workspace table with neither a delete nor an entry fails, and so does
 an entry whose table has gained its delete or is no longer a workspace table, so the list is
-always exactly what the schema holds. A new table belongs in a function an erasure runs; an entry
-here is a debt, not a decision that the rows may stay.
+always exactly what the schema holds. A new content table belongs in a function an erasure runs;
+an entry for content here is a debt, not a decision that its rows may stay.
 
 What this does not prove. A delete statement existing is not a trigger reaching it: the function
 may be called by nothing, or only by an erasure narrower than a workspace's, and a delete with a
@@ -36,11 +37,9 @@ import test_world_identity_inventory as world_inventory
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 # ---------------------------------------------------------------------------------------------
-# What remains, with why. The list may only shrink.
+# What remains, with why. Unresolved content debt may only shrink.
 # ---------------------------------------------------------------------------------------------
 
-#: One world's rows: keyed by a world, or hanging from a row that names one.
-_WORLD = "not reached yet: one world's rows, owed by the world removal"
 #: The workspace's rows that belong to no one world.
 _WORKSPACE = (
     "not reached yet: the workspace's own rows outside any one world, owed by a workspace erasure"
@@ -49,11 +48,6 @@ _WORKSPACE = (
 _ACCOUNT = (
     "not reached yet: the account's side of a workspace (who may enter it), which an account "
     "erasure or a workspace erasure would owe"
-)
-#: A door grant names one world; 0182 says a society erasure leaves these on purpose.
-_DOOR = (
-    "not reached yet: a door grant names one world and these rows hang from the grant; a society "
-    "erasure leaves them on purpose, so the world removal owes them"
 )
 #: The door programs' documents, keyed by their digest in the workspace and shared by its grants.
 _DOOR_DOCUMENT = (
@@ -78,6 +72,18 @@ _WITHDRAWAL = (
 
 #: Workspace tables no function in the migrations deletes from.
 KEPT: dict[str, str] = {
+    "kind_draft_start": (
+        "draft/job and actor identifiers, start timing, guest/deadline policy, manifest digest "
+        "and prompt version retained for recovery identity and shared hourly admission; no "
+        "description or provider text; 0211 cancels linked jobs and deletes input, attempts "
+        "and outcomes at workspace erasure"
+    ),
+    "world_draft_start": (
+        "identifiers and actor/start timing retained for replay identity and hourly admission; "
+        "no sentence, quote or content fingerprint; 0207 deletes all linked draft content"
+    ),
+    "world_draft_bound": "financial bound identifiers retained for closure after erasure",
+    "world_draft_bound_closed": "financial closure markers retained after erasure",
     "account_browser_session": _ACCOUNT,
     "account_guest_entry": _ACCOUNT,
     "account_membership": _ACCOUNT,
@@ -98,11 +104,6 @@ KEPT: dict[str, str] = {
     ),
     "companion_answer_citation": _WORKSPACE,
     "companion_answer_name": _WORKSPACE,
-    "companion_answer_simulation_citation": _WORLD,
-    "companion_answer_simulation_label": (
-        "not reached yet: the name a placeholder stood for in an answer about one version's "
-        "inhabitant, owed by the world removal"
-    ),
     "companion_escape": _WORKSPACE,
     "creature_draft": (
         "changed in place: a workspace tombstone cancels an unfinished draft; the row and "
@@ -117,15 +118,8 @@ KEPT: dict[str, str] = {
     "derived_environment_asset": _WORKSPACE,
     "dispute": _WORKSPACE,
     "door_declaration": _DOOR_DOCUMENT,
-    "door_delivery": _DOOR,
-    "door_grant": _DOOR,
-    "door_grant_revision": _DOOR,
-    "door_grant_revocation": _DOOR,
     "door_manifest": _DOOR_DOCUMENT,
     "door_mapping": _DOOR_DOCUMENT,
-    "door_presence": _DOOR,
-    "door_secret": _DOOR,
-    "door_visitor_gone": _DOOR,
     "embedding": (
         "deleted by the purge worker in product code, not by a migration: a tombstone names its "
         "vectors and the worker deletes each row"
@@ -168,14 +162,22 @@ KEPT: dict[str, str] = {
         "withdrawn; it stays at a workspace erasure"
     ),
     "personal_model_right": _WORKSPACE,
+    "personal_model_right_use": (
+        "retained consent evidence: the parent right's declared use, model identities, notice "
+        "and digest stay with that immutable right; no image bytes or reference notes are held "
+        "here. The parent right is not reached by workspace erasure, so its cascade does not "
+        "remove this binding; workspace-level retention remains unresolved debt"
+    ),
     "personal_request_receipt": _WORKSPACE,
     "piece_ask": _WORKSPACE,
-    "piece_look_step": _WORLD,
-    "piece_request": (
-        "changed in place: a workspace tombstone cancels a request still requested or queued; "
-        "request_canonical and requested_by stay, one world's rows the world removal owes"
+    "piece_erasure_settlement": (
+        "content-free erasure recovery: monetary obligations and GPU batch cancellation ids "
+        "survive until recovered; completed receipts retain identities and amounts only"
     ),
-    "piece_settlement": _WORLD,
+    "piece_erasure_settlement_event": (
+        "content-free recovery receipts: append-only GPU withdrawal, exact monetary decision "
+        "and settlement survive backup restore without retaining erased request content"
+    ),
     "pipeline_run": _WORKSPACE,
     "place": _WORKSPACE,
     "place_alignment": _WORKSPACE,
@@ -213,22 +215,11 @@ KEPT: dict[str, str] = {
         "not reached yet at a workspace erasure"
     ),
     "route_permission_refusal": _WORKSPACE,
-    "saved_world_entry": _WORLD,
-    "saved_world_source_attachment": _WORLD,
-    "saved_world_source_attachment_operation": _WORLD,
-    "saved_world_source_current_membership": _WORLD,
-    "saved_world_source_detach": _WORLD,
-    "saved_world_source_detach_operation": _WORLD,
     "scene_training_artifact": _WORKSPACE,
     "scene_training_right": _WORKSPACE,
-    "signal_comparison": _WORLD,
-    "signal_comparison_decision": _WORLD,
-    "signal_comparison_outcome": _WORLD,
-    "signal_comparison_run": _WORLD,
-    "signal_comparison_start": _WORLD,
     "society_erasure": (
-        "the erasure's own record: one row for each society erased, holding ids and no words; it "
-        "references its world's registration, which the world removal must settle"
+        "the erasure's own record: one row for each society erased, holding ids and no words; "
+        "it outlives its world's registration"
     ),
     "spending_event": _MONEY,
     "spending_grant": _MONEY,
@@ -245,6 +236,14 @@ KEPT: dict[str, str] = {
     ),
     "training_use_consent": _WORKSPACE,
     "user_annotation": _WORKSPACE,
+    "world_kind_erasure": (
+        "immutable erasure record: document/key fingerprints retire a version through restore, "
+        "without retaining its document, labels or validation report"
+    ),
+    "world_erasure": (
+        "the erasure's own record: identities and creation-budget figures carry world removal "
+        "through restore without retaining its title, sentence or content digests"
+    ),
     "workspace_asset": (
         "not reached yet as a row: a workspace tombstone purges its bytes through "
         "workspace_asset_blob; title, created_by and the declaration stay"
@@ -276,77 +275,6 @@ KEPT: dict[str, str] = {
     ),
     "workspace_style_pack_withdrawal": _WITHDRAWAL,
     "workspace_tile_quota": _WORKSPACE,
-    "world_alternate_element_override": _WORLD,
-    "world_alternate_environment_instance": _WORLD,
-    "world_alternate_object": _WORLD,
-    "world_alternate_point_map_instance": _WORLD,
-    "world_alternate_thing": _WORLD,
-    "world_alternate_version": _WORLD,
-    "world_alternate_version_edit": _WORLD,
-    "world_generation_receipt": _WORLD,
-    "world_identity": (
-        "not reached yet: the world's own registration, which other world tables reference and "
-        "so the last row the world removal deletes"
-    ),
-    "world_interaction_policy_audit_event": _WORLD,
-    "world_interaction_policy_preview": _WORLD,
-    "world_interaction_policy_proposal": _WORLD,
-    "world_interaction_policy_state": _WORLD,
-    "world_interaction_policy_version": _WORLD,
-    "world_kind_version": (
-        "not reached yet: a workspace's drafted kinds, keyed by no world; the world removal owes "
-        "those no other world uses, a workspace erasure the rest"
-    ),
-    "world_minds_budget": _WORLD,
-    "world_package_export": _WORLD,
-    "world_project": (
-        "changed in place: a workspace tombstone withdraws it; title and owner_actor_id stay, "
-        "one world's rows the world removal owes"
-    ),
-    "world_project_binding": _WORLD,
-    "world_project_item": (
-        "changed in place: withdrawn with its project or its source answer; author_actor_id "
-        "stays, one world's rows the world removal owes"
-    ),
-    "world_project_item_revision": (
-        "words blanked in place: text, note and refs are set to null when its item is "
-        "withdrawn; recorded_by stays, one world's rows the world removal owes"
-    ),
-    "world_project_item_source": _WORLD,
-    "world_project_share": (
-        "changed in place: stopped (withdrawn_at) with its project or item; shared_by stays, "
-        "one world's rows the world removal owes"
-    ),
-    "world_region_style_version": _WORLD,
-    "world_structure_audit_event": (
-        "a tombstone adds a row here when it invalidates a snapshot, and people's commits write "
-        "the rest; one world's rows, owed by the world removal"
-    ),
-    "world_structure_dependency": _WORLD,
-    "world_structure_element_identity": _WORLD,
-    "world_structure_invalidation": (
-        "written by a tombstone to invalidate a snapshot: an erasure's record inside one world, "
-        "which the world removal owes with the snapshot"
-    ),
-    "world_structure_placement_migration": _WORLD,
-    "world_structure_preview": _WORLD,
-    "world_structure_snapshot": _WORLD,
-    "world_structure_snapshot_element": _WORLD,
-    "world_structure_snapshot_region": _WORLD,
-    "world_structure_state": _WORLD,
-    "world_style_audit_event": _WORLD,
-    "world_style_preview": _WORLD,
-    "world_style_proposal": _WORLD,
-    "world_style_state": _WORLD,
-    "world_style_version": _WORLD,
-    "world_thing_look": _WORLD,
-    "world_topology_contract": _WORLD,
-    "world_topology_region": _WORLD,
-    "world_topology_source": _WORLD,
-    "world_traffic_signal_choice": _WORLD,
-    "world_traffic_signal_decision": _WORLD,
-    "world_traffic_signal_decision_request": _WORLD,
-    "world_traffic_signal_segment": _WORLD,
 }
 
 # ---------------------------------------------------------------------------------------------

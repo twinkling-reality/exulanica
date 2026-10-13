@@ -1,0 +1,5 @@
+LicenseRef-Pond-Duck-Preview
+
+Authored reference-inspired geometry and parameter data for private workspace previews.
+The source images remain outside this asset bundle. This is not an official character asset
+and carries no model-generation claim or grant of rights to the referenced character design.

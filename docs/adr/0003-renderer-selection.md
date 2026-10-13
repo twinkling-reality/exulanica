@@ -8,8 +8,10 @@ The label ADR-0003 is only an identifier.
 
 **Why it exists.** Renderer choice was open until matched-resolution measurement closed it.
 
-**What it still governs.** The production browser renderer. Three.js+Spark remains a measured
-alternative, not the shipping path. The living specification is
+**What it still governs.** The production browser renderer. The Three.js binding and the
+separate bake-off package were removed on 2026-09-16, as
+[third-party notices](../../THIRD_PARTY_NOTICES.md) record. The in-tree PlayCanvas harness
+remains so those measurements can be reproduced. The living specification is
 [architecture-overview.md](../architecture-overview.md) section 1.1.
 
 - Status: **ACCEPTED, PlayCanvas Engine 2.21.4**. Resolved 2026-08-28 by matched-resolution

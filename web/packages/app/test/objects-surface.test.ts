@@ -141,6 +141,7 @@ function runtime() {
         notices: supported ? [] : [`“${behaviour!.behaviourKey}@${behaviour!.behaviourVersion}” is not a behaviour this client can run.`],
       };
     }),
+    has: (id: string) => placed.has(id),
     remove: vi.fn((id: string) => placed.delete(id)),
     setTransform: vi.fn((id: string, pose: unknown) => {
       const held = placed.get(id);
@@ -1960,4 +1961,47 @@ it('releases browser pointer lock when P or the app toggle opens object controls
     else Reflect.deleteProperty(document, 'exitPointerLock');
     h.mounted.dispose();
   }
+});
+
+
+describe('inspection from a renderer object hit', () => {
+  it('selects the served resident without a write and refuses stale worlds and disposed mounts', async () => {
+    const h = harness({ initial: version({ objects: [objectRecord()] }), representationSubjects: ['object:lantern'] }); await h.mounted.begin();
+    expect(h.mounted.inspect('object:lantern')).toBe(true);
+    expect(h.mounted.panel.root.hidden).toBe(false);
+    expect(h.mounted.selectionContext().selected_object_id).toBe('object:lantern');
+    expect(writes(h.authority.calls)).toEqual([]);
+    expect(h.mounted.inspect('object:missing')).toBe(false);
+    h.objects.remove('object:lantern');
+    expect(h.mounted.inspect('object:lantern')).toBe(false);
+    expect(h.mounted.selectionContext().selected_object_id).toBeNull();
+    expect(h.binding.representationReport.selection).toBeNull();
+    h.mounted.dispose(); expect(h.mounted.inspect('object:lantern')).toBe(false);
+    const switched = harness({ initial: version({ objects: [objectRecord()] }) }); await switched.mounted.begin();
+    switched.state.activeWorldEntry = { worldId: 'another-world', authoredVersionId: 'another-version' } as never;
+    expect(switched.mounted.inspect('object:lantern')).toBe(false);
+  });
+});
+
+describe('objects on a saved generated ground', () => {
+  const ground = () => ({ worldId:version().worldId, versionId:version().versionId, regionId:'region:generated', navigation:{
+    surface:{sample:(x:number,z:number)=>x>=0 && x<=80 && z<=0 && z>=-70 ? {height:.125,normal:{x:0,y:1,z:0}} : null},
+    cameraRadius:.34,centre:atlasVec3(40,0,-35),fieldRadius:54,recoveryRadius:56,eyeHeight:1.62,
+    maximumSlopeDegrees:12,maximumStepHeight:.18,surfaceSampleSpacing:.05,regions:[],obstacles:[],traces:[],
+  } });
+  it('uses the active navigation sample in region millimetres, then normal preview and confirmed apply',async()=>{
+    const h=harness({generatedGround:ground,standAt:[40,9,-12]});h.state.placedPointMaps=[];
+    await h.mounted.begin();await place(h);await verdictReady(h);
+    const previewed=h.authority.calls.find(call=>call.name==='preview')!.args[1] as AppliedBody;
+    expect(previewed.placement.region_id).toBe('region:generated');
+    // The current player eye height is deliberately wrong: support comes from the sampler.
+    expect(previewed.placement.transform).toMatchObject({x_mm:40000,y_mm:125,z_mm:-15500});
+    expect(writes(h.authority.calls)).toEqual([]);confirmButton(h).click();
+    await vi.waitFor(()=>expect(writes(h.authority.calls)).toEqual(['apply']));
+  });
+  it.each(['stale','invalidated','absent','outside'] as const)('refuses %s generated support without a write',async mode=>{
+    const h=harness({generatedGround:()=>mode==='absent'?null:{...ground(),versionId:mode==='stale'?'another-version':version().versionId},standAt:mode==='outside'?[90,1.6,-12]:[40,1.6,-12],initial:version({sourceInvalidated:mode==='invalidated'})});
+    h.state.placedPointMaps=[];await h.mounted.begin();await place(h);
+    expect(writes(h.authority.calls)).toEqual([]);expect(h.authority.calls.some(call=>call.name==='preview')).toBe(false);
+  });
 });

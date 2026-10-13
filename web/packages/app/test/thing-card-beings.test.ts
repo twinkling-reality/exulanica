@@ -105,6 +105,12 @@ describe('a person of a society of things, on the card', () => {
     const villager = personCard('person-0', about(being({ kind: ref('villager'), cameBy: 'populated', placedId: null })), null);
     expect(villager.cameFrom).toBe('One of the people who live in this world.');
   });
+  it('keeps workspace availability separate from project authorship for a placed being', () => {
+    const originFacts = facts('kaykit-knight');
+    const card = personCard('workspace-being', about(being({ kind: { source: 'workspace', sha256: 'a'.repeat(64) } })), null, originFacts);
+    expect(originFacts.kind.origin.by).toBe('project');
+    expect(card.cameFrom).toBe('You placed it here. A knight is an authored kind available in this workspace.');
+  });
 });
 
 describe('playing a being from its card', () => {

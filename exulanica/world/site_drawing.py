@@ -43,6 +43,7 @@ from exulanica.grammar.grammars.site.records import (
     SiteZoneRecord,
 )
 from exulanica.world.kinds.catalogs import load_kind_catalogs
+from exulanica.world.terrain_authoring import TERRAIN_COMPOSER_VERSIONS
 
 __all__ = ["DRAWING_PROFILE", "LAYER_MM", "site_drawing", "site_drawing_sha256"]
 
@@ -200,7 +201,7 @@ def _wall_slots(wall: SiteWallRecord, label: str) -> tuple[list[dict[str, Any]],
     return slots, blocks
 
 
-def site_drawing(
+def _site_drawing_v1(
     *,
     world_id: str,
     receipt: Mapping[str, Any],
@@ -426,3 +427,27 @@ def _state_structures(slots: list[dict[str, Any]], records: Sequence[object]) ->
 def site_drawing_sha256(drawing: Mapping[str, Any]) -> str:
     """The SHA-256 of a drawing's canonical JSON: the digest it is served under."""
     return sha256_of_canonical(dict(drawing)).hex()
+
+
+def site_drawing(
+    *,
+    world_id: str,
+    receipt: Mapping[str, Any],
+    receipt_sha256: str,
+    records: Sequence[object],
+) -> dict[str, Any]:
+    """Keep historical drawings exact; explicit support composition publishes a v2 adapter."""
+    if receipt["composer"]["version"] in TERRAIN_COMPOSER_VERSIONS:
+        from exulanica.world.composers.site_plan import receipt_terrain
+        from exulanica.world.terrain_authoring import terrain_drawing
+
+        return terrain_drawing(receipt_terrain(receipt), world_id, receipt_sha256)
+    drawing = _site_drawing_v1(
+        world_id=world_id, receipt=receipt, receipt_sha256=receipt_sha256, records=records
+    )
+    if receipt["composer"]["version"] == 2:
+        from exulanica.world.composers.site_plan import receipt_support
+
+        drawing["profile"] = "exulanica.site-drawing/v2"
+        drawing["support"] = receipt_support(receipt, tuple(records)).adapter_document()
+    return drawing

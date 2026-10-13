@@ -260,3 +260,135 @@ def test_the_bounds_are_the_profile_s():
     assert LIMITS.image_side_px == 1024
     with pytest.raises(Refused, match="joints"):
         read_skinned_glb(_container(), limits=dataclasses.replace(LIMITS, joints=2))
+
+
+def _textured(*, component: int = 5126) -> tuple[dict[str, Any], bytes]:
+    """The independent three-joint fixture with a real embedded one-pixel PNG and UVs."""
+    import base64
+
+    builder = _Builder()
+    document, _ = builder.document()
+    if component == 5126:
+        uv = builder.add("2f", [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)], "VEC2", component)
+    else:
+        uv = builder.add("2H", [(0, 0), (65535, 0), (0, 65535)], "VEC2", component, normalized=True)
+    attrs = document["meshes"][0]["primitives"][0]["attributes"]
+    del attrs["COLOR_0"]
+    attrs["TEXCOORD_0"] = uv
+    png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aVioAAAAASUVORK5CYII="
+    )
+    builder.views.append({"buffer": 0, "byteOffset": len(builder.binary), "byteLength": len(png)})
+    builder.binary.extend(png)
+    document["images"] = [{"bufferView": len(builder.views) - 1, "mimeType": "image/png"}]
+    document["textures"] = [{"source": 0, "sampler": 0}]
+    document["samplers"] = [{"magFilter": 9729, "minFilter": 9729}]
+    document["materials"][0]["pbrMetallicRoughness"]["baseColorTexture"] = {"index": 0}
+    document["buffers"][0]["byteLength"] = len(builder.binary)
+    return document, bytes(builder.binary)
+
+
+@pytest.mark.parametrize("component", [5126, 5123])
+def test_base_colour_texture_with_float_or_normalized_uvs_is_read(component):
+    document, binary = _textured(component=component)
+    payload = _pack(document, binary)
+    read = read_skinned_glb(payload)
+    assert read.image_px == (1, 1)
+    assert read.vertices == 3 and read.materials == 1
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ["normalTexture"],
+        ["occlusionTexture"],
+        ["emissiveTexture"],
+        ["pbrMetallicRoughness", "metallicRoughnessTexture"],
+    ],
+)
+def test_v1_refuses_maps_beyond_base_colour_even_when_the_texture_exists(path):
+    document, binary = _textured()
+    target = document["materials"][0]
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = {"index": 0}
+    with pytest.raises(Refused, match="other than the one base colour"):
+        read_skinned_glb(_pack(document, binary))
+
+
+def test_dangling_normal_map_from_audit_is_not_admitted_as_v1():
+    payload = _container(_set(["materials", 0, "normalTexture"], {"index": 999}))
+    with pytest.raises(Refused, match="other than the one base colour"):
+        read_skinned_glb(payload)
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "words"),
+    [
+        (["materials", 0, "pbrMetallicRoughness", "baseColorTexture"], None, "is an object"),
+        (["materials", 0, "pbrMetallicRoughness", "baseColorTexture", "index"], 1, "index names"),
+        (
+            ["materials", 0, "pbrMetallicRoughness", "baseColorTexture", "index"],
+            True,
+            "index names",
+        ),
+        (
+            ["materials", 0, "pbrMetallicRoughness", "baseColorTexture", "texCoord"],
+            1,
+            "TEXCOORD_0 only",
+        ),
+        (["textures", 0, "source"], 1, "source names"),
+        (["textures", 0, "sampler"], 1, "sampler names"),
+        (["images", 0, "bufferView"], 999, "bufferView names"),
+        (
+            ["materials", 0, "pbrMetallicRoughness", "baseColorTexture", "extensions"],
+            {"KHR_texture_transform": {"texCoord": 1}},
+            "extension",
+        ),
+    ],
+)
+def test_texture_reference_chain_and_uv_set_are_checked(path, value, words):
+    document, binary = _textured()
+    _set(path, value)(document, binary)
+    with pytest.raises(Refused, match=words):
+        read_skinned_glb(_pack(document, binary))
+
+
+def test_uvs_alone_are_not_colour_and_textured_vertex_colours_do_not_replace_uvs():
+    document, binary = _textured()
+    del document["materials"][0]["pbrMetallicRoughness"]["baseColorTexture"]
+    with pytest.raises(Refused, match="vertex colours or a material"):
+        read_skinned_glb(_pack(document, binary))
+    document, binary = _textured()
+    attrs = document["meshes"][0]["primitives"][0]["attributes"]
+    attrs["COLOR_0"] = 1
+    del attrs["TEXCOORD_0"]
+    with pytest.raises(Refused, match="requires TEXCOORD_0"):
+        read_skinned_glb(_pack(document, binary))
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "words"),
+    [
+        ("type", "VEC3", "is VEC2"),
+        ("componentType", 5125, "float or normalized"),
+        ("normalized", True, "float or normalized"),
+        ("count", 2, "for every vertex"),
+    ],
+)
+def test_uv_accessor_shape_encoding_and_vertex_count_are_checked(key, value, words):
+    document, binary = _textured()
+    uv = document["meshes"][0]["primitives"][0]["attributes"]["TEXCOORD_0"]
+    document["accessors"][uv][key] = value
+    with pytest.raises(Refused, match=words):
+        read_skinned_glb(_pack(document, binary))
+
+
+def test_uv_coordinates_must_be_finite():
+    document, binary = _textured()
+    uv = document["meshes"][0]["primitives"][0]["attributes"]["TEXCOORD_0"]
+    view = document["bufferViews"][document["accessors"][uv]["bufferView"]]
+    altered = bytearray(binary)
+    struct.pack_into("<f", altered, view["byteOffset"], float("nan"))
+    with pytest.raises(Refused, match="finite coordinates"):
+        read_skinned_glb(_pack(document, bytes(altered)))

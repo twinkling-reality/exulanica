@@ -5,8 +5,8 @@ character foundation for the player and a world's synthetic inhabitants, how the
 society's people, and the representation boundary a scene's observed people would bind to, for
 which no adapter is built. Character catalogs are published by the host and served to the browser
 by digest; nothing about people is compiled into the app. A published catalog of fitted, textured
-people supplies the player's default body, the look of every inhabitant of every world that holds
-a society, the character studio and saved looks, with near and distant detail levels, planted
+people supplies the player's default body, the look of a society's person when that person is
+drawn from the catalog, the character studio and saved looks, with near and distant detail levels, planted
 feet, a seated rest drawn for the activity a society states, on the ground or on the seat of the
 furniture a person uses, and a frame budget measured on a production build. A second family kind,
 parametric bodies fitted per recipe, can be saved and worn by the player. It does not establish
@@ -553,12 +553,14 @@ budget run.
 
 The society display (`web/packages/atlas-react/src/playcanvas/society/crowd.ts`) draws the whole
 population of every world that holds a society, by distance, and never truncates it: the
-population is canonical state. The nearest inhabitants within 60 m are catalog people, up to
+population is canonical state. Inhabitants drawn with their own figure are drawn in full
+wherever they are within 700 m, have no far form, and take full-figure places ahead of catalog
+people (`assignDetail` in `crowd.ts`). Catalog people within 60 m fill the remaining places, up to
 `NEAR_INHABITANT_BUDGET` (60, the measured budget less the player's own place,
-[above](#detail-levels-and-frame-budget)), and every other outdoor inhabitant within 700 m is drawn
-in the far form of their own look (`society/far-figures.ts`, `farAppearance`), one draw call each,
-the same form a catalog person shows while its parts load, so nobody changes colour or build
-crossing the boundary. Indoor inhabitants are counted, not drawn. A state says where a person is
+[above](#detail-levels-and-frame-budget)), and every other outdoor catalog inhabitant within 700 m
+is drawn in the far form of that catalog look (`society/far-figures.ts`, `farAppearance`), one
+draw call each, the same form a catalog person shows while its parts load, so nobody changes colour
+or build crossing the boundary. Indoor inhabitants are counted, not drawn. A state says where a person is
 when its minute ends, so someone whose minute ends indoors is indoors only once the walk that
 minute recorded is done: they are drawn walking to the door, and from one door to another, and
 counted indoors from the moment they reach it. A saved world's inhabitants hang

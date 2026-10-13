@@ -116,7 +116,7 @@ Follow user controls, the browser world runtime, the Companion and appearance ch
 | Document | Role | Owns |
 | --- | --- | --- |
 | [Interaction and spatial model](interaction-model.md) | contract | The Atlas browser runtime's interaction, navigation, Companion encounter and proposal confirmation |
-| [Interface system](interface-system.md) | contract | The browser interface system: design tokens, components, icons, layout regions, the action registry and its availability, and the voice and words |
+| [Interface system](interface-system.md) | contract | The browser and public reading interface system: design tokens, components, icons, layout regions, the action registry and its availability, and the voice and words |
 | [Companion questions, memory and proposals](companion-question.md) | contract | Grounded question, conversation and appearance-proposal path |
 | [World project context](project-context.md) | contract | World projects: identity and binding, kept items and their bases, named records, sharing, bounded context assembly, deletion and audit residue |
 | [Atlas world customization contract](atlas-world-customization-contract.md) | contract | Browser appearance customization, protected values and review lifecycle |

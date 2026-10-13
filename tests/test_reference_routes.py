@@ -467,7 +467,9 @@ def test_where_pictures_are_on_the_list_offers_exactly_the_reference_picture_use
     assert (pictures["offered"], pictures["code"], pictures["maximum"]) == (True, None, 4)
     uses = pictures["consent"]["uses"]
     assert (
-        [use["role"] for use in uses] == [use["role"] for use in declared] == ["reference_vision"]
+        [use["role"] for use in uses]
+        == [use["role"] for use in declared]
+        == ["reference_vision", "creature_drafter"]
     )
     for use, stated in zip(uses, declared, strict=True):
         assert use["offered_on"] == "reference_pictures"
@@ -572,7 +574,10 @@ def test_a_caller_holding_a_picture_right_is_served_its_words_while_pictures_are
     monkeypatch.setattr(references_route, "_holds_picture_right", lambda c, w, a: True)
     pictures = _get(api[0](), "/worlds/references").json()["pictures"]
     assert (pictures["offered"], pictures["code"]) == (False, "reference_pictures_not_offered")
-    assert [use["role"] for use in pictures["consent"]["uses"]] == ["reference_vision"]
+    assert [use["role"] for use in pictures["consent"]["uses"]] == [
+        "reference_vision",
+        "creature_drafter",
+    ]
     assert all(use["stop"] and use["stop_action"] for use in pictures["consent"]["uses"])
 
 
@@ -596,3 +601,39 @@ def test_a_request_naming_a_picture_is_refused_with_the_code_the_list_states(api
     with_web = _post(client(**changes), pictures=[str(PICTURE)])
     assert (with_web.status_code, with_web.json()["code"]) == (409, stated["code"])
     assert _requests(repository) == 0
+
+
+@pytest.mark.parametrize("purpose", ["world_draft", "things"])
+def test_request_pins_the_words_selected_for_its_purpose(api, purpose):
+    from exulanica.references.drafting import prompts_for_request
+
+    client_for, repository = api
+    with client_for() as client:
+        response = _post(client, purpose=purpose)
+    assert response.status_code == 202
+    reference = store.read_request(
+        repository.connection, repository.workspace_id, uuid.UUID(response.json()["reference_id"])
+    )
+    assert reference.prompts_sha256 == prompts_for_request(purpose).sha256
+
+
+@pytest.mark.parametrize(
+    "web,pictures", [(True, None), (True, []), (False, [str(PICTURE)]), (True, [str(PICTURE)])]
+)
+def test_things_request_selects_picture_words_only_for_selected_captures(
+    api, monkeypatch, web, pictures
+):
+    from exulanica.references.drafting import prompts_for_request
+
+    _admit_every_picture(monkeypatch)
+    client, repository = api
+    response = _post(client(reference_pictures=True), purpose="things", web=web, pictures=pictures)
+    if pictures == []:
+        assert response.status_code == 422
+        return
+    assert response.status_code == 202, response.text
+    row = repository.connection.execute(
+        "select prompts_sha256 from reference_request where reference_id=%s",
+        (uuid.UUID(response.json()["reference_id"]),),
+    ).fetchone()
+    assert row["prompts_sha256"] == prompts_for_request("things", pictures=bool(pictures)).sha256

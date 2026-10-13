@@ -48,6 +48,7 @@
  */
 
 import * as pc from 'playcanvas';
+import { StaticMeshPicker } from './mesh-picking.js';
 import {
   BEHAVIOUR_REGISTRY,
   BoundedMotion,
@@ -58,6 +59,7 @@ import {
   type IslandId,
   type IslandPlacement,
   type NavigationPose,
+  type RepresentationSubject,
 } from '@exulanica/atlas-core';
 import {
   ORIGIN_LANDSCAPE,
@@ -68,6 +70,47 @@ import {
 
 import { giveFlatNormalsWhereUnusable } from './object-normals.js';
 import { fetchAuthenticatedAsset, type AuthenticatedAssetFetchOptions } from './physical-residency.js';
+
+/**
+ * The representation subject for one object placed from the reviewed catalog.
+ *
+ * What exists for it is a display record and the reviewed asset's identity: its key as the label
+ * and its content digest as the one reference. It has no structured source records, so it claims
+ * none. `extent` is the object root's local bounds, before authored placement is applied.
+ */
+export function placedCatalogObjectSubject(
+  object: PlacedAuthoredObject,
+  extent: {
+    readonly min: readonly [number, number, number];
+    readonly max: readonly [number, number, number];
+  },
+): RepresentationSubject {
+  const frameId = `authored-object:${object.objectId}:object-local`;
+  return Object.freeze({
+    subjectId: object.objectId,
+    subjectKind: 'object',
+    sceneId: null,
+    frameId,
+    origin: 'authored',
+    sourceRefs: Object.freeze([object.asset.contentSha256]),
+    availability: 'available',
+    rendered: true,
+    // These are deterministic presentation samples of the authored triangles, not measurements.
+    points: 'mesh-surface-samples',
+    compatibleBlend: true,
+    bounds: Object.freeze({
+      frameId,
+      units: 'scene-units',
+      origin: 'authored',
+      basis: 'authored-bounds',
+      min: extent.min,
+      max: extent.max,
+    }),
+    label: object.asset.assetKey,
+    dataAvailable: false,
+    unavailableReason: 'Generated whole-object surface samples from static renderer triangles; not observed measurements, semantic parts or segmentation.',
+  });
+}
 
 /** The only media type an authored object may name. A file extension is not a media type. */
 export const AUTHORED_OBJECT_MEDIA_TYPE = 'model/gltf-binary';
@@ -647,6 +690,7 @@ export class SceneObjectRuntime {
   readonly #resident = new Map<string, Resident>();
   readonly #materiallessFallback = new pc.StandardMaterial();
   #destroyed = false;
+  readonly #picker = new StaticMeshPicker();
 
   constructor(
     app: pc.AppBase,
@@ -670,6 +714,26 @@ export class SceneObjectRuntime {
 
   has(objectId: string): boolean {
     return this.#resident.has(objectId);
+  }
+
+  /** The nearest visible static triangle of a resident object; picking never changes its pose. */
+  pick(origin: readonly [number, number, number], direction: readonly [number, number, number], maximum = Number.POSITIVE_INFINITY): { readonly objectId: string; readonly distance: number } | null {
+    if (this.#destroyed || !origin.every(Number.isFinite) || !direction.every(Number.isFinite) || !(maximum >= 0)) return null;
+    const length = Math.hypot(...direction);
+    if (length === 0) return null;
+    const unit: readonly [number, number, number] = [direction[0] / length, direction[1] / length, direction[2] / length];
+    let best: { objectId: string; distance: number } | null = null;
+    for (const [objectId, resident] of this.#resident) {
+      if (!resident.entity.enabled) continue;
+      for (const render of resident.entity.findComponents('render') as pc.RenderComponent[]) {
+        if (!render.enabled) continue;
+        for (const instance of render.meshInstances) {
+          const distance = this.#picker.pick(instance, origin, unit, best?.distance ?? maximum);
+          if (distance !== null && (best === null || distance < best.distance)) best = { objectId, distance };
+        }
+      }
+    }
+    return best;
   }
 
   /** True only while at least one bounded behaviour needs another rendered frame. */
@@ -768,6 +832,10 @@ export class SceneObjectRuntime {
       }
       if (giveFlatNormalsWhereUnusable(this.#app.graphicsDevice, entity).unrepairable > 0) {
         notices.push('Part of this object has no surface direction to light it by, so it may draw dark.');
+      }
+      // Build after normal repair has finalized the mesh, before publishing it for interaction.
+      for (const render of entity.findComponents('render') as pc.RenderComponent[]) {
+        for (const instance of render.meshInstances) this.#picker.prepare(instance);
       }
       entity.name = `authored-object:${object.objectId}`;
       const authoredMm = translationOf(object.transform);

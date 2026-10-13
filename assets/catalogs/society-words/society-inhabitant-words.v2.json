@@ -1,0 +1,1804 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-inhabitant-words",
+  "catalog_version": 2,
+  "profiles": [
+    "exulanica-society/v2",
+    "exulanica-society/v5",
+    "exulanica-society/v7"
+  ],
+  "entries": [
+    {
+      "key": "reason.restore_need",
+      "kind": "reason",
+      "code": "restore_need",
+      "words": "they need a rest, and it is the nearest place to rest they have not just used",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.visit_place",
+      "kind": "reason",
+      "code": "visit_place",
+      "words": "they are rested enough to look around, and it is the nearest place to visit they have not just used",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.needs_a_rest",
+      "kind": "reason",
+      "code": "needs_a_rest",
+      "words": "they need a rest, and this place had room",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.sitting_a_while",
+      "kind": "reason",
+      "code": "sitting_a_while",
+      "words": "they chose to sit a while",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.looking_around",
+      "kind": "reason",
+      "code": "looking_around",
+      "words": "they are rested enough to look around, and chose this place",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.stopping_a_while",
+      "kind": "reason",
+      "code": "stopping_a_while",
+      "words": "they chose to stop and stand a while",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.stopped_to_talk",
+      "kind": "reason",
+      "code": "stopped_to_talk",
+      "words": "they met someone and stopped to talk",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.remembered_target_selected",
+      "kind": "reason",
+      "code": "remembered_target_selected",
+      "words": "you asked them to go there",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.chosen_by_their_model",
+      "kind": "reason",
+      "code": "chosen_by_their_model",
+      "words": "the model you chose for them picked it",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.called_away",
+      "kind": "reason",
+      "code": "called_away",
+      "words": "you asked them to go somewhere else",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.making_room",
+      "kind": "reason",
+      "code": "making_room",
+      "words": "they have finished there, and someone else may need the place",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.awaiting_goal",
+      "kind": "reason",
+      "code": "awaiting_goal",
+      "words": "they have only just arrived",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.following_reachable_route",
+      "kind": "reason",
+      "code": "following_reachable_route",
+      "words": "it is on their way",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.arrived_at_access_node",
+      "kind": "reason",
+      "code": "arrived_at_access_node",
+      "words": "they have arrived",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.standing_a_while",
+      "kind": "reason",
+      "code": "standing_a_while",
+      "words": "they stopped to stand a while",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.talking",
+      "kind": "reason",
+      "code": "talking",
+      "words": "they met and stopped to talk",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.waiting_for_partner",
+      "kind": "reason",
+      "code": "waiting_for_partner",
+      "words": "the person they are meeting is still on the way",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.partner_left",
+      "kind": "reason",
+      "code": "partner_left",
+      "words": "the person they were talking with left",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.reviewed_duration_elapsed",
+      "kind": "reason",
+      "code": "reviewed_duration_elapsed",
+      "words": "they have been at it as long as they meant to",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.made_room",
+      "kind": "reason",
+      "code": "made_room",
+      "words": "they stepped out of the way",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.place_moved",
+      "kind": "reason",
+      "code": "place_moved",
+      "words": "the place they stood at moved",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.standing_node_removed",
+      "kind": "reason",
+      "code": "standing_node_removed",
+      "words": "the ground they stood on changed",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.current_position_invalidated",
+      "kind": "reason",
+      "code": "current_position_invalidated",
+      "words": "the ground where they stand changed",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.target_disabled_or_removed",
+      "kind": "reason",
+      "code": "target_disabled_or_removed",
+      "words": "the place they were heading for is gone",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.authored_affordance_unreachable",
+      "kind": "reason",
+      "code": "authored_affordance_unreachable",
+      "words": "the place they were heading for can no longer be reached",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.authored_object_moves",
+      "kind": "reason",
+      "code": "authored_object_moves",
+      "words": "the thing they were heading for moves, and nobody uses it while it does",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.authored_object_off_ground",
+      "kind": "reason",
+      "code": "authored_object_off_ground",
+      "words": "the thing they were heading for is not resting on the ground",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.unsupported_active_behaviour",
+      "kind": "reason",
+      "code": "unsupported_active_behaviour",
+      "words": "the thing they were heading for moves in a way they cannot follow",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.target_changed",
+      "kind": "reason",
+      "code": "target_changed",
+      "words": "the place they were heading for changed",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.route_invalidated",
+      "kind": "reason",
+      "code": "route_invalidated",
+      "words": "their way there changed",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.no_reachable_affordance",
+      "kind": "reason",
+      "code": "no_reachable_affordance",
+      "words": "there is nowhere they can reach to go",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.no_enabled_affordance",
+      "kind": "reason",
+      "code": "no_enabled_affordance",
+      "words": "there is nowhere to go yet",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.no_known_reachable_affordance",
+      "kind": "reason",
+      "code": "no_known_reachable_affordance",
+      "words": "nowhere they know of can be reached",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.no_room_at_destination",
+      "kind": "reason",
+      "code": "no_room_at_destination",
+      "words": "every place they could use is taken",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.no_room_to_wait",
+      "kind": "reason",
+      "code": "no_room_to_wait",
+      "words": "there is no free spot to wait in",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.action_precondition_failed",
+      "kind": "reason",
+      "code": "action_precondition_failed",
+      "words": "they are not where it happens",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.validated_model_wait",
+      "kind": "reason",
+      "code": "validated_model_wait",
+      "words": "they chose to wait",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.validated_user_wait",
+      "kind": "reason",
+      "code": "validated_user_wait",
+      "words": "you asked them to do something where they stand",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.nothing_its_kind_does",
+      "kind": "reason",
+      "code": "nothing_its_kind_does",
+      "words": "their kind does none of the things people do here",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "reason.input_unavailable",
+      "kind": "reason",
+      "code": "input_unavailable",
+      "words": "this world cannot be walked right now",
+      "reason": "Authored: why a simulated person does what they do, said after 'because' of the reason code the society engine records, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "phrase.who_unnamed",
+      "kind": "phrase",
+      "code": "who_unnamed",
+      "words": "Someone",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.what",
+      "kind": "phrase",
+      "code": "what",
+      "words": "A simulated {role}, invented for this world: not anyone you know, and nothing they do is a memory.",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.what_crossed_world",
+      "kind": "phrase",
+      "code": "what_crossed_world",
+      "words": "A {role} who came in from {from}, not invented for this world: this world decides what they do here.",
+      "reason": "Authored: what a person who came in from outside this world is, said where the inspector would otherwise say what a simulated person is; who decides for them comes from their arrival's record (decided_by world, or the program they came with), and no person is claimed for a program."
+    },
+    {
+      "key": "phrase.what_crossed_program",
+      "kind": "phrase",
+      "code": "what_crossed_program",
+      "words": "A {role} who came in from {from}, not invented for this world: the program they came with decides what they do here.",
+      "reason": "Authored: what a person who came in from outside this world is, said where the inspector would otherwise say what a simulated person is; who decides for them comes from their arrival's record (decided_by world, or the program they came with), and no person is claimed for a program."
+    },
+    {
+      "key": "phrase.from_outside",
+      "kind": "phrase",
+      "code": "from_outside",
+      "words": "outside this world",
+      "reason": "Authored: where a person came in from when the door does not name the bridge they crossed through, so nothing is guessed."
+    },
+    {
+      "key": "phrase.role_unknown",
+      "kind": "phrase",
+      "code": "role_unknown",
+      "words": "inhabitant",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.place_gone",
+      "kind": "phrase",
+      "code": "place_gone",
+      "words": "a place that is no longer there",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.place_named",
+      "kind": "phrase",
+      "code": "place_named",
+      "words": "the {label}",
+      "reason": "Authored: a place the input a person's society consumed lists as open and names from its town (its label, and its address number where the town gives one); never a street, which is presentation."
+    },
+    {
+      "key": "phrase.place_named_at",
+      "kind": "phrase",
+      "code": "place_named_at",
+      "words": "the {label} at number {number}",
+      "reason": "Authored: a place the input a person's society consumed lists as open and names from its town (its label, and its address number where the town gives one); never a street, which is presentation."
+    },
+    {
+      "key": "phrase.place_named_residential",
+      "kind": "phrase",
+      "code": "place_named_residential",
+      "words": "a house",
+      "reason": "Authored: a town place of one use class said in its own words where the generic 'the {label}' reads wrong; the page looks for place_named_<use class> and place_named_at_<use class> and falls back to place_named and place_named_at, so no code names a use class."
+    },
+    {
+      "key": "phrase.place_named_at_residential",
+      "kind": "phrase",
+      "code": "place_named_at_residential",
+      "words": "the house at number {number}",
+      "reason": "Authored: a town place of one use class said in its own words where the generic 'the {label}' reads wrong; the page looks for place_named_<use class> and place_named_at_<use class> and falls back to place_named and place_named_at, so no code names a use class."
+    },
+    {
+      "key": "phrase.hand_move_out_of_reach",
+      "kind": "phrase",
+      "code": "hand_move_out_of_reach",
+      "words": "the thing was out of reach",
+      "reason": "Authored: the row words for a hands move that did not happen, by the hands_missed event's reason, in a comparison's reported counts (a row under 'Hand moves that did not happen'); a reason with none falls back to its event_reason words."
+    },
+    {
+      "key": "phrase.hand_move_thing_gone",
+      "kind": "phrase",
+      "code": "hand_move_thing_gone",
+      "words": "the thing was gone",
+      "reason": "Authored: the row words for a hands move that did not happen, by the hands_missed event's reason, in a comparison's reported counts (a row under 'Hand moves that did not happen'); a reason with none falls back to its event_reason words."
+    },
+    {
+      "key": "phrase.hand_move_chose_otherwise",
+      "kind": "phrase",
+      "code": "hand_move_chose_otherwise",
+      "words": "they chose something else first",
+      "reason": "Authored: the row words for a hands move that did not happen, by the hands_missed event's reason, in a comparison's reported counts (a row under 'Hand moves that did not happen'); a reason with none falls back to its event_reason words."
+    },
+    {
+      "key": "phrase.hand_move_asked_otherwise",
+      "kind": "phrase",
+      "code": "hand_move_asked_otherwise",
+      "words": "they were asked to do something else",
+      "reason": "Authored: the row words for a hands move that did not happen, by the hands_missed event's reason, in a comparison's reported counts (a row under 'Hand moves that did not happen'); a reason with none falls back to its event_reason words."
+    },
+    {
+      "key": "phrase.place_listed",
+      "kind": "phrase",
+      "code": "place_listed",
+      "words": "a place",
+      "reason": "Authored: a place the input a person's society consumed lists as one they can go to, which no object of the person's names (a town's premises): said plainly, never as gone."
+    },
+    {
+      "key": "phrase.place_none",
+      "kind": "phrase",
+      "code": "place_none",
+      "words": "a free spot nearby",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.partner_unknown",
+      "kind": "phrase",
+      "code": "partner_unknown",
+      "words": "someone nearby",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.still_one",
+      "kind": "phrase",
+      "code": "still_one",
+      "words": ", one more simulated minute",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.still_many",
+      "kind": "phrase",
+      "code": "still_many",
+      "words": ", {count} more simulated minutes",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.chosen_by_their_program",
+      "kind": "phrase",
+      "code": "chosen_by_their_program",
+      "words": "its own program chose it",
+      "reason": "Authored: why a person did what they do when the program that came with them from outside decides for them: their choice is recorded with the reason a decider's choice records (chosen_by_their_model), but no model of this world was asked, so the words never credit one."
+    },
+    {
+      "key": "phrase.chosen_by_their_player",
+      "kind": "phrase",
+      "code": "chosen_by_their_player",
+      "words": "the person playing them chose it",
+      "reason": "Authored: why a being did what it does when a person plays it: its choice is recorded with the reason a decider's choice records (chosen_by_their_model), but the person playing chose and no model was asked, so the words never credit one."
+    },
+    {
+      "key": "phrase.because",
+      "kind": "phrase",
+      "code": "because",
+      "words": "Because {reason}.",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.reason_unknown",
+      "kind": "phrase",
+      "code": "reason_unknown",
+      "words": "of a reason this page has no words for ({code})",
+      "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
+    },
+    {
+      "key": "phrase.inhabitant_unresolved",
+      "kind": "phrase",
+      "code": "inhabitant_unresolved",
+      "words": "a simulated person this page is not showing",
+      "reason": "Authored: how the page says a simulation citation or a simulated person it cannot draw, so a citation always reads as simulation and never as a memory, a photograph or a visit."
+    },
+    {
+      "key": "phrase.citation_list",
+      "kind": "phrase",
+      "code": "citation_list",
+      "words": "Simulation this answer cites",
+      "reason": "Authored: how the page says a simulation citation or a simulated person it cannot draw, so a citation always reads as simulation and never as a memory, a photograph or a visit."
+    },
+    {
+      "key": "phrase.citation_chip",
+      "kind": "phrase",
+      "code": "citation_chip",
+      "words": "Simulation, minute {minute}",
+      "reason": "Authored: how the page says a simulation citation or a simulated person it cannot draw, so a citation always reads as simulation and never as a memory, a photograph or a visit."
+    },
+    {
+      "key": "phrase.citation_shown",
+      "kind": "phrase",
+      "code": "citation_shown",
+      "words": "From the simulation, minute {minute}: {line}",
+      "reason": "Authored: how the page says a simulation citation or a simulated person it cannot draw, so a citation always reads as simulation and never as a memory, a photograph or a visit."
+    },
+    {
+      "key": "phrase.citation_shown_event",
+      "kind": "phrase",
+      "code": "citation_shown_event",
+      "words": "From the simulation: {line}",
+      "reason": "Authored: how the page says a simulation citation or a simulated person it cannot draw, so a citation always reads as simulation and never as a memory, a photograph or a visit."
+    },
+    {
+      "key": "phrase.ask_who",
+      "kind": "phrase",
+      "code": "ask_who",
+      "words": "Who is this?",
+      "reason": "Authored: a question a person asks the Companion from the inspector about the simulated person selected there, or what the page says when a citation's person has left the world."
+    },
+    {
+      "key": "phrase.ask_doing",
+      "kind": "phrase",
+      "code": "ask_doing",
+      "words": "What are they doing?",
+      "reason": "Authored: a question a person asks the Companion from the inspector about the simulated person selected there, or what the page says when a citation's person has left the world."
+    },
+    {
+      "key": "phrase.ask_why",
+      "kind": "phrase",
+      "code": "ask_why",
+      "words": "Why are they there?",
+      "reason": "Authored: a question a person asks the Companion from the inspector about the simulated person selected there, or what the page says when a citation's person has left the world."
+    },
+    {
+      "key": "phrase.citation_gone",
+      "kind": "phrase",
+      "code": "citation_gone",
+      "words": "The simulated person that citation names is not in this world now.",
+      "reason": "Authored: a question a person asks the Companion from the inspector about the simulated person selected there, or what the page says when a citation's person has left the world."
+    },
+    {
+      "key": "phrase.framing_recorded",
+      "kind": "phrase",
+      "code": "framing_recorded",
+      "words": "Here is what the simulation recorded.",
+      "reason": "Authored: a sentence the society composer may choose to put before the event lines it chose to answer a question about what happened; the composer chooses it and never writes it."
+    },
+    {
+      "key": "phrase.framing_talk",
+      "kind": "phrase",
+      "code": "framing_talk",
+      "words": "The simulation records who talked with whom, and never what they said.",
+      "reason": "Authored: a sentence the society composer may choose to put before the event lines it chose to answer a question about what happened; the composer chooses it and never writes it."
+    },
+    {
+      "key": "doing.nothing_recorded",
+      "kind": "doing",
+      "code": "nothing_recorded",
+      "words": "Nothing is recorded about what they are doing.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.waiting",
+      "kind": "doing",
+      "code": "waiting",
+      "words": "Waiting.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.walking_to_stand",
+      "kind": "doing",
+      "code": "walking_to_stand",
+      "words": "Walking to a spot to stand a while.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.walking_to_talk",
+      "kind": "doing",
+      "code": "walking_to_talk",
+      "words": "Walking over to talk with {partner}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.walking_to_free_spot",
+      "kind": "doing",
+      "code": "walking_to_free_spot",
+      "words": "Walking to a free spot nearby.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.walking_to_rest",
+      "kind": "doing",
+      "code": "walking_to_rest",
+      "words": "Walking to {place} to rest.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.walking_to_visit",
+      "kind": "doing",
+      "code": "walking_to_visit",
+      "words": "Walking to {place} to visit.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.resting",
+      "kind": "doing",
+      "code": "resting",
+      "words": "Resting at {place}{still}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.visiting",
+      "kind": "doing",
+      "code": "visiting",
+      "words": "Visiting {place}{still}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.finished_resting",
+      "kind": "doing",
+      "code": "finished_resting",
+      "words": "Just finished resting at {place}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.finished_visiting",
+      "kind": "doing",
+      "code": "finished_visiting",
+      "words": "Just finished visiting {place}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.standing",
+      "kind": "doing",
+      "code": "standing",
+      "words": "Standing a while{still}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.finished_standing",
+      "kind": "doing",
+      "code": "finished_standing",
+      "words": "Just finished standing a while.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.talking",
+      "kind": "doing",
+      "code": "talking",
+      "words": "Talking with {partner}{still}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.finished_talking",
+      "kind": "doing",
+      "code": "finished_talking",
+      "words": "Just finished talking with {partner}.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.waiting_to_talk",
+      "kind": "doing",
+      "code": "waiting_to_talk",
+      "words": "Waiting for {partner}, to talk.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.standing_aside",
+      "kind": "doing",
+      "code": "standing_aside",
+      "words": "Standing aside.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "doing.deciding",
+      "kind": "doing",
+      "code": "deciding",
+      "words": "Standing, deciding where to go.",
+      "reason": "Authored: what a simulated person is doing, chosen from their recorded action and goal; {place} is a place they use, {partner} the person they meet and {still} how long is left."
+    },
+    {
+      "key": "outcome.goal_selected",
+      "kind": "outcome",
+      "code": "goal_selected",
+      "words": "chose where to go next",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.moved",
+      "kind": "outcome",
+      "code": "moved",
+      "words": "walked on",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.action_started",
+      "kind": "outcome",
+      "code": "action_started",
+      "words": "began what they came to do",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.talk_started",
+      "kind": "outcome",
+      "code": "talk_started",
+      "words": "began talking",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.talk_ended",
+      "kind": "outcome",
+      "code": "talk_ended",
+      "words": "stopped talking",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.waiting",
+      "kind": "outcome",
+      "code": "waiting",
+      "words": "waited",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.stepped_aside",
+      "kind": "outcome",
+      "code": "stepped_aside",
+      "words": "stepped aside",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.plan_invalidated",
+      "kind": "outcome",
+      "code": "plan_invalidated",
+      "words": "had to change plans",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.stay_ended",
+      "kind": "outcome",
+      "code": "stay_ended",
+      "words": "ended their stay",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.unable_to_act",
+      "kind": "outcome",
+      "code": "unable_to_act",
+      "words": "could not do anything",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.rest_completed",
+      "kind": "outcome",
+      "code": "rest_completed",
+      "words": "finished resting",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.visit_completed",
+      "kind": "outcome",
+      "code": "visit_completed",
+      "words": "finished visiting",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.stand_completed",
+      "kind": "outcome",
+      "code": "stand_completed",
+      "words": "finished standing a while",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.talk_completed",
+      "kind": "outcome",
+      "code": "talk_completed",
+      "words": "finished talking",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.move_completed",
+      "kind": "outcome",
+      "code": "move_completed",
+      "words": "finished walking",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.idle_completed",
+      "kind": "outcome",
+      "code": "idle_completed",
+      "words": "finished waiting",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.departed",
+      "kind": "outcome",
+      "code": "departed",
+      "words": "left",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.arrived",
+      "kind": "outcome",
+      "code": "arrived",
+      "words": "arrived",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.action_request_applied",
+      "kind": "outcome",
+      "code": "action_request_applied",
+      "words": "took up your request",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.action_request_stale",
+      "kind": "outcome",
+      "code": "action_request_stale",
+      "words": "did not take up your request, which came after the world had moved on",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.action_request_unavailable",
+      "kind": "outcome",
+      "code": "action_request_unavailable",
+      "words": "could not take up your request",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.action_request_rejected",
+      "kind": "outcome",
+      "code": "action_request_rejected",
+      "words": "had your request refused",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.action_request_superseded",
+      "kind": "outcome",
+      "code": "action_request_superseded",
+      "words": "had your request replaced by a later one",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
+      "key": "outcome.put_elsewhere",
+      "kind": "outcome",
+      "code": "put_elsewhere",
+      "words": "was put somewhere else",
+      "reason": "Authored: what a society of things recorded happening to a thing that came, moved or went, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "outcome.not_arrived",
+      "kind": "outcome",
+      "code": "not_arrived",
+      "words": "did not arrive",
+      "reason": "Authored: what a society of things recorded happening to a thing that came, moved or went, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "outcome.not_placed",
+      "kind": "outcome",
+      "code": "not_placed",
+      "words": "was not placed",
+      "reason": "Authored: what a society of things recorded happening to a thing that came, moved or went, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "outcome.not_departed",
+      "kind": "outcome",
+      "code": "not_departed",
+      "words": "was not here to leave",
+      "reason": "Authored: what a society of things recorded happening to a thing that came, moved or went, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "outcome.said",
+      "kind": "outcome",
+      "code": "said",
+      "words": "said something",
+      "reason": "Authored: what a said event says happened to a being: it said a line. These words name no line; the line itself is in the event, chosen by the being's decider and held to the line rule."
+    },
+    {
+      "key": "event_reason.sent_away",
+      "kind": "event_reason",
+      "code": "sent_away",
+      "words": "the world's owner sent everyone away",
+      "reason": "Authored: why a recorded event happened when the event records a reason that is not a choice the planner makes, such as the world's owner sending everyone away."
+    },
+    {
+      "key": "event_reason.brought_back",
+      "kind": "event_reason",
+      "code": "brought_back",
+      "words": "the world's owner brought everyone back",
+      "reason": "Authored: why a recorded event happened when the event records a reason that is not a choice the planner makes, such as the world's owner sending everyone away."
+    },
+    {
+      "key": "event_reason.placed_by_author",
+      "kind": "event_reason",
+      "code": "placed_by_author",
+      "words": "the world's author placed it here",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.moved_by_author",
+      "kind": "event_reason",
+      "code": "moved_by_author",
+      "words": "the world's author moved it",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.removed_by_author",
+      "kind": "event_reason",
+      "code": "removed_by_author",
+      "words": "the world's author took it out of the world",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.kind_erased",
+      "kind": "event_reason",
+      "code": "kind_erased",
+      "words": "its maker erased the creature it was",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.society_full",
+      "kind": "event_reason",
+      "code": "society_full",
+      "words": "the world already holds as many people as it can",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.no_place_to_stand",
+      "kind": "event_reason",
+      "code": "no_place_to_stand",
+      "words": "there was nowhere open to stand near where it was placed",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.crossed_in",
+      "kind": "event_reason",
+      "code": "crossed_in",
+      "words": "it came in from another program through a gate",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.sent_home",
+      "kind": "event_reason",
+      "code": "sent_home",
+      "words": "the program it came from called it back",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.grant_ended",
+      "kind": "event_reason",
+      "code": "grant_ended",
+      "words": "the permission it came in under ended",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.no_arrival_place",
+      "kind": "event_reason",
+      "code": "no_arrival_place",
+      "words": "the world has no gate to arrive through",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.visitor_limit",
+      "kind": "event_reason",
+      "code": "visitor_limit",
+      "words": "the world already holds as many visitors as it takes",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.unknown_kind",
+      "kind": "event_reason",
+      "code": "unknown_kind",
+      "words": "it is no kind of thing this world knows",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.already_here",
+      "kind": "event_reason",
+      "code": "already_here",
+      "words": "something of the same name is already here",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.id_taken",
+      "kind": "event_reason",
+      "code": "id_taken",
+      "words": "somebody here already has the name it would have",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.malformed_crossing",
+      "kind": "event_reason",
+      "code": "malformed_crossing",
+      "words": "what its program sent could not be read",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.not_here",
+      "kind": "event_reason",
+      "code": "not_here",
+      "words": "nobody of that name was here",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.chose_to_say",
+      "kind": "event_reason",
+      "code": "chose_to_say",
+      "words": "it chose to say something",
+      "reason": "Authored: why a society of things recorded a line said, a visitor leaving by its own choice, or a visitor sent home because the program deciding for it went quiet: the decider's own act, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_to_leave",
+      "kind": "event_reason",
+      "code": "chose_to_leave",
+      "words": "it chose to go back where it came from",
+      "reason": "Authored: why a society of things recorded a line said, a visitor leaving by its own choice, or a visitor sent home because the program deciding for it went quiet: the decider's own act, said after 'because'."
+    },
+    {
+      "key": "event_reason.decider_lost",
+      "kind": "event_reason",
+      "code": "decider_lost",
+      "words": "the program deciding for it stopped answering",
+      "reason": "Authored: why a society of things recorded a line said, a visitor leaving by its own choice, or a visitor sent home because the program deciding for it went quiet: the decider's own act, said after 'because'."
+    },
+    {
+      "key": "line.event",
+      "kind": "line",
+      "code": "event",
+      "words": "Simulated minute {minute}: {subject} {outcome}, because {reason}.",
+      "reason": "Authored: how one recorded event reads as a line the Companion cites; {minute} is the simulated minute, {subject} the person, {outcome} and {reason} the words above, {partner} whom they met."
+    },
+    {
+      "key": "line.with_partner",
+      "kind": "line",
+      "code": "with_partner",
+      "words": "{line} They were with {partner}.",
+      "reason": "Authored: how one recorded event reads as a line the Companion cites; {minute} is the simulated minute, {subject} the person, {outcome} and {reason} the words above, {partner} whom they met."
+    },
+    {
+      "key": "line.chosen_model",
+      "kind": "line",
+      "code": "chosen_model",
+      "words": "{line} That model was {model}.",
+      "reason": "Authored: the sentence after the line of the minute whose goal a person's model chose, naming that model; {line} is that line and {model} the model's name as the People panel shows it (Manifest.model_name in exulanica/models/manifest.py)."
+    },
+    {
+      "key": "line.outcome_unknown",
+      "kind": "line",
+      "code": "outcome_unknown",
+      "words": "had something recorded that has no words here ({code})",
+      "reason": "Authored: how one recorded event reads as a line the Companion cites; {minute} is the simulated minute, {subject} the person, {outcome} and {reason} the words above, {partner} whom they met."
+    },
+    {
+      "key": "decision_reason.validated_choice",
+      "kind": "decision_reason",
+      "code": "validated_choice",
+      "words": "it chose one of the things they could do",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.answer_not_offered",
+      "kind": "decision_reason",
+      "code": "answer_not_offered",
+      "words": "it did not answer with one of the things they could do",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.model_timed_out",
+      "kind": "decision_reason",
+      "code": "model_timed_out",
+      "words": "it did not answer in time",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.model_call_failed",
+      "kind": "decision_reason",
+      "code": "model_call_failed",
+      "words": "asking it failed",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.model_unavailable",
+      "kind": "decision_reason",
+      "code": "model_unavailable",
+      "words": "it is not available right now",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.request_refused",
+      "kind": "decision_reason",
+      "code": "request_refused",
+      "words": "this world's rules would not let the question be sent",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.provider_not_admitted",
+      "kind": "decision_reason",
+      "code": "provider_not_admitted",
+      "words": "this server may not reach the service that runs it",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.provider_credential_absent",
+      "kind": "decision_reason",
+      "code": "provider_credential_absent",
+      "words": "this server has no key for the service that runs it",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.model_no_longer_offered",
+      "kind": "decision_reason",
+      "code": "model_no_longer_offered",
+      "words": "it is no longer offered for decisions",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.world_hour_decisions_spent",
+      "kind": "decision_reason",
+      "code": "world_hour_decisions_spent",
+      "words": "this world has asked models as often as it may this hour",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.world_hour_spend_spent",
+      "kind": "decision_reason",
+      "code": "world_hour_spend_spent",
+      "words": "this world has spent what it may on models this hour",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.process_budget_spent",
+      "kind": "decision_reason",
+      "code": "process_budget_spent",
+      "words": "this server's model budget had too little left for it",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.process_share_spent",
+      "kind": "decision_reason",
+      "code": "process_share_spent",
+      "words": "this server's model budget, less the part kept for its other work, had too little left for it",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.no_time_to_ask",
+      "kind": "decision_reason",
+      "code": "no_time_to_ask",
+      "words": "there was no time left to ask it before the minute",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.unanswered_in_its_minute",
+      "kind": "decision_reason",
+      "code": "unanswered_in_its_minute",
+      "words": "this server stopped before it heard the answer",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.decision_context_changed",
+      "kind": "decision_reason",
+      "code": "decision_context_changed",
+      "words": "the world changed before they could act on it",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.decision_sources_unavailable",
+      "kind": "decision_reason",
+      "code": "decision_sources_unavailable",
+      "words": "what they could see could not be read",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.provider_configuration_changed",
+      "kind": "decision_reason",
+      "code": "provider_configuration_changed",
+      "words": "this server changed which model it asks",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.person_asked_directly",
+      "kind": "decision_reason",
+      "code": "person_asked_directly",
+      "words": "you asked them yourself",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.subject_already_decided",
+      "kind": "decision_reason",
+      "code": "subject_already_decided",
+      "words": "something else already decided for them this minute",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.action_in_progress",
+      "kind": "decision_reason",
+      "code": "action_in_progress",
+      "words": "they were already busy",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.input_unavailable",
+      "kind": "decision_reason",
+      "code": "input_unavailable",
+      "words": "this world could not be walked right now",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.target_disabled_or_removed",
+      "kind": "decision_reason",
+      "code": "target_disabled_or_removed",
+      "words": "the place it chose is gone",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.current_position_invalidated",
+      "kind": "decision_reason",
+      "code": "current_position_invalidated",
+      "words": "the ground where they stood changed",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.known_target_unreachable",
+      "kind": "decision_reason",
+      "code": "known_target_unreachable",
+      "words": "they could no longer reach the place it chose",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.place_taken_this_minute",
+      "kind": "decision_reason",
+      "code": "place_taken_this_minute",
+      "words": "someone else took that place first",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.no_room_to_stand",
+      "kind": "decision_reason",
+      "code": "no_room_to_stand",
+      "words": "there was no free spot near them to stand at",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.no_room_to_talk",
+      "kind": "decision_reason",
+      "code": "no_room_to_talk",
+      "words": "there was no free spot for the two of them to stand and talk",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.partner_busy",
+      "kind": "decision_reason",
+      "code": "partner_busy",
+      "words": "the person it chose to talk with was busy that minute",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.partner_not_free",
+      "kind": "decision_reason",
+      "code": "partner_not_free",
+      "words": "the person it chose to talk with could not stop to talk",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.thing_gone",
+      "kind": "decision_reason",
+      "code": "thing_gone",
+      "words": "what its hands were to act on was gone",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.out_of_reach",
+      "kind": "decision_reason",
+      "code": "out_of_reach",
+      "words": "no open place within reach of it was left",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.spending_not_granted",
+      "kind": "decision_reason",
+      "code": "spending_not_granted",
+      "words": "this workspace has no allowance to spend on that model's service",
+      "reason": "Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.spending_revoked",
+      "kind": "decision_reason",
+      "code": "spending_revoked",
+      "words": "the allowance it spent from was withdrawn",
+      "reason": "Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.spending_expired",
+      "kind": "decision_reason",
+      "code": "spending_expired",
+      "words": "the allowance it spent from had run out of time",
+      "reason": "Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.spending_limit_reached",
+      "kind": "decision_reason",
+      "code": "spending_limit_reached",
+      "words": "the allowance would have gone over its limit",
+      "reason": "Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.spending_suspended",
+      "kind": "decision_reason",
+      "code": "spending_suspended",
+      "words": "spending on models is paused until the person who runs this installation resumes it",
+      "reason": "Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.spending_unavailable",
+      "kind": "decision_reason",
+      "code": "spending_unavailable",
+      "words": "the allowance could not be checked, so nothing was sent",
+      "reason": "Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.spending_scope_missing",
+      "kind": "decision_reason",
+      "code": "spending_scope_missing",
+      "words": "the request did not say which workspace to spend for",
+      "reason": "Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.decider_disconnected",
+      "kind": "decision_reason",
+      "code": "decider_disconnected",
+      "words": "the program that decides for them was not connected",
+      "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.no_answer_in_time",
+      "kind": "decision_reason",
+      "code": "no_answer_in_time",
+      "words": "the program that decides for them did not answer in time",
+      "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.grant_revoked",
+      "kind": "decision_reason",
+      "code": "grant_revoked",
+      "words": "the world's owner withdrew that program's permission to decide for them",
+      "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.grant_expired",
+      "kind": "decision_reason",
+      "code": "grant_expired",
+      "words": "that program's permission to decide for them had run out",
+      "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.decider_passed",
+      "kind": "decision_reason",
+      "code": "decider_passed",
+      "words": "nobody in the program that decides for them was acting for them",
+      "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.saved_name_withheld",
+      "kind": "decision_reason",
+      "code": "saved_name_withheld",
+      "words": "a name you saved is among the words the program that decides for them would be sent, so it was not asked",
+      "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.person_no_answer",
+      "kind": "decision_reason",
+      "code": "person_no_answer",
+      "words": "the person playing them chose nothing that minute, so they carried on",
+      "reason": "Authored: why a person's decider was or was not followed when a person plays them, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.person_line_withheld",
+      "kind": "decision_reason",
+      "code": "person_line_withheld",
+      "words": "the line the person playing them chose carried a name this world's rules keep out, so it was not said and they carried on",
+      "reason": "Authored: why a person's decider was or was not followed when a person plays them, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.line_out_of_bounds",
+      "kind": "decision_reason",
+      "code": "line_out_of_bounds",
+      "words": "the line it chose to say was not one plain line of words within the limit",
+      "reason": "Authored: why a person's model or outside program was not followed when the line its chosen option says breaks the line rule, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.line_refused_by_rules",
+      "kind": "decision_reason",
+      "code": "line_refused_by_rules",
+      "words": "the line it chose to say carried a name this world's rules keep out",
+      "reason": "Authored: why a person's model or outside program was not followed when the workspace's rules would change the line its chosen option says, as they change a saved name, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "doing.living_idle",
+      "kind": "doing",
+      "code": "living_idle",
+      "words": "waiting for the next choice",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_eat_at_home",
+      "kind": "doing",
+      "code": "living_eat_at_home",
+      "words": "eating at home",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_eat_out",
+      "kind": "doing",
+      "code": "living_eat_out",
+      "words": "eating out",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_rest",
+      "kind": "doing",
+      "code": "living_rest",
+      "words": "resting",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_shop",
+      "kind": "doing",
+      "code": "living_shop",
+      "words": "shopping",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_sleep",
+      "kind": "doing",
+      "code": "living_sleep",
+      "words": "sleeping at home",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_stay_home",
+      "kind": "doing",
+      "code": "living_stay_home",
+      "words": "spending time at home",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_stroll",
+      "kind": "doing",
+      "code": "living_stroll",
+      "words": "taking a walk",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_visit",
+      "kind": "doing",
+      "code": "living_visit",
+      "words": "visiting a place",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_work",
+      "kind": "doing",
+      "code": "living_work",
+      "words": "working",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_unknown",
+      "kind": "doing",
+      "code": "living_unknown",
+      "words": "carrying out an activity",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "phrase.living_who",
+      "kind": "phrase",
+      "code": "living_who",
+      "words": "Resident {number}",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "phrase.living_why_need",
+      "kind": "phrase",
+      "code": "living_why_need",
+      "words": "Their routine chose this to meet a need.",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "phrase.living_why_shift",
+      "kind": "phrase",
+      "code": "living_why_shift",
+      "words": "Their work shift is due.",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "phrase.living_why_wait",
+      "kind": "phrase",
+      "code": "living_why_wait",
+      "words": "They are waiting for the next choice.",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "phrase.living_why_home",
+      "kind": "phrase",
+      "code": "living_why_home",
+      "words": "They began this simulated day at home.",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "phrase.living_why_other",
+      "kind": "phrase",
+      "code": "living_why_other",
+      "words": "Their recorded routine chose this action.",
+      "reason": "Words for a living town resident, shared by the inspector and Companion."
+    },
+    {
+      "key": "doing.living_heading_eat_at_home",
+      "kind": "doing",
+      "code": "living_heading_eat_at_home",
+      "words": "walking home to eat",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_eat_out",
+      "kind": "doing",
+      "code": "living_heading_eat_out",
+      "words": "walking to a meal",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_rest",
+      "kind": "doing",
+      "code": "living_heading_rest",
+      "words": "walking to a place to rest",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_shop",
+      "kind": "doing",
+      "code": "living_heading_shop",
+      "words": "walking to shop",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_sleep",
+      "kind": "doing",
+      "code": "living_heading_sleep",
+      "words": "walking home to sleep",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_stay_home",
+      "kind": "doing",
+      "code": "living_heading_stay_home",
+      "words": "going home",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_stroll",
+      "kind": "doing",
+      "code": "living_heading_stroll",
+      "words": "taking a walk",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_visit",
+      "kind": "doing",
+      "code": "living_heading_visit",
+      "words": "walking to visit a place",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_work",
+      "kind": "doing",
+      "code": "living_heading_work",
+      "words": "walking to work",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "doing.living_heading_unknown",
+      "kind": "doing",
+      "code": "living_heading_unknown",
+      "words": "walking through town",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it."
+    },
+    {
+      "key": "phrase.living_what_home_work",
+      "kind": "phrase",
+      "code": "living_what_home_work",
+      "words": "A simulated {role} in this town. They have a home and an assigned workplace.",
+      "reason": "Words for a living resident’s recorded home and workplace availability."
+    },
+    {
+      "key": "phrase.living_what_home",
+      "kind": "phrase",
+      "code": "living_what_home",
+      "words": "A simulated {role} in this town. They have a home and no assigned workplace.",
+      "reason": "Words for a living resident’s recorded home and workplace availability."
+    },
+    {
+      "key": "phrase.living_what_work",
+      "kind": "phrase",
+      "code": "living_what_work",
+      "words": "A simulated {role} in this town. They have an assigned workplace and no recorded home.",
+      "reason": "Words for a living resident’s recorded home and workplace availability."
+    },
+    {
+      "key": "phrase.living_what_neither",
+      "kind": "phrase",
+      "code": "living_what_neither",
+      "words": "A simulated {role} in this town. No home or workplace is recorded for them.",
+      "reason": "Words for a living resident’s recorded home and workplace availability."
+    },
+    {
+      "key": "phrase.living_what_home_work@generated_site",
+      "kind": "phrase",
+      "code": "living_what_home_work@generated_site",
+      "words": "A simulated {role} {here}. They have a home and an assigned workplace.",
+      "reason": "Words for a living resident’s recorded home and workplace availability. For a world made from a world kind (the society ground generated_site): where they are is the kind's own words ({here})."
+    },
+    {
+      "key": "phrase.living_what_home@generated_site",
+      "kind": "phrase",
+      "code": "living_what_home@generated_site",
+      "words": "A simulated {role} {here}. They have a home and no assigned workplace.",
+      "reason": "Words for a living resident’s recorded home and workplace availability. For a world made from a world kind (the society ground generated_site): where they are is the kind's own words ({here})."
+    },
+    {
+      "key": "phrase.living_what_work@generated_site",
+      "kind": "phrase",
+      "code": "living_what_work@generated_site",
+      "words": "A simulated {role} {here}. They have an assigned workplace and no recorded home.",
+      "reason": "Words for a living resident’s recorded home and workplace availability. For a world made from a world kind (the society ground generated_site): where they are is the kind's own words ({here})."
+    },
+    {
+      "key": "phrase.living_what_neither@generated_site",
+      "kind": "phrase",
+      "code": "living_what_neither@generated_site",
+      "words": "A simulated {role} {here}. No home or workplace is recorded for them.",
+      "reason": "Words for a living resident’s recorded home and workplace availability. For a world made from a world kind (the society ground generated_site): where they are is the kind's own words ({here})."
+    },
+    {
+      "key": "doing.living_heading_unknown@generated_site",
+      "kind": "doing",
+      "code": "living_heading_unknown@generated_site",
+      "words": "walking {around}",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it. For a world made from a world kind (the society ground generated_site): where they walk is the kind's own words ({around})."
+    },
+    {
+      "key": "event_reason.chose_to_pick_up",
+      "kind": "event_reason",
+      "code": "chose_to_pick_up",
+      "words": "it chose to pick it up",
+      "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_to_put_down",
+      "kind": "event_reason",
+      "code": "chose_to_put_down",
+      "words": "it chose to put it down",
+      "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_to_give",
+      "kind": "event_reason",
+      "code": "chose_to_give",
+      "words": "it chose to give it away",
+      "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_to_take",
+      "kind": "event_reason",
+      "code": "chose_to_take",
+      "words": "it chose to take it",
+      "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "event_reason.asked_to_pick_up",
+      "kind": "event_reason",
+      "code": "asked_to_pick_up",
+      "words": "it was asked to pick it up",
+      "reason": "Authored: why a society of things recorded what a being's hands did when the world's owner asked for it, said after 'because'."
+    },
+    {
+      "key": "event_reason.asked_to_put_down",
+      "kind": "event_reason",
+      "code": "asked_to_put_down",
+      "words": "it was asked to put it down",
+      "reason": "Authored: why a society of things recorded what a being's hands did when the world's owner asked for it, said after 'because'."
+    },
+    {
+      "key": "event_reason.asked_to_give",
+      "kind": "event_reason",
+      "code": "asked_to_give",
+      "words": "it was asked to give it away",
+      "reason": "Authored: why a society of things recorded what a being's hands did when the world's owner asked for it, said after 'because'."
+    },
+    {
+      "key": "event_reason.asked_to_take",
+      "kind": "event_reason",
+      "code": "asked_to_take",
+      "words": "it was asked to take it",
+      "reason": "Authored: why a society of things recorded what a being's hands did when the world's owner asked for it, said after 'because'."
+    },
+    {
+      "key": "event_reason.thing_gone",
+      "kind": "event_reason",
+      "code": "thing_gone",
+      "words": "what it was for was gone",
+      "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "event_reason.out_of_reach",
+      "kind": "event_reason",
+      "code": "out_of_reach",
+      "words": "it never came within reach",
+      "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_otherwise",
+      "kind": "event_reason",
+      "code": "chose_otherwise",
+      "words": "it chose to do something else",
+      "reason": "Authored: why a society of things recorded a hands act the world's owner asked for as left undone: the being's decider chose another, said after 'because'."
+    },
+    {
+      "key": "event_reason.asked_otherwise",
+      "kind": "event_reason",
+      "code": "asked_otherwise",
+      "words": "you asked it to do something else",
+      "reason": "Authored: why a society of things recorded a pending hands act as left undone: the world's owner asked for another, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_to_follow",
+      "kind": "event_reason",
+      "code": "chose_to_follow",
+      "words": "it chose to follow them",
+      "reason": "Authored: why a society of things recorded a being beginning to follow another or stopping: the decider's choice, or what ended it, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_to_stop_following",
+      "kind": "event_reason",
+      "code": "chose_to_stop_following",
+      "words": "it chose to stop following",
+      "reason": "Authored: why a society of things recorded a being beginning to follow another or stopping: the decider's choice, or what ended it, said after 'because'."
+    },
+    {
+      "key": "event_reason.target_gone",
+      "kind": "event_reason",
+      "code": "target_gone",
+      "words": "the one it followed left",
+      "reason": "Authored: why a society of things recorded a being beginning to follow another or stopping: the decider's choice, or what ended it, said after 'because'."
+    },
+    {
+      "key": "event_reason.lost_target",
+      "kind": "event_reason",
+      "code": "lost_target",
+      "words": "it could not come near the one it followed",
+      "reason": "Authored: why a society of things recorded a being beginning to follow another or stopping: the decider's choice, or what ended it, said after 'because'."
+    },
+    {
+      "key": "event_reason.not_kept",
+      "kind": "event_reason",
+      "code": "not_kept",
+      "words": "nothing chose to keep it following",
+      "reason": "Authored: why a society of things recorded a being beginning to follow another or stopping: the decider's choice, or what ended it, said after 'because'."
+    },
+    {
+      "key": "outcome.picked_up",
+      "kind": "outcome",
+      "code": "picked_up",
+      "words": "picked something up",
+      "reason": "Authored: what a society of things recorded a being's hands doing, by the outcome the event records; the thing and the other being are named in the event."
+    },
+    {
+      "key": "outcome.put_down",
+      "kind": "outcome",
+      "code": "put_down",
+      "words": "put something down",
+      "reason": "Authored: what a society of things recorded a being's hands doing, by the outcome the event records; the thing and the other being are named in the event."
+    },
+    {
+      "key": "outcome.gave",
+      "kind": "outcome",
+      "code": "gave",
+      "words": "gave something away",
+      "reason": "Authored: what a society of things recorded a being's hands doing, by the outcome the event records; the thing and the other being are named in the event."
+    },
+    {
+      "key": "outcome.took",
+      "kind": "outcome",
+      "code": "took",
+      "words": "took something",
+      "reason": "Authored: what a society of things recorded a being's hands doing, by the outcome the event records; the thing and the other being are named in the event."
+    },
+    {
+      "key": "outcome.not_done",
+      "kind": "outcome",
+      "code": "not_done",
+      "words": "did not do it",
+      "reason": "Authored: what a society of things recorded a being's hands doing, by the outcome the event records; the thing and the other being are named in the event."
+    },
+    {
+      "key": "outcome.followed",
+      "kind": "outcome",
+      "code": "followed",
+      "words": "began to follow somebody",
+      "reason": "Authored: what a society of things recorded a being doing about following another, by the outcome the event records; the one it follows is named in the event."
+    },
+    {
+      "key": "outcome.stopped_following",
+      "kind": "outcome",
+      "code": "stopped_following",
+      "words": "stopped following somebody",
+      "reason": "Authored: what a society of things recorded a being doing about following another, by the outcome the event records; the one it follows is named in the event."
+    },
+    {
+      "key": "reason.day_arrived",
+      "kind": "reason",
+      "code": "day_arrived",
+      "words": "they reached the place their daily routine called for",
+      "reason": "Authored: describes arrival at the destination selected by the recorded daily routine, without inferring a thought or conversation."
+    }
+  ]
+}

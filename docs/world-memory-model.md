@@ -216,9 +216,10 @@ observe -> derive -> propose interpretations -> validate/confirm
         -> act or simulate -> record events -> compare with later observation
 ```
 
-The architecture must retain both the prior and the correction. It should eventually support
-multiple live hypotheses for ambiguous identity, place, geometry, and causality rather than forcing
-one premature state. Confidence is attached to a claim and calibration method, not used as a
+The architecture retains both the prior and the correction. Multiple live hypotheses for
+ambiguous identity, place, geometry, and causality are an open principle of this contract, not a
+delivered store. One premature state is not a substitute for an ambiguous claim. Confidence is
+attached to a claim and calibration method, not used as a
 substitute for epistemic class.
 
 An intervention is different from an observation. Moving a real object in a later photograph,

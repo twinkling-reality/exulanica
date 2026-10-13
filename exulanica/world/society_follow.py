@@ -1,4 +1,4 @@
-"""Following in a society of things: ``exulanica-ability/follow/v2``.
+"""Following in a society of things, by the module version its first input recorded.
 
 A being whose kind lists follow may follow another being whose kind offers to be followed. Its
 decider chooses to follow one; from that minute the being keeps near it, re-planned each minute it
@@ -8,7 +8,10 @@ itself, standing there until the next minute re-plans (a stand it is in ends for
 request ends a stay). It stops when its decider chooses anything but going on or saying something
 (``chose_otherwise``) or chooses to stop (``chose_to_stop_following``), when the one it follows is
 no longer here (``target_gone``), or after ``lost_after_minutes`` minutes in a row ending with it
-farther off than that distance and no open node within it (``lost_target``).
+farther off than that distance and no open node within it (``lost_target``). Version 3 retains
+this accepted intent between decision opportunities, including a missing model answer or a
+change of controller, until a new choice or applied owner command supersedes it. Version 2
+requires a decider's keeping choice every minute and otherwise stops with ``not_kept``.
 
 What this module states is pure: whether a society runs it, the goal policy a follower's minute is
 given (:func:`follow_goal_policy`), and the node it walks to (:func:`approach_node`). The society of
@@ -59,7 +62,15 @@ def followable(
 ) -> bool:
     """Whether ``follower``'s kind lists follow and ``other``'s offers to be followed, each kind
     read as the society whose ``state`` is at hand reads it."""
-    if "kind" not in follower or "kind" not in other or follower["id"] == other["id"]:
+    from exulanica.world.society_resident_day import inside
+
+    if (
+        inside(follower)
+        or inside(other)
+        or "kind" not in follower
+        or "kind" not in other
+        or follower["id"] == other["id"]
+    ):
         return False
     abilities = kind_here(state, follower["kind"]).document["abilities"]
     offers = kind_here(state, other["kind"]).document["offers"]
@@ -85,6 +96,10 @@ def approach_node(
     stands at or is headed to, no activity's place, and none ``promised`` to another this minute.
     None where there is none."""
     from exulanica.world.society_planner import open_ground
+    from exulanica.world.society_resident_day import inside
+
+    if inside(follower) or inside(target):
+        return None
 
     others = [person for person in state["inhabitants"] if person["id"] != follower["id"]]
     nodes = {n["node_id"]: n["position_mm"] for n in document["navigation"]["nodes"]}

@@ -5,7 +5,8 @@ assembled from. Three rules make a new route's line land in exactly one place, a
 place from anybody else's new route, so parallel changes touch different lines rather than the
 same end of the same block (two changes to one section collided there on 2026-09-22):
 
-1.  a section declares one requirement;
+1.  a section declares one permission and credential requirement, including browser ownership
+    or whether an invitation operation needs current source access;
 2.  its routes are listed one per line, sorted by path and then method;
 3.  no two sections declare the same requirement.
 
@@ -24,7 +25,9 @@ from exulanica.api.permissions import (
     ROUTE_RULE_SECTIONS,
     ROUTE_RULES,
     Authentication,
+    BrowserRequires,
     Channel,
+    Granted,
     Public,
     Requires,
     RouteDeclarationError,
@@ -47,16 +50,21 @@ def test_each_section_is_sorted_by_path_then_method(index):
 
 
 def test_each_requirement_has_one_section_and_each_section_one_requirement():
-    requirements: list[frozenset[str]] = []
+    requirements: list[tuple[type, frozenset[str], bool | None]] = []
     credentials: list[str] = []
     reason_sections = {Public: 0, Authentication: 0}
     for section in ROUTE_RULE_SECTIONS:
         kinds = {type(rule) for rule in section.values()}
         assert len(kinds) == 1, f"a section mixes {sorted(kind.__name__ for kind in kinds)}"
         [kind] = kinds
-        if kind is Requires:
-            declared = {frozenset(map(str, rule.permissions)) for rule in section.values()}
-            assert len(declared) == 1, f"one section declares {sorted(map(sorted, declared))}"
+        if kind in (Requires, BrowserRequires, Granted):
+            declared = {
+                (kind, frozenset(map(str, rule.permissions)),
+                 rule.owner_only if isinstance(rule, BrowserRequires)
+                 else rule.check_sources if isinstance(rule, Granted) else None)
+                for rule in section.values()
+            }
+            assert len(declared) == 1, f"one section mixes authority requirements: {declared}"
             requirements.extend(declared)
         elif kind is Channel:
             opened = {rule.credential for rule in section.values()}

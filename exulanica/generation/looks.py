@@ -33,6 +33,7 @@ from exulanica.world.style_packs import (
     canonical_json,
     manifest_sha256,
     read_manifest,
+    require_chain_catalog,
 )
 from exulanica.world.workspace_style_packs import GENERATED_PREFIX
 
@@ -181,6 +182,10 @@ def build_derived_look(
     ``None`` says the world wears the base itself.
     """
     _check_chain(chain)
+    try:
+        require_chain_catalog(chain)
+    except StylePackRefused as refused:
+        raise DerivedLookRefused("refused_by_reader", str(refused)) from refused
     applied = {role: variants for role, variants in roles.items() if variants}
     if not applied:
         return None
@@ -253,6 +258,8 @@ def build_derived_look(
         # Paths are ASCII, so code point order is the reader's UTF-16 order.
         "files": [files[path] for path in sorted(files)],
     }
+    if "look_family_catalog" in base:
+        manifest["look_family_catalog"] = dict(base["look_family_catalog"])
     try:
         read = read_manifest(manifest, context)
     except StylePackRefused as refused:

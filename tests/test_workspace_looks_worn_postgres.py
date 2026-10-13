@@ -17,9 +17,9 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from exulanica.api import thing_card
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.things.authored import container_of
+from exulanica.world import thing_looks
 from exulanica.world.thing_looks import (
     ThingLookRefused,
     check_crossing_look,
@@ -211,7 +211,7 @@ def test_a_look_withdrawn_between_two_reads_leaves_the_kind_s_first_worn(
     look = _admitted(client, world, tmp_path)
     worn = _swap(client, world, knight["id"], {"source": "workspace", "sha256": look.sha256})
     assert worn.status_code == 200, worn.text
-    monkeypatch.setattr(thing_card, "admitted_look_by_digest", lambda *_args: None)
+    monkeypatch.setattr(thing_looks, "admitted_look_by_digest", lambda *_args: None)
     card = _card(client, world, knight["id"])
     assert card.status_code == 200, card.text
     assert card.json()["look"] == first

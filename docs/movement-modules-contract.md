@@ -1,8 +1,8 @@
 # Movement modules contract
 
 Status: **WALKING, FLIGHT, FLIGHT FOR BEINGS AND ROADS BUILT; ROADS SERVED FOR A BAKED CITY ON THE DEVELOPMENT PREVIEW**.
-No engine calls flight for beings; its air is composed from a saved world's own ground, not yet
-from a town's.
+No engine calls flight for beings. Flight air is composed from the ground of one saved world
+version.
 
 Movement in a world is one engine module per kind of movement, chosen by data. A module states the
 space it moves in, the catalog its agents come from, its clock, the bounded parameters every agent's
@@ -115,7 +115,7 @@ engine it lists. A society of things records, in its first input alone, the move
 move its people (`movement_modules`: sorted, each once, each a built row that lists its engine,
 one version of each kind of movement), beside the ability modules it runs, and its minutes walk
 by exactly those for its whole life, whatever a later table adds. A new one records the newest
-built version of each kind (`current_engine_modules`): today the second walking. One whose first
+built version of each kind (`current_engine_modules`). One whose first
 input records none, every society made before the field, walks by the first version at the one
 budget, whatever pace its creatures' run forms state, and its minutes replay as they ran. The
 planner looks the step up through `step_of` by the recorded name and hands a step that declares a

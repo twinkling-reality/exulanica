@@ -441,7 +441,7 @@ DEPTH_STOP_ACTION: Final = "Stop 3D estimates for this photo"
 DEPTH_STOP_CONFIRM: Final = "Stop 3D estimates"
 
 #: The hosted roles a person may allow from the app, and the words each is granted against.
-MODEL_RIGHT_USES_PATH: Final = Path(__file__).with_name("model-right-uses.v1.json")
+MODEL_RIGHT_USES_PATH: Final = Path(__file__).with_name("model-right-uses.v2.json")
 MODEL_RIGHT_USES_PROFILE: Final = "exulanica.model-right-uses/v1"
 #: The admission a use is offered with. Detection queues the processing job the vision stage runs
 #: in; review records the screening depth needs.
@@ -500,6 +500,7 @@ class ModelRightUse:
     stop_action: str
     stop_confirm: str
     offered_on: OfferedOn = "photos"
+    consent_use: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -537,7 +538,7 @@ def parse_model_right_uses(raw: Mapping[str, Any]) -> ModelRightUses:
     """The declared uses, refused whole on anything this module does not know."""
     if not isinstance(raw, Mapping) or set(raw) != _USES_KEYS:
         raise ValueError(f"a model right uses file has exactly the keys {sorted(_USES_KEYS)}")
-    if raw["profile"] != MODEL_RIGHT_USES_PROFILE:
+    if raw["profile"] not in (MODEL_RIGHT_USES_PROFILE, "exulanica.model-right-uses/v2"):
         raise ValueError(f"a model right uses file declares {MODEL_RIGHT_USES_PROFILE}")
     template = _words(raw["notice"], "the notice template")
     if {name for _, name, _, _ in string.Formatter().parse(template) if name} != _NOTICE_FIELDS:
@@ -547,10 +548,9 @@ def parse_model_right_uses(raw: Mapping[str, Any]) -> ModelRightUses:
         raise ValueError("the fallback joiner is printable text")
     hosted = {member.value for member in models_manifest.Role}
     uses: list[ModelRightUse] = []
+    optional = _OPTIONAL_USE_KEYS | ({"consent_use"} if raw["profile"].endswith("/v2") else set())
     for entry in raw["uses"] if isinstance(raw["uses"], list) else ():
-        if not isinstance(entry, Mapping) or not _USE_KEYS <= set(entry) <= (
-            _USE_KEYS | _OPTIONAL_USE_KEYS
-        ):
+        if not isinstance(entry, Mapping) or not _USE_KEYS <= set(entry) <= (_USE_KEYS | optional):
             raise ValueError(
                 f"a model right use has exactly the keys {sorted(_USE_KEYS)}, and may state "
                 f"{sorted(_OPTIONAL_USE_KEYS)}"
@@ -563,6 +563,13 @@ def parse_model_right_uses(raw: Mapping[str, Any]) -> ModelRightUses:
         offered_on = entry.get("offered_on", "photos")
         if offered_on not in OFFERED_ON:
             raise ValueError(f"the {role} use is offered on one of {list(OFFERED_ON)}")
+        consent_use = entry.get("consent_use")
+        if consent_use is not None and (
+            consent_use != "creature_picture_notes/v1"
+            or role != "creature_drafter"
+            or offered_on != "reference_pictures"
+        ):
+            raise ValueError("the declared picture-note consent belongs to the creature drafter")
         detail = entry["detail"]
         uses.append(
             ModelRightUse(
@@ -578,6 +585,7 @@ def parse_model_right_uses(raw: Mapping[str, Any]) -> ModelRightUses:
                 stop_action=_words(entry["stop_action"], f"the {role} stop action"),
                 stop_confirm=_words(entry["stop_confirm"], f"the {role} stop confirmation"),
                 offered_on=offered_on,
+                consent_use=consent_use,
             )
         )
     if not uses:
@@ -608,6 +616,7 @@ class ModelRightOffer:
     stop_confirm: str
     handoff: ModelHandoff
     offered_on: OfferedOn = "photos"
+    consent_use: str | None = None
 
     def as_record(self) -> dict[str, Any]:
         return {
@@ -679,6 +688,21 @@ def role_notices(manifest: models_manifest.Manifest | None = None) -> dict[str, 
     return {offer.role: offer.notice for offer in model_right_offers(manifest)}
 
 
+def creature_picture_note_context(handoff: ModelHandoff) -> dict[str, Any]:
+    """Server-derived use identity; a client digest cannot attest to the notice it saw."""
+    use = MODEL_RIGHT_USES.use("creature_drafter")
+    if use is None or use.consent_use != "creature_picture_notes/v1":
+        raise ValueError("the creature picture-note use is not declared")
+    return {
+        "profile": "exulanica.model-right-use/v1",
+        "use": use.consent_use,
+        "role": use.role,
+        "destination": handoff.destination,
+        "models": [identity.as_record() for identity in handoff.identities],
+        "notice": MODEL_RIGHT_USES.notice(use, handoff),
+    }
+
+
 def admit_batch(
     body: PersonalBatch, *, actor: uuid.UUID, pipeline: PhotoIngestPipeline
 ) -> dict[str, Any]:
@@ -732,7 +756,11 @@ def admit_batch(
             )
         if expected is None and request.notice is not None:
             raise ValueError(f"this server states no notice for the model role {request.role!r}")
-        rights.append((role_handoff(request.role), until))
+        handoff = role_handoff(request.role)
+        context = (
+            creature_picture_note_context(handoff) if request.role == "creature_drafter" else None
+        )
+        rights.append((handoff, until, context))
     # Check all originals, including storage bytes, before the first receipt is written.
     for member in body.members:
         capture = repository.capture(uuid.UUID(member.capture_id))
@@ -820,8 +848,9 @@ def admit_batch(
                     purpose=body.purpose,
                     valid_until=until,
                     granted_at=at,
+                    use_context=context,
                 )
-                for handoff, until in rights
+                for handoff, until, context in rights
                 for identity in handoff.identities
             ]
             result["model_right_ids"] = [str(right.right_id) for right in granted]

@@ -36,6 +36,7 @@ import { TOWN_FIRST_VIEW } from '../town-first-view.js';
 import type { MountedStatusAndInspector } from './status-and-inspector.js';
 
 export interface RendererDependencies {
+  readonly terrainVersionCurrent?: () => boolean;
   readonly env: AppEnvironment;
   readonly state: SessionState;
   readonly snapshot: GraphSnapshot;
@@ -122,11 +123,11 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
     // A saved world made from a world kind draws its site's served drawing, read through its own
     // version and held to the digest the route names, in the look its appearance names as a town
     // is; one that cannot be read is not drawn.
-    const generatedSite = generatedTile === undefined && state.activeWorldEntry?.generatedSite != null
+    const generatedSite = generatedTile === undefined && (state.activeWorldEntry?.generatedSite != null || state.activeWorldEntry?.generatedTerrain != null)
       && state.credentials !== null
       ? await (await import('./site-world.js')).openSiteWorld(
         env, state.credentials, state.activeWorldEntry, state.worldStyleConnection?.state.current.stylePack ?? null,
-        standing,
+        standing, () => deps.terrainVersionCurrent?.() === false ? null : state.activeWorldEntry,
       )
       : undefined;
     const district = generatedTile === undefined && state.activeWorldEntry === null
@@ -192,6 +193,8 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       ...(generatedTile === undefined ? {} : { generatedTile }),
       ...(generatedWorld == null ? {} : { generatedTile: generatedWorld }),
       ...(generatedSite == null ? {} : { generatedSite }),
+      ...((generatedSite != null || generatedWorld != null) && state.activeWorldEntry?.availability === 'available'
+        ? { generatedRegionId: toIslandId((state.activeWorldEntry.generatedTerrain ?? state.activeWorldEntry.generatedSite ?? state.activeWorldEntry.generatedGround)!.regionId) } : {}),
       ...(state.placementRegionIds === undefined ? {} : { placementRegionIds: state.placementRegionIds }),
       ...(state.arrivalVerified && state.activeWorldEntry?.arrival != null
         ? { servedArrival: state.activeWorldEntry.arrival }

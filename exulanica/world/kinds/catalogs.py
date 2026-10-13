@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Final, cast
@@ -165,6 +165,7 @@ class KindCatalogs:
     bounds: Mapping[str, tuple[int, int]]
     sha256: Mapping[str, str]
     society_defaults: Mapping[str, SocietyDefault]
+    bounds_version: int = 1
 
     def bound(self, key: str) -> tuple[int, int]:
         found = self.bounds.get(key)
@@ -173,14 +174,16 @@ class KindCatalogs:
         return found
 
 
-def _read(directory: Path, catalog_id: str) -> dict[str, dict[str, FieldValue]]:
-    schema = _SCHEMAS[catalog_id]
-    catalog = load_catalog(directory.joinpath(f"{catalog_id}.v1.json"), schema)
+def _read(directory: Path, catalog_id: str, version: int = 1) -> dict[str, dict[str, FieldValue]]:
+    schema = replace(_SCHEMAS[catalog_id], catalog_version=version)
+    catalog = load_catalog(directory.joinpath(f"{catalog_id}.v{version}.json"), schema)
     return {entry.key: dict(entry.values) for entry in catalog.entries}
 
 
 @functools.cache
-def load_kind_catalogs(directory: Path = CATALOG_DIRECTORY) -> KindCatalogs:
+def load_kind_catalogs(
+    directory: Path = CATALOG_DIRECTORY, *, bounds_version: int = 1
+) -> KindCatalogs:
     """Read the four catalogs and hold them to the site grammar's closed words."""
     import hashlib
 
@@ -195,7 +198,9 @@ def load_kind_catalogs(directory: Path = CATALOG_DIRECTORY) -> KindCatalogs:
         raise CatalogError(
             f"the kind-role catalog states {sorted(roles)}, the site grammar {ROLES}"
         )
-    bounds = _read(directory, "kind-bound")
+    if bounds_version not in (1, 2):
+        raise CatalogError(f"unknown kind-bound version {bounds_version}")
+    bounds = _read(directory, "kind-bound", bounds_version)
     defaults = _read(directory, "kind-society")
     if tuple(sorted(defaults)) != SOCIETY_DEFAULTS:
         raise CatalogError(
@@ -228,7 +233,11 @@ def load_kind_catalogs(directory: Path = CATALOG_DIRECTORY) -> KindCatalogs:
         ),
         sha256=MappingProxyType(
             {
-                name: hashlib.sha256(directory.joinpath(f"{name}.v1.json").read_bytes()).hexdigest()
+                name: hashlib.sha256(
+                    directory.joinpath(
+                        f"{name}.v{bounds_version if name == 'kind-bound' else 1}.json"
+                    ).read_bytes()
+                ).hexdigest()
                 for name in sorted(_SCHEMAS)
             }
         ),
@@ -238,4 +247,5 @@ def load_kind_catalogs(directory: Path = CATALOG_DIRECTORY) -> KindCatalogs:
                 for key, values in sorted(defaults.items())
             }
         ),
+        bounds_version=bounds_version,
     )

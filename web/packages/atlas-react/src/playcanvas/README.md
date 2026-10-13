@@ -1,7 +1,9 @@
-# The PlayCanvas renderer binding, and its bake-off harness
+# The PlayCanvas renderer binding
 
-One of the two competing implementations of the `@exulanica/atlas-react` renderer binding, per
+The shipping renderer binding for `@exulanica/atlas-react`, selected in
 [ADR-0003](../../../../../docs/adr/0003-renderer-selection.md). Engine: PlayCanvas 2.21.4, pinned.
+The Three.js binding was removed. The harness in this directory remains so the PlayCanvas
+measurements can be reproduced.
 
 ```
 pnpm --filter @exulanica/atlas-react bakeoff:playcanvas

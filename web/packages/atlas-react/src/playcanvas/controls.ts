@@ -3,8 +3,10 @@ import type {
   GroundMovementResolution,
   NavigationWorld,
   SpatialClassification,
+  SupportState,
+  TerrainState,
 } from '@exulanica/atlas-core';
-import { atlasVec3, forwardFromYawPitch, resolveGroundMovement } from '@exulanica/atlas-core';
+import { atlasVec3, forwardFromYawPitch, resolveGroundMovement, SupportNavigationError, terrainGroundPose, terrainMillimetres } from '@exulanica/atlas-core';
 
 /**
  * First-person controls: pointer-lock mouse-look plus WASD, and a reticle at fixed screen centre.
@@ -68,6 +70,8 @@ export const DEFAULT_CONTROLS: ControlsConfig = Object.freeze({
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
 
 export interface CameraState {
+  terrain?: TerrainState;
+  support?: SupportState;
   x: number;
   y: number;
   z: number;
@@ -133,6 +137,11 @@ export class FirstPersonControls {
   private intent: PlanarMovement = Object.freeze({ x: 0, z: 0 });
   private locked = false;
   private lastSafe: AtlasVec3 | null = null;
+  private lastSafeSupport: SupportState | undefined;
+  private lastSafeTerrain: TerrainState | undefined;
+  /** Only the never-accepted original entry may wait for an asynchronous source attachment. */
+  private pendingTerrainEntry: {readonly x: number; readonly y: number; readonly z: number;
+    readonly worldId: string; readonly receiptSha256: string; readonly geometrySha256: string; readonly contactSha256: string} | null = null;
   private readonly navigationWorld: NavigationWorld | null;
   private cameraHold: CameraHold;
   /** How far from the field's centre a view held at altitude may pan; see `altitudeReachFrom`. */
@@ -172,7 +181,46 @@ export class FirstPersonControls {
     this.navigationWorld = navigationWorld;
     this.state = { ...start };
     this.cameraHold = options.hold ?? 'ground';
-    const initialGround = navigationWorld?.surface.sample(start.x, start.z);
+    if (navigationWorld?.terrain === undefined && navigationWorld?.support !== undefined) {
+      this.state.support = start.support ?? navigationWorld.support.entry;
+      this.lastSafeSupport = this.state.support;
+    }
+    let initialGround: { readonly height: number } | null | undefined;
+    try {
+      if (navigationWorld?.terrain !== undefined) {
+        const point = [terrainMillimetres(start.x), terrainMillimetres(start.z)] as const;
+        const entry = navigationWorld.terrain.entryMm;
+        const mayInitialize = start.terrain !== undefined || (point[0] === entry[0] && point[1] === entry[1]);
+        const accepted = mayInitialize ? terrainGroundPose(navigationWorld, point, start.terrain) : null;
+        if (accepted !== null && start.x === accepted.position.x && start.z === accepted.position.z
+            && Number.isFinite(start.y) && Math.abs(start.y - accepted.position.y) <= .001) {
+          this.state.terrain = accepted.state;
+          this.lastSafeTerrain = accepted.state;
+          initialGround = { height: accepted.position.y - navigationWorld.eyeHeight };
+        } else {
+          initialGround = null;
+          if (start.terrain === undefined && mayInitialize && navigationWorld.terrain.occupancy.status !== 'verified'
+              && [start.x, start.y, start.z].every(Number.isFinite)) {
+            this.pendingTerrainEntry = {x: start.x, y: start.y, z: start.z,
+              worldId: navigationWorld.terrain.source.worldId, receiptSha256: navigationWorld.terrain.source.receiptSha256,
+              geometrySha256: navigationWorld.terrain.contact.geometry.sha256, contactSha256: navigationWorld.terrain.contact.sha256};
+          }
+        }
+      } else initialGround = navigationWorld?.support === undefined ? navigationWorld?.surface.sample(start.x, start.z)
+        : { height: navigationWorld.support.at(this.state.support!, [start.x * 1000, start.z * 1000]) / 1000 };
+    } catch (error) {
+      if (navigationWorld?.terrain !== undefined && error instanceof RangeError) initialGround = null;
+      else if (!(error instanceof SupportNavigationError) || this.cameraHold === 'ground') throw error;
+      initialGround = null;
+    }
+    if (navigationWorld?.terrain !== undefined) {
+      if (this.lastSafeTerrain !== undefined) this.canvas.dataset['navigationTerrain'] = JSON.stringify(this.lastSafeTerrain);
+      this.disposers.push(() => { delete this.canvas.dataset['navigationTerrain']; delete this.canvas.dataset['navigationTerrainFailure']; });
+    }
+    if (this.state.support !== undefined) {
+      this.canvas.dataset['navigationSupport'] = JSON.stringify(this.state.support);
+      this.disposers.push(() => { delete this.canvas.dataset['navigationSupport']; });
+    }
     if (navigationWorld !== null && initialGround != null) {
       const grounded = initialGround.height + navigationWorld.eyeHeight;
       /*
@@ -321,7 +369,29 @@ export class FirstPersonControls {
    * its height and pans from there.
    */
   setView(pose: CameraState, hold: CameraHold): void {
-    Object.assign(this.state, pose);
+    const terrainWorld = this.navigationWorld?.terrain === undefined ? null : this.navigationWorld;
+    if (terrainWorld !== null && hold === 'ground') {
+      if (pose.terrain === undefined) return;
+      try {
+        const accepted = terrainGroundPose(terrainWorld, [terrainMillimetres(pose.x), terrainMillimetres(pose.z)], pose.terrain);
+        if (accepted === null || pose.x !== accepted.position.x || pose.z !== accepted.position.z
+            || !Number.isFinite(pose.y) || Math.abs(pose.y - accepted.position.y) > .001) return;
+        this.state.terrain = accepted.state;
+        this.lastSafeTerrain = accepted.state;
+      } catch (error) { if (!(error instanceof RangeError)) throw error; return; }
+    }
+    const supported = terrainWorld === null ? this.navigationWorld?.support : undefined;
+    if (supported !== undefined && hold === 'ground') {
+      const state = pose.support ?? supported.entry;
+      try {
+        const height = supported.at(state, [pose.x * 1000, pose.z * 1000]) / 1000 + this.navigationWorld!.eyeHeight;
+        if (!Number.isFinite(pose.y) || Math.abs(pose.y - height) > .001) return;
+        this.state.support = state;
+        this.lastSafeSupport = state;
+      } catch (error) { if (!(error instanceof SupportNavigationError)) throw error; return; }
+    }
+    const { support: _viewSupport, terrain: _viewTerrain, ...visualPose } = pose;
+    Object.assign(this.state, (supported !== undefined || terrainWorld !== null) && hold === 'altitude' ? visualPose : pose);
     this.vx = 0;
     this.vz = 0;
     this.intent = Object.freeze({ x: 0, z: 0 });
@@ -332,7 +402,13 @@ export class FirstPersonControls {
       this.altitudeReach = altitudeReachFrom(world, pose);
       return;
     }
-    const ground = world.surface.sample(pose.x, pose.z);
+    if (terrainWorld !== null) {
+      this.lastSafe = atlasVec3(this.state.x, this.state.y, this.state.z);
+      this.canvas.dataset['navigationTerrain'] = JSON.stringify(this.state.terrain);
+      return;
+    }
+    const ground = world.support === undefined ? world.surface.sample(pose.x, pose.z)
+      : { height: world.support.at(this.state.support!, [pose.x * 1000, pose.z * 1000]) / 1000 };
     if (ground == null) return;
     this.state.y = ground.height + world.eyeHeight;
     if (Math.hypot(pose.x - world.centre.x, pose.z - world.centre.z) <= world.fieldRadius) {
@@ -345,6 +421,14 @@ export class FirstPersonControls {
    * the surface, and the frames after it are walked.
    */
   holdGround(): void {
+    if (this.navigationWorld?.terrain !== undefined && this.cameraHold === 'altitude') {
+      const held = this.lastSafeTerrain;
+      const accepted = held === undefined ? null : terrainGroundPose(this.navigationWorld, held.positionMm, held);
+      // Returning from an overview restores the held accepted contact, never a new sampled floor.
+      if (accepted === null) return;
+      this.state.x = accepted.position.x; this.state.y = accepted.position.y; this.state.z = accepted.position.z;
+      this.state.terrain = accepted.state;
+    }
     this.cameraHold = 'ground';
   }
 
@@ -402,9 +486,30 @@ export class FirstPersonControls {
     }
   }
 
+  private acceptPendingTerrainEntry(): void {
+    const pending = this.pendingTerrainEntry, world = this.navigationWorld;
+    if (pending === null || world?.terrain === undefined) return;
+    const source = world.terrain;
+    if (this.cameraHold !== 'ground' || this.state.terrain !== undefined || this.lastSafeTerrain !== undefined
+        || this.state.x !== pending.x || this.state.y !== pending.y || this.state.z !== pending.z
+        || source.source.worldId !== pending.worldId || source.source.receiptSha256 !== pending.receiptSha256
+        || source.contact.geometry.sha256 !== pending.geometrySha256 || source.contact.sha256 !== pending.contactSha256) {
+      this.pendingTerrainEntry = null; return;
+    }
+    if (source.occupancy.status !== 'verified') return;
+    // One current, complete authorization attempt. A failed or later revoked pose is never retried here.
+    this.pendingTerrainEntry = null;
+    const accepted = terrainGroundPose(world, source.entryMm);
+    if (accepted === null || accepted.position.x !== pending.x || accepted.position.z !== pending.z
+        || Math.abs(accepted.position.y - pending.y) > .001) return;
+    this.state.terrain = accepted.state; this.lastSafeTerrain = accepted.state;
+    this.state.y = accepted.position.y; this.lastSafe = accepted.position;
+  }
+
   /** Advance by `dt` seconds. System surfaces never share ownership with locomotion. */
   update(dt: number): void {
     if (!this.enabled || !Number.isFinite(dt) || dt <= 0) return;
+    this.acceptPendingTerrainEntry();
     dt = Math.min(dt, .05);
     let ix = 0;
     let iz = 0;
@@ -452,11 +557,23 @@ export class FirstPersonControls {
       current,
       desired,
       lastSafe: this.lastSafe,
+      ...(this.state.terrain === undefined ? {} : { terrainState: this.state.terrain }),
+      ...(this.lastSafeTerrain === undefined ? {} : { lastSafeTerrain: this.lastSafeTerrain }),
+      ...(this.state.support === undefined ? {} : { supportState: this.state.support }),
+      ...(this.lastSafeSupport === undefined ? {} : { lastSafeSupport: this.lastSafeSupport }),
     });
     this.state.x = resolution.position.x;
     this.state.y = resolution.position.y;
     this.state.z = resolution.position.z;
     this.lastSafe = resolution.lastSafe;
+    if (resolution.terrainState !== undefined) this.state.terrain = resolution.terrainState;
+    if (resolution.lastSafeTerrain !== undefined) this.lastSafeTerrain = resolution.lastSafeTerrain;
+    if (resolution.terrainState !== undefined) this.canvas.dataset['navigationTerrain'] = JSON.stringify(resolution.terrainState);
+    if (resolution.terrainFailure === undefined) delete this.canvas.dataset['navigationTerrainFailure'];
+    else this.canvas.dataset['navigationTerrainFailure'] = resolution.terrainFailure;
+    if (resolution.supportState !== undefined) this.state.support = resolution.supportState;
+    if (resolution.lastSafeSupport !== undefined) this.lastSafeSupport = resolution.lastSafeSupport;
+    if (this.state.support !== undefined) this.canvas.dataset['navigationSupport'] = JSON.stringify(this.state.support);
     this.spatial = resolution.spatial;
     if (resolution.recovered) this.recoveryReason = resolution.recoveryReason;
   }

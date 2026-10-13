@@ -1,5 +1,8 @@
+import {readTerrainDressing, type TerrainDressing} from './terrain-dressing.js';
+import { readSupportNavigation, readHeightfieldGeometry, readHeightfieldContact, heightfieldAt, type HeightfieldContact, type HeightfieldPointContact, type SupportNavigation } from '@exulanica/atlas-core';
+import { sha256Hex, canonicalJson } from '../character/digest.js';
 /**
- * The drawing a site world's records make, as the server serves it (`exulanica.site-drawing/v1`).
+ * The drawing a site world's records make, in its level-floor or explicit-support profile.
  *
  * A world made from a world kind is not baked. Its version serves one document: every drawn piece
  * as a slot a style pack dresses (its stable identity, its look role `family.leaf`, the base centre
@@ -12,6 +15,10 @@
  */
 
 export const SITE_DRAWING_PROFILE = 'exulanica.site-drawing/v1';
+export const SITE_DRAWING_SUPPORT_PROFILE = 'exulanica.site-drawing/v2';
+
+export const SITE_DRAWING_TERRAIN_PROFILE = 'exulanica.site-drawing/v3';
+export const SITE_DRAWING_DRESSED_TERRAIN_PROFILE = 'exulanica.site-drawing/v4';
 
 export type SiteFit = 'contain' | 'fill' | 'tile' | 'surface';
 export type SitePrimitive = 'box' | 'plane' | 'gable' | 'none';
@@ -23,6 +30,8 @@ export interface SiteUvFrame {
 }
 
 export interface SiteSlot {
+  /** Derived from a canonical support network, never inferred from a render mesh. */
+  readonly supportSurfaceId?: string;
   readonly identity: string;
   readonly part: string;
   readonly label: string;
@@ -43,7 +52,9 @@ export interface SiteSlot {
 
 export type SiteRectMm = readonly [x0: number, y0: number, x1: number, y1: number];
 
-export interface SiteDrawing {
+export interface StructuredSiteDrawing {
+  readonly profile?: typeof SITE_DRAWING_PROFILE | typeof SITE_DRAWING_SUPPORT_PROFILE;
+  readonly support?: SupportNavigation;
   readonly worldId: string;
   readonly receiptSha256: string;
   readonly kind: { readonly kind: string; readonly version: number; readonly label: string };
@@ -59,6 +70,31 @@ export interface SiteDrawing {
     readonly keepOutMm: readonly SiteRectMm[];
   };
   readonly seats: readonly { readonly identity: string; readonly seatHeightMm: number }[];
+}
+
+/** Terrain has its own region frame and exact contact, with no structured-site slots. */
+interface TerrainDrawingBase {
+  readonly worldId: string;
+  readonly regionId: 'region:generated';
+  readonly receiptSha256: string;
+  readonly boundsMm: { readonly east: readonly [number, number]; readonly south: readonly [number, number] };
+  readonly terrain: HeightfieldContact;
+  readonly arrival: {
+    readonly positionMm: readonly [number, number, number];
+    readonly facingMm: readonly [number, number];
+    readonly contact: HeightfieldPointContact;
+  };
+}
+export interface PlainTerrainSiteDrawing extends TerrainDrawingBase {readonly profile: typeof SITE_DRAWING_TERRAIN_PROFILE;}
+export interface DressedTerrainSiteDrawing extends TerrainDrawingBase {
+  readonly profile: typeof SITE_DRAWING_DRESSED_TERRAIN_PROFILE;
+  readonly dressing: TerrainDressing;
+  readonly dressingSha256: string;
+}
+export type TerrainSiteDrawing = PlainTerrainSiteDrawing | DressedTerrainSiteDrawing;
+export type SiteDrawing = StructuredSiteDrawing | TerrainSiteDrawing;
+export function isTerrainSiteDrawing(drawing: SiteDrawing): drawing is TerrainSiteDrawing {
+  return drawing.profile === SITE_DRAWING_TERRAIN_PROFILE || drawing.profile === SITE_DRAWING_DRESSED_TERRAIN_PROFILE;
 }
 
 export class SiteDrawingError extends Error {
@@ -144,7 +180,8 @@ function slot(value: unknown, index: number): SiteSlot {
 /** Read a served site drawing, or refuse it by name. */
 export function parseSiteDrawing(value: unknown): SiteDrawing {
   const body = object(value, 'document');
-  if (body['profile'] !== SITE_DRAWING_PROFILE) fail(`The site drawing is not ${SITE_DRAWING_PROFILE}.`);
+  if ((body['profile'] === SITE_DRAWING_TERRAIN_PROFILE || body['profile'] === SITE_DRAWING_DRESSED_TERRAIN_PROFILE)) return parseTerrainDrawing(body);
+  if (body['profile'] !== SITE_DRAWING_PROFILE && body['profile'] !== SITE_DRAWING_SUPPORT_PROFILE) fail(`The site drawing is not ${SITE_DRAWING_PROFILE} or ${SITE_DRAWING_SUPPORT_PROFILE}.`);
   const kind = object(body['kind'], 'kind');
   const extent = object(body['extent'], 'extent');
   const enclosure = extent['enclosure'];
@@ -161,10 +198,36 @@ export function parseSiteDrawing(value: unknown): SiteDrawing {
   if (!Array.isArray(blockers) || !Array.isArray(keepOut) || !Array.isArray(seats)) {
     fail("The site drawing's walk or seats are not lists.");
   }
+  const supportRaw = body['profile'] === SITE_DRAWING_SUPPORT_PROFILE ? object(body['support'], 'support adapter') : null;
+  let support: SupportNavigation | undefined;
+  if (supportRaw !== null) {
+    if (supportRaw['profile'] !== 'exulanica.support-adapter/v1') fail('The site support adapter has an unknown profile.');
+    const entrySurface = text(supportRaw['entry_surface_id'], 'entry surface');
+    support = readSupportNavigation(supportRaw['network'], text(body['world_id'], 'world'), entrySurface, sha256Hex);
+    if (support.document.frame.name !== 'region:generated' || support.document.frame.datum !== 'region-origin') fail('The site support network uses another region frame.');
+    const binding = object(supportRaw['node_surfaces'], 'node surface bindings');
+    for (const [key, value] of Object.entries(binding)) {
+      if (!/^support-node:[0-9a-f]{64}$/.test(key) || typeof value !== 'string' || !support.surfaces.has(value)) fail('The site support node binding is not a qualified admitted surface.');
+    }
+    if (!/^[0-9a-f]{64}$/.test(text(supportRaw['place_sha256'], 'support place digest'))
+        || binding[text(supportRaw['entry_node_id'], 'support entry node')] !== entrySurface) fail('The site support entry/place binding is invalid.');
+  }
   const read = slots.map(slot);
+  // Network supports are canonical walking geometry. Draw their exact top planes in the same dresser.
+  if (support !== undefined) for (const surface of support.document.surfaces) {
+    if (surface.surface_id === support.entry.surfaceId) continue;
+    const [east0, south0, east1, south1] = surface.rect_mm;
+    read.push(Object.freeze({ identity: `support-plane:${support.document.document_sha256}:${surface.surface_id}`,
+      supportSurfaceId: surface.surface_id, part: 'walking_support', label: surface.surface_id, lookRole: 'ground.paving', family: 'ground', leaf: 'paving',
+      positionMm: Object.freeze([(east0 + east1) / 2, -(south0 + south1) / 2, surface.support_z_mm]) as readonly [number, number, number],
+      yawQuarterTurns: 0, boxMm: Object.freeze([east1-east0, south1-south0, 0]) as readonly [number, number, number],
+      front: '+y', fit: 'surface', primitive: 'plane' }));
+  }
   const identities = new Set(read.map((one) => one.identity));
   if (identities.size !== read.length) fail('Two slots of the site drawing share an identity.');
   return Object.freeze({
+    profile: body['profile'],
+    ...(support === undefined ? {} : { support }),
     worldId: text(body['world_id'], 'world'),
     receiptSha256: text(body['receipt_sha256'], 'receipt'),
     kind: Object.freeze({
@@ -195,4 +258,59 @@ export function parseSiteDrawing(value: unknown): SiteDrawing {
       });
     })),
   });
+}
+
+/** Require a structured site before using a dresser or a flat-site projection. */
+export function parseStructuredSiteDrawing(value: unknown): StructuredSiteDrawing {
+  const drawing = parseSiteDrawing(value);
+  if (isTerrainSiteDrawing(drawing)) fail('The drawing is terrain, not a structured site.');
+  return drawing;
+}
+
+function closed(value: unknown, fields: string, what: string): Record<string, unknown> {
+  const row = object(value, what);
+  if (Object.keys(row).sort().join(' ') !== fields.split(' ').sort().join(' ')) fail(`The site drawing's ${what} has unexpected or missing fields.`);
+  return row;
+}
+function pair(value: unknown, what: string): readonly [number, number] {
+  if (!Array.isArray(value) || value.length !== 2) fail(`The site drawing's ${what} is not two figures.`);
+  const result = value.map(v => integer(v, what));
+  if (result.some(v => Math.abs(v) > 512000)) fail(`The site drawing's ${what} is outside the bounded frame.`);
+  return Object.freeze([result[0]!, result[1]!]);
+}
+function digest(value: unknown, what: string): string {
+  const result = text(value, what);
+  if (!/^[0-9a-f]{64}$/.test(result)) fail(`The site drawing's ${what} is not a SHA-256 digest.`);
+  return result;
+}
+function parseTerrainDrawing(body: Record<string, unknown>): TerrainSiteDrawing {
+  closed(body, 'profile world_id region_id receipt_sha256 composer frame bounds_mm terrain arrival capabilities', 'terrain document');
+  const dressed = body['profile'] === SITE_DRAWING_DRESSED_TERRAIN_PROFILE;
+  const composer = closed(body['composer'], 'key version', 'composer');
+  if (composer['key'] !== 'site-plan' || composer['version'] !== (dressed ? 4 : 3)) fail('The terrain drawing does not bind its site-plan composer.');
+  if (body['region_id'] !== 'region:generated' || body['frame'] !== 'region-local-east-up-south-mm') fail('The terrain drawing uses another region frame.');
+  const capabilities = closed(body['capabilities'], 'person_navigation passive_flat_patch society_projection', 'capabilities');
+  if (capabilities['person_navigation'] !== true || capabilities['passive_flat_patch'] !== true || capabilities['society_projection'] !== 'unavailable') fail('The terrain drawing declares unsupported capabilities.');
+  const raw = closed(body['terrain'], 'geometry geometry_sha256 contact contact_sha256' + (dressed ? ' dressing dressing_sha256' : ''), 'terrain');
+  const geometry = readHeightfieldGeometry(raw['geometry'], sha256Hex, digest(raw['geometry_sha256'], 'geometry digest'));
+  const terrain = readHeightfieldContact(raw['contact'], geometry, sha256Hex, digest(raw['contact_sha256'], 'contact digest'));
+  const bounds = closed(body['bounds_mm'], 'east south', 'bounds');
+  const east = pair(bounds['east'], 'east bounds'), south = pair(bounds['south'], 'south bounds');
+  if (east[0] !== 0 || south[1] !== 0 || east[0] !== geometry.data.east_mm[0] || east[1] !== geometry.data.east_mm.at(-1)
+      || south[0] !== geometry.data.south_mm[0] || south[1] !== geometry.data.south_mm.at(-1)) fail('The terrain bounds differ from its admitted geometry.');
+  const arrival = closed(body['arrival'], 'position_mm facing_mm contact', 'terrain arrival');
+  const position = triple(arrival['position_mm'], 'terrain arrival'), facing = pair(arrival['facing_mm'], 'terrain facing');
+  if (facing[0] === 0 && facing[1] === 0) fail('The terrain arrival faces no way.');
+  const result = heightfieldAt(terrain, [position[0], position[2]]);
+  if (result.status !== 'clear' || result.contact === null) fail('The terrain arrival has no complete person clearance.');
+  if (canonicalJson(arrival['contact']) !== canonicalJson(result.contact)) fail('The terrain arrival contact differs from its admitted geometry.');
+  const n = BigInt(result.contact.height_mm.numerator), d = BigInt(result.contact.height_mm.denominator), abs = n < 0n ? -n : n;
+  const rounded = (abs / d + (2n * (abs % d) > d ? 1n : 0n)) * (n < 0n ? -1n : 1n);
+  if (position[1] !== Number(rounded)) fail('The terrain arrival height differs from canonical rounding.');
+  const dressingSha256 = dressed ? digest(raw['dressing_sha256'], 'dressing digest') : null;
+  const dressing = dressingSha256 === null ? null : readTerrainDressing(raw['dressing'], dressingSha256);
+  return Object.freeze({... (dressing === null ? {profile: SITE_DRAWING_TERRAIN_PROFILE} as const
+    : {profile: SITE_DRAWING_DRESSED_TERRAIN_PROFILE, dressing, dressingSha256: dressingSha256!} as const), worldId: text(body['world_id'], 'world'), regionId: 'region:generated',
+    receiptSha256: digest(body['receipt_sha256'], 'receipt'), boundsMm: Object.freeze({east, south}), terrain,
+    arrival: Object.freeze({positionMm: position, facingMm: facing, contact: result.contact})});
 }

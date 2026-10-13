@@ -25,6 +25,7 @@ from psycopg.types.json import Jsonb
 
 from exulanica.world.kinds.catalogs import load_kind_catalogs
 from exulanica.world.kinds.document import KindDocument, KindRefused, read_kind
+from exulanica.world.kinds.erasure import KindErasureRefused
 from exulanica.world.workspace_lock import lock_workspace
 
 __all__ = [
@@ -54,13 +55,22 @@ _CAP: Final = "this workspace keeps {cap} kind versions, the most it may"
 #: :data:`KINDS_PER_WORKSPACE` documents, each the same every time while the catalogs are.
 _READ_KEPT: Final = 128
 _read_lock = threading.Lock()
+_read_epoch = 0
 _read: OrderedDict[tuple[str, tuple[str, ...]], KindDocument | str] = OrderedDict()
 
 
-def _read_stored(document: object, document_sha256: str) -> KindDocument | str:
+def _cache_epoch() -> int:
+    with _read_lock:
+        return _read_epoch
+
+
+def _read_stored(
+    document: object, document_sha256: str, *, read_epoch: int | None = None
+) -> KindDocument | str:
     """A kept document read again, or why it no longer reads, once per digest and catalogs."""
     key = (document_sha256, tuple(sorted(load_kind_catalogs().sha256.values())))
     with _read_lock:
+        epoch = _read_epoch if read_epoch is None else read_epoch
         found = _read.get(key)
         if found is not None:
             _read.move_to_end(key)
@@ -74,10 +84,22 @@ def _read_stored(document: object, document_sha256: str) -> KindDocument | str:
         if outcome.sha256 != document_sha256:
             outcome = "reads to another digest"
     with _read_lock:
+        if epoch != _read_epoch:
+            return outcome
         _read[key] = outcome
         while len(_read) > _READ_KEPT:
             _read.popitem(last=False)
     return outcome
+
+
+def forget_kind(digest: str) -> None:
+    """Evict parsed content; an earlier reader cannot repopulate the cache after eviction."""
+    global _read_epoch
+    with _read_lock:
+        _read_epoch += 1
+        for key in tuple(_read):
+            if key[0] == digest:
+                del _read[key]
 
 
 class KindCapReached(ValueError):
@@ -125,6 +147,7 @@ class WorkspaceKinds:
         try:
             with self.connection.transaction():
                 lock_workspace(self.connection, self.workspace_id)
+                self.refuse_erased(kind)
                 with self.connection.cursor(row_factory=dict_row) as cursor:
                     held = cursor.execute(
                         "select count(*) as n from world_kind_version where workspace_id=%s",
@@ -164,11 +187,36 @@ class WorkspaceKinds:
         if row is not None and row["n"] >= KINDS_PER_WORKSPACE:
             raise KindCapReached(_CAP.format(cap=KINDS_PER_WORKSPACE))
 
+    def version_erased(self, kind: str, version: int) -> bool:
+        """Whether a library identity is retired, distinct from not yet being committed."""
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            return (
+                cursor.execute(
+                    "select 1 from world_kind_erasure where workspace_id=%s and "
+                    "kind_key_sha256=encode(sha256(convert_to(%s,'UTF8')),'hex') and version=%s",
+                    (self.workspace_id, kind, version),
+                ).fetchone()
+                is not None
+            )
+
+    def refuse_erased(self, kind: KindDocument) -> None:
+        """Refuse a retired digest or version before expensive work; SQL guards races."""
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            row = cursor.execute(
+                "select 1 from world_kind_erasure where workspace_id=%s and "
+                "(document_sha256=%s or (kind_key_sha256="
+                "encode(sha256(convert_to(%s,'UTF8')),'hex') and version=%s))",
+                (self.workspace_id, kind.sha256, kind.kind, kind.version),
+            ).fetchone()
+        if row:
+            raise KindErasureRefused("world_kind_erased")
+
     def refuse_before_checks(self, kind: KindDocument) -> None:
         """Refuse a kind the append would refuse, before anything is built for it: a version or a
         document the workspace already keeps (:class:`KindVersionExists`), or a workspace already
         keeping as many versions as it may (:class:`KindCapReached`). Asked without the lock; the
         append asks both again under it."""
+        self.refuse_erased(kind)
         with self.connection.cursor(row_factory=dict_row) as cursor:
             row = cursor.execute(
                 "select count(*) as n, coalesce(bool_or((kind=%s and version=%s) or "
@@ -181,11 +229,11 @@ class WorkspaceKinds:
         if row is not None and row["n"] >= KINDS_PER_WORKSPACE:
             raise KindCapReached(_CAP.format(cap=KINDS_PER_WORKSPACE))
 
-    def _stored(self, row: Mapping[str, Any]) -> StoredKind:
+    def _stored(self, row: Mapping[str, Any], epoch: int) -> StoredKind:
         """A kept kind read again; :class:`KindUnreadable` when today's catalogs refuse it or it
         reads to another digest, never a refusal escaping as an error. Each document is read once
         per digest and catalogs (:func:`_read_stored`)."""
-        kind = _read_stored(row["document"], row["document_sha256"])
+        kind = _read_stored(row["document"], row["document_sha256"], read_epoch=epoch)
         if isinstance(kind, str):
             raise KindUnreadable(f"kind {row['kind']} version {row['version']} {kind}")
         return StoredKind(
@@ -196,22 +244,24 @@ class WorkspaceKinds:
         )
 
     def version(self, kind: str, version: int) -> StoredKind | None:
+        epoch = _cache_epoch()
         with self.connection.cursor(row_factory=dict_row) as cursor:
             row = cursor.execute(
                 f"select {_COLUMNS} from world_kind_version where workspace_id=%s and kind=%s "
                 "and version=%s",
                 (self.workspace_id, kind, version),
             ).fetchone()
-        return None if row is None else self._stored(row)
+        return None if row is None else self._stored(row, epoch)
 
     def latest(self, kind: str) -> StoredKind | None:
+        epoch = _cache_epoch()
         with self.connection.cursor(row_factory=dict_row) as cursor:
             row = cursor.execute(
                 f"select {_COLUMNS} from world_kind_version where workspace_id=%s and kind=%s "
                 "order by version desc limit 1",
                 (self.workspace_id, kind),
             ).fetchone()
-        return None if row is None else self._stored(row)
+        return None if row is None else self._stored(row, epoch)
 
     def kind_keys(self) -> frozenset[str]:
         """Every key the workspace keeps a kind under, whether or not its kind still reads: a new
@@ -225,6 +275,7 @@ class WorkspaceKinds:
 
     def every_latest(self) -> tuple[StoredKind, ...]:
         """The latest version of every kind the workspace holds, by key."""
+        epoch = _cache_epoch()
         with self.connection.cursor(row_factory=dict_row) as cursor:
             rows = cursor.execute(
                 f"select distinct on (kind) {_COLUMNS} from world_kind_version "
@@ -234,7 +285,7 @@ class WorkspaceKinds:
         stored = []
         for row in rows:
             try:
-                stored.append(self._stored(row))
+                stored.append(self._stored(row, epoch))
             except KindUnreadable:
                 # Listed by the kinds it can still read; the row itself stays kept.
                 _log.warning(

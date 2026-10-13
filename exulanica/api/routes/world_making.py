@@ -14,21 +14,22 @@ Starting one needs ``world.write`` and ``model.invoke``, since a draft spends on
 by writing a world; reading one, or what a draft would take, needs ``world.read``. A server keeps
 a kind of place from a person only where its deployment says so (``EXULANICA_KINDS_FROM_PEOPLE``):
 elsewhere starting is refused 403 ``kinds_from_people_not_offered`` and the offer says so. A
-draft's state lives in this API process, as a kind's draft does: one a process restart lost is
-answered 404 ``world_draft_unknown``, and a world it had already made is among the person's
-worlds.
+draft's request, progress and result live in the durable job authority. Reads and same-key retries
+survive a process restart without inference. An interrupted worker recovers an already saved
+world or records a named interruption without asking again.
+
 """
 
 from __future__ import annotations
 
-import functools
 import math
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Annotated, Any, Final, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -36,6 +37,7 @@ from exulanica.api.dependencies import (
     CurrentSession,
     HeldPermissions,
     ReadOnlyConnection,
+    ScopedConnection,
     get_services,
     holds_as_guest,
 )
@@ -44,9 +46,6 @@ from exulanica.api.kind_drafts import (
     KINDS_FROM_PEOPLE_NOT_OFFERED,
     KINDS_FROM_PEOPLE_NOT_OFFERED_DETAIL,
     KindDraft,
-    KindDraftBusy,
-    KindDraftCapacity,
-    KindDraftLimit,
     allowance_refusal,
     draft_deadline_seconds,
 )
@@ -55,12 +54,21 @@ from exulanica.api.routes.selection import ExecutionView, ModelNotConfigured, _e
 from exulanica.api.routes.world_entries import SavedWorldEntryView, _view
 from exulanica.api.sayable import sayable
 from exulanica.api.services import Services
-from exulanica.api.world_making import WORLD_DRAFT_CODES, calls_at_most, make_world
-from exulanica.epistemics.hosted_requests import no_place_released
+from exulanica.api.world_draft_offer import (
+    WorldDraftOfferRefused,
+    confirm_operation,
+    read_operation_sheet,
+    stages,
+)
+from exulanica.api.world_draft_worker import manifest_sha256
+from exulanica.api.world_making import WORLD_DRAFT_CODES, calls_at_most
+from exulanica.canonical import canonical_json
 from exulanica.models.manifest import load_manifest
+from exulanica.selection.calls import AttemptOutcome, CallCost, ModelCall
 from exulanica.selection.tool_choosing import chooser_prompt
-from exulanica.selection.world_drafting import sendable
 from exulanica.world.saved_entries import SavedWorldEntryRepository
+from exulanica.world.world_draft_contract import DEFINITION_PROFILE
+from exulanica.world.world_draft_jobs import WorldDraftRefused, WorldDraftRepository, terms_sha256
 from exulanica.world.worlds import (
     GENERATED,
     UnknownWorldResource,
@@ -78,7 +86,7 @@ router = APIRouter(prefix="/worlds/drafts", tags=["world"])
 DESCRIPTION_CHARACTERS: Final = 1000
 #: The body asking for a draft may carry: a description of at most that many characters, at most
 #: four bytes each as UTF-8, with its envelope.
-DRAFT_BODY_MAXIMUM: Final = 16_384
+DRAFT_BODY_MAXIMUM: Final = 131_072
 #: How often the page asks after a draft, in seconds: choosing takes a few seconds, a town's
 #: draft about ten and a place's twenty or more.
 DRAFT_POLL_SECONDS: Final = 3
@@ -89,6 +97,20 @@ class DraftWorldBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     description: Annotated[str, Field(min_length=1, max_length=DESCRIPTION_CHARACTERS)]
+    idempotency_key: uuid.UUID | None = None
+    operation: dict[str, Any] | None = None
+    maximum_usd: str | None = Field(default=None, pattern=r"^[0-9]{1,6}(\.[0-9]{1,8})?$")
+
+    @field_validator("operation")
+    @classmethod
+    def _canonical_operation(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        try:
+            canonical_json(value)
+        except TypeError as failure:
+            raise ValueError(
+                "operation terms must have a deterministic representation"
+            ) from failure
+        return value
 
     @field_validator("description")
     @classmethod
@@ -165,7 +187,11 @@ class CodeView(BaseModel):
 
 class MadeWorldDraftView(BaseModel):
     draft_id: uuid.UUID
-    state: Literal["choosing", "drafting", "making", "ready", "refused"]
+    request_id: uuid.UUID | None = None
+    operation: dict[str, Any] | None = None
+    recovered: bool = False
+    accounting: dict[str, Any] | None = None
+    state: Literal["queued", "choosing", "drafting", "making", "ready", "refused"]
     #: The whole sentence, while the draft runs; a draft that ended keeps none of it here. (The
     #: phrases of ``left_out`` are the person's own words too, and stay while the draft is read.)
     description: str
@@ -219,6 +245,7 @@ class WorldDraftOfferView(BaseModel):
     #: This person's own draft of a world still running here, to follow instead of starting one.
     running_draft_id: uuid.UUID | None
     refusals: list[CodeView]
+    operation: dict[str, Any] | None = None
 
 
 def _problem(status: int, code: str, detail: str, **extra: Any) -> JSONResponse:
@@ -233,6 +260,20 @@ def _codes() -> list[CodeView]:
     listed.update(dict(WORLD_DRAFT_CODES))
     listed["world_draft_unknown"] = "The server holds no draft this person started with this id."
     listed["kind_draft_busy"] = "The workspace already has a draft running."
+    listed.update(
+        {
+            "world_draft_price_unavailable": "No fresh provider rates cover this operation.",
+            "world_draft_price_expired": "The accepted operation sheet expired before dispatch.",
+            "world_draft_operation_changed": "Read changed operation terms before confirming.",
+            "world_draft_bound_too_small": "The confirmed ceiling cannot cover this operation.",
+            "world_draft_key_reused": "The request key already holds different terms.",
+            "world_draft_worker_not_running": "This host is not running its world draft worker.",
+            "world_draft_spending_not_durable": "Durable spending authority is required.",
+            "world_draft_configuration_changed": "The accepted model configuration changed.",
+            "world_draft_funding_refused": "Durable provider bounds could not be opened.",
+            "world_draft_interrupted": "The interrupted draft was not asked again.",
+        }
+    )
     return [CodeView(code=code, meaning=meaning) for code, meaning in sorted(listed.items())]
 
 
@@ -292,7 +333,8 @@ def _draft_view(
                 draft.entry_id
             )
         except UnknownWorldResource:
-            found = None
+            services.kind_drafts.erase_entries(draft.workspace_id, {draft.entry_id})
+            raise
         entry = (
             None
             if found is None
@@ -326,6 +368,60 @@ def _draft_view(
     )
 
 
+def _durable_view(row: dict[str, Any], connection: Any, services: Services) -> MadeWorldDraftView:
+    doc = row["outcome"] or row["progress"] or {}
+    now = services.kind_drafts.clock()
+    age = max(0, (datetime.now(UTC) - row["started_at"]).total_seconds())
+    draft = KindDraft(
+        draft_id=row["draft_id"],
+        workspace_id=row["workspace_id"],
+        actor=row["actor_id"],
+        description=row["description"] or "",
+        started_at=row["started_at"],
+        started=now - age,
+        changed=now,
+        purpose="world",
+        deadline=row["definition"]["deadline_seconds"],
+        state="drafting" if row["state"] in ("queued", "running") else doc.get("state", "refused"),
+    )
+    for field in (
+        "stage",
+        "tool",
+        "tool_chosen",
+        "made",
+        "left_out",
+        "look",
+        "setting",
+        "refusal",
+        "model_id",
+    ):
+        if field in doc:
+            setattr(draft, field, doc[field])
+    draft.entry_id = None if not doc.get("entry_id") else uuid.UUID(doc["entry_id"])
+    draft.calls = tuple(
+        ModelCall(
+            **dict(
+                call,
+                outcome=AttemptOutcome(call["outcome"]),
+                cost_basis=CallCost(call["cost_basis"]),
+            )
+        )
+        for call in doc.get("calls", ())
+    )
+    view = _draft_view(draft, connection, services, now)
+    return view.model_copy(
+        update={
+            "state": "queued" if row["state"] == "queued" else view.state,
+            "request_id": row["request_id"],
+            "operation": row["definition"]["quote"],
+            "recovered": bool(doc.get("recovered")),
+            "accounting": WorldDraftRepository(connection, row["workspace_id"]).accounting(
+                row["actor_id"], row["draft_id"]
+            ),
+        }
+    )
+
+
 @router.post(
     "",
     response_model=MadeWorldDraftView,
@@ -335,6 +431,8 @@ def _draft_view(
 def start_world_draft(
     body: DraftWorldBody,
     connection: ReadOnlyConnection,
+    scoped: ScopedConnection,
+    request: Request,
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
     guest: Annotated[bool, Depends(holds_as_guest)],
@@ -351,66 +449,142 @@ def start_world_draft(
     ``kind_draft_limit`` with a ``Retry-After`` when the caller has started as many drafts this
     hour as one person may; 503 ``kind_draft_capacity`` with a ``Retry-After`` when the server
     runs as many drafts as it may. The three figures are the world draft policy's
-    budgets. A body over 16,384 bytes is refused 413 before it is read. Saved names are replaced
-    in the words before the job starts.
+    budgets. A body over 131,072 bytes, including quote metadata, is refused 413 before it is read.
+    Saved names are replaced in the words before the job starts.
     """
     workspace_id = session.workspace_id
+    key = body.idempotency_key or uuid.uuid4()
+    terms = terms_sha256(body.description, body.operation, body.maximum_usd)
+    repository = WorldDraftRepository(scoped, workspace_id)
+    prior = repository.by_request(session.actor, key)
+    if prior is not None:
+        try:
+            row = repository.get(session.actor, prior["draft_id"])
+        except WorldDraftRefused:
+            return _problem(
+                404, "world_draft_unknown", "That draft is no longer held for this person."
+            )
+        if row["terms_sha256"] != terms:
+            return _problem(409, "world_draft_key_reused", "That request key has different terms.")
+        return _durable_view(row, connection, services)
     no = _unstartable(services, connection, workspace_id, guest=guest)
     if no is not None:
         if no.raised is not None:
             raise no.raised
         return _problem(no.status, no.code, no.detail)
-    assert services.model_client is not None
-    sent = sendable(connection, workspace_id, body.description)
-
-    def readable() -> Any:
-        return services.readonly_database.session(workspace_id)
-
-    def opened() -> Any:
-        return services.database.session(workspace_id)
-
-    # Describing a world is no use a place-name right offers, so no grant reaches these requests;
-    # the policy opens its own connection for each judgement, since the request's is gone by then.
-    client = services.model_client.with_policy(
-        services.request_policy(workspace_id, readable, released_places=no_place_released)
-    )
-    try:
-        draft = services.kind_drafts.start(
-            workspace_id,
-            session.actor,
-            body.description,
-            functools.partial(
-                make_world,
-                client=client,
-                opened=opened,
-                actor=session.actor,
-                sent=sent,
-                store=services.store,
-                guest=guest,
-            ),
-            deadline=draft_deadline_seconds(client),
-            guest=guest,
-            purpose="world",
-        )
-    except KindDraftBusy as busy:
-        # The running draft's id is told only to the person who started it, and only where it is
-        # a world's: a kind's draft is read by the kinds' own route.
-        return _problem(409, "kind_draft_busy", str(busy), **busy.told_to(session.actor, "world"))
-    except KindDraftLimit as limit:
-        return _problem(
-            429,
-            "kind_draft_limit",
-            str(limit),
-            headers={"Retry-After": str(limit.retry_seconds)},
-        )
-    except KindDraftCapacity:
+    if services.spending is None:
         return _problem(
             503,
-            "kind_draft_capacity",
-            "The server is drafting as many worlds as it may. Try again in a moment.",
-            headers={"Retry-After": "30"},
+            "world_draft_spending_not_durable",
+            "Durable spending authority is required.",
         )
-    return _draft_view(draft, connection, services, services.kind_drafts.clock())
+    worker = getattr(request.app.state, "world_draft_worker", None)
+    thread = getattr(request.app.state, "world_draft_thread", None)
+    if worker is None or thread is None or not thread.is_alive() or services.kind_drafts.closing:
+        return _problem(
+            503,
+            "world_draft_worker_not_running",
+            "This host is not running its world draft worker.",
+        )
+    client = services.model_client
+    assert client is not None
+    try:
+        quote = confirm_operation(client, body.operation)
+        if body.maximum_usd is not None and Decimal(body.maximum_usd) < Decimal(
+            quote["maximum_usd"]
+        ):
+            raise WorldDraftOfferRefused("world_draft_bound_too_small")
+        native = services.kind_drafts.allowance(workspace_id, session.actor, guest=guest)
+        durable = repository.allowance(session.actor, native.starts_an_hour)
+        if durable["running_count"] >= services.kind_drafts._budget(
+            services.kind_drafts.per_workspace, "workspace_drafts_at_once"
+        ):
+            own = durable["running"]
+            extra = (
+                {"draft_id": str(own["draft_id"])}
+                if own is not None
+                and own["actor_id"] == session.actor
+                and own["purpose"] == "world"
+                else {"draft_id": str(native.running.draft_id)}
+                if native.running is not None
+                and native.running.actor == session.actor
+                and native.running.purpose == "world"
+                else {}
+            )
+            return _problem(409, "kind_draft_busy", "A draft is already running here.", **extra)
+        if durable["left"] == 0:
+            raise WorldDraftRefused("kind_draft_limit", durable["retry_after_seconds"])
+        now = datetime.now(UTC)
+        deadline = math.ceil(
+            sum(
+                attempts * client.worst_case_seconds(role)
+                for role, attempts in max(
+                    stages().values(),
+                    key=lambda rows: sum(
+                        attempts * client.worst_case_seconds(role) for role, attempts in rows
+                    ),
+                )
+            )
+            + draft_deadline_seconds(client)
+            + 120
+        )
+        definition = dict(
+            profile=DEFINITION_PROFILE,
+            quote=quote,
+            manifest_sha256=manifest_sha256(client),
+            deadline_seconds=deadline,
+            funding_valid_until=(now + timedelta(seconds=deadline + 120)).isoformat(),
+        )
+        ident = repository.submit(
+            actor=session.actor,
+            request_id=key,
+            description=body.description,
+            terms_sha256=terms,
+            definition=definition,
+            guest=guest,
+            starts_maximum=native.starts_an_hour,
+            workspace_maximum=services.kind_drafts._budget(
+                services.kind_drafts.per_workspace, "workspace_drafts_at_once"
+            ),
+        )
+        stored = repository.get(session.actor, ident)
+        definition = stored["definition"]
+        quote = definition["quote"]
+        try:
+            for provider in quote["providers"]:
+                bound = services.spending.open_bound(
+                    workspace_id,
+                    provider=provider["provider"],
+                    key=f"world-draft:{ident}:{provider['provider']}",
+                    ceiling_usd=Decimal(provider["ceiling_usd"]),
+                    max_calls=provider["max_calls"],
+                    valid_until=datetime.fromisoformat(definition["funding_valid_until"]),
+                    reason="A person confirmed this world draft operation.",
+                )
+                repository.attach_bound(session.actor, ident, provider["provider"], bound)
+            repository.enqueue(session.actor, ident)
+        except Exception:
+            repository.end_unstarted(session.actor, ident, "world_draft_funding_refused")
+            raise
+        worker = getattr(request.app.state, "world_draft_worker", None)
+        if worker is not None:
+            worker.notify(workspace_id)
+        return _durable_view(repository.get(session.actor, ident), connection, services)
+    except WorldDraftOfferRefused as failure:
+        return _problem(409, failure.code, "Read the operation sheet again before confirming.")
+    except WorldDraftRefused as failure:
+        return _problem(
+            404
+            if failure.code == "world_draft_unknown"
+            else 429
+            if failure.code == "kind_draft_limit"
+            else 409,
+            failure.code,
+            "The world draft was refused before another start.",
+            headers=None
+            if failure.retry_after_seconds is None
+            else {"Retry-After": str(failure.retry_after_seconds)},
+        )
 
 
 @router.get(
@@ -420,6 +594,7 @@ def start_world_draft(
 )
 def read_world_draft_offer(
     connection: ReadOnlyConnection,
+    request: Request,
     session: CurrentSession,
     held: HeldPermissions,
     services: Annotated[Services, Depends(get_services)],
@@ -434,8 +609,16 @@ def read_world_draft_offer(
     moment and is answered when a draft starts."""
     workspace_id = session.workspace_id
     allowance = services.kind_drafts.allowance(workspace_id, session.actor, guest=guest)
-    running = allowance.running
-    mine = running is not None and running.actor == session.actor and running.purpose == "world"
+    durable = WorldDraftRepository(connection, workspace_id).allowance(
+        session.actor, allowance.starts_an_hour
+    )
+    live = durable["running"]
+    own_running = (
+        live["draft_id"]
+        if live and live["actor_id"] == session.actor and live["purpose"] == "world"
+        else None
+    )
+    quote = None
     code: str | None
     detail: str | None
     if not services.kinds_from_people:
@@ -447,25 +630,50 @@ def read_world_draft_offer(
         no = _unstartable(services, connection, workspace_id, guest=guest)
         if no is not None:
             code, detail = no.code, no.detail
-        elif running is not None:
+        elif services.spending is None:
+            code, detail = (
+                "world_draft_spending_not_durable",
+                "Durable spending authority is required.",
+            )
+        elif durable["running_count"] >= services.kind_drafts._budget(
+            services.kind_drafts.per_workspace, "workspace_drafts_at_once"
+        ):
             code, detail = "kind_draft_busy", "A draft is already running in this workspace."
-        elif allowance.starts_left == 0:
+        elif durable["left"] == 0:
             code = "kind_draft_limit"
             detail = "As many drafts as one person may start in an hour were started."
         else:
-            code, detail = None, None
+            try:
+                quote = read_operation_sheet(services.model_client)
+                code, detail = None, None
+            except WorldDraftOfferRefused as failure:
+                code, detail = failure.code, "A current operation sheet is unavailable."
+    if code is None:
+        worker = getattr(request.app.state, "world_draft_worker", None)
+        thread = getattr(request.app.state, "world_draft_thread", None)
+        if (
+            worker is None
+            or thread is None
+            or not thread.is_alive()
+            or services.kind_drafts.closing
+        ):
+            code, detail = (
+                "world_draft_worker_not_running",
+                "This host is not running its world draft worker.",
+            )
     return WorldDraftOfferView(
         offered=code is None,
         code=code,
         detail=None if detail is None else sayable(detail),
-        calls_at_most=calls_at_most(),
+        calls_at_most=calls_at_most() if quote is None else quote["calls_at_most"],
+        operation=quote,
         starts=DraftStartsView(
             an_hour=allowance.starts_an_hour,
-            left=allowance.starts_left,
-            retry_after_seconds=allowance.retry_seconds,
+            left=durable["left"],
+            retry_after_seconds=durable["retry_after_seconds"],
         ),
         description_characters=DESCRIPTION_CHARACTERS,
-        running_draft_id=running.draft_id if mine and running is not None else None,
+        running_draft_id=own_running,
         refusals=_codes(),
     )
 
@@ -484,14 +692,10 @@ def read_world_draft(
     """The draft's state: choosing, drafting, making, ready with the saved world, or refused by
     name. 404 ``world_draft_unknown`` for an id the server holds for nobody here to read:
     another person's, another workspace's, a kind's draft, one a restart lost, or none."""
-    draft = services.kind_drafts.read(
-        session.workspace_id, session.actor, draft_id, purpose="world"
-    )
-    if draft is None:
+    try:
+        row = WorldDraftRepository(connection, session.workspace_id).get(session.actor, draft_id)
+    except WorldDraftRefused:
         return _problem(
-            404,
-            "world_draft_unknown",
-            "The server holds no draft of yours with this id. If it restarted while your world "
-            "was being drafted, look among your worlds, and say it again if it is not there.",
+            404, "world_draft_unknown", "The server holds no world draft for this person."
         )
-    return _draft_view(draft, connection, services, services.kind_drafts.clock())
+    return _durable_view(row, connection, services)

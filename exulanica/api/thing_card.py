@@ -38,7 +38,8 @@ from exulanica.world.thing_looks import (
     LookReference,
     ThingLookRefused,
     check_crossing_look,
-    look_choices,
+    effective_look,
+    resolve_look_reference,
 )
 from exulanica.world.thing_store import ThingStore, admitted_look_by_digest
 
@@ -109,7 +110,15 @@ def _card(
             connection, services, workspace_id, world_id, version_id, state, person, reader
         )
         made = _made_card(
-            connection, workspace_id, snapshot, person, decider, said=said, left_out=left_out
+            connection,
+            workspace_id,
+            snapshot,
+            person,
+            decider,
+            world_id=world_id,
+            version_id=version_id,
+            said=said,
+            left_out=left_out,
         )
         return made, held
     kind = shipped_kind(ThingKindReference(**held["kind"]))
@@ -166,6 +175,8 @@ def _made_card(
     person: Mapping[str, Any],
     decider: Mapping[str, Any],
     *,
+    world_id: str,
+    version_id: uuid.UUID,
     said: Sequence[Mapping[str, Any]],
     left_out: int,
 ) -> dict[str, Any]:
@@ -174,7 +185,7 @@ def _made_card(
     What it can do, where it is, what it holds, who decides for it and what it said are the
     society's, read from the run form its state carries, as for any being. What it is called is
     the workspace's: the label and summary its maker's words gave it, the open model that drafted
-    it and the sketch it wears are read here from the workspace's store by the digest the state
+    it and its admitted look are read here from the workspace's store by the digest the state
     names, on the caller's connection, and never from the society. Where the workspace no longer
     holds the kind (the creature was erased; the being leaves with the society's next minute) the
     card says so and names it only by its body, as the society does."""
@@ -185,7 +196,6 @@ def _made_card(
     hands = recorded_row(runs, "hands") is not None
     kept = ThingStore(connection, workspace_id, None).kind_by_digest(sha256)
     drafted_by = None
-    sketch = None
     if kept is not None:
         by = (kept.document["origin"] or {}).get("by") or {}
         if by.get("kind") == "model":
@@ -194,30 +204,28 @@ def _made_card(
                 "model_id": by["model_id"],
                 "name": load_manifest().model_name(str(by["model_id"])),
             }
-        first = next(iter(kept.document["looks"]), None)
-        if first is not None:
-            sketch = admitted_look_by_digest(connection, workspace_id, first["sha256"])
+    effective = effective_look(
+        connection,
+        workspace_id,
+        world_id,
+        version_id,
+        str(person["id"]),
+        kept,
+        workspace_kind=True,
+    )
+    sketch = None if effective is None else effective.look
     look: dict[str, Any] | None = None
-    looks: list[dict[str, Any]] = []
+    looks = [] if kept is None else _looks(connection, workspace_id, kept)
+    chosen_by_owner = effective is not None and effective.chosen_by_owner
     if sketch is not None:
         look = {
             "source": "workspace",
             "sha256": sketch.sha256,
             "label": sketch.label,
             "look_kind_words": _look_kind_words().get(sketch.look_kind),
-            "chosen_by_owner": False,
+            "chosen_by_owner": chosen_by_owner,
             "origin": sketch.document.get("origin"),
         }
-        looks = [
-            {
-                "source": "workspace",
-                "sha256": sketch.sha256,
-                "label": sketch.label,
-                "licence": _licence(sketch),
-                "authors": list((sketch.document.get("origin") or {}).get("authors", ())),
-                "preview": None,
-            }
-        ]
     return {
         "profile": THING_CARD_PROFILE,
         "thing_id": person["id"],
@@ -274,11 +282,11 @@ def choose_look(
     look: Mapping[str, Any],
     actor: uuid.UUID,
 ) -> dict[str, Any]:
-    """Record the world's owner's choice of a shipped ``look`` for ``thing_id``, one whose body plan
-    is its kind's (:class:`~exulanica.world.thing_looks.ThingLookRefused` otherwise), appended to
-    the look table and nothing else; answer the card as read before it with only the look it wears
-    replaced. The caller's transaction holds the workspace's lock from the card's first read, so
-    nothing else on the card can change before the answer."""
+    """Record the world's owner's choice of an admitted or shipped ``look`` for ``thing_id``,
+    one whose body plan is its kind's (:class:`~exulanica.world.thing_looks.ThingLookRefused`
+    otherwise), appended to the look table and nothing else. Answer the card with only its
+    worn look replaced. The caller holds the workspace lock throughout the read and choice,
+    so nothing else on the card can change before the answer."""
     card, held = _card(
         connection,
         services,
@@ -290,29 +298,44 @@ def choose_look(
         reader=actor,
     )
     if card["kind"].get("source") == "workspace":
-        # A creature its workspace keeps wears its sketch, its only look, until another is made.
-        raise ThingLookRefused(
-            "look_unfit", "a creature made from words wears only its sketch: no other look is made"
+        store = ThingStore(connection, workspace_id, None)
+        kind = store.kind_by_digest(card["kind"]["sha256"])
+        if set(look) != {"source", "sha256"} or look["source"] != "workspace":
+            raise ThingLookRefused("look_unfit", "a custom body wears admitted workspace looks")
+        candidate = admitted_look_by_digest(connection, workspace_id, str(look["sha256"]))
+        plan = None if kind is None else store.plan(kind.plan)
+        if kind is None or plan is None or not plan.bones:
+            raise ThingLookRefused(
+                "look_unfit", "this workspace holds no dressable body for the kind"
+            )
+        if candidate is None:
+            raise ThingLookRefused(
+                "look_not_shipped", "this workspace keeps no admitted look at that digest"
+            )
+        if candidate.body_plan != kind.plan:
+            raise ThingLookRefused("look_unfit", "the admitted look does not fit this body's plan")
+        chosen = LookReference(None, None, candidate.sha256, "workspace")
+    else:
+        chosen = check_crossing_look(
+            {key: card["kind"][key] for key in ("kind", "version", "sha256")},
+            look,
+            connection=connection,
+            workspace_id=workspace_id,
         )
-    chosen = check_crossing_look(
-        {key: card["kind"][key] for key in ("kind", "version", "sha256")},
-        look,
-        connection=connection,
-        workspace_id=workspace_id,
-    )
-    kind = shipped_kind(
-        ThingKindReference(**{k: card["kind"][k] for k in ("kind", "version", "sha256")})
-    )
-    if chosen.source == "workspace":
-        plan = thing_catalogs().plan(kind.plan)
-        if plan is None or not plan.bones:
+        kind = shipped_kind(
+            ThingKindReference(**{k: card["kind"][k] for k in ("kind", "version", "sha256")})
+        )
+        if chosen.source == "workspace":
+            plan = thing_catalogs().plan(kind.plan)
+            if plan is None or not plan.bones:
+                raise ThingLookRefused(
+                    "look_unfit",
+                    f"a {kind.kind} wears only its own looks: it has no bones to dress",
+                )
+        elif not _fits(kind, shipped_looks()[(chosen.look, chosen.version)]):
             raise ThingLookRefused(
                 "look_unfit", f"a {kind.kind} wears only its own looks: it has no bones to dress"
             )
-    elif not _fits(kind, shipped_looks()[(chosen.look, chosen.version)]):
-        raise ThingLookRefused(
-            "look_unfit", f"a {kind.kind} wears only its own looks: it has no bones to dress"
-        )
     placed = held.get("placed_id")
     connection.execute(
         "insert into world_thing_look(workspace_id,world_id,version_id,thing_id,placed_id,look,"
@@ -472,29 +495,11 @@ def _worn(
     version_id: uuid.UUID,
     thing_id: str,
     kind: Any,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     """The look the thing wears: the latest chosen for it that it may still wear (a shipped look,
     or one the workspace keeps, by its digest), else its kind's first."""
-    choices = look_choices(connection, workspace_id, world_id, version_id, thing_id=thing_id)
-    chosen = next(
-        (
-            row
-            for row in (*choices["looks"], *choices.get("workspace_looks", ()))
-            if row["thing_id"] == thing_id
-        ),
-        None,
-    )
-    if chosen is None:
-        return _look_entry(connection, workspace_id, None, kind, owner=False)
-    if chosen["look"].get("source") == "workspace":
-        reference = LookReference(None, None, chosen["look"]["sha256"], "workspace")
-    else:
-        reference = LookReference(
-            chosen["look"]["look"], chosen["look"]["version"], chosen["look"]["sha256"]
-        )
-    return _look_entry(
-        connection, workspace_id, reference, kind, owner=chosen["chosen_by"] == "owner"
-    )
+    resolved = effective_look(connection, workspace_id, world_id, version_id, thing_id, kind)
+    return _resolved_entry(resolved)
 
 
 def _look_entry(
@@ -504,30 +509,23 @@ def _look_entry(
     kind: Any,
     *,
     owner: bool,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     """The card's entry for a look the thing wears: ``reference``, or, where it is None or names a
     look no longer served (a shipped look a release dropped, or one the workspace withdrew since
     it was chosen), the kind's first look, not chosen by the owner."""
-    look = None
-    if reference is not None:
-        look = (
-            admitted_look_by_digest(connection, workspace_id, reference.sha256)
-            if reference.source == "workspace"
-            else shipped_looks().get((reference.look, reference.version))
-        )
-        if look is not None and look.sha256 != reference.sha256:
-            look = None
-    if look is None:
-        first = kind.document["looks"][0]
-        reference = LookReference(first["look"], first["version"], first["sha256"])
-        look = shipped_looks()[(reference.look, reference.version)]
-        owner = False
-    assert reference is not None
+    resolved = resolve_look_reference(connection, workspace_id, reference, kind, owner=owner)
+    return _resolved_entry(resolved)
+
+
+def _resolved_entry(resolved: Any) -> dict[str, Any] | None:
+    if resolved is None:
+        return None
+    look = resolved.look
     return {
-        **reference.document(),
+        **resolved.reference.document(),
         "label": look.label,
         "look_kind_words": _look_kind_words().get(look.look_kind),
-        "chosen_by_owner": owner,
+        "chosen_by_owner": resolved.chosen_by_owner,
         "origin": look.document.get("origin"),
     }
 
@@ -569,6 +567,9 @@ def _looks(
     for a body with bones, each the workspace keeps and has not withdrawn made for its body plan,
     by its digest alone."""
     plan = thing_catalogs().plan(kind.plan)
+    store = ThingStore(connection, workspace_id, None)
+    if plan is None:
+        plan = store.plan(kind.plan)
     own = (
         [
             {
@@ -579,7 +580,7 @@ def _looks(
                 "authors": list((look.document.get("origin") or {}).get("authors", ())),
                 "preview": None,
             }
-            for look in ThingStore(connection, workspace_id, None).looks_held()
+            for look in store.looks_held()
             if look.body_plan == kind.plan
         ]
         if plan is not None and plan.bones

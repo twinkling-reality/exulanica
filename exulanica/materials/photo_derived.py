@@ -1,10 +1,11 @@
 """A recipe a model derived from a person's photographs: data that cannot exist without rights.
 
-This is the object a future inverse model (``ml/``) will emit: a recipe, the model that read the
-photographs, where the photographs went to be read, and, for each photograph, the personal model
-right that allowed it. It is inert today. Nothing in this repository constructs one from a
-photograph, no function here takes pixels or a capture, and ``material_recipe`` refuses a
-``photo_derived`` row until the migration after 0073 replaces its two refusal triggers.
+The object is a recipe, the model that read the photographs, where the photographs went to be
+read, and, for each photograph, the personal model right that allowed it. Nothing in this
+repository constructs one from a photograph, and no function here takes pixels or a capture.
+:meth:`exulanica.world.material_recipes.MaterialRepository.create_recipe` refuses a
+``photo_derived`` origin, and migration 0066's ``tg_material_recipe_awaits_model_right`` refuses
+the row whatever writes it.
 
 **It has the personal model right's shape, as plain data.** A right (migration 0073,
 ``exulanica.ingest.model_rights``) names one capture, one model and one destination. So this
@@ -22,11 +23,9 @@ this destination, and has not been withdrawn is asked at the boundary, by the wo
 writes the recipe, through ``require_model_right``, never here. What this object guarantees is
 that it cannot be built without naming a right for every photograph it was read from.
 
-**A checkpoint this project trains cannot be named yet.** A right pins a local checkpoint to a
-full 40-character commit, and the weights ``ml/`` trains have no commit. They will be pinned by
-content, a revision spelled ``sha256:`` and the 64-character digest of the weights, with the
-training receipt as their provenance. That form arrives with the first trained checkpoint, in a
-migration and in the personal model right's code together, and not here first.
+**A trained checkpoint cannot be named here.** A personal model right pins a local checkpoint
+to a full 40-character commit, and the weights ``ml/`` trains have no commit. A content-digest
+pin would be a change to that right and to a migration together. This module does not add it.
 """
 
 from __future__ import annotations

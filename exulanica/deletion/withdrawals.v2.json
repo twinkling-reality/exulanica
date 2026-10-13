@@ -1,7 +1,113 @@
 {
   "profile": "exulanica.restore-withdrawal-catalog/v2",
-  "note": "Every withdrawal a person can make that lives outside the tombstone table, which a restore from an older backup would otherwise undo. A restore checkpoint of profile exulanica.restore-tombstone-checkpoint/v2 carries each row this names, and replay writes each one again into the restored database, before any tombstone, by the same statement the product writes: a column kind sets the columns a withdrawal sets on a row whose withdrawal is still open, and an event kind appends the withdrawal's own row. `withdrawn` is the condition a withdrawn row meets; `carried_when` narrows it; `workspace` names the column that says which workspace a row belongs to, or null for a row no workspace owns. A condition with `of` tests a column of the row the carried row names in another table, joined on the `on` columns. An event kind's `ends` names the rows the withdrawal ends, and `order` the column that orders a chain of decisions; a column kind's `order` is the column its rows are replayed by, earliest first, so a later withdrawal's cascade finds what an earlier one already ended. `writer` names the product's own writer that writes the carried row, where a row alone is not the whole withdrawal; `continues` names the writer that continues a chain whose restored last decision the carried row cannot follow, because a decision was made after the backup. Both are names of the writers the restore command gives replay (WRITERS in exulanica/orchestration/restore.py); replay refuses, when it starts and before it writes anything, writers other than exactly the names this catalog uses (require_writers in exulanica/deletion/withdrawals.py). An event kind whose `absent` is `carry` has its row written even when the restored database holds nothing it ends, because the installation makes what it ends again after a restore (a published catalog from the image), and a row the backup lacks would otherwise come back current; without it, nothing is written for an absent end. `excluded` names every other withdrawal-shaped table or column in the schema and why it is not carried; tests/test_restore_replay_withdrawal_catalog.py fails on any the catalog neither carries nor excludes.",
+  "note": "Every withdrawal a person can make that lives outside the tombstone table, which a restore from an older backup would otherwise undo. A restore checkpoint of profile exulanica.restore-tombstone-checkpoint/v2 carries each row this names, and replay writes each one again into the restored database, before any tombstone, by the same statement the product writes: a column kind sets the columns a withdrawal sets on a row whose withdrawal is still open, and an event kind appends the withdrawal's own row. `withdrawn` is the condition a withdrawn row meets; `carried_when` narrows it; `workspace` names the column that says which workspace a row belongs to, or null for a row no workspace owns. A condition with `of` tests a column of the row the carried row names in another table, joined on the `on` columns. An event kind's `ends` names the rows the withdrawal ends, and `order` the column that orders a chain of decisions; a column kind's `order` is the column its rows are replayed by, earliest first, so a later withdrawal's cascade finds what an earlier one already ended. `writer` names the product's own writer that writes the carried row, where a row alone is not the whole withdrawal; `continues` names the writer that continues a chain whose restored last decision the carried row cannot follow, because a decision was made after the backup. Both are names of the writers the restore command gives replay (WRITERS in exulanica/orchestration/restore.py); replay refuses, when it starts and before it writes anything, writers other than exactly the names this catalog uses (require_writers in exulanica/deletion/withdrawals.py). An event kind whose `absent` is `carry` has its row written even when the restored database holds nothing it ends, because the row retires an identity or retains a recovery obligation that must survive even when the backup predates it; without it, nothing is written for an absent end. `decimal_columns` names numeric columns projected as exact decimal strings so checkpoint digests and replay never pass financial values through binary floating point. `excluded` names every other withdrawal-shaped table or column in the schema and why it is not carried; tests/test_restore_replay_withdrawal_catalog.py fails on any the catalog neither carries nor excludes.",
   "kinds": [
+    {
+      "kind": "piece_erasure_obligation",
+      "table": "piece_erasure_settlement",
+      "shape": "event",
+      "decimal_columns": ["worst_case_usd", "usd"],
+      "note": "An immutable content-free obligation to withdraw a removed request from its generation batch and settle its reserved spend. Kept before progress and world erasures so restore preserves the original measured decision even when the request is absent.",
+      "identity": [
+        "workspace_id",
+        "piece_request_id"
+      ],
+      "withdrawn": {
+        "column": "recorded_at",
+        "is": "not null"
+      },
+      "workspace": "workspace_id",
+      "ends": {
+        "table": "piece_request",
+        "columns": [
+          "workspace_id",
+          "piece_request_id"
+        ]
+      },
+      "absent": "carry",
+      "order": null
+    },
+    {
+      "kind": "piece_erasure_withdrawn",
+      "table": "piece_erasure_settlement_event",
+      "shape": "event",
+      "decimal_columns": ["usd"],
+      "note": "An immutable generation-erasure recovery receipt. Withdrawal, decision and settlement are replayed in that order after their retained obligation.",
+      "identity": [
+        "workspace_id",
+        "piece_request_id",
+        "kind"
+      ],
+      "withdrawn": {
+        "column": "kind",
+        "in": [
+          "withdrawn"
+        ]
+      },
+      "workspace": "workspace_id",
+      "ends": {
+        "table": "piece_erasure_settlement",
+        "columns": [
+          "workspace_id",
+          "piece_request_id"
+        ]
+      },
+      "order": null
+    },
+    {
+      "kind": "piece_erasure_decided",
+      "table": "piece_erasure_settlement_event",
+      "shape": "event",
+      "decimal_columns": ["usd"],
+      "note": "An immutable generation-erasure recovery receipt. Withdrawal, decision and settlement are replayed in that order after their retained obligation.",
+      "identity": [
+        "workspace_id",
+        "piece_request_id",
+        "kind"
+      ],
+      "withdrawn": {
+        "column": "kind",
+        "in": [
+          "decided"
+        ]
+      },
+      "workspace": "workspace_id",
+      "ends": {
+        "table": "piece_erasure_settlement",
+        "columns": [
+          "workspace_id",
+          "piece_request_id"
+        ]
+      },
+      "order": null
+    },
+    {
+      "kind": "piece_erasure_settled",
+      "table": "piece_erasure_settlement_event",
+      "shape": "event",
+      "decimal_columns": ["usd"],
+      "note": "An immutable generation-erasure recovery receipt. Withdrawal, decision and settlement are replayed in that order after their retained obligation.",
+      "identity": [
+        "workspace_id",
+        "piece_request_id",
+        "kind"
+      ],
+      "withdrawn": {
+        "column": "kind",
+        "in": [
+          "settled"
+        ]
+      },
+      "workspace": "workspace_id",
+      "ends": {
+        "table": "piece_erasure_settlement",
+        "columns": [
+          "workspace_id",
+          "piece_request_id"
+        ]
+      },
+      "order": null
+    },
     {
       "kind": "model_right",
       "table": "personal_model_right",
@@ -29,7 +135,8 @@
       "columns": ["withdrawn_at"],
       "withdrawn": {"column": "withdrawn_at", "is": "not null"},
       "workspace": "workspace_id",
-      "order": "withdrawn_at"
+      "order": "withdrawn_at",
+      "removed_by": ["world_erasure_of_project_share"]
     },
     {
       "kind": "project_context_item",
@@ -41,7 +148,8 @@
       "withdrawn": {"column": "status", "in": ["withdrawn"]},
       "carried_when": [{"column": "withdrawn_by", "is": "null"}],
       "workspace": "workspace_id",
-      "order": "withdrawn_at"
+      "order": "withdrawn_at",
+      "removed_by": ["world_erasure_of_project_item"]
     },
     {
       "kind": "project_context_project",
@@ -53,7 +161,8 @@
       "withdrawn": {"column": "withdrawn_at", "is": "not null"},
       "carried_when": [{"column": "withdrawn_by", "is": "null"}],
       "workspace": "workspace_id",
-      "order": "withdrawn_at"
+      "order": "withdrawn_at",
+      "removed_by": ["world_erasure_of_project"]
     },
     {
       "kind": "companion_memory",
@@ -225,6 +334,30 @@
       "order": null
     },
     {
+      "kind": "world_erasure",
+      "table": "world_erasure",
+      "shape": "event",
+      "note": "Permanent generated-world removal, with no typed content. Carried even when the backup predates creation so removed identifiers and creation budget remain retired.",
+      "identity": ["workspace_id", "erasure_id"],
+      "withdrawn": {"column": "erased_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "world_identity", "columns": ["workspace_id", "world_id"]},
+      "absent": "carry",
+      "order": null
+    },
+    {
+      "kind": "world_kind_erasure",
+      "table": "world_kind_erasure",
+      "shape": "event",
+      "note": "Permanent retirement of an unused kept world-kind version. Content and key fingerprints remain for restore, not anonymization. Replay after world erasures removes receipts before checking uses; carry even before the kind existed.",
+      "identity": ["workspace_id", "erasure_id"],
+      "withdrawn": {"column": "erased_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "world_kind_version", "columns": ["workspace_id", "document_sha256"]},
+      "absent": "carry",
+      "order": null
+    },
+    {
       "kind": "retraction",
       "table": "retraction",
       "shape": "event",
@@ -282,7 +415,8 @@
       "withdrawn": {"column": "revoked_at", "is": "not null"},
       "workspace": "workspace_id",
       "ends": {"table": "door_grant", "columns": ["workspace_id", "grant_id"]},
-      "order": null
+      "order": null,
+      "removed_by": ["world_erasure_of_door_grant"]
     },
     {
       "kind": "door_secret",
@@ -292,7 +426,8 @@
       "identity": ["workspace_id", "secret_sha256"],
       "columns": ["revoked_at"],
       "withdrawn": {"column": "revoked_at", "is": "not null"},
-      "workspace": "workspace_id"
+      "workspace": "workspace_id",
+      "removed_by": ["world_erasure_of_door_secret"]
     },
     {
       "kind": "workspace_style_pack",
@@ -305,6 +440,41 @@
       "ends": {"table": "workspace_style_pack_version", "columns": ["workspace_id", "manifest_sha256"]},
       "order": "withdrawn_at",
       "writer": "style_pack_withdrawal"
+    },
+    {
+      "kind": "world_grant",
+      "table": "world_grant_revocation",
+      "shape": "event",
+      "note": "A creator permanently ending a human invitation. Restore replays the withdrawal; world and workspace erasure remove it with its grant.",
+      "identity": ["workspace_id", "grant_id"],
+      "withdrawn": {"column": "revoked_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "world_grant", "columns": ["workspace_id", "grant_id"]},
+      "order": null,
+      "removed_by": ["world_erasure_of_world_grant"]
+    },
+    {
+      "kind": "world_grant_departure",
+      "table": "world_grant_departure",
+      "shape": "event",
+      "note": "A visitor permanently leaving an invitation. Its trigger erases the principal binding and entry, including during restore replay.",
+      "identity": ["workspace_id", "grant_id"],
+      "withdrawn": {"column": "departed_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "world_grant", "columns": ["workspace_id", "grant_id"]},
+      "order": null,
+      "removed_by": ["world_erasure_of_world_grant_departure"]
+    },
+    {
+      "kind": "world_grant_entry",
+      "table": "world_grant_entry",
+      "shape": "column",
+      "note": "Revocation closes an invitation's entry in the same transaction. Backup sets exclude entries, so restored grants cannot authorize any visitor.",
+      "identity": ["workspace_id", "grant_id"],
+      "columns": ["revoked_at"],
+      "withdrawn": {"column": "revoked_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "removed_by": ["world_erasure_of_world_grant_entry", "departure_of_world_grant_entry"]
     }
   ],
   "excluded": [
@@ -343,6 +513,10 @@
     {
       "table": "workspace_preparation",
       "reason": "failure_class 'withdrawn' is written by the asset withdrawal's own trigger, which replaying the withdrawal runs again."
+    },
+    {
+      "table": "creature_draft",
+      "reason": "reference_usage code 'reference_withdrawn' records the worker's derived decision not to use reference notes, not a separate withdrawal or permission. The model_right kind carries the underlying picture right's stop, and tombstones are replayed. A restored draft rereads reference availability and current picture-use authority before dispatch and keep; replayed stops prevent selected-picture execution without replaying this use receipt (migrations 0203 and 0205). Historical web-only drafts may continue without unavailable notes."
     },
     {
       "table": "reference_request",

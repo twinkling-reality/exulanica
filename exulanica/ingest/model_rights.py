@@ -43,10 +43,11 @@ from __future__ import annotations
 import datetime as dt
 import re
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
+from psycopg.errors import UniqueViolation
 from psycopg.types.json import Jsonb
 
 from exulanica.canonical import canonical_json, sha256_digest
@@ -243,13 +244,16 @@ def grant_model_right(
     purpose: str,
     valid_until: dt.datetime,
     granted_at: dt.datetime | None = None,
+    use_context: Mapping[str, Any] | None = None,
 ) -> ModelRightRow:
     """Record that ``granted_by`` lets ``identity`` process these exact bytes at ``destination``.
 
     The grantor must be the account holder named by the personal authority ``authorization_id``,
     which must be over this capture's exact bytes and current at ``granted_at``; the database
     refuses anything else as well. The term ends at ``valid_until`` and the right lapses earlier if
-    that authority does. Recording the same grant twice returns the existing right.
+    that authority does. The default path returns an identical existing grant. ``use_context``
+    requests a fresh atomic creature-note consent binding; an existing right is refused, never
+    reinterpreted, and callers can use the admission route's request ID for retries.
     """
     if not isinstance(identity, ModelIdentity):
         raise TypeError("a model right names a ModelIdentity")
@@ -319,33 +323,45 @@ def grant_model_right(
     right_id = uuid.uuid5(
         _RIGHT_NAMESPACE, f"{repository.workspace_id}:{capture_id}:{digest.hex()}"
     )
-    connection.execute(
-        "insert into personal_model_right (workspace_id,right_id,capture_id,source_sha256,"
-        "authorization_id,operation,model_provider,model_role,model_id,model_revision,"
-        "destination,purpose,granted_by,granted_at,valid_until,receipt_record,"
-        "receipt_canonical,receipt_sha256) "
-        "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) on conflict do nothing",
-        (
-            repository.workspace_id,
-            right_id,
-            capture_id,
-            capture.blob_id.digest,
-            authorization_id,
-            MODEL_PROCESSING,
-            identity.provider,
-            identity.role,
-            identity.model_id,
-            identity.revision,
-            destination,
-            purpose,
-            granted_by,
-            at,
-            until,
-            Jsonb(record),
-            canonical,
-            digest,
-        ),
-    )
+    if use_context is not None:
+        try:
+            connection.execute(
+                "select grant_creature_note_model_right(%s,%s,%s,%s)",
+                (repository.workspace_id, right_id, Jsonb(record), Jsonb(dict(use_context))),
+            )
+        except UniqueViolation as exc:
+            raise PrivacyAdmissionError(
+                "creature picture-note consent requires a fresh right; retry with the admission "
+                "request ID or grant at a new time"
+            ) from exc
+    else:
+        connection.execute(
+            "insert into personal_model_right (workspace_id,right_id,capture_id,source_sha256,"
+            "authorization_id,operation,model_provider,model_role,model_id,model_revision,"
+            "destination,purpose,granted_by,granted_at,valid_until,receipt_record,"
+            "receipt_canonical,receipt_sha256) "
+            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) on conflict do nothing",
+            (
+                repository.workspace_id,
+                right_id,
+                capture_id,
+                capture.blob_id.digest,
+                authorization_id,
+                MODEL_PROCESSING,
+                identity.provider,
+                identity.role,
+                identity.model_id,
+                identity.revision,
+                destination,
+                purpose,
+                granted_by,
+                at,
+                until,
+                Jsonb(record),
+                canonical,
+                digest,
+            ),
+        )
     stored = model_right(repository, right_id)
     if stored is None or stored.receipt_sha256 != digest:
         raise ValueError("an existing model right disagrees with this receipt")

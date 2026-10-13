@@ -1,0 +1,3 @@
+Retired world-erasure reservation. Its foundation follows the model and acting-permission
+migrations as 0195; 0192 remains intentionally unused so an upgrade never installs that
+foundation before its already published prerequisites. Do not reuse this number.

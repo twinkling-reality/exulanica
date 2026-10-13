@@ -159,7 +159,7 @@ describe('choosing between saved worlds', () => {
   it('shows a returning user a plain world name without internal identifiers', () => {
     const text = surface([entry()]).textContent ?? '';
     expect(text).toContain('Family garden');
-    expect(text).toContain('saved changes and appearance');
+    expect(text).not.toContain('saved changes and appearance');
     expect(text).not.toContain('world:family-garden');
     expect(text).not.toContain('22222222');
   });

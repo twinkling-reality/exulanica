@@ -241,6 +241,12 @@ def model_goal_policies(
         taken_into[promise.partner_id] = (subject, promise)
     if runs_follow(state):
         _follow_policies(state, document, policies, promised, directed, applied, chosen_kinds)
+    from exulanica.world.society_resident_day import runs_day
+
+    if runs_day(state):
+        residents = {p["id"] for p in state["inhabitants"] if "day" in p}
+        for subject in applied & residents:
+            policies.setdefault(subject, {"allowed_target_ids": [], "day_keep": True})
     dispositions = tuple(
         DecisionDisposition(
             decision_seq=receipt["decision_seq"],

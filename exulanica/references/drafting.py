@@ -39,16 +39,21 @@ from exulanica.references.notes import MAX_NOTE_CHARACTERS, DraftedNote
 __all__ = [
     "DRAFTING_ROLE",
     "PROMPT_PATH",
+    "THINGS_PROMPT_PATH",
     "WITHOUT_PICTURE_DESCRIPTIONS",
     "Drafted",
     "ReferencePrompts",
+    "catalogs_for_prompts",
     "plan_subjects",
+    "prompts_for_request",
     "read_notes",
     "reference_prompts",
 ]
 
 DRAFTING_ROLE: Final = Role.REFERENCE_DRAFTING
 PROMPT_PATH: Final = Path(__file__).with_name("reference-prompts.v1.json")
+THINGS_PROMPT_PATH: Final = Path(__file__).with_name("reference-prompts.v3.json")
+THINGS_PICTURE_PROMPT_PATH: Final = Path(__file__).with_name("reference-prompts.v4.json")
 _PROFILE: Final = "exulanica.reference-prompts/v1"
 #: Answer ceilings. 640 is the structured_extraction chain's floor: its models reason before
 #: they answer (the manifest's min_max_tokens), and three short subjects fit well within it.
@@ -114,6 +119,33 @@ def reference_prompts(path: Path = PROMPT_PATH) -> ReferencePrompts:
         description_characters_maximum=int(document["description_characters_maximum"]),
         picture=str(picture["instructions"]),
         picture_notes_maximum=int(picture["notes_maximum"]),
+    )
+
+
+def prompts_for_request(
+    purpose: str, sha256: str | None = None, *, pictures: bool = False
+) -> ReferencePrompts:
+    """Select a new request's words, or resolve exactly the words an existing request pinned.
+
+    A missing version fails before provider admission; it never silently uses newer words.
+    Selected things pictures use their own words; historical digests resolve unchanged.
+    """
+    legacy = reference_prompts()
+    things = reference_prompts(THINGS_PROMPT_PATH)
+    picture_words = reference_prompts(THINGS_PICTURE_PROMPT_PATH)
+    if sha256 is None:
+        return (picture_words if pictures else things) if purpose == "things" else legacy
+    for candidate in (legacy, things, picture_words) if purpose == "things" else (legacy,):
+        if candidate.sha256 == sha256:
+            return candidate
+    raise ValueError("reference_prompts_unavailable")
+
+
+def catalogs_for_prompts(prompts: ReferencePrompts) -> ReferenceCatalogs:
+    """The closed vocabulary belonging to a supported set of reference words."""
+    return load_reference_catalogs(
+        aspect_version=2 if prompts.version in (3, 4) else 1,
+        picture_version=2 if prompts.version == 4 else 1,
     )
 
 

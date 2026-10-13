@@ -141,6 +141,8 @@ class WithdrawalKind:
     carry_absent: bool = False
     #: The carried removals whose replay deletes rows of this table (:data:`REMOVALS`), by name.
     removed_by: tuple[str, ...] = ()
+    #: Exact SQL numeric values are checkpointed as decimal strings, never JSON floats.
+    decimal_columns: tuple[str, ...] = ()
 
     def carried(self, alias: str) -> sql.Composable:
         """The rows a checkpoint carries: withdrawn, and whatever else the catalog requires."""
@@ -196,6 +198,32 @@ Writer = Callable[[psycopg.Connection[Any], Mapping[str, Any]], None]
 #: checkpoint lacks is then no sign of an older checkpoint: the source deleted it, and the replay
 #: deletes it again.
 REMOVALS: Final[Mapping[str, tuple[str, sql.Composable]]] = {
+    "departure_of_world_grant_entry": (
+        "world_grant_entry",
+        sql.SQL(
+            "exists (select 1 from jsonb_array_elements(%(world_grant_departures)s) d "
+            "where (d->>'workspace_id')::uuid=t.workspace_id "
+            "and (d->>'grant_id')::uuid=t.grant_id)"
+        ),
+    ),
+    **{
+        name: (
+            table,
+            sql.SQL(
+                "exists (select 1 from jsonb_array_elements(%(world_erasures)s) e "
+                "where (e->>'workspace_id')::uuid=t.workspace_id and e->>'world_id' = "
+                "(select g.world_id from world_grant g where g.workspace_id=t.workspace_id "
+                "and g.grant_id=t.grant_id)) "
+                "or exists (select 1 from jsonb_array_elements(%(tombstones)s) tb "
+                "where (tb->>'workspace_id')::uuid=t.workspace_id and tb->>'scope'='workspace')"
+            ),
+        )
+        for name, table in (
+            ("world_erasure_of_world_grant", "world_grant_revocation"),
+            ("world_erasure_of_world_grant_departure", "world_grant_departure"),
+            ("world_erasure_of_world_grant_entry", "world_grant_entry"),
+        )
+    },
     # A workspace tombstone erases every creature and look of its workspace (migration 0172).
     "workspace_tombstone": (
         "look_withdrawal",
@@ -215,6 +243,59 @@ REMOVALS: Final[Mapping[str, tuple[str, sql.Composable]]] = {
             "join jsonb_array_elements(%(erasures)s) e "
             "on (e->>'workspace_id')::uuid = k.workspace_id and e->>'sha256' = k.sha256 "
             "where l.workspace_id = t.workspace_id and l.key = t.key and l.version = t.version)"
+        ),
+    ),
+    "world_erasure_of_project_share": (
+        "world_project_share",
+        sql.SQL(
+            "exists (select 1 from jsonb_array_elements(%(world_erasures)s) e "
+            "where (e->>'workspace_id')::uuid=t.workspace_id and e->>'world_id' = "
+            "(select p.world_id from world_project p where p.workspace_id=t.workspace_id "
+            "and p.project_id=t.project_id)) "
+            "or exists (select 1 from jsonb_array_elements(%(tombstones)s) tb "
+            "where (tb->>'workspace_id')::uuid=t.workspace_id and tb->>'scope'='workspace')"
+        ),
+    ),
+    "world_erasure_of_project_item": (
+        "world_project_item",
+        sql.SQL(
+            "exists (select 1 from jsonb_array_elements(%(world_erasures)s) e "
+            "where (e->>'workspace_id')::uuid=t.workspace_id and e->>'world_id' = "
+            "t.world_id) "
+            "or exists (select 1 from jsonb_array_elements(%(tombstones)s) tb "
+            "where (tb->>'workspace_id')::uuid=t.workspace_id and tb->>'scope'='workspace')"
+        ),
+    ),
+    "world_erasure_of_project": (
+        "world_project",
+        sql.SQL(
+            "exists (select 1 from jsonb_array_elements(%(world_erasures)s) e "
+            "where (e->>'workspace_id')::uuid=t.workspace_id and e->>'world_id' = "
+            "t.world_id) "
+            "or exists (select 1 from jsonb_array_elements(%(tombstones)s) tb "
+            "where (tb->>'workspace_id')::uuid=t.workspace_id and tb->>'scope'='workspace')"
+        ),
+    ),
+    "world_erasure_of_door_grant": (
+        "door_grant_revocation",
+        sql.SQL(
+            "exists (select 1 from jsonb_array_elements(%(world_erasures)s) e "
+            "where (e->>'workspace_id')::uuid=t.workspace_id and e->>'world_id' = "
+            "(select g.world_id from door_grant g where g.workspace_id=t.workspace_id "
+            "and g.grant_id=t.grant_id)) "
+            "or exists (select 1 from jsonb_array_elements(%(tombstones)s) tb "
+            "where (tb->>'workspace_id')::uuid=t.workspace_id and tb->>'scope'='workspace')"
+        ),
+    ),
+    "world_erasure_of_door_secret": (
+        "door_secret",
+        sql.SQL(
+            "exists (select 1 from jsonb_array_elements(%(world_erasures)s) e "
+            "where (e->>'workspace_id')::uuid=t.workspace_id and e->>'world_id' = "
+            "(select g.world_id from door_grant g where g.workspace_id=t.workspace_id "
+            "and g.grant_id=t.grant_id)) "
+            "or exists (select 1 from jsonb_array_elements(%(tombstones)s) tb "
+            "where (tb->>'workspace_id')::uuid=t.workspace_id and tb->>'scope'='workspace')"
         ),
     ),
 }
@@ -252,12 +333,17 @@ def _load(path: Path) -> tuple[tuple[WithdrawalKind, ...], tuple[Exclusion, ...]
                 continues=entry.get("continues"),
                 carry_absent=_absent(entry),
                 removed_by=tuple(entry.get("removed_by", ())),
+                decimal_columns=tuple(entry.get("decimal_columns", ())),
             )
         )
     names = [kind.kind for kind in kinds]
     if len(set(names)) != len(names):
         raise ValueError(f"{path} names a kind twice")
     for kind in kinds:
+        if len(set(kind.decimal_columns)) != len(kind.decimal_columns) or any(
+            not isinstance(column, str) or not column for column in kind.decimal_columns
+        ):
+            raise ValueError(f"{kind.kind}: decimal_columns names distinct numeric columns")
         if (kind.shape == "column") != bool(kind.columns) or (kind.shape == "event") != (
             kind.ends is not None
         ):
@@ -306,12 +392,29 @@ def _names(columns: tuple[str, ...], alias: str | None = None) -> sql.Composable
 
 def _projection(kind: WithdrawalKind, alias: str) -> sql.Composable:
     """What a checkpoint holds of one withdrawn row: its identity and the withdrawal's columns,
-    or for an event the whole row."""
+    or for an event the whole row. Declared numeric columns cross JSON as exact decimal strings;
+    ``jsonb_populate_record`` restores their SQL numeric type without binary floating point."""
+
+    def value(column: str) -> sql.Composable:
+        identifier = sql.Identifier(alias, column)
+        return (
+            sql.SQL("{}::text").format(identifier) if column in kind.decimal_columns else identifier
+        )
+
     if kind.shape == "event":
-        return sql.SQL("to_jsonb({})").format(sql.Identifier(alias))
+        document = sql.SQL("to_jsonb({})").format(sql.Identifier(alias))
+        if not kind.decimal_columns:
+            return document
+        return sql.SQL("{} || jsonb_build_object({})").format(
+            document,
+            sql.SQL(", ").join(
+                sql.SQL("{}, {}").format(sql.Literal(column), value(column))
+                for column in kind.decimal_columns
+            ),
+        )
     return sql.SQL("jsonb_build_object({})").format(
         sql.SQL(", ").join(
-            sql.SQL("{}, {}").format(sql.Literal(column), sql.Identifier(alias, column))
+            sql.SQL("{}, {}").format(sql.Literal(column), value(column))
             for column in (*kind.identity, *kind.columns)
         )
     )
@@ -629,6 +732,10 @@ def stale_withdrawals(
     removals = {
         "tombstones": Jsonb([dict(tombstone) for tombstone in tombstones]),
         "erasures": Jsonb([item.row for item in carried if item.kind == "thing_erasure"]),
+        "world_erasures": Jsonb([item.row for item in carried if item.kind == "world_erasure"]),
+        "world_grant_departures": Jsonb(
+            [item.row for item in carried if item.kind == "world_grant_departure"]
+        ),
     }
     stale = []
     for kind in CATALOG:

@@ -233,6 +233,69 @@ def _image_px(data: bytes, mime: str) -> tuple[int, int]:
     raise _refuse("its image is a PNG or a JPEG")
 
 
+def _material_textures(document: Mapping[str, Any], materials: list[Any]) -> set[int]:
+    """The v1 colour image is the only material map, with explicit glTF references."""
+    images = _list(document, "images")
+    textures = _list(document, "textures")
+    samplers = _list(document, "samplers")
+    for index, texture in enumerate(textures):
+        where = f"textures[{index}]"
+        if not isinstance(texture, dict):
+            raise _refuse(f"{where} is an object")
+        if texture.get("extensions"):
+            raise _refuse(f"{where} uses an extension")
+        _index(texture.get("source"), len(images), f"{where}.source")
+        if "sampler" in texture:
+            sampler = samplers[_index(texture["sampler"], len(samplers), f"{where}.sampler")]
+            if not isinstance(sampler, dict) or sampler.get("extensions"):
+                raise _refuse(f"{where}.sampler is an object without extensions")
+    textured = set()
+    for index, material in enumerate(materials):
+        where = f"materials[{index}]"
+        if not isinstance(material, dict):
+            raise _refuse(f"{where} is an object")
+        pbr = material.get("pbrMetallicRoughness", {})
+        if not isinstance(pbr, dict):
+            raise _refuse(f"{where}.pbrMetallicRoughness is an object")
+        if any(
+            key in material for key in ("normalTexture", "occlusionTexture", "emissiveTexture")
+        ) or ("metallicRoughnessTexture" in pbr):
+            raise _refuse(f"{where} uses a map other than the one base colour texture")
+        if material.get("extensions") or pbr.get("extensions"):
+            raise _refuse(f"{where} uses an extension")
+        if "baseColorTexture" not in pbr:
+            continue
+        reference = pbr["baseColorTexture"]
+        where += ".pbrMetallicRoughness.baseColorTexture"
+        if not isinstance(reference, dict):
+            raise _refuse(f"{where} is an object")
+        if reference.get("extensions"):
+            raise _refuse(f"{where} uses an extension")
+        _index(reference.get("index"), len(textures), f"{where}.index")
+        coordinate = reference.get("texCoord", 0)
+        if type(coordinate) is not int or coordinate != 0:
+            raise _refuse(f"{where} uses TEXCOORD_0 only")
+        textured.add(index)
+    return textured
+
+
+def _texture_coordinates(accessors: _Accessors, index: Any, count: int, where: str) -> None:
+    """Every supplied UV is one finite VEC2 per vertex in glTF's supported UV encodings."""
+    accessor = accessors.accessor(index, where)
+    if not isinstance(accessor, dict) or accessor.get("type") != "VEC2":
+        raise _refuse(f"{where} is VEC2")
+    component = accessor.get("componentType")
+    normalized = accessor.get("normalized", False)
+    if not (
+        (component == _FLOAT and normalized is False)
+        or (component in (_UBYTE, _USHORT) and normalized is True)
+    ):
+        raise _refuse(f"{where} is float or normalized unsigned byte/short")
+    values, _ = accessors.values(index, where)
+    if len(values) != count or any(not math.isfinite(v) for uv in values for v in uv):
+        raise _refuse(f"{where} states two finite coordinates for every vertex")
+
+
 def _quaternion_matrix(q: Sequence[float]) -> list[list[float]]:
     x, y, z, w = q
     return [
@@ -413,6 +476,7 @@ def read_skinned_glb(
         )
         if max(image_px) > limits.image_side_px:
             raise _refuse(f"its image is at most {limits.image_side_px} pixels a side")
+    textured_materials = _material_textures(document, materials)
     vertices = 0
     triangles = 0
     for number, primitive in enumerate(primitives):
@@ -429,12 +493,20 @@ def read_skinned_glb(
                 raise _refuse(f"{where} has {needed}")
         if "COLOR_0" not in attributes and "TEXCOORD_0" not in attributes:
             raise _refuse(f"{where} is coloured by COLOR_0 or by a texture through TEXCOORD_0")
+        material = None
         if "material" in primitive:
-            _index(primitive["material"], len(materials), f"{where}.material")
+            material = _index(primitive["material"], len(materials), f"{where}.material")
+        textured = material in textured_materials
+        if textured and "TEXCOORD_0" not in attributes:
+            raise _refuse(f"{where}'s base colour texture requires TEXCOORD_0")
+        if "COLOR_0" not in attributes and not textured:
+            raise _refuse(f"{where} has vertex colours or a material's base colour texture")
         positions, _ = accessors.values(attributes["POSITION"], f"{where}.POSITION")
         if any(not math.isfinite(value) for position in positions for value in position):
             raise _refuse(f"{where} has a position that is not finite")
         count = len(positions)
+        if "TEXCOORD_0" in attributes:
+            _texture_coordinates(accessors, attributes["TEXCOORD_0"], count, f"{where}.TEXCOORD_0")
         joint_values, joint_accessor = accessors.values(attributes["JOINTS_0"], f"{where}.JOINTS_0")
         weight_values, weight_accessor = accessors.values(
             attributes["WEIGHTS_0"], f"{where}.WEIGHTS_0"

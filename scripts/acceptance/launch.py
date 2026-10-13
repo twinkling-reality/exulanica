@@ -215,6 +215,8 @@ PERMISSIONS = (
     "admission.write",
     "world.read",
     "world.write",
+    "world.enter",
+    "being.act",
     "operations.read",
     "operations.write",
     "references.request",

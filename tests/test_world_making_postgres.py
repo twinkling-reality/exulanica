@@ -29,16 +29,11 @@ from typing import Any
 
 import pytest
 from exulanica.api import world_making
+from exulanica.api.app import create_app
 from exulanica.api.routes import world_making as world_making_routes
+from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.transport import HttpResponse
-from exulanica.selection import (
-    kind_drafting,
-    look_choosing,
-    setting_choosing,
-    tool_choosing,
-    world_drafting,
-)
 from exulanica.selection.tool_choosing import CHOOSER_ROLE
 from exulanica.world import saved_entries, specification_source, worlds
 from exulanica.world.generated_worlds import generation_receipt
@@ -50,6 +45,7 @@ from exulanica.world.worlds import WorldsReadOnly
 from fastapi.testclient import TestClient
 
 from model_fakes import chat_body
+from spending_support import bench as bench
 from test_companion_saved_names import named as saved_named  # noqa: F401
 from test_kind_drafts_postgres import NEIGHBOUR_TOKEN, NO_MODEL_TOKEN, OTHER_TOKEN, TOKEN, _farm
 from test_kind_drafts_postgres import _reply as _brief
@@ -109,8 +105,73 @@ def _named_alias(request):
 
 
 @pytest.fixture(name="drafts")
-def _drafts_alias(request):
-    return request.getfixturevalue("imported_drafts")
+def _drafts_alias(request, bench, monkeypatch):
+    """Native world drafts use private durable spending and metadata fixtures."""
+    import datetime as dt
+    from dataclasses import replace
+
+    from exulanica.models.provider_catalog import ProviderPrice
+
+    factory, transport = request.getfixturevalue("imported_drafts")
+    durable = bench.durable("native-world-maker")
+    sample = factory(spending=durable)
+    workspace = sample.app.state.services.tokens.session_for(TOKEN).workspace_id
+
+    def price_read(client, provider):
+        return {
+            s.model_id: ProviderPrice(
+                s.model_id,
+                s.input_usd_per_mtok,
+                s.output_usd_per_mtok,
+                s.context_window_tokens,
+                "f" * 64,
+            )
+            for s in client.manifest.models.values()
+            if s.provider == provider
+        }
+
+    monkeypatch.setattr(ModelClient, "provider_prices", price_read)
+
+    def app(*args, **kwargs):
+        if kwargs.get("spending") is None:
+            for provider in load_manifest().providers:
+                if bench.query(
+                    "select 1 from spending_grant g join spending_authority a using(authority_id) "
+                    "where g.workspace_id=%s and a.provider=%s and g.parent_grant_id is null",
+                    workspace,
+                    provider,
+                ):
+                    continue
+                until = dt.datetime.now(dt.UTC) + dt.timedelta(days=1)
+                authority = bench.operator.issue(
+                    provider=provider,
+                    ceiling_usd=Decimal("1000"),
+                    max_calls=100000,
+                    valid_until=until,
+                    dispatch_seconds=60,
+                    witnessed=True,
+                    operator="test-operator",
+                    reason="Private native world fixture",
+                )
+                bench.operator.grant(
+                    authority,
+                    workspace,
+                    ceiling_usd=Decimal("100"),
+                    max_calls=10000,
+                    valid_until=until,
+                    operator="test-operator",
+                    reason="Private native world fixture",
+                )
+            kwargs["spending"] = durable
+        original = factory(*args, **kwargs)
+        services = replace(
+            original.app.state.services, database=bench.runtime, readonly_database=bench.runtime
+        )
+        application = create_app(services, verify=False)
+        application.dependency_overrides.update(original.app.dependency_overrides)
+        return TestClient(application)
+
+    return app, transport
 
 
 @pytest.fixture
@@ -123,6 +184,16 @@ def fixed_identities(monkeypatch):
         return f"{worlds.world_kind(kind).id_prefix}{uuid.uuid5(uuid.NAMESPACE_URL, name)}"
 
     monkeypatch.setattr(saved_entries, "new_world_id", fixed)
+    from exulanica.world import world_draft_jobs
+
+    class FixedDraftUUID:
+        def __getattr__(self, name):
+            return getattr(uuid, name)
+
+        def uuid5(self, namespace, name):
+            return uuid.UUID(fixed("generated").removeprefix("world:generated:"))
+
+    monkeypatch.setattr(world_draft_jobs, "uuid", FixedDraftUUID())
 
 
 def _start(client: TestClient, description: str, token: str = TOKEN):
@@ -179,7 +250,7 @@ def test_a_sentence_becomes_a_place_made_with_no_kind_kept(drafts, fixed_identit
         assert started.status_code == 202, started.text
         body = started.json()
         # The route answered before any model: the job has chosen nothing yet.
-        assert (body["state"], body["poll_after_seconds"], body["entry"]) == ("choosing", 3, None)
+        assert (body["state"], body["poll_after_seconds"], body["entry"]) == ("queued", 3, None)
         assert transport.arrived.wait(10), "the job never asked a model"
         assert _read(client, body["draft_id"]).json()["description"] == FARM_WORDS
         transport.release.set()
@@ -222,6 +293,41 @@ def test_a_sentence_becomes_a_place_made_with_no_kind_kept(drafts, fixed_identit
             headers={"Authorization": f"Bearer {TOKEN}"},
         )
         assert site.status_code == 200, site.text
+
+
+def test_a_site_reports_missing_content_even_when_an_overlapping_setting_is_taken(
+    drafts, fixed_identities
+):
+    app, transport = drafts
+    words = "a small farm beside the sea with flying boats"
+    brief = _farm()
+    brief["requirements"].append(
+        {
+            "words": "sea with flying boats",
+            "status": "omitted",
+            "omission": "unsupported_behavior",
+            "form": "",
+            "roles": [],
+            "look": "",
+            "shape_class": "",
+            "roof_form": "",
+            "minimum_count": 1,
+            "part_labels": [],
+        }
+    )
+    transport.responses.extend(
+        [
+            _tool("place", "a small farm"),
+            _brief(brief),
+            _look(None),
+            _setting("sea", ground="sea"),
+        ]
+    )
+    with app() as client:
+        ended = _ended(client, _start(client, words).json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        assert ended["left_out"] == ["sea with flying boats"]
+        assert "not_supported" not in _receipt(client, ended["entry"])["kind"]["document"]
 
 
 def test_where_the_chooser_is_unsure_the_place_tool_is_taken_and_said(drafts, fixed_identities):
@@ -333,12 +439,9 @@ def test_the_offer_says_what_a_draft_may_spend_before_a_word_is_typed(drafts, fi
         registry.starts_per_hour = 2
         before = _offer(client)
         assert (before["offered"], before["code"], before["detail"]) == (True, None, None)
-        # The most calls a draft makes is counted from the steps' own bounds: the chooser's call
-        # and its repair, then the attempts of whichever tool's drafter makes the most.
-        most = max(kind_drafting.DRAFT_ATTEMPTS, world_drafting.DRAFT_ATTEMPTS)
-        assert before["calls_at_most"] == (
-            tool_choosing.ATTEMPTS + most + look_choosing.ATTEMPTS + setting_choosing.ATTEMPTS
-        )
+        # The operation sheet includes bounded transport attempts and both native paths.
+        assert before["calls_at_most"] == before["operation"]["calls_at_most"]
+        assert before["operation"]["estimate_is_expected_spend"] is False
         assert before["starts"] == {"an_hour": 2, "left": 2, "retry_after_seconds": None}
         assert before["description_characters"] == 1000
         assert before["running_draft_id"] is None
@@ -357,7 +460,8 @@ def test_the_offer_says_what_a_draft_may_spend_before_a_word_is_typed(drafts, fi
         # Nor does the neighbour read it by an id they were never told.
         assert _read(client, draft_id, NEIGHBOUR_TOKEN).status_code == 404
         elsewhere = _offer(client, OTHER_TOKEN)
-        assert (elsewhere["offered"], elsewhere["running_draft_id"]) == (True, None)
+        assert (elsewhere["offered"], elsewhere["running_draft_id"]) == (False, None)
+        assert elsewhere["code"] == "budget_exceeded"  # Its separate workspace holds no grant.
         transport.release.set()
         assert _ended(client, draft_id)["state"] == "ready"
         after = _offer(client)
@@ -560,7 +664,7 @@ def test_every_call_of_a_draft_is_reserved_and_settled_against_the_workspace_s_g
             operator.grant(
                 authority,
                 workspace,
-                ceiling_usd=Decimal("1"),
+                ceiling_usd=Decimal("10"),
                 max_calls=100,
                 valid_until=until,
                 operator="test-operator",
@@ -582,6 +686,11 @@ def test_every_call_of_a_draft_is_reserved_and_settled_against_the_workspace_s_g
     assert len(reservations) == len(calls) == len(transport.requests) == 4
     assert {row["state"] for row in reservations} == {"settled"}
     assert {row["grant_id"] for row in reservations} <= grants
+    with database.session(workspace) as connection:
+        bound = connection.execute("select bound_id from world_draft_bound").fetchall()
+        used = connection.execute("select bound_id from spending_reservation").fetchall()
+    assert {row["bound_id"] for row in used} <= {row["bound_id"] for row in bound}
+
 
 
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
@@ -607,8 +716,9 @@ def _as_served(body: Any) -> Any:
         if isinstance(value, str):
             value = _UUID.sub(identity, value)
             value = _SHA256.sub("0" * 64, value)
-            return _MOMENT.sub("2026-01-01T00:00:00Z", value)
-        if key == "elapsed_seconds":
+            moment = "2026-01-01T00:01:00Z" if key == "expires_at" else "2026-01-01T00:00:00Z"
+            return _MOMENT.sub(moment, value)
+        if key in {"elapsed_seconds", "latency_ms"}:
             return 0
         return value
 

@@ -10,11 +10,10 @@ manifest, the same check the baker makes and the published library passes. A rec
 published set must use that set's maker. The person's label is checked and kept outside every
 digest.
 
-**Only authored recipes are stored today.** A proposal and a photo-derived recipe are a model's
-output, and each carries the model that made it: a proposal waits for the path that records that
-model, and a photo-derived recipe for the migration after 0073 and the service that checks the
-personal model right. :meth:`MaterialRepository.create_recipe` refuses both before the database
-does, and the database refuses both whatever writes them.
+**Only an authored recipe is stored.** A proposal and a photo-derived recipe are a model's
+output, and each carries the model that made it. No proposal path records that model.
+:meth:`MaterialRepository.create_recipe` refuses both origins before the database does, and
+migration 0066's triggers refuse both whatever writes them.
 
 **Reads ask the schema whether a recipe is still readable,** through
 ``tombstone_blocks_material_recipe`` in the query itself, and tell "never existed here" (404) from
@@ -86,8 +85,8 @@ __all__ = [
     "UnknownMaterial",
 ]
 
-#: The origins a recipe may be created with today. `proposed` waits for a proposal path that
-#: records the model, and `photo_derived` for the migration after 0073.
+#: The origins a recipe may be created with. ``proposed`` and ``photo_derived`` are refused:
+#: no proposal path records the model, and both origins are refused again by migration 0066.
 AUTHORABLE_ORIGINS: Final = ("authored",)
 _LABEL_LIMIT: Final = 200
 _CONTROL: Final = re.compile(r"[\x00-\x1f\x7f-\x9f]")

@@ -51,6 +51,7 @@
  * a small built-in catalogue and says, every time, that what it drew was not saved.
  */
 
+import { generatedObjectHeight, type GeneratedObjectGround } from './generated-object-ground.js';
 import {
   BEHAVIOUR_REGISTRY,
   BOUNDED_PATH_KEY,
@@ -207,6 +208,8 @@ export interface ObjectsDependencies {
   readonly districtPlacement?: () => DistrictObjectPlacement | null;
   /** Exact source-independent region pinned by an authored starter entry. */
   readonly authoredRegion?: AuthoredObjectRegion;
+  /** Late read of the active saved generated region and its authoritative navigation surface. */
+  readonly generatedGround?: () => GeneratedObjectGround | null;
   /**
    * The floor every region of a world that states no ground has (a world made from photographs),
    * as its saved entry serves it: objects stand on it, in any region, reconstructed or not.
@@ -239,6 +242,8 @@ export interface MountedObjects {
   readonly panel: ObjectPlacementPanel;
   readonly confirm: GatedConfirmPanel;
   toggle(): void;
+  /** Inspect a resident object from this selected saved version, using the same controls as its list. */
+  inspect(objectId: string): boolean;
   close(): void;
   /** Where the Create panel offers a small square: a saved world with an authored ground. */
   smallSquareOffered(): boolean;
@@ -472,7 +477,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     }
     const region = regionOf(record.regionId);
     if (region === null) return 'That object names a region this world does not draw.';
-    if (region.sceneId === 'authored-starter' &&
+    if ((region.sceneId === 'authored-starter' || region.sceneId === 'generated-region') &&
         !authoredContains(record.transform.xMm, record.transform.zMm)) {
       return 'That object is saved outside this world’s authored ground and was not drawn.';
     }
@@ -644,7 +649,15 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
 
   function authoredObjectRegion(): ObjectRegion | null {
     const region = deps.authoredRegion;
-    if (region === undefined) return null;
+    if (region === undefined) {
+      const generated = currentGeneratedGround();
+      return generated === null ? null : {
+        regionId: generated.regionId as IslandId,
+        placement: { position: atlasVec3(0, 0, 0), yaw: 0, scale: 1 },
+        footprintRadiusLocal: generated.navigation.fieldRadius,
+        sceneId: 'generated-region',
+      };
+    }
     return {
       regionId: region.regionId as IslandId,
       placement: {
@@ -683,9 +696,18 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     return Math.abs(xMm) <= floor.halfExtentMm && Math.abs(zMm) <= floor.halfExtentMm;
   }
 
+  function currentGeneratedGround(): GeneratedObjectGround | null {
+    const generated = deps.generatedGround?.() ?? null;
+    return generated !== null && version !== null && !version.sourceInvalidated
+      && generated.worldId === version.worldId && generated.versionId === version.versionId ? generated : null;
+  }
+
   function authoredContains(xMm: number, zMm: number): boolean {
     const region = deps.authoredRegion;
-    if (region === undefined) return false;
+    if (region === undefined) {
+      const generated = currentGeneratedGround();
+      return generated !== null && generatedObjectHeight(generated, xMm, zMm) !== null;
+    }
     if (region.kind === 'endless') {
       return Math.hypot(xMm, zMm) <= AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M * MM_PER_METRE;
     }
@@ -736,6 +758,10 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     pose: { readonly position: { readonly x: number; readonly y: number; readonly z: number } },
   ): number {
     if (sceneId === 'authored-starter') return 0;
+    if (sceneId === 'generated-region') {
+      const generated = currentGeneratedGround();
+      return generated === null ? Number.NaN : generatedObjectHeight(generated, pose.position.x * 1000, pose.position.z * 1000) ?? Number.NaN;
+    }
     if (sceneId === 'authored-district') return -(currentDistrict()?.translationMm[1] ?? 0);
     // Every region of a world made from photographs stands on its declared floor.
     if (deps.declaredFloor !== undefined) return deps.declaredFloor.elevationMm;
@@ -758,7 +784,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     if (binding === undefined) return null;
     const pose = binding.playerPose();
     const ground = groundMmIn(region, sceneId, pose);
-    const index = sceneId === 'authored-district' || sceneId === 'authored-starter'
+    const index = sceneId === 'authored-district' || sceneId === 'authored-starter' || sceneId === 'generated-region'
       ? null : binding.engageFocusedAnchor();
     if (index !== null) {
       const at = index * 3;
@@ -772,7 +798,11 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
         );
       }
     }
-    return placementPoseBeforeVisitor(region.placement, pose, DEFAULT_PLACEMENT_DISTANCE_MM, ground);
+    const candidate = placementPoseBeforeVisitor(region.placement, pose, DEFAULT_PLACEMENT_DISTANCE_MM, ground);
+    if (sceneId !== 'generated-region') return candidate;
+    const generated = currentGeneratedGround();
+    const height = generated === null ? null : generatedObjectHeight(generated, candidate.xMm, candidate.zMm);
+    return height === null ? null : { ...candidate, yMm: height };
   }
 
   /**
@@ -861,7 +891,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       panel.report('The world is still forming. Try again in a moment.', 'failure');
       return;
     }
-    if (region.sceneId === 'authored-starter' && !authoredContains(pose.xMm, pose.zMm)) {
+    if ((region.sceneId === 'authored-starter' || region.sceneId === 'generated-region') && !authoredContains(pose.xMm, pose.zMm)) {
       panel.report('That spot is outside this world’s authored ground. Face inward and try again.', 'failure');
       return;
     }
@@ -887,7 +917,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
         `Add “${asset.title}” where the mark shows, `
         + (districtAtPlacement !== null
           ? 'standing on this district’s authored ground'
-          : region.sceneId === 'authored-starter'
+          : region.sceneId === 'authored-starter' || region.sceneId === 'generated-region'
           ? 'standing on this world’s authored ground'
           : groundIsMeasured(region.sceneId)
           ? 'standing on the ground its cameras recovered'
@@ -1522,7 +1552,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   }
 
   function isAuthoredRegionId(regionId: string): boolean {
-    return deps.authoredRegion?.regionId === regionId;
+    return deps.authoredRegion?.regionId === regionId || currentGeneratedGround()?.regionId === regionId;
   }
 
   function discardMove(): void {
@@ -1778,6 +1808,23 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   return {
     panel,
     confirm,
+    inspect(objectId) {
+      if (disposed) return false;
+      const active = state.activeWorldEntry;
+      const stale = active != null && (active.worldId !== version?.worldId || active.authoredVersionId !== version?.versionId);
+      if (stale || !visibleObjects().some(record => record.objectId === objectId && record.asset.availability === 'available') || !state.atlas?.binding.objects?.has(objectId)) {
+        if (stale || selectedId === objectId) {
+          selectedId = null; nudged = null; panel.setPendingMove(null); refresh();
+          if (stale) setPanelVisible(false);
+          else reflectObjectSelectionInDataView(null);
+        }
+        return false;
+      }
+      setPanelVisible(true);
+      select(objectId);
+      panel.root.querySelector<HTMLButtonElement>('[data-selected="yes"] .object-placement-choose')?.focus();
+      return true;
+    },
     close() { setPanelVisible(false); },
     toggle() {
       setPanelVisible(!panel.visible());

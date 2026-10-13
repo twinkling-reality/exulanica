@@ -273,8 +273,8 @@ def advance_society(
     request: Request,
     world_id: WorldId,
 ) -> Any:
-    return _call(
-        lambda: served_snapshot(
+    def minute() -> Any:
+        return served_snapshot(
             _repository(connection, session, request, world_id).advance(
                 version_id,
                 base_tick=body.base_tick,
@@ -282,7 +282,15 @@ def advance_society(
                 base_clock_revision=body.base_clock_revision,
                 actor=session.actor,
             )
-        ),
+        )
+
+    runtime = request.app.state.services.society_runtime
+    if runtime is None:
+        return _call(minute, invalid_status=409)
+    # A minute that composes an input (a society behind an erasure) over a site world's place the
+    # kind worker keeps no longer: the place is made and the minute asked once more.
+    return _call(
+        lambda: runtime.with_the_place(connection, session, world_id, version_id, minute),
         invalid_status=409,
     )
 

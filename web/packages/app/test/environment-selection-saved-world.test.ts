@@ -11,6 +11,7 @@ import { parseSociety, parseSocietyActionRecord, type SocietySnapshot } from '..
 import { parseSocietyControl } from '../src/society-control-api.js';
 import { parseSocietyModels } from '../src/society-models-api.js';
 import { PLAYBACK_UNREAD_WORDS } from '../src/ui/world-inhabitants.js';
+import { rememberSiteSeats } from '../src/composition/site-furniture.js';
 
 /*
  * A person's own saved world: inhabitants are drawn over its authored region, they exist only
@@ -133,7 +134,7 @@ function mount() {
     env: { canvas, preview: false } as unknown as AppEnvironment,
     state: {
       atlas: { binding },
-      activeWorldEntry: { worldId: WORLD, authoredVersionId: 'version', title: 'My world',
+      activeWorldEntry: { entryId: 'saved-entry', worldId: WORLD, authoredVersionId: 'version', title: 'My world',
         authoredScene: { region: { regionId: 'region:starter' } } },
     } as unknown as SessionState,
     scene: { islands: [] } as unknown as AtlasScene,
@@ -318,8 +319,25 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     // A re-read that fails keeps the last seating it built, so nobody stands up for it, and says so.
     worldClient.connect.mockRejectedValueOnce(new ApiError(503, 'unavailable', 'the store is restarting'));
     await mounted.afterAuthoredEdit('version');
-    expect(crowd.setSeatingLayout.mock.calls.at(-1)![0]).toBe(relaid);
+    const retained = crowd.setSeatingLayout.mock.calls.at(-1)![0] as SeatingLayout;
+    expect(retained.objects).toBe(relaid.objects);
+    expect(retained.uses).toBe(relaid.uses);
+    expect(retained.targets).toBe(relaid.targets);
     expect(canvas.dataset['societySeatingLayout']).toBe('kept-after-failed-read');
+    // Drawn site seats remain live while authored seating is held through a failed read.
+    const seats = [{ objectId: 'fixture-seat', triangles: [], normals: [],
+      heightHintM: .225, maximumHeightM: .46, facing: 0 }];
+    const withdrawSeats = rememberSiteSeats('saved-entry', 'version', seats);
+    try {
+      const withSeats = crowd.setSeatingLayout.mock.calls.at(-1)![0] as SeatingLayout;
+      expect(withSeats.objects).toBe(relaid.objects);
+      expect(withSeats.fixtureSeats).toEqual(seats);
+    } finally {
+      withdrawSeats();
+    }
+    const withdrawn = crowd.setSeatingLayout.mock.calls.at(-1)![0] as SeatingLayout;
+    expect(withdrawn.objects).toBe(relaid.objects);
+    expect(withdrawn.fixtureSeats).toEqual([]);
     mounted.dispose();
     expect(crowd.clearSociety).toHaveBeenCalled();
   });

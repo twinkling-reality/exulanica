@@ -1,0 +1,8 @@
+@import url('/review-home-assets/navigation-material.css');
+/* The landing entry uses the Product navigation marker and fine gradient rim. */
+.pane-title #hero-entry { position:relative; isolation:isolate; min-height:44px; padding:0 14px 0 27px; border:0; border-radius:0; background:none; color:var(--ink); font:400 var(--ui-text-compact)/1 var(--ui-font-brand); box-shadow:none; }
+.pane-title #hero-entry::before { content:''; position:absolute; left:13px; top:50%; width:3px; height:11px; transform:translateY(-50%); background:var(--menu-accent); }
+.pane-title #hero-entry::after { content:''; position:absolute; inset:6px 0; border-radius:10px; padding:1px; pointer-events:none; background:var(--nav-edge); mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0); mask-composite:exclude; opacity:.85; }
+.pane-title #hero-entry:hover { background:none; color:var(--ink-soft); }
+.pane-title #hero-entry:hover::after { opacity:1; }
+.pane-title #hero-entry:focus-visible { outline:2px solid var(--focus); outline-offset:3px; }

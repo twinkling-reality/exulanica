@@ -19,7 +19,7 @@ pnpm run test         # vitest
 | `@exulanica/world-index` | index UI, entity detail, provenance panel | renderer |
 | `@exulanica/graph-client` | entity graph reads and writes, assertion log, evidence resolution | all of the above |
 | `@exulanica/scene-synth` | the synthetic scene generator for the ADR-0003 bake-off | everything except atlas-core; offline only |
-| `@exulanica/landing` | the public title, Purpose, and Capabilities surfaces; a configured link opens the real application | every renderer, and every workspace package except presentation |
+| `@exulanica/landing` | the public title, product, use-case, and documentation surfaces; research, roadmap, the blog index, and waitlist redirect; a configured link opens the real application | every renderer, and every workspace package except presentation |
 
 From `docs/architecture-overview.md` section 1.1, plus three packages that are not among the
 five shipped modules: `presentation` owns visual policy without owning a surface, `scene-synth` is

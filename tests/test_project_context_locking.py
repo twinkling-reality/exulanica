@@ -167,10 +167,11 @@ def _answer_deletion(drawn):
     return delete
 
 
-def _status(repository, item_id) -> str:
-    return repository.connection.execute(
+def _status(repository, item_id) -> str | None:
+    row = repository.connection.execute(
         "select status::text as status from world_project_item where item_id=%s", (item_id,)
-    ).fetchone()["status"]
+    ).fetchone()
+    return row["status"] if row is not None else None
 
 
 def test_a_workspace_tombstone_waits_for_a_writer_holding_its_project(
@@ -178,7 +179,7 @@ def test_a_workspace_tombstone_waits_for_a_writer_holding_its_project(
 ):
     writer, deletion = _race(spine_schema, drawn, _workspace_tombstone(drawn))
     assert (writer, deletion) == (None, None)
-    assert _status(repository, drawn["item"]) == "withdrawn"
+    assert _status(repository, drawn["item"]) is None
 
 
 def test_a_deleted_answer_waits_for_a_writer_holding_its_items_project(

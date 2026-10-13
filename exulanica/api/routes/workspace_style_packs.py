@@ -273,6 +273,21 @@ def _base_resolver(repository: WorkspaceStylePackRepository) -> Callable[[Mappin
     return resolve
 
 
+def _base_manifest(
+    repository: WorkspaceStylePackRepository, base: Mapping[str, Any]
+) -> Mapping[str, Any]:
+    """Read the exact base after its workspace/library admission identity was checked."""
+    chain = style_pack_library().chain(base["manifest_sha256"])
+    if chain is not None:
+        return chain[0]
+    held = repository.version(base["manifest_sha256"])
+    if held.manifest_canonical is None:
+        raise StylePackAdmissionRefused(
+            "style_pack_base_unavailable", "the base manifest is unavailable", path="base"
+        )
+    return json.loads(held.manifest_canonical)
+
+
 # -- routes --------------------------------------------------------------------------------------
 
 
@@ -380,6 +395,7 @@ def _admit(
                 budgets=runtime.budgets.families,
                 lod1_share_permille=runtime.budgets.lod1_share_permille,
                 resolve_base=_base_resolver(repository),
+                resolve_base_manifest=lambda base: _base_manifest(repository, base),
             )
             record, created = repository.record(admitted)
         except (PreparationError, _Unavailable) as error:

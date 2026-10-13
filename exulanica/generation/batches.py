@@ -69,6 +69,7 @@ __all__ = [
     "decide_cancelled",
     "end_batch",
     "fail_unreadable",
+    "mark_erasure_withdrawn",
     "mark_settled",
     "open_session",
     "record_batch",
@@ -499,14 +500,43 @@ _CANCELLED: Final = (
 )
 
 
-def cancelled_batches(connection: psycopg.Connection, workspace_id: uuid.UUID) -> list[uuid.UUID]:
+def cancelled_batches(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, *, erasure_only: bool = False
+) -> list[uuid.UUID]:
     """The batches of requests a deletion cancelled while queued and not yet decided: the entries
     the worker withdraws before it decides them."""
     with connection.cursor(row_factory=dict_row) as cursor:
         rows = cursor.execute(
-            f"select distinct p.piece_batch_id {_CANCELLED}", (workspace_id,)
+            f"select distinct p.piece_batch_id {_CANCELLED} and not %s "
+            "union select p.piece_batch_id from piece_erasure_settlement p "
+            "where p.workspace_id = %s and not exists (select 1 "
+            "from piece_erasure_settlement_event e where e.workspace_id = p.workspace_id "
+            "and e.piece_request_id = p.piece_request_id and e.kind = 'withdrawn')",
+            (workspace_id, erasure_only, workspace_id),
         ).fetchall()
     return sorted((row["piece_batch_id"] for row in rows), key=str)
+
+
+def mark_erasure_withdrawn(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    piece_batch_id: uuid.UUID,
+    written_at: datetime,
+) -> None:
+    """The cancellation marker was durably written before erased requests are settled.
+
+    Repeating the bucket write after a crash is safe; a receipt is advanced only after it succeeds.
+    """
+    with connection.transaction():
+        lock_workspace(connection, workspace_id)
+        connection.execute(
+            "insert into piece_erasure_settlement_event "
+            "(workspace_id,piece_request_id,kind,recorded_at) "
+            "select workspace_id,piece_request_id,'withdrawn',%s from piece_erasure_settlement "
+            "where workspace_id = %s and piece_batch_id = %s "
+            "on conflict (workspace_id,piece_request_id,kind) do nothing",
+            (written_at, workspace_id, piece_batch_id),
+        )
 
 
 def decide_cancelled(
@@ -514,6 +544,7 @@ def decide_cancelled(
     workspace_id: uuid.UUID,
     *,
     unsent: frozenset[uuid.UUID] | set[uuid.UUID] = frozenset(),
+    erasure_only: bool = False,
 ) -> list[uuid.UUID]:
     """Decide each request a deletion cancelled while it was queued, by its reservation: one only
     admitted, one the ledger already released (it lapsed while queued, so it was never dispatched),
@@ -525,9 +556,9 @@ def decide_cancelled(
         lock_workspace(connection, workspace_id)
         rows = cursor.execute(
             "select p.piece_request_id, p.reservation_id, p.piece_batch_id, p.worst_case_usd, "
-            f"r.state as reservation_state {_CANCELLED}"
+            f"r.state as reservation_state {_CANCELLED} and not %s "
             "order by p.requested_at, p.piece_request_id",
-            (workspace_id,),
+            (workspace_id, erasure_only),
         ).fetchall()
         for row in rows:
             admitted = (
@@ -545,6 +576,44 @@ def decide_cancelled(
                     Decimal(0) if admitted else row["worst_case_usd"],
                 ),
             )
+        # An erasure removes request documents and their old settlement rows atomically with
+        # retaining these content-free obligations. A measured decision is already present and
+        # stays unchanged; undecided work is considered only after its GPU entry was withdrawn.
+        erased = cursor.execute(
+            "select p.piece_request_id, p.reservation_id, p.piece_batch_id, p.worst_case_usd, "
+            "r.state as reservation_state, p.basis, p.usd, "
+            "exists (select 1 from piece_erasure_settlement_event e "
+            "where e.workspace_id = p.workspace_id and e.piece_request_id = p.piece_request_id "
+            "and e.kind = 'withdrawn') as withdrawn from piece_erasure_settlement p "
+            "left join spending_reservation r on r.workspace_id = p.workspace_id "
+            "and r.reservation_id = p.reservation_id "
+            "where p.workspace_id = %s and not exists (select 1 "
+            "from piece_erasure_settlement_event e where e.workspace_id = p.workspace_id "
+            "and e.piece_request_id = p.piece_request_id and e.kind = 'decided') "
+            "order by p.piece_request_id",
+            (workspace_id,),
+        ).fetchall()
+        for row in erased:
+            if not row["withdrawn"]:
+                continue
+            admitted = (
+                row["reservation_state"] in ("admitted", "released")
+                or row["piece_batch_id"] in unsent
+            )
+            cursor.execute(
+                "insert into piece_erasure_settlement_event "
+                "(basis,usd,workspace_id,piece_request_id,kind) values (%s,%s,%s,%s,'decided') "
+                "on conflict (workspace_id,piece_request_id,kind) do nothing",
+                (
+                    row["basis"] or ("not_sent" if admitted else "unknown"),
+                    row["usd"]
+                    if row["basis"]
+                    else (Decimal(0) if admitted else row["worst_case_usd"]),
+                    workspace_id,
+                    row["piece_request_id"],
+                ),
+            )
+        rows.extend(erased)
     return sorted({row["piece_batch_id"] for row in rows}, key=str)
 
 
@@ -580,7 +649,9 @@ def while_queued(
         yield row is not None
 
 
-def unsettled(connection: psycopg.Connection, workspace_id: uuid.UUID) -> list[Settlement]:
+def unsettled(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, *, erasure_only: bool = False
+) -> list[Settlement]:
     """The workspace's decided settlements the spending authority has not yet taken."""
     with connection.cursor(row_factory=dict_row) as cursor:
         rows = cursor.execute(
@@ -588,9 +659,16 @@ def unsettled(connection: psycopg.Connection, workspace_id: uuid.UUID) -> list[S
             "p.reservation_holder, s.basis, s.usd from piece_settlement s "
             "join piece_request p on p.workspace_id = s.workspace_id "
             "and p.piece_request_id = s.piece_request_id "
-            "where s.workspace_id = %s and s.settled_at is null "
-            "order by s.decided_at, s.piece_request_id",
-            (workspace_id,),
+            "where s.workspace_id = %s and s.settled_at is null and not %s "
+            "union all select p.piece_request_id,p.reservation_id,p.reservation_authority_id, "
+            "p.reservation_holder,d.basis,d.usd from piece_erasure_settlement p "
+            "join piece_erasure_settlement_event d on d.workspace_id = p.workspace_id "
+            "and d.piece_request_id = p.piece_request_id and d.kind = 'decided' "
+            "where p.workspace_id = %s and not exists (select 1 "
+            "from piece_erasure_settlement_event e where e.workspace_id = p.workspace_id "
+            "and e.piece_request_id = p.piece_request_id and e.kind = 'settled') "
+            "order by piece_request_id",
+            (workspace_id, erasure_only, workspace_id),
         ).fetchall()
     return [Settlement(**row) for row in rows]
 
@@ -600,12 +678,22 @@ def mark_settled(
     workspace_id: uuid.UUID,
     piece_request_id: uuid.UUID,
     settled_at: datetime,
+    *,
+    erasure_only: bool = False,
 ) -> None:
     """The spending authority took the request's settlement (or had already)."""
     with connection.transaction():
         lock_workspace(connection, workspace_id)
         connection.execute(
             "update piece_settlement set settled_at = %s where workspace_id = %s "
-            "and piece_request_id = %s and settled_at is null",
+            "and piece_request_id = %s and settled_at is null and not %s",
+            (settled_at, workspace_id, piece_request_id, erasure_only),
+        )
+        connection.execute(
+            "insert into piece_erasure_settlement_event "
+            "(recorded_at,workspace_id,piece_request_id,kind) "
+            "select %s,workspace_id,piece_request_id,'settled' from piece_erasure_settlement "
+            "where workspace_id = %s and piece_request_id = %s "
+            "on conflict (workspace_id,piece_request_id,kind) do nothing",
             (settled_at, workspace_id, piece_request_id),
         )

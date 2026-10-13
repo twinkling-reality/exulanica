@@ -1,0 +1,127 @@
+body.ux-review #shell .your-worlds.ux-world-entry {
+  --entry-ground:#ffffff; --entry-ink:#121715; --entry-muted:#344750; --entry-focus:#6496a6;
+  display:grid; grid-template-rows:auto minmax(280px,1fr) auto auto; gap:10px;
+  min-height:100dvh; padding:28px var(--entry-gutter) 28px; background:var(--entry-ground); color:var(--entry-ink);
+  overflow:auto; isolation:isolate; align-content:stretch; font-family:var(--ui-font-brand);
+}
+body.ux-review #shell .ux-world-entry [hidden] { display:none!important; }
+body.ux-review #shell .ux-world-entry .your-worlds-corner { display:flex; flex-direction:row; align-items:center; gap:20px; }
+.ux-entry-brand { display:inline-flex; color:var(--entry-ink); text-decoration:none; font:400 28px/1.4 var(--ui-font-brand); letter-spacing:-.035em; }
+body.ux-review #shell .ux-world-entry .ux-entry-hero { position:relative; isolation:isolate; align-self:start; margin:70px 0 24px; width:min(410px,100%); padding:28px 24px 24px; color:var(--entry-ink); }
+.ux-entry-hero::before { content:''; position:absolute; inset:0; z-index:-1; pointer-events:none; background:radial-gradient(ellipse at 12% 75%,rgb(125 166 179 / 38%),transparent 80%),linear-gradient(105deg,rgb(168 203 210 / 64%),rgb(232 240 237 / 14%) 94%); mask:var(--nav-shape) center/100% 100% no-repeat; }
+body.ux-review #shell .ux-entry-title { margin:0 0 22px; font:200 clamp(32px,3.2vw,42px)/1.15 var(--ui-font-brand); letter-spacing:-.025em; color:inherit; }
+.ux-entry-description { font:400 14px/1.6 var(--ui-font-brand); color:var(--entry-muted); margin:0 0 16px; }
+body.ux-review #shell .ux-world-entry .your-worlds-lede { display:flex; flex-direction:column; align-items:flex-start; gap:8px; }
+body.ux-review #shell .ux-world-entry .your-worlds-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+body.ux-review #shell .ux-world-entry .entry-command {
+  position:relative; isolation:isolate; min-height:44px; padding:0 10px; gap:7px; display:inline-flex; align-items:center; justify-content:center;
+  border:0; border-radius:0; background:none; color:var(--entry-ink); box-shadow:none; text-decoration:none;
+  font:400 var(--ui-text-compact)/1 var(--ui-font-brand); letter-spacing:0;
+}
+body.ux-review #shell .ux-world-entry .entry-command::before { content:''; position:absolute; inset:6px 0; border-radius:9px; z-index:-1; pointer-events:none; background:none; }
+body.ux-review #shell .ux-world-entry .entry-command::after { content:''; position:absolute; inset:6px 0; border-radius:9px; pointer-events:none; padding:1px; background:linear-gradient(110deg,rgb(100 150 166 / 36%),rgb(255 255 255 / 50%) 57%,rgb(27 48 52 / 20%)); mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0); mask-composite:exclude; opacity:.85; }
+body.ux-review #shell .ux-world-entry .your-worlds-open::before { background:none; }
+body.ux-review #shell .ux-world-entry .your-worlds-open::after { background:var(--nav-edge); }
+body.ux-review #shell .ux-world-entry .entry-command:hover:not(:disabled):not([aria-disabled="true"])::before { background:rgb(255 255 255 / 18%); }
+body.ux-review #shell .ux-world-entry .entry-command kbd { display:inline; min-width:0; width:auto; height:auto; padding:0; margin:0 0 0 3px; border:0; border-radius:0; background:none; color:var(--entry-muted); font:400 9px/1 var(--ui-font-code); box-shadow:none; }
+body.ux-review #shell .ux-world-entry .your-worlds-create-row { margin:0; }
+body.ux-review #shell .ux-world-entry .your-worlds-create:disabled,body.ux-review #shell .ux-world-entry .your-worlds-create[aria-disabled="true"] { opacity:.6; color:var(--entry-muted); }
+body.ux-review #shell .ux-world-entry .x-icon { width:14px; height:14px; flex:none; stroke-width:1.25; }
+.ux-control-mark { display:block; width:3px; height:11px; flex:none; background:var(--menu-accent); }
+.ux-entry-meta { margin:12px 0 0; font:400 10px/1.5 var(--ui-font-code); color:var(--entry-muted); }
+body.ux-review #shell .ux-world-entry .ux-entry-image { position:fixed; inset:0; z-index:-2; width:auto; max-width:none; margin:0; background-position:center; background-size:cover; filter:none; opacity:1; }
+body.ux-review #shell .ux-world-entry::before { content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background:radial-gradient(ellipse 640px 400px at 0px 230px,color-mix(in srgb,var(--entry-ground) 44%,transparent),color-mix(in srgb,var(--entry-ground) 18%,transparent) 35%,transparent 100%),linear-gradient(0deg,color-mix(in srgb,var(--entry-ground) 88%,transparent),color-mix(in srgb,var(--entry-ground) 62%,transparent) 180px,transparent 300px);
+}
+body.ux-review #shell .ux-world-entry .your-worlds-strip { display:flex; flex-wrap:nowrap; gap:18px; align-items:flex-end; overflow:auto; padding:4px; margin:-4px; min-height:128px; }
+body.ux-review #shell .ux-world-entry .your-worlds-card { position:relative; isolation:isolate; width:154px; gap:0; padding:0; background:none; border:0; border-radius:0; color:var(--entry-ink); }
+body.ux-review #shell .ux-world-entry .your-worlds-card[aria-current="true"] { width:198px; }
+body.ux-review #shell .ux-world-entry .your-worlds-picture { aspect-ratio:16/9; position:relative; border:0; border-radius:7px; background:none; }
+body.ux-review #shell .ux-world-entry .your-worlds-card[aria-current="true"] .your-worlds-picture { outline:none; }
+body.ux-review #shell .ux-world-entry .your-worlds-picture::after { content:''; position:absolute; inset:0; border-radius:7px; padding:1px; pointer-events:none; background:linear-gradient(110deg,#ffffffbd,#ffffff13 57%,rgb(27 48 52 / 20%)); mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0); mask-composite:exclude; }
+body.ux-review #shell .ux-world-entry .your-worlds-card[aria-current="true"] .your-worlds-picture::after { background:var(--nav-edge); }
+body.ux-review #shell .ux-world-entry .world-entry-choice-title { margin:8px 0 0; font:400 12px/1.4 var(--ui-font-brand); color:var(--entry-ink); }
+body.ux-review #shell .ux-world-entry .your-worlds-card[aria-current="true"] .world-entry-choice-title::before { content:''; display:inline-block; width:3px; height:9px; margin-right:7px; background:var(--menu-accent); }
+.ux-entry-card-caption { display:none; }
+.ux-entry-arrows { display:flex; gap:4px; }
+body.ux-review #shell .ux-entry-arrows button:not(.entry-command) { position:relative; isolation:isolate; display:inline-flex; align-items:center; justify-content:center; width:40px; height:44px; padding:0; border:0; border-radius:0; background:none; color:var(--entry-ink); cursor:pointer; }
+body.ux-review #shell .ux-entry-arrows button:not(.entry-command)::before { content:''; position:absolute; inset:7px 5px; z-index:-1; border-radius:8px; background:none; }
+body.ux-review #shell .ux-entry-arrows button:not(.entry-command)::after { content:''; position:absolute; inset:7px 5px; pointer-events:none; border-radius:8px; padding:1px; background:var(--nav-edge); mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0); mask-composite:exclude; }
+body.ux-review #shell .ux-entry-arrows button:not(.entry-command):hover:not(:disabled)::before { background:rgb(255 255 255 / 18%); }
+.ux-entry-arrows button:not(.entry-command):disabled { opacity:.55; cursor:default; }
+.ux-entry-previous svg { transform:rotate(180deg); }
+body.ux-review #shell .ux-world-entry :focus-visible { outline:1px solid var(--entry-focus); outline-offset:2px; }
+body.ux-review #shell .ux-world-entry .your-worlds-card:focus-visible { outline:none; }
+body.ux-review #shell .ux-world-entry .your-worlds-card:focus-visible .your-worlds-picture { outline:1px solid var(--entry-focus); outline-offset:3px; }
+body.ux-capture-world #shell,body.ux-capture-world #product-review { display:none!important; }
+html[data-ui-scheme="dark"] body.ux-review #shell .ux-world-entry { --entry-ground:#14191c; --entry-ink:#edf1f3; --entry-muted:#c1ccd1; }
+@media(prefers-color-scheme:dark) { html[data-ui-scheme="system"] body.ux-review #shell .ux-world-entry { --entry-ground:#14191c; --entry-ink:#edf1f3; --entry-muted:#c1ccd1; } }
+@media(max-width:760px) {
+  body.ux-review #shell .your-worlds.ux-world-entry { padding:24px; grid-template-rows:auto minmax(300px,1fr) auto auto; }
+  body.ux-review #shell .ux-world-entry .ux-entry-hero { margin-top:38px; padding:26px 20px 22px; }
+  body.ux-review #shell .ux-world-entry .your-worlds-card { width:140px; }
+  body.ux-review #shell .ux-world-entry .your-worlds-card[aria-current="true"] { width:174px; }
+}
+@media(prefers-reduced-transparency:reduce) { body.ux-review #shell .ux-world-entry .entry-command::before { background:var(--menu-light); } }
+@media(forced-colors:active) {
+  .ux-entry-hero::before { background:Canvas; mask:none; border:1px solid CanvasText; }
+  body.ux-review #shell .ux-world-entry .entry-command { color:ButtonText; border:1px solid ButtonText; }
+  body.ux-review #shell .ux-world-entry .entry-command::before,body.ux-review #shell .ux-world-entry .entry-command::after { display:none; }
+}
+
+/* One deliberate primary action, based on the reference's preorder orb. */
+body.ux-review #shell .ux-world-entry .your-worlds-actions { padding-right:74px; min-height:44px; }
+body.ux-review #shell .ux-world-entry .entry-command kbd { display:none; }
+body.ux-review #shell .ux-world-entry .ux-entry-back { padding-inline:0 10px; }
+body.ux-review #shell .ux-world-entry .ux-entry-back::before,body.ux-review #shell .ux-world-entry .ux-entry-back::after { content:none; }
+body.ux-review #shell .ux-world-entry .ux-entry-orb { position:absolute; right:12px; bottom:-18px; width:72px; height:72px; min-height:72px; padding:10px 0; gap:6px; flex-direction:column; color:#ffffff; border-radius:50%; background:radial-gradient(circle at 50% 48%,#4b555b 0%,#68777d 36%,rgb(202 215 218 / 85%) 68%,rgb(242 247 247 / 72%) 100%); box-shadow:inset 0 0 0 1px rgb(255 255 255 / 38%),0 2px 8px rgb(23 41 47 / 8%); font:400 13px/1 var(--ui-font-brand); }
+body.ux-review #shell .ux-world-entry .ux-entry-orb::before,body.ux-review #shell .ux-world-entry .ux-entry-orb::after { content:none; }
+body.ux-review #shell .ux-world-entry .ux-entry-orb .ux-orb-icon { display:grid; place-items:center; width:20px; height:20px; border:1px solid rgb(255 255 255 / 70%); border-radius:50%; }
+body.ux-review #shell .ux-world-entry .ux-entry-orb .x-icon { width:12px; height:12px; stroke-width:1.25; }
+body.ux-review #shell .ux-world-entry .ux-entry-orb:hover:not(:disabled) { background:radial-gradient(circle at 50% 48%,#3f4c53 0%,#62777f 36%,rgb(202 215 218 / 90%) 68%,rgb(242 247 247 / 82%) 100%); }
+body.ux-review #shell .ux-world-entry .ux-entry-orb:focus-visible { outline:2px solid var(--entry-focus); outline-offset:3px; }
+body.ux-review #shell .ux-world-entry .ux-entry-orb:disabled { opacity:.6; }
+@media(max-width:420px) { body.ux-review #shell .ux-world-entry .your-worlds-actions { padding-right:58px; gap:4px; } body.ux-review #shell .ux-world-entry .ux-entry-orb { right:8px; bottom:-14px; width:62px; height:62px; min-height:62px; } }
+
+/* Selection motion follows the reference's quiet fade, blur and filmstrip resize. */
+body.ux-review #shell .ux-world-entry .your-worlds-card { flex-shrink:0; transition:width 500ms cubic-bezier(.25,.46,.45,.94); }
+body.ux-review #shell .ux-world-entry .your-worlds-strip { scroll-behavior:smooth; }
+body.ux-review #shell .ux-world-entry .entry-command,body.ux-review #shell .ux-entry-arrows button { transition:color 160ms cubic-bezier(.25,.46,.45,.94),opacity 160ms cubic-bezier(.25,.46,.45,.94),transform 160ms cubic-bezier(.25,.46,.45,.94); }
+body.ux-review #shell .ux-world-entry .entry-command::before { transition:background 160ms cubic-bezier(.25,.46,.45,.94); }
+body.ux-review #shell .ux-world-entry .ux-entry-image { overflow:hidden; }
+.ux-entry-still,.ux-entry-live { position:absolute; inset:0; background-position:center; background-size:cover; transition:opacity 600ms cubic-bezier(.25,.46,.45,.94); }
+.ux-entry-live { border:0; width:max(100%,1100px); height:max(100%,800px); left:50%; transform:translateX(-50%); pointer-events:none; }
+.ux-entry-arrows { align-items:center; }
+body.ux-review #shell .ux-world-entry .ux-entry-arrows .your-worlds-create-row { margin-left:12px; }
+.ux-entry-action-error { font:400 13px/1.5 var(--ui-font-brand); margin:16px 0 0; }
+/* Saved facts are a reading surface; editing remains in native world controls. */
+.ux-entry-details { --entry-ink:#18242a; --entry-muted:#576970; box-sizing:border-box; width:min(460px,calc(100vw - 32px)); max-height:calc(100dvh - 48px); padding:0; border:1px solid rgb(125 166 179 / 35%); border-radius:20px; color:var(--entry-ink); background:rgb(250 252 251 / 97%); box-shadow:0 18px 80px rgb(18 40 44 / 14%); font:400 14px/1.5 var(--ui-font-brand); overflow:hidden; animation:ux-detail-enter 240ms cubic-bezier(.25,.46,.45,.94); }
+.ux-entry-details::backdrop { background:rgb(20 36 40 / 14%); }
+.ux-entry-details [hidden] { display:none!important; }
+.ux-entry-details[open] { display:flex; flex-direction:column; }
+.ux-entry-details header { flex:none; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:22px 22px 10px 28px; }
+.ux-entry-details h2 { font:200 28px/1.2 var(--ui-font-brand); letter-spacing:-.025em; margin:0; }
+.ux-entry-details button { display:inline-flex; align-items:center; justify-content:center; min-height:44px; border:0; color:inherit; background:none; font:400 13px/1 var(--ui-font-brand); cursor:pointer; }
+.ux-entry-details .ux-details-close { width:44px; padding:0; border-radius:10px; }
+.ux-entry-details .x-icon { width:16px; height:16px; stroke-width:1.25; }
+.ux-entry-details button:hover { background:rgb(125 166 179 / 8%); }
+.ux-entry-details :focus-visible { outline:1px solid var(--menu-accent); outline-offset:2px; }
+.ux-details-body { padding:0 28px 24px; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.ux-entry-details dl { margin:0; }
+.ux-details-fact { display:flex; justify-content:space-between; gap:24px; padding:10px 0; border-bottom:1px solid rgb(125 166 179 / 16%); }
+.ux-details-fact dt { color:var(--entry-muted); }
+.ux-details-fact dd { margin:0; text-align:right; overflow-wrap:anywhere; }
+.ux-entry-details h3 { margin:24px 0 6px; font:400 13px/1.5 var(--ui-font-brand); color:var(--entry-muted); }
+.ux-details-note { margin:12px 0 0; font-size:12px; color:var(--entry-muted); }
+.ux-details-parameters { margin-top:16px; font-size:12px; }
+.ux-details-parameters summary { min-height:44px; cursor:pointer; align-content:center; }
+.ux-entry-details footer { flex:none; display:flex; justify-content:flex-end; border-top:1px solid rgb(125 166 179 / 16%); padding:12px 22px; }
+.ux-entry-details .ux-details-action { position:relative; padding-inline:14px; border-radius:9px; }
+.ux-details-action::after { content:''; position:absolute; inset:6px 0; padding:1px; border-radius:9px; pointer-events:none; background:var(--nav-edge); mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0); mask-composite:exclude; }
+@keyframes ux-detail-enter { from { opacity:0; transform:translateY(6px); filter:blur(2px); } to { opacity:1; transform:translateY(0); filter:blur(0); } }
+html[data-ui-scheme="dark"] .ux-entry-details { --entry-ink:#edf1f3; --entry-muted:#bcc7cc; background:rgb(24 31 34 / 97%); }
+@media(prefers-reduced-motion:reduce) {
+  body.ux-review #shell .ux-world-entry .your-worlds-card,.ux-entry-still,.ux-entry-live,body.ux-review #shell .ux-world-entry .entry-command,body.ux-review #shell .ux-entry-arrows button { transition:none; }
+  body.ux-review #shell .ux-world-entry .your-worlds-strip { scroll-behavior:auto; }
+  .ux-entry-details { animation:none; }
+}

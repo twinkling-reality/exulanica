@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 from conftest import write_photo
 from tests_support_api import EVERY_PERMISSION
+from world_structure_fixtures import invalidate_snapshot_source
 from world_support import registered_world
 
 pytestmark = pytest.mark.postgres
@@ -461,12 +462,9 @@ def test_invalidated_snapshot_source_reads_are_explicit_for_list_and_single(
         base_topology_digest="api-topology",
         world_id=world_api.world_id,
     )
-    tombstone = repository.connection.execute(
-        "insert into tombstone (workspace_id,scope,requested_by,reason) "
-        "values (%s,'workspace',%s,'test invalidation') returning tombstone_id",
-        (repository.workspace_id, world_api.actor),
-    ).fetchone()
-    assert tombstone is not None
+    invalidate_snapshot_source(
+        repository, world_api.world_id, opened["snapshot_id"], world_api.actor
+    )
     query = f"source_snapshot_id={opened['snapshot_id']}"
     for path in (
         f"/world/source-media?{query}",

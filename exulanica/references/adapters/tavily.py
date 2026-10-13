@@ -18,8 +18,13 @@ from collections.abc import Mapping, Sequence
 from typing import Any, ClassVar, Final
 
 from exulanica.models.errors import TransportError
+from exulanica.models.manifest import load_manifest
 from exulanica.models.transport import Transport
-from exulanica.references.adapters.base import Leads, ReferenceSourceUnavailable
+from exulanica.references.adapters.base import (
+    Leads,
+    ReferenceSourceUnavailable,
+    search_timeout_seconds,
+)
 from exulanica.references.boundary import AdmittedQuery
 from exulanica.references.catalogs import ReferenceSource
 
@@ -40,7 +45,6 @@ MAX_PICTURE_DESCRIPTIONS: Final = 40
 MAX_ANSWER_CHARACTERS: Final = 1_000_000
 MAX_DESCRIPTION_CHARACTERS: Final = 400
 _REQUEST_ID: Final = re.compile(r"[A-Za-z0-9-]{1,64}")
-_TIMEOUT_SECONDS: Final = 20.0
 _STATUS_REFUSALS: Final = {
     401: "reference_source_refused",
     403: "reference_source_refused",
@@ -96,7 +100,7 @@ class TavilySearch:
                     "Content-Type": "application/json",
                 },
                 payload=self.payload(query),
-                timeout=_TIMEOUT_SECONDS,
+                timeout=search_timeout_seconds(load_manifest().timeout_rule),
             )
         except TransportError as failure:
             raise ReferenceSourceUnavailable(

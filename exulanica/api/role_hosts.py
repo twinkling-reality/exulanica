@@ -228,7 +228,11 @@ class _People:
                 subjects=people,
                 model=model,
                 chosen_by=context.session.actor,
-                manifest=load_manifest(),
+                manifest=get_services(context.request).workspace_choice_manifest(
+                    context.connection,
+                    context.session.workspace_id,
+                    repository.engine(context.version_id),
+                ),
                 contract=role.contract(),
             )
         except ModelChoiceRefused as exc:

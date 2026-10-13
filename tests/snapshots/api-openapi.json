@@ -6110,6 +6110,578 @@
     }
    }
   },
+  "/models": {
+   "post": {
+    "tags": [
+     "models"
+    ],
+    "summary": "Admit Model",
+    "operationId": "admit_model_models_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ModelRecordBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "models"
+    ],
+    "summary": "Discover Models",
+    "operationId": "discover_models_models_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Discover Models Models Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/models/remove": {
+   "post": {
+    "tags": [
+     "models"
+    ],
+    "summary": "Remove Admitted Model",
+    "operationId": "remove_admitted_model_models_remove_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ModelRecordBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/models/probes/prepare": {
+   "post": {
+    "tags": [
+     "models"
+    ],
+    "summary": "Prepare Model Probe",
+    "operationId": "prepare_model_probe_models_probes_prepare_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ModelRecordBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/models/probes/{probe_id}/start": {
+   "post": {
+    "tags": [
+     "models"
+    ],
+    "summary": "Start Model Probe",
+    "operationId": "start_model_probe_models_probes__probe_id__start_post",
+    "parameters": [
+     {
+      "name": "probe_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Probe Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProbeStartBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/models/probes/{probe_id}": {
+   "get": {
+    "tags": [
+     "models"
+    ],
+    "summary": "Read Model Probe",
+    "operationId": "read_model_probe_models_probes__probe_id__get",
+    "parameters": [
+     {
+      "name": "probe_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Probe Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/models/probes/{probe_id}/replay": {
+   "post": {
+    "tags": [
+     "models"
+    ],
+    "summary": "Replay Model Probe",
+    "operationId": "replay_model_probe_models_probes__probe_id__replay_post",
+    "parameters": [
+     {
+      "name": "probe_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Probe Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/models/probes/{probe_id}/cancel": {
+   "post": {
+    "tags": [
+     "models"
+    ],
+    "summary": "Cancel Model Probe",
+    "operationId": "cancel_model_probe_models_probes__probe_id__cancel_post",
+    "parameters": [
+     {
+      "name": "probe_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Probe Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/models/preflight": {
+   "post": {
+    "tags": [
+     "models"
+    ],
+    "summary": "Preflight Model",
+    "operationId": "preflight_model_models_preflight_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ModelPreflightBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Preflight Model Models Preflight Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/models/bindings/{binding_sha256}": {
+   "get": {
+    "tags": [
+     "models"
+    ],
+    "summary": "Read Model Binding",
+    "operationId": "read_model_binding_models_bindings__binding_sha256__get",
+    "parameters": [
+     {
+      "name": "binding_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Binding Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/workspace-assets": {
    "post": {
     "tags": [
@@ -12592,6 +13164,156 @@
     }
    }
   },
+  "/world/versions/{version_id}/inventory": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "World Inventory",
+    "description": "Enumerate saved identities; role membership does not grant model assignment or execution.",
+    "operationId": "world_inventory_world_versions__version_id__inventory_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response World Inventory World Versions  Version Id  Inventory Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/inventory/query": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Query World Entities",
+    "description": "Match actual constant base factors; reading performs no edit, worker or model call.",
+    "operationId": "query_world_entities_world_versions__version_id__inventory_query_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/WorldEntityQueryBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/environment-instances": {
    "post": {
     "tags": [
@@ -13484,6 +14206,242 @@
       }
      }
     },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/things/on-support/preview": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Check passive rigid thing placement against an exact source support and state.",
+    "operationId": "preview_supported_thing_world_versions__version_id__things_on_support_preview_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SupportedThingBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/things/on-support": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Save a passive rigid thing with explicit admitted support affinity.",
+    "operationId": "place_supported_thing_world_versions__version_id__things_on_support_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SupportedThingBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AlternateVersionView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/things/{thing_id}/support": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Read a placed thing's support affinity and current bounded clearance availability.",
+    "operationId": "read_thing_support_world_versions__version_id__things__thing_id__support_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "thing_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "maxLength": 200,
+       "title": "Thing Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
     "responses": {
      "200": {
       "description": "Successful Response",
@@ -16748,6 +17706,83 @@
     }
    }
   },
+  "/world/versions/{version_id}/subjects/{ref}": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "A world, being or thing's properties and catalog actions, without performing them.",
+    "operationId": "read_subject_world_versions__version_id__subjects__ref__get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "ref",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Ref"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/worlds/capabilities": {
    "get": {
     "tags": [
@@ -19533,6 +20568,117 @@
     }
    }
   },
+  "/worlds/{world_id}/removal": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Preview World Removal",
+    "description": "Read removal consequences. Only its creator or workspace owner can remove a world.",
+    "operationId": "preview_world_removal_worlds__world_id__removal_get",
+    "parameters": [
+     {
+      "name": "world_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WorldRemovalView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/{world_id}": {
+   "delete": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Remove World",
+    "description": "Permanently remove a generated world; a backup restore honors the removal again.",
+    "operationId": "remove_world_worlds__world_id__delete",
+    "parameters": [
+     {
+      "name": "world_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/worlds/recipes": {
    "get": {
     "tags": [
@@ -19688,6 +20834,145 @@
      },
      "409": {
       "description": "Refused by name; nothing was written."
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/generated/terrain": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Save an admitted terrain realization as a world.",
+    "description": "Retain exact authored terrain and a valid entry through saved-world authority.\n\nThe source declares bounded person contact and passive flat-patch geometry. It has no\nsociety projection; creating it does not fulfill a world kind's activity requirements.",
+    "operationId": "create_terrain_world_worlds_generated_terrain_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CreateTerrainWorldBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SavedWorldEntryView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Invalid terrain or entry; nothing was written."
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/terrain-contact": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Read Terrain Contact",
+    "description": "Bind static terrain contact to an authorized version with no unreconciled authored delta.\n\nAny authored occupancy without a complete terrain proxy adapter is unavailable. A source\ngeometry digest alone is never a claim that the current edited world is clear.",
+    "operationId": "read_terrain_contact_world_versions__version_id__terrain_contact_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "expected_state_sha256",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Expected State Sha256"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
      },
      "422": {
       "description": "Validation Error",
@@ -19996,7 +21281,7 @@
      "world"
     ],
     "summary": "A kind's draft: drafting, ready with the kept kind, or refused by name.",
-    "description": "The draft's state; 404 ``kind_draft_unknown`` for an id this server does not hold for this\ncaller in this workspace (another person's draft reads so too), which a draft lost when the\nserver restarted reads as too.",
+    "description": "The requester's retained draft, including after another process takes over.",
     "operationId": "read_kind_draft_worlds_kinds_drafts__draft_id__get",
     "parameters": [
      {
@@ -20036,6 +21321,115 @@
         }
        }
       }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/kinds/versions/{document_sha256}/removal": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Kind Removal Preview",
+    "operationId": "kind_removal_preview_worlds_kinds_versions__document_sha256__removal_get",
+    "parameters": [
+     {
+      "name": "document_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Document Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/kinds/versions/{document_sha256}": {
+   "delete": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Remove Kept Kind",
+    "operationId": "remove_kept_kind_worlds_kinds_versions__document_sha256__delete",
+    "parameters": [
+     {
+      "name": "document_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Document Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
      },
      "422": {
       "description": "Validation Error",
@@ -20128,7 +21522,7 @@
      "world"
     ],
     "summary": "A site world's drawing, for the world whose snapshot names its receipt.",
-    "description": "The drawing a site world's records make, generated again from the receipt the version's own\nsnapshot names, in the kind worker, and served with its digest as its entity tag. A drawing the\nworker does not finish in time, or cannot take, answers 503 ``kind_work_*`` with a\n``Retry-After``; a finished one is kept, so asking again reads it.",
+    "description": "Serve the version's exact drawing after worker/cache and final current-source checks.",
     "operationId": "read_site_drawing_world_versions__version_id__site_get",
     "parameters": [
      {
@@ -20197,7 +21591,7 @@
      "world"
     ],
     "summary": "Make a world from a description, as a job the page polls.",
-    "description": "Admit the words and start the draft; answer at once, never waiting on a model.\n\n403 ``kinds_from_people_not_offered`` on a server whose deployment has not turned kinds from\npeople on; 503 without a model credential; 429 ``budget_exceeded`` with its ``spending``\nmember when the workspace's allowance admits no attempt; 409 ``world_limit_reached`` when the\nworkspace holds as many generated worlds as it may; 403 ``worlds_read_only`` where the\ndatabase role cannot register a world: each before anything is spent, and each said by\n``GET /worlds/drafts`` before anything is typed. 409 ``kind_draft_busy`` while a draft runs in\nthis workspace, with its ``draft_id`` when the caller started it as a world's draft; 429\n``kind_draft_limit`` with a ``Retry-After`` when the caller has started as many drafts this\nhour as one person may; 503 ``kind_draft_capacity`` with a ``Retry-After`` when the server\nruns as many drafts as it may. The three figures are the world draft policy's\nbudgets. A body over 16,384 bytes is refused 413 before it is read. Saved names are replaced\nin the words before the job starts.",
+    "description": "Admit the words and start the draft; answer at once, never waiting on a model.\n\n403 ``kinds_from_people_not_offered`` on a server whose deployment has not turned kinds from\npeople on; 503 without a model credential; 429 ``budget_exceeded`` with its ``spending``\nmember when the workspace's allowance admits no attempt; 409 ``world_limit_reached`` when the\nworkspace holds as many generated worlds as it may; 403 ``worlds_read_only`` where the\ndatabase role cannot register a world: each before anything is spent, and each said by\n``GET /worlds/drafts`` before anything is typed. 409 ``kind_draft_busy`` while a draft runs in\nthis workspace, with its ``draft_id`` when the caller started it as a world's draft; 429\n``kind_draft_limit`` with a ``Retry-After`` when the caller has started as many drafts this\nhour as one person may; 503 ``kind_draft_capacity`` with a ``Retry-After`` when the server\nruns as many drafts as it may. The three figures are the world draft policy's\nbudgets. A body over 131,072 bytes, including quote metadata, is refused 413 before it is read.\nSaved names are replaced in the words before the job starts.",
     "operationId": "start_world_draft_worlds_drafts_post",
     "parameters": [
      {
@@ -20343,6 +21737,124 @@
         "schema": {
          "$ref": "#/components/schemas/MadeWorldDraftView"
         }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/selection/world-drafts/prepare": {
+   "post": {
+    "tags": [
+     "selection"
+    ],
+    "summary": "Prepare",
+    "operationId": "prepare_selection_world_drafts_prepare_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PrepareBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Prepare Selection World Drafts Prepare Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/selection/world-drafts/outcome": {
+   "post": {
+    "tags": [
+     "selection"
+    ],
+    "summary": "Outcome",
+    "operationId": "outcome_selection_world_drafts_outcome_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OutcomeBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
        }
       }
      },
@@ -21018,7 +22530,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/IssueBody"
+        "$ref": "#/components/schemas/exulanica__api__routes__door__IssueBody"
        }
       }
      }
@@ -21604,7 +23116,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/RedeemBody"
+        "$ref": "#/components/schemas/exulanica__api__routes__door__RedeemBody"
        }
       }
      },
@@ -21935,6 +23447,566 @@
         }
        }
       }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/invitations": {
+   "post": {
+    "tags": [
+     "participation"
+    ],
+    "summary": "Issue",
+    "operationId": "issue_world_invitations_post",
+    "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/exulanica__api__routes__participation__IssueBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Issue World Invitations Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "participation"
+    ],
+    "summary": "Invitations",
+    "operationId": "invitations_world_invitations_get",
+    "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "after",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "After"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Invitations World Invitations Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/invitations/{grant_id}": {
+   "get": {
+    "tags": [
+     "participation"
+    ],
+    "summary": "Invitation",
+    "operationId": "invitation_world_invitations__grant_id__get",
+    "parameters": [
+     {
+      "name": "grant_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Grant Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Invitation World Invitations  Grant Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/invitations/{grant_id}/revoke": {
+   "post": {
+    "tags": [
+     "participation"
+    ],
+    "summary": "Revoke",
+    "operationId": "revoke_world_invitations__grant_id__revoke_post",
+    "parameters": [
+     {
+      "name": "grant_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Grant Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Revoke World Invitations  Grant Id  Revoke Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/participation/notice": {
+   "get": {
+    "tags": [
+     "participation"
+    ],
+    "summary": "Notice",
+    "operationId": "notice_participation_notice_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Notice Participation Notice Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/participation/redeem": {
+   "post": {
+    "tags": [
+     "participation"
+    ],
+    "summary": "Redeem",
+    "operationId": "redeem_participation_redeem_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/exulanica__api__routes__participation__RedeemBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Redeem Participation Redeem Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/participation/{grant_id}": {
+   "get": {
+    "tags": [
+     "participation"
+    ],
+    "summary": "Grant",
+    "operationId": "grant_participation__grant_id__get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Grant Participation  Grant Id  Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/participation/{grant_id}/world": {
+   "get": {
+    "tags": [
+     "participation"
+    ],
+    "summary": "World",
+    "operationId": "world_participation__grant_id__world_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response World Participation  Grant Id  World Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/participation/{grant_id}/society": {
+   "get": {
+    "tags": [
+     "participation"
+    ],
+    "summary": "Society",
+    "operationId": "society_participation__grant_id__society_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Society Participation  Grant Id  Society Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/participation/{grant_id}/world/tiles/{baked_tile_id}/bytes": {
+   "get": {
+    "tags": [
+     "participation"
+    ],
+    "summary": "Tile",
+    "operationId": "tile_participation__grant_id__world_tiles__baked_tile_id__bytes_get",
+    "parameters": [
+     {
+      "name": "baked_tile_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Baked Tile Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/participation/{grant_id}/world/files/{sha256}": {
+   "get": {
+    "tags": [
+     "participation"
+    ],
+    "summary": "File",
+    "operationId": "file_participation__grant_id__world_files__sha256__get",
+    "parameters": [
+     {
+      "name": "sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Sha256"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/participation/{grant_id}/leave": {
+   "post": {
+    "tags": [
+     "participation"
+    ],
+    "summary": "Leave",
+    "operationId": "leave_participation__grant_id__leave_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
      },
      "422": {
       "description": "Validation Error",
@@ -26764,6 +28836,18 @@
        }
       ],
       "title": "Values"
+     },
+     "support": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Support"
      }
     },
     "additionalProperties": false,
@@ -26870,6 +28954,38 @@
     "type": "object",
     "title": "CreateStarterWorldBody"
    },
+   "CreateTerrainWorldBody": {
+    "properties": {
+     "title": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title"
+     },
+     "authoring": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Authoring"
+     },
+     "style_pack": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/StylePackBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "title",
+     "authoring"
+    ],
+    "title": "CreateTerrainWorldBody"
+   },
    "CreateVersionBody": {
     "properties": {
      "title": {
@@ -26927,6 +29043,18 @@
      "words": {
       "type": "string",
       "title": "Words"
+     },
+     "reference_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reference Id"
      }
     },
     "additionalProperties": false,
@@ -27491,6 +29619,42 @@
       "maxLength": 1000,
       "minLength": 1,
       "title": "Description"
+     },
+     "idempotency_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Idempotency Key"
+     },
+     "operation": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Operation"
+     },
+     "maximum_usd": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[0-9]{1,6}(\\.[0-9]{1,8})?$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Maximum Usd"
      }
     },
     "additionalProperties": false,
@@ -28677,6 +30841,64 @@
     ],
     "title": "GeneratedSiteView",
     "description": "What the page draws of a world made from a world kind: its kind, the one region its people\nlive in and where a person arrives, in that region's frame (east, height, south). The drawing\nitself is read through the world's version (``GET /world/versions/{version_id}/site``)."
+   },
+   "GeneratedTerrainView": {
+    "properties": {
+     "region_id": {
+      "type": "string",
+      "title": "Region Id"
+     },
+     "arrival_mm": {
+      "prefixItems": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       }
+      ],
+      "type": "array",
+      "maxItems": 3,
+      "minItems": 3,
+      "title": "Arrival Mm"
+     },
+     "arrival_facing_mm": {
+      "prefixItems": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       }
+      ],
+      "type": "array",
+      "maxItems": 2,
+      "minItems": 2,
+      "title": "Arrival Facing Mm"
+     },
+     "geometry_sha256": {
+      "type": "string",
+      "title": "Geometry Sha256"
+     },
+     "contact_sha256": {
+      "type": "string",
+      "title": "Contact Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "region_id",
+     "arrival_mm",
+     "arrival_facing_mm",
+     "geometry_sha256",
+     "contact_sha256"
+    ],
+    "title": "GeneratedTerrainView",
+    "description": "An exact terrain source and arrival, without a world-kind or society projection."
    },
    "GeneratedTileView": {
     "properties": {
@@ -30296,6 +32518,69 @@
     ],
     "title": "InteractionVersionView"
    },
+   "IntervalBody": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "interval",
+      "title": "Kind"
+     },
+     "lower": {
+      "prefixItems": [
+       {
+        "type": "integer",
+        "maximum": 255.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "integer",
+        "maximum": 255.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "integer",
+        "maximum": 255.0,
+        "minimum": 0.0
+       }
+      ],
+      "type": "array",
+      "maxItems": 3,
+      "minItems": 3,
+      "title": "Lower"
+     },
+     "upper": {
+      "prefixItems": [
+       {
+        "type": "integer",
+        "maximum": 255.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "integer",
+        "maximum": 255.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "integer",
+        "maximum": 255.0,
+        "minimum": 0.0
+       }
+      ],
+      "type": "array",
+      "maxItems": 3,
+      "minItems": 3,
+      "title": "Upper"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "lower",
+     "upper"
+    ],
+    "title": "IntervalBody"
+   },
    "InterventionSummary": {
     "properties": {
      "kind": {
@@ -30343,136 +32628,6 @@
      "detail"
     ],
     "title": "InvalidPair"
-   },
-   "IssueBody": {
-    "properties": {
-     "idempotency_key": {
-      "type": "string",
-      "maxLength": 128,
-      "minLength": 8,
-      "title": "Idempotency Key"
-     },
-     "bridge": {
-      "type": "string",
-      "maxLength": 32,
-      "minLength": 1,
-      "title": "Bridge"
-     },
-     "visitors_maximum": {
-      "type": "integer",
-      "maximum": 4.0,
-      "minimum": 0.0,
-      "title": "Visitors Maximum",
-      "default": 0
-     },
-     "kinds": {
-      "items": {
-       "type": "string"
-      },
-      "type": "array",
-      "maxItems": 16,
-      "title": "Kinds"
-     },
-     "things": {
-      "items": {
-       "type": "string",
-       "format": "uuid"
-      },
-      "type": "array",
-      "maxItems": 8,
-      "title": "Things"
-     },
-     "version_id": {
-      "anyOf": [
-       {
-        "type": "string",
-        "format": "uuid"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Version Id"
-     },
-     "gate": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 200,
-        "minLength": 1
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Gate"
-     },
-     "may_carry_in": {
-      "type": "boolean",
-      "title": "May Carry In",
-      "default": false
-     },
-     "may_carry_out": {
-      "type": "boolean",
-      "title": "May Carry Out",
-      "default": false
-     },
-     "may_speak": {
-      "type": "boolean",
-      "title": "May Speak",
-      "default": true
-     },
-     "world_words": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 80
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "World Words"
-     },
-     "visitors_decided_by": {
-      "type": "string",
-      "enum": [
-       "program",
-       "world"
-      ],
-      "title": "Visitors Decided By",
-      "default": "program"
-     },
-     "traveller": {
-      "anyOf": [
-       {
-        "$ref": "#/components/schemas/ChosenModel"
-       },
-       {
-        "type": "null"
-       }
-      ]
-     },
-     "minutes": {
-      "type": "integer",
-      "maximum": 1440.0,
-      "minimum": 1.0,
-      "title": "Minutes",
-      "default": 120
-     },
-     "channel_credential": {
-      "type": "boolean",
-      "title": "Channel Credential",
-      "default": false
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "idempotency_key",
-     "bridge"
-    ],
-    "title": "IssueBody"
    },
    "ItemBasis": {
     "type": "string",
@@ -31440,9 +33595,51 @@
       "format": "uuid",
       "title": "Draft Id"
      },
+     "request_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Request Id"
+     },
+     "operation": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Operation"
+     },
+     "recovered": {
+      "type": "boolean",
+      "title": "Recovered",
+      "default": false
+     },
+     "accounting": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Accounting"
+     },
      "state": {
       "type": "string",
       "enum": [
+       "queued",
        "choosing",
        "drafting",
        "making",
@@ -31922,6 +34119,62 @@
      "model"
     ],
     "title": "ModelChoiceBody"
+   },
+   "ModelPreflightBody": {
+    "properties": {
+     "provider": {
+      "type": "string",
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]{0,62}$",
+      "title": "Provider"
+     },
+     "model_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$",
+      "title": "Model Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "provider",
+     "model_id"
+    ],
+    "title": "ModelPreflightBody"
+   },
+   "ModelRecordBody": {
+    "properties": {
+     "provider": {
+      "type": "string",
+      "maxLength": 63,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]{0,62}$",
+      "title": "Provider"
+     },
+     "model_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$",
+      "title": "Model Id"
+     },
+     "request_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Request Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "provider",
+     "model_id",
+     "request_id"
+    ],
+    "title": "ModelRecordBody"
    },
    "ModelRightRequest": {
     "properties": {
@@ -32592,6 +34845,21 @@
     ],
     "title": "OutcomeAnswerBody",
     "description": "What one sent step's own request was answered with: its status and the identity that\nanswer named. The read credits a step only with the record its answer names; a step sent back\nwithout one, or with a refusal, is never applied. Each identity field is the response's own,\nby the step's route: ``edit_seq`` and ``state_sha256`` for an edit (an arrangement's from its\n``version``), ``event_seq`` and ``document_sha256`` for a control step (from its ``receipt``),\n``revision`` and ``last_event_seq`` for a configuration, ``society_id`` for people brought in;\na style step and a refused request send only ``status`` and ``code``."
+   },
+   "OutcomeBody": {
+    "properties": {
+     "plan": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Plan"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "plan"
+    ],
+    "title": "OutcomeBody"
    },
    "OutcomePinsBody": {
     "properties": {
@@ -34070,6 +36338,46 @@
     "title": "PointMapArrivalPin",
     "description": "One exact standalone estimate of an owned photograph."
    },
+   "PredicateBody": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "declared_base_colour",
+      "title": "Kind"
+     },
+     "quantifier": {
+      "type": "string",
+      "const": "any_constant_primitive",
+      "title": "Quantifier"
+     },
+     "colour": {
+      "oneOf": [
+       {
+        "$ref": "#/components/schemas/SwatchBody"
+       },
+       {
+        "$ref": "#/components/schemas/IntervalBody"
+       }
+      ],
+      "title": "Colour",
+      "discriminator": {
+       "propertyName": "kind",
+       "mapping": {
+        "interval": "#/components/schemas/IntervalBody",
+        "swatch": "#/components/schemas/SwatchBody"
+       }
+      }
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "quantifier",
+     "colour"
+    ],
+    "title": "PredicateBody"
+   },
    "PreparationBody": {
     "properties": {
      "recipe": {
@@ -34082,6 +36390,27 @@
      "recipe"
     ],
     "title": "PreparationBody"
+   },
+   "PrepareBody": {
+    "properties": {
+     "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Description"
+     },
+     "idempotency_key": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Idempotency Key"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "description"
+    ],
+    "title": "PrepareBody"
    },
    "PrepareExperimentBody": {
     "properties": {
@@ -34435,6 +36764,33 @@
      "created_at"
     ],
     "title": "PreviewView"
+   },
+   "ProbeStartBody": {
+    "properties": {
+     "request_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Request Id"
+     },
+     "definition_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Definition Sha256"
+     },
+     "ceiling_usd": {
+      "type": "string",
+      "pattern": "^[0-9]{1,4}(\\.[0-9]{1,18})?$",
+      "title": "Ceiling Usd"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "request_id",
+     "definition_sha256",
+     "ceiling_usd"
+    ],
+    "title": "ProbeStartBody"
    },
    "ProcessingState": {
     "type": "string",
@@ -36815,28 +39171,6 @@
     "title": "ReconstructionSceneRow",
     "description": "A durable multi-photograph scene with recorded and deliverable state kept separate."
    },
-   "RedeemBody": {
-    "properties": {
-     "code": {
-      "type": "string",
-      "maxLength": 40,
-      "minLength": 1,
-      "title": "Code"
-     },
-     "requester": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$",
-      "title": "Requester"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "code",
-     "requester"
-    ],
-    "title": "RedeemBody"
-   },
    "ReferenceBody": {
     "properties": {
      "purpose": {
@@ -38333,6 +40667,16 @@
       "anyOf": [
        {
         "$ref": "#/components/schemas/GeneratedSiteView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "generated_terrain": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/GeneratedTerrainView"
        },
        {
         "type": "null"
@@ -41398,7 +43742,7 @@
      "manifest_sha256"
     ],
     "title": "StylePackBody",
-    "description": "A style pack of the host's library, named exactly: id, version and manifest digest."
+    "description": "A style pack named exactly: id, version and manifest digest.\n\nAppearance previews resolve the library and current workspace; world creation uses the library."
    },
    "StylePackView": {
     "properties": {
@@ -42038,6 +44382,133 @@
      "entity_id"
     ],
     "title": "SupportView"
+   },
+   "SupportedThingBody": {
+    "properties": {
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "saved_entry": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/SavedEntryAdvanceBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "thing_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Thing Id"
+     },
+     "kind": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ThingKindBody"
+       },
+       {
+        "$ref": "#/components/schemas/WorkspaceKindBody"
+       }
+      ],
+      "title": "Kind"
+     },
+     "region_id": {
+      "type": "string",
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Region Id"
+     },
+     "position_mm": {
+      "prefixItems": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       }
+      ],
+      "type": "array",
+      "maxItems": 2,
+      "minItems": 2,
+      "title": "Position Mm"
+     },
+     "yaw_microradians": {
+      "type": "integer",
+      "maximum": 6283185.0,
+      "minimum": 0.0,
+      "title": "Yaw Microradians"
+     },
+     "origin_role": {
+      "type": "string",
+      "enum": [
+       "fictional",
+       "personal"
+      ],
+      "title": "Origin Role"
+     },
+     "support": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Support"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_state_sha256",
+     "thing_id",
+     "kind",
+     "region_id",
+     "position_mm",
+     "yaw_microradians",
+     "origin_role",
+     "support"
+    ],
+    "title": "SupportedThingBody"
+   },
+   "SwatchBody": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "swatch",
+      "title": "Kind"
+     },
+     "srgb8": {
+      "prefixItems": [
+       {
+        "type": "integer",
+        "maximum": 255.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "integer",
+        "maximum": 255.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "integer",
+        "maximum": 255.0,
+        "minimum": 0.0
+       }
+      ],
+      "type": "array",
+      "maxItems": 3,
+      "minItems": 3,
+      "title": "Srgb8"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "srgb8"
+    ],
+    "title": "SwatchBody"
    },
    "TakenLookView": {
     "properties": {
@@ -43461,6 +45932,18 @@
       },
       "type": "array",
       "title": "Refusals"
+     },
+     "operation": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Operation"
      }
     },
     "type": "object",
@@ -43654,6 +46137,25 @@
     "title": "WorldDraftView",
     "description": "What a description drafted: a proposal to confirm, or a refusal, and how it was made."
    },
+   "WorldEntityQueryBody": {
+    "properties": {
+     "profile": {
+      "type": "string",
+      "const": "exulanica.world-entity-query/v1",
+      "title": "Profile"
+     },
+     "predicate": {
+      "$ref": "#/components/schemas/PredicateBody"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "profile",
+     "predicate"
+    ],
+    "title": "WorldEntityQueryBody"
+   },
    "WorldRecipeView": {
     "properties": {
      "key": {
@@ -43677,6 +46179,57 @@
      "tiles"
     ],
     "title": "WorldRecipeView"
+   },
+   "WorldRemovalView": {
+    "properties": {
+     "world_id": {
+      "type": "string",
+      "title": "World Id"
+     },
+     "title": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title"
+     },
+     "counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Counts"
+     },
+     "consequences": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Consequences"
+     },
+     "retained": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Retained"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "world_id",
+     "title",
+     "counts",
+     "consequences",
+     "retained"
+    ],
+    "title": "WorldRemovalView",
+    "description": "What permanently removing this generated world affects."
    },
    "WorldView": {
     "properties": {
@@ -43959,6 +46512,214 @@
      "unanswered_cost_unknown"
     ],
     "title": "AnswerView"
+   },
+   "exulanica__api__routes__door__IssueBody": {
+    "properties": {
+     "idempotency_key": {
+      "type": "string",
+      "maxLength": 128,
+      "minLength": 8,
+      "title": "Idempotency Key"
+     },
+     "bridge": {
+      "type": "string",
+      "maxLength": 32,
+      "minLength": 1,
+      "title": "Bridge"
+     },
+     "visitors_maximum": {
+      "type": "integer",
+      "maximum": 4.0,
+      "minimum": 0.0,
+      "title": "Visitors Maximum",
+      "default": 0
+     },
+     "kinds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 16,
+      "title": "Kinds"
+     },
+     "things": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 8,
+      "title": "Things"
+     },
+     "version_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version Id"
+     },
+     "gate": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gate"
+     },
+     "may_carry_in": {
+      "type": "boolean",
+      "title": "May Carry In",
+      "default": false
+     },
+     "may_carry_out": {
+      "type": "boolean",
+      "title": "May Carry Out",
+      "default": false
+     },
+     "may_speak": {
+      "type": "boolean",
+      "title": "May Speak",
+      "default": true
+     },
+     "world_words": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 80
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "World Words"
+     },
+     "visitors_decided_by": {
+      "type": "string",
+      "enum": [
+       "program",
+       "world"
+      ],
+      "title": "Visitors Decided By",
+      "default": "program"
+     },
+     "traveller": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ChosenModel"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "minutes": {
+      "type": "integer",
+      "maximum": 1440.0,
+      "minimum": 1.0,
+      "title": "Minutes",
+      "default": 120
+     },
+     "channel_credential": {
+      "type": "boolean",
+      "title": "Channel Credential",
+      "default": false
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "idempotency_key",
+     "bridge"
+    ],
+    "title": "IssueBody"
+   },
+   "exulanica__api__routes__door__RedeemBody": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "maxLength": 40,
+      "minLength": 1,
+      "title": "Code"
+     },
+     "requester": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Requester"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "code",
+     "requester"
+    ],
+    "title": "RedeemBody"
+   },
+   "exulanica__api__routes__participation__IssueBody": {
+    "properties": {
+     "idempotency_key": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Idempotency Key"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Expires At"
+     },
+     "world_words": {
+      "type": "string",
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "World Words"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "idempotency_key",
+     "version_id",
+     "expires_at",
+     "world_words"
+    ],
+    "title": "IssueBody"
+   },
+   "exulanica__api__routes__participation__RedeemBody": {
+    "properties": {
+     "invitation": {
+      "type": "string",
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Invitation"
+     },
+     "notice_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Notice Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "invitation",
+     "notice_sha256"
+    ],
+    "title": "RedeemBody"
    },
    "exulanica__api__routes__selection__AnswerView": {
     "properties": {

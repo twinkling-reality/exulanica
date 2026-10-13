@@ -1,0 +1,37 @@
+/* Public-to-product entry uses the landing plane and its existing Plex typography. */
+:root {
+  --entry-font: 'IBM Plex Sans', ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --entry-utility-font: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  --entry-control-text: 14px;
+  --entry-task-title: 24px;
+  --entry-control-size: 44px;
+  --entry-gutter: clamp(24px, 4.5vw, 64px);
+}
+.entry-surface {
+  --font-ui: var(--entry-font);
+  --font-display: var(--entry-font);
+  --font-mono: var(--entry-utility-font);
+  color: var(--color-text);
+  background: var(--color-surface-solid);
+  font: 400 var(--entry-control-text)/1.5 var(--entry-font);
+  letter-spacing: normal;
+  -webkit-font-smoothing: antialiased;
+}
+.entry-surface .entry-command {
+  display: inline-flex; align-items: center; gap: 12px;
+  min-height: var(--entry-control-size); padding: 0;
+  border: 0; background: none; color: var(--color-text);
+  font: inherit; letter-spacing: normal; text-decoration: none;
+  cursor: pointer;
+}
+.entry-surface .entry-command .command-action-label { font: inherit; letter-spacing: normal; color: inherit; }
+.entry-surface .entry-command kbd {
+  display: grid; place-items: center; min-width: var(--entry-control-size); height: var(--entry-control-size);
+  box-sizing: border-box; padding: 0 10px; margin: 0;
+  border: 1px solid var(--color-border); border-radius: 12px;
+  background: none; box-shadow: none; color: inherit;
+  font: 400 12px/1 var(--entry-utility-font); letter-spacing: normal;
+}
+.entry-surface .entry-command:hover kbd { border-color: var(--color-text); }
+.entry-surface .entry-command:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 5px; }
+@supports (corner-shape: squircle) { .entry-surface .entry-command kbd { corner-shape: squircle; } }

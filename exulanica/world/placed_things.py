@@ -1,4 +1,4 @@
-"""A thing placed in an authored version: a thing kind, where it stands, and nothing else.
+"""A thing placed in an authored version by kind and pose, with optional explicit support.
 
 A placed thing is the authored plane's record of a thing a world's author put in a version: a
 knight by the well, a sword on the ground, the gate visitors arrive through, a creature drafted
@@ -15,6 +15,10 @@ Whether a workspace still holds a placed thing's own kind is read with the thing
 with it (:attr:`PlacedThing.kind_gone`): a kind the workspace erased, or erased after the thing was
 placed, leaves the thing gone wherever it is read, and its document says nothing of it.
 
+An explicit support reference pins the same version's generated source and a named horizontal
+surface. It selects the closed placed-thing/v2 document; unbound things keep their original
+document bytes. Clearance is the support placement authority's, not a general transform rule.
+
 Its document is the ``things`` section of the version's authored delta
 (:mod:`exulanica.world.authored_delta`), written only when the version holds a placed thing, so
 the token of every version that holds none keeps its bytes.
@@ -25,6 +29,7 @@ Pure: no connection and no SQL, so a verifier can rebuild the document.
 from __future__ import annotations
 
 import re
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cache
@@ -37,15 +42,19 @@ from exulanica.world.objects import ObjectOrigin, Transform, validate_origin, va
 __all__ = [
     "PLACED_THINGS_MAXIMUM",
     "PLACED_THING_ID_PATTERN",
+    "SUPPORTED_THING_PROFILE",
+    "SUPPORT_REFERENCE_PROFILE",
     "UNSCALED_MILLI",
     "KindReference",
     "PlacedThing",
+    "SupportReference",
     "ThingKindReference",
     "ThingPlacement",
     "WorkspaceKindReference",
     "named_kind",
     "placeable_by_author",
     "placed_thing_document",
+    "read_support_reference",
     "shipped_kind",
     "validate_placed_thing",
     "workspace_kind_reference",
@@ -58,6 +67,8 @@ _KIND_KEY: Final = re.compile(r"[a-z][a-z0-9_]{0,47}")
 _HEX64: Final = re.compile(r"[0-9a-f]{64}")
 #: A thing stands at its kind's own size: its pose's scale is always one to one.
 UNSCALED_MILLI: Final = 1000
+SUPPORT_REFERENCE_PROFILE: Final = "exulanica.support-reference/v1"
+SUPPORTED_THING_PROFILE: Final = "exulanica.placed-thing/v2"
 #: The most things one version holds, removed ones included, since its delta keeps them: a scene's
 #: worth, so the delta every edit digests again stays small however a session uses the version.
 #: One more is refused by name (``ThingLimitReached``), and undoing a placement makes room again.
@@ -112,6 +123,74 @@ class ThingPlacement:
 
 
 @dataclass(frozen=True, slots=True)
+class SupportReference:
+    """A horizontal support pinned to the owning version's immutable generated source."""
+
+    world_id: str
+    source_snapshot_id: uuid.UUID
+    receipt_sha256: str
+    network_sha256: str
+    region_id: str
+    surface_id: str
+
+    def document(self) -> dict[str, Any]:
+        return {
+            "profile": SUPPORT_REFERENCE_PROFILE,
+            "world_id": self.world_id,
+            "source_snapshot_id": str(self.source_snapshot_id),
+            "receipt_sha256": self.receipt_sha256,
+            "network_sha256": self.network_sha256,
+            "region_id": self.region_id,
+            "surface_id": self.surface_id,
+        }
+
+
+def read_support_reference(document: Any) -> SupportReference:
+    """Read a closed reference; source equality and clearance belong to the support authority."""
+    keys = {
+        "profile",
+        "world_id",
+        "source_snapshot_id",
+        "receipt_sha256",
+        "network_sha256",
+        "region_id",
+        "surface_id",
+    }
+    if (
+        type(document) is not dict
+        or set(document) != keys
+        or document["profile"] != SUPPORT_REFERENCE_PROFILE
+    ):
+        raise InvalidThingPlacement("a support reference uses its closed v1 profile")
+    if any(
+        type(document[k]) is not str or not 0 < len(document[k]) <= 160
+        for k in ("world_id", "region_id", "surface_id")
+    ):
+        raise InvalidThingPlacement(
+            "a support reference names bounded world, region and surface identities"
+        )
+    if any(
+        type(document[k]) is not str or _HEX64.fullmatch(document[k]) is None
+        for k in ("receipt_sha256", "network_sha256")
+    ):
+        raise InvalidThingPlacement("a support reference pins its receipt and network digests")
+    try:
+        snapshot = uuid.UUID(document["source_snapshot_id"])
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise InvalidThingPlacement("a support reference names a source snapshot UUID") from exc
+    if str(snapshot) != document["source_snapshot_id"]:
+        raise InvalidThingPlacement("a support reference names a canonical source snapshot UUID")
+    return SupportReference(
+        document["world_id"],
+        snapshot,
+        document["receipt_sha256"],
+        document["network_sha256"],
+        document["region_id"],
+        document["surface_id"],
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class PlacedThing:
     """A thing as a version holds it. ``kind_gone`` is read with it, never stored or digested: a
     workspace's own kind its workspace no longer holds, or erased after the thing was placed."""
@@ -123,12 +202,13 @@ class PlacedThing:
     origin: ObjectOrigin
     removed: bool = False
     kind_gone: bool = False
+    support: SupportReference | None = None
 
 
 def placed_thing_document(thing: PlacedThing) -> dict[str, Any]:
     """The canonical document of one placed thing, what its edits store before and after. A
     shipped kind's is the document it always was; whether a workspace kind is gone is not in it."""
-    return {
+    document = {
         "kind": thing.kind.document(),
         "origin": thing.origin.document(),
         "region_id": thing.region_id,
@@ -136,6 +216,10 @@ def placed_thing_document(thing: PlacedThing) -> dict[str, Any]:
         "thing_id": thing.thing_id,
         "transform": thing.transform.document(),
     }
+    if thing.support is not None:
+        document["profile"] = SUPPORTED_THING_PROFILE
+        document["support"] = thing.support.document()
+    return document
 
 
 @cache
@@ -225,6 +309,12 @@ def validate_placed_thing(
         raise InvalidThingPlacement(
             f"a thing stands at its kind's own size: transform.scale_milli is {UNSCALED_MILLI}"
         )
+    if thing.support is not None:
+        if not isinstance(thing.support, SupportReference):
+            raise InvalidThingPlacement("a supported thing states a typed support reference")
+        read_support_reference(thing.support.document())
+        if thing.support.region_id != thing.region_id:
+            raise InvalidThingPlacement("a supported thing remains in its support's region")
     if isinstance(thing.kind, WorkspaceKindReference):
         workspace_kind_reference(thing.kind.sha256)
     else:

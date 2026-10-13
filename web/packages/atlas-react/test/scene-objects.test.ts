@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type * as pc from 'playcanvas';
+import * as pc from 'playcanvas';
 import {
   DEFAULT_REPRESENTATION_INTENT,
   atlasVec3,
@@ -586,6 +586,7 @@ describe('a placed catalog object is inspected as what it is', () => {
 
 /** One vertex whose normal names a direction, so the normal repair leaves the mesh alone. */
 const LIT_MESH = {
+  primitive: [{ type: pc.PRIMITIVE_POINTS, base: 0, count: 1, indexed: false }],
   getPositions: (out: number[]) => { out.push(0, 0, 0); return 1; },
   getNormals: (out: number[]) => { out.push(0, 1, 0); return 1; },
 };
@@ -857,5 +858,28 @@ describe('the runtime places, moves and animates what a surface already committe
     expect(runtime.animating).toBe(false);
     runtime.setTransform('object:lantern', { ...POSE, xMm: 2000 });
     expect(invalidate).toHaveBeenCalledTimes(5);
+  });
+});
+
+
+describe('resident authored-object triangle picking', () => {
+  it('returns the drawn identity and metric distance, and drops hidden, removed and disposed objects', async () => {
+    const h = harness(); await h.runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
+    const node = new pc.GraphNode(); (node as unknown as { _enabledInHierarchy: boolean })._enabledInHierarchy = true; node.setLocalPosition(0, 0, 3);
+    const instance = {
+      visible: true, node, aabb: new pc.BoundingBox(new pc.Vec3(0, 0, 3), new pc.Vec3(1, 1, 0.001)),
+      mesh: {
+        primitive: [{ type: pc.PRIMITIVE_TRIANGLES, base: 0, count: 3, indexed: true }],
+        getPositions: (out: number[]) => out.push(-1, -1, 0, 1, -1, 0, 0, 1, 0),
+        getIndices: (out: number[]) => out.push(0, 1, 2),
+      },
+    };
+    h.drawn.findComponents = () => [{ enabled: true, meshInstances: [instance] }];
+    expect(h.runtime.pick([0, 0, 0], [0, 0, 2])).toEqual({ objectId: 'object:lantern', distance: 3 });
+    expect(h.runtime.pick([0, 0, 0], [0, 0, 1], 2)).toBeNull();
+    h.drawn.enabled = false; expect(h.runtime.pick([0, 0, 0], [0, 0, 1])).toBeNull();
+    h.drawn.enabled = true; h.runtime.remove('object:lantern');
+    expect(h.runtime.pick([0, 0, 0], [0, 0, 1])).toBeNull();
+    h.runtime.destroy(); expect(h.runtime.pick([0, 0, 0], [0, 0, 1])).toBeNull();
   });
 });

@@ -245,6 +245,7 @@ def assemble_creature(
     grammar: BodyGrammar | None = None,
     catalogs: ThingCatalogs | None = None,
     taken: frozenset[str] = frozenset(),
+    reference_ingredients: Sequence[str] = (),
 ) -> Creature:
     """The creature ``form`` describes, every document checked by its own reader, or
     :class:`CreatureRefused`.
@@ -292,7 +293,7 @@ def assemble_creature(
         if spec["module"] is None:
             raise _refuse("creature_movement_unbuilt", f"moves[{index}]", str(spec["refusal"]))
         modules.append(str(spec["module"]))
-    drafted = _origin("drafted", by, _DRAFTED_LICENCE, [recipe.sha256])
+    drafted = _origin("drafted", by, _DRAFTED_LICENCE, [recipe.sha256, *reference_ingredients])
     built = build_body(
         recipe,
         key=key,
@@ -358,7 +359,12 @@ def assemble_creature(
             "plan_sha256": plan.sha256,
             "extent_mm": dict(recipe.extent),
         },
-        "origin": _origin("drafted", by, _DRAFTED_LICENCE, [recipe.sha256, plan.sha256]),
+        "origin": _origin(
+            "drafted",
+            by,
+            _DRAFTED_LICENCE,
+            [recipe.sha256, plan.sha256, *reference_ingredients],
+        ),
         "moves": modules,
         "abilities": [{"key": ability, "parameters": {}} for ability in abilities],
         "offers": [{"key": offer, "parameters": {}} for offer in offers],

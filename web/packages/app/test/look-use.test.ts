@@ -133,3 +133,11 @@ describe('any other card', () => {
     expect(asked.settingOnly).toBe(false);
   });
 });
+
+ it('keeps an older workspace manifest when only its setting changes', () => {
+  const own={...WORN,own:{base:null,wearable:true}};
+  const latest={...LISTED['cozy']!,own:{base:null,wearable:true}};
+  const asked=lookToUse({option:{...OFFERED[0]!,choiceId:'workspace:cozy:latest'},isNow:true,setting:{sky:'dusk'},worn:own,listed:latest,earlierPackId:'workspace:cozy:latest'});
+  expect(asked.binding).toEqual({...own,settingParts:{sky:'dusk'}});
+  expect(asked.settingOnly).toBe(true);
+ });

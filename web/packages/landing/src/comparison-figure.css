@@ -1,0 +1,37 @@
+.comparison-figure { width: 100%; }
+.recorder-card { border: 1px solid var(--reading-line); border-radius: var(--reading-radius); background: linear-gradient(155deg,color-mix(in srgb,var(--reading-canvas) 75%,transparent),color-mix(in srgb,var(--reading-surface) 30%,transparent)); overflow: hidden; }
+.recorder-heading, .recorder-status { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 20px 24px; font-size: 12px; color: var(--reading-muted); }
+.recorder-heading h2 { font-size: 15px; letter-spacing: -.01em; }
+.recorder-stage-art { width: 100%; aspect-ratio: 640/450; }
+.recorder-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.recorder-face { stroke: #697b746e; stroke-width: .5; stroke-linejoin: round; }
+.recorder-record { stroke: none; }
+.recorder-shadow { fill: #6e7d7140; filter: blur(18px); }
+.recorder-status { padding-top: 0; padding-bottom: 20px; }
+.recorder-readout { color: var(--reading-body); text-align: right; }
+.recorder-stages { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin-inline: 24px; border-block: 1px solid var(--reading-line); }
+.recorder-stage { padding: 14px 8px; min-height: 52px; font: inherit; font-size: 13px; background: transparent; color: var(--reading-muted); border: 0; border-bottom: 2px solid transparent; cursor: pointer; }
+.recorder-stage[aria-selected='true'] { border-bottom-color: #a67791; color: var(--reading-ink); }
+.recorder-stage:hover { color: var(--reading-ink); }
+.recorder-detail { display: grid; margin: 20px 24px 0; }
+.recorder-detail > p { grid-area: 1/1; font-size: 14px; line-height: 1.55; }
+.recorder-measure { visibility: hidden; pointer-events: none; }
+.recorder-controls { display: flex; align-items: center; gap: 20px; padding: 16px 24px 20px; }
+.recorder-play { min-height: 44px; min-width: 108px; border: 1px solid var(--reading-line); border-radius: 6px; background: var(--reading-control-fill); padding: 8px 12px; color: var(--reading-body); font: inherit; font-size: 13px; cursor: pointer; }
+.recorder-play:hover { border-color: #8f9e96; }
+.recorder-play:disabled { cursor: default; color: var(--reading-muted); }
+.recorder-range { flex: 1; min-width: 0; min-height: 44px; accent-color: #a67791; cursor: pointer; }
+.comparison-figure figcaption { margin-top: 20px; }
+.recorder-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 12px; color: var(--reading-body); }
+.recorder-legend > span { display: inline-flex; align-items: center; gap: 8px; }
+.recorder-legend i { width: 8px; height: 8px; background: #99b0b5; border-radius: 2px; }
+.recorder-legend [data-model='b'] i { background: #b79eae; }
+.comparison-figure figcaption p { font-size: 12px; line-height: 1.55; margin-top: 12px; color: var(--reading-muted); }
+@media(max-width:480px) {
+  .recorder-heading,.recorder-status { padding-inline: 16px; gap: 8px; }
+  .recorder-status { align-items: start; flex-direction: column; }
+  .recorder-stages { margin-inline: 16px; }
+  .recorder-stage { font-size: 12px; padding-inline: 4px; }
+  .recorder-detail { margin-inline: 16px; }
+  .recorder-controls { padding-inline: 16px; gap: 12px; }
+}

@@ -15,8 +15,9 @@ What this module holds by construction:
     marked retired, and a retired id is never offered again (:func:`_succession`).
 *   **Nothing that spends or destroys is sent from a list.** An offered entry that costs anything,
     or destroys anything, runs as a plan step under a yes: it names the planner's word for it, and
-    the plan's sheet states the cost or the loss first. No other way through is accepted, since no
-    route serves both a preview and a confirmation outside a plan.
+    the plan's sheet states the cost or the loss first. Profile v2 also permits a spending
+    action to name a separate GET spend sheet; this never replaces a plan for destruction.
+    A sheet is a descriptor, not permission to send the action.
 *   **A reserved id is named and never served.** It fixes the spelling of an action whose route
     does not exist yet, so the id cannot be invented twice; it carries no route and no plan word.
 *   **Permission is the route's own.** The catalog names a route and never a permission, so what
@@ -51,6 +52,13 @@ __all__ = [
 _ROOT: Final = Path(__file__).resolve().parents[2]
 DIRECTORY: Final = _ROOT / "assets/catalogs/actions"
 PROFILE: Final = "exulanica.action-catalog/v1"
+PROFILE_V2: Final = "exulanica.action-catalog/v2"
+WHEN_FACTS: Final = {
+    "society": frozenset({"absent", "held"}),
+    "mode": frozenset({"playing", "paused"}),
+    "presence": frozenset({"here", "away"}),
+}
+_V2_MEMBERS: Final = frozenset({"when", "spend_read"})
 #: An id's standing: served and planned; named before its route exists; or no longer offered.
 OFFERED: Final = "offered"
 RESERVED: Final = "reserved"
@@ -100,6 +108,8 @@ class Action:
     destroys: tuple[str, ...]
     #: An action every role holds: no creator's role may leave it out.
     protected: bool
+    when: tuple[Mapping[str, str], ...] = ()
+    spend_read: str | None = None
 
     @property
     def spends_or_destroys(self) -> bool:
@@ -107,7 +117,7 @@ class Action:
 
     def view(self) -> dict[str, Any]:
         """The action as a read serves it, with nothing of any caller in it."""
-        return {
+        view = {
             "id": self.id,
             "family": self.family,
             "subjects": list(self.subjects),
@@ -122,11 +132,35 @@ class Action:
                 "plan_step": self.plan_word,
             },
         }
+        if self.when:
+            view["when"] = [dict(condition) for condition in self.when]
+        if self.spend_read is not None:
+            view["runs_by"]["spend_read"] = self.spend_read
+        return view
 
 
-def _entry(raw: Any, where: str) -> Action:
-    if not isinstance(raw, Mapping) or set(raw) != _MEMBERS:
-        raise ActionCatalogError(f"{where}: an entry states exactly {sorted(_MEMBERS)}")
+def narrow_offer(
+    action: Action, view: Mapping[str, Any], facts: Mapping[str, str] | None
+) -> dict[str, Any]:
+    """Conditions may narrow an existing available operation, never grant or enable one."""
+    result = dict(view)
+    if facts is None or result.get("state") != "available":
+        return result
+    for condition in action.when:
+        value = facts.get(condition["fact"])
+        if value != condition["value"]:
+            result.update(
+                state="unavailable",
+                code="subject_fact_unavailable" if value is None else condition["code"],
+            )
+            break
+    return result
+
+
+def _entry(raw: Any, where: str, *, extended: bool = False) -> Action:
+    members = _MEMBERS | _V2_MEMBERS if extended else _MEMBERS
+    if not isinstance(raw, Mapping) or set(raw) != members:
+        raise ActionCatalogError(f"{where}: an entry states exactly {sorted(members)}")
     ident = raw["id"]
     if not isinstance(ident, str) or _ID.fullmatch(ident) is None or raw["key"] != ident:
         raise ActionCatalogError(f"{where}: {ident!r} is no action id, or its key is another")
@@ -159,6 +193,32 @@ def _entry(raw: Any, where: str) -> Action:
     )
     if not plain:
         raise ActionCatalogError(f"{where}: {ident} states a member this catalog cannot hold")
+    when = raw.get("when", [])
+    spend_read = raw.get("spend_read")
+    if (
+        not isinstance(when, list)
+        or any(
+            not isinstance(condition, Mapping)
+            or set(condition) != {"fact", "value", "code"}
+            or not isinstance(condition["fact"], str)
+            or condition["fact"] not in WHEN_FACTS
+            or not isinstance(condition["value"], str)
+            or condition["value"] not in WHEN_FACTS[condition["fact"]]
+            or not isinstance(condition["code"], str)
+            or re.fullmatch(r"[a-z]+(?:_[a-z]+)*", condition["code"]) is None
+            for condition in when
+        )
+        or len({condition["fact"] for condition in when}) != len(when)
+        or (
+            spend_read is not None
+            and (
+                not isinstance(spend_read, str)
+                or re.fullmatch(r"GET /[^\s?#]+", spend_read) is None
+                or raw["cost_class"] == "none"
+            )
+        )
+    ):
+        raise ActionCatalogError(f"{where}: {ident} states an invalid condition or spend read")
     action = Action(
         id=ident,
         status=raw["status"],
@@ -173,16 +233,28 @@ def _entry(raw: Any, where: str) -> Action:
         world_cost_class=raw["world_cost_class"],
         destroys=tuple(destroys),
         protected=raw["protected"],
+        when=tuple(dict(condition) for condition in when),
+        spend_read=spend_read,
     )
     if action.status == OFFERED:
         if action.route is None:
             raise ActionCatalogError(f"{where}: {ident} is offered and names no route")
-        if action.spends_or_destroys and action.plan_word is None:
+        if (
+            action.spends_or_destroys
+            and action.plan_word is None
+            and (action.spend_read is None or action.destroys)
+        ):
             # Nothing that spends or destroys is sent from a list: it runs under a plan's yes.
             raise ActionCatalogError(
                 f"{where}: {ident} spends or destroys and runs as no plan step"
             )
-    elif action.route is not None or action.plan_word is not None or action.bind:
+    elif (
+        action.route is not None
+        or action.plan_word is not None
+        or action.bind
+        or action.spend_read is not None
+        or action.when
+    ):
         raise ActionCatalogError(
             f"{where}: {ident} is {action.status} and still names a way to run"
         )
@@ -194,11 +266,14 @@ def read(document: Any, where: str = "the catalog") -> tuple[Action, ...]:
     actions, an id is stated twice, or two offered ids are drafted by one plan word."""
     if (
         not isinstance(document, Mapping)
-        or document.get("profile") != PROFILE
+        or document.get("profile") not in {PROFILE, PROFILE_V2}
         or not isinstance(document.get("entries"), list)
     ):
         raise ActionCatalogError(f"{where}: not a catalog of profile {PROFILE}")
-    found = tuple(_entry(raw, where) for raw in document["entries"])
+    found = tuple(
+        _entry(raw, where, extended=document["profile"] == PROFILE_V2)
+        for raw in document["entries"]
+    )
     ids = [action.id for action in found]
     if len(set(ids)) != len(ids):
         raise ActionCatalogError(f"{where}: an id is stated twice")

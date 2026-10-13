@@ -4,22 +4,8 @@ import { build } from 'vite';
 import { describe, expect, it } from 'vitest';
 
 /**
- * What the public page's bundle is allowed to contain.
- *
- * The signed-out surface draws one small Companion avatar in the corner, and for months it paid for
- * the entire world style vocabulary to do it. `index.ts` re-exports `world-profiles.js`, which
- * constructs the world style registry at module scope, and a module-scope constructor call cannot
- * be dropped as unused: one named import from the barrel shipped the registry and the five modules
- * behind it, 25,600 of 55,898 attributed bytes executing on every cold load. Importing
- * `@exulanica/presentation/companion` instead halved the bundle.
- *
- * Nothing about that fix is self-enforcing. Anyone adding a second Companion symbol would reach for
- * the barrel, the import would look identical to the one it replaced, and the 25 kB would come back
- * with no test failing and nothing visible on the page. So the property is asserted here against
- * the build's own sourcemap rather than left as a thing to remember.
- *
- * `web/.dependency-cruiser.cjs` refuses the barrel import statically, which is the faster failure.
- * This is the slower one that does not care how the module arrived.
+ * Assert the public bundle boundary against the production sourcemap. Static import rules
+ * catch direct dependency violations; this also catches world code arriving transitively.
  */
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -42,7 +28,7 @@ async function bundledSources(): Promise<readonly string[]> {
 
 describe("the signed-out page's bundle", () => {
   it(
-    'draws the Companion without carrying the world style vocabulary',
+    'keeps the public page free of application rendering and world style code',
     async () => {
       const sources = await bundledSources();
 
@@ -53,15 +39,7 @@ describe("the signed-out page's bundle", () => {
       expect(sources.length).toBeGreaterThan(0);
       expect(sources.some((s) => s.endsWith('/src/main.ts'))).toBe(true);
 
-      /*
-       * And prove the presentation package really is in there, so the absence below is a statement
-       * about which of its modules arrive rather than about whether any of them do.
-       */
-      const presentation = sources.filter((s) => s.includes('/presentation/src/'));
-      expect(presentation.map((s) => s.split('/presentation/src/')[1]).sort()).toEqual([
-        'companion-appearance.ts',
-        'companion-avatar-blueprint.ts',
-      ]);
+      expect(sources.filter((source) => /atlas-react|playcanvas|three\//.test(source))).toEqual([]);
 
       expect(sources.filter((s) => /world-style|world-profiles/.test(s))).toEqual([]);
     },

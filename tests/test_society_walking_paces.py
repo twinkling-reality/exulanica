@@ -68,6 +68,7 @@ from exulanica.world.society_things import (
     validate_things_state,
 )
 
+import test_site_society_of_things as site
 import test_society_hands_requests as asked
 import test_walking_surfaces_v3 as town
 from test_society_made_kinds import KNIGHT, WELL, _made, _placed
@@ -238,6 +239,8 @@ def _first_and_later() -> dict[str, tuple[dict[str, Any], dict[str, Any]]]:
     return {
         "authored-starter-world": (compose((KNIGHT,)), compose((KNIGHT,), input_seq=2, edit_seq=9)),
         "city-grammar-town": (town._compose(), town._compose(input_seq=2)),
+        # A world made from a world kind, composed over its own surfaces by the town's builder.
+        "site-plan": (site._things_input("farm")[0], site._things_input("farm", 2)[0]),
     }
 
 

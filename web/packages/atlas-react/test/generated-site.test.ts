@@ -14,13 +14,13 @@ import { describe, expect, it } from 'vitest';
 import {
   SITE_BEYOND_DROP_M,
   baseGroundSlot,
-  parseSiteDrawing,
+  parseStructuredSiteDrawing,
   siteMount,
   siteNavigationWorld,
   siteStart,
   slotColour,
   drawSiteSlots,
-  type SiteDrawing,
+  type StructuredSiteDrawing,
 } from '../src/playcanvas/generated-site/index.js';
 import type { TileLook } from '../src/playcanvas/generated-tile/look.js';
 import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
@@ -61,7 +61,7 @@ function served(): Record<string, unknown> {
 
 describe('reading a site drawing', () => {
   it('reads the served shape, splitting each look role into its family and leaf', () => {
-    const drawing = parseSiteDrawing(served());
+    const drawing = parseStructuredSiteDrawing(served());
     expect(drawing.kind.label).toBe('Yard');
     expect(drawing.slots).toHaveLength(7);
     expect(drawing.slots[5]).toMatchObject({ family: 'roof', leaf: 'clay', primitive: 'gable' });
@@ -69,7 +69,7 @@ describe('reading a site drawing', () => {
   });
 
   it.each([
-    ['another profile', (d: Record<string, unknown>) => { d['profile'] = 'exulanica.site-drawing/v2'; }, 'is not exulanica.site-drawing/v1'],
+    ['another profile', (d: Record<string, unknown>) => { d['profile'] = 'exulanica.site-drawing/unsupported'; }, 'is not exulanica.site-drawing/v1'],
     ['a float', (d: Record<string, unknown>) => { (d['arrival'] as { positionMm: number[] }).positionMm[0] = 0.5; }, 'not a whole number'],
     ['a look role with no family', (d: Record<string, unknown>) => { (d['slots'] as { lookRole: string }[])[1]!.lookRole = 'plaster'; }, 'family.leaf'],
     ['a fifth quarter turn', (d: Record<string, unknown>) => { (d['slots'] as { yawQuarterTurns: number }[])[1]!.yawQuarterTurns = 4; }, '0 to 3 quarter turns'],
@@ -78,12 +78,12 @@ describe('reading a site drawing', () => {
   ])('refuses %s by name', (_name, change, words) => {
     const document = served();
     change(document);
-    expect(() => parseSiteDrawing(document)).toThrow(words);
+    expect(() => parseStructuredSiteDrawing(document)).toThrow(words);
   });
 });
 
 describe('walking a site', () => {
-  const drawing = parseSiteDrawing(served());
+  const drawing = parseStructuredSiteDrawing(served());
   const world = siteNavigationWorld(drawing);
   // A site point (x east, y north, in millimetres) in the renderer's frame (east, up, south, metres).
   const at = (x: number, y: number) => atlasVec3(x / 1000, 0, -y / 1000);
@@ -108,7 +108,7 @@ describe('walking a site', () => {
     const start = siteStart(drawing, world);
     expect(start).toMatchObject({ x: 5, y: world.eyeHeight, z: -4, pitch: 0 });
     expect(start.yaw).toBeCloseTo(0);
-    const east = parseSiteDrawing({ ...served(), arrival: { positionMm: [5000, 4000, 0], facingMm: [1, 0] } });
+    const east = parseStructuredSiteDrawing({ ...served(), arrival: { positionMm: [5000, 4000, 0], facingMm: [1, 0] } });
     expect(siteStart(east, world).yaw).toBeCloseTo(-Math.PI / 2);
   });
 });
@@ -144,7 +144,7 @@ function nullApp(): { app: pc.AppBase; camera: pc.Entity; environmentRoot: pc.En
 }
 
 describe('drawing a site', () => {
-  const drawing: SiteDrawing = parseSiteDrawing(served());
+  const drawing: StructuredSiteDrawing = parseStructuredSiteDrawing(served());
 
   it('draws each slot but a pack-only one at its base, turned by its quarter turns', () => {
     const { app } = nullApp();
@@ -191,7 +191,7 @@ describe('drawing a site', () => {
       slot('gap', 'wall.stone', 'none', [9000, 9000, 0], 0, [1000, 200, 2000]),
       slot('hole', 'wall.who_knows', 'none', [9000, 5000, 0], 0, [1000, 200, 2000]),
     ] };
-    const mount = siteMount(parseSiteDrawing(unread), { servedBytes: 1, materials: MATERIALS });
+    const mount = siteMount(parseStructuredSiteDrawing(unread), { servedBytes: 1, materials: MATERIALS });
     const attachment = mount.attach({ app, camera, environmentRoot });
     const shape = (identity: string) => ((environmentRoot.findByName(`${identity}:shape`) as pc.Entity).render!.meshInstances[0]!.material as pc.StandardMaterial).diffuse;
     const soil = MATERIALS.materials.find((material) => material.key === 'soil')!.swatch.srgb8;
@@ -228,12 +228,12 @@ describe('drawing a site', () => {
   });
 
   it('keeps the look\'s own ground beyond an indoor site and beyond a site with no ground over its whole extent', () => {
-    const indoor = parseSiteDrawing({ ...served(), extent: { widthMm: 10_000, depthMm: 12_000, enclosure: 'indoor' } });
-    const patch = parseSiteDrawing({ ...served(), slots: (served()['slots'] as { identity: string; boxMm: number[] }[]).map((one) => (one.identity === 'ground' ? { ...one, boxMm: [9000, 12_000, 0] } : one)) });
+    const indoor = parseStructuredSiteDrawing({ ...served(), extent: { widthMm: 10_000, depthMm: 12_000, enclosure: 'indoor' } });
+    const patch = parseStructuredSiteDrawing({ ...served(), slots: (served()['slots'] as { identity: string; boxMm: number[] }[]).map((one) => (one.identity === 'ground' ? { ...one, boxMm: [9000, 12_000, 0] } : one)) });
     expect(baseGroundSlot(patch)).toBeNull();
     // The base ground is the plane over the whole extent at the site's own level: not one as wide but
     // shallower, not one of the right size laid off its centre or above the ground, and not a box.
-    const groundAs = (change: Record<string, unknown>) => parseSiteDrawing({ ...served(), slots: (served()['slots'] as { identity: string }[]).map((one) => (one.identity === 'ground' ? { ...one, ...change } : one)) });
+    const groundAs = (change: Record<string, unknown>) => parseStructuredSiteDrawing({ ...served(), slots: (served()['slots'] as { identity: string }[]).map((one) => (one.identity === 'ground' ? { ...one, ...change } : one)) });
     expect(baseGroundSlot(groundAs({ boxMm: [10_000, 11_000, 0] }))).toBeNull();
     expect(baseGroundSlot(groundAs({ positionMm: [5500, 6000, 0] }))).toBeNull();
     expect(baseGroundSlot(groundAs({ positionMm: [5000, 6500, 0] }))).toBeNull();
@@ -253,7 +253,7 @@ describe('drawing a site', () => {
 
   it('draws a roof in its material\'s form where the mount carries the roof forms, and not the walls a tent stands in place of', () => {
     // The yard's shed, roofed in canvas: a tent. Its three wall pieces are inside its footprint.
-    const camp = parseSiteDrawing({ ...served(), slots: (served()['slots'] as { identity: string }[]).map((one) => (one.identity === 'shed:roof' ? { ...one, lookRole: 'roof.tent' } : one)) });
+    const camp = parseStructuredSiteDrawing({ ...served(), slots: (served()['slots'] as { identity: string }[]).map((one) => (one.identity === 'shed:roof' ? { ...one, lookRole: 'roof.tent' } : one)) });
     const { app } = nullApp();
     const plain = drawSiteSlots(app.graphicsDevice, camp, MATERIALS);
     const shaped = drawSiteSlots(app.graphicsDevice, camp, MATERIALS, ROOF_FORMS);

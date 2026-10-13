@@ -30,7 +30,7 @@ from exulanica.world.kinds import repository
 from fastapi.testclient import TestClient
 
 from conftest import TEST_CEILING_USD, TEST_MAX_CALLS
-from kind_briefs import brief_of, fixture_kind, held_to_form
+from kind_briefs import brief_of, fixture_kind
 from model_fakes import FakeTransport, chat_body
 from test_companion_saved_names import named as saved_named  # noqa: F401
 from tests_support_api import EVERY_PERMISSION, scratch_database
@@ -52,7 +52,24 @@ def _reply(value: Any) -> HttpResponse:
 
 
 def _farm() -> dict[str, Any]:
-    return held_to_form(brief_of(fixture_kind("farm")))
+    from exulanica.selection.kind_brief import brief_form
+
+    brief = brief_of(fixture_kind("farm"))
+    brief["requirements"] = [
+        {
+            "words": "farm",
+            "status": "fulfilled",
+            "omission": "",
+            "form": "structure",
+            "roles": ["home"],
+            "look": "",
+            "shape_class": "",
+            "roof_form": "",
+            "minimum_count": 1,
+            "part_labels": ["farmhouse"],
+        }
+    ]
+    return brief_form(requirement_contract=True).model_validate(brief).model_dump(mode="json")
 
 
 class _Held(FakeTransport):
@@ -166,7 +183,7 @@ def _ended(client: TestClient, draft_id: str) -> dict[str, Any]:
     raise AssertionError("the draft never ended")
 
 
-def test_the_route_answers_before_the_model_and_the_page_reads_the_kept_kind(drafts):
+def test_the_route_answers_before_the_model_and_the_page_reads_the_kept_kind(drafts, monkeypatch):
     app, transport = drafts
     transport.release.clear()
     transport.responses.append(_reply(_farm()))
@@ -187,6 +204,19 @@ def test_the_route_answers_before_the_model_and_the_page_reads_the_kept_kind(dra
         assert ended["model_id"] == DRAFTER and ended["execution"] is not None
         library = client.get("/worlds/kinds", headers={"Authorization": f"Bearer {TOKEN}"}).json()
         assert ended["kind"]["kind"] in {k["kind"] for k in library["kinds"]}
+
+        from types import SimpleNamespace
+
+        from exulanica.api.routes import world_kinds
+
+        monkeypatch.setattr(
+            world_kinds,
+            "kind_drafting_prompt",
+            lambda: SimpleNamespace(prompt_version="later-prompt-fixture"),
+        )
+        reread = _read(client, body["draft_id"]).json()
+        assert reread["prompt_version"] == ended["prompt_version"]
+        assert reread["execution"]["prompt_version"] == ended["execution"]["prompt_version"]
 
 
 def test_a_workspace_with_a_draft_running_is_told_which_and_starts_no_other(drafts):
@@ -463,7 +493,7 @@ def test_a_person_who_started_as_many_drafts_as_an_hour_allows_is_told_when_to_r
     assert len(transport.requests) == 1
 
 
-def test_a_refused_draft_says_the_last_check_s_own_sentence(drafts):
+def test_a_refused_draft_says_the_last_check_s_catalog_sentence(drafts):
     from test_kind_drafting import _crowded
 
     crowded = _farm()
@@ -477,8 +507,10 @@ def test_a_refused_draft_says_the_last_check_s_own_sentence(drafts):
         "kind_not_drafted",
         "kind_population_out_of_bounds",
     )
-    assert "houses" in refusal["detail"]
-    assert "No kind of world was drafted" not in refusal["detail"]
+    from exulanica.world.kinds.document import KIND_CODES
+
+    assert refusal["detail"] == dict(KIND_CODES)["kind_population_out_of_bounds"]
+    assert refusal["where"] is None  # arbitrary model-supplied keys are not a terminal archive
 
 
 def _remaining(monkeypatch, refused=None, available=None) -> None:

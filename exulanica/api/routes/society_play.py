@@ -4,8 +4,9 @@
 .../play/{subject_id}/give-back`` gives it back, ``GET .../play/{subject_id}/turn`` reads what the
 being is offered in the minute to come, and ``POST .../play/{subject_id}/answer`` posts the person's
 answer for that minute (:mod:`exulanica.world.society_play`). Starting, giving back and answering
-take ``world.write``. A read never names the account that plays a being, only whether it is the
-reader (``played_by_you``).
+take ``being.act`` beside ``world.read``, and no ``world.write``: acting as a being changes what
+that being does in its society and edits nothing of the authored world. A read never names the
+account that plays a being, only whether it is the reader (``played_by_you``).
 """
 
 from __future__ import annotations

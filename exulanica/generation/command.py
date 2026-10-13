@@ -6,7 +6,8 @@ back on request: :mod:`exulanica.generation.apply`) and, while the operator's se
 queues the served workspaces' waiting piece requests into it. Workspaces are deployment
 configuration, as for the asset preparation worker: ``EXULANICA_WORKSPACE_IDS`` and
 ``--workspace``, and, when ``EXULANICA_ACCOUNT_DATABASE_URL`` is set, the workspaces active accounts
-own, read fresh each pass.
+own, read fresh each pass. Account workspaces whose authority was revoked are considered only
+for erased-request cancellation and spending recovery; this does not resume their ordinary work.
 
 It holds two credentials, both from the operator's environment and read in this process only: the
 runtime database role (``EXULANICA_DATABASE_URL``; it refuses an owner or a superuser) and the
@@ -113,6 +114,7 @@ def build(args: argparse.Namespace, environ: Mapping[str, str]) -> PieceGenerati
         library=library,
         shipped=shipped_thing_kinds(),
         workspaces=_workspaces(configured, source),
+        recovery_workspaces=source.recovery_candidates if source is not None else None,
         store_bound=max_bytes(environ),
         looks=LookStepper(
             library=library,

@@ -151,6 +151,20 @@ row. The Companion's execution record is built this way, one copy per question o
 never read back from the process ledger
 ([Companion question: execution provenance](companion-question.md#execution-provenance)).
 
+Model-backed creature and world drafting, action/look/setting/environment proposals and person
+decisions retain a reported model identity only when it is an exact admitted identifier for the
+provider that answered. A dynamically bound decision model must be the explicit admitted spec for
+that call. Missing identity is `response_names_no_model`; an unknown, non-string or cross-provider
+identity is `reported_model_not_admitted`. Both retain a null served identity and the measured call
+counters. The requested model is never substituted for an absent response identity.
+
+A validated decision or proposal can remain usable with unavailable model identity. A newly drafted
+creature or native world kind requires admitted provenance and refuses before publication when
+that identity is unavailable; identity alone does not trigger another paid repair call. Durable
+draft snapshots recheck identities before retaining their call metadata. These boundaries do not
+rewrite historical receipts or establish the same filtering for embedding, probe or Companion
+execution records.
+
 ### Providers, chosen roles and a person's decisions
 
 The [model manifest](../exulanica/models/models.manifest.json) states providers as data. Each

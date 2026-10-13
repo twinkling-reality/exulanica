@@ -4,10 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Credentials } from '../src/config.js';
 import type { ListedStylePack } from '../src/world-look.js';
 
-const listed = vi.hoisted(() => ({ packs: [] as ListedStylePack[], fetched: [] as string[], settings: null as unknown, settingsFail: false }));
+const listed = vi.hoisted(() => ({ packs: [] as ListedStylePack[], fetched: [] as string[], settings: null as unknown, settingsFail: false, ownPacks: [] as ListedStylePack[] }));
 vi.mock('../src/world-look.js', async (original) => ({
   ...await original<typeof import('../src/world-look.js')>(),
   listedStylePacks: async () => listed.packs,
+  listedWorkspaceStylePacks: async () => listed.ownPacks,
   listedSettings: async () => {
     if (listed.settingsFail) throw new Error('the list could not be read');
     return listed.settings;
@@ -41,6 +42,7 @@ beforeEach(() => {
   listed.fetched = [];
   listed.settings = null;
   listed.settingsFail = false;
+  listed.ownPacks = [];
 });
 
 describe('the looks the host serves', () => {
@@ -104,3 +106,32 @@ describe('what a world is drawn in now', () => {
     expect(await library.now(own(true, null))).toEqual({ packId: null, how: { notice: ownLookWords(null, true) } });
   });
 });
+
+ it('offers an admitted standalone workspace look and preserves its authority for redraw and apply', async () => {
+  listed.ownPacks = [{ ...TOON, pack_id: 'original.garden', manifest_sha256: sha('9'), source: 'workspace', ownBase: null }];
+  const library = await readLookLibrary(ACCESS);
+  const binding = library.binding(library.options.find(option => option.packId === 'original.garden')!.choiceId!);
+  expect(binding).toEqual({ ...bound('original.garden', 1, sha('9')), own: { base: null, wearable: true } });
+  expect(await library.now(binding)).toEqual({ packId: 'workspace:original.garden:1:'+sha('9'), how: {} });
+  expect(library.defaultId).toBe(COZY.pack_id);
+ });
+
+ it('keeps library and workspace choices with the same pack id separate by source and exact manifest', async () => {
+  listed.packs=[{...COZY,source:'library'},TOON];
+  listed.ownPacks=[{...COZY,source:'workspace',manifest_sha256:sha('9'),earlier_versions:[{version:2,manifest_sha256:sha('8'),preview_sha256:null,preview_media_type:null}],ownBase:null,default:false}];
+  const library=await readLookLibrary(ACCESS);
+  const choices=library.options.filter(option=>option.packId===COZY.pack_id);
+  expect(choices).toHaveLength(2);
+  expect(library.binding(COZY.pack_id)).toBeNull();
+  expect(library.binding(choices[1]!.choiceId!)).toMatchObject({manifestSha256:sha('9'),own:{base:null,wearable:true}});
+  expect(await library.now({...bound(COZY.pack_id,2,sha('8')),own:{base:null,wearable:true}})).toMatchObject({packId:choices[1]!.choiceId,how:{earlier:{packId:choices[1]!.choiceId,version:2}}});
+  expect(await library.now(bound(COZY.pack_id,3,sha('c')))).toEqual({packId:choices[0]!.choiceId,how:{}});
+ });
+
+ it('keeps a workspace choice in its own namespace even if identical bytes were promoted to the library', async () => {
+  listed.packs=[{...COZY,source:'library'},TOON];
+  listed.ownPacks=[{...COZY,source:'workspace',ownBase:null,default:false}];
+  const library=await readLookLibrary(ACCESS);
+  const choice=library.options.find(option=>option.choiceId?.startsWith('workspace:'))!;
+  expect(await library.now({...bound(COZY.pack_id,COZY.version,COZY.manifest_sha256),own:{base:null,wearable:true}})).toEqual({packId:choice.choiceId,how:{}});
+ });

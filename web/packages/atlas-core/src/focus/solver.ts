@@ -218,7 +218,7 @@ export function resolveFocus(inputs: FocusInputs, previous: FocusState): FocusRe
   // Dwell. A winner must hold for `dwellMs` before it becomes focused, which is what stops the
   // label strobing while sweeping the view. The same dwell applies to LOSING focus, so sweeping
   // past an anchor does not flash the label off and on. The document specifies the acquire side;
-  // applying it symmetrically is a decision recorded in the handover notes.
+  // the release side uses the same dwell.
   let focusedIndex = previous.focusedIndex;
   let pendingIndex = previous.pendingIndex;
   let pendingSinceMs = previous.pendingSinceMs;

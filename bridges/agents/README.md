@@ -26,15 +26,15 @@ Copying the `exulanica_agent` folder next to your program works too.
 
 ## The quickstart
 
-[`examples/quickstart.py`](examples/quickstart.py) is a whole agent in 24 lines of code. Its mind
-is `Qwen/Qwen3-235B-A22B-Instruct-2507` on Nebius Token Factory; one line switches it to an NVIDIA
-Nemotron mind (`nvidia/Nemotron-3_5-Lightning`). Both are models Exulanica itself verified to answer
-this exact choice by a tool call. A turn allows 15 seconds, so a mind must answer within that; one
+[`examples/quickstart.py`](examples/quickstart.py) runs an agent with a model on Nebius Token
+Factory. Set `NEBIUS_MODEL` to the provider model ID you want to use and `NEBIUS_API_KEY` to your
+provider key. The model must support tool calls; confirm its availability with your provider.
+A turn allows 15 seconds, so a mind must answer within that; one
 that reasons at length before it calls a function can miss its turns, which the world's own routine
 then decides.
 
 ```bash
-EXULANICA_URL=https://<the world> EXULANICA_AGENT_KEY=<key> NEBIUS_API_KEY=<yours> python examples/quickstart.py
+EXULANICA_URL="https://your-world.example" EXULANICA_AGENT_KEY_FILE="/absolute/path/to/agent.key" NEBIUS_MODEL="your-provider-model-id" python examples/quickstart.py
 ```
 
 What it does, turn by turn:
@@ -149,9 +149,10 @@ Says hello with the settings above and prints what the agent may do and the worl
 EXULANICA_URL=https://<the world> EXULANICA_TOKEN=<an owner token> exulanica-agent grant --world <id> --version <id> --visitors 1 --gate <id> --key-file agent.key
 ```
 
-For a world's owner with an API token that may issue grants: issues one for outside agents and
-writes the key, shown once, to a new file only its owner can read. It never prints the key. A grant
-names the world version its things are in or its bodies arrive in (`--version`); `--thing <id>`
+For a world's owner with an API token that holds `world.write` and `door.grant`: issues one for
+outside agents and writes the key, shown once, to a new file only its owner can read. It never
+prints the key. A token of only `world.read` and `world.write` is refused `403 not_authorised`.
+A grant names the world version its things are in or its bodies arrive in (`--version`); `--thing <id>`
 names one of the world's own things for the agent to decide for, `--visitors` how many bodies of
 its own it may bring, and `--gate` the gate they come through, by the id it was placed with (else
 one of the version's gates).
@@ -160,7 +161,8 @@ one of the version's gates).
 EXULANICA_URL=https://<the world> EXULANICA_TOKEN=<an owner token> exulanica-agent key --grant <id> --key-file agent-new.key
 ```
 
-A new key for the same grant, written the same way, for when a key may have been seen. A grant has
+A new key for the same grant, written the same way, for when a key may have been seen. The token
+needs the same `world.write` and `door.grant` pair, as does revoke. A grant has
 one key at a time: the earlier key stops working at once, and an agent still holding it reads that
 its connection ended because a new key was issued.
 

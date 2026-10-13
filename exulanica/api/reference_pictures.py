@@ -13,18 +13,24 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager
+from typing import NoReturn
 
 import psycopg
+from psycopg.types.json import Jsonb
 
 from exulanica.api.composer_rights import observation_screening
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.model_rights import require_model_right
-from exulanica.ingest.personal_admission import role_handoff
+from exulanica.ingest.personal_admission import creature_picture_note_context, role_handoff
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.spine.artifacts import CaptureArtifactRow
+from exulanica.models.manifest import Manifest
+from exulanica.references import store as reference_store
+from exulanica.references.bundle import THINGS_PICTURE_PROFILE, read_bundle
+from exulanica.references.for_drafting import NotesRefused, PictureNotesAuthority
 from exulanica.references.pictures import PICTURE_ROLE, PictureUnavailable, ReferencePicture
 from exulanica.store.base import ContentAddressedStore
 
@@ -159,3 +165,104 @@ def reference_picture_source(
         return ReferencePicture(store.get(BlobId(rendition.content_sha256)), rights, recheck)
 
     return picture
+
+
+def creature_picture_notes_authority(
+    *, manifest: Manifest, offered_to: Callable[[uuid.UUID], bool]
+) -> PictureNotesAuthority:
+    """Check exact picture-note authority on the caller's currency/lifecycle-guarded connection.
+
+    No right row is locked. The worker serializes this read with privacy mutations and capture
+    tombstones, releases those locks before dispatch, and repeats it in both publication phases.
+    Hosted request policy independently checks declared photographs at its own dispatch boundary.
+    """
+    handoff = role_handoff("creature_drafter", manifest)
+
+    def check(
+        connection: psycopg.Connection,
+        workspace_id: uuid.UUID,
+        requester: uuid.UUID,
+        reference_id: uuid.UUID,
+        photographs: frozenset[uuid.UUID],
+        bound: Mapping[uuid.UUID, tuple[uuid.UUID, ...]] | None,
+    ) -> dict[uuid.UUID, tuple[uuid.UUID, ...]]:
+        def refuse() -> NoReturn:
+            raise NotesRefused("reference_withdrawn")
+
+        if not offered_to(workspace_id):
+            refuse()
+        found = reference_store.read_request(
+            connection, workspace_id, reference_id, owner_actor_id=requester
+        )
+        if found is None or found.bundle is None:
+            refuse()
+        bundle = read_bundle(found.bundle)
+        if bundle.profile != THINGS_PICTURE_PROFILE:
+            refuse()
+        expected_context = creature_picture_note_context(handoff)
+        pictures = {picture.picture_id: picture for picture in bundle.pictures}
+        rights_by_picture = {}
+        for capture_id in sorted(photographs):
+            picture = pictures.get(capture_id)
+            if (
+                picture is None
+                or picture_still_readable(
+                    connection,
+                    workspace_id,
+                    capture_id,
+                    picture.model_right_ids,
+                    requester,
+                    found.created_at,
+                )
+                is not None
+            ):
+                refuse()
+            # Resolve current screening with the same authoritative observation predicate, with
+            # no asset-read lock acquired below the lifecycle lock.
+            if not connection.execute(
+                "select 1 from reconstruction_privacy_screening where workspace_id=%s "
+                "and capture_id=%s and asset_observation_allows(workspace_id,capture_id,"
+                "screening_id,clock_timestamp()) limit 1",
+                (workspace_id, capture_id),
+            ).fetchone():
+                refuse()
+            if connection.execute(
+                "select 1 from personal_model_right where workspace_id=%s and capture_id=%s "
+                "and model_role='creature_drafter' and granted_by=%s "
+                "and withdrawn_at >= %s limit 1",
+                (workspace_id, capture_id, requester, found.created_at),
+            ).fetchone():
+                refuse()
+            selected = []
+            for identity in handoff.identities:
+                row = connection.execute(
+                    "select r.right_id from personal_model_right r join personal_model_right_use u "
+                    "using(workspace_id,right_id) where r.workspace_id=%s and r.capture_id=%s "
+                    "and r.granted_by=%s and r.model_provider=%s and r.model_role=%s "
+                    "and r.model_id=%s and r.model_revision is not distinct from %s "
+                    "and r.destination=%s and u.use_context=%s "
+                    "and personal_model_right_allows(r.workspace_id,r.right_id,r.capture_id,"
+                    "r.model_provider,r.model_role,r.model_id,r.model_revision,r.destination,"
+                    "clock_timestamp()) order by r.granted_at desc,r.right_id desc limit 1",
+                    (
+                        workspace_id,
+                        capture_id,
+                        requester,
+                        identity.provider,
+                        identity.role,
+                        identity.model_id,
+                        identity.revision,
+                        handoff.destination,
+                        Jsonb(expected_context),
+                    ),
+                ).fetchone()
+                if row is None:
+                    refuse()
+                selected.append(row["right_id"])
+            current = tuple(selected)
+            if bound is not None and bound.get(capture_id) != current:
+                refuse()
+            rights_by_picture[capture_id] = current
+        return rights_by_picture
+
+    return check
