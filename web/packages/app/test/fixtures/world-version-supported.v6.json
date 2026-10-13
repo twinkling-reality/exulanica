@@ -1,0 +1,71 @@
+{
+  "schema_version": 6,
+  "version_id": "2a60dc4e-163d-470a-b13e-e136b776d53e",
+  "world_id": "atlas:default",
+  "source_snapshot_id": "5e630963-6947-4e14-88b6-b976c1ef5339",
+  "parent_version_id": null,
+  "title": "Existence support fixture",
+  "origin": "authored",
+  "style_version_id": "01a12e61-a947-7c9b-a304-e877fbf42e50",
+  "state_sha256": "1ea4e00e54ebf41198e58cfe621d36119e320262a28f2599f0a9fd473ff691f9",
+  "edit_seq": 1,
+  "source_invalidated": false,
+  "created_by": "f9a46470-f1cc-4203-a215-bc658eb6d2ef",
+  "created_at": "2026-10-12T04:31:54.699786+00:00",
+  "objects": [],
+  "element_overrides": [],
+  "environment_instances": [],
+  "point_map_instances": [],
+  "things": [
+    {
+      "kind": {
+        "kind": "lantern",
+        "sha256": "5cb77297b677cdf10b67eb20fd4e7845c3f1f9f0dbd1f26fd57066c4bcf973a9",
+        "version": 1
+      },
+      "origin": {
+        "kind": "authored",
+        "role": "fictional"
+      },
+      "region_id": "region:generated",
+      "removed": false,
+      "thing_id": "thing:support-probe",
+      "transform": {
+        "coordinate_space": "region_local",
+        "coordinate_unit": "millimetre",
+        "scale_milli": 1000,
+        "x_mm": 50400,
+        "y_mm": 150,
+        "yaw_microradians": 0,
+        "z_mm": -5340
+      },
+      "profile": "exulanica.placed-thing/v2",
+      "support": {
+        "profile": "exulanica.support-reference/v1",
+        "world_id": "atlas:default",
+        "source_snapshot_id": "5e630963-6947-4e14-88b6-b976c1ef5339",
+        "receipt_sha256": "1438123a79eb0cd9c4f66c26a7233e56b1f2936db9f97830886f43b2bbdf8340",
+        "network_sha256": "12f14274e0cf3586d9283a5a6baa010772d08d7817dcf381b3b35f492ff2e633",
+        "region_id": "region:generated",
+        "surface_id": "deck"
+      }
+    }
+  ],
+  "edits": [
+    {
+      "edit_id": "343ba4e6-e31d-4341-b476-7016c030cc4f",
+      "edit_seq": 1,
+      "kind": "add_thing",
+      "object_id": null,
+      "element_id": null,
+      "environment_instance_id": null,
+      "point_map_instance_id": null,
+      "thing_id": "thing:support-probe",
+      "undone_edit_id": null,
+      "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+      "result_state_sha256": "1ea4e00e54ebf41198e58cfe621d36119e320262a28f2599f0a9fd473ff691f9",
+      "actor": "f9a46470-f1cc-4203-a215-bc658eb6d2ef",
+      "recorded_at": "2026-10-12T04:31:54.938286+00:00"
+    }
+  ]
+}
