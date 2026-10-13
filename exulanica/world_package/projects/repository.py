@@ -36,6 +36,7 @@ from exulanica.world_package.projects.checkpoint import (
     pretty,
     pretty_evidence,
 )
+from exulanica.world_package.projects.link import LINK_FILE, link_bytes, make_link, read_link
 from exulanica.world_package.projects.schema import ModelBinding, binding_sha256
 from exulanica.world_package.projects.summary import evidence_summary, report, subject
 
@@ -231,6 +232,7 @@ class Project:
             "pending": [] if edited == world else report(world, edited)["summary"],
             "pending_evidence": evidence_summary(sessions, edited_sessions),
             "sessions": self._sessions_view(world, sessions),
+            "link": read_link(self.folder),
             "checkpoints": checkpoints,
             "more": len(entries) > limit,
         }
@@ -368,6 +370,26 @@ class Project:
             "evidence": recorded,
         }
 
+    def link(self, repository: str, base: str, branch: str) -> dict[str, Any]:
+        """Record where this project publishes. A local, committed file; nothing is contacted."""
+        self._require()
+        if self.head() is None:
+            raise ProjectError("project has no saved checkpoint")
+        data = link_bytes(make_link(repository, base, branch))
+        path = self.folder / LINK_FILE
+        if path.is_symlink():
+            raise ProjectError("project-link.json must be a regular file")
+        if path.is_file() and path.read_bytes() == data:
+            return {"committed": False, "reason": "unchanged", "link": read_link(self.folder)}
+        path.write_bytes(data)
+        text = f"Link project to {repository} (base {base}, branch {branch})"
+        return {
+            "committed": True,
+            "commit": self._commit([LINK_FILE], text),
+            "message": text,
+            "link": read_link(self.folder),
+        }
+
     # Comparing, reopening and forking
 
     def compare(self, before: str, after: str = "HEAD") -> dict[str, Any]:
@@ -392,6 +414,7 @@ class Project:
             "uncommitted_edits": pending,
             "uncommitted_evidence": evidence_summary(sessions, self.working_sessions()),
             "sessions": self._sessions_view(committed, sessions),
+            "link": read_link(self.folder),
             "installed": False,
         }
 

@@ -517,3 +517,24 @@ def test_each_unpublished_checkpoint_becomes_its_own_commit(tmp_path):
     branch["oid"] = remote.oid()
     review = client.review(target, local, "Put the knight back where it was saved")
     assert [c["message"] for c in review["commits"]] == ["Put the knight back where it was saved"]
+
+
+def test_a_free_repository_name_is_a_not_found_answer_and_nothing_else(monkeypatch):
+    from exulanica.world_package.projects.github import gh_graphql
+
+    free = {
+        "data": {"viewer": {"login": "learner", "repository": None}},
+        "errors": [{"type": "NOT_FOUND", "message": "Could not resolve to a Repository"}],
+    }
+    denied = {"data": None, "errors": [{"type": "FORBIDDEN"}]}
+
+    def answer(body):
+        return lambda *a, **k: SimpleNamespace(returncode=1, stdout=json.dumps(body), stderr="")
+
+    monkeypatch.setattr(subprocess, "run", answer(free))
+    assert gh_graphql("q", {}, tolerate_not_found=True)["viewer"]["repository"] is None
+    with pytest.raises(ProjectError):
+        gh_graphql("q", {})
+    monkeypatch.setattr(subprocess, "run", answer(denied))
+    with pytest.raises(ProjectError):
+        gh_graphql("q", {}, tolerate_not_found=True)

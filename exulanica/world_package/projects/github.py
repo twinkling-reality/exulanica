@@ -77,8 +77,14 @@ class Snapshot:
     writable_owned: bool
 
 
-def gh_graphql(query: str, variables: dict[str, Any]) -> dict[str, Any]:
-    """Use the user's CLI credential store; never return CLI stderr or retry a write."""
+def gh_graphql(
+    query: str, variables: dict[str, Any], *, tolerate_not_found: bool = False
+) -> dict[str, Any]:
+    """Use the user's CLI credential store; never return CLI stderr or retry a write.
+
+    With `tolerate_not_found`, a response whose only errors are NOT_FOUND returns its data:
+    asking whether a repository exists is answered by GitHub as such an error.
+    """
     environment = dict(os.environ)
     for name in ("GH_DEBUG", "GH_HOST", "GH_REPO"):
         environment.pop(name, None)
@@ -98,6 +104,16 @@ def gh_graphql(query: str, variables: dict[str, Any]) -> dict[str, Any]:
             "GitHub request did not complete; a publication may have succeeded. "
             "Read the branch before preparing another review."
         ) from exc
+    if tolerate_not_found:
+        try:
+            response = json.loads(result.stdout)
+            errors = response.get("errors") or []
+            if isinstance(response.get("data"), dict) and all(
+                isinstance(e, dict) and e.get("type") == "NOT_FOUND" for e in errors
+            ):
+                return response["data"]
+        except (ValueError, AttributeError):
+            pass
     if result.returncode != 0:
         raise ProjectError(
             "GitHub refused or failed the request. Check CLI access and branch state; "
@@ -376,9 +392,9 @@ class RollingPullRequests:
 
     def __init__(
         self,
-        request: Callable[[str, dict[str, Any]], dict[str, Any]] = gh_graphql,
+        request: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
     ) -> None:
-        self.request = request
+        self.request = request or gh_graphql
 
     def read(self, target: BranchTarget) -> Remote:
         owner, name = target.repository.split("/")
@@ -648,4 +664,127 @@ class RollingPullRequests:
             "branch_url": f"https://github.com/{target.repository}/tree/{target.branch}",
             "compare_url": f"https://github.com/{target.repository}/compare/"
             f"{target.base}...{target.branch}",
+        }
+
+
+# Creating a repository: a reviewed operation like publication. GraphQL's createRepository cannot
+# add a first commit, so creation uses REST with a README, which gives the base branch a commit.
+
+_VIEWER_REPOSITORY = """query($name:String!) {
+  viewer { login repository(name:$name) { nameWithOwner } }
+}"""
+
+
+def gh_rest(method: str, path: str, body: dict[str, Any]) -> dict[str, Any]:
+    """One REST call through the user's CLI credential store; no stderr echo and no retry."""
+    environment = dict(os.environ)
+    for name in ("GH_DEBUG", "GH_HOST", "GH_REPO"):
+        environment.pop(name, None)
+    environment["GH_PROMPT_DISABLED"] = "1"
+    try:
+        result = subprocess.run(
+            ["gh", "api", "--hostname", "github.com", "--method", method, path, "--input", "-"],
+            input=json.dumps(body),
+            text=True,
+            capture_output=True,
+            timeout=45,
+            check=False,
+            env=environment,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ProjectError(
+            "GitHub request did not complete; the repository may exist. Review again first."
+        ) from exc
+    if result.returncode != 0:
+        raise ProjectError(
+            "GitHub refused or failed the request; its outcome may be unknown. "
+            "No automatic retry was made."
+        )
+    try:
+        response = json.loads(result.stdout)
+        if not isinstance(response, dict):
+            raise ValueError("not an object")
+        return response
+    except ValueError as exc:
+        raise ProjectError("GitHub returned an unsuccessful response") from exc
+
+
+class RepositoryCreation:
+    """Create a private repository under the signed-in account, after a bound review."""
+
+    def __init__(
+        self,
+        request: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
+        rest: Callable[[str, str, dict[str, Any]], dict[str, Any]] | None = None,
+    ) -> None:
+        self.request = request or (
+            lambda query, variables: gh_graphql(query, variables, tolerate_not_found=True)
+        )
+        self.rest = rest or gh_rest
+
+    def review(self, name: str, description: str = "") -> dict[str, Any]:
+        """What creation would do. Reads the signed-in login and whether the name is free."""
+        if re.fullmatch(r"[A-Za-z0-9_.-]{1,100}", name) is None or name in (".", ".."):
+            raise ProjectError("repository name must be letters, digits, '-', '_' or '.'")
+        if len(description) > 200 or any(ord(c) < 32 for c in description):
+            raise ProjectError("description must be one line of at most 200 characters")
+        data = self.request(_VIEWER_REPOSITORY, {"name": name})
+        try:
+            login = data["viewer"]["login"]
+            existing = data["viewer"]["repository"]
+        except (KeyError, TypeError) as exc:
+            raise ProjectError("GitHub returned incomplete account metadata") from exc
+        if not isinstance(login, str) or re.fullmatch(r"[A-Za-z0-9-]{1,100}", login) is None:
+            raise ProjectError("GitHub did not return the signed-in login")
+        if existing is not None:
+            raise Conflict(
+                "a repository with this name exists; link the project to it instead of creating"
+            )
+        review = {
+            "repository": f"{login}/{name}",
+            "owner": login,
+            "visibility": "private",
+            "first_commit": "README on the default branch",
+            "description": description,
+            "creation": "Creates an empty private repository with a README under the signed-in "
+            "account. Nothing from the project is published by this step.",
+        }
+        return {**review, "review_sha256": digest(canonical_json(review))}
+
+    def create(
+        self,
+        name: str,
+        description: str = "",
+        *,
+        reviewed_sha256: str,
+        allow_publication: bool = False,
+    ) -> dict[str, Any]:
+        if not allow_publication:
+            raise ProjectError("creating a repository requires explicit authorization")
+        review = self.review(name, description)
+        if review["review_sha256"] != reviewed_sha256:
+            raise Conflict("account, name or description changed; review again")
+        made = self.rest(
+            "POST",
+            "/user/repos",
+            {"name": name, "description": description, "private": True, "auto_init": True},
+        )
+        try:
+            ok = (
+                made["full_name"].lower() == review["repository"].lower()
+                and made["private"] is True
+                and isinstance(made["default_branch"], str)
+            )
+        except (KeyError, TypeError, AttributeError):
+            ok = False
+        if not ok:
+            raise ProjectError(
+                "GitHub's reply did not confirm a private repository; inspect it before linking"
+            )
+        return {
+            "created": True,
+            "repository": made["full_name"],
+            "private": True,
+            "default_branch": made["default_branch"],
+            "url": f"https://github.com/{made['full_name']}",
         }

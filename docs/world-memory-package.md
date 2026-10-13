@@ -761,8 +761,8 @@ the source record was authentic. Inference reruns are not implemented by this ad
 
 ### Project folders
 
-A project is a plain local git repository: `world-project.json`, `evidence/<session>.json` and
-optional `dependencies/<sha256>` files. No account, remote or hook is involved. Every git call
+A project is a plain local git repository: `world-project.json`, `evidence/<session>.json`, an
+optional `project-link.json` and optional `dependencies/<sha256>` files. No account, remote or hook is involved. Every git call
 names the folder's own `.git` directory with environment overrides removed, so it cannot reach an
 enclosing checkout; a folder with a remote is refused.
 
@@ -818,6 +818,16 @@ uv run python -m exulanica.world_package.projects capture --api http://localhost
 uv run python -m exulanica.world_package.projects watch ./my-project --api http://localhost:PORT --token-file TOKEN --world WORLD --version VERSION --thing THING
 ```
 
+`record-world` captures straight into a project folder as one checkpoint and one session's
+evidence, creating the folder when `--project-id` is given. A later run's world may still hold an
+earlier run's records; a record already kept in another session, recognized by its source record
+digest, is not repeated. Request identities derive from the being and the minute, so two runs from
+one starting state reuse identities for different decisions; the digest keeps both.
+
+```sh
+uv run python -m exulanica.world_package.projects record-world ./my-project --api http://localhost:PORT --token-file TOKEN --world WORLD --version VERSION --thing THING --session session:run-1 --readable --project-id project:mine
+```
+
 `watch` keeps a project's history without a save button. It captures at a bounded interval
 (5 to 300 seconds, default 15) into one evidence session per run and writes pending changes to
 the folder so they are visible before they are recorded. It records a checkpoint once the
@@ -838,13 +848,34 @@ CLI user with write permission. Organization ownership, repository creation and 
 forking are outside both. Dependency bytes are never published. Fetch may read an accessible
 repository without write permission.
 
+**Repository and link.** `review-repository NAME` reads the signed-in GitHub login and whether
+the name is free, and returns a digest over the owner, name, private visibility, README first
+commit and description. `create-repository NAME --review-sha256 DIGEST --allow-publication`
+recomputes it, creates the private repository with a README so its default branch has a commit,
+and confirms GitHub's reply names a private repository. An existing name is refused; `link`
+records an existing repository instead. No account or repository name is built in: the owner is
+the CLI's login and the name is the argument.
+
+`link FOLDER --repository OWNER/NAME --base BRANCH --branch BRANCH` writes `project-link.json`
+(profile `exulanica.world-project-link/v1`: repository, base branch and project branch; no
+credential, token or URL) and records it as one checkpoint. Nothing is contacted. Branch commands
+read the link when their flags are omitted and refuse a flag that disagrees with it; the link is
+not published. The link lives in the folder rather than in the workspace database because a
+project must work with no account or server, and GitHub authentication stays in the GitHub CLI.
+
+```sh
+uv run python -m exulanica.world_package.projects review-repository my-world
+uv run python -m exulanica.world_package.projects create-repository my-world --review-sha256 REVIEW_DIGEST --allow-publication
+uv run python -m exulanica.world_package.projects link ./my-project --repository OWNER/my-world --base main --branch exulanica/my-project
+```
+
 **Rolling pull request.** A project folder publishes its last saved commit, never pending edits,
 to one project branch with one open pull request against a base branch, the way dependency bots
 group updates:
 
 ```sh
-uv run python -m exulanica.world_package.projects review-branch ./my-project --repository OWNER/REPOSITORY --base main --branch exulanica/my-project
-uv run python -m exulanica.world_package.projects publish-branch ./my-project --repository OWNER/REPOSITORY --base main --branch exulanica/my-project --review-sha256 REVIEW_DIGEST --allow-publication
+uv run python -m exulanica.world_package.projects review-branch ./my-project
+uv run python -m exulanica.world_package.projects publish-branch ./my-project --review-sha256 REVIEW_DIGEST --allow-publication
 ```
 
 `review-branch` writes nothing. It reads the base branch, the project branch and its open pull

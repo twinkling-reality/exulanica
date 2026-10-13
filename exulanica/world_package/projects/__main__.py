@@ -28,10 +28,18 @@ from exulanica.world_package.projects.checkpoint import (
 from exulanica.world_package.projects.github import (
     BranchTarget,
     GitHubProjects,
+    RepositoryCreation,
     RollingPullRequests,
     Target,
 )
-from exulanica.world_package.projects.repository import Author, Project, create, fork_project
+from exulanica.world_package.projects.link import resolve
+from exulanica.world_package.projects.repository import (
+    Author,
+    Project,
+    accumulate,
+    create,
+    fork_project,
+)
 from exulanica.world_package.projects.schema import Checkpoint, Evidence, Source
 from exulanica.world_package.projects.watch import Policy, Watcher
 
@@ -97,15 +105,39 @@ def parser() -> argparse.ArgumentParser:
     for name in ("review-branch", "publish-branch"):
         command = commands.add_parser(name, help="one rolling pull request for a project folder")
         command.add_argument("folder", type=Path)
-        command.add_argument("--repository", required=True)
-        command.add_argument("--base", required=True)
-        command.add_argument("--branch", required=True)
+        command.add_argument("--repository", help="defaults to the project's link")
+        command.add_argument("--base", help="defaults to the project's link")
+        command.add_argument("--branch", help="defaults to the project's link")
         command.add_argument(
             "--message", help="only when the branch matches no saved checkpoint and is squashed"
         )
         if name == "publish-branch":
             command.add_argument("--review-sha256", required=True)
             command.add_argument("--allow-publication", action="store_true")
+    for name in ("review-repository", "create-repository"):
+        command = commands.add_parser(name, help="a private repository under the signed-in account")
+        command.add_argument("name")
+        command.add_argument("--description", default="")
+        if name == "create-repository":
+            command.add_argument("--review-sha256", required=True)
+            command.add_argument("--allow-publication", action="store_true")
+    command = commands.add_parser("link", help="record where a project folder publishes")
+    command.add_argument("folder", type=Path)
+    command.add_argument("--repository", required=True)
+    command.add_argument("--base", required=True)
+    command.add_argument("--branch", required=True)
+    command.add_argument("--author-name")
+    command.add_argument("--author-email")
+    command = commands.add_parser(
+        "record-world", help="capture a running world (GET) into a project folder as a checkpoint"
+    )
+    command.add_argument("folder", type=Path)
+    _world_arguments(command)
+    command.add_argument("--session", required=True)
+    command.add_argument("--project-id", help="required when the folder does not exist yet")
+    command.add_argument("--message")
+    command.add_argument("--author-name")
+    command.add_argument("--author-email")
     command = commands.add_parser("capture", help="read a selection from a running world (GET)")
     _world_arguments(command)
     command.add_argument("--project-id", required=True)
@@ -183,6 +215,12 @@ def project_command(args: argparse.Namespace) -> dict[str, object]:
             for sha, data in result.dependencies.items():
                 (args.dependencies_output / sha).write_bytes(data)
         return {**saved, "report": result.report, "published": False}
+    if args.command == "link":
+        return Project(args.folder, author=_author(args)).link(
+            args.repository, args.base, args.branch
+        )
+    if args.command == "record-world":
+        return record_world(args)
     if args.command == "create":
         return create(
             args.folder,
@@ -226,6 +264,59 @@ def project_command(args: argparse.Namespace) -> dict[str, object]:
     return {"session_id": session, "final": _brief(final)}
 
 
+def record_world(args: argparse.Namespace) -> dict[str, object]:
+    """Capture a running world into a project folder: one checkpoint, one session's evidence."""
+    exists = args.folder.exists()
+    project = Project(args.folder, author=_author(args))
+    project_id = project.at("HEAD")["project_id"] if exists else args.project_id
+    if project_id is None:
+        raise ProjectError("a new project folder needs --project-id")
+    with _reader(args) as reader:
+        captured = _capture(args, reader, project_id, args.session)
+    if not exists:
+        return {
+            **create(
+                args.folder,
+                captured.checkpoint,
+                author=_author(args),
+                message=args.message,
+                dependencies=captured.dependencies,
+                evidence=[captured.evidence] if captured.evidence else [],
+            ),
+            "report": captured.report,
+        }
+    evidence = []
+    if captured.evidence:
+        # A later run's world may still hold an earlier run's records; each is kept once. A
+        # request identity derives from the being and the minute, so two runs from one start
+        # reuse identities for different decisions: the source record's digest tells them apart.
+        sessions = project.working_sessions()
+        own = {
+            name
+            for name, held in sessions.items()
+            if held["session_id"] == args.session
+            or held["session_id"].startswith(f"{args.session}:")
+        }
+        held = {
+            d["source_record_sha256"]
+            for name, session in sessions.items()
+            if name not in own
+            for d in session["decisions"]
+        }
+        fresh = [d for d in captured.evidence["decisions"] if d["source_record_sha256"] not in held]
+        if fresh:
+            evidence = accumulate(sessions, {**captured.evidence, "decisions": fresh})
+    return {
+        **project.save(
+            captured.checkpoint,
+            evidence=evidence,
+            message=args.message,
+            dependencies=captured.dependencies,
+        ),
+        "report": captured.report,
+    }
+
+
 def _brief(outcome: dict[str, object]) -> dict[str, object]:
     return {k: v for k, v in outcome.items() if k != "diff"}
 
@@ -239,8 +330,22 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "evidence-schema":
             print(json.dumps(Evidence.model_json_schema(), indent=2, sort_keys=True))
             return 0
+        if args.command in ("review-repository", "create-repository"):
+            creation = RepositoryCreation()
+            if args.command == "review-repository":
+                result = creation.review(args.name, args.description)
+            else:
+                result = creation.create(
+                    args.name,
+                    args.description,
+                    reviewed_sha256=args.review_sha256,
+                    allow_publication=args.allow_publication,
+                )
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return 0
         if args.command in ("review-branch", "publish-branch"):
-            target = BranchTarget(args.repository, args.base, args.branch)
+            linked = resolve(args.folder, args.repository, args.base, args.branch)
+            target = BranchTarget(linked["repository"], linked["base"], linked["branch"])
             client, project = RollingPullRequests(), Project(args.folder)
             if args.command == "review-branch":
                 result = client.review(target, project, args.message)
@@ -254,7 +359,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0
-        if args.command in (*PROJECT_COMMANDS, "capture"):
+        if args.command in (*PROJECT_COMMANDS, "capture", "link", "record-world"):
             print(json.dumps(project_command(args), indent=2, sort_keys=True))
             return 0
         if args.command == "diff":
