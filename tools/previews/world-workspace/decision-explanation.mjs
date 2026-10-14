@@ -52,7 +52,8 @@ export function explainDecision(data, summary, { actionWords = {}, reasonWords =
   const remembered = context.remembers;
   if (remembered) {
     const count = ['beings', 'places', 'handed'].reduce((sum, key) => sum + list(remembered[key]).length, 0);
-    inputs.push(count ? `${count} memory entries were also included; inspect the recorded inputs for their complete contents.` : 'No memory entries were included.');
+    inputs.push(count === 1 ? '1 memory entry was also included; inspect the recorded inputs for its complete contents.'
+      : count ? `${count} memory entries were also included; inspect the recorded inputs for their complete contents.` : 'No memory entries were included.');
   }
   const limitations = [];
   if (options.length && options.every(option => option.kind === 'wait' || option.kind === 'carry_on')) limitations.push('The recorded options offered only waiting or continuing the current action.');

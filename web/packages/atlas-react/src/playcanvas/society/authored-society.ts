@@ -185,6 +185,14 @@ export class AuthoredRegionSociety {
     return this.crowd.groundOf(id, out);
   }
 
+  /**
+   * The point of the box an inhabitant is drawn and picked by nearest a point, both in world space
+   * (`SocietyCrowd.nearestPointOf`), or false when they are not drawn outdoors now.
+   */
+  nearestPointOf(id: string, from: pc.Vec3, out: pc.Vec3): boolean {
+    return this.crowd.nearestPointOf(id, from, out);
+  }
+
   /** Everyone drawn as everyone else is although their state says what they do, and why. */
   get seatingMisses(): readonly CrowdSeatingMiss[] {
     return this.crowd.seatingMisses;

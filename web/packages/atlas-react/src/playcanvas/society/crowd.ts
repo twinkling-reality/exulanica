@@ -898,6 +898,32 @@ export class SocietyCrowd {
     return true;
   }
 
+  /** The inverse of the root's world transform, kept for `nearestPointOf`. */
+  private toRoot: pc.Mat4 | null = null;
+
+  /**
+   * The point of the box an inhabitant is drawn and picked by (`pick`) that lies nearest `from`, both
+   * in world space, written into `out`: `from` itself when it is inside the box. So how near someone
+   * is can be measured to their body, whatever its size, rather than to a point inside it. The box is
+   * clamped in this crowd's frame, which a region turns and scales alike on every axis. False when
+   * they are not drawn outdoors now.
+   */
+  nearestPointOf(id: string, from: pc.Vec3, out: pc.Vec3): boolean {
+    const walker = this.drawnOutdoors(id);
+    if (walker === null) return false;
+    const [min, max] = this.boxOf(id, walker);
+    const toWorld = this.root.getWorldTransform();
+    const toRoot = (this.toRoot ??= toWorld.clone()).invert(toWorld);
+    toRoot.transformPoint(from, out);
+    out.set(
+      Math.min(Math.max(out.x, min[0]), max[0]),
+      Math.min(Math.max(out.y, min[1]), max[1]),
+      Math.min(Math.max(out.z, min[2]), max[2]),
+    );
+    toWorld.transformPoint(out, out);
+    return true;
+  }
+
   /** What an inhabitant's far figure draws: the far form of that person's own look. */
   farAppearance(id: string): FarAppearance {
     return this.far.appearanceOf(id);
@@ -1024,18 +1050,27 @@ export class SocietyCrowd {
       if (renderable && (!renderable.root.enabled || renderable.root.tags.has('native-character-hidden'))) continue;
       const walker = this.walkers.get(id);
       if (!walker) continue;
-      const [x, y, z] = walker.drawn;
-      const height = renderable?.standingHeight ?? this.far.appearanceOf(id).heightMetres;
-      // A body that states its size is picked over the ground it covers, turned as it is drawn
-      // (`pickReach`); anyone else, by a person's box.
-      const [hx, hz] = pickReach(renderable?.footprint ?? null, renderable?.facing ?? 0);
-      const distance = hit([x - hx, y, z - hz], [x + hx, y + height, z + hz]);
+      const [min, max] = this.boxOf(id, walker);
+      const distance = hit(min, max);
       if (distance !== null && distance < nearest) {
         nearest = distance;
         selected = id;
       }
     }
     return selected;
+  }
+
+  /**
+   * The box an inhabitant is drawn and picked by, in this crowd's frame: from their feet up to the
+   * height they stand, and across the ground a body that states its size covers, turned as it is
+   * drawn (`pickReach`); anyone else, a person's box.
+   */
+  private boxOf(id: string, walker: Walker): readonly [readonly [number, number, number], readonly [number, number, number]] {
+    const renderable = this.near.get(id);
+    const [x, y, z] = walker.drawn;
+    const height = renderable?.standingHeight ?? this.far.appearanceOf(id).heightMetres;
+    const [hx, hz] = pickReach(renderable?.footprint ?? null, renderable?.facing ?? 0);
+    return [[x - hx, y, z - hz], [x + hx, y + height, z + hz]];
   }
 
   /**

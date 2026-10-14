@@ -144,6 +144,16 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     point.set(...[0, 1, 2].map(axis => overhead && axis === 1 ? Math.max(...bounds.map(value => value[axis])) : bounds.reduce((sum, value) => sum + value[axis], 0) / bounds.length));
     return point;
   }
+  /** How far the camera is from a subject for inspect reach: to the nearest point of a being's box, so a being of any size can be inspected from beside it; to an object's middle. */
+  function reachDistance(row) {
+    const eye = b.camera.getPosition();
+    if (row.scene.type === 'being') {
+      const nearest = eye.clone();
+      return b.authoredSociety?.nearestPointOf(row.scene.id, eye, nearest) ? eye.distance(nearest) : Infinity;
+    }
+    const point = targetPoint(row);
+    return point ? eye.distance(point) : Infinity;
+  }
   function visitorGround(row) {
     if (row?.scene.type !== 'being') return null;
     const point = b.camera.getPosition().clone();
@@ -306,8 +316,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   async function inspect(row = target) {
     if (!row || !panel.hidden) return;
-    const position = targetPoint(row);
-    if (!position || !inspectionReach(b.camera.getPosition().distance(position), row.key === target?.key && targetReachable)) { notice('Move closer to inspect this entity.'); return; }
+    if (!inspectionReach(reachDistance(row), row.key === target?.key && targetReachable)) { notice('Move closer to inspect this entity.'); return; }
     held = row; panel.hidden = false; prompt.hidden = true; notice('');
     b.setControlsEnabled(false); b.setFreeCursorActive(true); canvas.inert = true;
     if (document.pointerLockElement) document.exitPointerLock();
@@ -426,7 +435,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const subjectFrame = row && screenFrame(row);
     const point = subjectFrame?.body, projected = subjectFrame?.projected;
     const visible = projected && projected.z > 0 && projected.x >= 0 && projected.x <= innerWidth && projected.y >= 0 && projected.y <= innerHeight && (held || visibleMarkers.some(item => item.key === row?.key));
-    const distance = point ? b.camera.getPosition().distance(point) : Infinity;
+    const distance = point ? reachDistance(row) : Infinity;
     targetReachable = Boolean(target && inspectionReach(distance, targetReachable));
     $('.cw-reticle').hidden = !panel.hidden;
     $('.cw-reticle').dataset.state = target ? targetReachable ? 'ready' : 'far' : 'empty';

@@ -38,6 +38,15 @@ export async function runSelectedModel({ modelsClient, controlClient, entry, sub
   return verified;
 }
 
+/**
+ * A being's newest recorded events, newest first. The events read serves minutes newest first and,
+ * within a minute, events in the order the engine gave them, so a minute's later events go first.
+ */
+function newestEvents(events, subjectId, count) {
+  return events.flatMap((event, index) => event.subject_id === subjectId ? [{ event, index }] : [])
+    .sort((a, b) => b.event.tick - a.event.tick || b.index - a.index).slice(0, count).map(item => item.event);
+}
+
 /** Observe through existing authenticated clients; never advance a tick or ask a provider. */
 export async function readEntityActivity({ modelsClient, controlClient, societyClient, entry, subjectId, current }) {
   const [models, control, society] = await Promise.all([modelsClient.read(entry.authoredVersionId), controlClient.read(entry.authoredVersionId), societyClient.read(entry.authoredVersionId)]);
@@ -47,7 +56,7 @@ export async function readEntityActivity({ modelsClient, controlClient, societyC
   if (!person) throw Error('This character is no longer in the world.');
   const events = await societyClient.events(society);
   if (!current()) throw Error('The activity view is no longer open.');
-  return { models, control, person, events: events.filter(event => event.subject_id === subjectId).slice(-6).reverse(), latest: models.latest.find(item => item.subjectId === subjectId) || null, tick: society.currentTick };
+  return { models, control, person, events: newestEvents(events, subjectId, 6), latest: models.latest.find(item => item.subjectId === subjectId) || null, tick: society.currentTick };
 }
 
 export function decisionView(data, entry, subjectId) {

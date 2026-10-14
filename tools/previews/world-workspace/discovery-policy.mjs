@@ -4,6 +4,7 @@ export const DISCOVERY = Object.freeze({
   hitSizePx: 40, // A marker has a usable pointer target even when its glyph is small.
   farGlyphPx: 14,
   nearGlyphPx: 24,
+  // Inspect reach runs from the camera to the nearest point of a being's box (an object's middle).
   inspectEnterMetres: 6, // Prototype exploration radius, not an engine's physical-action permission.
   inspectLeaveMetres: 7, // Hysteresis keeps a prompt stable at the boundary.
 });
