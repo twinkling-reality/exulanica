@@ -1,16 +1,21 @@
 // Build mode in the world workspace. B switches it on and off while the world keeps playing. In it,
 // pointing at a thing placed in the world names it, a click selects it (a ring at its foot and a
-// small card beside it), Backspace asks the server what removing it would do and Enter does it, and
-// Cmd+Z takes back the world's newest change. Every write goes through the app's own edit path
+// small card beside it). Dragging it carries a see-through copy along the ground and `[` `]` turn
+// it (half metres and 15 degree steps, Alt for free); the server says whether it may stand there
+// while it moves and when it is let go, and Enter keeps the move, Esc puts it back. Backspace asks
+// the server what removing it would do and Enter does it, and Cmd+Z takes back the world's newest
+// change. Every write goes through the app's own edit path
 // (`send`, main.ts's sendPlanned), which advances the saved world and redraws what changed; every
 // write is asked of the server first as a preview, and only the server's answer is shown.
 // What a key does in each state, and every sentence, is build-words.mjs.
 import { pointerRay } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
-import { keyAction, refusalWords, removeQuestion, removedNote, thingName, titled, undoRefusalWords, undoneNote } from './build-words.mjs';
+import { keepLine, keyAction, moveWords, movedNote, refusalWords, removeQuestion, removedNote, snapped, thingName, titled, turned, undoRefusalWords, undoneNote } from './build-words.mjs';
 import './build-mode.css';
 
 /** How long a note of what was done stays, in milliseconds. */
 const NOTE_MS = 5000;
+/** How long a carried thing rests before the server is asked about where it is, in milliseconds. */
+const ASK_AFTER_MS = 180;
 
 export function mountBuildMode({ b, root, state, entry, read, send, binding, canvas, guidance, worlds = null, inspecting }) {
   const lifetime = new AbortController();
@@ -32,14 +37,20 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   root.append(pill, hints, tag, card, note);
 
   let on = false, hovered = null, selected = null, confirming = null, busy = false, failure = '';
+  /**
+   * A move being made: the thing, where it stands (`from`) and where it would stand (`to`, region
+   * frame: east, up, south in millimetres, yaw in microradians), the grip while it is dragged, and
+   * the server's newest answer about `to` (`verdict`: checking, ready or refused, with its words).
+   */
+  let moving = null, asked = 0, askTimer = 0;
   let records = new Map(), pointer = null, lastPick = 0, noteTimer = 0;
   /** The first read of the version's things after B, which a click made before it ends waits for. */
   let reading = null;
-  const point = b.camera.getPosition().clone();
+  const point = b.camera.getPosition().clone(), footPoint = point.clone();
   let wasInspecting = false;
 
   const things = () => b.__workspaceThings?.() ?? null;
-  const flags = () => ({ on, selected: selected !== null, confirming: confirming !== null, busy });
+  const flags = () => ({ on, selected: selected !== null, confirming: confirming !== null, moving: moving !== null, ready: moving?.verdict.state === 'ready', busy });
 
   function say(words) {
     clearTimeout(noteTimer);
@@ -79,7 +90,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     // While building, Esc is build mode's (put back, close, then done): the way out of the world
     // and its Esc show again once building is done.
     if (worlds) worlds.hidden = on;
-    hints.textContent = selected === null ? 'Drag to look · Click to select · ⌘Z to undo' : 'Drag to look · ⌘Z to undo';
+    hints.textContent = selected === null ? 'Drag to look · Click to select · ⌘Z to undo'
+      : moving !== null ? 'Drag it to move · [ ] to turn · Alt for free' : 'Drag it to move · [ ] to turn · ⌘Z to undo';
     card.replaceChildren();
     card.hidden = !on || selected === null || inspecting();
     if (card.hidden) return;
@@ -90,7 +102,16 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     const actions = node('div', '', 'bm-actions');
     if (busy) card.append(node('p', 'Checking…', 'bm-line'));
     else if (failure) card.append(node('p', failure, 'bm-line bm-refused'));
-    if (confirming !== null && !busy) {
+    if (moving !== null && !busy) {
+      const where = moveWords(moving.from, moving.to);
+      card.append(node('p', where.charAt(0).toUpperCase() + where.slice(1), 'bm-line bm-where'));
+      const verdict = moving.verdict;
+      if (verdict.state === 'checking') card.append(node('p', 'Checking…', 'bm-line'));
+      else if (verdict.state === 'refused') card.append(node('p', verdict.words, 'bm-line bm-refused'));
+      else card.append(node('p', verdict.words || keepLine(), 'bm-line'));
+      if (verdict.state === 'ready') actions.append(chip('Enter', 'Keep', () => { void keepMove(); }));
+      actions.append(chip('Esc', 'Put it back', putBack));
+    } else if (confirming !== null && !busy) {
       card.append(node('p', removeQuestion(name), 'bm-line'));
       actions.append(chip('Enter', 'Remove', () => { void confirmRemove(); }), chip('Esc', 'Keep it', cancel));
     } else if (!busy) {
@@ -101,11 +122,13 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   }
 
   function select(placedId) {
+    dropMove();
     selected = placedId; confirming = null; failure = '';
     things()?.layer.setPicked({ placedId, thingId: null, subjectId: null });
     render();
   }
   function deselect() {
+    dropMove();
     selected = null; confirming = null; failure = '';
     things()?.layer.setPicked(null);
     render(); canvas.focus({ preventScroll: true });
@@ -119,10 +142,88 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     await reading; reading = null;
   }
   function leave() {
+    dropMove();
     on = false; hovered = null; tag.hidden = true;
     if (selected !== null) things()?.layer.setPicked(null);
     selected = null; confirming = null; failure = '';
     render(); canvas.focus({ preventScroll: true });
+  }
+
+  /** The move under way, if any, ended without keeping it: the copy goes, nothing was written. */
+  function dropMove() {
+    if (moving === null) return;
+    moving = null; ++asked; clearTimeout(askTimer);
+    things()?.layer.setGhost(null);
+  }
+  function putBack() { dropMove(); render(); canvas.focus({ preventScroll: true }); }
+
+  /** The ground point under a screen point (region frame, millimetres), or null off the ground. */
+  function groundAt(x, y) {
+    const ray = pointerRay(b, x, y); if (!ray) return null;
+    return b.authoredSociety?.groundPoint(ray.origin, ray.direction) ?? null;
+  }
+
+  /** Start a move of the selected thing from where it stands, or keep the one under way. */
+  function beginMove() {
+    if (moving !== null || selected === null) return moving;
+    const record = records.get(selected); if (!record) return null;
+    const t = record.transform;
+    const from = { x: t.x_mm, y: t.y_mm, z: t.z_mm, yaw: t.yaw_microradians };
+    moving = { placedId: selected, from, to: { ...from }, grip: null, verdict: { state: 'checking', words: '' } };
+    return moving;
+  }
+
+  /** Stand the copy where the move would put it and ask the server about it once it rests. */
+  function moveTo(to) {
+    if (moving === null) return;
+    moving.to = to;
+    moving.verdict = { state: 'checking', words: '' };
+    things()?.layer.setGhost({ placedId: moving.placedId, xMm: to.x, yMm: to.y, zMm: to.z, yawMicroradians: to.yaw, refused: false });
+    clearTimeout(askTimer);
+    askTimer = window.setTimeout(() => { void askMove(); }, ASK_AFTER_MS);
+    render();
+  }
+
+  /** The server's move preview for where the copy stands now; an older answer is dropped. */
+  async function askMove() {
+    if (moving === null) return;
+    const request = ++asked, move = moving, to = { ...move.to }, stateBase = base();
+    try {
+      const answer = (await post('things.move.preview', '/things/' + encodeURIComponent(move.placedId) + '/move/preview',
+        { base_state_sha256: stateBase, pose: { x_mm: to.x, y_mm: to.y, z_mm: to.z, yaw_microradians: to.yaw } })).body;
+      if (request !== asked || moving !== move) return;
+      move.verdict = answer.availability === 'ready'
+        ? { state: 'ready', words: answer.landing?.checked === false ? 'Where it may stand is not checked in this world.' : '', base: stateBase, to }
+        : { state: 'refused', words: refusalWords(answer.blocked_reason, answer.blocked_detail) };
+    } catch (error) {
+      if (request !== asked || moving !== move) return;
+      move.verdict = { state: 'refused', words: problem(error) };
+    }
+    things()?.layer.setGhost({ placedId: move.placedId, xMm: to.x, yMm: to.y, zMm: to.z, yawMicroradians: to.yaw, refused: move.verdict.state === 'refused' });
+    render();
+  }
+
+  function turn(degrees, free) {
+    const move = beginMove(); if (move === null) return;
+    moveTo({ ...move.to, yaw: turned(move.to.yaw, degrees, free) });
+  }
+
+  async function keepMove() {
+    if (moving === null || busy || moving.verdict.state !== 'ready') return;
+    const move = moving, verdict = move.verdict, name = nameOf(move.placedId);
+    busy = true; render();
+    try {
+      // The pose and the base the server's answer was about: anything since is refused as stale.
+      const to = verdict.to;
+      await post('things.move', '/things/' + encodeURIComponent(move.placedId) + '/move',
+        { base_state_sha256: verdict.base, pose: { x_mm: to.x, y_mm: to.y, z_mm: to.z, yaw_microradians: to.yaw }, saved_entry: savedEntry() });
+      busy = false; dropMove(); render(); say(movedNote(name, moveWords(move.from, to)));
+    } catch (error) {
+      busy = false;
+      if (moving === move) move.verdict = { state: 'refused', words: problem(error) };
+      render();
+    }
+    try { await refreshRecords(); } catch {}
   }
 
   function savedEntry() {
@@ -193,6 +294,34 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       else if (action === 'remove') void askRemove();
       else if (action === 'confirm') void confirmRemove();
       else if (action === 'undo') void undo();
+      else if (action === 'turn-left') turn(15 * (event.altKey ? 1 / 15 : 1), event.altKey);
+      else if (action === 'turn-right') turn(-15 * (event.altKey ? 1 / 15 : 1), event.altKey);
+      else if (action === 'put-back') putBack();
+      else if (action === 'keep') void keepMove();
+      return true;
+    },
+    /**
+     * A press on the world: true when it picks up the selected thing to carry it (build mode then
+     * follows the pointer until it is let go); false leaves the press to looking around.
+     */
+    pointerDown(event) {
+      if (!on || busy || event.button !== 0 || selected === null || confirming !== null) return false;
+      if (placedAt(event.clientX, event.clientY) !== selected) return false;
+      const ground = groundAt(event.clientX, event.clientY);
+      const move = ground === null ? null : beginMove();
+      if (move === null) return false;
+      move.grip = { east: move.to.x - ground.xMm, south: move.to.z - ground.zMm };
+      const carry = (at, free) => {
+        const point = groundAt(at.clientX, at.clientY);
+        if (point === null || moving !== move) return;
+        moveTo({ ...move.to, x: snapped(point.xMm + move.grip.east, free), z: snapped(point.zMm + move.grip.south, free) });
+      };
+      const follow = new AbortController();
+      document.addEventListener('mousemove', at => carry(at, at.altKey), { signal: follow.signal });
+      document.addEventListener('mouseup', at => { carry(at, at.altKey); follow.abort(); if (moving === move) move.grip = null; }, { signal: follow.signal, capture: true });
+      lifetime.signal.addEventListener('abort', () => follow.abort());
+      canvas.style.cursor = 'grabbing';
+      render();
       return true;
     },
     /** A click on the world, not a drag: true when build mode took it. */
@@ -208,14 +337,18 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       if (!on) return;
       if (now - lastPick >= 50) {
         lastPick = now;
-        hovered = pointer && !inspecting() ? placedAt(pointer.x, pointer.y) : null;
-        canvas.style.cursor = hovered !== null ? 'pointer' : '';
+        hovered = pointer && !inspecting() && moving?.grip == null ? placedAt(pointer.x, pointer.y) : null;
+        canvas.style.cursor = moving?.grip != null ? 'grabbing' : hovered !== null ? (hovered === selected ? 'grab' : 'pointer') : '';
       }
       const layer = things()?.layer;
       const place = (element, placedId, beside) => {
         // Out of view is not closed: the element keeps its state and shows again when it is in view.
         const figure = placedId === null ? null : layer?.figureOf(placedId);
-        const screen = figure && figure.root.enabled ? b.camera.camera.worldToScreen(figure.markAnchor(point)) : null;
+        // While it is being moved, beside where it would stand.
+        const to = beside && moving !== null && moving.placedId === placedId ? moving.to : null;
+        const anchor = !figure ? null : to === null ? figure.markAnchor(point)
+          : figure.root.parent.getWorldTransform().transformPoint(point.set(to.x / 1000, to.y / 1000 + figure.standingHeight + 0.25, to.z / 1000), point);
+        const screen = anchor && (figure.root.enabled || to !== null) ? b.camera.camera.worldToScreen(anchor) : null;
         element.style.visibility = screen && screen.z > 0 ? '' : 'hidden';
         if (!screen || screen.z <= 0) return;
         let x, y;
@@ -223,7 +356,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
           // Beside the thing, clear of it by about its drawn height (its top to its foot on the
           // screen), on its right where there is room, else on its left, inside the window.
           const width = element.offsetWidth, height = element.offsetHeight;
-          const foot = b.camera.camera.worldToScreen(figure.root.getPosition());
+          const foot = b.camera.camera.worldToScreen(to === null ? figure.root.getPosition()
+            : figure.root.parent.getWorldTransform().transformPoint(footPoint.set(to.x / 1000, to.y / 1000, to.z / 1000), footPoint));
           const clear = Math.max(32, Math.min(240, Math.abs(foot.y - screen.y) + 12));
           x = screen.x + clear + width <= innerWidth - 16 ? screen.x + clear : screen.x - clear - width;
           x = Math.max(16, Math.min(innerWidth - width - 16, x));

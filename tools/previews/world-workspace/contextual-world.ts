@@ -380,6 +380,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   window.addEventListener('mousedown', event => {
     if (event.target !== canvas || !panel.hidden || ![0, 2].includes(event.button)) return;
     event.preventDefault(); event.stopImmediatePropagation(); canvas.focus({ preventScroll: true });
+    if (build?.pointerDown(event)) return;
     dragging = { startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY, moved: false, button: event.button };
   }, { capture: true, signal: lifetime.signal });
   document.addEventListener('pointerlockchange', () => {

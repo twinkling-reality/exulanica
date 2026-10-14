@@ -12,6 +12,13 @@
  * hold, a look kind this page does not draw, a container that does not read) is drawn as nothing,
  * and its reason is kept by name in `misses`, never stood in for.
  *
+ * A thing an edit moved, placed or brought back stands where its version now puts it, not where the
+ * society's minute last saw it, while the minutes drawn still show it as it was before the edit: a
+ * paused world shows an edit at once, and a minute that took the edit in (it lists the thing at its
+ * new place, in a hand, or anywhere else it has gone since) draws it again. An editor may draw a
+ * see-through copy of a placed thing where it would go (`setGhost`), tinted where the world refused
+ * that spot.
+ *
  * Picking meets each figure's pick volume; the nearest wins. The picked thing wears a ring. While a
  * person plays a being (Play this one), that being wears a steady ring at its feet as the society
  * draws it, and the ground where its next walk goes wears another, both in the world-mark person
@@ -29,6 +36,10 @@ type HeldThing = SocietyThingSnapshot & { readonly socket?: string | null };
 
 /** A society thing's key here: the author's id for a placed thing, else its society id. */
 const thingKey = (thing: { readonly id: string; readonly placed_id: string | null }): string => thing.placed_id ?? `carried:${thing.id}`;
+
+/** Whether two placed transforms stand a thing in the same place, turned the same way. */
+const sameTransform = (a: PlacedThingRecord['transform'], b: PlacedThingRecord['transform']): boolean =>
+  a.xMm === b.xMm && a.yMm === b.yMm && a.zMm === b.zMm && a.yawMicroradians === b.yawMicroradians;
 
 /** Who holds a thing and in which socket, or null for a thing on the ground. */
 const holderOf = (thing: HeldThing): string | null => (thing.held_by == null ? null : `${thing.held_by}|${thing.socket ?? ''}`);
@@ -85,6 +96,24 @@ export interface ThingPick {
   readonly thingId: string | null;
   readonly subjectId: string | null;
 }
+
+/**
+ * Where an editor would put a placed thing: its placed id, a pose of its region in the frame of a
+ * record's transform, and whether the world refused that spot.
+ */
+export interface ThingGhost {
+  readonly placedId: string;
+  readonly xMm: number;
+  readonly yMm: number;
+  readonly zMm: number;
+  readonly yawMicroradians: number;
+  readonly refused: boolean;
+}
+
+/** The refusal tint of a ghost, added as its light: a warm red that reads on paving, grass and water. */
+const REFUSED_GLOW = new pc.Color(0.7, 0.12, 0.08);
+/** How much of a ghost is drawn: a dither, as a fading representation is, so it never sorts against the world. */
+const GHOST_OPACITY = 0.45;
 
 export interface ThingMiss {
   readonly placedId: string;
@@ -180,6 +209,17 @@ export class ThingLayer {
   /** Makes every figure of this page from the library, a container once a digest. */
   readonly maker: ThingFigureMaker;
   private picked: string | null = null;
+  /** The see-through copy an editor asked for, and what it was made from. */
+  private ghost: { readonly placedId: string; readonly refused: boolean; readonly source: ThingFigure; readonly root: pc.Entity; readonly materials: readonly pc.StandardMaterial[] } | null = null;
+  /**
+   * Things an edit moved, placed or brought back, by placed id, with every spot the edits replaced
+   * (east and south, millimetres): where the drawing stood it before the first, and each place its
+   * version gave it before a later one. A minute that lists it at one of them has not taken the
+   * newest edit in.
+   */
+  private readonly edited = new Map<string, Array<readonly [number, number]>>();
+  /** Whether the version's things were stood once: later new ones are an edit's. */
+  private placedOnce = false;
   /** Play this one: the being played, ringed where its feet are drawn, and where its next walk goes. */
   private readonly playedRing: PickRing;
   private readonly destinationRing: PickRing;
@@ -213,16 +253,28 @@ export class ThingLayer {
       if (!wanted.has(id)) this.drop(id, entry);
     }
     const loads: Promise<void>[] = [];
+    let moved = false;
     for (const [id, record] of wanted) {
       const key = this.keyOf(record);
       const entry = this.entries.get(id);
       if (entry !== undefined && entry.key === key) {
         // Moved or turned: stood where the version now says at once, not at the next frame.
+        if (!sameTransform(entry.record.transform, record.transform)) {
+          const replaced = this.edited.get(id) ?? [this.standing(entry)];
+          replaced.push([entry.record.transform.xMm, entry.record.transform.zMm]);
+          this.edited.set(id, replaced);
+          moved = true;
+        }
         entry.record = record;
         this.poseOne(entry, 0);
         continue;
       }
-      if (entry !== undefined) this.drop(id, entry);
+      if (entry !== undefined) {
+        // Made again (another look, its support read again): an edit's mark stays with it.
+        const replaced = this.edited.get(id);
+        this.drop(id, entry);
+        if (replaced !== undefined) this.edited.set(id, replaced);
+      } else if (this.placedOnce) this.edited.set(id, []);
       const fresh: Entry = {
         record, key, figure: null, look: null, generation: (entry?.generation ?? 0) + 1,
         grip: null, parent: null, heldBy: null, heldIn: null,
@@ -230,8 +282,65 @@ export class ThingLayer {
       this.entries.set(id, fresh);
       loads.push(this.build(id, fresh));
     }
+    this.placedOnce = true;
+    // Once for all of them: a group of moves (an undo of several) is not walked once per move.
+    if (moved) this.applySociety();
     await Promise.all(loads);
     this.options.invalidate?.();
+  }
+
+  /**
+   * Draw a see-through copy of a placed thing where an editor would put it, tinted where the world
+   * refused that spot, or take it away with null. It is never picked and never part of a society.
+   */
+  setGhost(ghost: ThingGhost | null): void {
+    const entry = ghost === null ? undefined : this.entries.get(ghost.placedId);
+    const figure = entry?.figure ?? null;
+    if (ghost === null || figure === null || entry?.parent == null) {
+      this.dropGhost();
+      this.options.invalidate?.();
+      return;
+    }
+    if (this.ghost === null || this.ghost.placedId !== ghost.placedId || this.ghost.refused !== ghost.refused || this.ghost.source !== figure) {
+      this.dropGhost();
+      // The pick ring stands under the picked figure: it is the thing's, not its copy's.
+      const ringed = this.ring.entity.parent === figure.root;
+      if (ringed) figure.root.removeChild(this.ring.entity);
+      const root = figure.root.clone() as pc.Entity;
+      if (ringed) figure.root.addChild(this.ring.entity);
+      root.name = `thing-ghost:${ghost.placedId}`;
+      root.enabled = true;
+      const materials: pc.StandardMaterial[] = [];
+      for (const render of root.findComponents('render') as pc.RenderComponent[]) {
+        // A copy throws no shadow (a second, dithered one, drawn in every cascade); it still receives.
+        render.castShadows = false;
+        for (const instance of render.meshInstances) {
+          // Only a part whose material can fade is drawn: a copy is never solid. A skinned part is
+          // posed by its original's bones, so it would stand where the original stands: not drawn.
+          if (!(instance.material instanceof pc.StandardMaterial) || instance.skinInstance != null) { instance.visible = false; continue; }
+          const material = instance.material.clone();
+          material.opacity = GHOST_OPACITY;
+          material.opacityDither = pc.DITHER_IGNNOISE;
+          material.opacityShadowDither = pc.DITHER_IGNNOISE;
+          if (ghost.refused) material.emissive = REFUSED_GLOW;
+          material.update();
+          instance.material = material;
+          materials.push(material);
+        }
+      }
+      entry.parent.addChild(root);
+      this.ghost = { placedId: ghost.placedId, refused: ghost.refused, source: figure, root, materials };
+    }
+    this.ghost.root.setLocalPosition(ghost.xMm / 1000, ghost.yMm / 1000, ghost.zMm / 1000);
+    this.ghost.root.setLocalEulerAngles(0, (ghost.yawMicroradians / 1_000_000) * (180 / Math.PI), 0);
+    this.options.invalidate?.();
+  }
+
+  private dropGhost(): void {
+    if (this.ghost === null) return;
+    this.ghost.root.destroy();
+    for (const material of this.ghost.materials) material.destroy();
+    this.ghost = null;
   }
 
   /** Draw a placed thing in another look, or its kind's first with null. Nothing else changes. */
@@ -315,6 +424,7 @@ export class ThingLayer {
     if (this.destroyed) return;
     this.destroyed = true;
     this.options.app.off('update', this.onUpdate);
+    this.dropGhost();
     this.ring.place(null, 0);
     for (const [id, entry] of this.entries) this.drop(id, entry);
     this.ring.destroy();
@@ -369,6 +479,8 @@ export class ThingLayer {
 
   private drop(id: string, entry: Entry): void {
     if (this.picked === id) this.ring.place(null, 0);
+    if (this.ghost?.placedId === id) this.dropGhost();
+    this.edited.delete(id);
     entry.figure?.destroy();
     entry.figure = null;
     entry.generation += 1;
@@ -442,6 +554,7 @@ export class ThingLayer {
     walkEnded: (subjectId: string) => boolean = () => true,
     leaving: (subjectId: string) => boolean = () => false,
   ): void {
+    this.settleEdits(state);
     if (state?.things === undefined) {
       this.society = null;
       this.shown.clear();
@@ -468,6 +581,39 @@ export class ThingLayer {
     }
     this.applySociety();
     this.options.invalidate?.();
+  }
+
+  /**
+   * Let the society draw an edited thing again once a minute has taken the newest edit in: it lists
+   * the thing in a hand, at the place its version now gives it, or on the ground anywhere none of
+   * the edits replaced. A minute that lists it at a replaced spot, or does not list it, has not: the
+   * version's drawing stays. Without a society's things every mark goes, since the version alone is
+   * drawn then.
+   */
+  private settleEdits(state: OwnedSocietyState | null): void {
+    if (this.edited.size === 0) return;
+    if (state?.things === undefined) {
+      this.edited.clear();
+      return;
+    }
+    const listed = new Map(state.things.map((thing) => [thingKey(thing), thing as HeldThing]));
+    for (const [id, replaced] of this.edited) {
+      const thing = listed.get(id);
+      if (thing === undefined) continue;
+      const at = thing.held_by == null ? thing.position_mm : null;
+      const now = this.entries.get(id)?.record.transform;
+      const current = at != null && now !== undefined && at[0] === now.xMm && at[1] === now.zMm;
+      if (at != null && !current && replaced.some(([east, south]) => at[0] === east && at[1] === south)) continue;
+      this.edited.delete(id);
+    }
+  }
+
+  /** Where the drawing stands a thing now (east and south, millimetres): the society's place, else its version's. */
+  private standing(entry: Entry): readonly [number, number] {
+    const shown = this.society === null || entry.record.support !== undefined ? undefined : this.shown.get(entry.record.thingId);
+    return shown?.position_mm != null
+      ? [shown.position_mm[0], shown.position_mm[1]]
+      : [entry.record.transform.xMm, entry.record.transform.zMm];
   }
 
   private society: {
@@ -531,7 +677,10 @@ export class ThingLayer {
         continue;
       }
       const society = this.society;
-      const thing = society === null ? undefined : this.shown.get(entry.record.thingId);
+      // An object an edit moved, placed or brought back stands as its version says until a later
+      // minute lists it; a being is the crowd's to draw.
+      const edited = society !== null && this.edited.has(entry.record.thingId) && !society.beings.has(entry.record.thingId);
+      const thing = society === null || edited ? undefined : this.shown.get(entry.record.thingId);
       const holder = thing?.held_by == null || thing.socket == null ? null : { subjectId: thing.held_by, socket: thing.socket };
       const holderFigure = holder === null ? null : society?.figures?.figureOf(holder.subjectId) ?? null;
       const holding = holder !== null && holderFigure?.hold !== undefined && entry.grip !== null;
@@ -555,7 +704,7 @@ export class ThingLayer {
       // or an object carried away. A thing of a kind its workspace keeps that is none of the state's
       // people is in no society, so it stands where its version places it.
       if (thing === undefined) {
-        figure.setVisible(entry.record.kind.source === 'workspace' && !society.beings.has(entry.record.thingId));
+        figure.setVisible(edited || (entry.record.kind.source === 'workspace' && !society.beings.has(entry.record.thingId)));
         continue;
       }
       if (holder !== null) {
@@ -609,7 +758,8 @@ export class ThingLayer {
     }
     const t = entry.record.transform;
     // Where a society runs, an object stands at the state's plan point, turned by the state's yaw.
-    const thing = this.society === null || entry.record.support !== undefined ? undefined : this.shown.get(entry.record.thingId);
+    const thing = this.society === null || entry.record.support !== undefined || this.edited.has(entry.record.thingId)
+      ? undefined : this.shown.get(entry.record.thingId);
     // A society's thing stands its height above the ground under it: on land, the land's.
     const ground = thing?.position_mm == null ? undefined : this.options.society?.()?.groundHeightAt;
     figure.pose({
