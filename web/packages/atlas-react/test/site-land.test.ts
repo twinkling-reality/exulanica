@@ -403,7 +403,7 @@ describe('the sea of a site on land, dressed', () => {
   const PBR = { model: 'pbr', toon: null, ink: null } as const;
 
   /** The material the land's sea is drawn in, mounted with a pack's dresser from `name`'s manifest, or with none. */
-  interface Seen { readonly name: string; readonly chunks: Map<string, string>; readonly blendType: number; readonly depthWrite: boolean; readonly diffuse: pc.Color }
+  interface Seen { readonly name: string; readonly chunks: Map<string, string>; readonly blendType: number; readonly depthWrite: boolean; readonly diffuse: pc.Color; readonly pondChunks: ReadonlySet<string> }
   const seaOf = (name: string | null, look?: TileLook): Seen => {
     const { app, camera, environmentRoot } = nullApp();
     const pack = name === null ? null : resolveStylePack([readStylePackManifest(manifest(name), { families, textureSets: new Set(CASES.context.texture_sets) })]);
@@ -413,7 +413,10 @@ describe('the sea of a site on land, dressed', () => {
       .attach({ app, camera, environmentRoot });
     const material = (environmentRoot.findByName('site-land:water:sea') as pc.Entity).render!.meshInstances[0]!.material as pc.StandardMaterial;
     const glsl = material.getShaderChunks(pc.SHADERLANGUAGE_GLSL);
-    const seen: Seen = { name: material.name, chunks: new Map([...glsl.keys()].map((key) => [key, String(glsl.get(key))])), blendType: material.blendType, depthWrite: material.depthWrite, diffuse: material.diffuse.clone() };
+    // The site's own pond, a water slot beside the land's sea.
+    const pond = (environmentRoot.findByName('pond:shape') as pc.Entity).render!.meshInstances[0]!.material;
+    const pondChunks = new Set((pond as pc.StandardMaterial).getShaderChunks(pc.SHADERLANGUAGE_GLSL).keys());
+    const seen: Seen = { name: material.name, chunks: new Map([...glsl.keys()].map((key) => [key, String(glsl.get(key))])), blendType: material.blendType, depthWrite: material.depthWrite, diffuse: material.diffuse.clone(), pondChunks };
     attachment.dispose();
     return seen;
   };
@@ -438,6 +441,9 @@ describe('the sea of a site on land, dressed', () => {
     expect(chunk(sea, 'opacityPS')).toContain('getLinearScreenDepth');
     expect(chunk(sea, 'opacityPS')).not.toContain('exuSeaDepth');
     expect(chunk(sea, 'diffusePS')).not.toContain('exuFinishSea');
+    // A sea seen from afar carries no ripple in its light; the site's pond, under the same look, does.
+    expect(sea.chunks.has('normalMapPS')).toBe(false);
+    expect(sea.pondChunks.has('normalMapPS')).toBe(true);
   });
 
   it('keeps plain water where no pack dresses the site', () => {

@@ -290,7 +290,9 @@ host.
 
 Texture surfaces retain their served rectangle rather than expanding for a cosmetic broken border.
 The ground beyond uses the base ground's physical texture scale. Water swatches in PBR shading
-carry animated normal ripples; these are cosmetic, with no change to basin geometry, keep-outs,
+carry animated normal ripples, the slope of drifting noise in two octaves, each fading where it would
+be finer than the picture; the land's sea and lakes carry none, so far water is a soft glow and never
+a grid of glints. These are cosmetic, with no change to basin geometry, keep-outs,
 movement or simulation. Toon water keeps its static pattern. Glazing samples the drawn scene;
 water reflects the environment, without a separate planar reflection pass. A pack that states a
 `water` finish has its PBR water coloured by its own depth: the scene's depth behind the surface

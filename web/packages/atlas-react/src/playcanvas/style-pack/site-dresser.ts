@@ -333,9 +333,9 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
       if (swatch === null) continue;
       const material = swatchMaterial(swatch.swatch, swatch.up, shading, `style-pack:land-water:${body.kind}:${body.id}`);
       made.push(material);
-      // No ripple normals here: over a lake or a sea seen from afar their two waves tile into a grid of
-      // glints. The finish's drift and sheen move the water's colour instead.
-      const byDepth = shading.model === 'pbr' && waterFinish !== null && water.add(material, waterFinish);
+      // No ripple normals here, under the look's depth finish or the surface finish: a lake or a sea is
+      // seen from afar, where ripples read as glints. The finish's drift and sheen move its colour.
+      const byDepth = shading.model === 'pbr' && waterFinish !== null && water.add(material, waterFinish, { ripples: false });
       if (!byDepth && finish !== null && applySeaFinish(device, material, finish)) water.animate(material);
       landWaters.set(body.id, material);
     }

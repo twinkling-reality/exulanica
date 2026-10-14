@@ -93,23 +93,31 @@ describe('the haze end chunk', () => {
 
 describe('a water material', () => {
   const app = { on() {}, off() {}, graphicsDevice: { isWebGPU: false } } as unknown as pc.AppBase;
-  const PLAIN_NORMAL = `
-uniform float exuWaterTime;
-void getNormal() {
-    float a = vPositionW.x * 2.1 + vPositionW.z * 1.3 + exuWaterTime * 0.75;
-    float b = vPositionW.z * 3.2 - vPositionW.x * 0.8 - exuWaterTime * 0.48;
-    dNormalW = normalize(dVertexNormalW + vec3(-0.042 * cos(a) + 0.008 * cos(b), 0.0, -0.026 * cos(a) - 0.032 * cos(b)));
-}
-`;
-
-  it('with no finish keeps its ripples and the shader text it had, and nothing else', () => {
+  const normalOf = (finish: Parameters<WaterRipples['add']>[1], options?: Parameters<WaterRipples['add']>[2]) => {
     const material = new pc.StandardMaterial();
-    new WaterRipples(app).add(material);
-    const glsl = material.getShaderChunks(pc.SHADERLANGUAGE_GLSL);
-    expect(glsl.get('normalMapPS')).toBe(PLAIN_NORMAL);
+    new WaterRipples(app).add(material, finish, options);
+    return { material, glsl: material.getShaderChunks(pc.SHADERLANGUAGE_GLSL) };
+  };
+
+  it('with no finish keeps its ripples, declaring its own clock, and nothing else', () => {
+    const { material, glsl } = normalOf(null);
+    expect(glsl.get('normalMapPS')).toMatch(/^\nuniform float exuWaterTime;\n[\s\S]*void getNormal\(\) \{/);
     expect(glsl.has('opacityPS')).toBe(false);
     expect(glsl.has('emissivePS')).toBe(false);
     expect(material.blendType).toBe(pc.BLEND_NONE);
+  });
+
+  it('ripples alike with a finish or without one: the finish changes only how the clock is declared', () => {
+    const plain = normalOf(null).glsl.get('normalMapPS') as string;
+    const finished = normalOf(lookOf(FINISHED).water!).glsl.get('normalMapPS') as string;
+    expect(finished).not.toBe(plain);
+    expect(finished.replace('#ifndef EXU_WATER_TIME\n#define EXU_WATER_TIME\nuniform float exuWaterTime;\n#endif', 'uniform float exuWaterTime;')).toBe(plain);
+  });
+
+  it('gives the depth finish without ripples where asked, as a sea or a lake seen from afar', () => {
+    const { glsl } = normalOf(lookOf(FINISHED).water!, { ripples: false });
+    expect(glsl.has('normalMapPS')).toBe(false);
+    expect(glsl.get('opacityPS')).toContain('getLinearScreenDepth');
   });
 
   it('with a finish blends over the scene by its depth and never reads the scene colour', () => {
