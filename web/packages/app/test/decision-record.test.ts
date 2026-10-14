@@ -6,7 +6,7 @@ import accountWordsText from '../../../../assets/catalogs/roles/choice-account-w
 import {
   ACCOUNT_WORDS, VERDICT_ORDER, choiceAccount, choiceTimeline, decisionChange, explainDecisionRecord,
   knownDecisions, parseDecisionEvents, rewind, type DecisionEvent,
-} from '../src/composition/decision-record.js';
+} from '../src/decision-record.js';
 import type { PersonDecision, SocietyDecisionDetail } from '../src/society-models-api.js';
 
 const BEING = 'being-1';

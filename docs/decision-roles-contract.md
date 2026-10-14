@@ -320,8 +320,8 @@ receipt binding, and propagates absent or withdrawn-source refusals. Older summa
 request identity do not acquire an invented link. The server remains responsible for validating
 the role's request and receipt contracts.
 
-The browser's `composition/decision-record.ts` tells one decision as four parts (what it saw,
-what it answered, how the answer was checked, what the world did), each labelled observed,
+The browser's `web/packages/app/src/decision-record.ts` tells one decision as four parts (what
+it saw, what it answered, how the answer was checked, what the world did), each labelled observed,
 reported or inferred by a named rule and pointing at the stored request, receipt or event it was
 read from, with one verdict chosen in a fixed order. It steps through a being's decisions in
 decision order from the events read; stepping asks no model.

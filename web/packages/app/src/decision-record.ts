@@ -11,10 +11,10 @@
  * and nothing here describes a choice as thinking or feeling.
  */
 
-import type { PersonDecision, SocietyDecisionDetail } from '../society-models-api.js';
-import { DECISION_WORDS, outcomeWords } from '../society-inhabitant-words.js';
-import { ACTION_LABELS, ACTIVITY_LABELS } from '../society-activity-words.js';
-import accountWordsText from '../../../../../assets/catalogs/roles/choice-account-words.v1.json?raw';
+import type { PersonDecision, SocietyDecisionDetail } from './society-models-api.js';
+import { DECISION_WORDS, outcomeWords } from './society-inhabitant-words.js';
+import { ACTION_LABELS, ACTIVITY_LABELS } from './society-activity-words.js';
+import accountWordsText from '../../../../assets/catalogs/roles/choice-account-words.v1.json?raw';
 
 interface AccountWordsEntry { readonly key: string; readonly kind: string; readonly code: string; readonly words: string }
 const accountCatalog = JSON.parse(accountWordsText) as {
