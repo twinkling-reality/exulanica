@@ -279,6 +279,33 @@ among those decisions (`latest`: `{decision_seq, base_tick, consumed_tick, statu
 program left without a usable answer reads as its receipt does, such as `unavailable` with
 `no_answer_in_time`: the turn the routine decided. Neither route asks a model.
 
+Each per-model summary also carries `measures`, and the read carries `by_being`: the same measures
+for each being under each model (`{subject_id, provider, model_id, name, measures}`). Both are
+optional fields of `exulanica.society-models/v1`, computed by
+`exulanica/world/decision_measures.py` from the decisions read, and the page reads them rather
+than computing them again. `measures` holds:
+
+- `counts`: decisions, answered (accepted), refused, unavailable, timeouts, stale, applied,
+  not applied and pending. Decisions are answered, refused or unavailable; an answer is applied,
+  not applied, stale or pending (no minute has taken it up yet). An ask left without an answer is
+  counted under unavailable and timeouts, never as pending.
+- `rates`: acceptance (accepted over accepted plus refused; unavailable is counted apart), applied
+  (applied over accepted answers a minute took up), repeated choice and repeated line (identical
+  consecutive answers, and identical consecutive spoken lines, within each being). Each rate is
+  `{numerator, denominator, minimum, value}`; `value` is null, never 0, below its minimum sample
+  (5 for acceptance and applied, 4 pairs for repetition). A line counts as said only where a
+  minute applied the choice that carried it.
+- `timeouts`: the longest and the current run of timed-out receipts of one being.
+- `repetition`: the longest identical run of answers and of spoken lines.
+- `latency_ms`: `{n, minimum, p50, p95, longest}`, percentiles null below 5 timed calls.
+- `cost`: `{usd, known_usd, reserved_usd, basis, unknown_calls, calls}`. `known_usd` is computed
+  from the provider's reported tokens at the manifest's listed price; `reserved_usd` is what calls
+  whose tokens were not reported were charged, their reservation, the most they can have cost;
+  `usd` is their sum. `basis` is `computed` where nothing was reserved and `bounded` otherwise. It
+  is never a provider's bill.
+
+No measure is combined into a single score, and the read sets no threshold on any of them.
+
 A latest model decision's `request_id` addresses
 `GET /world/versions/{version_id}/society/decisions/{request_id}?world_id=W`, which returns the
 recorded request and receipt. The same identity is retained in the person role's `view.latest`
@@ -292,6 +319,12 @@ world. It preserves the versioned role documents, checks the returned request id
 receipt binding, and propagates absent or withdrawn-source refusals. Older summaries without a
 request identity do not acquire an invented link. The server remains responsible for validating
 the role's request and receipt contracts.
+
+The browser's `composition/decision-record.ts` tells one decision as four parts (what it saw,
+what it answered, how the answer was checked, what the world did), each labelled observed,
+reported or inferred by a named rule and pointing at the stored request, receipt or event it was
+read from, with one verdict chosen in a fixed order. It steps through a being's decisions in
+decision order from the events read; stepping asks no model.
 
 In a saved world the People panel offers the choice for one person or for everyone and shows this
 read (`web/packages/app/src/composition/society-models-mount.ts`). Where the host cannot ask a
