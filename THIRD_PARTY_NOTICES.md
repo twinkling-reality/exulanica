@@ -606,3 +606,38 @@ differ from the manifest below.
 | Retained files | Count and bytes | Digest |
 | --- | --- | --- |
 | `tests/vectors/aws-sigv4-test-suite/` | 86 files, 24,272 bytes | manifest SHA-256 `c9f6907461bed6cea5f24d12d841265a113b37ecd1b7a583ccec8257dfb1c37c`: the SHA-256 of one line per file in path order, `<file SHA-256>  <path within the directory>`, each line ending in a newline |
+
+## Derived code: the analytic sky (2026-10-14)
+
+`analyticSkyRadiance` in `web/packages/atlas-react/src/playcanvas/generated-tile/sky.ts` evaluates
+the daylight model of Preetham, Shirley and Smits, "A Practical Analytic Model for Daylight"
+(SIGGRAPH 1999). Its constants (total Rayleigh scattering per primary, the Mie constant, the sun
+intensity cutoff and steepness, the zenith path lengths) and the way its terms are combined (the
+optical path toward the horizon, the 1.5 and 0.5 powers of the in-scattering, the 0.04 scale and the
+small blue floor) follow the three.js `Sky` shader, as read in PlayCanvas's port of it,
+`scripts/esm/sky/procedural-sky.mjs` in `playcanvas` 2.21.4 (listed in section 5, MIT). The code is
+written here in TypeScript for the CPU; no file was copied. The three.js shader credits Simon
+Wallner (atmospheric scattering), Martin Upitis (Rayleigh and Mie) and Joshua Koo (the three.js
+port).
+
+**Licence: MIT.** Read on 2026-10-14 from `https://raw.githubusercontent.com/mrdoob/three.js/dev/LICENSE`.
+The required notice:
+
+> The MIT License
+>
+> Copyright © 2010-2026 three.js authors
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+> associated documentation files (the "Software"), to deal in the Software without restriction,
+> including without limitation the rights to use, copy, modify, merge, publish, distribute,
+> sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all copies or
+> substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+> NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+> DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+> OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

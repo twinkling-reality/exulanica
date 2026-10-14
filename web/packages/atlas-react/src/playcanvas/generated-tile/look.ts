@@ -388,6 +388,22 @@ export interface RenderSky {
   readonly clouds: RenderClouds | null;
   /** Edge length of each face of the sky cubemap, in texels. */
   readonly faceTexels: number;
+  /** How the sky's colour is computed; absent: the gradient above. */
+  readonly model?: RenderSkyModel;
+}
+
+/**
+ * The analytic daylight sky (`sky.ts`, `analyticSkyRadiance`): Rayleigh and Mie scattering of the
+ * look's one sun replace the gradient above the horizon. Its brightness is the sky's `intensity`.
+ */
+export interface RenderSkyModel {
+  readonly kind: 'analytic';
+  readonly turbidity: number;
+  readonly rayleigh: number;
+  /** Mie scattering coefficient. */
+  readonly mie: number;
+  /** Mie forward scattering, 0 to 0.95. */
+  readonly mieDirection: number;
 }
 
 /** Haze thinning with height, integrated along each view ray; drawn in place of the fog. */
@@ -522,6 +538,13 @@ const RENDER_SHAPE: Shape = obj({
     sunDisc: num(0, 64),
     clouds: nullable(obj({ cover: num(0, 1), colour: rgb, shade: rgb, scale: num(0.25, 4), seed: num(0, 2_147_483_647, true) })),
     faceTexels: enumOf('64', '128', '256'),
+    model: optional({
+      kind: 'variant',
+      key: 'kind',
+      variants: {
+        analytic: obj({ kind: { kind: 'literal', value: 'analytic' }, turbidity: num(1, 20), rayleigh: num(0, 4), mie: num(0, 0.1), mieDirection: num(0, 0.95) }),
+      },
+    }),
   }),
   fog: {
     kind: 'variant',

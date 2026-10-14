@@ -1,4 +1,4 @@
-import { sunDirection, type RenderLook, type Rgb } from './look.js';
+import { sunDirection, type RenderLook, type RenderSkyModel, type Rgb } from './look.js';
 
 /**
  * The sky a render look describes, as a pure function of direction: no engine, no GPU.
@@ -69,18 +69,72 @@ export function cloudNoise(x: number, y: number, seed: number): number {
 
 const mix = (a: Rgb, b: Rgb, t: number): Rgb => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
+/*
+ * THE ANALYTIC SKY. Preetham, Shirley and Smits, "A Practical Analytic Model for Daylight"
+ * (SIGGRAPH 1999): Rayleigh and Mie in-scattering of one sun along an optical path that lengthens
+ * toward the horizon. The constants and the way the terms are combined follow the three.js `Sky`
+ * shader (MIT, three.js authors: Simon Wallner, Martin Upitis, Joshua Koo), as read in PlayCanvas's
+ * port `scripts/esm/sky/procedural-sky.mjs` (MIT); see THIRD_PARTY_NOTICES.md. It is evaluated here
+ * on the CPU into the same cube faces as the gradient, so the engine needs no script for it.
+ */
+const TOTAL_RAYLEIGH: Rgb = [5.804542996261093e-6, 1.3562911419845635e-5, 3.0265902468824876e-5];
+const MIE_CONST: Rgb = [1.8399918514433978e14, 2.7798023919660528e14, 4.0790479543861094e14];
+const SUN_EE = 1000;
+const SUN_CUTOFF = 1.6110731556870734;
+const SUN_STEEPNESS = 1.5;
+const RAYLEIGH_ZENITH_M = 8400;
+const MIE_ZENITH_M = 1250;
+
+/** Linear radiance of the analytic sky toward a unit `dir` at or above the horizon, with no sun disc. */
+export function analyticSkyRadiance(model: RenderSkyModel, toSun: readonly [number, number, number], dir: readonly [number, number, number]): Rgb {
+  const sunY = toSun[1];
+  const fade = 1 - Math.min(Math.max(1 - Math.exp(sunY), 0), 1);
+  const rayleigh = model.rayleigh - (1 - fade);
+  const mie = 0.434 * (0.2 * model.turbidity * 1e-18) * model.mie;
+  const sunE = SUN_EE * Math.max(0, 1 - Math.exp(-((SUN_CUTOFF - Math.acos(Math.max(-1, Math.min(1, sunY)))) / SUN_STEEPNESS)));
+  const zenith = Math.acos(Math.max(0, dir[1]));
+  const denominator = Math.cos(zenith) + 0.15 * Math.pow(Math.max(93.885 - (zenith * 180) / Math.PI, 0), -1.253);
+  const pathRayleigh = RAYLEIGH_ZENITH_M / denominator;
+  const pathMie = MIE_ZENITH_M / denominator;
+  const cosTheta = linearDot(dir, toSun);
+  const rayleighPhase = (3 / (16 * Math.PI)) * (1 + Math.pow(cosTheta * 0.5 + 0.5, 2));
+  const g = model.mieDirection;
+  const miePhase = (1 / (4 * Math.PI)) * ((1 - g * g) / Math.pow(Math.max(1 - 2 * g * cosTheta + g * g, 0), 1.5));
+  const towardHorizon = Math.min(Math.max(Math.pow(1 - sunY, 5), 0), 1);
+  const out: [number, number, number] = [0, 0, 0];
+  for (let channel = 0; channel < 3; channel += 1) {
+    const betaR = TOTAL_RAYLEIGH[channel]! * rayleigh;
+    const betaM = MIE_CONST[channel]! * mie;
+    const extinction = Math.exp(-(betaR * pathRayleigh + betaM * pathMie));
+    const share = (betaR * rayleighPhase + betaM * miePhase) / (betaR + betaM);
+    let inScatter = Math.pow(sunE * share * (1 - extinction), 1.5);
+    inScatter *= 1 + (Math.pow(sunE * share * extinction, 0.5) - 1) * towardHorizon;
+    out[channel] = (inScatter + 0.1 * extinction) * 0.04 + [0, 0.0003, 0.00075][channel]!;
+  }
+  return out;
+}
+
 /** Linear radiance of the render look's sky toward `direction` (any length; +Y up). */
 export function renderSkyRadiance(look: RenderLook, direction: readonly [number, number, number], forLighting = false): Rgb {
   const length = Math.hypot(direction[0], direction[1], direction[2]);
   const dir = [direction[0] / length, direction[1] / length, direction[2] / length] as const;
   const sky = look.sky;
   const up = dir[1];
-  let colour: Rgb = up >= 0
-    ? mix(sky.horizon, sky.zenith, Math.pow(up, 0.55))
-    : mix(sky.horizon, forLighting ? sky.bounceGround : sky.ground, Math.min(1, -up * 6));
   // Toward the sun: the light travels along sunDirection, so the sun sits at its negation.
   const travel = sunDirection(look);
-  const toSun = [-travel[0], -travel[1], -travel[2]];
+  const toSun = [-travel[0], -travel[1], -travel[2]] as const;
+  let colour: Rgb;
+  if (sky.model === undefined) {
+    colour = up >= 0
+      ? mix(sky.horizon, sky.zenith, Math.pow(up, 0.55))
+      : mix(sky.horizon, forLighting ? sky.bounceGround : sky.ground, Math.min(1, -up * 6));
+  } else {
+    // Below the horizon the analytic horizon gives way to the ground, as the gradient's does.
+    const flat = Math.hypot(dir[0], dir[2]) || 1;
+    const above = up >= 0 ? dir : ([dir[0] / flat, 0, dir[2] / flat] as const);
+    const analytic = analyticSkyRadiance(sky.model, toSun, above);
+    colour = up >= 0 ? analytic : mix(analytic, forLighting ? sky.bounceGround : sky.ground, Math.min(1, -up * 6));
+  }
   const facing = Math.max(0, linearDot(dir, toSun));
   const glow = sky.sunGlow * (Math.pow(facing, 8) * 0.6 + Math.pow(facing, 64) * 1.5);
   const disc = forLighting || facing <= 0.9996 ? 0 : sky.sunDisc;

@@ -81,6 +81,17 @@ export interface StylePackSkyPreset {
     readonly seed: number;
   } | null;
   readonly face_texels: number;
+  /** How the sky's colour is computed. Absent in a preset written before it: the gradient above. */
+  readonly model?: StylePackSkyModel;
+}
+
+/** The analytic daylight sky, computed from the preset's one sun. */
+export interface StylePackSkyModel {
+  readonly kind: 'analytic';
+  readonly turbidity_permille: number;
+  readonly rayleigh_permille: number;
+  readonly mie_micro: number;
+  readonly mie_direction_permille: number;
 }
 
 /** Haze that thins with height, drawn in place of the preset's fog when stated. */
@@ -347,6 +358,17 @@ function lightPreset(value: Json, path: string): StylePackLightPreset {
         if (![64, 128, 256].includes(n)) fail('range', q, 'must be one of 64, 128, 256');
         return n;
       },
+      // Added within the profile: a preset written before it draws the gradient sky.
+      model: optional((m, q) => {
+        const kind = m !== null && typeof m === 'object' && !Array.isArray(m) ? (m as Record<string, unknown>)['kind'] : undefined;
+        if (kind === 'analytic') {
+          return object(m, q, {
+            kind: literal('analytic'), turbidity_permille: permille(1000, 20_000), rayleigh_permille: permille(0, 4000),
+            mie_micro: integer(0, 100_000), mie_direction_permille: permille(0, 950),
+          });
+        }
+        return fail('range', join(q, 'kind'), 'must be one of analytic');
+      }),
     }),
     fog: (v, p) => {
       const kind = v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>)['kind'] : undefined;

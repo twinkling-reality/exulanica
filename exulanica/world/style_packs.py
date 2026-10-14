@@ -357,6 +357,25 @@ def _sun(value: Any, path: str) -> dict[str, Any]:
     return sun
 
 
+def _sky_model(value: Any, path: str) -> dict[str, Any]:
+    # How the sky's colour is computed when a preset names a model; the gradient fields stay
+    # required beside it for the ground below the horizon.
+    kind = value.get("kind") if isinstance(value, dict) else None
+    if kind == "analytic":
+        return _object(
+            value,
+            path,
+            {
+                "kind": _literal("analytic"),
+                "turbidity_permille": _integer(1000, 20_000),
+                "rayleigh_permille": _integer(0, 4000),
+                "mie_micro": _integer(0, 100_000),
+                "mie_direction_permille": _integer(0, 950),
+            },
+        )
+    return _fail("range", _join(path, "kind"), "must be one of analytic")
+
+
 def _haze(value: Any, path: str) -> dict[str, Any]:
     # Haze thinning with height, in place of the preset's fog when stated.
     return _object(
@@ -417,6 +436,8 @@ def _light_preset(value: Any, path: str) -> dict[str, Any]:
         "sun_disc_permille": _integer(0, 64_000),
         "clouds": clouds,
         "face_texels": _face_texels,
+        # Added within the profile: a preset written before it draws the gradient sky.
+        "model": _Optional(_sky_model),
     }
     post = {
         "bloom": _nullable(

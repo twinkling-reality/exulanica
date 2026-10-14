@@ -63,6 +63,15 @@ export function renderLookOfPreset(
         seed: sky.clouds.seed,
       },
       faceTexels: sky.face_texels,
+      ...(sky.model === undefined ? {} : {
+        model: {
+          kind: sky.model.kind,
+          turbidity: sky.model.turbidity_permille / 1000,
+          rayleigh: sky.model.rayleigh_permille / 1000,
+          mie: sky.model.mie_micro / 1_000_000,
+          mieDirection: sky.model.mie_direction_permille / 1000,
+        },
+      }),
     },
     fog: preset.fog.kind === 'linear'
       ? { kind: 'linear', startM: preset.fog.start_mm / 1000, endM: preset.fog.end_mm / 1000, colour: linearRgb(preset.fog.colour) }
