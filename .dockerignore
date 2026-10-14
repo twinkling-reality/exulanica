@@ -1,8 +1,7 @@
 # An ALLOWLIST, not a denylist, because a denylist is one forgotten line away from baking a
-# credential into an image. `exulanica/models/credentials.py` walks up from the process working
-# directory looking for a `.env` file, so a `.env` that reaches /app is a credential the image
-# carries, which `docs/deployment.md` forbids. It is excluded here structurally rather than by a
-# rule somebody has to remember to add.
+# credential into an image. A checkout's `.env` holds the model key, so a `.env` that reaches /app
+# is a credential the image carries, which `docs/deployment.md` forbids. It is excluded here
+# structurally rather than by a rule somebody has to remember to add.
 #
 # It is also the difference between a build context of about 1.5 GB and one of a few megabytes:
 # `.venv`, `web/node_modules`, `.orimera` and `.exulanica` are the bulk of this checkout and the

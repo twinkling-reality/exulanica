@@ -111,7 +111,9 @@ def main() -> None:
     rows, latencies, failures = [], [], []
     spent = Decimal(0)
     for name in sorted(truths):
-        client = ModelClient(manifest=manifest, budget=BudgetGuard(ceiling_usd=stated))
+        client = ModelClient(
+            manifest=manifest, budget=BudgetGuard(ceiling_usd=stated), dotenv=ROOT / ".env"
+        )
         started = time.monotonic()
         try:
             result = module.NebiusVisionModel(client).observe(

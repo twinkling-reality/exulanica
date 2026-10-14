@@ -88,6 +88,7 @@ import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import replace
 from decimal import Decimal
+from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Final, TypeVar
 
@@ -226,6 +227,7 @@ class ModelClient:
         clock: Callable[[], float] = time.monotonic,
         spending: SpendingSource | None = None,
         local_only: bool = False,
+        dotenv: Path | None = None,
     ) -> None:
         # No policy means nothing is sent: every sending method refuses by name until one is
         # attached, here or with `with_policy` where the workspace is known.
@@ -285,7 +287,8 @@ class ModelClient:
         # one through a repr, a traceback or a cache entry. ``api_key`` is one key only for a
         # manifest with one provider that takes a key; with several, it names each provider's
         # key, so no provider is ever sent another's. A provider on this computer takes none, is
-        # given none and is never counted here.
+        # given none and is never counted here. A key not given is read from the environment, or
+        # from the ``.env`` file ``dotenv`` names, and from no other file.
         keyed = [p for p in self._manifest.providers.values() if p.takes_credential]
         if isinstance(api_key, str) and len(keyed) > 1:
             raise ValueError(
@@ -298,7 +301,9 @@ class ModelClient:
                 continue
             given = api_key.get(provider.provider_id) if isinstance(api_key, Mapping) else api_key
             try:
-                keys[provider.provider_id] = given or api_key_from_env(provider.api_key_env)
+                keys[provider.provider_id] = given or api_key_from_env(
+                    provider.api_key_env, dotenv=dotenv
+                )
             except ModelError:
                 if provider.provider_id in bound:
                     raise

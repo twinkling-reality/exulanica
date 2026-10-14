@@ -95,7 +95,9 @@ def rendition(path: Path) -> bytes:
 
 
 def observe(module, manifest, image: bytes, cap: Decimal) -> dict[str, Any]:
-    client = ModelClient(manifest=manifest, budget=BudgetGuard(ceiling_usd=cap))
+    client = ModelClient(
+        manifest=manifest, budget=BudgetGuard(ceiling_usd=cap), dotenv=ROOT / ".env"
+    )
     started = time.monotonic()
     try:
         result = module.NebiusVisionModel(client).observe(image_bytes=image,

@@ -283,16 +283,19 @@ never retried and never failed over, and the API answers it with `502 egress_ref
   a `NAME_API_KEY` name that is never an `EXULANICA_` setting, so no manifest entry can send a
   database URL or another setting as a bearer token. A key a caller passes to `ModelClient` is
   given by provider, and one key is never sent to a second provider. When the variable is not in
-  the environment, `exulanica/models/credentials.py` reads that one variable from a `.env` file
-  in the working directory or a parent and exports nothing: that is how a development checkout
-  supplies a key, kept for every provider alike. A deployment sets the variable in its
-  environment. A provider on this computer, every URL of which reaches `localhost` (the Ollama
-  server `ollama_local`), states no variable, is read no credential and is sent no
-  `Authorization` header; the parser refuses a null variable for any other provider. A client
-  built with `local_only=True`, which a deployment with no model credential builds when its list
-  declares that server, refuses every provider that takes a credential before one could be read,
-  so the `.env` fallback is never consulted. The server is optional: a list that leaves it out
-  refuses it by name and logs nothing for it at startup (`EgressAllowlist.declares`).
+  the environment, `exulanica/models/credentials.py` reads that one variable from the `.env` file
+  its caller names (`ModelClient(dotenv=...)`) and exports nothing. It never searches the working
+  directory or its parents for one, so a process started beneath a checkout, a worktree or a
+  child given a cleaned environment among them, holds no key it was not given. A script that
+  reads its key from a file names that file, in its source or on its command line, and
+  `uv run --env-file .env` gives one development command a checkout's `.env`. A deployment sets
+  the variable in its environment. A provider on this computer, every URL of which reaches
+  `localhost` (the Ollama server `ollama_local`), states no variable, is read no credential and is
+  sent no `Authorization` header; the parser refuses a null variable for any other provider. A
+  client built with `local_only=True`, which a deployment with no model credential builds when its
+  list declares that server, refuses every provider that takes a credential before one could be
+  read, so no `.env` file is consulted. The server is optional: a list that leaves it out refuses
+  it by name and logs nothing for it at startup (`EgressAllowlist.declares`).
 - Enforced for Google sign-in in `exulanica/api/account_runtime.py`. When sign-in is configured,
   `load_account_runtime` stops startup unless the list includes `https://accounts.google.com`
   (discovery), `https://oauth2.googleapis.com` (token) and `https://www.googleapis.com` (JWKS),

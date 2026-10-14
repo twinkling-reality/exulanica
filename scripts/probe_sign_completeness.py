@@ -152,7 +152,9 @@ def run(photos: Path, out: Path, cap: Decimal) -> None:
 
     rows = []
     for entry in photographs:
-        client = ModelClient(manifest=manifest, budget=BudgetGuard(ceiling_usd=cap))
+        client = ModelClient(
+            manifest=manifest, budget=BudgetGuard(ceiling_usd=cap), dotenv=ROOT / ".env"
+        )
         messages = [
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": [

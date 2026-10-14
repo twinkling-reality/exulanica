@@ -119,10 +119,9 @@ def test_the_image_runs_as_a_non_root_user():
 
 
 def test_the_build_context_is_an_allowlist_that_cannot_carry_a_credential():
-    """``credentials.py`` walks up from the working directory looking for a `.env`.
-
-    So a denylist is one forgotten line away from an image that carries a credential. The first
-    non-comment line must exclude everything, and `.env` must not be added back.
+    """A checkout's `.env` holds the model key, and a denylist is one forgotten line away from an
+    image that carries it. The first non-comment line must exclude everything, and `.env` must not
+    be added back.
     """
     lines = [
         line.strip()

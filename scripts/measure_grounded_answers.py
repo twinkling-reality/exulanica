@@ -48,6 +48,7 @@ from exulanica.models.manifest import Role, load_manifest
 from exulanica.selection import SelectionPlan, Session, build_packet, execute, validate
 from exulanica.selection.question import CallLog, compose_answer
 
+ROOT = Path(__file__).resolve().parents[1]
 MICRO = Decimal("0.000001")
 
 CANDIDATES = ("nvidia/nemotron-3-super-120b-a12b", "nvidia/Nemotron-3-Ultra-550b-a55b")
@@ -107,7 +108,9 @@ def pinned(manifest, model_id: str):
 
 def compose_with(manifest, question: str, packet, cap: Decimal) -> dict[str, Any]:
     """One composition, with its own budget guard so one arm cannot spend another's ceiling."""
-    client = ModelClient(manifest=manifest, budget=BudgetGuard(ceiling_usd=cap))
+    client = ModelClient(
+        manifest=manifest, budget=BudgetGuard(ceiling_usd=cap), dotenv=ROOT / ".env"
+    )
     log = CallLog()
     started = time.monotonic()
     try:
