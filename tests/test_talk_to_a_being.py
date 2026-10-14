@@ -49,7 +49,7 @@ class _Answerer(FakeTransport):
         properties = payload["tools"][0]["function"]["parameters"]["properties"]
         labels = properties["action"]["enum"]
         shown = json.dumps(payload["messages"], ensure_ascii=False)
-        # The knight that asked, named as the page names it: the first knight placed is "the knight".
+        # The knight that asked, named as the page names it: the first knight placed, "the knight".
         say = next(
             (label for label in labels if label.startswith("say something to the knight")), None
         )
