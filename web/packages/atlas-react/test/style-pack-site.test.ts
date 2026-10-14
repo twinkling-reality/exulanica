@@ -106,12 +106,12 @@ const PIECES: Readonly<Record<string, Uint8Array<ArrayBuffer>>> = { 'pieces/door
  * The readers' complete case with this site's dressing: swatches for ground, walls and roofs, a
  * texture set for one wall leaf, and pieces for doors and boundaries; nothing for fixtures.
  */
-function sitePack(plant = false): ResolvedStylePack {
+function sitePack(plant = false, building = false): ResolvedStylePack {
   const manifest = structuredClone(CASES.cases.find((c: { name: string }) => c.name === 'a complete pack with no base').manifest);
   manifest['palette'].swatches.push(
     { key: 'soil', srgb8: [...SOIL], roughness_permille: 900, metalness_permille: 0, emission_permille: 0 },
     { key: 'oak', srgb8: [...OAK], roughness_permille: 700, metalness_permille: 0, emission_permille: 0 },
-    ...(plant ? [{ key: 'leaf', srgb8: [...LEAF], roughness_permille: 900, metalness_permille: 0, emission_permille: 0 }] : []),
+    ...(plant || building ? [{ key: 'leaf', srgb8: [...LEAF], roughness_permille: 900, metalness_permille: 0, emission_permille: 0 }] : []),
   );
   manifest['surfaces'] = {
     'ground.default': { swatch: 'soil', up: null },
@@ -126,8 +126,11 @@ function sitePack(plant = false): ResolvedStylePack {
     'door.default': { variants: [{ file: 'pieces/door.glb', lod1: null, size_mm: [1000, 180, 2100], stretch_mm: [null, null, null] }] },
     // A pack with a tree of its own, as every town pack has.
     ...(plant ? { 'plant.default': { variants: [{ file: 'pieces/tree.glb', lod1: null, size_mm: [3200, 3200, 5800], stretch_mm: [null, null, null] }] } } : {}),
+    // A pack with one piece for a whole building, as an architecture kit has.
+    // Its own file, so a page that reads none of the hall's pieces reads none of it.
+    ...(building ? { 'structure.default': { variants: [{ file: 'pieces/tree.glb', lod1: null, size_mm: [6000, 4000, 3000], stretch_mm: [null, null, null] }] } } : {}),
   };
-  manifest['files'] = Object.entries(PIECES).filter(([path]) => plant || path !== 'pieces/tree.glb').map(([path, bytes]) => ({
+  manifest['files'] = Object.entries(PIECES).filter(([path]) => plant || building || path !== 'pieces/tree.glb').map(([path, bytes]) => ({
     path, sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.byteLength, media_type: 'model/gltf-binary',
   }));
   return resolveStylePack([readStylePackManifest(manifest, { families, textureSets: new Set<string>(CASES.context.texture_sets) })]);
@@ -392,6 +395,80 @@ describe('a site dressed in a pack', () => {
     mount.attach({ app, camera, environmentRoot }).dispose();
     expect(seenBeforeTheSlotsWent).toEqual({ ground: expect.stringMatching(/^generated-site-colour:/), fence: true, pieces: false, ink: 0 });
     expect(environmentRoot.children).toEqual([]);
+  });
+});
+
+describe('a building a pack dresses with one piece', () => {
+  /** A hall: its own slot, its roof, a wall run's wall, lintel and door, its room's floor and a bench in it; a fence of no building. */
+  const hall = (): StructuredSiteDrawing => parseStructuredSiteDrawing({
+    profile: 'exulanica.site-drawing/v1', world_id: 'world-hall', receipt_sha256: 'a'.repeat(64),
+    kind: { kind: 'fixture_hall', version: 1, label: 'Hall' },
+    extent: { widthMm: 12_000, depthMm: 12_000, enclosure: 'open' },
+    arrival: { positionMm: [6000, 2000, 0], facingMm: [0, 1] },
+    slots: [
+      slot('ground', 'ground.tilled_soil', 'plane', [6000, 6000, 0], 0, [12_000, 12_000, 0], 'surface'),
+      slot('hall', 'structure.hall', 'none', [6000, 8000, 0], 0, [6000, 4000, 3000]),
+      { ...slot('hall:roof', 'roof.flat', 'box', [6000, 8000, 3000], 0, [6000, 4000, 200], 'surface'), structure: 'hall' },
+      { ...slot('hall-front:wall:0', 'wall.default', 'box', [4250, 6000, 0], 0, [2500, 200, 3000], 'surface'), structure: 'hall' },
+      { ...slot('hall-front:lintel:0', 'wall.default', 'box', [6000, 6000, 2100], 0, [1000, 200, 900], 'surface'), structure: 'hall' },
+      { ...slot('hall-front:door:0', 'door.plank', 'none', [6000, 6000, 0], 0, [1000, 200, 2100], 'fill'), structure: 'hall' },
+      { ...slot('hall-room', 'ground.timber', 'plane', [6000, 8000, 6], 0, [5600, 3600, 0], 'surface'), structure: 'hall' },
+      { ...slot('hall-bench', 'fixture.bench', 'box', [6000, 8500, 0], 0, [1800, 500, 450]), structure: 'hall' },
+      slot('fence', 'boundary.picket', 'box', [6000, 500, 0], 2, [6000, 100, 1000], 'tile'),
+    ],
+    walk: { floorMm: [0, 0, 12_000, 12_000], blockersMm: [], keepOutMm: [] },
+    seats: [],
+  });
+  const ENVELOPE = ['hall:roof', 'hall-front:wall:0', 'hall-front:lintel:0'];
+  const KEPT = ['ground', 'hall-room', 'hall-bench'];
+  // A boundary of no building: its own piece stands in it, with or without the hall's, as before.
+  const FENCE = { fence: false };
+
+  /** `fetched` false: the pack names a piece for the hall that this page could not read. */
+  const dress = async (building: boolean, fetched = true) => {
+    const pack = sitePack(false, building);
+    const roles = Object.keys(pack.modules).filter((role) => fetched || role !== 'structure.default');
+    const pieces = await fetchPackPieces(pack, roles, TABLE, async (file: StylePackFile) => PIECES[file.path]!);
+    const dresser = packSiteDresser({ pack, families, pieces, shading: PBR, told: (summary) => summaries.push(summary) });
+    const summaries: SiteDressingSummary[] = [];
+    let dressed: Record<string, boolean> = {};
+    let undressed: Record<string, boolean> = {};
+    const enabled = (root: pc.Entity) => Object.fromEntries([...ENVELOPE, ...KEPT, 'fence'].map((identity) => [identity, (root.findByName(identity) as pc.Entity).enabled]));
+    const mount = siteMount(hall(), {
+      servedBytes: 1,
+      dress: (host, drawn, dressing) => {
+        const undress = dresser(host, drawn, dressing);
+        dressed = enabled(drawn.root);
+        return () => {
+          undress();
+          undressed = enabled(drawn.root);
+        };
+      },
+    });
+    mount.attach(nullApp()).dispose();
+    return { dressed, undressed, summary: summaries[0]! };
+  };
+  const all = (identities: readonly string[], on: boolean) => Object.fromEntries(identities.map((identity) => [identity, on]));
+
+  it('hides its own walls, lintels and roof once the piece stands, keeps its room floor and fixtures, and puts them back', async () => {
+    const { dressed, undressed, summary } = await dress(true);
+    expect(dressed).toEqual({ ...all(ENVELOPE, false), ...all(KEPT, true), ...FENCE });
+    expect(undressed).toEqual({ ...all(ENVELOPE, true), ...all(KEPT, true), fence: true });
+    // The hall's piece and the fence's stand; the hall's door is the hall piece's own, so none is baked in.
+    expect(summary.pieces).toBe(2);
+  });
+
+  it('keeps the walls and roof of a building whose piece could not stand, and leaves its door open', async () => {
+    const { dressed, summary } = await dress(true, false);
+    expect(dressed).toEqual({ ...all(ENVELOPE, true), ...all(KEPT, true), ...FENCE });
+    // Only the fence's piece stands: the hall's was not read, and its door was its piece's to draw.
+    expect(summary.pieces).toBe(1);
+  });
+
+  it('keeps every slot of a building the pack has no piece for, its door in the pack\'s door', async () => {
+    const { dressed, summary } = await dress(false);
+    expect(dressed).toEqual({ ...all(ENVELOPE, true), ...all(KEPT, true), ...FENCE });
+    expect(summary.pieces).toBe(2);
   });
 });
 

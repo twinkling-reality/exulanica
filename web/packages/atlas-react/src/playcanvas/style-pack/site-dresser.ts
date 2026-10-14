@@ -121,6 +121,9 @@ const FRONTS: readonly (readonly [number, number])[] = Object.freeze([[0, 1], [-
 /** The look role a tree of the scenery beyond a place is dressed by: the pack's plant, whatever its leaf. */
 const SCENERY_TREE_ROLE = 'plant.tree';
 
+/** The families of a building's own envelope, which a piece dressing the whole building replaces. */
+const BUILDING_ENVELOPE: ReadonlySet<string> = new Set(['wall', 'door', 'window', 'roof']);
+
 function pieceSlot(slot: SiteSlot): PieceSlot {
   return {
     identity: slot.identity,
@@ -213,18 +216,30 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     const unknownLooks = new Set<string>();
     const modules: PieceSlot[] = [];
     const leftAsDrawn: SiteSlot[] = [];
-    for (const slot of drawing.slots) {
-      const entity = drawn.entities.get(slot.identity);
-      const accepts = entity === undefined ? 'module' : 'either';
-      const resolved = catalog === null
+    const resolve = (slot: SiteSlot) => {
+      const accepts = drawn.entities.has(slot.identity) ? 'either' : 'module';
+      return catalog === null
         ? resolveLookRole(pack, slot, families, accepts)
         : resolveSurfaceLookRole(pack, slot, families, accepts, catalog);
+    };
+    // The buildings the pack dresses with one piece each: their own walls, doors, windows and roof
+    // give way to it once it stands; their rooms' floors and fixtures stay.
+    const owners = new Set(drawing.slots.flatMap((slot) => (slot.structure === undefined ? [] : [slot.structure])));
+    const dressedBuildings = new Set(drawing.slots
+      .filter((slot) => owners.has(slot.identity) && resolve(slot)?.kind === 'module')
+      .map((slot) => slot.identity));
+    const envelopeOf = (slot: SiteSlot): string | null =>
+      slot.structure !== undefined && dressedBuildings.has(slot.structure) && BUILDING_ENVELOPE.has(slot.family) ? slot.structure : null;
+    for (const slot of drawing.slots) {
+      const entity = drawn.entities.get(slot.identity);
+      const resolved = resolve(slot);
       // A drawn slot whose leaf names nothing known is drawn as its family's default: counted, by its words.
       if (catalog !== null && entity !== undefined && resolved?.role !== slot.lookRole && unknownSurfaceLeaf(catalog, slot.lookRole)) {
         unknownLooks.add(slot.lookRole);
       }
       if (resolved?.kind === 'module') {
-        modules.push(pieceSlot(slot));
+        // A dressed building's own door: the building's piece has its doors, so none is baked in.
+        if (envelopeOf(slot) === null) modules.push(pieceSlot(slot));
       } else if (resolved?.kind === 'material' && entity !== undefined) {
         const pattern = patternOf(slot);
         let material = surfaceMaterials.get(resolved.role);
@@ -282,6 +297,16 @@ export function packSiteDresser(dressing: SitePackDressing): SiteDresser {
     for (const identity of standing) {
       const entity = drawn.entities.get(identity);
       if (entity === undefined) continue;
+      hidden.push([entity, entity.enabled]);
+      entity.enabled = false;
+    }
+    // A building whose piece stands: its own box gives way to it. One whose piece could not stand
+    // keeps its walls and roof as drawn, and its doors open, as a pack with no door leaves them.
+    for (const slot of drawing.slots) {
+      const building = envelopeOf(slot);
+      if (building === null || !standing.has(building)) continue;
+      const entity = drawn.entities.get(slot.identity);
+      if (entity === undefined || !entity.enabled) continue;
       hidden.push([entity, entity.enabled]);
       entity.enabled = false;
     }

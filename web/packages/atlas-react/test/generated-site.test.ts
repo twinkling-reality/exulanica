@@ -59,6 +59,15 @@ function served(): Record<string, unknown> {
   };
 }
 
+/** The yard with its shed's own slot, every piece of the shed naming it, as the served drawing states buildings. */
+function built(): Record<string, unknown> {
+  const document = served();
+  const slots = document['slots'] as Record<string, unknown>[];
+  for (const one of slots) if (String(one['identity']).startsWith('shed:')) one['structure'] = 'shed';
+  slots.push({ ...slot('shed', 'structure.shed', 'none', [5000, 8500, 0], 0, [4000, 3000, 2400]) });
+  return document;
+}
+
 describe('reading a site drawing', () => {
   it('reads the served shape, splitting each look role into its family and leaf', () => {
     const drawing = parseStructuredSiteDrawing(served());
@@ -68,6 +77,15 @@ describe('reading a site drawing', () => {
     expect(drawing.walk.blockersMm).toHaveLength(3);
   });
 
+  it('reads which building a slot is a piece of, and states none where the drawing says none', () => {
+    const document = built();
+    const drawing = parseStructuredSiteDrawing(document);
+    expect(drawing.slots.filter((one) => one.structure === 'shed').map((one) => one.identity))
+      .toEqual(['shed:wall:0', 'shed:wall:1', 'shed:wall:2', 'shed:door:0', 'shed:roof']);
+    expect(drawing.slots.find((one) => one.identity === 'shed')!.structure).toBeUndefined();
+    expect('structure' in parseStructuredSiteDrawing(served()).slots[1]!).toBe(false);
+  });
+
   it.each([
     ['another profile', (d: Record<string, unknown>) => { d['profile'] = 'exulanica.site-drawing/unsupported'; }, 'is not exulanica.site-drawing/v1'],
     ['a float', (d: Record<string, unknown>) => { (d['arrival'] as { positionMm: number[] }).positionMm[0] = 0.5; }, 'not a whole number'],
@@ -75,8 +93,11 @@ describe('reading a site drawing', () => {
     ['a fifth quarter turn', (d: Record<string, unknown>) => { (d['slots'] as { yawQuarterTurns: number }[])[1]!.yawQuarterTurns = 4; }, '0 to 3 quarter turns'],
     ['two slots of one identity', (d: Record<string, unknown>) => { (d['slots'] as { identity: string }[])[2]!.identity = 'shed:wall:0'; }, 'share an identity'],
     ['a rectangle from its far corner', (d: Record<string, unknown>) => { (d['walk'] as { floorMm: number[] }).floorMm = [10_000, 0, 0, 12_000]; }, 'from its least corner'],
+    ['a structure that is not text', (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[])[1]!['structure'] = 7; }, 'slot 1 structure is not text'],
+    ['a structure the drawing has no slot for', (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[])[1]!['structure'] = 'barn'; }, 'is a piece of barn, which is no slot of the drawing'],
+    ['a building that is a piece of another', (d: Record<string, unknown>) => { (d['slots'] as Record<string, unknown>[]).at(-1)!['structure'] = 'bench'; }, "slot shed is a building's own slot and a piece of another"],
   ])('refuses %s by name', (_name, change, words) => {
-    const document = served();
+    const document = built();
     change(document);
     expect(() => parseStructuredSiteDrawing(document)).toThrow(words);
   });

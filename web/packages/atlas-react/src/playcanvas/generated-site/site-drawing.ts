@@ -59,6 +59,12 @@ export interface SiteSlot {
    * under it as its base stands above the land under its base's centre. Stated only on land.
    */
   readonly drape?: true;
+  /**
+   * The building a slot is a piece of, by its own slot's identity: its walls, lintels, doors and
+   * roof, its rooms' floors and the fixtures in its rooms. A pack that dresses the building's own
+   * slot with one piece hides the building's envelope (`site-dresser.ts`). Absent on everything else.
+   */
+  readonly structure?: string;
 }
 
 /** What a site on land states of its land: each chunk's place and digest, the backdrop's and the water's. */
@@ -176,6 +182,7 @@ function slot(value: unknown, index: number, onLand: boolean): SiteSlot {
   if (box.some((side) => side < 0)) fail(`The site drawing's slot ${index} has a negative side.`);
   const uv = row['uvFrame'];
   const frame = uv === undefined ? undefined : object(uv, `slot ${index} uv frame`);
+  const structure = row['structure'] === undefined ? undefined : text(row['structure'], `slot ${index} structure`);
   return Object.freeze({
     identity: text(row['identity'], `slot ${index} identity`),
     part: text(row['part'], `slot ${index} part`),
@@ -199,6 +206,7 @@ function slot(value: unknown, index: number, onLand: boolean): SiteSlot {
         }),
       }),
     ...(drape === true ? { drape: true as const } : {}),
+    ...(structure === undefined ? {} : { structure }),
   });
 }
 
@@ -293,6 +301,13 @@ export function parseSiteDrawing(value: unknown): SiteDrawing {
   }
   const identities = new Set(read.map((one) => one.identity));
   if (identities.size !== read.length) fail('Two slots of the site drawing share an identity.');
+  // A piece of a building names the building's own slot, which is a slot of the drawing and itself
+  // the piece of no building.
+  const owners = new Set(read.flatMap((one) => (one.structure === undefined ? [] : [one.structure])));
+  for (const one of read) {
+    if (one.structure !== undefined && !identities.has(one.structure)) fail(`The site drawing's slot ${one.identity} is a piece of ${one.structure}, which is no slot of the drawing.`);
+    if (one.structure !== undefined && owners.has(one.identity)) fail(`The site drawing's slot ${one.identity} is a building's own slot and a piece of another.`);
+  }
   return Object.freeze({
     profile,
     ...(support === undefined ? {} : { support }),
