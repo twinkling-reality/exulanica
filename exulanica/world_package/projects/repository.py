@@ -435,6 +435,19 @@ def session_file(session_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "-", session_id) + ".json"
 
 
+def _session_may_follow(old: dict[str, Any] | None, new: dict[str, Any] | None) -> bool:
+    """A living session's block may only close once, and grow its spending while open.
+
+    A closed block never changes, not even when a later reconciliation settles an unknown cost:
+    that is recorded as a new entry, never as an edit.
+    """
+    if old is None or old["state"] == "closed":
+        return new == old
+    if new is None or (new["session_id"], new["opened"]) != (old["session_id"], old["opened"]):
+        return False
+    return new["state"] in ("open", "closed")
+
+
 def append_only(saved: Sessions, sessions: Sessions) -> None:
     for name, old in saved.items():
         new = sessions.get(name)
@@ -446,6 +459,7 @@ def append_only(saved: Sessions, sessions: Sessions) -> None:
             or any(model not in new["models"] for model in old["models"])
             or (old["project_id"], old["session_id"], old["source"])
             != (new["project_id"], new["session_id"], new["source"])
+            or not _session_may_follow(old.get("living_session"), new.get("living_session"))
         ):
             raise Conflict(f"evidence file {name} is append-only; saved records cannot change")
     for name, session in sessions.items():

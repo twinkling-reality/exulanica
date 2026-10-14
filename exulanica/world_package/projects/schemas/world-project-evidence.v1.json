@@ -173,6 +173,50 @@
       "title": "Decision",
       "type": "object"
     },
+    "LivingSession": {
+      "additionalProperties": false,
+      "description": "One living session of the society: its two receipts and what it used, no actor ids.",
+      "properties": {
+        "closed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionClosed"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "opened": {
+          "$ref": "#/$defs/SessionOpened"
+        },
+        "session_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "spending": {
+          "$ref": "#/$defs/SessionSpending"
+        },
+        "state": {
+          "enum": [
+            "open",
+            "closed"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "state",
+        "opened",
+        "closed",
+        "spending"
+      ],
+      "title": "LivingSession",
+      "type": "object"
+    },
     "ModelBinding": {
       "additionalProperties": false,
       "properties": {
@@ -503,6 +547,263 @@
       "title": "Receipt",
       "type": "object"
     },
+    "SessionBound": {
+      "additionalProperties": false,
+      "description": "One provider's bound under the session, as the spending authority read it.",
+      "properties": {
+        "ceiling_usd": {
+          "pattern": "^[0-9]{1,6}(\\.[0-9]{1,12})?$",
+          "title": "Ceiling Usd",
+          "type": "string"
+        },
+        "committed_calls": {
+          "minimum": 0,
+          "title": "Committed Calls",
+          "type": "integer"
+        },
+        "committed_usd": {
+          "pattern": "^[0-9]{1,6}(\\.[0-9]{1,12})?$",
+          "title": "Committed Usd",
+          "type": "string"
+        },
+        "known_usage_usd": {
+          "pattern": "^[0-9]{1,6}(\\.[0-9]{1,12})?$",
+          "title": "Known Usage Usd",
+          "type": "string"
+        },
+        "provider": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9:._/-]+$",
+          "title": "Provider",
+          "type": "string"
+        },
+        "reconciled_usd": {
+          "pattern": "^[0-9]{1,6}(\\.[0-9]{1,12})?$",
+          "title": "Reconciled Usd",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "open",
+            "closed"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "unresolved_count": {
+          "minimum": 0,
+          "title": "Unresolved Count",
+          "type": "integer"
+        },
+        "unresolved_usd": {
+          "pattern": "^[0-9]{1,6}(\\.[0-9]{1,12})?$",
+          "title": "Unresolved Usd",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "state",
+        "ceiling_usd",
+        "committed_usd",
+        "committed_calls",
+        "known_usage_usd",
+        "unresolved_count",
+        "unresolved_usd",
+        "reconciled_usd"
+      ],
+      "title": "SessionBound",
+      "type": "object"
+    },
+    "SessionClosed": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "pattern": "^20[0-9]{2}-[01][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9]Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "enum": [
+            "system",
+            "person"
+          ],
+          "title": "By",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[a-z0-9_.:-]+$",
+          "title": "Reason",
+          "type": "string"
+        },
+        "state_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "State Sha256",
+          "type": "string"
+        },
+        "tick": {
+          "minimum": 0,
+          "title": "Tick",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tick",
+        "at",
+        "state_sha256",
+        "reason",
+        "by"
+      ],
+      "title": "SessionClosed",
+      "type": "object"
+    },
+    "SessionLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "calls": {
+          "minimum": 1,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "decisions": {
+          "minimum": 1,
+          "title": "Decisions",
+          "type": "integer"
+        },
+        "minutes": {
+          "minimum": 1,
+          "title": "Minutes",
+          "type": "integer"
+        },
+        "usd": {
+          "pattern": "^[0-9]{1,6}(\\.[0-9]{1,12})?$",
+          "title": "Usd",
+          "type": "string"
+        },
+        "wall_seconds": {
+          "minimum": 1,
+          "title": "Wall Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "wall_seconds",
+        "minutes",
+        "decisions",
+        "usd",
+        "calls"
+      ],
+      "title": "SessionLimits",
+      "type": "object"
+    },
+    "SessionOpened": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "pattern": "^20[0-9]{2}-[01][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9]Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "limits": {
+          "$ref": "#/$defs/SessionLimits"
+        },
+        "state_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "State Sha256",
+          "type": "string"
+        },
+        "tick": {
+          "minimum": 0,
+          "title": "Tick",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tick",
+        "at",
+        "state_sha256",
+        "limits"
+      ],
+      "title": "SessionOpened",
+      "type": "object"
+    },
+    "SessionSpending": {
+      "additionalProperties": false,
+      "description": "Spending as found: the authority's figures when captured, never a bill.",
+      "properties": {
+        "bounds": {
+          "items": {
+            "$ref": "#/$defs/SessionBound"
+          },
+          "maxItems": 64,
+          "title": "Bounds",
+          "type": "array"
+        },
+        "used": {
+          "$ref": "#/$defs/SessionUsed"
+        }
+      },
+      "required": [
+        "used",
+        "bounds"
+      ],
+      "title": "SessionSpending",
+      "type": "object"
+    },
+    "SessionUsed": {
+      "additionalProperties": false,
+      "properties": {
+        "calls": {
+          "minimum": 0,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "decisions": {
+          "minimum": 0,
+          "title": "Decisions",
+          "type": "integer"
+        },
+        "minutes": {
+          "minimum": 0,
+          "title": "Minutes",
+          "type": "integer"
+        },
+        "unresolved_count": {
+          "minimum": 0,
+          "title": "Unresolved Count",
+          "type": "integer"
+        },
+        "unresolved_usd": {
+          "pattern": "^[0-9]{1,6}(\\.[0-9]{1,12})?$",
+          "title": "Unresolved Usd",
+          "type": "string"
+        },
+        "usd": {
+          "pattern": "^[0-9]{1,6}(\\.[0-9]{1,12})?$",
+          "title": "Usd",
+          "type": "string"
+        },
+        "wall_seconds": {
+          "minimum": 0,
+          "title": "Wall Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "wall_seconds",
+        "minutes",
+        "decisions",
+        "usd",
+        "calls",
+        "unresolved_count",
+        "unresolved_usd"
+      ],
+      "title": "SessionUsed",
+      "type": "object"
+    },
     "Source": {
       "additionalProperties": false,
       "properties": {
@@ -586,6 +887,17 @@
       "minItems": 1,
       "title": "Decisions",
       "type": "array"
+    },
+    "living_session": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LivingSession"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "models": {
       "items": {

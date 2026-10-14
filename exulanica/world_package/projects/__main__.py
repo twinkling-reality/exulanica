@@ -158,7 +158,7 @@ def parser() -> argparse.ArgumentParser:
     )
     command.add_argument("folder", type=Path)
     _world_arguments(command)
-    command.add_argument("--session", required=True)
+    command.add_argument("--session", help="required unless --living-session names one")
     command.add_argument("--project-id", help="required when the folder does not exist yet")
     command.add_argument("--message")
     command.add_argument("--author-name")
@@ -180,6 +180,10 @@ def _world_arguments(command: argparse.ArgumentParser) -> None:
     command.add_argument("--version", required=True)
     command.add_argument("--thing", action="append", required=True)
     command.add_argument("--readable", action="store_true")
+    command.add_argument(
+        "--living-session",
+        help="a living session's id, or latest: its evidence file is named for it",
+    )
 
 
 def _author(args: argparse.Namespace) -> Author | None:
@@ -219,7 +223,9 @@ def _capture(
         project_id=project_id,
         thing_ids=args.thing,
         readable=args.readable,
-        session_id=session,
+        # A living session names its own evidence file.
+        session_id=None if args.living_session else session,
+        living_session=args.living_session,
     )
 
 
@@ -302,8 +308,11 @@ def record_world(args: argparse.Namespace) -> dict[str, object]:
     project_id = project.at("HEAD")["project_id"] if exists else args.project_id
     if project_id is None:
         raise ProjectError("a new project folder needs --project-id")
+    if args.session is None and args.living_session is None:
+        raise ProjectError("record-world needs --session or --living-session")
     with _reader(args) as reader:
         captured = _capture(args, reader, project_id, args.session)
+    session_id = captured.evidence["session_id"] if captured.evidence else args.session
     if not exists:
         return {
             **create(
@@ -325,8 +334,7 @@ def record_world(args: argparse.Namespace) -> dict[str, object]:
         own = {
             name
             for name, held in sessions.items()
-            if held["session_id"] == args.session
-            or held["session_id"].startswith(f"{args.session}:")
+            if held["session_id"] == session_id or held["session_id"].startswith(f"{session_id}:")
         }
         held = {
             d["source_record_sha256"]

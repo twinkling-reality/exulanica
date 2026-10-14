@@ -381,3 +381,31 @@ def test_a_session_keeps_its_first_capture_time():
     [grown] = accumulate({session_file("session:one"): kept}, later)
     assert grown["captured_at"] == "2026-10-14T01:00:00Z"
     assert len(grown["decisions"]) == 2
+
+
+def test_a_living_session_may_close_once_and_never_change_after():
+    from exulanica.world_package.projects.repository import append_only, session_file
+
+    from test_world_project_evidence_format import SESSION, living
+
+    project, _ = sample()
+    _, evidence = evidence_from(project)
+    evidence["session_id"] = f"session:{SESSION}"
+    name = session_file(evidence["session_id"])
+    opened = {**evidence, "living_session": living(state="open")}
+    grown = deepcopy(opened)
+    grown["living_session"]["spending"]["used"]["calls"] = 500
+    closed = {**evidence, "living_session": living(state="closed")}
+    append_only({name: opened}, {name: grown})  # spending grows while open
+    append_only({name: opened}, {name: closed})  # open becomes closed
+    for later in (
+        {**closed, "living_session": living(state="closed", reason="session_deadline")},
+        {**evidence, "living_session": living(state="open")},
+        evidence,
+    ):
+        with pytest.raises(Conflict, match="append-only"):
+            append_only({name: closed}, {name: later})
+    reopened = deepcopy(opened)
+    reopened["living_session"]["opened"]["tick"] = 5
+    with pytest.raises(Conflict, match="append-only"):
+        append_only({name: opened}, {name: reopened})

@@ -163,6 +163,94 @@ class Coverage(Closed):
     decisions: Literal["consumed", "all"]
 
 
+Instant = Annotated[
+    str, Field(pattern=r"^20[0-9]{2}-[01][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9]Z$")
+]
+PERSON_STOPS = frozenset({"stopped_by_person", "paused_by_person"})
+
+
+class SessionLimits(Closed):
+    wall_seconds: Annotated[int, Field(ge=1)]
+    minutes: Annotated[int, Field(ge=1)]
+    decisions: Annotated[int, Field(ge=1)]
+    usd: Usd
+    calls: Annotated[int, Field(ge=1)]
+
+
+class SessionOpened(Closed):
+    tick: Natural
+    at: Instant
+    state_sha256: Digest
+    limits: SessionLimits
+
+
+class SessionClosed(Closed):
+    tick: Natural
+    at: Instant
+    state_sha256: Digest
+    #: The society's stop code; the words for it belong to the society's own table.
+    reason: Code
+    by: Literal["system", "person"]
+
+    @model_validator(mode="after")
+    def who(self) -> Self:
+        if (self.by == "person") != (self.reason in PERSON_STOPS):
+            raise ValueError("a person's stop is said to be a person's, and only that")
+        return self
+
+
+class SessionUsed(Closed):
+    wall_seconds: Natural
+    minutes: Natural
+    decisions: Natural
+    usd: Usd
+    calls: Natural
+    unresolved_count: Natural
+    unresolved_usd: Usd
+
+
+class SessionBound(Closed):
+    """One provider's bound under the session, as the spending authority read it."""
+
+    provider: Name
+    state: Literal["open", "closed"]
+    ceiling_usd: Usd
+    committed_usd: Usd
+    committed_calls: Natural
+    known_usage_usd: Usd
+    unresolved_count: Natural
+    unresolved_usd: Usd
+    reconciled_usd: Usd
+
+
+class SessionSpending(Closed):
+    """Spending as found: the authority's figures when captured, never a bill."""
+
+    used: SessionUsed
+    bounds: Annotated[list[SessionBound], Field(max_length=64)]
+
+
+class LivingSession(Closed):
+    """One living session of the society: its two receipts and what it used, no actor ids."""
+
+    session_id: Annotated[
+        str, Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+    ]
+    state: Literal["open", "closed"]
+    opened: SessionOpened
+    closed: SessionClosed | None
+    spending: SessionSpending
+
+    @model_validator(mode="after")
+    def receipts(self) -> Self:
+        if (self.state == "closed") != (self.closed is not None):
+            raise ValueError("a closed session has its closing receipt, and only a closed one")
+        if self.closed is not None and self.closed.tick < self.opened.tick:
+            raise ValueError("a session closes at or after the minute it opened")
+        unique([bound.provider for bound in self.spending.bounds], "session bound")
+        return self
+
+
 class Readable(Closed):
     """What a source decision record itself stores, made readable. Opt-in at capture.
 
@@ -303,18 +391,18 @@ class Evidence(Closed):
     decisions: Annotated[list[Decision], Field(min_length=1, max_length=1024)]
     # Optional additions; an older file without them keeps its digest.
     coverage: Coverage | None = None
-    captured_at: (
-        Annotated[
-            str,
-            Field(pattern=r"^20[0-9]{2}-[01][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9]Z$"),
-        ]
-        | None
-    ) = None
+    captured_at: Instant | None = None
+    #: The living session this file is the evidence of, when it is one.
+    living_session: LivingSession | None = None
 
     @model_validator(mode="after")
     def references(self) -> Self:
         validate_object_id(self.project_id)
         validate_object_id(self.session_id)
+        if self.living_session is not None:
+            named = f"session:{self.living_session.session_id}"
+            if self.session_id != named and not self.session_id.startswith(f"{named}:"):
+                raise ValueError("a living session's file is named for that session")
         unique([d.record_id for d in self.decisions], "decision")
         bindings = [binding_sha256(model) for model in self.models]
         unique(bindings, "model assignment")

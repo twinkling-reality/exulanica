@@ -41,12 +41,53 @@ optional fields left out rather than written as null.
 | `decisions` | array, 1 to 1024 | The recorded decisions (below). |
 | `coverage` | object, optional | Which of the session's decisions the file holds (below). Absent in files written before it existed: treat as unknown. |
 | `captured_at` | string, optional | When the session's first file was written, UTC, `YYYY-MM-DDTHH:MM:SSZ`. Later captures of the same session keep it. |
+| `living_session` | object, optional | The living session the file is the evidence of (below). The file's `session_id` is then `session:<its session_id>`, with `:2`, `:3` for continuations. |
 
 ### `coverage`
 
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `decisions` | `consumed` or `all` | `consumed`: only decisions a minute of the world took up are present. A request that never got a usable answer and was never taken up (an unavailable answer, a timed-out call) is absent, so counts of those, the acceptance denominator and timeout streaks cannot be computed from the file. `all`: every request of the session is present. |
+
+### `living_session`
+
+A living session is one bounded stretch of a society's playback, opened and closed by two receipts
+of its playback history ([synthetic society contract](synthetic-society-contract.md#living-sessions)).
+The block carries those receipts and the spending authority's figures as read when the file was
+captured. It carries no account, actor, request or bound identity.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `session_id` | UUID string | The society's session identity. |
+| `state` | `open` or `closed` | The session's state when captured. |
+| `opened` | object | `tick` (the minute it started from), `at` (UTC instant), `state_sha256` (the state it started from) and `limits`. |
+| `at` | string | A receipt's UTC instant, `YYYY-MM-DDTHH:MM:SSZ`. |
+| `limits` | object | As recorded when it opened: `wall_seconds`, `minutes`, `decisions`, `usd` and `calls`. |
+| `wall_seconds` | integer | Wall-clock seconds: the limit, or what was used. |
+| `minutes` | integer | World minutes: the limit, or what was played. |
+| `usd` | decimal string | US dollars: the limit, or what the bounds committed. |
+| `calls` | integer | Model calls: the limit, or what the bounds committed. |
+| `closed` | object or null | Null while open. Otherwise `tick` (the minute it ended at), `at`, `state_sha256`, `reason` and `by`. |
+| `reason` | code | Why it closed, as the society records it, for example `session_minutes`, `session_spending_limit`, `session_liability_unknown`, `stopped_by_person`. The words for a code belong to the society's own table. |
+| `by` | `system` or `person` | `person` for `stopped_by_person` and `paused_by_person`, `system` for every other code. |
+| `spending` | object | `used` and `bounds`, below: spending as found, never a bill. |
+| `used` | object | What the session used of each limit: `wall_seconds`, `minutes`, `decisions`, `usd`, `calls`, and `unresolved_count` and `unresolved_usd`, calls whose cost is not known until an operator reconciles them, counted at their reservation, the most they can have cost. |
+| `bounds` | array | One entry per provider the session could ask. |
+| `provider` | identifier | The model provider the bound is for. |
+| `ceiling_usd` | decimal string | The bound's ceiling. |
+| `committed_usd` | decimal string | What the bound committed. |
+| `committed_calls` | integer | The calls it committed. |
+| `known_usage_usd` | decimal string | The part computed from reported tokens at the listed price. |
+| `unresolved_count` | integer | Calls whose cost is unknown until an operator reconciles them. |
+| `unresolved_usd` | decimal string | Reservations of calls whose cost is unknown, at most what they cost. |
+| `reconciled_usd` | decimal string | What reconciliation had settled when captured. |
+
+A bound's `state` is `open` or `closed`. An open session's block may later
+become closed, and its spending may change while it is open; a closed block never changes, even
+when a later reconciliation settles an unknown cost, which is recorded as a new entry naming the
+session and the provider rather than as an edit. When a capture could read every request the
+session asked (fewer than the society's listing cap), the file's `coverage` is `all` and requests
+no minute took up are present with their receipts; otherwise it is `consumed`.
 
 ### `source`
 

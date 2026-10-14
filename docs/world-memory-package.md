@@ -844,6 +844,13 @@ uv run python -m exulanica.world_package.projects capture --api http://localhost
 uv run python -m exulanica.world_package.projects watch ./my-project --api http://localhost:PORT --token-file TOKEN --world WORLD --version VERSION --thing THING
 ```
 
+`--living-session ID` (or `latest`) on `capture`, `record-world` and `watch` captures one living
+session as its own evidence file: the decisions asked in its minutes, every request with its
+receipt when the society can list them all (`coverage: all`, so unanswered and timed-out requests
+appear), and the session's receipts and spending as the spending authority reads them; the watcher
+records a checkpoint as soon as the session closes. The fields are in the
+[evidence format](world-project-evidence-format.md#living_session).
+
 `record-world` captures straight into a project folder as one checkpoint and one session's
 evidence, creating the folder when `--project-id` is given. A later run's world may still hold an
 earlier run's records; a record already kept in another session, recognized by its source record

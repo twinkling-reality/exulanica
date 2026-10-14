@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import re
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 from urllib.parse import quote, urlsplit
 
 import httpx
@@ -204,21 +204,20 @@ def _events(reader: WorldReader, version: str, subjects: set[str]) -> list[dict[
     raise ProjectError("society history is longer than capture reads; select fewer records")
 
 
-def _receipt(receipt: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]:
+def _receipt(receipt: dict[str, Any], event: dict[str, Any] | None) -> dict[str, Any]:
     """The receipt and its minute as codes and numbers, from the record alone: no words."""
     provider = receipt.get("provider") or {}
     cost = provider.get("cost_usd")
-    disposition = event["document"].get("disposition")
+    document = {} if event is None else event["document"]
+    disposition = document.get("disposition")
     return {
         "status": receipt["status"],
         "reason": _name(receipt.get("reason")),
         "disposition": disposition
         if disposition in ("applied", "rejected", "superseded", "stale")
         else None,
-        "disposition_reason": None
-        if event["document"].get("reason") is None
-        else _name(event["document"]["reason"]),
-        "consumed_tick": _natural(event.get("tick")),
+        "disposition_reason": None if document.get("reason") is None else _name(document["reason"]),
+        "consumed_tick": None if event is None else _natural(event.get("tick")),
         "served_model_id": provider.get("served_model_id")
         if isinstance(provider.get("served_model_id"), str)
         and _NAME.fullmatch(provider["served_model_id"])
@@ -251,6 +250,74 @@ def _readable(
     }
 
 
+_PERSON_STOPS: Final = ("stopped_by_person", "paused_by_person")
+
+
+def read_session(reader: WorldReader, version: str, which: str) -> dict[str, Any]:
+    """One living session as the society read serves it: by id, or the newest for "latest"."""
+    base = f"/world/versions/{version}/society/control/sessions"
+    if which == "latest":
+        listed = reader.json("GET living sessions", base)["sessions"]
+        if not listed:
+            raise ProjectError("this world has no living session")
+        which = listed[0]["session_id"]
+    return reader.json("GET living session", f"{base}/{segment(which)}")
+
+
+def _instant(value: str) -> str:
+    """A UTC instant to the second, in the evidence format's one spelling."""
+    return datetime.fromisoformat(value).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def living_session_block(session: Mapping[str, Any]) -> dict[str, Any]:
+    """The session's receipts and the spending authority's figures; no actor or request ids."""
+    opened, closed, used = session["opened"], session["closed"], session["used"]
+    return {
+        "session_id": session["session_id"],
+        "state": session["state"],
+        "opened": {
+            "tick": opened["start_tick"],
+            "at": _instant(opened["opened_at"]),
+            "state_sha256": opened["start_state_sha256"],
+            "limits": dict(opened["limits"]),
+        },
+        "closed": None
+        if closed is None
+        else {
+            "tick": closed["end_tick"],
+            "at": _instant(closed["closed_at"]),
+            "state_sha256": closed["end_state_sha256"],
+            "reason": closed["reason"],
+            "by": "person" if closed["reason"] in _PERSON_STOPS else "system",
+        },
+        "spending": {
+            "used": {
+                "wall_seconds": used["wall_seconds"],
+                "minutes": used["minutes"],
+                "decisions": used["decisions"],
+                "usd": used["usd"],
+                "calls": used["calls"],
+                "unresolved_count": used["unresolved"]["count"],
+                "unresolved_usd": used["unresolved"]["usd"],
+            },
+            "bounds": [
+                {
+                    "provider": bound["provider"],
+                    "state": bound["state"],
+                    "ceiling_usd": bound["ceiling_usd"],
+                    "committed_usd": bound["committed_usd"],
+                    "committed_calls": bound["committed_calls"],
+                    "known_usage_usd": bound["known_usage_usd"],
+                    "unresolved_count": bound["unresolved"]["count"],
+                    "unresolved_usd": bound["unresolved"]["usd"],
+                    "reconciled_usd": bound["reconciled_usd"],
+                }
+                for bound in session["bounds"]
+            ],
+        },
+    }
+
+
 def capture(
     reader: WorldReader,
     *,
@@ -263,6 +330,7 @@ def capture(
     max_decisions: int = 256,
     licence: str = "unreviewed",
     session_id: str | None = None,
+    living_session: str | None = None,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     progress: Callable[[str], None] | None = None,
 ) -> Capture:
@@ -276,6 +344,13 @@ def capture(
     """
     note = progress or (lambda _: None)
     version = segment(version_id)
+    session = None if living_session is None else read_session(reader, version, living_session)
+    coverage = "consumed"
+    window: tuple[int, int | None] = (0, None)
+    if session is not None:
+        closed = session["closed"]
+        window = (session["opened"]["start_tick"], None if closed is None else closed["end_tick"])
+        session_id = session_id or f"session:{session['session_id']}"
     view = reader.json("GET version", f"/world/versions/{version}")
     if view.get("world_id") != reader.world_id or view.get("version_id") != version_id:
         raise ProjectError("world API returned another world or version")
@@ -351,23 +426,41 @@ def capture(
                 if held is None or choice["choice_seq"] > held["choice_seq"]:
                     latest[choice["subject_id"]] = choice
         events = _events(reader, version, set(latest)) if include_decisions and latest else []
-        records = {}
-        for event in events[-max_decisions:]:
-            request_id = segment(event["document"]["request_id"])
-            records[request_id] = (
-                event,
-                reader.json(
-                    "GET society decision",
-                    f"/world/versions/{version}/society/decisions/{request_id}",
-                ),
+        consumed = {event["document"]["request_id"]: event for event in events}
+        # Each entry: (the minute's event or None, the record, the subject it was asked for).
+        records: dict[str, tuple[dict[str, Any] | None, dict[str, Any], str]] = {}
+        if (
+            session is not None
+            and session["decisions_read"]["counted"] < session["decisions_read"]["maximum"]
+        ):
+            # The session lists every request asked in its minutes: the unanswered ones too.
+            coverage = "all"
+            asked = [
+                (entry["request_id"], entry["subject_id"])
+                for entry in session["decisions"]
+                if (entry.get("decider") or {}).get("kind") == "model"
+                and entry["subject_id"] in latest
+            ]
+        else:
+            asked = [(event["document"]["request_id"], event["subject_id"]) for event in events]
+        for request_id, subject in asked[-max_decisions:]:
+            record = reader.json(
+                "GET society decision",
+                f"/world/versions/{version}/society/decisions/{segment(request_id)}",
             )
+            base_tick = record["request"]["base_tick"]
+            if session is not None and not (
+                window[0] <= base_tick and (window[1] is None or base_tick < window[1])
+            ):
+                continue
+            records[request_id] = (consumed.get(request_id), record, subject)
         note(f"read {len(records)} decision records")
         for subject, choice in sorted(latest.items()):
             decider = choice["decider"]
             served = [
                 record["decision"]["provider"].get("served_model_id")
-                for event, record in records.values()
-                if event["subject_id"] == subject and record.get("decision")
+                for _, record, asked_for in records.values()
+                if asked_for == subject and record.get("decision")
             ]
             manifest = {
                 "provider": _name(decider.get("provider")),
@@ -392,8 +485,8 @@ def capture(
             }
             models.append(binding)
             binding_sha256 = sha256_of_canonical(binding).hex()
-            for event, record in records.values():
-                if event["subject_id"] != subject:
+            for event, record, asked_for in records.values():
+                if asked_for != subject:
                     continue
                 request, receipt = record["request"], record.get("decision")
                 config = request.get("provider_config") or {}
@@ -408,7 +501,7 @@ def capture(
                 options = request["context"]["options"]
                 labels = [option["label"] for option in options]
                 chosen = (receipt.get("proposal") or {}).get("label")
-                disposition = event["document"].get("disposition")
+                disposition = None if event is None else event["document"].get("disposition")
                 outcome = _OUTCOMES.get(disposition, "not-applied")
                 provider = receipt.get("provider") or {}
                 decision = {
@@ -434,7 +527,7 @@ def capture(
                     "outcome": outcome,
                     "reason_code": _name(
                         receipt.get("reason")
-                        if outcome == "applied"
+                        if outcome == "applied" or event is None
                         else event["document"].get("reason")
                     ),
                     "elapsed_ms": _natural(provider.get("latency_ms")),
@@ -447,7 +540,8 @@ def capture(
                     )
                     continue
                 decision["receipt"] = _receipt(receipt, event)
-                if readable:
+                # A request no minute took up has no consumed minute or disposition to read.
+                if readable and event is not None:
                     decision["readable"] = _readable(request, receipt, event)
                 decisions.append(decision)
 
@@ -470,8 +564,9 @@ def capture(
                 "decisions": decisions,
                 # Only decisions a minute took up are enumerated (decision_applied events): a
                 # request that never got a usable answer and was never consumed is absent.
-                "coverage": {"decisions": "consumed"},
+                "coverage": {"decisions": coverage},
                 "captured_at": now().astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "living_session": None if session is None else living_session_block(session),
             }
         )
         decisions = []

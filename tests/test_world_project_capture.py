@@ -393,3 +393,194 @@ def test_a_session_capture_records_receipts_coverage_and_its_time(world):
     assert receipts["request:r3"]["disposition"] == "superseded"
     # Receipts carry no words: nothing readable unless asked for.
     assert all("readable" not in d for d in evidence["decisions"])
+
+
+SESSION_ID = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
+
+
+def with_session(world, *, counted=7, maximum=2000, reason="session_minutes"):
+    """Give the fake world one closed living session from minute 3, with a timed-out request."""
+    timed_out = record("r9", world.knight, 7, "wait here a minute")
+    timed_out["decision"].update(status="unavailable", reason="model_timed_out", proposal=None)
+    timed_out["decision"]["provider"].update(
+        latency_ms=20000, prompt_tokens=None, completion_tokens=None, cost_known=False
+    )
+    world.records["r9"] = timed_out
+    # Asked of the same model, but at minute 2, before the session opened at minute 3.
+    world.records["early"] = record("early", world.knight, 2, "wait here a minute")
+    # Asked of a model for a being the capture did not select.
+    world.records["bench"]["request"]["provider_config"] = {"provider": "synthetic"}
+    listed = [
+        {
+            "request_id": rid,
+            "decision_seq": n,
+            "role": "society_decision",
+            "subject_id": world.knight if rid != "bench" else world.bench,
+            "decider": {"kind": "model", "provider": "synthetic", "model_id": "synthetic-model"},
+            "base_tick": tick,
+            "consumed_tick": None if rid == "r9" else tick + 1,
+        }
+        for n, (rid, tick) in enumerate(
+            [("early", 2), ("r1", 4), ("r2", 5), ("r3", 6), ("r9", 7), ("bench", 4)], start=1
+        )
+    ]
+    view = {
+        "profile": "exulanica.society-session/v1",
+        "session_id": SESSION_ID,
+        "state": "closed",
+        "opened": {
+            "event_seq": 10,
+            "request_id": "11111111-1111-1111-1111-111111111111",
+            "reason": "owner",
+            "opened_by": "22222222-2222-2222-2222-222222222222",
+            "limits": {
+                "wall_seconds": 3600,
+                "minutes": 60,
+                "decisions": 500,
+                "usd": "0.5",
+                "calls": 600,
+            },
+            "start_tick": 3,
+            "start_state_sha256": "a" * 64,
+            "opened_at": "2026-10-14T01:00:00+00:00",
+            "ends_by": "2026-10-14T02:00:00+00:00",
+        },
+        "closed": {
+            "event_seq": 90,
+            "reason": reason,
+            "closed_by": None,
+            "end_tick": 63,
+            "end_state_sha256": "b" * 64,
+            "closed_at": "2026-10-14T01:20:00.250000+00:00",
+        },
+    }
+    read = {
+        **view,
+        "used": {
+            "wall_seconds": 1200,
+            "minutes": 60,
+            "decisions": 4,
+            "usd": "0.0003",
+            "calls": 4,
+            "unresolved": {"count": 0, "usd": "0"},
+        },
+        "bounds": [
+            {
+                "provider": "synthetic",
+                "bound_id": "33333333-3333-3333-3333-333333333333",
+                "state": "closed",
+                "ceiling_usd": "0.5",
+                "max_calls": 600,
+                "valid_until": "2026-10-14T02:00:00+00:00",
+                "committed_usd": "0.0003",
+                "committed_calls": 4,
+                "in_flight_usd": "0",
+                "unresolved": {"count": 0, "usd": "0"},
+                "known_usage_usd": "0.0001",
+                "reconciled_usd": "0",
+            }
+        ],
+        "decisions": listed,
+        "decisions_read": {"counted": counted, "maximum": maximum},
+        "measures": {},
+        "by_model": [],
+    }
+    base = f"/world/versions/{VERSION}/society/control/sessions"
+    world.routes[base] = {"sessions": [view]}
+    world.routes[f"{base}/{SESSION_ID}"] = read
+
+
+def test_a_living_session_is_captured_with_every_request_it_asked(world):
+    with_session(world)
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        result = capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=["knight:1"],
+            living_session="latest",
+            readable=True,
+        )
+    evidence = result.evidence
+    assert evidence["session_id"] == f"session:{SESSION_ID}"
+    assert evidence["coverage"] == {"decisions": "all"}
+    by_id = {d["record_id"]: d for d in evidence["decisions"]}
+    # Minute 2's request came before the session opened: not its evidence.
+    assert sorted(by_id) == ["request:r1", "request:r2", "request:r3", "request:r9"]
+    timed_out = by_id["request:r9"]
+    assert timed_out["receipt"]["status"] == "unavailable"
+    assert timed_out["receipt"]["reason"] == "model_timed_out"
+    assert timed_out["receipt"]["consumed_tick"] is None
+    assert timed_out["outcome"] == "not-applied" and timed_out["chosen_option_id"] is None
+    assert "readable" not in timed_out and "readable" in by_id["request:r1"]
+    living = evidence["living_session"]
+    assert living["state"] == "closed"
+    assert living["opened"] == {
+        "tick": 3,
+        "at": "2026-10-14T01:00:00Z",
+        "state_sha256": "a" * 64,
+        "limits": {
+            "wall_seconds": 3600,
+            "minutes": 60,
+            "decisions": 500,
+            "usd": "0.5",
+            "calls": 600,
+        },
+    }
+    assert living["closed"] == {
+        "tick": 63,
+        "at": "2026-10-14T01:20:00Z",
+        "state_sha256": "b" * 64,
+        "reason": "session_minutes",
+        "by": "system",
+    }
+    assert living["spending"]["bounds"] == [
+        {
+            "provider": "synthetic",
+            "state": "closed",
+            "ceiling_usd": "0.5",
+            "committed_usd": "0.0003",
+            "committed_calls": 4,
+            "known_usage_usd": "0.0001",
+            "unresolved_count": 0,
+            "unresolved_usd": "0",
+            "reconciled_usd": "0",
+        }
+    ]
+    # A being the capture did not select has none of its records read.
+    assert not any(path.split("?")[0].endswith("/decisions/bench") for _, path, _ in world.requests)
+    text = json.dumps(evidence)
+    for private in ("22222222", "11111111", "33333333"):
+        assert private not in text  # no actor, request or bound identities
+
+
+def test_a_capped_session_list_falls_back_to_the_decisions_minutes_took_up(world):
+    with_session(world, counted=2000, maximum=2000)
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        result = capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=["knight:1"],
+            living_session=SESSION_ID,
+        )
+    assert result.evidence["coverage"] == {"decisions": "consumed"}
+    assert sorted(d["record_id"] for d in result.evidence["decisions"]) == [
+        "request:r1",
+        "request:r2",
+        "request:r3",
+    ]
+
+
+def test_a_session_a_person_stopped_says_so(world):
+    with_session(world, reason="stopped_by_person")
+    with WorldReader(world.url, TOKEN, WORLD) as reader:
+        result = capture(
+            reader,
+            version_id=VERSION,
+            project_id="project:demo",
+            thing_ids=["knight:1"],
+            living_session=SESSION_ID,
+        )
+    closed = result.evidence["living_session"]["closed"]
+    assert (closed["reason"], closed["by"]) == ("stopped_by_person", "person")

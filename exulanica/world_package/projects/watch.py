@@ -90,6 +90,14 @@ class Watcher:
             sessions[session_file(evidence["session_id"])] = evidence
         return sessions
 
+    def _session_closed(self, captured: Capture) -> bool:
+        """A living session that closed since the last record: its end is the checkpoint."""
+        held = (captured.evidence or {}).get("living_session")
+        if held is None or held["state"] != "closed":
+            return False
+        saved = self.project.sessions_at("HEAD").get(session_file(captured.evidence["session_id"]))
+        return saved is None or (saved.get("living_session") or {}).get("state") != "closed"
+
     def _digest(self, candidate: dict[str, Any], captured: Capture) -> str:
         files = self._files(self.project.working_sessions(), captured)
         return ":".join([checkpoint_digest(candidate), *(evidence_digest(f) for f in files)])
@@ -115,7 +123,7 @@ class Watcher:
         pending = {"pending": world, "pending_evidence": evidence}
         settled = self._since is not None and now - self._since >= self.policy.settle_seconds
         overdue = self._first is not None and now - self._first >= self.policy.max_pending_seconds
-        if not settled and not overdue:
+        if not settled and not overdue and not self._session_closed(captured):
             return {"state": "settling", **pending}
         return self._record(captured, now, pending)
 

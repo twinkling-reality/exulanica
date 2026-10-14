@@ -216,3 +216,29 @@ def test_a_capture_window_never_loses_records_and_long_sessions_continue(tmp_pat
     assert [len(sessions[name]["decisions"]) for name in sorted(sessions)] == [3, 5]
     kept = {d["record_id"] for s in sessions.values() for d in s["decisions"]}
     assert kept == {d["record_id"] for d in full["decisions"]}
+
+
+def test_a_session_that_closes_is_recorded_at_once(tmp_path):
+    from test_world_project_evidence_format import SESSION, living
+    from test_world_project_repository import evidence_from, more_records
+
+    project, _ = sample()
+    world_doc, evidence = evidence_from(project)
+    evidence["session_id"] = f"session:{SESSION}"
+    folder = tmp_path / "project"
+    create(folder, world_doc, author=AUTHOR)
+    clock = Clock()
+    feed = {"evidence": {**evidence, "living_session": living(state="open")}}
+
+    def read():
+        return Capture(deepcopy(world_doc), {}, evidence=deepcopy(feed["evidence"]))
+
+    policy = Policy(poll_seconds=15, settle_seconds=120, daily_cap=5)
+    watcher = Watcher(Project(folder, author=AUTHOR), read, policy, clock)
+    assert watcher.step()["state"] == "settling"  # an open session's evidence settles as usual
+    clock.now += 15
+    grown = more_records(evidence, 1)
+    feed["evidence"] = {**grown, "living_session": living(state="closed")}
+    assert watcher.step()["state"] == "checkpointed"  # closing does not wait out the settle
+    saved = Project(folder).sessions_at("HEAD")
+    assert [s["living_session"]["state"] for s in saved.values()] == ["closed"]

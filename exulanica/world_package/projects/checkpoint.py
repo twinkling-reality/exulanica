@@ -112,7 +112,7 @@ def evidence_document(value: Any) -> dict[str, Any]:
     result["models"].sort(key=lambda item: item["thing_id"] + "\x00" + item["model_id"])
     result["decisions"].sort(key=lambda item: (item["tick"], item["record_id"]))
     _drop_absent_readable(result["decisions"])
-    for key in ("coverage", "captured_at"):
+    for key in ("coverage", "captured_at", "living_session"):
         if result.get(key) is None:
             result.pop(key, None)
     return result
