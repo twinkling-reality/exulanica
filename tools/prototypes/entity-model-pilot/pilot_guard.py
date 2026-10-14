@@ -72,6 +72,18 @@ class Snapshot:
     refusal: str | None = None
 
 
+#: The isolated runtime slots a guarded run may bind, each (database, API, app) on this machine. The
+#: first is the observer slot the world workspace preview accepts; none is the primary runtime's.
+ISOLATED_SLOTS: tuple[tuple[int, int, int], ...] = (
+    (20030, 20031, 20032),
+    (20033, 20034, 20035),
+    (20036, 20037, 20038),
+    (20100, 20101, 20102),
+    (20103, 20104, 20105),
+    (20106, 20107, 20108),
+)
+
+
 def code_schema_version() -> int:
     """The newest migration this code carries. A target database must be migrated exactly to it."""
     *_, newest = migrations()
@@ -125,22 +137,24 @@ class TargetBinding:
             witness == p or witness.is_relative_to(p) or p.is_relative_to(witness) for p in paths
         ):
             raise PilotStop("witness_in_backup_domain")
-        for url, port, schemes in (
-            (self.database_url, 20030, {"postgres", "postgresql"}),
-            (self.api_url, 20031, {"http"}),
-            (self.app_url, 20032, {"http"}),
+        ports = []
+        for url, schemes in (
+            (self.database_url, {"postgres", "postgresql"}),
+            (self.api_url, {"http"}),
+            (self.app_url, {"http"}),
         ):
             try:
                 parsed = urlsplit(url)
-                safe = (
-                    parsed.hostname in {"localhost", "127.0.0.1", "::1"}
-                    and parsed.port == port
-                    and parsed.scheme in schemes
+                safe = parsed.hostname in {"localhost", "127.0.0.1", "::1"} and (
+                    parsed.scheme in schemes
                 )
+                ports.append(parsed.port)
             except ValueError:
                 safe = False
             if not safe:
                 raise PilotStop("target_endpoint_not_isolated")
+        if tuple(ports) not in ISOLATED_SLOTS:
+            raise PilotStop("target_endpoint_not_isolated")
         if (
             self.schema_version != code_schema_version()
             or len(self.source_inputs_sha256) != 64

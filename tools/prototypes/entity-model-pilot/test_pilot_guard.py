@@ -88,6 +88,22 @@ def test_primary_endpoint_cannot_be_bound(case, field, port):
         replace(case.binding, **{field: f"{scheme}://localhost:{port}/target"}).validate()
 
 
+def test_another_isolated_slot_is_accepted(case):
+    db, api, app = pg.ISOLATED_SLOTS[3]
+    replace(
+        case.binding,
+        database_url=f"postgresql://localhost:{db}/test",
+        api_url=f"http://localhost:{api}",
+        app_url=f"http://localhost:{app}",
+    ).validate()
+
+
+def test_ports_from_two_slots_are_refused(case):
+    _, api, _ = pg.ISOLATED_SLOTS[1]
+    with pytest.raises(pg.PilotStop, match="target_endpoint_not_isolated"):
+        replace(case.binding, api_url=f"http://localhost:{api}").validate()
+
+
 def test_target_migrated_below_the_code_is_refused(case):
     behind = pg.code_schema_version() - 1
     with pytest.raises(pg.PilotStop, match="source_preflight_missing"):
