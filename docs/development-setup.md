@@ -115,6 +115,28 @@ shared database took 1074 s, and `-n 6` with private servers took 301 s, failing
 exactly the same tests. More workers were no faster at comparable load and take every core from
 other work, so six, one per performance core, is the setting to use.
 
+#### The guards: checks a change anywhere can break
+
+Some tests read the whole source tree, every route or every table: every route refuses an anonymous
+caller, a stranger cannot tell a foreign id from an invented one, every table is isolated by
+workspace and reached by an erasure, no product module names a game. A change anywhere can break
+one, so choosing tests by the files a change touches never picks them, and a run of the whole tree
+without a database skips the ones keyed on routes and tables. `tests/guard_selection.py` lists
+them, and `--guards` runs exactly that list; a test file it does not name is not imported.
+
+```bash
+uv run pytest --guards -m "not postgres" -n 2
+EXULANICA_TEST_POSTGRES=private uv run pytest --guards -n 2
+```
+
+The first needs no database; run it before any change lands. The second runs every guard on
+private servers; run it for any change to a route, a table, a migration, SQL or a catalog. A new
+test that reads the whole tree, iterates every route or inspects every table joins the list, with
+one line on what it holds; `tests/test_guard_selection.py` holds every entry to a test that exists.
+
+MEASURED 2026-10-14 at fd57f9d8 on an Apple M5 Max with 18 cores, while a full suite ran beside
+it: the first command ran 2,229 guards and skipped 23 in 162 s.
+
 #### Servers you started: one per worker
 
 A machine without PostgreSQL's server binaries cannot initialise private servers. Continuous

@@ -37,6 +37,7 @@ from PIL import Image
 from PIL.TiffImagePlugin import IFDRational
 
 import ast_parse_race
+from guard_selection import guard_files, is_guard
 from model_fakes import FakeTransport, RecordingPolicy
 from pg_harness import migrated_schema, names_a_scratch_database, open_scratch_connection
 
@@ -531,6 +532,24 @@ def pytest_addoption(parser):
             "runs with K from 1 to N run the selection once between them"
         ),
     )
+    parser.addoption(
+        "--guards",
+        action="store_true",
+        help=(
+            "run only the guards tests/guard_selection.py lists, the checks over the whole tree, "
+            "route table or schema; with -m 'not postgres', only those that need no database"
+        ),
+    )
+
+
+def pytest_ignore_collect(collection_path, config):
+    """Under ``--guards``, a test file holding no guard is not imported at all."""
+    if not config.getoption("guards"):
+        return None
+    test_file = collection_path.suffix == ".py" and collection_path.name.startswith("test_")
+    if test_file and collection_path.name not in guard_files():
+        return True
+    return None
 
 
 def part_of(nodeid: str, parts: int) -> int:
@@ -553,10 +572,19 @@ def chosen_part(text: str) -> tuple[int, int]:
 
 def pytest_collection_modifyitems(config, items):
     """Mark every test that reaches a real database, by what it asks for rather than by where
-    it lives, and keep only the tests of the part ``--part`` names."""
+    it lives, keep only the guards under ``--guards``, and keep only the tests of the part
+    ``--part`` names."""
     for item in items:
         if DATABASE_FIXTURES & set(getattr(item, "fixturenames", ())):
             item.add_marker(pytest.mark.postgres)
+    if config.getoption("guards"):
+        guards, others = [], []
+        for item in items:
+            name = getattr(item, "originalname", item.name)
+            (guards if is_guard(item.path.name, name) else others).append(item)
+        if others:
+            config.hook.pytest_deselected(items=others)
+            items[:] = guards
     if (written := config.getoption("part")) is None:
         return
     part, parts = chosen_part(written)
