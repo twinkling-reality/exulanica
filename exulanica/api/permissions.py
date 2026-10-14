@@ -532,7 +532,8 @@ _WORLD_READS_WITH_A_MODEL: Final = _every(
 #: the workspace to the creature drafter's calls and keeps what passes in its own store. A
 #: reference request commits the workspace to a planning and a reading call and to web searches
 #: against its credits; stopping one takes the same grants. A piece request commits the workspace
-#: to GPU time against its allowance.
+#: to GPU time against its allowance. Opening a living session commits the world's host to asking
+#: the models its owner chose for its beings, within the session's limits.
 _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE),
     "POST /models/probes/prepare",
@@ -543,6 +544,7 @@ _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     "POST /world/versions/{version_id}/models/{role_key}/budget",
     "POST /world/versions/{version_id}/society/comparisons",
     "POST /world/versions/{version_id}/society/comparisons/{comparison_id}/cancel",
+    "POST /world/versions/{version_id}/society/control/sessions",
     "POST /world/versions/{version_id}/society/models",
     "POST /world/versions/{version_id}/traffic/comparisons",
     "POST /world/versions/{version_id}/traffic/comparisons/{comparison_id}/cancel",
@@ -746,6 +748,8 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}/day",
     "GET /world/versions/{version_id}/society/control",
     "GET /world/versions/{version_id}/society/control/events",
+    "GET /world/versions/{version_id}/society/control/sessions",
+    "GET /world/versions/{version_id}/society/control/sessions/{session_id}",
     "GET /world/versions/{version_id}/society/decisions/{request_id}",
     "GET /world/versions/{version_id}/society/district",
     "GET /world/versions/{version_id}/society/events",
@@ -855,6 +859,7 @@ _WORLD_WRITES: Final = _every(
     "POST /world/versions/{version_id}/society",
     "POST /world/versions/{version_id}/society/actions",
     "PUT /world/versions/{version_id}/society/control",
+    "POST /world/versions/{version_id}/society/control/sessions/{session_id}/stop",
     "POST /world/versions/{version_id}/society/control/steps",
     "POST /world/versions/{version_id}/society/decisions",
     "POST /world/versions/{version_id}/society/experiments",

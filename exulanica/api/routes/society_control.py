@@ -19,6 +19,7 @@ from exulanica.selection.validation import Session
 from exulanica.world.society import SocietyPlaceWaiting, UnavailableSocietyInput, served_snapshot
 from exulanica.world.society_control_repository import SocietyControlRepository
 from exulanica.world.society_controls import DEFAULT_BASE_TICK_INTERVAL_MS, effective_interval_ms
+from exulanica.world.society_sessions import SessionRefused
 from exulanica.world.world_clock import ClockRefused
 from exulanica.world.worlds import require_world
 
@@ -44,6 +45,38 @@ class StepBody(BaseModel):
     base_state_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
     #: As :class:`ConfigureBody`'s.
     base_clock_revision: Annotated[StrictInt, Field(ge=0)] | None = None
+
+
+class SessionLimitsBody(BaseModel):
+    """What a living session may use before it closes: each figure stated and positive."""
+
+    model_config = ConfigDict(extra="forbid")
+    wall_seconds: Annotated[StrictInt, Field(ge=1)]
+    minutes: Annotated[StrictInt, Field(ge=1)]
+    decisions: Annotated[StrictInt, Field(ge=1)]
+    #: US dollars, a decimal string of at most eight places.
+    usd: Annotated[str, Field(pattern=r"^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$")]
+    calls: Annotated[StrictInt, Field(ge=1)]
+
+
+class OpenSessionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    #: The caller's key for this opening: the same key answers the session it opened.
+    request_id: uuid.UUID
+    base_revision: Annotated[StrictInt, Field(ge=0)]
+    base_tick: Annotated[StrictInt, Field(ge=0)]
+    base_state_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+    limits: SessionLimitsBody
+    speed: StrictInt = 1
+    #: As :class:`ConfigureBody`'s.
+    base_clock_revision: Annotated[StrictInt, Field(ge=0)] | None = None
+
+
+#: The status each refusal of a session answers with; any other code answers 409.
+SESSION_REFUSAL_STATUS: Final[dict[str, int]] = {
+    "session_unknown": 404,
+    "invalid_session_limits": 422,
+}
 
 
 class HostPlayback(BaseModel):
@@ -263,6 +296,11 @@ def repository(
 def call(operation: Callable[[], Any]) -> Any:
     try:
         return operation()
+    except SessionRefused as exc:
+        return JSONResponse(
+            status_code=SESSION_REFUSAL_STATUS.get(exc.code, 409),
+            content={"code": exc.code, "detail": str(exc)},
+        )
     except SocietyPlaceWaiting as exc:
         # A site world's place still being made: ask again, as the society routes answer it.
         return JSONResponse(
@@ -367,4 +405,76 @@ def control_events(
                 version_id, limit=limit
             )
         }
+    )
+
+
+@router.post("/sessions", status_code=201)
+def open_living_session(
+    version_id: uuid.UUID,
+    body: OpenSessionBody,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+) -> Any:
+    """Open a living session on a paused society and play it: one bounded stretch of playback,
+    stated by its limits, from the tick and state digest the caller read. Refused 409
+    ``session_already_open`` while one is open, ``society_not_paused`` for a society playing without
+    one, ``session_request_reused`` for a key that opened a session with other limits, and
+    ``stale_society_state`` for another revision, tick or digest; 422 for limits beyond the
+    installation's. The same key answers the session it opened."""
+    fields = body.model_dump()
+    return call(
+        lambda: repository(connection, session, request, world_id).open_session(
+            version_id, actor=session.actor, **fields
+        )
+    )
+
+
+@router.get("/sessions")
+def list_living_sessions(
+    version_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+) -> Any:
+    """Every living session of the society, newest first, each open until it closed."""
+    return call(
+        lambda: {
+            "sessions": repository(connection, session, request, world_id).sessions(version_id)
+        }
+    )
+
+
+@router.get("/sessions/{session_id}")
+def read_living_session(
+    version_id: uuid.UUID,
+    session_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+) -> Any:
+    """One living session; 404 ``session_unknown`` where the society has none by that id."""
+    return call(
+        lambda: repository(connection, session, request, world_id).session(version_id, session_id)
+    )
+
+
+@router.post("/sessions/{session_id}/stop")
+def stop_living_session(
+    version_id: uuid.UUID,
+    session_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+) -> Any:
+    """Stop a living session: pause the society and close the session, ``stopped_by_person``. A
+    session that already closed is answered as it closed."""
+    return call(
+        lambda: repository(connection, session, request, world_id).stop_session(
+            version_id, actor=session.actor, session_id=session_id
+        )
     )

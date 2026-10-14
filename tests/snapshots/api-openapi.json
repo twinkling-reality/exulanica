@@ -2885,6 +2885,318 @@
     }
    }
   },
+  "/world/versions/{version_id}/society/control/sessions": {
+   "post": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Open Living Session",
+    "description": "Open a living session on a paused society and play it: one bounded stretch of playback,\nstated by its limits, from the tick and state digest the caller read. Refused 409\n``session_already_open`` while one is open, ``society_not_paused`` for a society playing without\none, ``session_request_reused`` for a key that opened a session with other limits, and\n``stale_society_state`` for another revision, tick or digest; 422 for limits beyond the\ninstallation's. The same key answers the session it opened.",
+    "operationId": "open_living_session_world_versions__version_id__society_control_sessions_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OpenSessionBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Open Living Session World Versions  Version Id  Society Control Sessions Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "society"
+    ],
+    "summary": "List Living Sessions",
+    "description": "Every living session of the society, newest first, each open until it closed.",
+    "operationId": "list_living_sessions_world_versions__version_id__society_control_sessions_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response List Living Sessions World Versions  Version Id  Society Control Sessions Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/society/control/sessions/{session_id}": {
+   "get": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Read Living Session",
+    "description": "One living session; 404 ``session_unknown`` where the society has none by that id.",
+    "operationId": "read_living_session_world_versions__version_id__society_control_sessions__session_id__get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Read Living Session World Versions  Version Id  Society Control Sessions  Session Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/society/control/sessions/{session_id}/stop": {
+   "post": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Stop Living Session",
+    "description": "Stop a living session: pause the society and close the session, ``stopped_by_person``. A\nsession that already closed is answered as it closed.",
+    "operationId": "stop_living_session_world_versions__version_id__society_control_sessions__session_id__stop_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Stop Living Session World Versions  Version Id  Society Control Sessions  Session Id  Stop Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/society/comparisons": {
    "get": {
     "tags": [
@@ -34826,6 +35138,60 @@
     "title": "OpenPreviewsView",
     "description": "A world's open previews, newest first, and how many open ones this server could not read.\n\nBest effort: a preview this server cannot read, such as one made before the reviewed\nrecipe-binding contract, is counted in ``unreadable`` and left out, never refused, because a\npage reads this as it opens a world and nothing here may stand in the way of the opening."
    },
+   "OpenSessionBody": {
+    "properties": {
+     "request_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Request Id"
+     },
+     "base_revision": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Base Revision"
+     },
+     "base_tick": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Base Tick"
+     },
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "limits": {
+      "$ref": "#/components/schemas/SessionLimitsBody"
+     },
+     "speed": {
+      "type": "integer",
+      "title": "Speed",
+      "default": 1
+     },
+     "base_clock_revision": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Clock Revision"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "request_id",
+     "base_revision",
+     "base_tick",
+     "base_state_sha256",
+     "limits"
+    ],
+    "title": "OpenSessionBody"
+   },
    "OperationRights": {
     "properties": {
      "display": {
@@ -42784,6 +43150,46 @@
      "thing_id"
     ],
     "title": "SendAwayBody"
+   },
+   "SessionLimitsBody": {
+    "properties": {
+     "wall_seconds": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Wall Seconds"
+     },
+     "minutes": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Minutes"
+     },
+     "decisions": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Decisions"
+     },
+     "usd": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,8})?$",
+      "title": "Usd"
+     },
+     "calls": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Calls"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "wall_seconds",
+     "minutes",
+     "decisions",
+     "usd",
+     "calls"
+    ],
+    "title": "SessionLimitsBody",
+    "description": "What a living session may use before it closes: each figure stated and positive."
    },
    "SetObjectBehaviourBody": {
     "properties": {

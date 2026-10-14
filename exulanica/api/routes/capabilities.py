@@ -695,6 +695,15 @@ NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
         ("POST", "/world/versions/{version_id}/society/decisions"): (
             "retired: every request is refused by name (society_proposals_retired)"
         ),
+        ("POST", "/world/versions/{version_id}/society/control/sessions"): (
+            "opening a living session commits the world to model spending within limits its "
+            "owner states, so no capability read offers it before the interface that asks the "
+            "owner for those limits"
+        ),
+        ("POST", "/world/versions/{version_id}/society/control/sessions/{session_id}/stop"): (
+            "stops a session that POST /world/versions/{version_id}/society/control/sessions "
+            "opened, which no capability read offers"
+        ),
         ("POST", "/world/versions/{version_id}/society/models"): (
             "records the same choice as POST /world/versions/{version_id}/models/{role_key}, which "
             "is projected for every role, for existing callers"

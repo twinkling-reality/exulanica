@@ -567,6 +567,16 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"base_revision": 0, "mode": "paused", "speed": 1},
     },
+    "POST /world/versions/{version_id}/society/control/sessions": {
+        **_IN_WORLD,
+        "json": {
+            "request_id": "00000000-0000-4000-8000-000000000001",
+            "base_revision": 0,
+            "base_tick": 0,
+            "base_state_sha256": _ZERO_DIGEST,
+            "limits": {"wall_seconds": 60, "minutes": 1, "decisions": 1, "usd": "0.01", "calls": 1},
+        },
+    },
     "POST /world/versions/{version_id}/society/control/steps": {
         **_IN_WORLD,
         "json": {"base_revision": 0, "base_tick": 0, "base_state_sha256": _ZERO_DIGEST},
@@ -953,6 +963,9 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/world/versions/{version_id}/society/comparisons/{comparison_id}": Owned(build.comparison),
     "/world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}": Owned(
         build.comparison_run
+    ),
+    "/world/versions/{version_id}/society/control/sessions/{session_id}": Owned(
+        build.living_session
     ),
     "/world/versions/{version_id}/society/decisions/{request_id}": Owned(build.decision_request),
     "/world/versions/{version_id}/society/experiments/{experiment_id}": Owned(build.experiment),

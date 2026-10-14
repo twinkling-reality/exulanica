@@ -1444,6 +1444,52 @@ Stepping by hand stays outside the pace: a paused society is stepped as often as
 minute advanced through `POST /world/versions/{version_id}/society/steps` writes no control
 receipt and moves no deadline.
 
+#### Living sessions
+
+A living session is one bounded stretch of a society's playback: who opened it, what it may use,
+and where it started and ended. It is recorded as two receipts of the playback history
+(`world_society_control_event`, migration 0214), not as a table of its own. `session_opened` states
+the session's server-allocated `session_id`, the caller's `request_id`, `opened_by`, its `limits`,
+`start_tick`, `start_state_sha256`, `opened_at` and `ends_by` (`opened_at` plus the wall seconds).
+`session_closed` states the `session_id`, its `reason`, `closed_by` (null for the system),
+`end_tick`, `end_state_sha256` and `closed_at`. The database admits both kinds beside 0059's and
+refuses a session receipt without these fields. Because they are playback receipts, sessions are
+erased with the society's playback history by the society's and the workspace's erasure, read
+under the same grants and participant scope, digest-chained in the same sequence, and interleaved
+with the receipts of the minutes they played (`exulanica/world/society_sessions.py`).
+
+The limits are `wall_seconds`, `minutes`, `decisions`, `usd` and `calls`, every one stated,
+positive and at most the installation's maxima (`SESSION_MAXIMA`: a day of wall time, 1,440
+minutes, 10,000 decisions, 100 US dollars, 10,000 calls); `usd` is a decimal string of at most
+eight places, stored at the ledger's quantum. They are recorded when the session opens.
+
+A session opens only on a paused society, at the control revision, tick and state digest its
+caller read, and opening it sets the society playing in the same transaction: a `configured`
+receipt, then `session_opened`. One session is open at a time per society, held under the
+workspace lock every playback write takes. The same `request_id` answers the session it opened,
+whatever happened since; with other limits it is refused. A session is open until its closing
+receipt, and a closed session is never open again: the next stretch is a new session from the
+society's current tick and digest. A session closes when:
+
+- a person stops it (`stopped_by_person`), which pauses the society;
+- a person pauses the society (`paused_by_person`); another speed while playing keeps it open;
+- the worker pauses the society for an error, with that pause's own reason
+  (`lease_recovery_limit`, `source_unavailable` or `invalid_society_state`) and no person.
+
+Under the base route, `/sessions`:
+
+- `POST /sessions` takes `{request_id, base_revision, base_tick, base_state_sha256, limits,
+  speed?, base_clock_revision?}` and answers 201 with the session. It needs `world.write` and
+  `model.invoke`. It is refused 409 `session_already_open`, `society_not_paused`,
+  `session_request_reused` or `stale_society_state`, and 422 for limits beyond the maxima.
+- `POST /sessions/{session_id}/stop` stops the session; a session that already closed is answered
+  as it closed. It needs `world.write`.
+- `GET /sessions` lists the society's sessions newest first, and `GET /sessions/{session_id}`
+  reads one, 404 `session_unknown` where the society has none by that id. Both need `world.read`.
+
+Each answer is `exulanica.society-session/v1`: `{session_id, state: "open" | "closed", opened,
+closed}`, the opening and closing receipts' fields with their event sequence numbers.
+
 ### Server integration and HTTP
 
 The authenticated society routes (`exulanica/api/routes/society.py`) create a society, read it,

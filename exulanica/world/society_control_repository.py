@@ -35,6 +35,14 @@ from exulanica.world.society_controls import (
 )
 from exulanica.world.society_engines import PLAYABLE_ENGINES, society_engine
 from exulanica.world.society_repository import SocietyInputBehind, SocietyRepository
+from exulanica.world.society_sessions import (
+    SESSION_CLOSED,
+    SESSION_KINDS,
+    SESSION_OPENED,
+    SessionRefused,
+    session_limits,
+    sessions_from,
+)
 from exulanica.world.world_clock import lead_room
 from exulanica.world.world_clock_repository import ClockLeadExhausted, WorldClockRepository
 
@@ -217,6 +225,56 @@ class SocietyControlRepository:
         )
         return document
 
+    @staticmethod
+    def _verified(row: dict) -> dict:
+        """A stored receipt, its digest checked against the row and its own contents."""
+        doc = row["document"]
+        digest = society_state_sha256({k: v for k, v in doc.items() if k != "document_sha256"})
+        if digest != row["document_sha256"] or digest != doc["document_sha256"]:
+            raise ValueError("control receipt digest mismatch")
+        return doc
+
+    def _session_receipts(self, society_id: uuid.UUID) -> list[dict]:
+        """The society's session receipts, oldest first, each digest checked."""
+        rows = self.connection.execute(
+            "select document,document_sha256 from world_society_control_event "
+            "where workspace_id=%s and society_id=%s and document->>'kind' in (%s,%s) "
+            "order by event_seq desc",
+            (self.workspace_id, society_id, *SESSION_KINDS),
+        ).fetchall()
+        return [self._verified(row) for row in reversed(rows)]
+
+    def _open_session(self, society_id: uuid.UUID) -> dict | None:
+        """The society's open session's opening receipt, or None while none is open."""
+        row = self.connection.execute(
+            "select document,document_sha256 from world_society_control_event "
+            "where workspace_id=%s and society_id=%s and document->>'kind' in (%s,%s) "
+            "order by event_seq desc limit 1",
+            (self.workspace_id, society_id, *SESSION_KINDS),
+        ).fetchone()
+        if row is None:
+            return None
+        doc = self._verified(row)
+        return doc if doc["kind"] == SESSION_OPENED else None
+
+    def _close_session(
+        self, society: dict, opened: dict, *, reason: str, closed_by: uuid.UUID | None
+    ) -> dict:
+        """Close the open session: where the society stands now, why, and who (None: the system)."""
+        now = self._society()._row(society["version_id"])
+        return self._event(
+            society,
+            SESSION_CLOSED,
+            {
+                "session_id": opened["session_id"],
+                "reason": reason,
+                "closed_by": None if closed_by is None else str(closed_by),
+                "end_tick": now["current_tick"],
+                "end_state_sha256": now["state_sha256"],
+                "closed_at": utc(self._now()),
+            },
+        )
+
     def _last_execution(self, society_id: uuid.UUID) -> dict | None:
         row = self.connection.execute(
             "select document,document_sha256 from world_society_control_event "
@@ -332,6 +390,115 @@ class SocietyControlRepository:
                     raise ValueError("control receipt digest mismatch")
             return [row["document"] for row in rows]
 
+    def sessions(self, version_id: uuid.UUID) -> list[dict]:
+        """Every living session of the society, newest first."""
+        with self.connection.transaction():
+            society = self._scope(version_id)
+            return sessions_from(self._session_receipts(society["society_id"]))
+
+    def session(self, version_id: uuid.UUID, session_id: uuid.UUID) -> dict:
+        """One living session of the society; refused ``session_unknown`` where it has none."""
+        for one in self.sessions(version_id):
+            if one["session_id"] == str(session_id):
+                return one
+        raise SessionRefused("session_unknown", "this society has no such session")
+
+    def open_session(
+        self,
+        version_id: uuid.UUID,
+        *,
+        actor: uuid.UUID,
+        request_id: uuid.UUID,
+        base_revision: int,
+        base_tick: int,
+        base_state_sha256: str,
+        limits: dict,
+        speed: int = 1,
+        base_clock_revision: int | None = None,
+    ) -> dict:
+        """Open a living session on a paused society and play it, in one transaction.
+
+        The caller states the control revision, tick and state digest it read; another is refused
+        as stale. The same ``request_id`` answers the session it opened, whatever has happened
+        since; with other limits it is refused ``session_request_reused``. While a session is open
+        another is refused ``session_already_open``, and a society playing without one is refused
+        ``society_not_paused``. Opening writes a ``configured`` receipt (playing) and then a
+        ``session_opened`` one.
+        """
+        stated = session_limits(limits)
+        with self.connection.transaction():
+            society = self._scope(version_id)
+            receipts = self._session_receipts(society["society_id"])
+            same = [
+                one
+                for one in receipts
+                if one["kind"] == SESSION_OPENED and one["request_id"] == str(request_id)
+            ]
+            if same:
+                if same[0]["limits"] != stated:
+                    raise SessionRefused(
+                        "session_request_reused", "this request opened a session with other limits"
+                    )
+                return self.session(version_id, uuid.UUID(same[0]["session_id"]))
+            if self._open_session(society["society_id"]) is not None:
+                raise SessionRefused("session_already_open", "a session is open; stop it first")
+            control = self._control(society["society_id"])
+            if control is not None and control["mode"] != "paused":
+                raise SessionRefused(
+                    "society_not_paused", "a session opens a paused society; pause it first"
+                )
+            if society["current_tick"] != base_tick or society["state_sha256"] != base_state_sha256:
+                raise StaleSocietyState("society changed; reload before opening a session")
+            self.configure(
+                version_id,
+                actor=actor,
+                base_revision=base_revision,
+                mode="playing",
+                speed=speed,
+                base_clock_revision=base_clock_revision,
+            )
+            session_id = uuid.uuid4()
+            now = self._now()
+            self._event(
+                society,
+                SESSION_OPENED,
+                {
+                    "session_id": str(session_id),
+                    "request_id": str(request_id),
+                    "opened_by": str(actor),
+                    "limits": stated,
+                    "start_tick": base_tick,
+                    "start_state_sha256": base_state_sha256,
+                    "opened_at": utc(now),
+                    "ends_by": utc(now + dt.timedelta(seconds=stated["wall_seconds"])),
+                },
+            )
+            return self.session(version_id, session_id)
+
+    def stop_session(
+        self, version_id: uuid.UUID, *, actor: uuid.UUID, session_id: uuid.UUID
+    ) -> dict:
+        """Stop a living session: pause the society and close it (``stopped_by_person``).
+
+        A session that already closed is answered as it closed, and nothing is written; one the
+        society never had is refused ``session_unknown``.
+        """
+        with self.connection.transaction():
+            society = self._scope(version_id)
+            found = self.session(version_id, session_id)
+            if found["state"] == "closed":
+                return found
+            control = self._control(society["society_id"])
+            self.configure(
+                version_id,
+                actor=actor,
+                base_revision=control["revision"],
+                mode="paused",
+                speed=control["speed"],
+                closing_reason="stopped_by_person",
+            )
+            return self.session(version_id, session_id)
+
     def configure(
         self,
         version_id: uuid.UUID,
@@ -341,7 +508,10 @@ class SocietyControlRepository:
         mode: str,
         speed: int,
         base_clock_revision: int | None = None,
+        closing_reason: str = "paused_by_person",
     ) -> dict:
+        """Play or pause the society, at a speed. Pausing closes its open living session, by
+        ``closing_reason``, in the same transaction."""
         validate_settings(mode, speed, self.base_tick_interval_ms)
         if type(base_revision) is not int or base_revision < 0:
             raise ValueError("base_revision must be a nonnegative integer")
@@ -400,6 +570,10 @@ class SocietyControlRepository:
                     else str(prior["lease_token"]),
                 },
             )
+            if mode == "paused":
+                opened = self._open_session(society["society_id"])
+                if opened is not None:
+                    self._close_session(society, opened, reason=closing_reason, closed_by=actor)
             return self.read(version_id)
 
     def manual_step(
@@ -549,7 +723,12 @@ class SocietyControlRepository:
             "society_id=%s",
             (reason, self.workspace_id, society["society_id"]),
         )
-        return self._event(society, kind, {"reason": reason, **details})
+        receipt = self._event(society, kind, {"reason": reason, **details})
+        # A pause the system makes closes the open living session, by the pause's own reason.
+        opened = self._open_session(society["society_id"])
+        if opened is not None:
+            self._close_session(society, opened, reason=reason, closed_by=None)
+        return receipt
 
     def _check_lease(self, row: dict | None, claim: ControlClaim) -> None:
         if (

@@ -3078,6 +3078,336 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/world/versions/{version_id}/society/control/sessions",
+    "method": "post",
+    "id": "open_living_session_world_versions__version_id__society_control_sessions_post",
+    "title": "Open Living Session",
+    "description": "Open a living session on a paused society and play it: one bounded stretch of playback,\nstated by its limits, from the tick and state digest the caller read. Refused 409\n``session_already_open`` while one is open, ``society_not_paused`` for a society playing without\none, ``session_request_reused`` for a key that opened a session with other limits, and\n``stale_society_state`` for another revision, tick or digest; 422 for limits beyond the\ninstallation's. The same key answers the session it opened.",
+    "group": "society",
+    "permission": {
+      "requires": [
+        "model.invoke",
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/OpenSessionBody"
+          }
+        }
+      }
+    },
+    "responses": {
+      "201": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response Open Living Session World Versions  Version Id  Society Control Sessions Post"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/versions/{version_id}/society/control/sessions",
+    "method": "get",
+    "id": "list_living_sessions_world_versions__version_id__society_control_sessions_get",
+    "title": "List Living Sessions",
+    "description": "Every living session of the society, newest first, each open until it closed.",
+    "group": "society",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response List Living Sessions World Versions  Version Id  Society Control Sessions Get"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/versions/{version_id}/society/control/sessions/{session_id}",
+    "method": "get",
+    "id": "read_living_session_world_versions__version_id__society_control_sessions__session_id__get",
+    "title": "Read Living Session",
+    "description": "One living session; 404 ``session_unknown`` where the society has none by that id.",
+    "group": "society",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "session_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Session Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response Read Living Session World Versions  Version Id  Society Control Sessions  Session Id  Get"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/versions/{version_id}/society/control/sessions/{session_id}/stop",
+    "method": "post",
+    "id": "stop_living_session_world_versions__version_id__society_control_sessions__session_id__stop_post",
+    "title": "Stop Living Session",
+    "description": "Stop a living session: pause the society and close the session, ``stopped_by_person``. A\nsession that already closed is answered as it closed.",
+    "group": "society",
+    "permission": {
+      "requires": [
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "session_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Session Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response Stop Living Session World Versions  Version Id  Society Control Sessions  Session Id  Stop Post"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/world/versions/{version_id}/society/comparisons",
     "method": "get",
     "id": "society_comparisons_world_versions__version_id__society_comparisons_get",

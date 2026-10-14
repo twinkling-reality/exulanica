@@ -715,6 +715,37 @@ def action_request(owner) -> dict[str, Any]:
     }
 
 
+def living_session(owner) -> dict[str, Any]:
+    """A living session of a purposeful society, opened over the API, with its version (API)."""
+    made = _version_with_society(owner, PURPOSEFUL, society_input)
+    version_id, state = made["version_id"], made["society"]
+    session = _ok(
+        in_world(
+            owner,
+            "POST",
+            f"/world/versions/{version_id}/society/control/sessions",
+            json={
+                "request_id": str(uuid.uuid4()),
+                "base_revision": 0,
+                "base_tick": state["current_tick"],
+                "base_state_sha256": state["state_sha256"],
+                "limits": {
+                    "wall_seconds": 60,
+                    "minutes": 1,
+                    "decisions": 1,
+                    "usd": "0.01",
+                    "calls": 1,
+                },
+            },
+        ),
+        201,
+    )
+    return {
+        "/world/versions/{version_id}": version_id,
+        "/world/versions/{version_id}/society/control/sessions/{session_id}": session["session_id"],
+    }
+
+
 def decision_request(owner) -> dict[str, Any]:
     """A stored model decision request in a social society, with its version (domain).
 
